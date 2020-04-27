@@ -35,6 +35,7 @@ import io.reactivex.observables.ConnectableObservable;
 final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable<T> implements RxInstrumentedComponent  {
     private final ConnectableObservable<T> source;
     private final InvocationInstrumenter instrumenter;
+    private boolean active;
 
     /**
      * Default constructor.
@@ -49,21 +50,33 @@ final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable
 
     @Override
     protected void subscribeActual(Observer<? super T> o) {
+        if (active) {
+            source.subscribe(o);
+            return;
+        }
         try {
+            active = true;
             instrumenter.beforeInvocation();
             source.subscribe(o);
         } finally {
             instrumenter.afterInvocation(false);
+            active = false;
         }
     }
 
     @Override
     public void connect(Consumer<? super Disposable> connection) {
+        if (active) {
+            source.connect(connection);
+            return;
+        }
         try {
+            active = true;
             instrumenter.beforeInvocation();
             source.connect(connection);
         } finally {
             instrumenter.afterInvocation(false);
+            active = false;
         }
     }
 }

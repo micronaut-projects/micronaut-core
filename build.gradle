@@ -274,8 +274,8 @@ ext {
             'junit5'               : [
                     version: junit5Version,
                     group  : 'org.junit.jupiter',
-                    name   : 'junit-jupiter-api',
-                    modules: ['junit-jupiter-engine', 'junit-jupiter-params']
+                    name   : 'junit-jupiter',
+                    modules: ['junit-jupiter-api', 'junit-jupiter-engine', 'junit-jupiter-params']
             ],
             'junitVintage'         : [
                     version: junit5Version,
@@ -586,7 +586,6 @@ ext {
                 group  : 'io.micronaut.jaxrs',
                 modules: ['micronaut-jaxrs-server', 'micronaut-jaxrs-processor']
             ],
-
     ]
 
     dependencyVersion = { String name ->

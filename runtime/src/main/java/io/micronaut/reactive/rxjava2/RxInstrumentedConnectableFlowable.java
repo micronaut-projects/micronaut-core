@@ -35,6 +35,7 @@ import org.reactivestreams.Subscriber;
 final class RxInstrumentedConnectableFlowable<T> extends ConnectableFlowable<T> implements RxInstrumentedComponent {
     private final ConnectableFlowable<T> source;
     private final InvocationInstrumenter instrumenter;
+    private boolean active;
 
     /**
      * Default constructor.
@@ -49,21 +50,33 @@ final class RxInstrumentedConnectableFlowable<T> extends ConnectableFlowable<T> 
 
     @Override
     protected void subscribeActual(Subscriber<? super T> s) {
+        if (active) {
+            source.subscribe(s);
+            return;
+        }
         try {
+            active = true;
             instrumenter.beforeInvocation();
             source.subscribe(s);
         } finally {
             instrumenter.afterInvocation(false);
+            active = false;
         }
     }
 
     @Override
     public void connect(Consumer<? super Disposable> connection) {
+        if (active) {
+            source.connect(connection);
+            return;
+        }
         try {
+            active = true;
             instrumenter.beforeInvocation();
             source.connect(connection);
         } finally {
             instrumenter.afterInvocation(false);
+            active = false;
         }
     }
 }

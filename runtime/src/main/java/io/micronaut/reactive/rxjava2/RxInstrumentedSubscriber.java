@@ -32,6 +32,7 @@ import org.reactivestreams.Subscription;
 class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent {
     private final Subscriber<T> source;
     private final InvocationInstrumenter instrumenter;
+    private boolean active;
 
     /**
      * Default constructor.
@@ -46,28 +47,32 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
 
     @Override
     public final void onSubscribe(Subscription s) {
-        if (instrumenter == null) {
+        if (instrumenter == null || active) {
             source.onSubscribe(s);
         } else {
             try {
+                active = true;
                 instrumenter.beforeInvocation();
                 source.onSubscribe(s);
             } finally {
                 instrumenter.afterInvocation(false);
+                active = false;
             }
         }
     }
 
     @Override
     public void onNext(T t) {
-        if (instrumenter == null) {
+        if (instrumenter == null || active) {
             source.onNext(t);
         } else {
             try {
+                active = true;
                 instrumenter.beforeInvocation();
                 source.onNext(t);
             } finally {
                 instrumenter.afterInvocation(false);
+                active = false;
             }
         }
     }
@@ -75,28 +80,32 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
     @SuppressWarnings("Duplicates")
     @Override
     public void onError(Throwable t) {
-        if (instrumenter == null) {
+        if (instrumenter == null || active) {
             source.onError(t);
         } else {
             try {
+                active = true;
                 instrumenter.beforeInvocation();
                 source.onError(t);
             } finally {
                 instrumenter.afterInvocation(false);
+                active = false;
             }
         }
     }
 
     @Override
     public void onComplete() {
-        if (instrumenter == null) {
+        if (instrumenter == null || active) {
             source.onComplete();
         } else {
             try {
+                active = true;
                 instrumenter.beforeInvocation();
                 source.onComplete();
             } finally {
                 instrumenter.afterInvocation(false);
+                active = false;
             }
         }
     }
