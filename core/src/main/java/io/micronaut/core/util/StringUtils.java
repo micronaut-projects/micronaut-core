@@ -260,7 +260,7 @@ public final class StringUtils {
             uri = "";
         }
         uri = baseUri + uri;
-        return uri.replaceAll("[\\/]{2,}", "/");
+        return uri.replaceAll("([^:])[//]{2,}", "$1/");
     }
 
     /**
