@@ -35,9 +35,9 @@ snippet::io.micronaut.docs.server.intro.HelloController[tags="imports,class"]
 <3> A String "Hello World" is returned as the result
 
 [%hardbreaks]
-If you are using Java, place the previous file in `src/main/java/hello/world`.
-If you are using Groovy, place the previous file in `src/main/groovy/hello/world`.
-If you are using Kotlin, place the previous file in `src/main/kotlin/hello/world`.
+If you are using Java, place the previous file in `src/main/java/micronaut/hello/world`.
+If you are using Groovy, place the previous file in `src/main/groovy/micronaut/hello/world`.
+If you are using Kotlin, place the previous file in `src/main/kotlin/micronaut/hello/world`.
 
 If you start the application and send a request to the `/hello` URI then the text "Hello World" is returned:
 
