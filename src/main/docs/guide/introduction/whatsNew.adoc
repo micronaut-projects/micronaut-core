@@ -66,6 +66,57 @@ Due to the fact that JSR-305 has been cancelled and that this dependency has pot
 
 It is recommended users of Micronaut use this API instead (although the `javax.annotation.Nullable` and `javax.annotation.NotNull` annotations continue to be supported).
 
+=== CLI Features
+
+==== New Native CLI
+
+Micronaut's `mn` command for the CLI has been rewritten in Micronaut itself and is now compiled into a native image available on Linux, MacOS X and Windows.
+
+==== Micronaut LaunchPad
+
+Create Micronaut 2.0 applications without having the CLI installed using `curl`:
+
+[source,bash]
+----
+$ curl https://launch.micronaut.io/demo.zip -o demo.zip
+$ unzip demo.zip -d demo
+----
+
+Or by visiting https://launch.micronaut.io in your browser.
+
+Run `curl https://launch.micronaut.io` for more instructions on how to use the API or visit the https://launch.micronaut.io/swagger/views/swagger-ui/index.html[OpenAPI documentation].
+
+==== Diff Command
+
+Run `mn feature-diff --features=[FEATURE NAME]` from the root of another Micronaut project to create a diff of the changes that need to be applied to enable the feature. For example:
+
+.Using `feature-diff`
+[source,bash]
+----
+$ mn feature-diff --features=azure-function
+--- micronaut-cli.yml
++++ micronaut-cli.yml
+@@ -3,4 +3,4 @@
+ testFramework: junit
+ sourceLanguage: java
+ buildTool: gradle
+-features: [app-name, application, gradle, http-client, java, junit, logback, netty-server, shade, yaml]
++features: [app-name, application, azure-function, azure-function-http, gradle, java, junit, logback, yaml]
+
+
+--- host.json
++++ host.json
+@@ -1,0 +1,7 @@
++{
++  "version": "2.0",
++  "extensionBundle": {
++    "id": "Microsoft.Azure.Functions.ExtensionBundle",
++    "version": "[1.*, 2.0.0)"
++  }
++}
+
+----
+
 === Build Improvements
 
 ==== New Maven Parent POM
@@ -175,9 +226,11 @@ Caching has been moved into a separate module and out of `micronaut-runtime`. If
 
 See the documentation for the https://micronaut-projects.github.io/micronaut-cache/2.0.x/guide/[Cache module] for more information.
 
-==== Micronaut SQL 2.0.0 Upgrade
+==== Micronaut SQL 2.1.0 Upgrade
 
 Micronaut SQL has been improved to default to Micronaut transaction management (making Spring management optional) and includes https://micronaut-projects.github.io/micronaut-sql/2.0.x/guide/#jdbi[support for Jdbi] (Thanks to https://github.com/drmaas[Dan Maas] for this contribution).
+
+In addition, support has been added for https://micronaut-projects.github.io/micronaut-sql/latest/guide/#jdbc[Oracle Universal Connection Pool]. Thanks to https://github.com/recursivecodes[Todd Sharp] for this contribution.
 
 ==== Micronaut Security 2.0.0 Upgrade
 
