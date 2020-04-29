@@ -213,6 +213,11 @@ ext {
                     group:'io.micronaut',
                     name:'micronaut-function-aws'
             ],
+            'micronaut.alexa-httpserver': [
+                    version:micronautAwsVersion,
+                    group:'io.micronaut.aws',
+                    name:'micronaut-aws-alexa-httpserver'
+            ],
             'micronaut.function.aws': [
                     version:micronautAwsVersion,
                     group:'io.micronaut.aws',
