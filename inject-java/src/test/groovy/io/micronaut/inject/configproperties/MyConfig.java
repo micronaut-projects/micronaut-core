@@ -40,11 +40,20 @@ public class MyConfig {
     Inner inner;
     protected int defaultPort = 9999;
     protected Integer anotherPort;
+    char[] charArray;
 
     private int maxSize;
     @ReadableBytes
     int anotherSize;
 
+
+    public char[] getCharArray() {
+        return charArray;
+    }
+
+    public void setCharArray(char[] charArray) {
+        this.charArray = charArray;
+    }
 
     private Map<String, Map<String, Value>> map = new HashMap<>();
 

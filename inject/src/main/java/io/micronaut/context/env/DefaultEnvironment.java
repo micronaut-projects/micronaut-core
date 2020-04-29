@@ -17,6 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.converters.StringArrayToClassArrayConverter;
+import io.micronaut.context.converters.StringToCharArray;
 import io.micronaut.context.converters.StringToClassConverter;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.ConversionContext;
@@ -214,6 +215,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         );
         conversionService.addConverter(
                 Object[].class, Class[].class, new StringArrayToClassArrayConverter(conversionService)
+        );
+        conversionService.addConverter(
+                CharSequence.class, char[].class, new StringToCharArray()
         );
         this.resourceLoader = configuration.getResourceLoader();
         this.annotationScanner = createAnnotationScanner(classLoader);

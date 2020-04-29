@@ -73,6 +73,7 @@ class ConfigurationPropertiesSpec extends Specification {
             'foo.bar.stringList':"1,2",
             'foo.bar.flags.one':'1',
             'foo.bar.flags.two':'2',
+            'foo.bar.charArray': 'test',
             'foo.bar.urlList':"http://test.com, http://test2.com",
             'foo.bar.urlList2':["http://test.com", "http://test2.com"],
             'foo.bar.url':'http://test.com']
@@ -83,6 +84,7 @@ class ConfigurationPropertiesSpec extends Specification {
         MyConfig config = applicationContext.getBean(MyConfig)
 
         expect:
+        config.charArray == "test".toCharArray()
         config.port == 8080
         config.maxSize == 1048576
         config.anotherSize == 1048576
