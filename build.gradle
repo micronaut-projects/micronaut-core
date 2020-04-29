@@ -410,6 +410,11 @@ ext {
                     name   : 'spring-core',
                     modules: ['spring-context', 'spring-tx', 'spring-orm', 'spring-jdbc']
             ],
+            springboot                 : [
+                version: springBootVersion,
+                group  : 'org.springframework.boot',
+                modules: ['spring-boot-starter', 'spring-boot-starter-web']
+            ],
             snakeyaml                  : [
                     version: yamlVersion,
                     group  : 'org.yaml',
