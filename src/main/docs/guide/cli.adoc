@@ -1,5 +1,7 @@
 The Micronaut CLI is the recommended way to create new Micronaut projects. The CLI includes commands for generating specific categories of projects, allowing you to choose between build tools, test frameworks, and even pick the language you wish to use in your application. The CLI also provides commands for generating artifacts such as controllers, client interfaces, and serverless functions.
 
+TIP: We have a website that can be used to generate projects instead of the CLI. Check out https://micronaut.io/start[Micronaut Launch] to get started!
+
 When <<buildCLI, Micronaut is installed on your computer>>, you can call the CLI with the `mn` command.
 
 [source,bash]
@@ -7,24 +9,14 @@ When <<buildCLI, Micronaut is installed on your computer>>, you can call the CLI
 $ mn create-app my-app
 ----
 
-A Micronaut CLI project can be identified by the `micronaut-cli.yml` file, which will be included at the root of the project (if it was generated via the CLI). This file will include the project's profile, default package, and other variables. The project's default package is evaluated based on the project name, for example:
+A Micronaut CLI project can be identified by the `micronaut-cli.yml` file, which will be included at the root of the project (if it was generated via the CLI). This file will include the project's profile, default package, and other variables. The project's default package is evaluated based on the project name.
 
 [source,bash]
 ----
 $ mn create-app my-demo-app
 ----
 
-Will result in the following `micronaut-cli-yml`.
-
-.micronaut-cli.yml
-[source,yaml]
-----
-profile: service
-defaultPackage: my.demo.app
----
-testFramework: junit
-sourceLanguage: java
-----
+Will result in the default package being `my.demo.app`.
 
 You can supply your own default package when creating the application by prefixing the application name with the package:
 
@@ -33,28 +25,7 @@ You can supply your own default package when creating the application by prefixi
 $ mn create-app example.my-demo-app
 ----
 
-Will result in the following `micronaut-cli-yml`.
-
-.micronaut-cli.yml
-[source,yaml]
-----
-profile: service
-defaultPackage: example
----
-testFramework: junit
-sourceLanguage: java
-----
-
-TIP: Throughout the user guide, references to CLI features/commands have been provided as applicable.
-
-== Definitions
-
-Projects created with the CLI are based on one of several *profiles*, which consist of a project template (or *skeleton*), optional features, and profile-specific commands. Commands from a profile typically are specific to the profile application type; for example, the `service` profile (designed for creation of web service applications) provides the `create-controller` and `create-client` commands.
-
-CLI commands typically accept at least one *argument*, such as the name of the project or controller to generate.
-
-CLI commands can accept optional *flags* to control their behavior. Some flags accept multiple arguments, which are separated by commas.
-
+Will result in the default package being `example`.
 
 == Interactive Mode
 
@@ -70,79 +41,39 @@ mn>
 
 == Help and Info
 
-General usage information can be viewed using the `help` command.
+General usage information can be viewed using the `help` flag on a command.
 
 [source,bash]
 ----
-mn> help create-app
-    Usage: mn create-app [-hinvVx] [-b=BUILD-TOOL] [-l=LANG] [-p=PROFILE] [-f=FEATURE[,FEATURE...]]...
-                         [NAME]
-    Creates an application
-          [NAME]               The name of the application to create.
-      -b, --build=BUILD-TOOL   Which build tool to configure. Possible values: gradle, maven.
-      -f, --features=FEATURE[,FEATURE...]
-                               The features to use
-      -h, --help               Show this help message and exit.
-      -i, --inplace            Create a service using the current directory
-      -l, --lang=LANG          Which language to use. Possible values: java, groovy, kotlin.
-...
-----
-
-For details about a specific command, supply the command name after the `help` command.
-
-[source,bash]
-----
-mn> help create-app
-| Command: create-app
-| Description:
+mn> create-app -h
+Usage: mn create-app [-hivVx] [--list-features] [-b=BUILD-TOOL] [--jdk=<javaVersion>] [-l=LANG]
+                     [-t=TEST] [-f=FEATURE[,FEATURE...]]... [NAME]
 Creates an application
-
-| Usage:
-create-app [NAME]
-...
+      [NAME]               The name of the application to create.
+  -b, --build=BUILD-TOOL   Which build tool to configure. Possible values: gradle, maven.
+  -f, --features=FEATURE[,FEATURE...]
+  -h, --help               Show this help message and exit.
+  -i, --inplace            Create a service using the current directory
+      --jdk, --java-version=<javaVersion>
+                           The JDK version the project should target
+  -l, --lang=LANG          Which language to use. Possible values: java, groovy, kotlin.
+      --list-features      Output the available features and their descriptions
+  -t, --test=TEST          Which test framework to use. Possible values: junit, spock, kotlintest.
 ----
 
-
-A list of available profiles can be viewed using the `list-profiles` command.
+A list of available features can be viewed using the `--list-features` flag on any of the create commands.
 
 [source,bash]
 ----
-mn> list-profiles
-| Available Profiles
---------------------
-  base          The base profile
-  cli           The cli profile
-  federation    The federation profile
-  function      The function profile
-  function-aws  The function profile for AWS Lambda
-  kafka         The Kafka messaging profile
-  profile       A profile for creating new Micronaut profiles
-  service       The service profile
-----
+mn> create-app --list-features
+Available Features
+(+) denotes the feature is included by default
+  Name                             Description
+  -------------------------------  ---------------
+  Cache
+  cache-caffeine                   Adds support for cache using Caffeine (https://github.com/ben-manes/caffeine)
+  cache-ehcache                    Adds support for cache using EHCache (https://www.ehcache.org/)
+  cache-hazelcast                  Adds support for cache using Hazelcast (https://hazelcast.org/)
+  cache-infinispan                 Adds support for cache using Infinispan (https://infinispan.org/)
 
-To view details on a specific profile, use the `profile-info` command, followed by the profile name.
-
-[source,bash]
-----
-mn> profile-info service
-    | Profile: service
-    --------------------
-    The service profile
-
-    | Provided Commands:
-    --------------------
-      create-bean        Creates a singleton bean
-      create-client      Creates a client interface
-      create-controller  Creates a controller and associated test
-      create-job         Creates a job with scheduled method
-      help               Prints help information for a specific command
-
-    | Provided Features:
-    --------------------
-      annotation-api    Adds Java annotation API
-      config-consul     Adds support for Distributed Configuration with Consul (https://www.consul.io)
-      discovery-consul  Adds support for Service Discovery with Consul (https://www.consul.io)
-      discovery-eureka  Adds support for Service Discovery with Eureka
-      groovy            Creates a Groovy application
-...
 ----
