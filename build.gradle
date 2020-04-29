@@ -176,6 +176,21 @@ ext {
                     name:'micronaut-runtime-groovy',
                     modules:['micronaut-function-groovy']
             ],
+            'micronaut.kotlin-runtime': [
+                    version:micronautAwsVersion,
+                    group:'io.micronaut.kotlin',
+                    name:'micronaut-kotlin-runtime'
+            ],
+            'micronaut.ktor': [
+                    version:micronautAwsVersion,
+                    group:'io.micronaut.kotlin',
+                    name:'micronaut-ktor'
+            ],
+            'micronaut.kotlin-extension-functions': [
+                    version:micronautAwsVersion,
+                    group:'io.micronaut.kotlin',
+                    name:'micronaut-kotlin-extension-functions'
+            ],
             'micronaut.aws': [
                     version:micronautAwsVersion,
                     group:'io.micronaut.configuration',
