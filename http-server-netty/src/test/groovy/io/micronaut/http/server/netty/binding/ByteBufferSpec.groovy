@@ -17,6 +17,7 @@ import io.micronaut.test.annotation.MicronautTest
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.reactivex.Flowable
+import io.reactivex.Single
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -77,6 +78,14 @@ class ByteBufferSpec extends Specification {
         new String(bytes) == 'blah'
     }
 
+    void "test read single bytes flowable"() {
+        when:
+        def bytes = rxClient.retrieve(HttpRequest.GET('/singleBytesFlowable'), byte[].class).blockingFirst()
+
+        then:
+        new String(bytes) == 'blah'
+    }
+
     @Requires(property = "spec.name", value = "ByteBufferSpec")
     @Controller
     static class ByteBufferController {
@@ -113,6 +122,15 @@ class ByteBufferSpec extends Specification {
             return HttpResponse
                     .ok(Unpooled.copiedBuffer("blah", StandardCharsets.UTF_8))
                     .contentType(MediaType.IMAGE_JPEG);
+        }
+
+        @Get(uri = "/singleBytesFlowable", produces = MediaType.IMAGE_JPEG)
+        Single<HttpResponse<Flowable<byte[]>>> singleBytesFlowable() throws IOException {
+            return Single.just(
+                    HttpResponse
+                            .ok(Flowable.just("blah".getBytes()))
+                            .contentType(MediaType.IMAGE_JPEG)
+            )
         }
     }
 

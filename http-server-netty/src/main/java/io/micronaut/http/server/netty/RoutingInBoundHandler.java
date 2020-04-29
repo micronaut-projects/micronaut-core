@@ -50,6 +50,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -131,6 +132,7 @@ import org.slf4j.LoggerFactory;
 
 import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
 import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
+
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
@@ -1014,13 +1016,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             );
             AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
             Flowable<? extends MutableHttpResponse<?>> filteredPublisher = buildResultEmitter(
-                            request,
-                            requestReference,
-                            finalRoute,
-                            executor,
-                            isErrorRoute,
-                            skipOncePerRequest
-                    );
+                    request,
+                    requestReference,
+                    finalRoute,
+                    executor,
+                    isErrorRoute,
+                    skipOncePerRequest
+            );
 
             filteredPublisher.subscribe(new ContextCompletionAwareSubscriber<MutableHttpResponse<?>>(context) {
                 @Override
@@ -1124,7 +1126,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 // streaming case
                                 Argument<?> typeArgument = finalRoute.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                                 boolean isHttp2 = request.getHttpVersion() == io.micronaut.http.HttpVersion.HTTP_2_0;
-                                if (HttpResponse.class.isAssignableFrom(typeArgument.getType())) {
+                                if (HttpResponse.class.isAssignableFrom(typeArgument.getType()) && !typeArgument.getFirstTypeVariable().map(Argument::isAsyncOrReactive).orElse(false)) {
                                     // a response stream
                                     Flowable<HttpResponse<?>> bodyFlowable = Publishers.convertPublisher(body, Flowable.class);
 
@@ -1409,7 +1411,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             }
                         }
                         outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK)
-                                                .body(suspendedBody);
+                                .body(suspendedBody);
                     } else {
                         if (body instanceof MutableHttpResponse) {
                             outgoingResponse = (MutableHttpResponse<?>) body;
@@ -1499,7 +1501,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         // if declaringType is not null, this means its a locally marked method handler
         if (declaringType != null) {
             statusRoute = router.findStatusRoute(declaringType, status, incomingRequest)
-                .orElseGet(() -> router.findStatusRoute(status, incomingRequest).orElse(null));
+                    .orElseGet(() -> router.findStatusRoute(status, incomingRequest).orElse(null));
         }
         return statusRoute;
     }
@@ -1570,7 +1572,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     @SuppressWarnings("rawtypes")
-    private @Nullable Class<?> getDeclaringType(RouteMatch<?> route) {
+    private @Nullable
+    Class<?> getDeclaringType(RouteMatch<?> route) {
         if (route instanceof MethodBasedRouteMatch) {
             return ((MethodBasedRouteMatch) route).getDeclaringType();
         }
