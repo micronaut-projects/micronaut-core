@@ -1,0 +1,22 @@
+Micronaut supports reactive and non-blocking client to connect to MySql using https://github.com/eclipse-vertx/vertx-sql-client/tree/master/vertx-mysql-client[vertx-mysql-client], allowing to handle many database connections with a single thread.
+
+== Configuring the Reactive MySQL Client
+
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `vertx-mysql-client` feature to configure the Reactive MySQL client in your project:
+----
+$ mn create-app my-app --features vertx-mysql-client
+----
+====
+
+To configure the Reactive MySQL client you should first add `vertx-mysql-client` module to your classpath:
+
+[source,groovy]
+.build.gradle
+----
+compile "io.micronaut.configuration:micronaut-vertx-mysql-client"
+----
+
+For more information see the https://micronaut-projects.github.io/micronaut-sql/latest/guide/#mysqlclient[Configuring Reactive MySQL] section of the https://github.com/micronaut-projects/micronaut-sql[Micronaut SQL libraries] project.
