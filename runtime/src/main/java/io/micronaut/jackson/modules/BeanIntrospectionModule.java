@@ -232,6 +232,9 @@ public class BeanIntrospectionModule extends SimpleModule {
                 BeanDescription beanDesc,
                 BeanDeserializerBuilder builder) {
 
+            if (builder.getValueInstantiator().getDelegateType(config) != null) {
+                return builder;
+            }
 
             final Class<?> beanClass = beanDesc.getBeanClass();
             final BeanIntrospection<Object> introspection = (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
