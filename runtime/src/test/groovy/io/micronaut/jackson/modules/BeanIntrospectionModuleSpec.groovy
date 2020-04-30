@@ -176,6 +176,33 @@ class BeanIntrospectionModuleSpec extends Specification {
         ctx.close()
     }
 
+    void "test that introspected serialization works for JsonCreator.Mode.DELEGATING"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        Edition e = objectMapper.readValue('{"book_title":"The Stand"}', Edition)
+
+        then:
+        ctx.getBean(JacksonConfiguration).beanIntrospectionModule
+        ctx.containsBean(BeanIntrospectionModule)
+        e.title == 'The Stand'
+
+        when:
+        def sw = new StringWriter()
+        objectMapper.writeValue(sw, e)
+        def result = sw.toString()
+
+        then:
+        result.contains('"title":"The Stand"')
+
+        cleanup:
+        ctx.close()
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -218,6 +245,18 @@ class BeanIntrospectionModuleSpec extends Specification {
     @Introspected
     static class Author {
         String name
+    }
+
+    @Introspected
+    static class Edition {
+
+        String title
+
+        @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+        static Edition fromBook(Book book) {
+            return new Edition(title: book.title)
+        }
+
     }
 
     //Used for @JsonView
