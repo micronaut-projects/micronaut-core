@@ -23,7 +23,7 @@ dependencies {
     compileOnly group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-secrets', version: '1.15.4'
     compileOnly group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-common', version: '1.15.4'
 
-    testImplementation "org.testcontainers:spock:1.14.0"
+    testImplementation "org.testcontainers:spock:1.14.1"
 
     testImplementation dependencyVersion("micronaut.aws"), {
         exclude module:'micronaut-http-client'
