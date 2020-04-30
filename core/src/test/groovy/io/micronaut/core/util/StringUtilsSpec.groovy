@@ -58,6 +58,25 @@ class StringUtilsSpec extends Specification {
         "a/"  | "/b/" | "a/b/"
         "/a"  | "/b/" | "/a/b/"
         "/a/" | "/b/" | "/a/b/"
+        "/"   | "/b"  | "/b"
+    }
+
+    @Unroll
+    void "test full prependUri(#base, #uri) == #expected"() {
+
+        expect:
+        StringUtils.prependUri("http://" + base, uri) == "http://" + expected
+
+        where:
+        base  | uri   | expected
+        "a"   | "b"   | "a/b"
+        "a/"  | "b"   | "a/b"
+        "a"   | "b/"  | "a/b/"
+        "a/"  | "b/"  | "a/b/"
+        "a"   | "/b"  | "a/b"
+        "a/"  | "/b"  | "a/b"
+        "a"   | "/b/" | "a/b/"
+        "a/"  | "/b/" | "a/b/"
     }
 
     @Unroll
