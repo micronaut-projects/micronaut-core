@@ -70,7 +70,7 @@ It is recommended users of Micronaut use this API instead (although the `javax.a
 
 ==== New Native CLI
 
-Micronaut's `mn` command for the CLI has been rewritten in Micronaut itself and is now compiled into a native image available on Linux, MacOS X and Windows.
+Micronaut's `mn` command for the CLI has been rewritten in Micronaut itself and is now compiled into a native image https://github.com/micronaut-projects/micronaut-starter/releases/tag/v{version}[available on Linux, MacOS X and Windows].
 
 ==== Micronaut Launch
 
