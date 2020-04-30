@@ -217,7 +217,13 @@ ext {
                     version:micronautAwsVersion,
                     group:'io.micronaut.aws',
                     name:'micronaut-function-aws-api-proxy',
-                    modules: ['micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa']
+                    modules: ['micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver']
+            ],
+            'micronaut.kotlin': [
+                    version:micronautKotlinVersion,
+                    group:'io.micronaut.kotlin',
+                    name:'micronaut-kotlin-runtime',
+                    modules: ['micronaut-ktor', 'micronaut-kotlin-extension-functions']
             ],
             'micronaut.gorm': [
                     version:micronautGroovyVersion,

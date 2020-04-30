@@ -72,7 +72,7 @@ It is recommended users of Micronaut use this API instead (although the `javax.a
 
 Micronaut's `mn` command for the CLI has been rewritten in Micronaut itself and is now compiled into a native image available on Linux, MacOS X and Windows.
 
-==== Micronaut LaunchPad
+==== Micronaut Launch
 
 Create Micronaut 2.0 applications without having the CLI installed using `curl`:
 
