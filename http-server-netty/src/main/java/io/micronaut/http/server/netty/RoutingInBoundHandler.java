@@ -1406,11 +1406,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             if (isKotlinFunctionReturnTypeUnit) {
                                 suspendedBody = Completable.complete();
                             } else {
-                                suspendedBody = Single.just(body);
+                                suspendedBody = body;
                             }
                         }
-                        outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK)
-                                .body(suspendedBody);
+                        if (suspendedBody instanceof MutableHttpResponse) {
+                            outgoingResponse = (MutableHttpResponse<?>) suspendedBody;
+                        } else {
+                            outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK)
+                                    .body(suspendedBody);
+                        }
                     } else {
                         if (body instanceof MutableHttpResponse) {
                             outgoingResponse = (MutableHttpResponse<?>) body;

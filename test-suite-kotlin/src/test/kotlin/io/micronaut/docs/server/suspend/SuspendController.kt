@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.server.suspend
 
-import io.micronaut.http.HttpStatus
+import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Status
@@ -60,5 +60,11 @@ class SuspendController {
     @Get("/count")
     suspend fun count(): Int { // <1>
         return count.incrementAndGet()
+    }
+
+    @Get("/greet")
+    suspend fun suspendingGreet(name: String, request: HttpRequest<String>): HttpResponse<out Any> {
+        val json = "{\"message\":\"hello\"}"
+        return HttpResponse.ok(json).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
     }
 }

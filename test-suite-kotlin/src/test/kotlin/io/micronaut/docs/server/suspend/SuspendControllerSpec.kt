@@ -18,7 +18,12 @@ package io.micronaut.docs.server.suspend
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpHeaders.*
+import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpRequest.GET
+import io.micronaut.http.HttpRequest.OPTIONS
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -26,7 +31,12 @@ import io.micronaut.runtime.server.EmbeddedServer
 class SuspendControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java)
+            ApplicationContext.run(EmbeddedServer::class.java, mapOf(
+                    "micronaut.server.cors.enabled" to true,
+                    "micronaut.server.cors.configurations.dev.allowedOrigins" to listOf("foo.com"),
+                    "micronaut.server.cors.configurations.dev.allowedMethods" to listOf("GET"),
+                    "micronaut.server.cors.configurations.dev.allowedHeaders" to listOf(ACCEPT, CONTENT_TYPE)
+            ))
     )
 
     val client = autoClose(
@@ -34,6 +44,33 @@ class SuspendControllerSpec: StringSpec() {
     )
 
     init {
+        "test suspend applies CORS options"() {
+            val origin = "foo.com"
+            val headers = "$CONTENT_TYPE,$ACCEPT"
+            val method = HttpMethod.GET
+            val optionsResponse = client.exchange(
+                    OPTIONS<Any>("/suspend/greet")
+                            .header(ORIGIN, origin)
+                            .header(ACCESS_CONTROL_REQUEST_METHOD, method)
+                            .header(ACCESS_CONTROL_REQUEST_HEADERS, headers)
+            ).blockingFirst()
+
+
+            optionsResponse.status shouldBe HttpStatus.OK
+            optionsResponse.header(ACCESS_CONTROL_ALLOW_ORIGIN) shouldBe origin
+            optionsResponse.header(ACCESS_CONTROL_ALLOW_METHODS) shouldBe method.toString()
+            optionsResponse.headers.getAll(ACCESS_CONTROL_ALLOW_HEADERS).joinToString(",") shouldBe headers
+
+            val response = client.exchange(
+                    GET<String>("/suspend/greet?name=Fred")
+                            .header(ORIGIN, origin)
+            ).blockingFirst()
+
+            response.status shouldBe HttpStatus.OK
+            response.header(ACCESS_CONTROL_ALLOW_ORIGIN) shouldBe origin
+
+        }
+
         "test suspend"() {
             val response = client.exchange(HttpRequest.GET<Any>("/suspend/simple"), String::class.java).blockingFirst()
             val body = response.body.get()
@@ -69,5 +106,6 @@ class SuspendControllerSpec: StringSpec() {
             body shouldBe 1
             response.status shouldBe HttpStatus.OK
         }
+
     }
 }
