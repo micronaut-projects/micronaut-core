@@ -49,6 +49,12 @@ public class CacheConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_TESTMODE = false;
 
+    /**
+     * The default coonvert value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_CONVERT = true;
+
     protected Charset charset;
 
     private Integer initialCapacity;
@@ -59,6 +65,7 @@ public class CacheConfiguration {
     private boolean recordStats = DEFAULT_RECORD_STATS;
     private boolean testMode = DEFAULT_TESTMODE;
     private final String cacheName;
+    private boolean convert = DEFAULT_CONVERT;
 
     /**
      * Creates a new cache with the given name.
@@ -205,5 +212,21 @@ public class CacheConfiguration {
      */
     public void setTestMode(boolean testMode) {
         this.testMode = testMode;
+    }
+
+    /**
+     * @return True if cache values should be converted to the required type. They will
+     * be cast to the type otherwise
+     */
+    public boolean isConvert() {
+        return convert;
+    }
+
+    /**
+     * @param convert Sets whether retrieved cache values should be converted (true), or cast (false)
+     *                to the required type. Default value ({@value #DEFAULT_CONVERT})
+     */
+    public void setConvert(boolean convert) {
+        this.convert = convert;
     }
 }

@@ -28,6 +28,7 @@ import io.micronaut.scheduling.TaskExecutors;
 import javax.annotation.Nonnull;
 import javax.cache.Cache;
 import javax.cache.CacheManager;
+import javax.inject.Inject;
 import javax.inject.Named;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -52,6 +53,26 @@ public class JCacheManager implements io.micronaut.cache.CacheManager<Cache> {
     private final CacheManager cacheManager;
     private final ConversionService<?> conversionService;
     private final ExecutorService executorService;
+    private final JCacheConfiguration cacheConfiguration;
+
+    /**
+     * Default constructor.
+     *
+     * @param cacheManager The cache manager
+     * @param executorService The executor to execute I/O operations
+     * @param conversionService The conversion service
+     */
+    @Inject
+    protected JCacheManager(
+            @Nonnull CacheManager cacheManager,
+            @Nonnull @Named(TaskExecutors.IO) ExecutorService executorService,
+            @Nonnull ConversionService<?> conversionService,
+            @Nonnull JCacheConfiguration cacheConfiguration) {
+        this.cacheManager = cacheManager;
+        this.conversionService = conversionService;
+        this.executorService = executorService;
+        this.cacheConfiguration = cacheConfiguration;
+    }
 
     /**
      * Default constructor.
@@ -67,6 +88,7 @@ public class JCacheManager implements io.micronaut.cache.CacheManager<Cache> {
         this.cacheManager = cacheManager;
         this.conversionService = conversionService;
         this.executorService = executorService;
+        this.cacheConfiguration = new JCacheConfiguration();
     }
 
     @Override
@@ -82,7 +104,7 @@ public class JCacheManager implements io.micronaut.cache.CacheManager<Cache> {
         if (cache == null) {
             throw new ConfigurationException("No cache configured for name: " + name);
         }
-        return new JCacheSyncCache(cache, conversionService, executorService);
+        return new JCacheSyncCache(cache, cacheConfiguration.isConvert() ? conversionService : null, executorService);
     }
 
     /**

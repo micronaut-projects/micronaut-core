@@ -59,4 +59,9 @@ public @interface CacheConfig {
      * @return The default bean type of the key generator
      */
     Class<? extends CacheKeyGenerator> keyGenerator() default DefaultCacheKeyGenerator.class;
+
+    /**
+     * @return True if values returned from the cache should be converted to the method return type.
+     */
+    boolean convert() default true;
 }
