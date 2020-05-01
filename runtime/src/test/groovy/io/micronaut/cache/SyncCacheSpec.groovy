@@ -27,6 +27,7 @@ import io.micronaut.cache.annotation.InvalidateOperations
 import io.micronaut.cache.annotation.PutOperations
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
+import org.codehaus.groovy.runtime.typehandling.GroovyCastException
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -281,6 +282,36 @@ class SyncCacheSpec extends Specification {
 
         cleanup:
         applicationContext.stop()
+    }
+
+    void "test convert false"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'micronaut.caches.test.initialCapacity': 1,
+                'micronaut.caches.test.maximumSize': 3,
+                'micronaut.caches.test.convert': false,
+        )
+        CacheManager cacheManager = applicationContext.getBean(CacheManager)
+        SyncCache cache = cacheManager.getCache("test")
+        cache.put("value", "1")
+
+        when:
+        Optional<Integer> value = cache.get("value", Integer.class)
+
+        then:
+        value.get() instanceof String
+
+        when:
+        Integer suppliedValue = cache.get("value", Integer.class, { "hello" })
+
+        then:
+        suppliedValue == 49 // ?? (Integer)"1" returns 49.. gotta love Groovy
+
+        when:
+        Integer suppliedValueFromSupplier = cache.get("not.exists", Integer.class, { "hello" })
+
+        then:
+        thrown(GroovyCastException)
     }
 
     @Singleton
