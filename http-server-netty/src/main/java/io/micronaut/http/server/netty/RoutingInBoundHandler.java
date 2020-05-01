@@ -34,7 +34,6 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.*;
-import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -114,7 +113,6 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -127,7 +125,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
-import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
@@ -330,26 +327,27 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             MediaType defaultResponseMediaType = errorRoute.getProduces().stream().findFirst().orElse(MediaType.APPLICATION_JSON_TYPE);
             try {
                 final MethodBasedRouteMatch<?, ?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
-                Class<?> javaReturnType = errorRoute.getReturnType().getType();
-                boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
-                boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
-                boolean isKotlinSuspendingFunction = methodBasedRoute.getExecutableMethod().isSuspend();
-                boolean isKotlinFunctionReturnTypeUnit = isKotlinSuspendingFunction &&
-                        isKotlinFunctionReturnTypeUnit(methodBasedRoute.getExecutableMethod());
-                Flowable resultFlowable = Flowable.defer(() -> {
-                      Object result = methodBasedRoute.execute();
-                      MutableHttpResponse<?> response = errorResultToResponse(result, methodBasedRoute);
-                      response.setAttribute(HttpAttributes.ROUTE_MATCH, methodBasedRoute);
-                      return Flowable.just(response);
-                });
+                ReactiveMetadata reactiveMetadata = new ReactiveMetadata(methodBasedRoute);
+
+                Flowable<MutableHttpResponse<?>> resultFlowable = buildErrorResultEmitter(
+                        ctx,
+                        methodBasedRoute,
+                        new AtomicReference<HttpRequest<?>>(nettyHttpRequest),
+                        reactiveMetadata.isReactiveReturnType(),
+                        reactiveMetadata.isKotlinSuspendingFunction(),
+                        reactiveMetadata.isKotlinFunctionReturnTypeUnit(),
+                        reactiveMetadata.isSingle())
+                        .doOnNext((MutableHttpResponse<?> response) -> {
+                            response.setAttribute(HttpAttributes.ROUTE_MATCH, methodBasedRoute);
+                        });
 
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                         methodBasedRoute.getDeclaringType(),
                         methodBasedRoute.getReturnType(),
-                        isReactiveReturnType,
-                        isKotlinSuspendingFunction,
-                        isKotlinFunctionReturnTypeUnit,
+                        reactiveMetadata.isReactiveReturnType(),
+                        reactiveMetadata.isKotlinSuspendingFunction(),
+                        reactiveMetadata.isKotlinFunctionReturnTypeUnit(),
                         methodBasedRoute.getAnnotationMetadata(),
                         requestReference,
                         resultFlowable);
@@ -677,7 +675,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 .link(Link.SELF, Link.of(uri));
     }
 
-    private MutableHttpResponse errorResultToResponse(Object result, @Nullable RouteMatch routeMatch) {
+    private MutableHttpResponse<?> errorResultToResponse(Object result, @Nullable RouteMatch<?> routeMatch) {
         MutableHttpResponse<?> response;
         if (result instanceof HttpResponse) {
             response = ConversionService.SHARED.convert(result, NettyMutableHttpResponse.class)
@@ -1013,29 +1011,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Class<?> javaReturnType = genericReturnType.getType();
 
             AtomicReference<io.micronaut.http.HttpRequest<?>> requestReference = new AtomicReference<>(request);
-            boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
-            boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
-            boolean isKotlinSuspendingFunction =
-                    finalRoute instanceof MethodBasedRouteMatch &&
-                    ((MethodBasedRouteMatch) finalRoute).getExecutableMethod().isSuspend();
-            boolean isKotlinFunctionReturnTypeUnit = isKotlinSuspendingFunction &&
-                    isKotlinFunctionReturnTypeUnit(((MethodBasedRouteMatch) finalRoute).getExecutableMethod());
-            boolean isSingle =
-                    isReactiveReturnType && Publishers.isSingle(javaReturnType) ||
-                            isResponsePublisher(genericReturnType, javaReturnType) ||
-                                isFuture ||
-                                    finalRoute.getAnnotationMetadata().booleanValue(Produces.class, "single").orElse(false) ||
-                                        isKotlinSuspendingFunction;
+            ReactiveMetadata reactiveMetadata = new ReactiveMetadata(finalRoute);
 
             // build the result emitter. This result emitter emits the response from a controller action
             Flowable<?> resultEmitter = buildResultEmitter(
                     context,
                     finalRoute,
                     requestReference,
-                    isReactiveReturnType,
-                    isKotlinSuspendingFunction,
-                    isKotlinFunctionReturnTypeUnit,
-                    isSingle
+                    reactiveMetadata.isReactiveReturnType(),
+                    reactiveMetadata.isKotlinSuspendingFunction(),
+                    reactiveMetadata.isKotlinFunctionReturnTypeUnit(),
+                    reactiveMetadata.isSingle()
             );
 
             // here we transform the result of the controller action into a MutableHttpResponse
@@ -1093,9 +1079,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             routePublisher = buildRoutePublisher(
                     finalRoute.getDeclaringType(),
                     genericReturnType,
-                    isReactiveReturnType,
-                    isKotlinSuspendingFunction,
-                    isKotlinFunctionReturnTypeUnit,
+                    reactiveMetadata.isReactiveReturnType(),
+                    reactiveMetadata.isKotlinSuspendingFunction(),
+                    reactiveMetadata.isKotlinFunctionReturnTypeUnit(),
                     finalRoute.getAnnotationMetadata(),
                     requestReference,
                     routePublisher
@@ -1109,7 +1095,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     false
             );
 
-            boolean isStreaming = isReactiveReturnType && !isSingle;
+            boolean isStreaming = reactiveMetadata.isReactiveReturnType() && !reactiveMetadata.isSingle();
 
             Optional<Class<?>> javaPayloadType = genericReturnType.getFirstTypeVariable().map(Argument::getType);
 
@@ -1495,6 +1481,82 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     } else {
                         emitter.onNext(result);
                     }
+                    emitter.onComplete();
+                }
+
+                // should be no back pressure
+            }, BackpressureStrategy.ERROR);
+        }
+        return resultEmitter;
+    }
+
+    // builds the result emitter for a given route action
+    private Flowable<MutableHttpResponse<?>> buildErrorResultEmitter(
+            ChannelHandlerContext context,
+            RouteMatch<?> finalRoute,
+            AtomicReference<HttpRequest<?>> requestReference,
+            boolean isReactiveReturnType,
+            boolean isKotlinSuspendingFunction,
+            boolean isKotlinFunctionReturnTypeUnit,
+            boolean isSingleResult) {
+        Flowable<MutableHttpResponse<?>> resultEmitter;
+        if (isReactiveReturnType || isKotlinSuspendingFunction) {
+            // if the return type is reactive, execute the action and obtain the Observable
+            try {
+                if (isSingleResult) {
+                    // for a single result we are fine as is
+                    resultEmitter = Flowable.defer(() -> {
+                        if (isKotlinSuspendingFunction) {
+                            return executeKotlinSuspendingFunction(isKotlinFunctionReturnTypeUnit, finalRoute, requestReference.get());
+                        } else {
+                            Object result = finalRoute.execute();
+                            return Publishers.convertPublisher(result, Publisher.class);
+                        }
+                    }).map(obj -> errorResultToResponse(obj, finalRoute));
+                } else {
+                    // for a streaming response we wrap the result on an HttpResponse so that a single result is received
+                    // then the result can be streamed chunk by chunk
+                    resultEmitter = Flowable.create((emitter) -> {
+                        Object result = finalRoute.execute();
+                        MutableHttpResponse<?> chunkedResponse = errorResultToResponse(result, finalRoute);
+                        chunkedResponse.getHeaders().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                        emitter.onNext(chunkedResponse);
+                        emitter.onComplete();
+                        // should be no back pressure
+                    }, BackpressureStrategy.ERROR);
+                }
+            } catch (Throwable e) {
+                resultEmitter = Flowable.error(new InternalServerException("Error executing route [" + finalRoute + "]: " + e.getMessage(), e));
+            }
+        } else {
+            // for non-reactive results we build flowable that executes the
+            // route
+            resultEmitter = Flowable.create((emitter) -> {
+                Object result;
+                try {
+                    result = finalRoute.execute();
+                } catch (Throwable e) {
+                    emitter.onError(e);
+                    return;
+                }
+
+                if (result instanceof Optional) {
+                    result = ((Optional<?>) result).orElse(null);
+                }
+
+                if (result == null) {
+                    // empty flowable
+                    emitter.onComplete();
+                } else {
+                    // emit the result
+                    if (result instanceof Writable) {
+                        ByteBuf byteBuf = context.alloc().ioBuffer(128);
+                        ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
+                        Writable writable = (Writable) result;
+                        writable.writeTo(outputStream, requestReference.get().getCharacterEncoding());
+                        result = byteBuf;
+                    }
+                    emitter.onNext(errorResultToResponse(result, finalRoute));
                     emitter.onComplete();
                 }
 
