@@ -61,6 +61,7 @@ public class JCacheManager implements io.micronaut.cache.CacheManager<Cache> {
      * @param cacheManager The cache manager
      * @param executorService The executor to execute I/O operations
      * @param conversionService The conversion service
+     * @param cacheConfiguration The cache configuration
      */
     @Inject
     protected JCacheManager(

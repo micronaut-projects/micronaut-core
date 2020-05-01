@@ -47,6 +47,9 @@ public abstract class AbstractMapBasedSyncCache<C extends Map<Object, Object>> i
         this.nativeCache = nativeCache;
     }
 
+    /**
+     * @param nativeCache the native cache
+     */
     public AbstractMapBasedSyncCache(C nativeCache) {
         this.conversionService = null;
         this.nativeCache = nativeCache;
