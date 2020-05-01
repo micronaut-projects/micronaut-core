@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import groovy.lang.GroovyClassLoader;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -22,6 +23,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -91,7 +93,19 @@ public class GroovyVisitorContext implements VisitorContext {
         if (name == null || compilationUnit == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(compilationUnit.getClassNode(name))
+
+        ClassNode classNode = Optional.ofNullable(compilationUnit.getClassNode(name))
+                .orElseGet(() -> {
+                    if (sourceUnit != null) {
+                        GroovyClassLoader classLoader = sourceUnit.getClassLoader();
+                        if (classLoader != null) {
+                            return ClassUtils.forName(name, classLoader).map(ClassHelper::make).orElse(null);
+                        }
+                    }
+                    return null;
+                });
+
+        return Optional.ofNullable(classNode)
                 .map(cn -> new GroovyClassElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)));
     }
 
