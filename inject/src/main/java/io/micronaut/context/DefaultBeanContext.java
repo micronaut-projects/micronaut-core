@@ -1810,9 +1810,7 @@ public class DefaultBeanContext implements BeanContext {
             parallelBeans.forEach(beanDefinitionReference -> {
                 try {
                     if (isRunning()) {
-                        synchronized (singletonObjects) {
-                            loadContextScopeBean(beanDefinitionReference, parallelDefinitions::add);
-                        }
+                        loadContextScopeBean(beanDefinitionReference, parallelDefinitions::add);
                     }
                 } catch (Throwable e) {
                     LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + "] could not be loaded: " + e.getMessage(), e);
@@ -1829,9 +1827,7 @@ public class DefaultBeanContext implements BeanContext {
             parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
                 try {
                     if (isRunning()) {
-                        synchronized (singletonObjects) {
-                            loadContextScopeBean(beanDefinition);
-                        }
+                        loadContextScopeBean(beanDefinition);
                     }
                 } catch (Throwable e) {
                     LOG.error("Parallel Bean definition [" + beanDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
@@ -1991,7 +1987,7 @@ public class DefaultBeanContext implements BeanContext {
 
         } else {
             try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
-                createAndRegisterSingletonInternal(resolutionContext, beanDefinition, beanDefinition.getBeanType(), null);
+                createAndRegisterSingleton(resolutionContext, beanDefinition, beanDefinition.getBeanType(), null);
             }
         }
     }
