@@ -37,7 +37,7 @@ jobs:
       env:
           BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
           BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
-        run: ./gradlew publish docs --no-daemon
+      run: ./gradlew publish docs --no-daemon
 #      - name: Publish to Github Pages
 #        if: success() && github.event_name == 'push' && matrix.java == '8' && github.ref == 'refs/heads/1.3.x'
 #        uses: micronaut-projects/micronaut-docs-deploy@master
