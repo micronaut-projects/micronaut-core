@@ -224,7 +224,7 @@ class RxHttpPostSpec extends Specification {
         )
 
         when:
-        Person person = flowable.blockingFirst()
+        flowable.blockingFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)

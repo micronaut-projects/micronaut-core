@@ -16,9 +16,8 @@
 package io.micronaut.docs.server.suspend
 
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Status
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.*
 import kotlinx.coroutines.delay
 
 @Controller("/suspend")
@@ -53,4 +52,16 @@ class SuspendController {
         delay(1)
     }
     // end::suspendStatusDelayed[]
+
+    @Get("/illegal")
+    suspend fun illegal(): Unit {
+        throw IllegalArgumentException()
+    }
+
+    @Status(HttpStatus.BAD_REQUEST)
+    @Error(exception = IllegalArgumentException::class)
+    @Produces(MediaType.TEXT_PLAIN)
+    suspend fun onIllegalArgument(e: IllegalArgumentException): String {
+        return "illegal.argument"
+    }
 }
