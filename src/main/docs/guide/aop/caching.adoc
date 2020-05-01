@@ -52,6 +52,22 @@ For use cases where caches cannot be configured ahead of time, a api:cache.Dynam
 
 By default, if there is no other dynamic cache manager defined in the application, Micronaut registers an instance of api:cache.DefaultDynamicCacheManager[] that will create Caffeine caches with default values.
 
+== Cache Value Conversion
+
+By default, Micronaut will convert values returned from a cache to the requested type. This can have undesirable consequences in certain circumstances. To disable this behavior, set the `convert` configuration to false for the given cache.
+
+.No Conversion Example
+[source,yaml]
+----
+micronaut:
+    caches:
+        my-cache:
+            convert: false
+
+# Or if you are using the JCache manager
+micronaut.jcache.convert: false
+----
+
 == Other Cache Implementations
 
 Check the https://micronaut-projects.github.io/micronaut-cache/latest/guide/index.html[Micronaut Cache] project for more
