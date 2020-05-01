@@ -20,6 +20,9 @@ import io.micronaut.core.convert.TypeConverter;
 
 import java.util.Optional;
 
+/**
+ *  Converts a String to a char[]
+ */
 public class StringToCharArray implements TypeConverter<CharSequence, char[]> {
     @Override
     public Optional<char[]> convert(CharSequence object, Class<char[]> targetType, ConversionContext context) {
