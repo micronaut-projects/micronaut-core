@@ -212,9 +212,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     @SuppressWarnings("MagicNumber")
     public @NonNull ApplicationContext build() {
-        DefaultApplicationContext applicationContext = new DefaultApplicationContext(
-            this
-        );
+        ApplicationContext applicationContext = newApplicationContext();
         Environment environment = applicationContext.getEnvironment();
         if (!packages.isEmpty()) {
             for (String aPackage : packages) {
@@ -248,6 +246,18 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         }
 
         return applicationContext;
+    }
+
+    /**
+     * Creates the {@link ApplicationContext} instance.
+     * @return The application context
+     * @since 2.0
+     */
+    @NonNull
+    protected ApplicationContext newApplicationContext() {
+        return new DefaultApplicationContext(
+            this
+        );
     }
 
     /**
