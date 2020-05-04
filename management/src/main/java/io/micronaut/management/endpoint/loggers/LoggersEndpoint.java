@@ -52,7 +52,7 @@ public class LoggersEndpoint {
     /**
      * Endpoint default enabled.
      */
-    public static final boolean DEFAULT_ENABLED = true;
+    public static final boolean DEFAULT_ENABLED = false;
 
     /**
      * Endpoint default sensitivity.

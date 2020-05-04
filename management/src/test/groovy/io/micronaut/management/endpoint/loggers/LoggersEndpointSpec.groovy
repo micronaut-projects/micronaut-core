@@ -16,6 +16,7 @@
 package io.micronaut.management.endpoint.loggers
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -57,7 +58,7 @@ class LoggersEndpointSpec extends Specification {
     static final expectedBuiltinLoggers = ['io.micronaut', 'io.netty']
 
     void setup() {
-        server = ApplicationContext.run(EmbeddedServer)
+        server = ApplicationContext.run(EmbeddedServer, ['endpoints.loggers.enabled': true], Environment.TEST)
         client = server.applicationContext.createBean(RxHttpClient, server.URL)
     }
 
@@ -66,8 +67,26 @@ class LoggersEndpointSpec extends Specification {
         server.close()
     }
 
+    void "test the endpoint is disabled by default"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, Environment.TEST)
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        rxClient.exchange("/logger").blockingFirst()
+
+        then:
+        HttpClientResponseException ex = thrown()
+        ex.response.code() == HttpStatus.NOT_FOUND.code
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
+    }
+
     void 'test that available log levels are returned from the endpoint'() {
         when:
+
         def response = client.exchange(GET('/loggers'), Map).blockingFirst()
 
         then:

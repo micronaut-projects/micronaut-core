@@ -2,8 +2,11 @@
 The loggers endpoint returns information about the available loggers in the application and
 permits configuring the their log level.
 
+NOTE: By default, the loggers endpoint is disabled and needs to be explicitly enabled to be used.
+
 To get a collection of all loggers by name with their configured and effective log levels,
 send a GET request to /loggers. This will also provide a list of the available log levels.
+
 
 [source,bash]
 ----
