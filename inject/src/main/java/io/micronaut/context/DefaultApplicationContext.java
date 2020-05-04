@@ -137,7 +137,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param configuration The application context configuration
      * @return The environment instance
      */
-    protected @NonNull DefaultEnvironment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
+    protected @NonNull Environment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
         return new RuntimeConfiguredEnvironment(configuration);
     }
 
