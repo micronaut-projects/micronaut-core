@@ -121,7 +121,7 @@ micronaut:
 
 ----
 
-You can lon longer inject an HTTP client with `@Named("foo")`:
+You can no longer inject an HTTP client with `@Named("foo")`:
 
 [source,java]
 ----
