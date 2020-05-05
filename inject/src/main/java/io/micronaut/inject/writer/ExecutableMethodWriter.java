@@ -70,6 +70,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private final boolean isInterface;
     private final boolean isAbstract;
     private final boolean isSuspend;
+    private final boolean isDefault;
     private String outerClassName = null;
     private boolean isStatic = false;
 
@@ -78,6 +79,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param methodClassName      The method class name
      * @param methodProxyShortName The method proxy short name
      * @param isInterface          Whether is an interface
+     * @param isDefault            Whether the method is a default method
      * @param isSuspend            Whether the method is Kotlin suspend function
      * @param annotationMetadata   The annotation metadata
      */
@@ -86,6 +88,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             String methodClassName,
             String methodProxyShortName,
             boolean isInterface,
+            boolean isDefault,
             boolean isSuspend,
             AnnotationMetadata annotationMetadata) {
         super(methodClassName, annotationMetadata, true);
@@ -96,7 +99,8 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         this.internalName = getInternalName(methodClassName);
         this.methodType = getObjectType(methodClassName);
         this.isInterface = isInterface;
-        this.isAbstract = isInterface;
+        this.isAbstract = !isInterface || !isDefault;
+        this.isDefault = isDefault;
         this.isSuspend = isSuspend;
     }
 
@@ -107,6 +111,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param methodProxyShortName The method proxy short name
      * @param isInterface          Whether is an interface
      * @param isAbstract           Whether the method is abstract
+     * @param isDefault            Whether the method is a default method
      * @param isSuspend            Whether the method is Kotlin suspend function
      * @param annotationMetadata   The annotation metadata
      */
@@ -116,6 +121,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             String methodProxyShortName,
             boolean isInterface,
             boolean isAbstract,
+            boolean isDefault,
             boolean isSuspend,
             AnnotationMetadata annotationMetadata) {
         super(methodClassName, annotationMetadata, true);
@@ -126,7 +132,8 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         this.internalName = getInternalName(methodClassName);
         this.methodType = getObjectType(methodClassName);
         this.isInterface = isInterface;
-        this.isAbstract = isInterface || isAbstract;
+        this.isAbstract = isAbstract;
+        this.isDefault = isDefault;
         this.isSuspend = isSuspend;
     }
 
@@ -135,6 +142,21 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      */
     public boolean isAbstract() {
         return isAbstract;
+    }
+
+    /**
+     * @return Is the method in an interface.
+     */
+    public boolean isInterface() {
+        return isInterface;
+    }
+
+
+    /**
+     * @return Is the method a default method.
+     */
+    public boolean isDefault() {
+        return isDefault;
     }
 
     /**
