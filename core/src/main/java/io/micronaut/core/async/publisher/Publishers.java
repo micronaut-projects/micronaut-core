@@ -87,10 +87,45 @@ public class Publishers {
     }
 
     /**
+     * Registers an additional reactive type. Should be called during application static initialization.
+     * @param type The type
+     * @since 2.0
+     */
+    public static void registerReactiveType(Class<?> type) {
+        if (type != null) {
+            REACTIVE_TYPES.add(type);
+        }
+    }
+
+    /**
+     * Registers an additional reactive single type. Should be called during application static initialization.
+     * @param type The type
+     * @since 2.0
+     */
+    public static void registerReactiveSingle(Class<?> type) {
+        if (type != null) {
+            registerReactiveType(type);
+            SINGLE_TYPES.add(type);
+        }
+    }
+
+    /**
+     * Registers an additional reactive completable type. Should be called during application static initialization.
+     * @param type The type
+     * @since 2.0
+     */
+    public static void registerReactiveCompletable(Class<?> type) {
+        if (type != null) {
+            registerReactiveType(type);
+            COMPLETABLE_TYPES.add(type);
+        }
+    }
+
+    /**
      * @return A list of known reactive types.
      */
     public static List<Class<?>> getKnownReactiveTypes() {
-        return Collections.unmodifiableList(REACTIVE_TYPES);
+        return Collections.unmodifiableList(new ArrayList<>(REACTIVE_TYPES));
     }
 
     /**
