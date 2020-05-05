@@ -36,6 +36,7 @@ import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
+import io.reactivex.Single
 import org.reactivestreams.Publisher
 import spock.lang.Specification
 
@@ -83,6 +84,15 @@ class HttpFilterSpec extends Specification {
         !response.headers.contains("X-Matched-Filter")
     }
 
+    void "test a filter on a reactive url"() {
+        when:
+        HttpResponse response = rxClient.exchange("/reactive").blockingFirst()
+
+        then:
+        response.status == HttpStatus.OK
+        response.headers.get("X-Root-Filter") == "processed"
+        !response.headers.contains("X-Matched-Filter")
+    }
 
     void "test a filter on matched with filter matcher URI"() {
         when:
@@ -101,7 +111,7 @@ class HttpFilterSpec extends Specification {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Flowable.fromPublisher(chain.proceed(request)).doOnNext({ response ->
-                if (request.getParameters().contains("username")) {
+                if (response.status.code < 300) {
                     assert response.getAttribute(HttpAttributes.ROUTE_MATCH,
                             AnnotationMetadata.class).isPresent()
                 }
@@ -131,6 +141,11 @@ class HttpFilterSpec extends Specification {
         @Get
         HttpResponse root() {
             HttpResponse.ok()
+        }
+
+        @Get("/reactive")
+        Single<HttpResponse> reactive() {
+            Single.just(HttpResponse.ok())
         }
 
         @Get("/matched")

@@ -1353,13 +1353,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     singleResponse = forStatus(routeMatch.getAnnotationMetadata(), HttpStatus.OK)
                                             .header(HttpHeaders.CONTENT_LENGTH, HttpHeaderValues.ZERO);
                                 } else {
-                                    return newNotFoundError(request);
+                                    singleResponse = newNotFoundError(request);
                                 }
                             } else {
                                 if (o instanceof MutableHttpResponse) {
-                                    return (MutableHttpResponse<?>) o;
+                                    singleResponse = (MutableHttpResponse<?>) o;
                                 } else {
-                                    return forStatus(routeMatch.getAnnotationMetadata(), isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK)
+                                    singleResponse = forStatus(routeMatch.getAnnotationMetadata(), isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK)
                                             .body(o);
                                 }
                             }
