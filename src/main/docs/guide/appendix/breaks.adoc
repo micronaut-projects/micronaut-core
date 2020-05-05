@@ -238,3 +238,22 @@ my.message=We love Micronaut''s documentation
 ----
 
 NOTE: This change also applies to messages in custom constraint annotations, which interpolate the message via the message source api.
+
+=== LoggersEndpoint is disabled by default
+In Micronaut 1.x, the LoggersEndpoint ( /logger ) management endpoint was enabled by default. This allowed unauthenticated modification of the services logging.
+This was also inconsistent with other management endpoints that allowed modification of the internal state, such as ServerStopEndpoint ( /stop ) which allows users to shutdown the service. Which was disabled by default.
+
+In Microanut 2.x, the LoggersEndpoint ( /logger ) is disabled by default. To enable the logger endpoint  following properties must be set.
+[source,yaml]
+-----
+endpoints.loggers.enabled
+endpoints:
+    loggers:
+        enabled: true
+        sensitive: false
+
+ ----
+
+
+
+

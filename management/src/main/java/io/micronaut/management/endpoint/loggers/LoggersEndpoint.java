@@ -57,7 +57,7 @@ public class LoggersEndpoint {
     /**
      * Endpoint default sensitivity.
      */
-    public static final boolean DEFAULT_SENSITIVE = false;
+    public static final boolean DEFAULT_SENSITIVE = true;
 
     private final LoggingSystem loggingSystem;
     private final LoggersManager<Map<String, Object>> loggersManager;
