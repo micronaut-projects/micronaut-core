@@ -2358,17 +2358,19 @@ public class DefaultBeanContext implements BeanContext {
                     synchronized (singletonObjects) {
                         bean = (T) reg.bean;
                         registerSingletonBean(reg.beanDefinition, beanType, bean, qualifier, true);
+                        break;
                     }
                 }
             } else if (key.qualifier == null) {
                 BeanRegistration registration = entry.getValue();
                 Object existing = registration.bean;
                 if (beanType.isInstance(existing)) {
-                    Optional<BeanDefinition> candidate = qualifier.reduce(beanType, Stream.of(registration.beanDefinition)).findFirst();
+                    Optional<BeanDefinition> candidate = qualifier.qualify(beanType, Stream.of(registration.beanDefinition));
                     if (candidate.isPresent()) {
                         synchronized (singletonObjects) {
                             bean = (T) existing;
                             registerSingletonBean(candidate.get(), beanType, bean, qualifier, true);
+                            break;
                         }
                     }
                 }
