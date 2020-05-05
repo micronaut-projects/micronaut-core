@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.DeserializationConfig
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.fasterxml.jackson.databind.node.LongNode
@@ -248,6 +249,277 @@ class JacksonProcessorSpec extends Specification {
         foo.bd1.toPlainString() == dec.toPlainString()
         foo.bd2.toPlainString() != dec.toPlainString()
         foo.bd2.toPlainString() == "888.77945381695534"
+    }
+
+    void "test big integer"() {
+
+        given:
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        BigInteger bInt = new BigInteger("9223372036854775807")
+        BigI bigI = new BigI(bi1: bInt, bi2: bInt)
+
+        when:
+        def string = objectMapper.writeValueAsString(bigI)
+        byte[] bytes = objectMapper.writeValueAsBytes(bigI)
+        boolean complete = false
+        JsonNode node = null
+        Throwable error = null
+        int nodeCount = 0
+        processor.subscribe(new Subscriber<JsonNode>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE)
+            }
+
+            @Override
+            void onNext(JsonNode jsonNode) {
+                nodeCount++
+                node = jsonNode
+            }
+
+            @Override
+            void onError(Throwable t) {
+                error = t
+            }
+
+            @Override
+            void onComplete() {
+                complete = true
+            }
+        })
+        processor.onSubscribe(new Subscription() {
+            @Override
+            void request(long n) {
+
+            }
+
+            @Override
+            void cancel() {
+
+            }
+        })
+        processor.onNext(bytes)
+        processor.onComplete()
+
+        then:
+        complete
+        node != null
+        error == null
+        nodeCount == 1
+        string == '{"bi1":"9223372036854775807","bi2":9223372036854775807}'
+
+        when:
+        BigI fooI = objectMapper.treeToValue(node, BigI)
+        NumsOSN fooOSN = objectMapper.treeToValue(node, NumsOSN)
+        NumsOSBI fooOSBI = objectMapper.treeToValue(node, NumsOSBI)
+        NumsN fooN = objectMapper.treeToValue(node, NumsN)
+
+        then:
+        fooI != null
+        fooI.bi1 == bInt
+        fooI.bi2 == bInt
+        fooOSN != null
+        fooOSN.bi1 == bInt
+        fooOSN.bi2 == bInt
+        fooOSN.bi1.class == Long
+        fooOSN.bi2.class == Long
+        fooOSBI != null
+        fooOSBI.bi1 == bInt
+        fooOSBI.bi2 == bInt
+        fooOSBI.bi1.class == BigInteger
+        fooOSBI.bi2.class == Long
+        fooN != null
+        fooN.bi1 == bInt
+        fooN.bi2 == bInt
+        fooN.bi1.class == Long
+        fooN.bi2.class == Long
+    }
+
+    void "test big integer - USE_BIG_INTEGER_FOR_INTS"() {
+
+        given:
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
+        DeserializationConfig cfg = objectMapper.getDeserializationConfig()
+        JacksonProcessor processor = new JacksonProcessor(cfg.with(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS))
+        JacksonProcessor processor2 = new JacksonProcessor(cfg.with(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS))
+        BigInteger bInt = new BigInteger("9223372036854775807")
+        BigI bigI = new BigI(bi1: bInt, bi2: bInt)
+
+        when:
+        def string = objectMapper.writeValueAsString(bigI)
+        byte[] bytes = objectMapper.writeValueAsBytes(bigI)
+        boolean complete = false
+        JsonNode node = null
+        Throwable error = null
+        int nodeCount = 0
+        processor.subscribe(new Subscriber<JsonNode>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE)
+            }
+
+            @Override
+            void onNext(JsonNode jsonNode) {
+                nodeCount++
+                node = jsonNode
+            }
+
+            @Override
+            void onError(Throwable t) {
+                error = t
+            }
+
+            @Override
+            void onComplete() {
+                complete = true
+            }
+        })
+        processor.onSubscribe(new Subscription() {
+            @Override
+            void request(long n) {
+
+            }
+
+            @Override
+            void cancel() {
+
+            }
+        })
+        processor.onNext(bytes)
+        processor.onComplete()
+
+        then:
+        complete
+        node != null
+        error == null
+        nodeCount == 1
+        string == '{"bi1":"9223372036854775807","bi2":9223372036854775807}'
+
+        when:
+        BigI fooI = objectMapper.treeToValue(node, BigI)
+        NumsO numsO = objectMapper.treeToValue(node, NumsO)
+        NumsOSN numsOSN = objectMapper.treeToValue(node, NumsOSN)
+        NumsOSBI numsOSBI = objectMapper.treeToValue(node, NumsOSBI)
+        NumsN numsN = objectMapper.treeToValue(node, NumsN)
+
+        then:
+        fooI != null
+        fooI.bi1 == bInt
+        fooI.bi2 == bInt
+        numsO != null
+        numsO.bi1 == "9223372036854775807"
+        numsO.bi2 == bInt
+        numsO.bi1.class == String
+        numsO.bi2.class == BigInteger
+        numsOSN != null
+        numsOSN.bi1 == bInt
+        numsOSN.bi2 == bInt
+        numsOSN.bi1.class == Long
+        numsOSN.bi2.class == BigInteger
+        numsOSBI != null
+        numsOSBI.bi1 == bInt
+        numsOSBI.bi2 == bInt
+        numsOSBI.bi1.class == BigInteger
+        numsOSBI.bi2.class == BigInteger
+        numsN != null
+        numsN.bi1 == bInt
+        numsN.bi2 == bInt
+        numsN.bi1.class == Long
+        numsN.bi2.class == BigInteger
+
+    }
+
+    void "test big integer without string - USE_BIG_INTEGER_FOR_INTS"() {
+
+        given:
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
+        DeserializationConfig cfg = objectMapper.getDeserializationConfig()
+        JacksonProcessor processor = new JacksonProcessor(cfg.with(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS))
+        BigInteger bInt = new BigInteger("9223372036854775807")
+        NumsO bigI = new NumsO(bi1: bInt, bi2: bInt)
+
+        when:
+        def string = objectMapper.writeValueAsString(bigI)
+        byte[] bytes = objectMapper.writeValueAsBytes(bigI)
+        boolean complete = false
+        JsonNode node = null
+        Throwable error = null
+        int nodeCount = 0
+        processor.subscribe(new Subscriber<JsonNode>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE)
+            }
+
+            @Override
+            void onNext(JsonNode jsonNode) {
+                nodeCount++
+                node = jsonNode
+            }
+
+            @Override
+            void onError(Throwable t) {
+                error = t
+            }
+
+            @Override
+            void onComplete() {
+                complete = true
+            }
+        })
+        processor.onSubscribe(new Subscription() {
+            @Override
+            void request(long n) {
+
+            }
+
+            @Override
+            void cancel() {
+
+            }
+        })
+        processor.onNext(bytes)
+        processor.onComplete()
+
+        then:
+        complete
+        node != null
+        error == null
+        nodeCount == 1
+        string == '{"bi1":9223372036854775807,"bi2":9223372036854775807}'
+
+        when:
+        BigI fooI = objectMapper.treeToValue(node, BigI)
+        NumsO numsO = objectMapper.treeToValue(node, NumsO)
+        NumsOSN numsOSN = objectMapper.treeToValue(node, NumsOSN)
+        NumsOSBI numsOSBI = objectMapper.treeToValue(node, NumsOSBI)
+        NumsN numsN = objectMapper.treeToValue(node, NumsN)
+
+        then:
+        fooI != null
+        fooI.bi1 == bInt
+        fooI.bi2 == bInt
+        numsO != null
+        numsO.bi1 == bInt
+        numsO.bi2 == bInt
+        numsO.bi1.class == BigInteger
+        numsO.bi2.class == BigInteger
+        numsOSN != null
+        numsOSN.bi1 == bInt
+        numsOSN.bi2 == bInt
+        numsOSN.bi1.class == BigInteger
+        numsOSN.bi2.class == BigInteger
+        numsOSBI != null
+        numsOSBI.bi1 == bInt
+        numsOSBI.bi2 == bInt
+        numsOSBI.bi1.class == BigInteger
+        numsOSBI.bi2.class == BigInteger
+        numsN != null
+        numsN.bi1 == bInt
+        numsN.bi2 == bInt
+        numsN.bi1.class == BigInteger
+        numsN.bi2.class == BigInteger
     }
 
     void "test publish JSON node async"() {
@@ -502,7 +774,10 @@ class JacksonProcessorSpec extends Specification {
         JacksonProcessor processor = new JacksonProcessor(new JsonFactory(), true, objectMapper.getDeserializationConfig())
 
         when:
-        byte[] bytes = '[1, 2, [3, 4, [5, 6], 7], [8, 9, 10], 11, 12]'.bytes
+        long longValue = Integer.MAX_VALUE + 1L
+        BigInteger bigIntegerValue = new BigInteger(Long.MAX_VALUE) + 1L
+        BigDecimal bigDecimalValue = new BigDecimal(Double.MAX_VALUE) * new BigDecimal("10")
+        byte[] bytes = "[1, $longValue, [3, 4, [5, 6], 7], $bigDecimalValue, [8, 9, 10], 11, $bigIntegerValue]".bytes
         boolean complete = false
         List<JsonNode> nodes = new ArrayList<>()
         Throwable error = null
@@ -544,13 +819,15 @@ class JacksonProcessorSpec extends Specification {
         processor.onComplete()
 
         then:
-        nodeCount == 6
-        nodes[0].equals(JsonNodeFactory.instance.numberNode(1L))
-        nodes[1].equals(JsonNodeFactory.instance.numberNode(2L))
+        complete
+        nodeCount == 7
+        nodes[0].equals(JsonNodeFactory.instance.numberNode(1))
+        nodes[1].equals(JsonNodeFactory.instance.numberNode(longValue))
         ((ArrayNode) nodes[2]).size() == 4
-        ((ArrayNode) nodes[3]).size() == 3
-        nodes[4].equals(JsonNodeFactory.instance.numberNode(11L))
-        nodes[5].equals(JsonNodeFactory.instance.numberNode(12L))
+        nodes[3].numberValue().toBigDecimal() == bigDecimalValue
+        ((ArrayNode) nodes[4]).size() == 3
+        nodes[5].equals(JsonNodeFactory.instance.numberNode(11))
+        nodes[6].equals(JsonNodeFactory.instance.numberNode(bigIntegerValue))
     }
 
 }
@@ -564,4 +841,32 @@ class BigD {
 class Foo {
     String name
     Integer age
+}
+
+class BigI {
+    @JsonFormat(shape= JsonFormat.Shape.STRING)
+    BigInteger bi1
+    BigInteger bi2
+}
+
+class NumsO {
+    Object bi1
+    Object bi2
+}
+
+class NumsOSN {
+    @JsonDeserialize(as = Number.class)
+    Object bi1
+    Object bi2
+}
+
+class NumsOSBI {
+    @JsonDeserialize(as = BigInteger.class)
+    Object bi1
+    Object bi2
+}
+
+class NumsN {
+    Number bi1
+    Number bi2
 }
