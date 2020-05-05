@@ -977,7 +977,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 proxyConstructorGenerator.loadThis();
                 proxyConstructorGenerator.invokeConstructor(methodType, new Method(CONSTRUCTOR_NAME, getConstructorDescriptor(proxyFullName)));
                 proxyConstructorGenerator.visitInsn(AASTORE);
-                pushResolveInterceptorsCall(proxyConstructorGenerator, i, isIntroduction && executableMethodWriter.isAbstract());
+                pushResolveInterceptorsCall(proxyConstructorGenerator, i, isIntroduction && (executableMethodWriter.isAbstract() || executableMethodWriter.isInterface()));
             }
         }
 

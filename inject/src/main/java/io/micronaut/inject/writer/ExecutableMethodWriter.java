@@ -126,7 +126,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         this.internalName = getInternalName(methodClassName);
         this.methodType = getObjectType(methodClassName);
         this.isInterface = isInterface;
-        this.isAbstract = isInterface || isAbstract;
+        this.isAbstract = isAbstract;
         this.isSuspend = isSuspend;
     }
 
@@ -135,6 +135,13 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      */
     public boolean isAbstract() {
         return isAbstract;
+    }
+
+    /**
+     * @return Is the method in an interface.
+     */
+    public boolean isInterface() {
+        return isInterface;
     }
 
     /**
