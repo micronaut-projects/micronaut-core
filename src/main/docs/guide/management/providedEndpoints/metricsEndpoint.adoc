@@ -3,7 +3,7 @@ Micronaut includes the ability to expose Metrics via integration with http://mic
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI, supply one of micrometer features to enable metrics and preconfigure the selected registery in your project. For example:
+If you are creating your project using the Micronaut CLI, supply one of the micrometer features to enable metrics and preconfigure the selected registery in your project. For example:
 ----
 $ mn create-app my-app --features micrometer-atlas
 ----
