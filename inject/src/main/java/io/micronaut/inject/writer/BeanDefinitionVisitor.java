@@ -295,6 +295,7 @@ public interface BeanDefinitionVisitor {
      * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         The annotation metadata for the method
      * @param isInterface                If the method belongs to an interface
+     * @param isDefault                  If the method is a default method
      * @return The {@link ExecutableMethodWriter}.
      */
     ExecutableMethodWriter visitExecutableMethod(Object declaringType,

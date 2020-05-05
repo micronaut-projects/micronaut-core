@@ -79,6 +79,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param methodClassName      The method class name
      * @param methodProxyShortName The method proxy short name
      * @param isInterface          Whether is an interface
+     * @param isDefault            Whether the method is a default method
      * @param isSuspend            Whether the method is Kotlin suspend function
      * @param annotationMetadata   The annotation metadata
      */
@@ -110,6 +111,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param methodProxyShortName The method proxy short name
      * @param isInterface          Whether is an interface
      * @param isAbstract           Whether the method is abstract
+     * @param isDefault            Whether the method is a default method
      * @param isSuspend            Whether the method is Kotlin suspend function
      * @param annotationMetadata   The annotation metadata
      */

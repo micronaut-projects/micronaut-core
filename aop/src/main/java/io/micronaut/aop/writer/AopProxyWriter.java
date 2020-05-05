@@ -442,6 +442,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         metadata
      * @param isInterface                If the method is in an interface
+     * @param isDefault                  If the method is a default method
      */
     public void visitAroundMethod(Object declaringType,
                                   Object returnType,
@@ -471,6 +472,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 false, isDefault, isInterface);
     }
 
+    @SuppressWarnings("ParameterNumber")
     private void visitAroundMethod(Object declaringType,
                                    Object returnType,
                                    Object genericReturnType,
