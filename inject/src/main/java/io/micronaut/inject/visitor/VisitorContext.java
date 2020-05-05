@@ -24,6 +24,7 @@ import io.micronaut.inject.writer.GeneratedFile;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.io.File;
 import java.net.URL;
 import java.util.Collections;
 import java.util.Map;
@@ -78,7 +79,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     Optional<GeneratedFile> visitMetaInfFile(String path);
 
-
     /**
      * Visit a file that will be located within the generated source directory.
      *
@@ -97,6 +97,15 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     default @NonNull Iterable<URL> getClasspathResources(@NonNull String path) {
         return Collections.emptyList();
+    }
+
+    /**
+     * Get the project base path.
+     *
+     * @return An optional file representing the project base path
+     */
+    default Optional<File> getProjectPath() {
+        return Optional.empty();
     }
 
     /**

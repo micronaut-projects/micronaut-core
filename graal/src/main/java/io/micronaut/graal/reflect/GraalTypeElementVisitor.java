@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -220,8 +221,11 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             ObjectMapper mapper = new ObjectMapper();
             ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
 
-            File f = new File(BASE_REFLECT_JSON);
-            if (f.exists()) {
+            File f = visitorContext.getProjectPath()
+                    .map(projectPath -> Paths.get(projectPath.getAbsolutePath(), BASE_REFLECT_JSON).toFile())
+                    .orElse(null);
+
+            if (f != null && f.exists()) {
                 try {
                     json = mapper.readValue(f, new TypeReference<List<Map>>() {
                     });

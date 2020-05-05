@@ -90,6 +90,12 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
+    public Optional<File> getProjectPath() {
+        // hack to retrieve the project base path
+        return Optional.of(compilationUnit.getConfiguration().getTargetDirectory().getParentFile().getParentFile().getParentFile().getParentFile());
+    }
+
+    @Override
     public Optional<ClassElement> getClassElement(String name) {
         if (name == null || compilationUnit == null) {
             return Optional.empty();
