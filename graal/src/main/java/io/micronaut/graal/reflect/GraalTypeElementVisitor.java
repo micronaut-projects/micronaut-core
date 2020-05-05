@@ -217,87 +217,91 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
             executed = true;
 
-            List<Map> json;
-            ObjectMapper mapper = new ObjectMapper();
-            ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
+            generateNativeImageProperties(visitorContext);
+        }
+    }
 
-            File f = visitorContext.getProjectPath()
-                    .map(projectPath -> Paths.get(projectPath.getAbsolutePath(), BASE_REFLECT_JSON).toFile())
-                    .orElse(null);
+    private void generateNativeImageProperties(VisitorContext visitorContext) {
+        List<Map> json;
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
 
-            if (f != null && f.exists()) {
-                try {
-                    json = mapper.readValue(f, new TypeReference<List<Map>>() {
-                    });
-                } catch (Throwable e) {
-                    visitorContext.fail("Error parsing base reflect.json: " + BASE_REFLECT_JSON, null);
-                    return;
-                }
-            } else {
-                json = new ArrayList<>();
-            }
+        File f = visitorContext.getProjectPath()
+                .map(projectPath -> Paths.get(projectPath.getAbsolutePath(), BASE_REFLECT_JSON).toFile())
+                .orElse(null);
 
-            if (CollectionUtils.isEmpty(classes) && CollectionUtils.isEmpty(arrays) && CollectionUtils.isEmpty(json)) {
+        if (f != null && f.exists()) {
+            try {
+                json = mapper.readValue(f, new TypeReference<List<Map>>() {
+                });
+            } catch (Throwable e) {
+                visitorContext.fail("Error parsing base reflect.json: " + BASE_REFLECT_JSON, null);
                 return;
             }
+        } else {
+            json = new ArrayList<>();
+        }
 
-            try {
+        if (CollectionUtils.isEmpty(classes) && CollectionUtils.isEmpty(arrays) && CollectionUtils.isEmpty(json)) {
+            return;
+        }
 
-                String basePackage = packages.stream()
-                        .distinct()
-                        .min(Comparator.comparingInt(String::length)).orElse("io.micronaut");
+        try {
 
-                String module;
-                if (basePackage.startsWith("io.micronaut.")) {
-                    module = basePackage.substring("io.micronaut.".length()).replace('.', '-');
-                    basePackage = "io.micronaut";
+            String basePackage = packages.stream()
+                    .distinct()
+                    .min(Comparator.comparingInt(String::length)).orElse("io.micronaut");
+
+            String module;
+            if (basePackage.startsWith("io.micronaut.")) {
+                module = basePackage.substring("io.micronaut.".length()).replace('.', '-');
+                basePackage = "io.micronaut";
+            } else {
+                if (basePackage.contains(".")) {
+                    final int i = basePackage.lastIndexOf('.');
+                    module = basePackage.substring(i + 1);
+                    basePackage = basePackage.substring(0, i);
                 } else {
-                    if (basePackage.contains(".")) {
-                        final int i = basePackage.lastIndexOf('.');
-                        module = basePackage.substring(i + 1);
-                        basePackage = basePackage.substring(0, i);
-                    } else {
-                        module = basePackage;
-                    }
+                    module = basePackage;
+                }
+            }
+
+            String path = "native-image/" + basePackage + "/" + module + "/";
+            String reflectFile = path + REFLECTION_CONFIG_JSON;
+            String propsFile = path + NATIVE_IMAGE_PROPERTIES;
+
+            visitorContext.visitMetaInfFile(propsFile).ifPresent(gf -> {
+                visitorContext.info("Writing " + NATIVE_IMAGE_PROPERTIES + " file to destination: " + gf.getName());
+                try (PrintWriter w = new PrintWriter(gf.openWriter())) {
+                    w.println("Args = -H:ReflectionConfigurationResources=${.}/reflection-config.json");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+            final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(reflectFile);
+            generatedFile.ifPresent(gf -> {
+                for (Map<String, Object> value : classes.values()) {
+                    json.add(value);
                 }
 
-                String path = "native-image/" + basePackage + "/" + module + "/";
-                String reflectFile = path + REFLECTION_CONFIG_JSON;
-                String propsFile = path + NATIVE_IMAGE_PROPERTIES;
+                for (String array : arrays) {
+                    json.add(CollectionUtils.mapOf(
+                            NAME, "[L" + array.substring(0, array.length() - 2) + ";",
+                            ALL_DECLARED_CONSTRUCTORS, true
+                    ));
+                }
 
-                visitorContext.visitMetaInfFile(propsFile).ifPresent(gf -> {
-                    visitorContext.info("Writing " + NATIVE_IMAGE_PROPERTIES + " file to destination: " + gf.getName());
-                    try (PrintWriter w = new PrintWriter (gf.openWriter())) {
-                        w.println("Args = -H:ReflectionConfigurationResources=${.}/reflection-config.json");
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                });
-                final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(reflectFile);
-                generatedFile.ifPresent(gf -> {
-                    for (Map<String, Object> value : classes.values()) {
-                        json.add(value);
-                    }
+                try (Writer w = gf.openWriter()) {
+                    visitorContext.info("Writing " + REFLECTION_CONFIG_JSON + " file to destination: " + gf.getName());
 
-                    for (String array : arrays) {
-                        json.add(CollectionUtils.mapOf(
-                                NAME, "[L" + array.substring(0, array.length() - 2) + ";",
-                                ALL_DECLARED_CONSTRUCTORS, true
-                        ));
-                    }
-
-                    try (Writer w = gf.openWriter()) {
-                        visitorContext.info("Writing " + REFLECTION_CONFIG_JSON + " file to destination: " + gf.getName());
-
-                        writer.writeValue(w, json);
-                    } catch (IOException e) {
-                        visitorContext.fail("Error writing " + REFLECTION_CONFIG_JSON + ": " + e.getMessage(), null);
-                    }
-                });
-            } finally {
-                classes.clear();
-                arrays.clear();
-            }
+                    writer.writeValue(w, json);
+                } catch (IOException e) {
+                    visitorContext.fail("Error writing " + REFLECTION_CONFIG_JSON + ": " + e.getMessage(), null);
+                }
+            });
+        } finally {
+            classes.clear();
+            arrays.clear();
         }
     }
 
