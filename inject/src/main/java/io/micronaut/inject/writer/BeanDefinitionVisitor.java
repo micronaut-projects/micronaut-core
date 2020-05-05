@@ -307,7 +307,8 @@ public interface BeanDefinitionVisitor {
                                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                                  Map<String, Map<String, Object>> genericTypes,
                                                  @Nullable AnnotationMetadata annotationMetadata,
-                                                 boolean isInterface);
+                                                 boolean isInterface,
+                                                 boolean isDefault);
 
     /**
      * Visits a field injection point.

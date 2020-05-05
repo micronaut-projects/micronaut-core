@@ -70,6 +70,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private final boolean isInterface;
     private final boolean isAbstract;
     private final boolean isSuspend;
+    private final boolean isDefault;
     private String outerClassName = null;
     private boolean isStatic = false;
 
@@ -86,6 +87,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             String methodClassName,
             String methodProxyShortName,
             boolean isInterface,
+            boolean isDefault,
             boolean isSuspend,
             AnnotationMetadata annotationMetadata) {
         super(methodClassName, annotationMetadata, true);
@@ -96,7 +98,8 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         this.internalName = getInternalName(methodClassName);
         this.methodType = getObjectType(methodClassName);
         this.isInterface = isInterface;
-        this.isAbstract = isInterface;
+        this.isAbstract = !isInterface || !isDefault;
+        this.isDefault = isDefault;
         this.isSuspend = isSuspend;
     }
 
@@ -116,6 +119,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             String methodProxyShortName,
             boolean isInterface,
             boolean isAbstract,
+            boolean isDefault,
             boolean isSuspend,
             AnnotationMetadata annotationMetadata) {
         super(methodClassName, annotationMetadata, true);
@@ -127,6 +131,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         this.methodType = getObjectType(methodClassName);
         this.isInterface = isInterface;
         this.isAbstract = isAbstract;
+        this.isDefault = isDefault;
         this.isSuspend = isSuspend;
     }
 
@@ -142,6 +147,14 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      */
     public boolean isInterface() {
         return isInterface;
+    }
+
+
+    /**
+     * @return Is the method a default method.
+     */
+    public boolean isDefault() {
+        return isDefault;
     }
 
     /**

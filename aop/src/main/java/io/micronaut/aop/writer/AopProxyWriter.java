@@ -424,6 +424,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 genericTypes,
                 annotationMetadata,
                 true,
+                false,
                 true);
     }
 
@@ -452,7 +453,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                   Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                   Map<String, Map<String, Object>> genericTypes,
                                   AnnotationMetadata annotationMetadata,
-                                  boolean isInterface) {
+                                  boolean isInterface,
+                                  boolean isDefault) {
 
 
         visitAroundMethod(
@@ -466,7 +468,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 argumentAnnotationMetadata,
                 genericTypes,
                 annotationMetadata,
-                false, isInterface);
+                false, isDefault, isInterface);
     }
 
     private void visitAroundMethod(Object declaringType,
@@ -480,6 +482,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                    Map<String, Map<String, Object>> genericTypes,
                                    AnnotationMetadata annotationMetadata,
                                    boolean isAbstract,
+                                   boolean isDefault,
                                    boolean isInterface) {
 
         boolean interfaceMethod = isInterface || this.isInterface;
@@ -496,7 +499,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 argumentAnnotationMetadata,
                 genericTypes,
                 annotationMetadata,
-                isInterface);
+                isInterface,
+                isDefault);
 
         List<Object> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();
@@ -529,7 +533,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             String bridgeDesc = getMethodDescriptor(returnType, bridgeArguments);
             boolean isSuspend = "kotlin.coroutines.Continuation".equals(CollectionUtils.last(argumentTypes.values()));
             ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
-                    proxyFullName, methodExecutorClassName, methodProxyShortName, interfaceMethod, isAbstract, isSuspend, annotationMetadata) {
+                    proxyFullName, methodExecutorClassName, methodProxyShortName, interfaceMethod, isAbstract, isDefault, isSuspend, annotationMetadata) {
 
                 @Override
                 protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, GeneratorAdapter invokeMethodVisitor) {
@@ -604,7 +608,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 bridgeGenerator.loadArg(i);
             }
 
-            bridgeWriter.visitMethodInsn(INVOKESPECIAL, declaringTypeReference.getInternalName(), methodName, overrideDescriptor, false);
+            bridgeWriter.visitMethodInsn(INVOKESPECIAL, declaringTypeReference.getInternalName(), methodName, overrideDescriptor, interfaceMethod);
             pushReturnValue(bridgeWriter, returnType);
             bridgeWriter.visitMaxs(DEFAULT_MAX_STACK, 1);
             bridgeWriter.visitEnd();
@@ -965,6 +969,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
             for (int i = 0; i < proxyMethodCount; i++) {
                 ExecutableMethodWriter executableMethodWriter = proxiedMethods.get(i);
+                boolean introduction = isIntroduction && (
+                        executableMethodWriter.isAbstract() || (
+                                executableMethodWriter.isInterface() && !executableMethodWriter.isDefault()));
 
                 // The following will initialize the array of $proxyMethod instances
                 // Eg. this.proxyMethods[0] = new $blah0();
@@ -977,7 +984,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 proxyConstructorGenerator.loadThis();
                 proxyConstructorGenerator.invokeConstructor(methodType, new Method(CONSTRUCTOR_NAME, getConstructorDescriptor(proxyFullName)));
                 proxyConstructorGenerator.visitInsn(AASTORE);
-                pushResolveInterceptorsCall(proxyConstructorGenerator, i, isIntroduction && (executableMethodWriter.isAbstract() || executableMethodWriter.isInterface()));
+                pushResolveInterceptorsCall(proxyConstructorGenerator, i, introduction);
             }
         }
 
@@ -1159,7 +1166,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             Map<String, AnnotationMetadata> argumentAnnotationMetadata,
             Map<String, Map<String, Object>> genericTypes,
             AnnotationMetadata annotationMetadata,
-            boolean isInterface) {
+            boolean isInterface,
+            boolean isDefault) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitExecutableMethod(
                         declaringType,
@@ -1172,7 +1180,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         argumentAnnotationMetadata,
                         genericTypes,
                         annotationMetadata,
-                        isInterface
+                        isInterface,
+                        isDefault
                 )
         );
         return null;
