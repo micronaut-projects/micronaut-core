@@ -608,7 +608,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 bridgeGenerator.loadArg(i);
             }
 
-            bridgeWriter.visitMethodInsn(INVOKESPECIAL, declaringTypeReference.getInternalName(), methodName, overrideDescriptor, interfaceMethod);
+            bridgeWriter.visitMethodInsn(INVOKESPECIAL, declaringTypeReference.getInternalName(), methodName, overrideDescriptor, isDefault);
             pushReturnValue(bridgeWriter, returnType);
             bridgeWriter.visitMaxs(DEFAULT_MAX_STACK, 1);
             bridgeWriter.visitEnd();
