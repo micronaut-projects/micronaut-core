@@ -1,4 +1,4 @@
-Multi-Tenancy, as it relates to software development, is when a single instance of an application is used to service multiple clients (tenants) in a way that each tenants' data is isolated from the other.
+Multi-Tenancy, as it relates to software development, is when a single instance of an application is used to service multiple clients (tenants) in a way that each tenant's data is isolated from the other.
 
 To use the Micronaut's multitenancy capabilities you must have the `multitenancy` dependency on your classpath.
 
