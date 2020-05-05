@@ -1172,11 +1172,20 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public <T> T getBean(@NonNull BeanDefinition<T> definition) {
         ArgumentUtils.requireNonNull("definition", definition);
+        Class<T> beanType = definition.getBeanType();
+        Qualifier<T> declaredQualifier = definition.getDeclaredQualifier();
+        if (definition.isSingleton()) {
+            BeanKey<T> key = new BeanKey<>(definition, declaredQualifier);
+            BeanRegistration beanRegistration = singletonObjects.get(key);
+            if (beanRegistration != null) {
+                return (T) beanRegistration.bean;
+            }
+        }
         try (BeanResolutionContext context = newResolutionContext(definition, null)) {
             return getBeanForDefinition(
                     context,
-                    definition.getBeanType(),
-                    definition.getDeclaredQualifier(),
+                    beanType,
+                    declaredQualifier,
                     true,
                     definition
             );
