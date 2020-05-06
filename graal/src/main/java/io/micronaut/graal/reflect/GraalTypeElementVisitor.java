@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
@@ -65,9 +66,21 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
      */
     protected static Set<String> arrays = new HashSet<>();
 
+    /**
+     * Files in resources directory to generate metadata.
+     */
+    protected static Set<String> resourceFiles = new HashSet<>();
+
     private static final TypeHint.AccessType[] DEFAULT_ACCESS_TYPE = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS};
     private static final String REFLECTION_CONFIG_JSON = "reflection-config.json";
     private static final String NATIVE_IMAGE_PROPERTIES = "native-image.properties";
+
+    private static final String BASE_RESOURCE_CONFIG_JSON = "src/main/graal/resource-config.json";
+    private static final String RESOURCE_CONFIG_JSON = "resource-config.json";
+    private static final String RESOURCES_DIR = "src/main/resources";
+    private static final String RESOURCES = "resources";
+    private static final String BUNDLES = "bundles";
+    private static final String PATTERN = "pattern";
 
     private static final String BASE_REFLECT_JSON = "src/main/graal/reflect.json";
 
@@ -218,6 +231,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             executed = true;
 
             generateNativeImageProperties(visitorContext);
+            generateResourceConfig(visitorContext);
         }
     }
 
@@ -248,25 +262,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
         try {
 
-            String basePackage = packages.stream()
-                    .distinct()
-                    .min(Comparator.comparingInt(String::length)).orElse("io.micronaut");
-
-            String module;
-            if (basePackage.startsWith("io.micronaut.")) {
-                module = basePackage.substring("io.micronaut.".length()).replace('.', '-');
-                basePackage = "io.micronaut";
-            } else {
-                if (basePackage.contains(".")) {
-                    final int i = basePackage.lastIndexOf('.');
-                    module = basePackage.substring(i + 1);
-                    basePackage = basePackage.substring(0, i);
-                } else {
-                    module = basePackage;
-                }
-            }
-
-            String path = "native-image/" + basePackage + "/" + module + "/";
+            String path = buildNativeImagePath();
             String reflectFile = path + REFLECTION_CONFIG_JSON;
             String propsFile = path + NATIVE_IMAGE_PROPERTIES;
 
@@ -303,6 +299,104 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             classes.clear();
             arrays.clear();
         }
+    }
+
+    private void generateResourceConfig(VisitorContext visitorContext) {
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
+        List<Map> json;
+
+        Path resourcesPath = visitorContext.getProjectPath()
+                .map(projectPath -> Paths.get(projectPath.getAbsolutePath(), RESOURCES_DIR))
+                .orElse(null);
+
+        if (resourcesPath != null) {
+            calculateResourceFiles(resourcesPath.toFile(), new ArrayList<>());
+
+            File f = visitorContext.getProjectPath()
+                    .map(projectPath -> Paths.get(projectPath.getAbsolutePath(), BASE_RESOURCE_CONFIG_JSON).toFile())
+                    .orElse(null);
+
+            if (f != null && f.exists()) {
+                try {
+                    json = mapper.readValue(f, new TypeReference<List<Map>>() {});
+                } catch (Throwable e) {
+                    visitorContext.fail("Error parsing base resource-config.json: " + BASE_REFLECT_JSON, null);
+                    return;
+                }
+            } else {
+                json = new ArrayList<>();
+            }
+
+            try {
+                String path = buildNativeImagePath();
+                String resourcesFile = path + RESOURCE_CONFIG_JSON;
+
+                final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(resourcesFile);
+                generatedFile.ifPresent(gf -> {
+                    List<Map> resourceList = resourceFiles.stream()
+                            .map(resourceFile -> CollectionUtils.mapOf(PATTERN, "\\Q" + resourceFile + "\\E"))
+                            .collect(Collectors.toList());
+
+                    json.add(CollectionUtils.mapOf(RESOURCES, resourceList));
+                    json.add(CollectionUtils.mapOf(BUNDLES, Collections.emptyList()));
+
+                    try (Writer w = gf.openWriter()) {
+                        visitorContext.info("Writing " + RESOURCE_CONFIG_JSON + " file to destination: " + gf.getName());
+                        writer.writeValue(w, json);
+                    } catch (IOException e) {
+                        visitorContext.fail("Error writing " + RESOURCE_CONFIG_JSON + ": " + e.getMessage(), null);
+                    }
+                });
+            } finally {
+                resourceFiles.clear();
+            }
+        }
+    }
+
+    private void calculateResourceFiles(File folder, List<String> filePath) {
+        if (filePath == null) {
+            filePath = new ArrayList<>();
+        }
+        File[] files = folder.listFiles((dir, name) -> !name.equals("META-INF"));
+        for (File element : files) {
+            if (element.isDirectory()) {
+                List<String> paths = new ArrayList<>(filePath);
+                paths.add(element.getName());
+
+                calculateResourceFiles(element, paths);
+            } else {
+                String join = String.join("/", filePath);
+
+                String elementName = join.isEmpty() ?
+                        element.getName() :
+                        join + "/" + element.getName();
+
+                resourceFiles.add(elementName);
+            }
+        }
+    }
+
+    private String buildNativeImagePath() {
+        String basePackage = packages.stream()
+                .distinct()
+                .min(Comparator.comparingInt(String::length)).orElse("io.micronaut");
+
+        String module;
+        if (basePackage.startsWith("io.micronaut.")) {
+            module = basePackage.substring("io.micronaut.".length()).replace('.', '-');
+            basePackage = "io.micronaut";
+        } else {
+            if (basePackage.contains(".")) {
+                final int i = basePackage.lastIndexOf('.');
+                module = basePackage.substring(i + 1);
+                basePackage = basePackage.substring(0, i);
+            } else {
+                module = basePackage;
+            }
+        }
+
+        return "native-image/" + basePackage + "/" + module + "/";
     }
 
     private Map<String, Object> resolveClassData(String introspectedClass) {
