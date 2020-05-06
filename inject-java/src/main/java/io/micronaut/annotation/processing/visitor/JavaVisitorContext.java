@@ -44,15 +44,10 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileManager;
-import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -134,33 +129,6 @@ public class JavaVisitorContext implements VisitorContext {
             }
         }
         return Collections.emptyList();
-    }
-
-    @Override
-    public Optional<File> getProjectPath() {
-        // horrible hack to get the base project path.
-        // See https://stackoverflow.com/questions/37225786/android-annotation-processor-access-resources-assets/37230331#37230331
-        try {
-            JavaFileObject dummySourceFile = processingEnv.getFiler().createSourceFile("dummy" + System.currentTimeMillis());
-            String dummySourceFilePath = dummySourceFile.toUri().toString();
-
-            if (dummySourceFilePath.startsWith("file:")) {
-                if (!dummySourceFilePath.startsWith("file://")) {
-                    dummySourceFilePath = "file://" + dummySourceFilePath.substring("file:".length());
-                }
-            } else {
-                dummySourceFilePath = "file://" + dummySourceFilePath;
-            }
-
-            URI cleanURI = new URI(dummySourceFilePath);
-            File dummyFile = new File(cleanURI);
-
-            File projectRoot = dummyFile.getParentFile().getParentFile().getParentFile().getParentFile().getParentFile().getParentFile().getParentFile();
-            return Optional.of(projectRoot);
-
-        } catch (IOException | URISyntaxException | IllegalArgumentException e) {
-            return Optional.empty();
-        }
     }
 
     @Override
