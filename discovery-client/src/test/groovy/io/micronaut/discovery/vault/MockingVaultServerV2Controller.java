@@ -39,7 +39,7 @@ public class MockingVaultServerV2Controller {
 
     public static final String ENABLED = "enable.mock.vault-config-v2";
 
-    @Get("/v2/{backend}/data/{vaultKey:.*}")
+    @Get("/v1/{backend}/data/{vaultKey:.*}")
     public Publisher<VaultResponseV2> readConfigurationValuesV2(@NonNull String backend,
                                                                 @NonNull String vaultKey) {
         Map<String, Object> properties = new HashMap<>();

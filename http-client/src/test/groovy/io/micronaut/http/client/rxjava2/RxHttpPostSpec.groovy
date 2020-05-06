@@ -18,6 +18,7 @@ package io.micronaut.http.client.rxjava2
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.RxStreamingHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -223,6 +224,21 @@ class RxHttpPostSpec extends Specification {
         thrown(HttpClientResponseException)
     }
 
+    void "test a local error handler that returns a single"() {
+        Flowable<Person> flowable = client.retrieve(
+                HttpRequest.POST("/reactive/post/error", '{"firstName": "John"}'),
+                Argument.of(Person),
+                Argument.of(String)
+        )
+
+        when:
+        flowable.blockingFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.NOT_FOUND
+        ex.response.getBody(String).get() == "illegal.argument"
+    }
 
     @Introspected
     static class Person {
@@ -246,6 +262,7 @@ class RxHttpPostSpec extends Specification {
 
     @Controller('/reactive/post')
     static class ReactivePostController {
+
         @Post('/single')
         Single<HttpPostSpec.Book> simple(@Body Single<HttpPostSpec.Book> book) {
             return book
@@ -278,6 +295,16 @@ class RxHttpPostSpec extends Specification {
         @Post(uri = "/person", consumes = MediaType.APPLICATION_FORM_URLENCODED)
         Single<HttpResponse<Person>> createPerson(@Body Person person)  {
             return Single.just(HttpResponse.created(person))
+        }
+
+        @Post(uri = "/error")
+        Single<HttpResponse<Person>> emitError(@Body Person person)  {
+            return Single.error(new IllegalArgumentException())
+        }
+
+        @Error(exception = IllegalArgumentException.class)
+        Single<HttpResponse<String>> illegalArgument(HttpRequest request, IllegalArgumentException e) {
+            Single.just(HttpResponse.notFound("illegal.argument"))
         }
     }
 

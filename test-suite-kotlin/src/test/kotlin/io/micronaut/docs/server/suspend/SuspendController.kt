@@ -16,9 +16,7 @@
 package io.micronaut.docs.server.suspend
 
 import io.micronaut.http.*
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Status
+import io.micronaut.http.annotation.*
 import kotlinx.coroutines.delay
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -66,5 +64,17 @@ class SuspendController {
     suspend fun suspendingGreet(name: String, request: HttpRequest<String>): HttpResponse<out Any> {
         val json = "{\"message\":\"hello\"}"
         return HttpResponse.ok(json).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
+    }
+
+    @Get("/illegal")
+    suspend fun illegal(): Unit {
+        throw IllegalArgumentException()
+    }
+
+    @Status(HttpStatus.BAD_REQUEST)
+    @Error(exception = IllegalArgumentException::class)
+    @Produces(MediaType.TEXT_PLAIN)
+    suspend fun onIllegalArgument(e: IllegalArgumentException): String {
+        return "illegal.argument"
     }
 }

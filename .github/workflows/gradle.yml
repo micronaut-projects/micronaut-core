@@ -2,7 +2,7 @@ name: Java CI
 on:
   push:
     branches:
-    - '*'
+      - '*'
   pull_request:
     branches:
     - master
@@ -29,14 +29,14 @@ jobs:
     - name: Set up JDK
       uses: actions/setup-java@v1
       with:
-        java-version: ${{ matrix.java }}   
+        java-version: ${{ matrix.java }}
     - name: Build with Gradle
       run: ./gradlew check --no-daemon --parallel --continue
     - name: Publish to JFrog OSS
       if: success() && github.event_name == 'push' && matrix.java == '8' && github.ref == 'refs/heads/master'
       env:
-         BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
-         BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
+          BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
+          BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
       run: ./gradlew publish docs --no-daemon
     - name: Publish to Github Pages
       if: success() && github.event_name == 'push' && matrix.java == '8' && github.ref == 'refs/heads/master'

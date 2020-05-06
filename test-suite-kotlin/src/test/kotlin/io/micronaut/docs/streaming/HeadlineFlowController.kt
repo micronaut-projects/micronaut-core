@@ -17,9 +17,10 @@ package io.micronaut.docs.streaming
 
 // tag::imports[]
 
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -43,4 +44,13 @@ class HeadlineFlowController {
             }
         }
     // end::streamingWithFlow[]
+
+    @Get(value = "/illegal")
+    fun illegal(): Any = throw IllegalArgumentException()
+
+    @Error(exception = IllegalArgumentException::class)
+    @Produces(MediaType.TEXT_PLAIN)
+    fun onIllegalArgument(e: IllegalArgumentException): Flow<HttpResponse<String>> = flow {
+        emit(HttpResponse.badRequest("illegal.argument"))
+    }
 }

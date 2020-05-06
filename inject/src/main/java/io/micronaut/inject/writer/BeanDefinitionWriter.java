@@ -871,7 +871,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                                         Map<String, Map<String, Object>> genericTypes,
                                                         AnnotationMetadata annotationMetadata,
-                                                        boolean isInterface) {
+                                                        boolean isInterface,
+                                                        boolean isDefault) {
 
         DefaultAnnotationMetadata.contributeDefaults(
                 this.annotationMetadata,
@@ -901,6 +902,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 methodExecutorClassName,
                 methodProxyShortName,
                 this.isInterface || isInterface,
+                isDefault,
                 isSuspend,
                 annotationMetadata);
 //        executableMethodWriter.makeStaticInner(beanDefinitionInternalName, (ClassWriter) classWriter);

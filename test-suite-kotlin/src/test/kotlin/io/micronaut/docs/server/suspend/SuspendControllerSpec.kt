@@ -16,9 +16,9 @@
 package io.micronaut.docs.server.suspend
 
 import io.kotlintest.shouldBe
+import io.kotlintest.shouldThrowExactly
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpHeaders.*
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
@@ -26,6 +26,7 @@ import io.micronaut.http.HttpRequest.GET
 import io.micronaut.http.HttpRequest.OPTIONS
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 
 class SuspendControllerSpec: StringSpec() {
@@ -107,5 +108,14 @@ class SuspendControllerSpec: StringSpec() {
             response.status shouldBe HttpStatus.OK
         }
 
+        "test error route"() {
+            val ex = shouldThrowExactly<HttpClientResponseException> {
+                client.exchange(HttpRequest.GET<Any>("/suspend/illegal"), String::class.java).blockingFirst()
+            }
+            val body = ex.response.getBody(String::class.java).get()
+
+            ex.status shouldBe HttpStatus.BAD_REQUEST
+            body shouldBe "illegal.argument"
+        }
     }
 }
