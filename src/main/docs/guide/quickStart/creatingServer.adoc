@@ -11,6 +11,14 @@ $ mn create-app hello-world
 
 TIP: You can supply `--build maven` if you wish to create a Maven based build instead
 
+If you are behind a proxy, you might have to export MN_OPTS before running the mn command
+
+[source,bash]
+----
+$ export MN_OPTS="-Dhttps.proxyHost=your.proxy.host -Dhttps.proxyPort=3128 -Dhttp.proxyUser=test -Dhttp.proxyPassword=test"
+$ mn create-app hello-world
+----
+
 The previous command will create a new Java application in a directory called `hello-world` featuring a Gradle build. The application can be run with `./gradlew run`:
 
 [source,bash]
