@@ -51,7 +51,7 @@ public interface VaultConfigHttpClientV2 extends VaultConfigHttpClient<VaultResp
      * @param vaultKey          The vault key
      * @return A {@link Publisher} that emits a list of {@link VaultResponseV2}
      */
-    @Get("/v2/{backend}/data/{vaultKey}")
+    @Get("/v1/{backend}/data/{vaultKey}")
     @Produces(single = true)
     @Retryable(
             attempts = "${" + VaultClientDiscoveryConfiguration.PREFIX + ".retry-count:3}",

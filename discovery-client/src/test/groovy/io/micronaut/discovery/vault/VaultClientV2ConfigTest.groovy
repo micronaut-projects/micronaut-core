@@ -25,7 +25,7 @@ class VaultClientV2ConfigTest extends Specification {
         given:
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "true")
         ApplicationContext context = ApplicationContext.run([
-                (MockingVaultServerV1Controller.ENABLED): true,
+                (MockingVaultServerV2Controller.ENABLED): true,
                 "micronaut.application.name": "myapp",
                 "micronaut.config-client.enabled": true,
                 "vault.client.config.enabled": true,
