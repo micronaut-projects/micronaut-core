@@ -42,6 +42,7 @@ public interface ApplicationEventPublisher {
      *
      * @param event The event to publish
      * @return A future that completes when the event is published
+     * @since 1.3.5
      */
     default Future<Void> publishEventAsync(@Nonnull Object event) {
         CompletableFuture<Void> future = new CompletableFuture<>();
