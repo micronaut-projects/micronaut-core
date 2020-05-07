@@ -16,6 +16,8 @@
 package io.micronaut.context.event;
 
 import javax.annotation.Nonnull;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 
 /**
  * <p>Interface for classes that publish events received by {@link ApplicationEventListener} instances.</p>
@@ -34,4 +36,17 @@ public interface ApplicationEventPublisher {
      * @param event The event to publish
      */
     void publishEvent(@Nonnull Object event);
+
+    /**
+     * Publish the given event. The event will be published asynchronously. A future is returned that can be used to check whether the event completed successfully or not.
+     *
+     * @param event The event to publish
+     * @return A future that completes when the event is published
+     * @since 1.3.5
+     */
+    default Future<Void> publishEventAsync(@Nonnull Object event) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        future.completeExceptionally(new UnsupportedOperationException("Asynchronous event publishing is not supported by this implementation"));
+        return future;
+    }
 }
