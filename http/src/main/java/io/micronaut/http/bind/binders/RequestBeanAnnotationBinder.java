@@ -33,7 +33,6 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.bind.RequestBinderRegistry;
 
@@ -117,7 +116,7 @@ public class RequestBeanAnnotationBinder<T> extends AbstractAnnotatedArgumentBin
         }
     }
 
-    public Optional<Object> getBindableResult(HttpRequest<?> source, Argument<Object> argument) {
+    private Optional<Object> getBindableResult(HttpRequest<?> source, Argument<Object> argument) {
         ArgumentConversionContext<Object> conversionContext = ConversionContext.of(
                 argument,
                 source.getLocale().orElse(Locale.getDefault()),
