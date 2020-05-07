@@ -15,9 +15,7 @@
  */
 package io.micronaut.http.bind.binders;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -32,8 +30,10 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.bind.RequestBinderRegistry;
 
@@ -41,6 +41,7 @@ import io.micronaut.http.bind.RequestBinderRegistry;
  * Used to bind Bindable parameters to a Bean object.
  *
  * @author Anze Sodja
+ * @author graemerocher
  * @since 2.0
  * @see RequestBean
  * @param <T>
@@ -72,23 +73,39 @@ public class RequestBeanAnnotationBinder<T> extends AbstractAnnotatedArgumentBin
 
         if (hasAnnotation) {
             BeanIntrospection<T> introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
-            List<BeanProperty<T, Object>> bindableProperties = introspection.getBeanProperties().stream()
+            Map<String, BeanProperty<T, Object>> bindableProperties = introspection.getBeanProperties().stream()
                     .filter(p -> p.getType().isAssignableFrom(HttpRequest.class) || p.hasStereotype(Bindable.class))
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toMap(Named::getName, (p) -> p));
 
             if (introspection.getConstructorArguments().length > 0) {
                 // Handle injection with Constructor or @Creator
-                Object[] argumentValues = Arrays.stream(introspection.getConstructorArguments())
-                        .map(a -> bindArgument((Argument<Object>) a, bindableProperties, context, source))
-                        .toArray();
+                Argument<?>[] constructorArguments = introspection.getConstructorArguments();
+                Object[] argumentValues = new Object[constructorArguments.length];
+                for (int i = 0; i < constructorArguments.length; i++) {
+                    @SuppressWarnings("unchecked")
+                    Argument<Object> constructorArgument = (Argument<Object>) constructorArguments[i];
+                    if (HttpRequest.class.isAssignableFrom(constructorArgument.getType())) {
+                        argumentValues[i] = source;
+                    } else {
+                        BeanProperty<T, Object> bp = bindableProperties.get(constructorArgument.getName());
+                        Argument<Object> argumentToBind;
+                        if (bp != null) {
+                            argumentToBind = bp.asArgument();
+                        } else {
+                            argumentToBind = constructorArgument;
+                        }
+                        Optional<Object> bindableResult = getBindableResult(source, argumentToBind);
+                        argumentValues[i] = constructorArgument.isOptional() ? bindableResult : bindableResult.orElse(null);
+                    }
+                }
                 return () -> Optional.of(introspection.instantiate(false, argumentValues));
             } else {
                 // Handle injection with setters, we checked that all values are writable at compile time
                 T bean = introspection.instantiate();
-                for (BeanProperty<T, Object> property : bindableProperties) {
-                    ArgumentConversionContext<Object> conversionContext = propertyConversionContext(property, property.getType(), context);
-                    Optional<Object> bindableResult = getBindableResult(conversionContext, source);
-                    property.set(bean, property.getType().isAssignableFrom(Optional.class)
+                for (BeanProperty<T, Object> property : bindableProperties.values()) {
+                    Argument<Object> propertyArgument = property.asArgument();
+                    Optional<Object> bindableResult = getBindableResult(source, propertyArgument);
+                    property.set(bean, propertyArgument.isOptional()
                             ? bindableResult
                             : bindableResult.orElse(null));
                 }
@@ -100,47 +117,35 @@ public class RequestBeanAnnotationBinder<T> extends AbstractAnnotatedArgumentBin
         }
     }
 
-    private Object bindArgument(Argument<Object> argument, List<BeanProperty<T, Object>> bindableProperties,
-            ArgumentConversionContext<T> parentContext, HttpRequest<?> source) {
-        if (argument.getType().isAssignableFrom(HttpRequest.class)) {
-            return source;
-        }
-        Optional<BeanProperty<T, Object>> bindablePropertyForArgument = bindableProperties.stream()
-                .filter(p -> p.getName().equals(argument.getName()))
-                .findFirst();
-        if (bindablePropertyForArgument.isPresent()) {
-            ArgumentConversionContext<Object> conversionContext = propertyConversionContext(bindablePropertyForArgument.get(), argument.getType(), parentContext);
-            Optional<Object> result = getBindableResult(conversionContext, source);
-            return argument.getType().isAssignableFrom(Optional.class) ? result : result.orElse(null);
-        } else {
-            return argument.getType().isAssignableFrom(Optional.class) ? Optional.empty() : null;
-        }
+    public Optional<Object> getBindableResult(HttpRequest<?> source, Argument<Object> argument) {
+        ArgumentConversionContext<Object> conversionContext = ConversionContext.of(
+                argument,
+                source.getLocale().orElse(Locale.getDefault()),
+                source.getCharacterEncoding()
+        );
+        return getBindableResult(conversionContext, source);
     }
 
     private Optional<Object> getBindableResult(ArgumentConversionContext<Object> conversionContext, HttpRequest<?> source) {
-        if (conversionContext.getArgument().getType().isAssignableFrom(HttpRequest.class)) {
+        Argument<Object> argument = conversionContext.getArgument();
+        if (argument.getType().isAssignableFrom(HttpRequest.class)) {
             return Optional.of(source);
         }
-        Argument<Object> argument = conversionContext.getArgument();
-        Optional<ArgumentBinder<Object, HttpRequest<?>>> binder = requestBinderRegistry.findArgumentBinder(conversionContext.getArgument(), source);
+        Optional<ArgumentBinder<Object, HttpRequest<?>>> binder = requestBinderRegistry.findArgumentBinder(argument, source);
         if (!binder.isPresent()) {
             throw new UnsatisfiedArgumentException(argument);
         }
         BindingResult<Object> result = binder.get().bind(conversionContext, source);
         if (!result.isSatisfied() || !result.getConversionErrors().isEmpty()) {
             List<ConversionError> errors = result.getConversionErrors();
-            throw new ConversionErrorException(argument, errors.get(errors.size() - 1));
+            if (!errors.isEmpty()) {
+                throw new ConversionErrorException(argument, errors.iterator().next());
+            }
         }
         if (!result.isPresentAndSatisfied() && !argument.isNullable() && !argument.getType().isAssignableFrom(Optional.class)) {
-            throw new UnsatisfiedArgumentException(conversionContext.getArgument());
+            throw new UnsatisfiedArgumentException(argument);
         }
         return result.getValue();
-    }
-
-    private ArgumentConversionContext<Object> propertyConversionContext(BeanProperty<T, Object> property,
-            Class<Object> type, ArgumentConversionContext<T> parentContext) {
-        Argument<Object> argument = Argument.of(type, property.getName(), property.getAnnotationMetadata());
-        return ConversionContext.of(argument, parentContext.getLocale(), parentContext.getCharset());
     }
 
 }

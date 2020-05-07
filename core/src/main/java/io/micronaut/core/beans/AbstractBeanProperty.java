@@ -84,9 +84,9 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     @Override
     public Argument<P> asArgument() {
         if (typeArguments != null) {
-            return Argument.of(type, name, typeArguments);
+            return Argument.of(type, name, getAnnotationMetadata(), typeArguments);
         } else {
-            return Argument.of(type, name);
+            return Argument.of(type, name, getAnnotationMetadata());
         }
     }
 
