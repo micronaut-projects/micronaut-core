@@ -28,6 +28,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.validation.routes.rules.MissingParameterRule;
 import io.micronaut.validation.routes.rules.NullableParameterRule;
+import io.micronaut.validation.routes.rules.RequestBeanParameterRule;
 import io.micronaut.validation.routes.rules.RouteValidationRule;
 
 import javax.annotation.processing.SupportedOptions;
@@ -98,5 +99,6 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMe
         skipValidation = prop != null && prop.equals("false");
         rules.add(new MissingParameterRule());
         rules.add(new NullableParameterRule());
+        rules.add(new RequestBeanParameterRule());
     }
 }
