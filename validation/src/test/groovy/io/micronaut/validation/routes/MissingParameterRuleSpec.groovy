@@ -298,4 +298,219 @@ class Foo {
         then:
         noExceptionThrown()
     }
+
+    void "test missing parameter with RequestBean"() {
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/{abc}")
+    String abc(String abc) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+
+        @PathVariable
+        private String abc;
+        
+        public String getAbc() { return abc; }
+    
+    }
+}
+
+""")
+
+        then:
+            noExceptionThrown()
+
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/{abc}")
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+    }
+    
+}
+
+""")
+
+        then:
+            def ex = thrown(RuntimeException)
+            ex.message.contains("The route declares a uri variable named [abc], but no corresponding method argument is present")
+    }
+
+    void "test property name change with bindable with RequestParams"() {
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/{abc}")
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+
+        @QueryValue("abc")
+        private String def;
+        
+        public String getDef() { return def; }
+        public void setDef(String def) { this.def = def; }
+    
+    }
+    
+}
+
+""")
+        then:
+            noExceptionThrown()
+    }
+
+    void "test missing parameter with multiple uris with RequestBean"() {
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{abc}", "/{def}"})
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+
+        @PathVariable
+        private String abc;
+        
+        public String getAbc() { return abc; }
+        public void setAbc(String abc) { this.abc = abc; }
+    
+    }
+    
+}
+
+""")
+
+        then:
+            def ex = thrown(RuntimeException)
+            ex.message.contains("The route declares a uri variable named [def], but no corresponding method argument is present")
+
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+import javax.annotation.Nullable;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{abc}", "/{def}"})
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+
+        @PathVariable
+        @Nullable
+        private String abc;
+        
+        @PathVariable
+        @Nullable
+        private String def;
+        
+        public String getAbc() { return abc; }
+        public void setAbc(String abc) { this.abc = abc; }
+        public String getDef() { return def; }
+        public void setDef(String def) { this.def = def; }
+    }
+}
+
+""")
+        then:
+            noExceptionThrown()
+    }
+
+    void "test map name to different header with RequestBean"() {
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/{name}")
+    String abc(@Header("pet-name") String name, @QueryValue("name") String pathName) {
+        return "abc";
+    }
+    
+    @Introspected
+    private static class Bean {
+
+        @Header("pet-name")
+        private String name;
+        
+        @QueryValue("name")
+        private String pathName;
+        
+        public String getName() { return name; }
+        
+        public String pathName() { return pathName; }
+    
+    }
+    
+}
+
+""")
+
+        then:
+            noExceptionThrown()
+    }
+
+
 }

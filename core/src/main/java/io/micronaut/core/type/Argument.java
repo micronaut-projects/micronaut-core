@@ -29,6 +29,7 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
@@ -223,6 +224,13 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     default boolean isAsync() {
         Class<T> type = getType();
         return CompletionStage.class.isAssignableFrom(type);
+    }
+
+    /**
+     * @return Is this type an optional
+     */
+    default boolean isOptional() {
+        return getType() == Optional.class;
     }
 
     /**
@@ -467,4 +475,5 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
         //noinspection unchecked
         return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
     }
+
 }

@@ -15,16 +15,27 @@
  */
 package io.micronaut.validation.routes.rules;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.validation.routes.RouteValidationResult;
-
-import java.util.*;
 
 /**
  * Validates route parameters are nullable or optional for optional
@@ -81,25 +92,34 @@ public class NullableParameterRule implements RouteValidationRule {
 
             for (UriMatchVariable variable : variables.values()) {
                 Arrays.stream(parameters)
+                        .flatMap(p -> getTypedElements(p).stream())
                         .filter(p -> p.getName().equals(variable.getName()))
-                        .findFirst()
-                        .ifPresent(p -> {
+                        .forEach(p -> {
                             ClassElement type = p.getType();
                             boolean hasDefaultValue = p.findAnnotation(Bindable.class).flatMap(av -> av.stringValue("defaultValue")).isPresent();
                             if (!isNullable(p) && type != null && !type.isAssignable(Optional.class) && !hasDefaultValue) {
-                                errorMessages.add(String.format("The uri variable [%s] is optional, but the corresponding method argument [%s] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.", variable.getName(), p.toString()));
+                                errorMessages.add(String.format("The uri variable [%s] is optional, but the corresponding method argument [%s %s] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.", variable.getName(), p.getType().toString(), p.getName()));
                             }
                         });
-
             }
         }
 
         return new RouteValidationResult(errorMessages.toArray(new String[0]));
     }
 
-    private boolean isNullable(ParameterElement p) {
+    private boolean isNullable(TypedElement p) {
         // Handles javax.annotation.Nullable or org.jetbrains.annotations.Nullable or Spring's version
         return p.getAnnotationNames().stream().anyMatch(n -> NameUtils.getSimpleName(n).equals("Nullable"));
+    }
+
+    private List<TypedElement> getTypedElements(ParameterElement parameterElement) {
+        if (parameterElement.hasAnnotation(RequestBean.class)) {
+            return parameterElement.getType().getBeanProperties().stream()
+                    .filter(p -> p.hasStereotype(Bindable.class))
+                    .collect(Collectors.toList());
+        } else {
+            return Collections.singletonList(parameterElement);
+        }
     }
 
 }

@@ -234,6 +234,9 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         PathVariableAnnotationBinder<Object> pathVariableAnnotationBinder = new PathVariableAnnotationBinder<>(conversionService);
         byAnnotation.put(pathVariableAnnotationBinder.getAnnotationType(), pathVariableAnnotationBinder);
 
+        RequestBeanAnnotationBinder<Object> requestBeanAnnotationBinder = new RequestBeanAnnotationBinder<>(this, conversionService);
+        byAnnotation.put(requestBeanAnnotationBinder.getAnnotationType(), requestBeanAnnotationBinder);
+
         if (KOTLIN_COROUTINES_SUPPORTED) {
             ContinuationArgumentBinder continuationArgumentBinder = new ContinuationArgumentBinder();
             byType.put(continuationArgumentBinder.argumentType().typeHashCode(), continuationArgumentBinder);
