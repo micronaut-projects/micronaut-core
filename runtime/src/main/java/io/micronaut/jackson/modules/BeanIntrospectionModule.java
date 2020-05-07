@@ -650,7 +650,7 @@ public class BeanIntrospectionModule extends SimpleModule {
             }
             if (isUnwrapping()) {
                 JsonSerializer<Object> unwrappingSerializer = ser.unwrappingSerializer(null);
-                unwrappingSerializer.serialize(value,gen, prov);
+                unwrappingSerializer.serialize(value, gen, prov);
             } else {
                 gen.writeFieldName(fastName);
                 if (_typeSerializer == null) {
