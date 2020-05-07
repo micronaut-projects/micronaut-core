@@ -37,7 +37,7 @@ public interface ApplicationEventPublisher {
     void publishEvent(@Nonnull Object event);
 
     /**
-     * Publish the given event. The event will be published synchronously and only return once all listeners have consumed the event.
+     * Publish the given event. The event will be published asynchronously. A future is returned that can be used to check whether the event completed successfully or not.
      *
      * @param event The event to publish
      * @return A future that completes when the event is published
