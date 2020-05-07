@@ -18,6 +18,7 @@ package io.micronaut.jackson.modules;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.SerializableString;
@@ -493,6 +494,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         final SerializableString fastName;
         private final JavaType type;
         private final boolean shouldSuppressNulls;
+        private final boolean unwrapping;
 
         BeanIntrospectionPropertyWriter(BeanPropertyWriter src,
                                         BeanProperty<Object, Object> introspection,
@@ -518,6 +520,7 @@ public class BeanIntrospectionModule extends SimpleModule {
             _dynamicSerializers = (ser == null) ? PropertySerializerMap
                     .emptyForProperties() : null;
             shouldSuppressNulls = shouldSuppressNulls(_suppressNulls);
+            this.unwrapping = introspection.hasAnnotation(JsonUnwrapped.class);
         }
 
         BeanIntrospectionPropertyWriter(
@@ -531,6 +534,12 @@ public class BeanIntrospectionModule extends SimpleModule {
             _dynamicSerializers = PropertySerializerMap
                     .emptyForProperties();
             shouldSuppressNulls = shouldSuppressNulls(_suppressNulls);
+            this.unwrapping = introspection.hasAnnotation(JsonUnwrapped.class);
+        }
+
+        @Override
+        public boolean isUnwrapping() {
+            return unwrapping;
         }
 
         @Override
@@ -605,8 +614,10 @@ public class BeanIntrospectionModule extends SimpleModule {
             if (value == null) {
                 boolean willSuppressNulls = willSuppressNulls();
                 if (!willSuppressNulls && _nullSerializer != null) {
-                    gen.writeFieldName(fastName);
-                    _nullSerializer.serialize(null, gen, prov);
+                    if (!isUnwrapping()) {
+                        gen.writeFieldName(fastName);
+                        _nullSerializer.serialize(null, gen, prov);
+                    }
                 } else if (!willSuppressNulls) {
                     gen.writeFieldName(fastName);
                     prov.defaultSerializeNull(gen);
@@ -637,11 +648,16 @@ public class BeanIntrospectionModule extends SimpleModule {
                     return;
                 }
             }
-            gen.writeFieldName(fastName);
-            if (_typeSerializer == null) {
-                ser.serialize(value, gen, prov);
+            if (isUnwrapping()) {
+                JsonSerializer<Object> unwrappingSerializer = ser.unwrappingSerializer(null);
+                unwrappingSerializer.serialize(value, gen, prov);
             } else {
-                ser.serializeWithType(value, gen, prov, _typeSerializer);
+                gen.writeFieldName(fastName);
+                if (_typeSerializer == null) {
+                    ser.serialize(value, gen, prov);
+                } else {
+                    ser.serializeWithType(value, gen, prov, _typeSerializer);
+                }
             }
         }
 
