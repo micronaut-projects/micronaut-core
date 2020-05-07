@@ -41,6 +41,7 @@ public interface ApplicationEventPublisher {
      * Publish the given event. The event will be published synchronously and only return once all listeners have consumed the event.
      *
      * @param event The event to publish
+     * @return A future that completes when the event is published
      */
     default Future<Void> publishEventAsync(@Nonnull Object event) {
         CompletableFuture<Void> future = new CompletableFuture<>();
