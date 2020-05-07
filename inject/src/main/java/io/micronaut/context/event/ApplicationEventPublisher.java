@@ -16,7 +16,6 @@
 package io.micronaut.context.event;
 
 import javax.annotation.Nonnull;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
 /**
@@ -45,13 +44,6 @@ public interface ApplicationEventPublisher {
      * @since 1.3.5
      */
     default Future<Void> publishEventAsync(@Nonnull Object event) {
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        try {
-            publishEvent(event);
-            future.complete(null);
-        } catch (Throwable e) {
-            future.completeExceptionally(e);
-        }
-        return future;
+        throw new UnsupportedOperationException("Asynchronous event publishing is not supported by this implementation");
     }
 }
