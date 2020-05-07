@@ -456,9 +456,8 @@ public class DefaultBeanContext implements BeanContext {
         ArgumentUtils.requireNonNull("singleton", singleton);
         BeanKey<T> beanKey = new BeanKey<>(type, qualifier);
         synchronized (singletonObjects) {
-            synchronized (initializedObjectsByType) {
-                initializedObjectsByType.clear();
-            }
+
+            initializedObjectsByType.clear();
             beanCandidateCache.remove(type);
             BeanDefinition<T> beanDefinition = inject ? findConcreteCandidate(type, qualifier, false, false).orElse(null) : null;
             if (beanDefinition != null && beanDefinition.getBeanType().isInstance(singleton)) {
@@ -1176,9 +1175,7 @@ public class DefaultBeanContext implements BeanContext {
      */
     protected void invalidateCaches() {
         beanCandidateCache.clear();
-        synchronized (initializedObjectsByType) {
-            initializedObjectsByType.clear();
-        }
+        initializedObjectsByType.clear();
     }
 
     /**
@@ -2588,7 +2585,7 @@ public class DefaultBeanContext implements BeanContext {
             LOG.trace("No beans found for key: {}", key);
         }
 
-        synchronized (initializedObjectsByType) {
+        synchronized (singletonObjects) {
             existing = (Collection<T>) initializedObjectsByType.get(key);
             if (existing != null) {
                 logResolvedExisting(beanType, qualifier, hasQualifier, existing);
