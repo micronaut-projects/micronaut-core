@@ -84,7 +84,9 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param name The name to resolve
      * @return The property entries.
      */
-    @NonNull Collection<String> getPropertyEntries(@NonNull String name);
+    default @NonNull Collection<String> getPropertyEntries(@NonNull String name) {
+        return Collections.emptySet();
+    }
 
     /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>
