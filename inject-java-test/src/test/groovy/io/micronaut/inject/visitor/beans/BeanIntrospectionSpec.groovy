@@ -1460,6 +1460,7 @@ public enum Test {
         thrown(InstantiationException)
     }
 
+    @IgnoreIf({ Jvm.current.isJava11Compatible() })
     void "test instantiating an enum"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test;
