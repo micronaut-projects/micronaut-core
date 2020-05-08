@@ -3,8 +3,10 @@ package io.micronaut.jackson.modules
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.JsonUnwrapped
 import com.fasterxml.jackson.annotation.JsonView
 import com.fasterxml.jackson.databind.ObjectMapper
+import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.hateoas.JsonError
@@ -108,6 +110,21 @@ class BeanIntrospectionModuleSpec extends Specification {
         )
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
+        when:"json unwrapped is used"
+        def plant = new Plant(name: "Rose", attributes: new Attributes(hasFlowers: true, color: "green"))
+        def str = objectMapper.writeValueAsString(plant)
+
+        then:"The result is correct"
+        str == '{"name":"Rose","color":"green","hasFlowers":true}'
+
+        when:"deserializing"
+        def read = objectMapper.readValue(str, Plant)
+
+        then:
+        read == plant
+        read.attributes.color == 'green'
+        read.attributes.hasFlowers
+
         when:
         Book b = objectMapper.readValue('{"opt":null,"book_title":"The Stand", "book_pages":1000,"author":{"name":"Fred"}}', Book)
 
@@ -141,6 +158,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         then:
         result.contains('"book_title":')
         result.contains('"book_pages":')
+
 
         cleanup:
         ctx.close()
@@ -259,7 +277,22 @@ class BeanIntrospectionModuleSpec extends Specification {
 
     }
 
-    //Used for @JsonView
+    @Introspected
+    @EqualsAndHashCode
+    static class Plant {
+        String name
+        @JsonUnwrapped
+        Attributes attributes
+    }
+
+    @Introspected
+    @EqualsAndHashCode
+    static class Attributes {
+        String color
+        boolean hasFlowers
+
+    }
+        //Used for @JsonView
     static class PublicView {}
     static class AllView extends PublicView {}
 

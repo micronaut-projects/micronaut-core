@@ -59,9 +59,7 @@ import java.io.Closeable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -1244,32 +1242,56 @@ public class DefaultBeanContext implements BeanContext {
 
             eventListeners = eventListeners.stream().sorted(OrderUtil.COMPARATOR).collect(Collectors.toList());
 
-            if (!eventListeners.isEmpty()) {
-                if (EVENT_LOGGER.isTraceEnabled()) {
-                    EVENT_LOGGER.trace("Established event listeners {} for event: {}", eventListeners, event);
-                }
-                for (ApplicationEventListener listener : eventListeners) {
-                    if (listener.supports(event)) {
-                        try {
-                            if (EVENT_LOGGER.isTraceEnabled()) {
-                                EVENT_LOGGER.trace("Invoking event listener [{}] for event: {}", listener, event);
+            notifyEventListeners(event, eventListeners);
+        }
+    }
+
+    private void notifyEventListeners(@NonNull Object event, Collection<ApplicationEventListener> eventListeners) {
+        if (!eventListeners.isEmpty()) {
+            if (EVENT_LOGGER.isTraceEnabled()) {
+                EVENT_LOGGER.trace("Established event listeners {} for event: {}", eventListeners, event);
+            }
+            for (ApplicationEventListener listener : eventListeners) {
+                if (listener.supports(event)) {
+                    try {
+                        if (EVENT_LOGGER.isTraceEnabled()) {
+                            EVENT_LOGGER.trace("Invoking event listener [{}] for event: {}", listener, event);
+                        }
+                        listener.onApplicationEvent(event);
+                    } catch (ClassCastException ex) {
+                        String msg = ex.getMessage();
+                        if (msg == null || msg.startsWith(event.getClass().getName())) {
+                            if (EVENT_LOGGER.isDebugEnabled()) {
+                                EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
                             }
-                            listener.onApplicationEvent(event);
-                        } catch (ClassCastException ex) {
-                            String msg = ex.getMessage();
-                            if (msg == null || msg.startsWith(event.getClass().getName())) {
-                                if (EVENT_LOGGER.isDebugEnabled()) {
-                                    EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
-                                }
-                            } else {
-                                throw ex;
-                            }
+                        } else {
+                            throw ex;
                         }
                     }
-
                 }
+
             }
         }
+    }
+
+    @Override
+    public @NonNull Future<Void> publishEventAsync(@NonNull Object event) {
+        Objects.requireNonNull(event, "Event cannot be null");
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        Collection<ApplicationEventListener> eventListeners = streamOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()))
+                                                                        .sorted(OrderUtil.COMPARATOR).collect(Collectors.toList());
+
+        Executor executor = findBean(Executor.class, Qualifiers.byName("scheduled"))
+                                .orElseGet(ForkJoinPool::commonPool);
+        executor.execute(() -> {
+            try {
+                notifyEventListeners(event, eventListeners);
+                future.complete(null);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
     }
 
     @Override
