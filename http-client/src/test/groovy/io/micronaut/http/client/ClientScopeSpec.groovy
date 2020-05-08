@@ -30,6 +30,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Get
 import io.reactivex.Flowable
 import spock.lang.AutoCleanup
+import spock.lang.IgnoreIf
 import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
@@ -42,6 +43,7 @@ import javax.inject.Singleton
  * @since 1.0
  */
 @Retry(mode = Retry.Mode.SETUP_FEATURE_CLEANUP)
+@IgnoreIf({env["GITHUB_WORKFLOW"]})
 class ClientScopeSpec extends Specification {
 
     ApplicationContext context
