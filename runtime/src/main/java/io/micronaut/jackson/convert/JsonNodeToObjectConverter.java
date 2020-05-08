@@ -19,6 +19,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ContainerNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -68,18 +69,18 @@ public class JsonNodeToObjectConverter implements TypeConverter<JsonNode, Object
                 return Optional.of(node.toString());
             } else {
                 Argument<Object> argument = null;
-                if (context instanceof ArgumentConversionContext) {
+                if (node instanceof ContainerNode && context instanceof ArgumentConversionContext) {
                     argument = ((ArgumentConversionContext<Object>) context).getArgument();
                 }
-                ObjectMapper om = this.objectMapper.get();
-                JsonParser jsonParser = om.treeAsTokens(node);
-                TypeFactory typeFactory = om.getTypeFactory();
                 Object result;
                 if (argument != null) {
+                    ObjectMapper om = this.objectMapper.get();
+                    JsonParser jsonParser = om.treeAsTokens(node);
+                    TypeFactory typeFactory = om.getTypeFactory();
                     JavaType javaType = JacksonConfiguration.constructType(argument, typeFactory);
                     result = om.readValue(jsonParser, javaType);
                 } else {
-                    result = om.readValue(jsonParser, targetType);
+                    result = this.objectMapper.get().treeToValue(node, targetType);
                 }
                 return Optional.ofNullable(result);
             }
