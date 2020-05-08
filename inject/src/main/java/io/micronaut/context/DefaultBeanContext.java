@@ -1831,9 +1831,7 @@ public class DefaultBeanContext implements BeanContext {
             parallelBeans.forEach(beanDefinitionReference -> {
                 try {
                     if (isRunning()) {
-                        synchronized (singletonObjects) {
-                            loadContextScopeBean(beanDefinitionReference, parallelDefinitions::add);
-                        }
+                        loadContextScopeBean(beanDefinitionReference, parallelDefinitions::add);
                     }
                 } catch (Throwable e) {
                     LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + "] could not be loaded: " + e.getMessage(), e);
@@ -1850,9 +1848,7 @@ public class DefaultBeanContext implements BeanContext {
             parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
                 try {
                     if (isRunning()) {
-                        synchronized (singletonObjects) {
-                            loadContextScopeBean(beanDefinition);
-                        }
+                        loadContextScopeBean(beanDefinition);
                     }
                 } catch (Throwable e) {
                     LOG.error("Parallel Bean definition [" + beanDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
@@ -2422,11 +2418,15 @@ public class DefaultBeanContext implements BeanContext {
             if (reg == null) {
                 throw new IllegalStateException("Manually registered singleton no longer present in bean context");
             }
-            registerSingletonBean(definition, beanType, reg.bean, qualifier, true);
+            synchronized (singletonObjects) {
+                registerSingletonBean(definition, beanType, reg.bean, qualifier, true);
+            }
             return reg.bean;
         } else {
             T createdBean = doCreateBean(resolutionContext, definition, qualifier, true, null);
-            registerSingletonBean(definition, beanType, createdBean, qualifier, true);
+            synchronized (singletonObjects) {
+                registerSingletonBean(definition, beanType, createdBean, qualifier, true);
+            }
             return createdBean;
         }
     }
