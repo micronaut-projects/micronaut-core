@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.jackson;
 import com.fasterxml.jackson.annotation.JsonView;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -73,17 +74,23 @@ public class JsonViewServerFilter implements HttpServerFilter {
         final Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
         if (viewClass.isPresent()) {
             return Flowable.fromPublisher(responsePublisher).switchMap(response -> {
-                final Optional<?> body = response.getBody();
-                if (body.isPresent()) {
+                final Optional<?> optionalBody = response.getBody();
+                if (optionalBody.isPresent()) {
+                    Object body = optionalBody.get();
                     MediaTypeCodec codec = codecFactory.resolveJsonViewCodec(viewClass.get());
-                    return Flowable.fromCallable(() -> {
-                        final byte[] encoded = codec.encode(body.get());
-                        ((MutableHttpResponse) response).body(encoded);
-                        return response;
-                    }).subscribeOn(Schedulers.from(executorService));
-                } else {
-                    return Flowable.just(response);
+                    if (Publishers.isConvertibleToPublisher(body)) {
+                        response.body(Publishers.convertPublisher(body, Flowable.class)
+                                .map(item -> codec.encode(item))
+                                .subscribeOn(Schedulers.from(executorService)));
+                    } else {
+                        return Flowable.fromCallable(() -> {
+                            final byte[] encoded = codec.encode(body);
+                            response.body(encoded);
+                            return response;
+                        }).subscribeOn(Schedulers.from(executorService));
+                    }
                 }
+                return Flowable.just(response);
             });
         } else {
             return responsePublisher;

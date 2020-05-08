@@ -16,6 +16,8 @@
 package io.micronaut.http.server.netty.jackson
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.type.Argument
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -55,6 +57,44 @@ class JsonViewServerFilterSpec extends Specification {
         rsp.body().lastName == JsonViewController.TEST_MODEL.lastName
         rsp.body().birthdate == null
         rsp.body().password == null
+    }
+
+    def "invoking /jsonview/reactive specifies 'public' @JsonView, thus, only public properties are returned"() {
+        when:
+        HttpResponse<TestModel> rsp = client.toBlocking().exchange('/jsonview/reactive', TestModel)
+
+        then:
+        rsp.body().firstName == JsonViewController.TEST_MODEL.firstName
+        rsp.body().lastName == JsonViewController.TEST_MODEL.lastName
+        rsp.body().birthdate == null
+        rsp.body().password == null
+    }
+
+
+    def "invoking /jsonview/reactive/single specifies 'public' @JsonView, thus, only public properties are returned"() {
+        when:
+        HttpResponse<TestModel> rsp = client.toBlocking().exchange('/jsonview/reactive/single', TestModel)
+
+        then:
+        rsp.body().firstName == JsonViewController.TEST_MODEL.firstName
+        rsp.body().lastName == JsonViewController.TEST_MODEL.lastName
+        rsp.body().birthdate == null
+        rsp.body().password == null
+    }
+
+    def "invoking /jsonview/reactive/multiple specifies 'public' @JsonView, thus, only public properties are returned"() {
+        when:
+        List<TestModel> rsp = client.toBlocking().retrieve(HttpRequest.GET('/jsonview/reactive/multiple'), Argument.listOf(TestModel))
+
+        then:
+        rsp.get(0).firstName == JsonViewController.TEST_MODEL.firstName
+        rsp.get(0).lastName == JsonViewController.TEST_MODEL.lastName
+        rsp.get(0).birthdate == null
+        rsp.get(0).password == null
+        rsp.get(1).firstName == JsonViewController.TEST_MODEL.firstName
+        rsp.get(1).lastName == JsonViewController.TEST_MODEL.lastName
+        rsp.get(1).birthdate == null
+        rsp.get(1).password == null
     }
 
     def "invoking /jsonview/internal specifies 'internal' @JsonView, thus, only internal properties are returned"() {
