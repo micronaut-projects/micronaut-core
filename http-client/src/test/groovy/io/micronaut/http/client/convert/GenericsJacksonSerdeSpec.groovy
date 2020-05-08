@@ -62,6 +62,7 @@ class GenericsJacksonSerdeSpec extends Specification {
         }
     }
 
+    @Introspected
     static final class Token {
         private final String value
 
