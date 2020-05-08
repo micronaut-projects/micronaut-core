@@ -59,7 +59,7 @@ public class BookControllerTest {
         // end::postform[]
 
         thrown.expect(HttpClientResponseException.class);
-        thrown.expectMessage(CoreMatchers.startsWith("Failed to convert argument [pages] for value [notnumber]"));
+        thrown.expectMessage(CoreMatchers.startsWith("Failed to convert argument [book] for value [{title=The Stand, pages=notnumber, url=noturl}]"));
 
         HttpResponse<Book> response = call.blockingFirst();
 
