@@ -285,7 +285,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                             props = new SettableBeanProperty[constructorArguments.length];
                             for (int i = 0; i < constructorArguments.length; i++) {
                                 Argument<?> argument = constructorArguments[i];
-                                final JavaType javaType = existing.length > i ? existing[i].getType() : newType(argument, typeFactory);
+                                final JavaType javaType = existing != null && existing.length > i ? existing[i].getType() : newType(argument, typeFactory);
                                 final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
                                 PropertyMetadata propertyMetadata = newPropertyMetadata(argument, annotationMetadata);
                                 final String simpleName = annotationMetadata.stringValue(JsonProperty.class).orElse(argument.getName());
