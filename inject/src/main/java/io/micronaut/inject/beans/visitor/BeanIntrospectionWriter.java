@@ -34,6 +34,7 @@ import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
@@ -346,7 +347,13 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             instantiateInternal.invokeConstructor(beanType, new Method("<init>", constructorDescriptor));
         } else if (constructor.isStatic()) {
             final String methodDescriptor = getMethodDescriptor(beanType, (Collection) argumentTypes);
-            instantiateInternal.invokeStatic(beanType, new Method(constructor.getName(), methodDescriptor));
+            Method method = new Method(constructor.getName(), methodDescriptor);
+            if (classElement.isInterface()) {
+                instantiateInternal.visitMethodInsn(Opcodes.INVOKESTATIC, beanType.getInternalName(), method.getName(),
+                        method.getDescriptor(), true);
+            } else {
+                instantiateInternal.invokeStatic(beanType, method);
+            }
         } else if (isCompanion) {
             instantiateInternal.invokeVirtual(getTypeReference(constructor.getDeclaringType().getName()), new Method(constructor.getName(), getMethodDescriptor(beanType, (Collection) argumentTypes)));
         }
