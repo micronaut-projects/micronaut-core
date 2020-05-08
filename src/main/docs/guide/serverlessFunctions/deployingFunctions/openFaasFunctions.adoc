@@ -1,4 +1,4 @@
-When creating a function you can use the `openfaas` feature to create a function that includes a `Dockerfile` that can be built into an image deployable to OpenFaas:
+When creating a function you can use the `openfaas` feature to create a function that includes a `Dockerfile` that can be built into a docker image deployable to OpenFaas as well as the `function.yml` needed to deploy the function in OpenFaas:
 
 .Creating an OpenFaaS Function
 [source,bash]
@@ -6,3 +6,27 @@ When creating a function you can use the `openfaas` feature to create a function
 $ mn create-function hello-world-function --features openfaas
 ----
 
+== Manual deployment
+ 
+To deploy the function manually the image should first be build using the OpenFaas cli:
+ 
+[source,bash]
+----
+$ faas-cli build -f function.yml
+----
+ 
+The image can then be pushed to a registry. This will be the registry as specified in the image in the `function.yml`:
+ 
+[source,bash]
+----
+$ faas-cli push -f function.yml
+----
+ 
+Once the image pushed in the registry, the function can be deployed in the cluster:
+ 
+[source,bash]
+----
+$ faas-cli deploy -f function.yml
+----
+
+This will deploy the function in the namespace `openfaas-fn`.
