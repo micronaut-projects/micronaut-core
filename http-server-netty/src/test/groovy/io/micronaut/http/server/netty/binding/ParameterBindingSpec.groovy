@@ -92,7 +92,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
 
         expect:
         response.status() == HttpStatus.BAD_REQUEST
-        response.body().contains('Failed to convert argument [age]')
+        response.body().contains('Unexpected token (VALUE_STRING), expected END_ARRAY')
     }
 
     @Controller(value = "/parameter", produces = MediaType.TEXT_PLAIN)

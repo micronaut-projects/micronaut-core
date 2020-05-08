@@ -15,9 +15,14 @@
  */
 package io.micronaut.jackson.bind
 
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Introspected
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -27,10 +32,12 @@ import spock.lang.Unroll
  */
 class JacksonBeanPropertyBinderSpec extends Specification {
 
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
+
     @Unroll
     void "test bind map properties to object"() {
         given:
-        JacksonBeanPropertyBinder binder = ApplicationContext.run().getBean(JacksonBeanPropertyBinder)
+        JacksonBeanPropertyBinder binder = context.getBean(JacksonBeanPropertyBinder)
         def result = binder.bind(type.newInstance(), map)
 
         expect:
@@ -49,6 +56,17 @@ class JacksonBeanPropertyBinderSpec extends Specification {
         Book   | ['authorsByInitials[SK].name' : 'Stephen King', 'authorsByInitials[SK].age': 60,
                   'authorsByInitials[JRR].name': 'JRR Tolkien', 'authorsByInitials[JRR].age': 110]              | new Book(authorsByInitials: [SK: new Author(name: "Stephen King", age: 60), JRR: new Author(name: "JRR Tolkien", age: 110)])
 
+    }
+
+    void "test convert map to immutable object"() {
+        when:
+        def mapToObjectConverter = context.getBean(MapToObjectConverter)
+        def optional = mapToObjectConverter.convert(['first_name': 'Todd'], ImmutablePerson)
+
+        then:
+        optional.isPresent()
+        optional.get() instanceof ImmutablePerson
+        optional.get().firstName == 'Todd'
     }
 
     @EqualsAndHashCode
@@ -75,4 +93,22 @@ class JacksonBeanPropertyBinderSpec extends Specification {
     static class Publisher {
         String name
     }
+
+
+    @Introspected
+    static class ImmutablePerson {
+
+        @JsonProperty("first_name")
+        private String firstName
+
+        @JsonCreator
+        ImmutablePerson(@JsonProperty("first_name") String firstName) {
+            this.firstName = firstName
+        }
+
+        String getFirstName() {
+            return firstName
+        }
+    }
+
 }

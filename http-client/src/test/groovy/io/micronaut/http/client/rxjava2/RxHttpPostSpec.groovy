@@ -41,6 +41,9 @@ import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.validation.Valid
+import javax.validation.constraints.NotNull
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -238,21 +241,10 @@ class RxHttpPostSpec extends Specification {
     @Introspected
     static class Person {
 
-        private final String firstName
-        private final String lastName
-
-        Person(String firstName, String lastName) {
-            this.lastName = lastName
-            this.firstName = firstName
-        }
-
-        String getFirstName() {
-            return firstName
-        }
-
-        String getLastName() {
-            return lastName
-        }
+        @NotNull
+        String firstName
+        @NotNull
+        String lastName
     }
 
     @Controller('/reactive/post')
@@ -288,7 +280,7 @@ class RxHttpPostSpec extends Specification {
         }
 
         @Post(uri = "/person", consumes = MediaType.APPLICATION_FORM_URLENCODED)
-        Single<HttpResponse<Person>> createPerson(@Body Person person)  {
+        Single<HttpResponse<Person>> createPerson(@Valid @Body Person person)  {
             return Single.just(HttpResponse.created(person))
         }
 

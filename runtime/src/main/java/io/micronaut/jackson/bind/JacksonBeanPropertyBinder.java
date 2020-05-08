@@ -15,6 +15,8 @@
  */
 package io.micronaut.jackson.bind;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,6 +24,7 @@ import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -65,11 +68,29 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
     public BindingResult<Object> bind(ArgumentConversionContext<Object> context, Map<CharSequence, ? super Object> source) {
         try {
             ObjectNode objectNode = buildSourceObjectNode(source.entrySet());
-            Object result = objectMapper.treeToValue(objectNode, context.getArgument().getType());
+            JsonParser jsonParser = objectMapper.treeAsTokens(objectNode);
+            TypeFactory typeFactory = objectMapper.getTypeFactory();
+            JavaType javaType = JacksonConfiguration.constructType(context.getArgument(), typeFactory);
+            Object result = objectMapper.readValue(jsonParser, javaType);
             return () -> Optional.of(result);
         } catch (Exception e) {
             context.reject(e);
-            return BindingResult.EMPTY;
+            return new BindingResult<Object>() {
+                @Override
+                public List<ConversionError> getConversionErrors() {
+                    return CollectionUtils.iterableToList(context);
+                }
+
+                @Override
+                public boolean isSatisfied() {
+                    return false;
+                }
+
+                @Override
+                public Optional<Object> getValue() {
+                    return Optional.empty();
+                }
+            };
         }
     }
 
