@@ -34,6 +34,56 @@ import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+    void "test bean introspection with enum"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+
+@io.micronaut.core.annotation.Introspected
+enum Foo {
+    FOO, BAR;
+    
+    @Creator
+    static Foo create(String name) {
+        return Foo.valueOf(name.toUpperCase(java.util.Locale.ENGLISH));
+    }
+}
+
+''')
+        when:
+        def test = introspection.instantiate("foo")
+
+        then:
+        test.name() == 'FOO'
+    }
+
+    void "test bean introspection with property with static creator method on interface"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+
+@io.micronaut.core.annotation.Introspected
+interface Foo {
+    String getName();
+    
+    @Creator
+    static Foo create(String name) {
+        return () -> name;
+    }
+}
+
+''')
+        when:
+        def test = introspection.instantiate("test")
+
+        then:
+        introspection.getRequiredProperty("name", String)
+                .get(test) == 'test'
+    }
 
     void "test bean introspection with property from default interface method"() {
         given:
