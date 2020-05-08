@@ -462,7 +462,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     private MethodNode findConcreteConstructor() {
         List<ConstructorNode> constructors = classNode.getDeclaredConstructors();
-        if (CollectionUtils.isEmpty(constructors)) {
+        if (CollectionUtils.isEmpty(constructors) && !classNode.isAbstract() && !classNode.isEnum()) {
             return new ConstructorNode(Modifier.PUBLIC, new BlockStatement()); // empty default constructor
         }
 
