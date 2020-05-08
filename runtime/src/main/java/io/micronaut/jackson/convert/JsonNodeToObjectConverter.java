@@ -15,16 +15,22 @@
  */
 package io.micronaut.jackson.convert;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.type.TypeFactory;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
+import io.micronaut.core.type.Argument;
+import io.micronaut.jackson.JacksonConfiguration;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
+import java.io.IOException;
 import java.util.Optional;
 
 /**
@@ -61,10 +67,23 @@ public class JsonNodeToObjectConverter implements TypeConverter<JsonNode, Object
             if (CharSequence.class.isAssignableFrom(targetType) && node instanceof ObjectNode) {
                 return Optional.of(node.toString());
             } else {
-                Object result = objectMapper.get().treeToValue(node, targetType);
+                Argument<Object> argument = null;
+                if (context instanceof ArgumentConversionContext) {
+                    argument = ((ArgumentConversionContext<Object>) context).getArgument();
+                }
+                ObjectMapper om = this.objectMapper.get();
+                JsonParser jsonParser = om.treeAsTokens(node);
+                TypeFactory typeFactory = om.getTypeFactory();
+                Object result;
+                if (argument != null) {
+                    JavaType javaType = JacksonConfiguration.constructType(argument, typeFactory);
+                    result = om.readValue(jsonParser, javaType);
+                } else {
+                    result = om.readValue(jsonParser, targetType);
+                }
                 return Optional.ofNullable(result);
             }
-        } catch (JsonProcessingException e) {
+        } catch (IOException e) {
             context.reject(e);
             return Optional.empty();
         }
