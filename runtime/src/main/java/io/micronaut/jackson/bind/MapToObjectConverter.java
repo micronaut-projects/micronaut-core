@@ -19,14 +19,11 @@ import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.TypeConverter;
-import io.micronaut.core.convert.exceptions.ConversionErrorException;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -68,12 +65,7 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
         }
         ArgumentBinder binder = this.beanPropertyBinder.get();
         ArgumentBinder.BindingResult result = binder.bind(conversionContext, map);
-        List<ConversionError> conversionErrors = result.getConversionErrors();
-        if (!conversionErrors.isEmpty()) {
-            context.reject(map, new ConversionErrorException(conversionContext.getArgument(), conversionErrors.iterator().next()));
-            return Optional.empty();
-        } else {
-            return result.getValue();
-        }
+        Optional opt = result.getValue();
+        return opt;
     }
 }

@@ -59,7 +59,7 @@ public class BookControllerTest {
         // end::postform[]
 
         thrown.expect(HttpClientResponseException.class);
-        thrown.expectMessage(CoreMatchers.startsWith("Failed to convert argument [book] for value [{title=The Stand, pages=notnumber, url=noturl}]"));
+        thrown.expectMessage(CoreMatchers.startsWith("Failed to convert argument [book] for value [null] due to: Cannot deserialize value of type `int` from String \"notnumber\""));
 
         HttpResponse<Book> response = call.blockingFirst();
 
