@@ -1417,7 +1417,6 @@ class Test {
         introspection.getRequiredProperty("name", String).get(instance) == "Apple"
     }
 
-    @IgnoreIf({ Jvm.current.isJava9Compatible() })
     void "test enum bean properties"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test;
@@ -1460,12 +1459,11 @@ public enum Test {
         thrown(InstantiationException)
     }
 
-    @IgnoreIf({ Jvm.current.isJava11Compatible() })
     void "test instantiating an enum"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test;
 
-import io.micronaut.core.annotation.*;
+import io.micronaut.core.annotation.Introspected;
 
 @Introspected
 enum Test {
