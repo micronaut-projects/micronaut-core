@@ -847,7 +847,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 boolean isPublic) {
             return (isExecutableType && (isPublic || (modifiers.isEmpty()) && concreteClass.equals(enclosingElement))) ||
                     annotationMetadataHierarchy.hasDeclaredStereotype(Executable.class) ||
-                    declaredMetadata.hasAnnotation(Executable.class);
+                    declaredMetadata.hasStereotype(Executable.class);
         }
 
         private void visitConfigurationPropertySetter(ExecutableElement method) {
