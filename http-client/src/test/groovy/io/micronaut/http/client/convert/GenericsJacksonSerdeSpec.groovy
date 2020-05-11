@@ -10,6 +10,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -33,6 +34,16 @@ class GenericsJacksonSerdeSpec extends Specification {
         then:
         response.body().value == 'test'
     }
+
+    void "test deser body controller with generics - Issue #3202"() {
+
+                when:
+                def response = client.exchange(HttpRequest.POST("/generics-inherited/body", new Demo("value")), Demo)
+                        .blockingFirst()
+
+                then:
+                response.body().name == 'value'
+     }
 
     @Controller("/generics-test")
     static final class GenericsController {
@@ -75,6 +86,46 @@ class GenericsJacksonSerdeSpec extends Specification {
         @JsonValue
         String getValue() {
             return value
+        }
+    }
+
+    static abstract class AbstractOperations<T> {
+
+        @Post("/body")
+        T base(@Body T entity) {
+            return entity
+        }
+
+    }
+
+    @Controller("/generics-inherited")
+    static class DemoController extends AbstractOperations<Demo> {
+
+        @Get("/hello")
+        String hello() {
+            return "Hello world!"
+        }
+
+    }
+
+    @Introspected
+    static class Demo {
+        private String name
+
+        public Demo() {
+
+        }
+
+        public Demo(String name) {
+            this.name = name;
+        }
+
+        public String getName() {
+            return name
+        }
+
+        public void setName(String name) {
+            this.name = name
         }
     }
 }
