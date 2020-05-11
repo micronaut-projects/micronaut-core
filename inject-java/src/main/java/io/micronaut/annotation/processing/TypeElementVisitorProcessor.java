@@ -246,7 +246,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     return null;
                 } else {
                     TypeElement superClass = modelUtils.superClassFor(classElement);
-                    if (superClass != null && !modelUtils.isObjectClass(superClass)) {
+                    if (superClass != null && !modelUtils.isObjectClass(superClass) && !superClass.getQualifiedName().toString().equals("java.lang.Enum")) {
                         superClass.accept(this, o);
                     }
 

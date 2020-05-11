@@ -271,7 +271,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             Set<AnnotationValue> indexedAnnotations,
             ClassElement ce,
             BeanIntrospectionWriter writer) {
-        if (ce.isAbstract()) {
+        Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
+        if (ce.isAbstract() && !constructorElement.isPresent()) {
             currentAbstractIntrospection = new AbstractIntrospection(
                     writer,
                     includes,
@@ -283,7 +284,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             abstractIntrospections.add(currentAbstractIntrospection);
         } else {
             final List<PropertyElement> beanProperties = ce.getBeanProperties();
-            Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
 
             final MethodElement constructor = constructorElement.orElse(null);
             process(

@@ -35,6 +35,32 @@ import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test bean introspection with property with static creator method on interface"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+
+@io.micronaut.core.annotation.Introspected
+interface Foo {
+    String getName();
+    
+    @Creator
+    static Foo create(String name) {
+        return () -> name;
+    }
+}
+
+''')
+        when:
+        def test = introspection.instantiate("test")
+
+        then:
+        introspection.getRequiredProperty("name", String)
+                .get(test) == 'test'
+    }
+
     void "test bean introspection with property from default interface method"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
@@ -1391,7 +1417,6 @@ class Test {
         introspection.getRequiredProperty("name", String).get(instance) == "Apple"
     }
 
-    @IgnoreIf({ Jvm.current.isJava9Compatible() })
     void "test enum bean properties"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test;
@@ -1438,7 +1463,7 @@ public enum Test {
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test;
 
-import io.micronaut.core.annotation.*;
+import io.micronaut.core.annotation.Introspected;
 
 @Introspected
 enum Test {
