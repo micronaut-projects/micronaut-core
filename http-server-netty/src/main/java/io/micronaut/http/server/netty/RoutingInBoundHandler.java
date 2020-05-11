@@ -1461,7 +1461,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
                 try {
                     writable.writeTo(outputStream, nettyRequest.getCharacterEncoding());
-                    ((MutableHttpResponse) response).body(byteBuf);
+                    response.body(byteBuf);
+                    if (!response.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
+                        response.header(HttpHeaders.CONTENT_TYPE, defaultResponseMediaType);
+                    }
                     writeFinalNettyResponse(
                             response,
                             nettyRequest,
