@@ -160,6 +160,11 @@ ext {
                     group:'io.micronaut.configuration',
                     name:'micronaut-rabbitmq'
             ],
+            'micronaut.nats': [
+                    version:micronautNatsIoVersion,
+                    group:'io.micronaut.nats',
+                    name:'micronaut-nats'
+            ],
             'micronaut.graphql': [
                     version:micronautGraphQLVersion,
                     group:'io.micronaut.graphql',
