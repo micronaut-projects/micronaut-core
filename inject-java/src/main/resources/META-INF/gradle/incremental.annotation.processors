@@ -1,4 +1,5 @@
 io.micronaut.annotation.processing.TypeElementVisitorProcessor,dynamic
+io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor,dynamic
 io.micronaut.annotation.processing.BeanDefinitionInjectProcessor,dynamic
 io.micronaut.annotation.processing.PackageConfigurationInjectProcessor,dynamic
 io.micronaut.annotation.processing.ServiceDescriptionProcessor,dynamic
