@@ -20,10 +20,12 @@ import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
+import io.micronaut.core.naming.NameUtils;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -63,8 +65,13 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
         } else {
             conversionContext = ConversionContext.of(targetType);
         }
+        Map mapWithExtraProps = new LinkedHashMap(map.size());
+        for (Map.Entry entry : ((Map<?, ?>) map).entrySet()) {
+            Object key = entry.getKey();
+            mapWithExtraProps.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
+        }
         ArgumentBinder binder = this.beanPropertyBinder.get();
-        ArgumentBinder.BindingResult result = binder.bind(conversionContext, map);
+        ArgumentBinder.BindingResult result = binder.bind(conversionContext, mapWithExtraProps);
         Optional opt = result.getValue();
         return opt;
     }
