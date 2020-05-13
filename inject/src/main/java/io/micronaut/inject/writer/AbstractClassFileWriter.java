@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
@@ -25,6 +26,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import org.jetbrains.annotations.NotNull;
@@ -103,6 +105,15 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         NAME_TO_TYPE_MAP.put("long", "J");
         NAME_TO_TYPE_MAP.put("double", "D");
         NAME_TO_TYPE_MAP.put("float", "F");
+    }
+
+    protected final Element originatingElement;
+
+    /**
+     * @param originatingElement The originating element
+     */
+    protected AbstractClassFileWriter(Element originatingElement) {
+        this.originatingElement = originatingElement;
     }
 
     /**
@@ -537,6 +548,13 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         isSingletonMethod.returnValue();
         isSingletonMethod.visitMaxs(1, 1);
         isSingletonMethod.visitEnd();
+    }
+
+    /**
+     * @return The originating element
+     */
+    public @Nullable Element getOriginatingElement() {
+        return this.originatingElement;
     }
 
     /**

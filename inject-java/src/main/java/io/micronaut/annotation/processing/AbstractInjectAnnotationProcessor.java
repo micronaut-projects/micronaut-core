@@ -51,6 +51,14 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      * Annotation processor option used to add additional annotation patterns to process.
      */
     protected static final String MICRONAUT_PROCESSING_ANNOTATIONS = "micronaut.processing.annotations";
+    /**
+     * Constant for aggregating processor.
+     */
+    protected static final String GRADLE_PROCESSING_AGGREGATING = "org.gradle.annotation.processing.aggregating";
+    /**
+     * Constant for isolating processor.
+     */
+    protected static final String GRADLE_PROCESSING_ISOLATING = "org.gradle.annotation.processing.isolating";
 
     protected Messager messager;
     protected Filer filer;
@@ -83,12 +91,22 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     public Set<String> getSupportedOptions() {
         final Set<String> options;
         if (incremental) {
-            options = CollectionUtils.setOf("org.gradle.annotation.processing.aggregating");
+            options = CollectionUtils.setOf(getIncrementalProcessorType());
         } else {
             options = new HashSet<>(5);
         }
         options.addAll(super.getSupportedOptions());
         return options;
+    }
+
+    /**
+     *
+     * @return The incremental processor type.
+     * @see #GRADLE_PROCESSING_AGGREGATING
+     * @see #GRADLE_PROCESSING_ISOLATING
+     */
+    protected String getIncrementalProcessorType() {
+        return GRADLE_PROCESSING_ISOLATING;
     }
 
     @Override

@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.ast.Element;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
@@ -51,13 +52,16 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
 
     /**
      * @param className               The class name
+     * @param originatingElement      The originating element
      * @param annotationMetadata      The annotation metadata
      * @param writeAnnotationDefaults Whether to write annotation defaults
      */
     protected AbstractAnnotationMetadataWriter(
             String className,
+            Element originatingElement,
             AnnotationMetadata annotationMetadata,
             boolean writeAnnotationDefaults) {
+        super(originatingElement);
         this.targetClassType = getTypeReference(className);
         this.annotationMetadata = annotationMetadata;
         this.writeAnnotationDefault = writeAnnotationDefaults;

@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassGenerationException;
@@ -151,10 +152,16 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * Constructs a new writer for the given class name and metadata.
      *
      * @param className               The class name for which the metadata relates
+     * @param originatingElement      The originating element
      * @param annotationMetadata      The annotation metadata
      * @param writeAnnotationDefaults Whether annotations defaults should be written
      */
-    public AnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata, boolean writeAnnotationDefaults) {
+    public AnnotationMetadataWriter(
+            String className,
+            ClassElement originatingElement,
+            AnnotationMetadata annotationMetadata,
+            boolean writeAnnotationDefaults) {
+        super(originatingElement);
         this.className = className + AnnotationMetadata.CLASS_NAME_SUFFIX;
         if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             this.parent = null;
@@ -174,10 +181,14 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * Constructs a new writer for the given class name and metadata.
      *
      * @param className          The class name for which the metadata relates
+     * @param originatingElement The originating element
      * @param annotationMetadata The annotation metadata
      */
-    public AnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata) {
-        this(className, annotationMetadata, false);
+    public AnnotationMetadataWriter(
+            String className,
+            ClassElement originatingElement,
+            AnnotationMetadata annotationMetadata) {
+        this(className, originatingElement, annotationMetadata, false);
     }
 
     /**
@@ -197,7 +208,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         ClassWriter classWriter = generateClassBytes();
         if (classWriter != null) {
 
-            try (OutputStream outputStream = outputVisitor.visitClass(className)) {
+            try (OutputStream outputStream = outputVisitor.visitClass(className, getOriginatingElement())) {
                 outputStream.write(classWriter.toByteArray());
             }
         }

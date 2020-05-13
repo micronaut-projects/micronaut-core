@@ -15,6 +15,8 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaClassElement;
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
@@ -269,7 +271,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             AnnotationMetadata annotationMetadata = beanDefinitionWriter.getAnnotationMetadata();
             BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                    new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionName, annotationMetadata);
+                    new BeanDefinitionReferenceWriter(
+                            beanTypeName,
+                            beanDefinitionName,
+                            beanDefinitionWriter.getOriginatingElement(),
+                            annotationMetadata
+                    );
             beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
 
             String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();
@@ -341,6 +348,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private final boolean isAopProxyType;
         private final OptionalValues<Boolean> aopSettings;
         private final boolean isDeclaredBean;
+        private final JavaClassElement originatingElement;
         private ConfigurationMetadata configurationMetadata;
         private ExecutableElementParamInfo constructorParameterInfo;
         private AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
@@ -353,6 +361,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         AnnBeanElementVisitor(TypeElement concreteClass) {
             this.concreteClass = concreteClass;
             this.concreteClassMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
+            this.originatingElement = new JavaClassElement(concreteClass, concreteClassMetadata, new JavaVisitorContext(
+                processingEnv,
+                messager,
+                elementUtils,
+                annotationUtils,
+                typeUtils,
+                modelUtils,
+                genericUtils,
+                filer,
+                visitorAttributes
+            ));
             beanDefinitionWriters = new LinkedHashMap<>();
             this.isFactoryType = concreteClassMetadata.hasStereotype(Factory.class);
             this.isConfigurationPropertiesType = concreteClassMetadata.hasDeclaredStereotype(ConfigurationReader.class) || concreteClassMetadata.hasDeclaredStereotype(EachProperty.class);
@@ -1426,9 +1445,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 beanClassName,
                                 true,
                                 false,
+                                originatingElement,
                                 methodAnnotationMetadata,
                                 new Object[]{modelUtils.resolveTypeReference(typeToImplement)},
-                                ArrayUtils.EMPTY_OBJECT_ARRAY);
+                                ArrayUtils.EMPTY_OBJECT_ARRAY
+                        );
 
                         aopProxyWriter.visitBeanDefinitionConstructor(methodAnnotationMetadata, false);
 
@@ -2109,7 +2130,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             ? elementUtils.getBinaryName(typeElement).toString()
                             : providerTypeParam.toString(),
                     isInterface,
-                    annotationMetadata);
+                    originatingElement,
+                    annotationMetadata
+            );
 
             visitTypeArguments(typeElement, beanDefinitionWriter);
 
@@ -2148,9 +2171,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     packageElement.getQualifiedName().toString(),
                     beanClassName,
                     isInterface,
+                    originatingElement,
                     annotationMetadata,
                     interfaceTypes,
-                    interceptorTypes);
+                    interceptorTypes
+            );
 
             if (ArrayUtils.isNotEmpty(interfaceTypes)) {
                 List<? extends AnnotationMirror> annotationMirrors = typeElement.getAnnotationMirrors();
@@ -2222,7 +2247,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     factoryMethodBeanDefinitionName,
                     modelUtils.resolveTypeReference(producedElement).toString(),
                     isInterface,
-                    annotationMetadata);
+                    originatingElement,
+                    annotationMetadata
+            );
         }
 
         private ExecutableElementParamInfo populateParameterData(@Nullable String declaringTypeName, ExecutableElement element, Map<String, Object> boundTypes) {

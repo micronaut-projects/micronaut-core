@@ -188,8 +188,8 @@ public class JavaVisitorContext implements VisitorContext {
     }
 
     @Override
-    public OutputStream visitClass(String classname) throws IOException {
-        return outputVisitor.visitClass(classname);
+    public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
+        return outputVisitor.visitClass(classname, originatingElement);
     }
 
     @Override

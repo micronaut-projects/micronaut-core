@@ -191,6 +191,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                                 element.getName(),
                                 index.getAndIncrement(),
+                                element,
                                 ce,
                                 metadata ? element.getAnnotationMetadata() : null
                         );
@@ -214,6 +215,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                                 element.getName(),
                                 j++,
+                                element,
                                 classElement,
                                 metadata ? element.getAnnotationMetadata() : null
                         );

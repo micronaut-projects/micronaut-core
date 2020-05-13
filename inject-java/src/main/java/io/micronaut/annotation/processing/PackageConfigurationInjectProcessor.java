@@ -15,7 +15,10 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaPackageElement;
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.context.annotation.Configuration;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.writer.BeanConfigurationWriter;
 
@@ -80,9 +83,21 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
             Object aPackage = super.visitPackage(packageElement, p);
             if (annotationUtils.hasStereotype(packageElement, Configuration.class)) {
                 String packageName = packageElement.getQualifiedName().toString();
+                AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(packageElement);
                 BeanConfigurationWriter writer = new BeanConfigurationWriter(
                     packageName,
-                    annotationUtils.getAnnotationMetadata(packageElement)
+                    new JavaPackageElement(packageElement, annotationMetadata, new JavaVisitorContext(
+                        processingEnv,
+                        messager,
+                        elementUtils,
+                        annotationUtils,
+                        typeUtils,
+                        modelUtils,
+                        genericUtils,
+                        filer,
+                        visitorAttributes
+                    )),
+                    annotationMetadata
                 );
                 try {
                     writer.accept(classWriterOutputVisitor);
