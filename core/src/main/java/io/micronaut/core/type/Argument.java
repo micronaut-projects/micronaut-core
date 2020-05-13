@@ -25,12 +25,11 @@ import io.micronaut.core.util.ArrayUtils;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
@@ -128,7 +127,13 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     @Override
     @NonNull
     default String getTypeName() {
-        return getName();
+        Argument[] typeParameters = getTypeParameters();
+        if (ArrayUtils.isNotEmpty(typeParameters)) {
+            String typeName = getType().getTypeName();
+            return typeName +  "<" + Arrays.stream(typeParameters).map(Argument::getTypeName).collect(Collectors.joining(",")) + ">";
+        } else {
+            return getType().getTypeName();
+        }
     }
 
     /**
@@ -152,6 +157,35 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      * @return The type hash code
      */
     int typeHashCode();
+
+    /**
+     * Represent this argument as a {@link ParameterizedType}.
+     * @return The {@link ParameterizedType}
+     * @since 2.0.0
+     */
+    default @NonNull ParameterizedType asParameterizedType() {
+        return new ParameterizedType() {
+            @Override
+            public Type[] getActualTypeArguments() {
+                return getTypeParameters();
+            }
+
+            @Override
+            public Type getRawType() {
+                return Argument.this.getType();
+            }
+
+            @Override
+            public Type getOwnerType() {
+                return Argument.this;
+            }
+
+            @Override
+            public String getTypeName() {
+                return Argument.this.getTypeName();
+            }
+        };
+    }
 
     /**
      * Whether the given argument is an instance.

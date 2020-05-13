@@ -17,11 +17,24 @@ package io.micronaut.core.type
 
 import spock.lang.Specification
 
+import java.lang.reflect.ParameterizedType
+
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 class ArgumentSpec extends Specification {
+
+    void "test as parameterized type"() {
+        given:
+        def listOfString = Argument.listOf(String)
+        def parameterizedType = listOfString.asParameterizedType()
+
+        expect:
+        parameterizedType.actualTypeArguments[0].typeName == String.name
+        parameterizedType.rawType.typeName == List.name
+        parameterizedType.typeName == 'java.util.List<java.lang.String>'
+    }
 
     void "test equals/hashcode"() {
         expect:
