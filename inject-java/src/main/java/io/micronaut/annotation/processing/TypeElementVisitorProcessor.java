@@ -145,10 +145,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             }
         }
 
-        if (roundEnv.processingOver()) {
-            javaVisitorContext.finish();
-        }
-
         return false;
     }
 

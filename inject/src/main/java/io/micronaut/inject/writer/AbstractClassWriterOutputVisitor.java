@@ -55,6 +55,15 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
     public final void finish() {
         Map<String, Set<String>> serviceEntries = getServiceEntries();
 
+        writeServiceEntries(serviceEntries);
+    }
+
+    /**
+     * Writes the service entries.
+     *
+     * @param serviceEntries The service entries
+     */
+    public void writeServiceEntries(Map<String, Set<String>> serviceEntries) {
         for (Map.Entry<String, Set<String>> entry : serviceEntries.entrySet()) {
             String serviceName = entry.getKey();
             Set<String> serviceTypes = entry.getValue();
@@ -94,7 +103,6 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
                 } catch (IOException x) {
                     throw new ClassGenerationException("Failed to open writer for service definition files: " + x);
                 }
-
             }
         }
     }

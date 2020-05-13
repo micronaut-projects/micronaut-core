@@ -202,7 +202,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         if (processingOver) {
             try {
                 writeConfigurationMetadata();
-                writeBeanDefinitionsToMetaInf();
             } finally {
                 AnnotationUtils.invalidateCache();
                 AbstractAnnotationMetadataBuilder.clearMutated();
@@ -227,18 +226,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             } catch (ServiceConfigurationError e) {
                 warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
             }
-        }
-    }
-
-    /**
-     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io.micronaut.inject.BeanDefinitionReference.
-     */
-    private void writeBeanDefinitionsToMetaInf() {
-        try {
-            classWriterOutputVisitor.finish();
-        } catch (Exception e) {
-            String message = e.getMessage();
-            error("Error occurred writing META-INF files: %s", message != null ? message : e);
         }
     }
 

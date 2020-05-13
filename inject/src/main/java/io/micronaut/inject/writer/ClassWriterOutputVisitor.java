@@ -57,6 +57,7 @@ public interface ClassWriterOutputVisitor {
      */
     OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException;
 
+
     /**
      * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
      * name.

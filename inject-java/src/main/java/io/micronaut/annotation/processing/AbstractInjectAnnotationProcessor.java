@@ -20,8 +20,6 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.inject.writer.ClassWriterOutputVisitor;
-
 import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -68,7 +66,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected GenericUtils genericUtils;
     protected ModelUtils modelUtils;
     protected MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
-    protected ClassWriterOutputVisitor classWriterOutputVisitor;
+    protected AnnotationProcessingOutputVisitor classWriterOutputVisitor;
     protected JavaVisitorContext javaVisitorContext;
     private boolean incremental = false;
     private Set<String> supportedAnnotationTypes = new HashSet<>(5);

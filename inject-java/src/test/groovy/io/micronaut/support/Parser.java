@@ -37,6 +37,7 @@ import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.util.Context;
 import io.micronaut.annotation.processing.PackageConfigurationInjectProcessor;
 import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
+import io.micronaut.annotation.processing.ServiceDescriptionProcessor;
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
 
 import java.io.File;
@@ -127,6 +128,7 @@ public final class Parser {
             processors.add(new TypeElementVisitorProcessor());
             processors.add(new PackageConfigurationInjectProcessor());
             processors.add(new BeanDefinitionInjectProcessor());
+            processors.add(new ServiceDescriptionProcessor());
             task.setProcessors(processors);
             task.generate();
 

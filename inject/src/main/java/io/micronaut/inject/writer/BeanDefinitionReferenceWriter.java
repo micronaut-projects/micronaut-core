@@ -125,7 +125,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
         Type superType = Type.getType(AbstractBeanDefinitionReference.class);
-        startPublicClass(classWriter, beanDefinitionClassInternalName, superType);
+        startService(classWriter, BeanDefinitionReference.class, beanDefinitionClassInternalName, superType);
         Type beanDefinitionType = getTypeReference(beanDefinitionName);
         writeAnnotationMetadataStaticInitializer(classWriter);
 

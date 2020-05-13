@@ -21,6 +21,7 @@ import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.util.Context;
 import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
 import io.micronaut.annotation.processing.PackageConfigurationInjectProcessor;
+import io.micronaut.annotation.processing.ServiceDescriptionProcessor;
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -188,6 +189,7 @@ public class JavaParser implements Closeable {
         processors.add(getTypeElementVisitorProcessor());
         processors.add(new PackageConfigurationInjectProcessor());
         processors.add(getBeanDefinitionInjectProcessor());
+        processors.add(new ServiceDescriptionProcessor());
         return processors;
     }
 

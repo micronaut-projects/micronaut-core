@@ -18,7 +18,6 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 
-import javax.lang.model.element.Element;
 import javax.lang.model.element.PackageElement;
 
 /**
@@ -30,7 +29,7 @@ import javax.lang.model.element.PackageElement;
 @Internal
 public class JavaPackageElement extends AbstractJavaElement {
     /**
-     * @param element            The {@link Element}
+     * @param element            The {@link PackageElement}
      * @param annotationMetadata The Annotation metadata
      * @param visitorContext     The Java visitor context
      */
