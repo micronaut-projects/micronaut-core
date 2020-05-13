@@ -36,12 +36,12 @@ public interface ClassWriterOutputVisitor {
      * Visits a new class and returns the output stream with which should be written the bytes of the class to be
      * generated.
      *
+     * Note that this method should only be called from a {@link io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind#AGGREGATING} visitor from within the {@link io.micronaut.inject.visitor.TypeElementVisitor#finish(io.micronaut.inject.visitor.VisitorContext)} method. If the file
+     *
      * @param classname          the fully qualified classname
      * @return the output stream to write to
-     * @deprecated Use {@link #visitClass(String, Element)} instead
      * @throws IOException if an error occurs creating the output stream
      */
-    @Deprecated
     default OutputStream visitClass(String classname) throws IOException {
         return visitClass(classname, null);
     }

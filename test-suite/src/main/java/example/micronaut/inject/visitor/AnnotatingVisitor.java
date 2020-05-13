@@ -15,6 +15,7 @@
  */
 package example.micronaut.inject.visitor;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -32,6 +33,12 @@ public class AnnotatingVisitor implements TypeElementVisitor<Version, Version> {
     public void visitClass(ClassElement element, VisitorContext context) {
         context.info("Annotating type", element);
         element.annotate(TestAnn.class, (builder) -> builder.value("class"));
+    }
+
+    @NonNull
+    @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
     }
 
     @Override

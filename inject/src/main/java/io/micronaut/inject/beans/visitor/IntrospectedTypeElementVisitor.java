@@ -235,6 +235,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
     }
 
+    @NonNull
+    @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
+    }
+
     @Override
     public void finish(VisitorContext visitorContext) {
 
