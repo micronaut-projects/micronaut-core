@@ -18,6 +18,21 @@ The above activates environments called `foo` and `bar`.
 
 Finally, the Cloud environment names are also detected. See the section on <<cloudConfiguration,Cloud Configuration>> for more information.
 
+== Environment Priority
+
+Micronaut will load property sources based off the environments specified, and if the same property key exists in multiple property sources specific to an environment, the environment order determines which value will be used.
+
+Micronaut uses the following hierarchy for environment processing (lowest priority to highest priority):
+
+* Deduced environments
+* Environments from the `micronaut.environments` system property
+* Environments from the `MICRONAUT_ENVIRONMENTS` environment variable
+* Environments specified explicitly through the application context builder
++
+NOTE: This also applies to `@MicronautTest(environments = )`
++
+
+
 == Disabling Environment Detection
 
 The automatic detection of environments can be disabled setting the `micronaut.env.deduction` system property or the `MICRONAUT_ENV_DEDUCTION` environment variable to `false`. This will prevent Micronaut from detecting current environments, while still using any environments that are specifically provided as shown above.
