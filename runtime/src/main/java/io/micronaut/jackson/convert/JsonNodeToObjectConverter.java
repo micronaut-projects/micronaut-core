@@ -69,7 +69,7 @@ public class JsonNodeToObjectConverter implements TypeConverter<JsonNode, Object
                 return Optional.of(node.toString());
             } else {
                 Argument<Object> argument = null;
-                if (node instanceof ContainerNode && context instanceof ArgumentConversionContext) {
+                if (node instanceof ContainerNode && context instanceof ArgumentConversionContext && targetType.getTypeParameters().length != 0) {
                     argument = ((ArgumentConversionContext<Object>) context).getArgument();
                 }
                 Object result;
