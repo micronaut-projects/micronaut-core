@@ -127,6 +127,15 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     }
 
     @Override
+    public Set<String> getSupportedAnnotationTypes() {
+        if (loadedVisitors.isEmpty()) {
+            return Collections.emptySet();
+        } else {
+            return super.getSupportedAnnotationTypes();
+        }
+    }
+
+    @Override
     public Set<String> getSupportedOptions() {
         Stream<String> baseOption = super.getSupportedOptions().stream();
         Stream<String> visitorsOptions = typeElementVisitors

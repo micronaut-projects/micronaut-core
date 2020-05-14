@@ -115,7 +115,12 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                     "io.micronaut.*"
             );
             types.addAll(supportedAnnotationTypes);
-            types.addAll(AbstractAnnotationMetadataBuilder.getMappedAnnotationNames());
+            Set<String> mappedAnnotationNames = AbstractAnnotationMetadataBuilder.getMappedAnnotationNames();
+            for (String mappedAnnotationName : mappedAnnotationNames) {
+                if (!mappedAnnotationName.contains("Nullable") && !mappedAnnotationName.contains("NotNull")) {
+                    types.add(mappedAnnotationName);
+                }
+            }
             return types;
         } else {
             return Collections.singleton("*");
