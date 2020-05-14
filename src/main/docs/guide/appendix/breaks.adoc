@@ -211,10 +211,6 @@ To bind to a map with flat keys, add the ann:core.convert.format.MapFormat[] ann
 
 The no longer used group for Graal is no longer part of the bom. While upgrading if you depend on Graal you may see `Could not find com.oracle.substratevm:svm:.`. To resolve the issue, change the dependency group to `org.graalvm.nativeimage`.
 
-=== Cookie Configuration
-
-The `getCookieMaxAge` method has been changed to return a `java.time.Duration`.
-
 === `@Retryable` and `@CircuitBreaker` Exception Handling
 
 `@Retryable` and `@CircuitBreaker` in previous versions of Micronaut resolved `includes` and `excludes` explicitly. Any exception thrown had to exactly match one of the exceptions specified. This has been changed to now also include subclasses of the exception types specified.
@@ -238,3 +234,7 @@ my.message=We love Micronaut''s documentation
 ----
 
 NOTE: This change also applies to messages in custom constraint annotations, which interpolate the message via the message source api.
+
+=== Environment Order Bugfix
+
+Environments specified through the application context builder have priority over environments deduced or supplied through the MICRONAUT_ENVIRONMENTS environment variable, or the equivalent system property. A bug in the logic however did not change the order of a specified environment if it previously was found or deduced. This issue manifested itself with `@MicronautTest(environments = "test")`. The `test` environment is already deduced for tests, so it retained the order of other deduced environments, and was able to be overriden by `MICRONAUT_ENVIRONMENTS=dev`. In Micronaut 1.x configuration for `dev` would have overridden `test`. In Micronaut 2.x `test` will override `dev`.

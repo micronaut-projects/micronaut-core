@@ -115,6 +115,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             packages.add(aPackage);
         }
 
+        environments.removeAll(specifiedNames);
         environments.addAll(specifiedNames);
 
         this.classLoader = configuration.getClassLoader();
