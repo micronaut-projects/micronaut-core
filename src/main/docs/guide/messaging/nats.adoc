@@ -1,0 +1,7 @@
+https://nats.io/[Nats.io] is a simple, secure and high performance open source messaging system for cloud native applications, IoT messaging, and microservices architectures.
+
+Micronaut features dedicated support for defining both Nats.io publishers and consumers. Micronaut applications built with Nats.io can be deployed with or without the presence of an HTTP server.
+
+With Micronaut's efficient compile-time AOP, using Nats.io has never been easier. Support has been added for publisher confirms and RPC through reactive streams.
+
+See the documentation for https://micronaut-projects.github.io/micronaut-nats/latest/guide/[Micronaut Nats] for more information on how to build Nats.io applications with Micronaut.
