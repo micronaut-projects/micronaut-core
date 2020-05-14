@@ -69,7 +69,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected AnnotationProcessingOutputVisitor classWriterOutputVisitor;
     protected JavaVisitorContext javaVisitorContext;
     private boolean incremental = false;
-    private Set<String> supportedAnnotationTypes = new HashSet<>(5);
+    private final Set<String> supportedAnnotationTypes = new HashSet<>(5);
 
     @Override
     public SourceVersion getSupportedSourceVersion() {

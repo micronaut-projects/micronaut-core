@@ -18,6 +18,8 @@ package io.micronaut.inject.visitor;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.reflect.GenericTypeUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.FieldElement;
@@ -93,6 +95,29 @@ public interface TypeElementVisitor<C, E> extends Ordered {
      */
     default void finish(VisitorContext visitorContext) {
         // no-op
+    }
+
+    /**
+     * @return The supported default annotation names.
+     */
+    default Set<String> getSupportedAnnotationNames() {
+        Class<?>[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(getClass(), TypeElementVisitor.class);
+
+        if (classes.length == 2) {
+            Class<?> classType = classes[0];
+            if (classType == Object.class) {
+                return Collections.singleton("*");
+            } else {
+                Class<?> methodType = classes[1];
+                if (methodType != Object.class) {
+                    return CollectionUtils.setOf(classType.getName(), methodType.getName());
+                } else {
+                    return CollectionUtils.setOf(classType.getName());
+                }
+
+            }
+        }
+        return Collections.singleton("*");
     }
 
     /**

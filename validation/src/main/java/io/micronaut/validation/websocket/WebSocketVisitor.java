@@ -15,8 +15,10 @@
  */
 package io.micronaut.validation.websocket;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -48,6 +50,19 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
 
     private Map<String, UriMatchTemplate> uriCache = new HashMap<>(3);
     private boolean skipValidation = false;
+
+    @NonNull
+    @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
+    }
+
+    @Override
+    public Set<String> getSupportedAnnotationNames() {
+        return CollectionUtils.setOf(
+                WebSocketComponent.class.getName()
+        );
+    }
 
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {

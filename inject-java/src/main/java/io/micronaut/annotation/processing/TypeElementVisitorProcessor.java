@@ -106,6 +106,13 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     }
 
     /**
+     * @return The loaded visitors.
+     */
+    protected List<LoadedVisitor> getLoadedVisitors() {
+        return loadedVisitors;
+    }
+
+    /**
      *
      * @return The incremental processor type.
      * @see #GRADLE_PROCESSING_AGGREGATING
