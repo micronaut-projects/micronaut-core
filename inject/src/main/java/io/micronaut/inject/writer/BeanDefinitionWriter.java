@@ -60,6 +60,7 @@ import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 
 /**
  * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
@@ -912,7 +913,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Object type,
             String field,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder) {
+            ConfigurationMetadataBuilder metadataBuilder,
+            boolean isInterface) {
         String factoryMethod = annotationMetadata
                 .getValue(
                         ConfigurationBuilder.class,
@@ -939,7 +941,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 field,
                 false,
                 annotationMetadata,
-                metadataBuilder);
+                metadataBuilder,
+                isInterface);
     }
 
     @Override
@@ -947,7 +950,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Object type,
             String methodName,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder) {
+            ConfigurationMetadataBuilder metadataBuilder,
+            boolean isInterface) {
 
         String factoryMethod = annotationMetadata
                 .getValue(
@@ -975,7 +979,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             ));
         }
 
-        this.currentConfigBuilderState = new ConfigBuilderState(type, methodName, true, annotationMetadata, metadataBuilder);
+        this.currentConfigBuilderState = new ConfigBuilderState(type, methodName, true, annotationMetadata, metadataBuilder, isInterface);
     }
 
     @Override
@@ -1151,28 +1155,24 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 pushCastToType(injectMethodVisitor, paramType);
             }
 
-            if (zeroArgs) {
-                injectMethodVisitor.invokeVirtual(
-                        builderType,
-                        new org.objectweb.asm.commons.Method(methodName, methodDescriptor)
-                );
-            } else if (isDurationWithTimeUnit) {
+            boolean isInterface = currentConfigBuilderState.isInterface();
+
+            if (isDurationWithTimeUnit) {
                 injectMethodVisitor.invokeVirtual(Type.getType(Duration.class), org.objectweb.asm.commons.Method.getMethod(
                         ReflectionUtils.getRequiredMethod(Duration.class, "toMillis")
                 ));
                 Type tu = Type.getType(TimeUnit.class);
                 injectMethodVisitor.getStatic(tu, "MILLISECONDS", tu);
-                injectMethodVisitor.invokeVirtual(
-                        builderType,
-                        new org.objectweb.asm.commons.Method(methodName, methodDescriptor)
-                );
-
-            } else {
-                injectMethodVisitor.invokeVirtual(
-                        builderType,
-                        new org.objectweb.asm.commons.Method(methodName, methodDescriptor)
-                );
             }
+
+            if (isInterface) {
+                injectMethodVisitor.invokeInterface(builderType,
+                        new org.objectweb.asm.commons.Method(methodName, methodDescriptor));
+            } else {
+                injectMethodVisitor.invokeVirtual(builderType,
+                        new org.objectweb.asm.commons.Method(methodName, methodDescriptor));
+            }
+
             if (returnType != void.class) {
                 injectMethodVisitor.pop();
             }

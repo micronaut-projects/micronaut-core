@@ -92,4 +92,76 @@ final class TestProps {
         testPropBean.getBuilder().build().getManufacturer() == "Toyota"
 
     }
+
+    void "test configuration builder that are interfaces"() {
+        given:
+        ApplicationContext ctx = buildContext("test.PoolConfig", '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@ConfigurationProperties("pool")    
+final class PoolConfig { 
+    
+    @ConfigurationBuilder(prefixes = {""})
+    public ConnectionPool.Builder builder = DefaultConnectionPool.builder();
+    
+}
+
+interface ConnectionPool {
+    
+    interface Builder {
+        Builder maxConcurrency(Integer maxConcurrency);
+        ConnectionPool build();
+    }
+    
+    int getMaxConcurrency();
+}
+
+class DefaultConnectionPool implements ConnectionPool {
+    private final int maxConcurrency;
+    
+    DefaultConnectionPool(int maxConcurrency) {
+        this.maxConcurrency = maxConcurrency;
+    }
+    
+    public static ConnectionPool.Builder builder() {
+        return new DefaultBuilder();
+    }
+    
+    @Override 
+    public int getMaxConcurrency() {
+        return maxConcurrency;
+    }
+    
+    private static class DefaultBuilder implements ConnectionPool.Builder {
+    
+        private int maxConcurrency;
+    
+        private DefaultBuilder() {
+        }
+    
+        @Override
+        public ConnectionPool.Builder maxConcurrency(Integer maxConcurrency) {
+            this.maxConcurrency = maxConcurrency;
+            return this;
+        }
+        
+        public ConnectionPool build() {
+            return new DefaultConnectionPool(maxConcurrency);
+        }
+    }
+}
+''')
+        ctx.getEnvironment().addPropertySource(PropertySource.of(["pool.max-concurrency": 123]))
+
+        when:
+        Class testProps = ctx.classLoader.loadClass("test.PoolConfig")
+        def testPropBean = ctx.getBean(testProps)
+
+        then:
+        noExceptionThrown()
+        testPropBean.builder.build().getMaxConcurrency() == 123
+    }
+
 }

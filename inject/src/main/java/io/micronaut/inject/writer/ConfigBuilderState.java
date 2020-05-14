@@ -38,22 +38,24 @@ class ConfigBuilderState {
     private final boolean invokeMethod;
     private final ConfigurationMetadataBuilder metadataBuilder;
     private final AnnotationMetadata annotationMetadata;
+    private final boolean isInterface;
 
     /**
      * Constructs a config builder.
-     *
-     * @param type               The builder type
+     *  @param type               The builder type
      * @param name               The name of the field or method
      * @param isMethod           Is the configuration builder resolver a method
      * @param annotationMetadata The annotation metadata
      * @param metadataBuilder    The metadata builder
+     * @param isInterface
      */
-    ConfigBuilderState(Object type, String name, boolean isMethod, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder) {
+    ConfigBuilderState(Object type, String name, boolean isMethod, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder, boolean isInterface) {
         this.type = AbstractClassFileWriter.getTypeReference(type);
         this.name = name;
         this.invokeMethod = isMethod;
         this.metadataBuilder = metadataBuilder;
         this.annotationMetadata = annotationMetadata;
+        this.isInterface = isInterface;
     }
 
     /**
@@ -89,5 +91,9 @@ class ConfigBuilderState {
      */
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
+    }
+
+    public boolean isInterface() {
+        return isInterface;
     }
 }
