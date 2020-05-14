@@ -15,7 +15,9 @@
  */
 package io.micronaut.inject.writer;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.ast.Element;
 
 import java.io.File;
 import java.io.IOException;
@@ -42,8 +44,8 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
-    public OutputStream visitClass(String className) throws IOException {
-        File targetFile = new File(targetDir, getClassFileName(className)).getCanonicalFile();
+    public OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
+        File targetFile = new File(targetDir, getClassFileName(classname)).getCanonicalFile();
         File parentDir = targetFile.getParentFile();
         if (!parentDir.exists() && !parentDir.mkdirs()) {
             throw new IOException("Cannot create parent directory: " + targetFile.getParentFile());

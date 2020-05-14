@@ -182,13 +182,13 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
-    public OutputStream visitClass(String classname) throws IOException {
+    public OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
         File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                     classesDir
             );
-            return outputVisitor.visitClass(classname);
+            return outputVisitor.visitClass(classname, originatingElement);
         } else {
             // should only arrive here in testing scenarios
             if (compilationUnit.getClassLoader() instanceof InMemoryByteCodeGroovyClassLoader) {
@@ -207,7 +207,6 @@ public class GroovyVisitorContext implements VisitorContext {
                 return new ByteArrayOutputStream(); // in-memory, mock or unit tests situation?
             }
         }
-
     }
 
     @Override

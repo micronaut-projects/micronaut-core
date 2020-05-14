@@ -15,11 +15,13 @@
  */
 package io.micronaut.annotation.processing;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ClassGenerationException;
 import io.micronaut.inject.writer.GeneratedFile;
 
 import javax.annotation.processing.Filer;
+import javax.lang.model.element.Element;
 import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
@@ -55,9 +57,20 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
-    public OutputStream visitClass(String classname) throws IOException {
-        JavaFileObject javaFileObject = filer.createClassFile(classname);
+    public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
+        JavaFileObject javaFileObject;
+        if (originatingElement != null) {
+            Object nativeType = originatingElement.getNativeType();
+            if (nativeType instanceof Element) {
+                javaFileObject = filer.createClassFile(classname, (Element) nativeType);
+            } else {
+                javaFileObject = filer.createClassFile(classname);
+            }
+        } else {
+            javaFileObject = filer.createClassFile(classname);
+        }
         return javaFileObject.openOutputStream();
+
     }
 
     @Override

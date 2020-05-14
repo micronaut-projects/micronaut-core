@@ -22,6 +22,7 @@ import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Creator;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -46,6 +47,7 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
 public class GroovyClassElement extends AbstractGroovyElement implements ClassElement {
 
     private final ClassNode classNode;
@@ -57,7 +59,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
      */
-    GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
+    public GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
         this(sourceUnit, compilationUnit, classNode, annotationMetadata, null);
     }
 

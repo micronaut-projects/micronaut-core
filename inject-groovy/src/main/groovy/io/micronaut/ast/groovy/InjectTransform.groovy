@@ -15,10 +15,13 @@
  */
 package io.micronaut.ast.groovy
 
+import edu.umd.cs.findbugs.annotations.Nullable
 import groovy.transform.CompileDynamic
 import io.micronaut.aop.Adapter
 import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
+import io.micronaut.ast.groovy.visitor.GroovyClassElement
+import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.annotation.ConfigurationInject
 import io.micronaut.context.annotation.ConfigurationProperties
@@ -32,6 +35,8 @@ import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.Element
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.PropertyMetadata
 import io.micronaut.inject.processing.JavaModelUtils
@@ -150,7 +155,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (classNode.nameWithoutPackage == 'package-info') {
                 PackageNode packageNode = classNode.getPackage()
                 if (AstAnnotationUtils.hasStereotype(source, unit, packageNode, Configuration)) {
-                    BeanConfigurationWriter writer = new BeanConfigurationWriter(classNode.packageName, AstAnnotationUtils.getAnnotationMetadata(source, unit, packageNode))
+                    def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, unit, packageNode)
+                    BeanConfigurationWriter writer = new BeanConfigurationWriter(
+                            classNode.packageName,
+                            new GroovyPackageElement(source, unit, packageNode, annotationMetadata),
+                            annotationMetadata
+                    )
                     try {
                         writer.accept(outputVisitor)
                         outputVisitor.finish()
@@ -204,6 +214,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(
                         beanTypeName,
                         beanDefinitionName,
+                        beanDefWriter.getOriginatingElement(),
                         beanDefWriter.annotationMetadata
                 )
 
@@ -219,7 +230,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                     ClassWriterOutputVisitor visitor = new ClassWriterOutputVisitor() {
                         @Override
-                        OutputStream visitClass(String classname) throws IOException {
+                        OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
                             ByteArrayOutputStream stream = new ByteArrayOutputStream()
                             classStreams.put(classname, stream)
                             return stream
@@ -296,6 +307,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         public static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction"
         final SourceUnit sourceUnit
         final ClassNode concreteClass
+        final ClassElement originatingElement
         final AnnotationMetadata annotationMetadata
         final boolean isConfigurationProperties
         final boolean isFactoryClass
@@ -324,6 +336,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.concreteClass = targetClassNode
             def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, targetClassNode)
             this.annotationMetadata = annotationMetadata
+            this.originatingElement = new GroovyClassElement(sourceUnit, compilationUnit, concreteClass, annotationMetadata)
             this.isFactoryClass = annotationMetadata.hasStereotype(Factory)
             this.isAopProxyType = annotationMetadata.hasStereotype(AROUND_TYPE) && !targetClassNode.isAbstract()
             this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()
@@ -391,9 +404,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         packageName,
                         beanClassName,
                         isInterface,
+                        originatingElement,
                         annotationMetadata,
                         interfaceTypes,
-                        interceptorTypes)
+                        interceptorTypes
+                )
                 populateProxyWriterConstructor(node, aopProxyWriter)
                 beanDefinitionWriters.put(node, aopProxyWriter)
                 visitIntroductionTypePublicMethods(aopProxyWriter, node)
@@ -694,6 +709,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         factoryMethodBeanDefinitionName,
                         producedType.name,
                         producedType.isInterface(),
+                        originatingElement,
                         methodAnnotationMetadata
                 )
 
@@ -1620,13 +1636,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             classNode.nameWithoutPackage,
                             providerGenericType.name,
                             classNode.isInterface(),
-                            annotationMetadata)
+                            originatingElement,
+                            annotationMetadata
+                    )
                 } else {
 
                     beanWriter = new BeanDefinitionWriter(
                             classNode.packageName,
                             classNode.nameWithoutPackage,
-                            annotationMetadata)
+                            originatingElement,
+                            annotationMetadata
+                    )
                 }
 
                 visitTypeArguments(classNode, (BeanDefinitionWriter) beanWriter)
@@ -1720,9 +1740,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             beanClassName,
                             true,
                             false,
+                            originatingElement,
                             methodAnnotationMetadata,
                             [typeToImplement.name] as Object[],
-                            ArrayUtils.EMPTY_OBJECT_ARRAY)
+                            ArrayUtils.EMPTY_OBJECT_ARRAY
+                    )
 
                     aopProxyWriter.visitBeanDefinitionConstructor(methodAnnotationMetadata, false)
 

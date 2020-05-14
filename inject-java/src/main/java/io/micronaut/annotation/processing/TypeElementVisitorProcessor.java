@@ -76,15 +76,19 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         this.loadedVisitors = new ArrayList<>(typeElementVisitors.size());
 
         for (TypeElementVisitor visitor : typeElementVisitors) {
-            try {
-                loadedVisitors.add(new LoadedVisitor(
-                    visitor,
-                    javaVisitorContext,
-                    genericUtils,
-                    processingEnv
-                ));
-            } catch (TypeNotPresentException | NoClassDefFoundError e) {
-                // ignored, means annotations referenced are not on the classpath
+            TypeElementVisitor.VisitorKind visitorKind = visitor.getVisitorKind();
+            TypeElementVisitor.VisitorKind incrementalProcessorKind = getIncrementalProcessorKind();
+            if (incrementalProcessorKind == visitorKind) {
+                try {
+                    loadedVisitors.add(new LoadedVisitor(
+                            visitor,
+                            javaVisitorContext,
+                            genericUtils,
+                            processingEnv
+                    ));
+                } catch (TypeNotPresentException | NoClassDefFoundError e) {
+                    // ignored, means annotations referenced are not on the classpath
+                }
             }
 
         }
@@ -99,6 +103,36 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             }
         }
 
+    }
+
+    /**
+     * @return The loaded visitors.
+     */
+    protected List<LoadedVisitor> getLoadedVisitors() {
+        return loadedVisitors;
+    }
+
+    /**
+     *
+     * @return The incremental processor type.
+     * @see #GRADLE_PROCESSING_AGGREGATING
+     * @see #GRADLE_PROCESSING_ISOLATING
+     */
+    protected TypeElementVisitor.VisitorKind getIncrementalProcessorKind() {
+        String type = getIncrementalProcessorType();
+        if (type.equals(GRADLE_PROCESSING_AGGREGATING)) {
+            return TypeElementVisitor.VisitorKind.AGGREGATING;
+        }
+        return TypeElementVisitor.VisitorKind.ISOLATING;
+    }
+
+    @Override
+    public Set<String> getSupportedAnnotationTypes() {
+        if (loadedVisitors.isEmpty()) {
+            return Collections.emptySet();
+        } else {
+            return super.getSupportedAnnotationTypes();
+        }
     }
 
     @Override
@@ -122,31 +156,30 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 
-        TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
-        TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
+        if (!loadedVisitors.isEmpty()) {
 
-        roundEnv.getRootElements()
-                .stream()
-                .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))
-                .filter(element -> element.getAnnotation(Generated.class) == null)
-                .map(modelUtils::classElementFor)
-                .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
-                .forEach((typeElement) -> {
-                    String className = typeElement.getQualifiedName().toString();
-                    List<LoadedVisitor> matchedVisitors = loadedVisitors.stream().filter((v) -> v.matches(typeElement)).collect(Collectors.toList());
-                    typeElement.accept(new ElementVisitor(typeElement, matchedVisitors), className);
-                });
+            TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
+            TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
 
-        for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            try {
-                loadedVisitor.getVisitor().finish(javaVisitorContext);
-            } catch (Throwable e) {
-                error("Error finalizing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
+            roundEnv.getRootElements()
+                    .stream()
+                    .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))
+                    .filter(element -> element.getAnnotation(Generated.class) == null)
+                    .map(modelUtils::classElementFor)
+                    .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
+                    .forEach((typeElement) -> {
+                        String className = typeElement.getQualifiedName().toString();
+                        List<LoadedVisitor> matchedVisitors = loadedVisitors.stream().filter((v) -> v.matches(typeElement)).collect(Collectors.toList());
+                        typeElement.accept(new ElementVisitor(typeElement, matchedVisitors), className);
+                    });
+
+            for (LoadedVisitor loadedVisitor : loadedVisitors) {
+                try {
+                    loadedVisitor.getVisitor().finish(javaVisitorContext);
+                } catch (Throwable e) {
+                    error("Error finalizing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
+                }
             }
-        }
-
-        if (roundEnv.processingOver()) {
-            javaVisitorContext.finish();
         }
 
         return false;

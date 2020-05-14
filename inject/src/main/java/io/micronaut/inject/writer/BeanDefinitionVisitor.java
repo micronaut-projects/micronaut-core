@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
 
@@ -38,6 +39,11 @@ public interface BeanDefinitionVisitor {
      * The suffix use for generated AOP intercepted types.
      */
     String PROXY_SUFFIX = "$Intercepted";
+
+    /**
+     * @return The element where the bean definition originated from.
+     */
+    @Nullable Element getOriginatingElement();
 
     /**
      * Visits a no arguments constructor. Either this method or
