@@ -14,7 +14,7 @@ dependencies {
     api dependencyModuleVersion("groovy", "groovy-templates")
     api "org.fusesource.jansi:jansi:1.14"
     api "jline:jline:2.12"
-    api "org.springframework.boot:spring-boot-cli:1.5.10.RELEASE"
+    api "org.springframework.boot:spring-boot-cli:2.3.0.RELEASE"
     api dependencyVersion("snakeyaml")
     runtimeOnly dependencyModuleVersion("slf4j", "slf4j-simple")
     runtimeOnly "org.codehaus.plexus:plexus-component-api:1.0-alpha-33"
