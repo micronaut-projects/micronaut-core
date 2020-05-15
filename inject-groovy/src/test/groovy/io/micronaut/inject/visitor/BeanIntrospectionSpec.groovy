@@ -655,6 +655,32 @@ class Test {
         introspection.getRequiredProperty("name", String).get(instance) == "default"
     }
 
+    void "test introspections are not created for super classes"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test extends Foo {
+
+}
+
+class Foo {
+
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        introspection.getClass().getClassLoader().loadClass("test.\$Foo\$Introspection")
+
+        then:
+        thrown(ClassNotFoundException)
+    }
+
     void "test instantiating an enum"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
@@ -723,6 +749,12 @@ enum Test {
 
         then:
         thrown(InstantiationException)
+
+        when:
+        introspection.getClass().getClassLoader().loadClass("java.lang.\$Enum\$Introspection")
+
+        then:
+        thrown(ClassNotFoundException)
     }
 
     void "test introspection class member configuration works"() {

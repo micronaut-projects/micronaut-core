@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.util.CollectionUtils
+import spock.lang.Ignore
 import spock.lang.Specification
 
 class ConfigurationPropertiesSpec extends Specification {
@@ -61,6 +62,7 @@ class ConfigurationPropertiesSpec extends Specification {
         ctx.close()
     }
 
+    @Ignore
     void "test configuration properties binding"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
