@@ -42,12 +42,12 @@ class ConfigBuilderState {
 
     /**
      * Constructs a config builder.
-     *  @param type               The builder type
+     * @param type               The builder type
      * @param name               The name of the field or method
      * @param isMethod           Is the configuration builder resolver a method
      * @param annotationMetadata The annotation metadata
      * @param metadataBuilder    The metadata builder
-     * @param isInterface
+     * @param isInterface        Whether the type is an interface or not
      */
     ConfigBuilderState(Object type, String name, boolean isMethod, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder, boolean isInterface) {
         this.type = AbstractClassFileWriter.getTypeReference(type);
@@ -93,6 +93,9 @@ class ConfigBuilderState {
         return annotationMetadata;
     }
 
+    /**
+     * @return Whether the type is an interface or not
+     */
     public boolean isInterface() {
         return isInterface;
     }
