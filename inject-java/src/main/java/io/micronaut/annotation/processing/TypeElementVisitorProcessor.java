@@ -278,24 +278,20 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 } else if (JavaModelUtils.isEnum(classElement)) {
                     return scan(classElement.getEnclosedElements(), o);
                 } else {
-                    TypeElement superClass = modelUtils.superClassFor(classElement);
-                    if (superClass != null && !modelUtils.isObjectClass(superClass) && !superClass.getQualifiedName().toString().equals("java.lang.Enum")) {
-                        superClass.accept(this, o);
-                    }
-                    return o;
+                    return scan(enclosedElements(classElement), o);
                 }
             } else {
                 return null;
             }
         }
 
-        private List enclosedElements(TypeElement classElement) {
-            List enclosedElements = new ArrayList<>(classElement.getEnclosedElements());
+        private List<? extends Element> enclosedElements(TypeElement classElement) {
+            List<Element> enclosedElements = new ArrayList<>(classElement.getEnclosedElements());
             TypeElement superClass = modelUtils.superClassFor(classElement);
             // collect fields and methods, skip overrides
             while (superClass != null && !modelUtils.isObjectClass(superClass)) {
-                List elements = superClass.getEnclosedElements();
-                for (Object elt1: elements) {
+                List<? extends Element> elements = superClass.getEnclosedElements();
+                for (Element elt1: elements) {
                     if (elt1 instanceof ExecutableElement) {
                         checkMethodOverride(enclosedElements, elt1);
                     } else if (elt1 instanceof VariableElement) {
@@ -307,13 +303,13 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             return enclosedElements;
         }
 
-        private void checkFieldHide(List enclosedElements, Object elt1) {
+        private void checkFieldHide(List<Element> enclosedElements, Element elt1) {
             boolean hides = false;
-            for (Object elt2: enclosedElements) {
+            for (Element elt2: enclosedElements) {
                 if (elt1.equals(elt2) || ! (elt2 instanceof VariableElement)) {
                     continue;
                 }
-                if (elementUtils.hides((VariableElement) elt2, (VariableElement) elt1)) {
+                if (elementUtils.hides(elt2, elt1)) {
                     hides = true;
                     break;
                 }
@@ -323,7 +319,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             }
         }
 
-        private void checkMethodOverride(List enclosedElements, Object elt1) {
+        private void checkMethodOverride(List<Element> enclosedElements, Element elt1) {
             boolean overrides = false;
             for (Object elt2: enclosedElements) {
                 if (elt1.equals(elt2) || ! (elt2 instanceof ExecutableElement)) {

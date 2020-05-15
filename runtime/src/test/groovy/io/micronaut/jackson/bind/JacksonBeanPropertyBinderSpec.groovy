@@ -21,6 +21,7 @@ import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.convert.ConversionService
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -60,7 +61,7 @@ class JacksonBeanPropertyBinderSpec extends Specification {
 
     void "test convert map to immutable object"() {
         when:
-        def mapToObjectConverter = context.getBean(MapToObjectConverter)
+        def mapToObjectConverter = context.getBean(ConversionService)
         def optional = mapToObjectConverter.convert(['first_name': 'Todd'], ImmutablePerson)
 
         then:
