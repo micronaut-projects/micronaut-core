@@ -57,18 +57,6 @@ public class MyConfig {
         return map;
     }
 
-    public static class InnerVal {
-        private Integer expireUnsignedSeconds;
-
-        public Integer getExpireUnsignedSeconds() {
-            return expireUnsignedSeconds;
-        }
-
-        public void setExpireUnsignedSeconds(Integer expireUnsignedSeconds) {
-            this.expireUnsignedSeconds = expireUnsignedSeconds;
-        }
-    }
-
     public static class Value {
         private int property;
         private Value2 property2;
@@ -255,5 +243,17 @@ public class MyConfig {
 
     public void setInnerVals(List<InnerVal> innerVals) {
         this.innerVals = innerVals;
+    }
+}
+
+class InnerVal {
+    private Integer expireUnsignedSeconds;
+
+    public Integer getExpireUnsignedSeconds() {
+        return expireUnsignedSeconds;
+    }
+
+    public void setExpireUnsignedSeconds(Integer expireUnsignedSeconds) {
+        this.expireUnsignedSeconds = expireUnsignedSeconds;
     }
 }
