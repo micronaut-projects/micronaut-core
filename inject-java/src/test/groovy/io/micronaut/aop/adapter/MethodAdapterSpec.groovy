@@ -49,8 +49,39 @@ class Test {
         ApplicationEventListener.isAssignableFrom(definition.getBeanType())
         !definition.getTypeArguments(ApplicationEventListener).isEmpty()
         definition.getTypeArguments(ApplicationEventListener).get(0).type == StartupEvent
+    }
 
+    void "test method adapter inherited from an interface produces additional bean"() {
+        when:"An adapter method is parsed"
+        BeanDefinition definition = buildBeanDefinition('test.Test$ApplicationEventListener$onStartup1$Intercepted','''\
+package test;
 
+import io.micronaut.aop.*;
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.context.event.*;
+
+@javax.inject.Singleton
+class Test implements TestContract {
+
+    @Override
+    public void onStartup(StartupEvent event) {
+        
+    }
+}
+
+interface TestContract {
+
+    @Adapter(ApplicationEventListener.class)
+    void onStartup(StartupEvent event);
+}
+
+''')
+        then:"Then a bean is produced that is valid"
+        definition != null
+        ApplicationEventListener.isAssignableFrom(definition.getBeanType())
+        !definition.getTypeArguments(ApplicationEventListener).isEmpty()
+        definition.getTypeArguments(ApplicationEventListener).get(0).type == StartupEvent
     }
 
     void  "test method adapter honours type restraints - correct path"() {

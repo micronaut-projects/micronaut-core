@@ -138,7 +138,7 @@ public class RequestArgumentSatisfier {
                     value = bindingResult.get();
                 } else if (bindingResult.isSatisfied() && argument.isNullable()) {
                     value = NullArgument.INSTANCE;
-                } else if (HttpMethod.requiresRequestBody(request.getMethod()) || argument.isNullable()) {
+                } else if (HttpMethod.requiresRequestBody(request.getMethod()) || argument.isNullable() || conversionContext.hasErrors()) {
                     value = (UnresolvedArgument) () -> {
                         ArgumentBinder.BindingResult result = argumentBinder.bind(conversionContext, request);
                         Optional<ConversionError> lastError = conversionContext.getLastError();

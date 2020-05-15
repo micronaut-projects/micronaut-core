@@ -98,6 +98,7 @@ public class LoadedVisitor implements Ordered {
             return true;
         }
         AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement);
+
         return annotationMetadata.hasStereotype(classAnnotation);
     }
 

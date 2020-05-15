@@ -986,7 +986,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     parameter.type.name,
                                     NameUtils.getterNameFor(propertyName),
                                     methodAnnotationMetadata,
-                                    configurationMetadataBuilder)
+                                    configurationMetadataBuilder,
+                                    parameter.type.interface)
                             try {
                                 visitConfigurationBuilder(declaringClass, methodAnnotationMetadata, parameter.type, getBeanWriter())
                             } finally {
@@ -1312,12 +1313,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 String fieldGetterName = NameUtils.getterNameFor(fieldName)
                                 MethodNode getterMethod = declaringClass.methods?.find { it.name == fieldGetterName}
                                 if(getterMethod != null) {
-                                    getBeanWriter().visitConfigBuilderMethod(fieldType, getterMethod.name, fieldAnnotationMetadata, configurationMetadataBuilder)
+                                    getBeanWriter().visitConfigBuilderMethod(fieldType, getterMethod.name, fieldAnnotationMetadata, configurationMetadataBuilder, fieldNode.type.interface)
                                 } else {
                                     addError("ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.", fieldNode)
                                 }
                             } else {
-                                getBeanWriter().visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, configurationMetadataBuilder)
+                                getBeanWriter().visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, configurationMetadataBuilder, fieldNode.type.interface)
                             }
                             try {
                                 visitConfigurationBuilder(declaringClass, fieldAnnotationMetadata, fieldNode.type, getBeanWriter())
@@ -1454,7 +1455,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 resolvedFieldType,
                                 getGetterName(propertyNode),
                                 fieldAnnotationMetadata,
-                                configurationMetadataBuilder)
+                                configurationMetadataBuilder,
+                                fieldNode.type.interface)
                         try {
                             visitConfigurationBuilder(declaringClass, fieldAnnotationMetadata, fieldNode.type, getBeanWriter())
                         } finally {

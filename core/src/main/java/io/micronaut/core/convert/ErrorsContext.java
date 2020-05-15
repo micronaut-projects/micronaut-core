@@ -60,4 +60,11 @@ public interface ErrorsContext extends Iterable<ConversionError> {
         return Optional.empty();
     }
 
+    /**
+     * @return Check whether errors exist
+     */
+    default boolean hasErrors() {
+        return getLastError().isPresent();
+    }
+
 }

@@ -276,89 +276,92 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                 final Argument<?>[] constructorArguments = introspection.getConstructorArguments();
                 final TypeFactory typeFactory = config.getTypeFactory();
+                ValueInstantiator defaultInstantiator = builder.getValueInstantiator();
                 builder.setValueInstantiator(new StdValueInstantiator(config, typeFactory.constructType(beanClass)) {
-
+                    SettableBeanProperty[] props;
                     @Override
                     public SettableBeanProperty[] getFromObjectArguments(DeserializationConfig config) {
 
-
-                        SettableBeanProperty[] props = new SettableBeanProperty[constructorArguments.length];
-                        for (int i = 0; i < constructorArguments.length; i++) {
-                            Argument<?> argument = constructorArguments[i];
-                            final JavaType javaType = newType(argument, typeFactory);
-                            final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-                            PropertyMetadata propertyMetadata = newPropertyMetadata(argument, annotationMetadata);
-                            final String simpleName = annotationMetadata.stringValue(JsonProperty.class).orElse(argument.getName());
-                            TypeDeserializer typeDeserializer;
-                            try {
-                                typeDeserializer = config.findTypeDeserializer(javaType);
-                            } catch (JsonMappingException e) {
-                                typeDeserializer = null;
-                            }
-                            props[i] = new CreatorProperty(
-                                    PropertyName.construct(simpleName),
-                                    javaType,
-                                    null,
-                                    typeDeserializer,
-                                    null,
-                                    null,
-                                    i,
-                                    null,
-                                    propertyMetadata
-
-                            ) {
-                                private final BeanProperty<Object, Object> property = introspection.getProperty(argument.getName()).orElse(null);
-
-                                @Override
-                                public <A extends Annotation> A getAnnotation(Class<A> acls) {
-                                    return annotationMetadata.synthesize(acls);
+                        SettableBeanProperty[] existing = defaultInstantiator.getFromObjectArguments(config);
+                        if (props == null) {
+                            props = new SettableBeanProperty[constructorArguments.length];
+                            for (int i = 0; i < constructorArguments.length; i++) {
+                                Argument<?> argument = constructorArguments[i];
+                                final JavaType javaType = existing != null && existing.length > i ? existing[i].getType() : newType(argument, typeFactory);
+                                final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+                                PropertyMetadata propertyMetadata = newPropertyMetadata(argument, annotationMetadata);
+                                final String simpleName = annotationMetadata.stringValue(JsonProperty.class).orElse(argument.getName());
+                                TypeDeserializer typeDeserializer;
+                                try {
+                                    typeDeserializer = config.findTypeDeserializer(javaType);
+                                } catch (JsonMappingException e) {
+                                    typeDeserializer = null;
                                 }
+                                props[i] = new CreatorProperty(
+                                        PropertyName.construct(simpleName),
+                                        javaType,
+                                        null,
+                                        typeDeserializer,
+                                        null,
+                                        null,
+                                        i,
+                                        null,
+                                        propertyMetadata
 
-                                @Override
-                                public AnnotatedMember getMember() {
-                                    return new VirtualAnnotatedMember(
-                                            beanDesc.getClassInfo(),
-                                            beanClass,
-                                            argument.getName(),
-                                            javaType
-                                    ) {
-                                        @Override
-                                        public boolean hasOneOf(Class<? extends Annotation>[] annoClasses) {
-                                            return Arrays.stream(annoClasses).anyMatch(annotationMetadata::hasAnnotation);
+                                ) {
+                                    private final BeanProperty<Object, Object> property = introspection.getProperty(argument.getName()).orElse(null);
+
+                                    @Override
+                                    public <A extends Annotation> A getAnnotation(Class<A> acls) {
+                                        return annotationMetadata.synthesize(acls);
+                                    }
+
+                                    @Override
+                                    public AnnotatedMember getMember() {
+                                        return new VirtualAnnotatedMember(
+                                                beanDesc.getClassInfo(),
+                                                beanClass,
+                                                argument.getName(),
+                                                javaType
+                                        ) {
+                                            @Override
+                                            public boolean hasOneOf(Class<? extends Annotation>[] annoClasses) {
+                                                return Arrays.stream(annoClasses).anyMatch(annotationMetadata::hasAnnotation);
+                                            }
+                                        };
+                                    }
+
+                                    @Override
+                                    public void deserializeAndSet(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
+                                        if (property != null) {
+                                            property.set(instance, deserialize(p, ctxt));
                                         }
-                                    };
-                                }
-
-                                @Override
-                                public void deserializeAndSet(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
-                                    if (property != null) {
-                                        property.set(instance, deserialize(p, ctxt));
                                     }
-                                }
 
-                                @Override
-                                public Object deserializeSetAndReturn(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
-                                    if (property != null) {
-                                        property.set(instance, deserialize(p, ctxt));
+                                    @Override
+                                    public Object deserializeSetAndReturn(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
+                                        if (property != null) {
+                                            property.set(instance, deserialize(p, ctxt));
+                                        }
+                                        return null;
                                     }
-                                    return null;
-                                }
 
-                                @Override
-                                public void set(Object instance, Object value) {
-                                    if (property != null) {
-                                        property.set(instance, value);
+                                    @Override
+                                    public void set(Object instance, Object value) {
+                                        if (property != null) {
+                                            property.set(instance, value);
+                                        }
                                     }
-                                }
 
-                                @Override
-                                public Object setAndReturn(Object instance, Object value) throws IOException {
-                                    if (property != null) {
-                                        property.set(instance, value);
+                                    @Override
+                                    public Object setAndReturn(Object instance, Object value) throws IOException {
+                                        if (property != null) {
+                                            property.set(instance, value);
+                                        }
+                                        return null;
                                     }
-                                    return null;
-                                }
-                            };
+                                };
+                            }
                         }
                         return props;
                     }

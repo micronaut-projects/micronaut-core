@@ -66,7 +66,10 @@ class ConfigurationPropertiesSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(PropertySource.of(
             'test',
-            ['foo.bar.port':'8080',
+            ['foo.bar.innerVals': [
+                    ['expire-unsigned-seconds': 123], ['expireUnsignedSeconds': 600]
+            ],
+             'foo.bar.port':'8080',
              'foo.bar.max-size':'1MB',
              'foo.bar.another-size':'1MB',
             'foo.bar.anotherPort':'9090',
@@ -84,6 +87,9 @@ class ConfigurationPropertiesSpec extends Specification {
         MyConfig config = applicationContext.getBean(MyConfig)
 
         expect:
+        config.innerVals.size() == 2
+        config.innerVals[0].expireUnsignedSeconds == 123
+        config.innerVals[1].expireUnsignedSeconds == 600
         config.port == 8080
         config.maxSize == 1048576
         config.anotherSize == 1048576

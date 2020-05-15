@@ -890,7 +890,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 boolean isPublic) {
             return (isExecutableType && (isPublic || (modifiers.isEmpty()) && concreteClass.equals(enclosingElement))) ||
                     annotationMetadataHierarchy.hasDeclaredStereotype(Executable.class) ||
-                    declaredMetadata.hasAnnotation(Executable.class);
+                    declaredMetadata.hasStereotype(Executable.class);
         }
 
         private void visitConfigurationPropertySetter(ExecutableElement method) {
@@ -911,12 +911,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
 
                 String propertyName = NameUtils.getPropertyNameForSetter(method.getSimpleName().toString());
+                boolean isInterface = JavaModelUtils.isInterface(typeUtils.asElement(valueType));
+
                 if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                     writer.visitConfigBuilderMethod(
                             fieldType,
                             NameUtils.getterNameFor(propertyName),
                             methodAnnotationMetadata,
-                            metadataBuilder);
+                            metadataBuilder,
+                            isInterface);
                     try {
                         visitConfigurationBuilder(declaringClass, method, valueType, writer);
                     } finally {
@@ -1883,13 +1886,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         accessible = declaringPackage.getQualifiedName().equals(concretePackage.getQualifiedName());
                     }
 
+                    boolean isInterface = JavaModelUtils.isInterface(typeUtils.asElement(fieldTypeMirror));
                     if (accessible) {
-                        writer.visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, metadataBuilder);
+                        writer.visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, metadataBuilder, isInterface);
                     } else {
                         // Using the field would throw a IllegalAccessError, use the method instead
                         Optional<ExecutableElement> getterMethod = modelUtils.findGetterMethodFor(field);
                         if (getterMethod.isPresent()) {
-                            writer.visitConfigBuilderMethod(fieldType, getterMethod.get().getSimpleName().toString(), fieldAnnotationMetadata, metadataBuilder);
+                            writer.visitConfigBuilderMethod(fieldType, getterMethod.get().getSimpleName().toString(), fieldAnnotationMetadata, metadataBuilder, isInterface);
                         } else {
                             error(field, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
                         }

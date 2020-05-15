@@ -31,7 +31,6 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
     public static List<ClassElement> VISITED_CLASS_ELEMENTS = new ArrayList<>();
     public static List<MethodElement> VISITED_METHOD_ELEMENTS = new ArrayList<>();
 
-
     @Override
     public void start(VisitorContext visitorContext) {
         VISITED_ELEMENTS.clear();
