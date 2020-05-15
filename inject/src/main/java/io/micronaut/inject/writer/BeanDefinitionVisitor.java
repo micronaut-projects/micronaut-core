@@ -369,13 +369,15 @@ public interface BeanDefinitionVisitor {
      * @param field              The name of the field that represents the builder
      * @param annotationMetadata The annotation metadata associated with the field
      * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
+     * @param isInterface        Whether the builder type is an interface or not
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderField(
             Object type,
             String field,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder);
+            ConfigurationMetadataBuilder metadataBuilder,
+            boolean isInterface);
 
     /**
      * Begin defining a configuration builder.
@@ -384,13 +386,15 @@ public interface BeanDefinitionVisitor {
      * @param methodName         The name of the method that returns the builder
      * @param annotationMetadata The annotation metadata associated with the field
      * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
+     * @param isInterface        Whether the builder type is an interface or not
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
             Object type,
             String methodName,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder);
+            ConfigurationMetadataBuilder metadataBuilder,
+            boolean isInterface);
 
     /**
      * Visit a configuration builder method.
