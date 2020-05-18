@@ -78,16 +78,33 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         for (TypeElementVisitor<?, ?> visitor : typeElementVisitors) {
             TypeElementVisitor.VisitorKind visitorKind = visitor.getVisitorKind();
             TypeElementVisitor.VisitorKind incrementalProcessorKind = getIncrementalProcessorKind();
-            if (incrementalProcessorKind == visitorKind) {
-                try {
-                    loadedVisitors.add(new LoadedVisitor(
-                            visitor,
-                            javaVisitorContext,
-                            genericUtils,
-                            processingEnv
-                    ));
-                } catch (TypeNotPresentException | NoClassDefFoundError e) {
-                    // ignored, means annotations referenced are not on the classpath
+            // workaround for Micronaut Data until it is upgraded to Micronaut 2.x
+            if (visitor.getClass().getName().startsWith("io.micronaut.data")) {
+                if (incrementalProcessorKind == TypeElementVisitor.VisitorKind.ISOLATING) {
+                    try {
+                        loadedVisitors.add(new LoadedVisitor(
+                                visitor,
+                                javaVisitorContext,
+                                genericUtils,
+                                processingEnv
+                        ));
+                    } catch (TypeNotPresentException | NoClassDefFoundError e) {
+                        // ignored, means annotations referenced are not on the classpath
+                    }
+                }
+            } else {
+
+                if (incrementalProcessorKind == visitorKind) {
+                    try {
+                        loadedVisitors.add(new LoadedVisitor(
+                                visitor,
+                                javaVisitorContext,
+                                genericUtils,
+                                processingEnv
+                        ));
+                    } catch (TypeNotPresentException | NoClassDefFoundError e) {
+                        // ignored, means annotations referenced are not on the classpath
+                    }
                 }
             }
 

@@ -127,7 +127,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     @Override
     @NonNull
     default String getTypeName() {
-        Argument[] typeParameters = getTypeParameters();
+        Argument<?>[] typeParameters = getTypeParameters();
         if (ArrayUtils.isNotEmpty(typeParameters)) {
             String typeName = getType().getTypeName();
             return typeName +  "<" + Arrays.stream(typeParameters).map(Argument::getTypeName).collect(Collectors.joining(",")) + ">";
@@ -183,6 +183,11 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
             @Override
             public String getTypeName() {
                 return Argument.this.getTypeName();
+            }
+
+            @Override
+            public String toString() {
+                return getTypeName();
             }
         };
     }
