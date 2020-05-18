@@ -268,7 +268,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 try (PrintWriter w = new PrintWriter(gf.openWriter())) {
                     w.println("Args = -H:ReflectionConfigurationResources=${.}/reflection-config.json");
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    visitorContext.fail("Error writing " + NATIVE_IMAGE_PROPERTIES + ": " + e.getMessage(), null);
                 }
             });
             final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(reflectFile);
