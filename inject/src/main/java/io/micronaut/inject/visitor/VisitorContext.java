@@ -111,7 +111,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      *
      * @return An optional wrapping the project directory
      */
-    default Optional<Path> projectDir() {
+    default Optional<Path> getProjectDir() {
         Optional<Path> projectDir = get(MICRONAUT_PROCESSING_PROJECT_DIR, Path.class);
         if (projectDir.isPresent()) {
             return projectDir;

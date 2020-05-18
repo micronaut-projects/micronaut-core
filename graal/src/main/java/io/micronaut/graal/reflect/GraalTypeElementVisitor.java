@@ -236,7 +236,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         List<Map> json;
         ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
 
-        Optional<Path> projectDir = visitorContext.projectDir();
+        Optional<Path> projectDir = visitorContext.getProjectDir();
 
         File userReflectJsonFile = projectDir
                 .map(projectPath -> Paths.get(projectPath.toString(), BASE_REFLECT_JSON).toFile())
@@ -302,7 +302,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
         Map json;
 
-        Optional<Path> projectDir = visitorContext.projectDir();
+        Optional<Path> projectDir = visitorContext.getProjectDir();
 
         if (projectDir.isPresent()) {
             File f = Paths.get(projectDir.get().toString(), BASE_RESOURCE_CONFIG_JSON).toFile();
