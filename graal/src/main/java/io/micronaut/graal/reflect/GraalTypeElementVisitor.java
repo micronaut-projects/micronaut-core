@@ -321,30 +321,33 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             try {
                 Set<String> resourceFiles = findResourceFiles(Paths.get(projectDir.get().toString(), RESOURCES_DIR).toFile(), new ArrayList<>());
 
-                String path = buildNativeImagePath();
-                String resourcesFile = path + RESOURCE_CONFIG_JSON;
+                if (!resourceFiles.isEmpty()) {
+                    String path = buildNativeImagePath();
+                    String resourcesFile = path + RESOURCE_CONFIG_JSON;
 
-                final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(resourcesFile);
-                generatedFile.ifPresent(gf -> {
-                    List<Map> resourceList = resourceFiles.stream()
-                            .map(resourceFile -> CollectionUtils.mapOf(PATTERN, "\\Q" + resourceFile + "\\E"))
-                            .collect(Collectors.toList());
+                    final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(resourcesFile);
+                    generatedFile.ifPresent(gf -> {
+                        List<Map> resourceList = resourceFiles.stream()
+                                .map(resourceFile -> CollectionUtils.mapOf(PATTERN, "\\Q" + resourceFile + "\\E"))
+                                .collect(Collectors.toList());
 
-                    // add any existing resource defined by the user in it's own file in src/main/graal
-                    resourceList.addAll((List) json.get(RESOURCES));
+                        // add any existing resource defined by the user in it's own file in src/main/graal
+                        resourceList.addAll((List) json.getOrDefault(RESOURCES, Collections.EMPTY_LIST));
 
-                    json.put(RESOURCES, resourceList);
-                    json.put(BUNDLES, Collections.emptyList());
+                        json.put(RESOURCES, resourceList);
+                        json.put(BUNDLES, Collections.emptyList());
 
-                    try (Writer w = gf.openWriter()) {
-                        visitorContext.info("Writing " + RESOURCE_CONFIG_JSON + " file to destination: " + gf.getName());
-                        writer.writeValue(w, json);
-                    } catch (IOException e) {
-                        visitorContext.fail("Error writing " + RESOURCE_CONFIG_JSON + ": " + e.getMessage(), null);
-                    }
-                });
+                        try (Writer w = gf.openWriter()) {
+                            visitorContext.info("Writing " + RESOURCE_CONFIG_JSON + " file to destination: " + gf.getName());
+                            writer.writeValue(w, json);
+                        } catch (IOException e) {
+                            visitorContext.fail("Error writing " + RESOURCE_CONFIG_JSON + ": " + e.getMessage(), null);
+                        }
+                    });
+                }
             } catch (Exception e) {
                 // skip processing resources
+                visitorContext.fail("There was an error generating " + RESOURCE_CONFIG_JSON + ": " + e.getMessage(), null);
             }
         }
     }
@@ -356,18 +359,22 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             filePath = new ArrayList<>();
         }
 
-        File[] files = folder.listFiles((dir, name) -> !name.equals("META-INF"));
-        for (File element : files) {
-            if (element.isDirectory()) {
-                List<String> paths = new ArrayList<>(filePath);
-                paths.add(element.getName());
+        if (folder.exists()) {
+            File[] files = folder.listFiles((dir, name) -> !name.equals("META-INF"));
+            if (files != null) {
+                for (File element : files) {
+                    if (element.isDirectory()) {
+                        List<String> paths = new ArrayList<>(filePath);
+                        paths.add(element.getName());
 
-                resourceFiles.addAll(findResourceFiles(element, paths));
-            } else {
-                String joinedDirectories = String.join("/", filePath);
-                String elementName = joinedDirectories.isEmpty() ? element.getName() : joinedDirectories + "/" + element.getName();
+                        resourceFiles.addAll(findResourceFiles(element, paths));
+                    } else {
+                        String joinedDirectories = String.join("/", filePath);
+                        String elementName = joinedDirectories.isEmpty() ? element.getName() : joinedDirectories + "/" + element.getName();
 
-                resourceFiles.add(elementName);
+                        resourceFiles.add(elementName);
+                    }
+                }
             }
         }
 
