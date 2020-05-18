@@ -99,7 +99,7 @@ public class RxJavaConverterRegistrar implements TypeConverterRegistrar {
         );
         conversionService.addConverter(Publisher.class, Single.class, (Function<Publisher, Single>) Single::fromPublisher);
         conversionService.addConverter(Publisher.class, Observable.class, (Function<Publisher, Observable>) Observable::fromPublisher);
-        conversionService.addConverter(Publisher.class, Maybe.class, (Function<Publisher, Maybe>) publisher -> Maybe.fromSingle(Single.fromPublisher(publisher)));
+        conversionService.addConverter(Publisher.class, Maybe.class, (Function<Publisher, Maybe>) publisher -> Flowable.fromPublisher(publisher).firstElement());
         conversionService.addConverter(Publisher.class, Completable.class, (Function<Publisher, Completable>) Completable::fromPublisher);
     }
 }
