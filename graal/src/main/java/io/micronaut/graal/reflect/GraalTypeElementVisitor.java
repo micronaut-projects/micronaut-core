@@ -76,6 +76,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     private static final String RESOURCES = "resources";
     private static final String BUNDLES = "bundles";
     private static final String PATTERN = "pattern";
+    private static final String META_INF = "META-INF";
+    private static final String NATIVE_IMAGE = "native-image";
 
     private static final String BASE_REFLECT_JSON = "src/main/graal/reflect.json";
 
@@ -360,19 +362,26 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         }
 
         if (folder.exists()) {
-            File[] files = folder.listFiles((dir, name) -> !name.equals("META-INF"));
+            File[] files = folder.listFiles();
+
             if (files != null) {
+                boolean isMetaInfDirectory = folder.getName().equals(META_INF);
+
                 for (File element : files) {
-                    if (element.isDirectory()) {
-                        List<String> paths = new ArrayList<>(filePath);
-                        paths.add(element.getName());
+                    boolean isNativeImageDirectory = element.getName().equals(NATIVE_IMAGE);
+                    // Exclude META-INF/native-image but process other META-INF/* files and directories
+                    if (!isMetaInfDirectory || !isNativeImageDirectory) {
+                        if (element.isDirectory()) {
+                            List<String> paths = new ArrayList<>(filePath);
+                            paths.add(element.getName());
 
-                        resourceFiles.addAll(findResourceFiles(element, paths));
-                    } else {
-                        String joinedDirectories = String.join("/", filePath);
-                        String elementName = joinedDirectories.isEmpty() ? element.getName() : joinedDirectories + "/" + element.getName();
+                            resourceFiles.addAll(findResourceFiles(element, paths));
+                        } else {
+                            String joinedDirectories = String.join("/", filePath);
+                            String elementName = joinedDirectories.isEmpty() ? element.getName() : joinedDirectories + "/" + element.getName();
 
-                        resourceFiles.add(elementName);
+                            resourceFiles.add(elementName);
+                        }
                     }
                 }
             }
