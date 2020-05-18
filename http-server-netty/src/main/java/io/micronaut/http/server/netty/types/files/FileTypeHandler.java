@@ -86,7 +86,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             long ifModifiedSinceDateSeconds = ifModifiedSince.toEpochSecond();
             long fileLastModifiedSeconds = lastModified / 1000;
             if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
-                FullHttpResponse nettyResponse = notModified();
+                FullHttpResponse nettyResponse = notModified(response);
                 context.writeAndFlush(nettyResponse);
                 return;
             }
@@ -157,8 +157,13 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         headers.date(now);
     }
 
-    private FullHttpResponse notModified() {
+    private static void copyHeaders(NettyMutableHttpResponse<?> from, NettyMutableHttpResponse to) {
+        from.getHeaders().forEachValue((header, value) -> to.getHeaders().add(header, value));
+    }
+
+    private FullHttpResponse notModified(NettyMutableHttpResponse<?> originalResponse) {
         NettyMutableHttpResponse response = (NettyMutableHttpResponse) HttpResponse.notModified();
+        copyHeaders(originalResponse, response);
         setDateHeader(response);
         return response.getNativeResponse();
     }
