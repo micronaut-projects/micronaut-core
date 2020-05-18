@@ -89,6 +89,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private static final String ALL_DECLARED_CONSTRUCTORS = "allDeclaredConstructors";
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     private boolean isSubclass = getClass() != GraalTypeElementVisitor.class;
 
     private boolean executed = false;
@@ -232,8 +234,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private void generateNativeImageProperties(VisitorContext visitorContext) {
         List<Map> json;
-        ObjectMapper mapper = new ObjectMapper();
-        ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
+        ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
 
         Optional<Path> projectDir = visitorContext.projectDir();
 
@@ -243,7 +244,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
         if (userReflectJsonFile != null && userReflectJsonFile.exists()) {
             try {
-                json = mapper.readValue(userReflectJsonFile, new TypeReference<List<Map>>() {
+                json = MAPPER.readValue(userReflectJsonFile, new TypeReference<List<Map>>() {
                 });
             } catch (Throwable e) {
                 visitorContext.fail("Error parsing base reflect.json: " + BASE_REFLECT_JSON, null);
@@ -298,8 +299,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     }
 
     private void generateResourceConfig(VisitorContext visitorContext) {
-        ObjectMapper mapper = new ObjectMapper();
-        ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
+        ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
         Map json;
 
         Optional<Path> projectDir = visitorContext.projectDir();
@@ -308,7 +308,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             File f = Paths.get(projectDir.get().toString(), BASE_RESOURCE_CONFIG_JSON).toFile();
             if (f.exists()) {
                 try {
-                    json = mapper.readValue(f, new TypeReference<Map>() {
+                    json = MAPPER.readValue(f, new TypeReference<Map>() {
                     });
                 } catch (Throwable e) {
                     visitorContext.fail("Error parsing base resource-config.json: " + BASE_RESOURCE_CONFIG_JSON, null);
