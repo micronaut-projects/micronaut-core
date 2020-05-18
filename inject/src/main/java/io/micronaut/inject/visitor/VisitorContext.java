@@ -24,6 +24,7 @@ import io.micronaut.inject.writer.GeneratedFile;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import javax.annotation.processing.SupportedOptions;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
@@ -39,10 +40,11 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@SupportedOptions({VisitorContext.MICRONAUT_PROCESSING_PROJECT_DIR})
 public interface VisitorContext extends MutableConvertibleValues<Object>, ClassWriterOutputVisitor {
 
     String MICRONAUT_BASE_OPTION_NAME = "micronaut";
-    String MICRONAUT_PROJECT_DIR = "micronaut.project.dir";
+    String MICRONAUT_PROCESSING_PROJECT_DIR = "micronaut.processing.project.dir";
 
     /**
      * Allows printing informational messages.
@@ -110,7 +112,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return An optional wrapping the project directory
      */
     default Optional<Path> projectDir() {
-        Optional<Path> projectDir = get(MICRONAUT_PROJECT_DIR, Path.class);
+        Optional<Path> projectDir = get(MICRONAUT_PROCESSING_PROJECT_DIR, Path.class);
         if (projectDir.isPresent()) {
             return projectDir;
         }
@@ -126,7 +128,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
                     Path dummyFileName = dummy.getFileName();
                     if (dummyFileName != null && ("build".equals(dummyFileName.toString()) || "target".equals(dummyFileName.toString()))) {
                         projectDir = Optional.ofNullable(dummy.getParent());
-                        put(MICRONAUT_PROJECT_DIR, dummy.getParent());
+                        put(MICRONAUT_PROCESSING_PROJECT_DIR, dummy.getParent());
                         break;
                     }
                     dummy = dummy.getParent();
