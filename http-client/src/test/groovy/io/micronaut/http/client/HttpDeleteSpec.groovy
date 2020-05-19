@@ -95,6 +95,16 @@ class HttpDeleteSpec extends Specification {
         val == "multiple mappings"
     }
 
+    void "test delete annotation with HttpRequest<Void> injection"() {
+        def client = embeddedServer.applicationContext.getBean(MyDeleteClient)
+
+        when:
+        String val = client.voidRequest()
+
+        then:
+        val == "ok"
+    }
+
     @Controller("/delete")
     static class DeleteController {
 
@@ -114,6 +124,11 @@ class HttpDeleteSpec extends Specification {
         String multipleMappings() {
             return "multiple mappings"
         }
+
+        @Delete("/void")
+        String voidRequest(HttpRequest<Void> req) {
+            "ok"
+        }
     }
 
     @Client("/delete")
@@ -124,5 +139,8 @@ class HttpDeleteSpec extends Specification {
 
         @Delete("/multiple/mappings")
         String multipleMappings()
+
+        @Delete("/void")
+        String voidRequest()
     }
 }
