@@ -24,7 +24,6 @@ import io.micronaut.inject.writer.GeneratedFile;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.annotation.processing.SupportedOptions;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
@@ -40,7 +39,6 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@SupportedOptions({VisitorContext.MICRONAUT_PROCESSING_PROJECT_DIR})
 public interface VisitorContext extends MutableConvertibleValues<Object>, ClassWriterOutputVisitor {
 
     String MICRONAUT_BASE_OPTION_NAME = "micronaut";
