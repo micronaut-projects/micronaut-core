@@ -77,7 +77,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     private static final String BUNDLES = "bundles";
     private static final String PATTERN = "pattern";
     private static final String META_INF = "META-INF";
-    private static final String NATIVE_IMAGE = "native-image";
+    private static final List<String> EXCLUDED_META_INF_DIRECTORIES = Arrays.asList("native-image", "services");
 
     private static final String BASE_REFLECT_JSON = "src/main/graal/reflect.json";
 
@@ -368,9 +368,10 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 boolean isMetaInfDirectory = folder.getName().equals(META_INF);
 
                 for (File element : files) {
-                    boolean isNativeImageDirectory = element.getName().equals(NATIVE_IMAGE);
-                    // Exclude META-INF/native-image but process other META-INF/* files and directories
-                    if (!isMetaInfDirectory || !isNativeImageDirectory) {
+                    boolean isExcludedDirectory = EXCLUDED_META_INF_DIRECTORIES.contains(element.getName());
+                    // Exclude some directories in 'META-INF' like 'native-image' and 'services' but process other
+                    // 'META-INF' files and directories, for example, to include swagger-ui.
+                    if (!isMetaInfDirectory || !isExcludedDirectory) {
                         if (element.isDirectory()) {
                             List<String> paths = new ArrayList<>(filePath);
                             paths.add(element.getName());
