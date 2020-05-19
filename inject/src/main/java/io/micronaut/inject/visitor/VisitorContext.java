@@ -42,7 +42,7 @@ import java.util.Optional;
 public interface VisitorContext extends MutableConvertibleValues<Object>, ClassWriterOutputVisitor {
 
     String MICRONAUT_BASE_OPTION_NAME = "micronaut";
-    String MICRONAUT_PROJECT_DIR = "micronaut.project.dir";
+    String MICRONAUT_PROCESSING_PROJECT_DIR = "micronaut.processing.project.dir";
 
     /**
      * Allows printing informational messages.
@@ -109,8 +109,8 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      *
      * @return An optional wrapping the project directory
      */
-    default Optional<Path> projectDir() {
-        Optional<Path> projectDir = get(MICRONAUT_PROJECT_DIR, Path.class);
+    default Optional<Path> getProjectDir() {
+        Optional<Path> projectDir = get(MICRONAUT_PROCESSING_PROJECT_DIR, Path.class);
         if (projectDir.isPresent()) {
             return projectDir;
         }
@@ -126,7 +126,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
                     Path dummyFileName = dummy.getFileName();
                     if (dummyFileName != null && ("build".equals(dummyFileName.toString()) || "target".equals(dummyFileName.toString()))) {
                         projectDir = Optional.ofNullable(dummy.getParent());
-                        put(MICRONAUT_PROJECT_DIR, dummy.getParent());
+                        put(MICRONAUT_PROCESSING_PROJECT_DIR, dummy.getParent());
                         break;
                     }
                     dummy = dummy.getParent();
