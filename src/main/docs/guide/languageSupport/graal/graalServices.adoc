@@ -122,6 +122,10 @@ If you have more advanced requirements and only wish to include certain fields o
 
 TIP: If you wish to provide your own `reflect.json` you can add one to `src/main/graal/reflect.json` and it will be automatically picked up.
 
+Stating with Micronaut 2.0 the framework generates automatically the file `resource-config.json` defining all the static
+resources in the `src/main/resources` directory. If you want to include your own additional resources you can provide them
+in `src/main/graal/resource-config.json` and they will automatically added to the generated file.
+
 
 === Adding Additional Classes for Reflective Access
 

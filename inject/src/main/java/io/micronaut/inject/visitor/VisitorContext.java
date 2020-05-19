@@ -24,7 +24,10 @@ import io.micronaut.inject.writer.GeneratedFile;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.net.URI;
 import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +40,10 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface VisitorContext extends MutableConvertibleValues<Object>, ClassWriterOutputVisitor {
+
     String MICRONAUT_BASE_OPTION_NAME = "micronaut";
+    String MICRONAUT_PROJECT_DIR = "micronaut.project.dir";
+
     /**
      * Allows printing informational messages.
      *
@@ -78,7 +84,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     Optional<GeneratedFile> visitMetaInfFile(String path);
 
-
     /**
      * Visit a file that will be located within the generated source directory.
      *
@@ -97,6 +102,39 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     default @NonNull Iterable<URL> getClasspathResources(@NonNull String path) {
         return Collections.emptyList();
+    }
+
+    /**
+     * Obtain the project directory.
+     *
+     * @return An optional wrapping the project directory
+     */
+    default Optional<Path> projectDir() {
+        Optional<Path> projectDir = get(MICRONAUT_PROJECT_DIR, Path.class);
+        if (projectDir.isPresent()) {
+            return projectDir;
+        }
+        // let's find the projectDir
+        Optional<GeneratedFile> dummyFile = visitGeneratedFile("dummy");
+        if (dummyFile.isPresent()) {
+            URI uri = dummyFile.get().toURI();
+            // happens in tests 'mem:///CLASS_OUTPUT/dummy'
+            if (uri.getScheme() != null && !uri.getScheme().equals("mem")) {
+                // assume files are generated in 'build' or 'target' directories
+                Path dummy = Paths.get(uri).normalize();
+                while (dummy != null) {
+                    Path dummyFileName = dummy.getFileName();
+                    if (dummyFileName != null && ("build".equals(dummyFileName.toString()) || "target".equals(dummyFileName.toString()))) {
+                        projectDir = Optional.ofNullable(dummy.getParent());
+                        put(MICRONAUT_PROJECT_DIR, dummy.getParent());
+                        break;
+                    }
+                    dummy = dummy.getParent();
+                }
+            }
+        }
+
+        return projectDir;
     }
 
     /**
