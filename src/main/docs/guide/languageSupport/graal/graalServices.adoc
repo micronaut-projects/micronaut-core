@@ -56,11 +56,11 @@ The provided `Dockerfile` is a multi-stage dockerfile which builds the project i
 
 To build your native image without using Docker you need to install GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using SDKman:
 
-.Installing GraalVM 20.0.0 with SDKman
+.Installing GraalVM 20.1.0 with SDKman
 [source,bash]
 ----
-$ sdk install java 20.0.0.r8-grl # or 20.0.0.r11-grl if you want to use JDK 11
-$ sdk use java 20.0.0.r8-grl
+$ sdk install java 20.1.0.r8-grl # or 20.1.0.r11-grl if you want to use JDK 11
+$ sdk use java 20.1.0.r8-grl
 ----
 
 The `native-image` tool was extracted from the base GraalVM distribution. Currently it is available as an early adopter plugin. To install it, run:
