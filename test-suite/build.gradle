@@ -47,7 +47,7 @@ dependencies {
     // tag::testcontainers-dependencies[]
     testImplementation "org.testcontainers:spock:1.14.1"
     // end::testcontainers-dependencies[]
-    testImplementation 'org.awaitility:awaitility:4.0.2'
+    testImplementation 'org.awaitility:awaitility:4.0.3'
 
     testAnnotationProcessor project(":test-suite-helper")
     testAnnotationProcessor project(":inject-java")
