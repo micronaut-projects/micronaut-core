@@ -16,7 +16,6 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.SingleObserver;
 import io.reactivex.disposables.Disposable;
 
@@ -31,8 +30,7 @@ import io.reactivex.disposables.Disposable;
 @Internal
 final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, RxInstrumentedComponent {
     private final SingleObserver<T> source;
-    private final InvocationInstrumenter instrumenter;
-    private boolean active;
+    private final RunOnceInvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -42,55 +40,21 @@ final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, RxInst
      */
     RxInstrumentedSingleObserver(SingleObserver<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = instrumenterFactory.create();
+        this.instrumenter = new RunOnceInvocationInstrumenter(instrumenterFactory.create());
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        if (instrumenter == null || active) {
-            source.onSubscribe(d);
-        } else {
-            try {
-                active = true;
-                instrumenter.beforeInvocation();
-                source.onSubscribe(d);
-            } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
-            }
-        }
+        instrumenter.run(() -> source.onSubscribe(d));
     }
 
     @Override
     public void onError(Throwable t) {
-        if (instrumenter == null || active) {
-            source.onError(t);
-        } else {
-            try {
-                active = true;
-                instrumenter.beforeInvocation();
-                source.onError(t);
-            } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
-            }
-        }
+        instrumenter.run(() -> source.onError(t));
     }
 
     @Override
     public void onSuccess(T value) {
-        if (instrumenter == null || active) {
-            source.onSuccess(value);
-        } else {
-            try {
-                active = true;
-                instrumenter.beforeInvocation();
-                source.onSuccess(value);
-            } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
-            }
-        }
+        instrumenter.run(() -> source.onSuccess(value));
     }
-
 }

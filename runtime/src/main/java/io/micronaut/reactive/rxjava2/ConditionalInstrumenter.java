@@ -64,8 +64,10 @@ public interface ConditionalInstrumenter extends InvocationInstrumenter {
      * <p/>
      * Use {@link #invoke(Supplier)} instead whenever the callable does not declare to throw checked exceptions.
      *
-     * @param callable the {@link Callable} to execute
+     * @param callable The {@link Callable} to execute
+     * @param <T>      The return type
      * @return the result of {@code callable.call();}
+     * @throws Exception if thrown by {@code callable.call()}
      */
     default <T> T call(Callable<T> callable) throws Exception {
         if (isActive()) {
@@ -83,6 +85,7 @@ public interface ConditionalInstrumenter extends InvocationInstrumenter {
      * want it to propagate outside of this invocation.
      *
      * @param supplier the {@link Supplier} to execute
+     * @param <T>      The return type
      * @return the result of {@code supplier.get();}
      */
     default <T> T invoke(Supplier<T> supplier) {

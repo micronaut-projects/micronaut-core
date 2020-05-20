@@ -22,7 +22,6 @@ import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Consumer;
 import io.reactivex.observables.ConnectableObservable;
 
-
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
  * See https://github.com/openzipkin/brave/tree/master/context/rxjava2/src/main/java/brave/context/rxjava2/internal.
@@ -32,10 +31,9 @@ import io.reactivex.observables.ConnectableObservable;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable<T> implements RxInstrumentedComponent  {
+final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable<T> implements RxInstrumentedComponent {
     private final ConnectableObservable<T> source;
-    private final InvocationInstrumenter instrumenter;
-    private boolean active;
+    private final RunOnceInvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -45,38 +43,16 @@ final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable
      */
     RxInstrumentedConnectableObservable(ConnectableObservable<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
-        this.instrumenter = instrumenter;
+        this.instrumenter = new RunOnceInvocationInstrumenter(instrumenter);
     }
 
     @Override
     protected void subscribeActual(Observer<? super T> o) {
-        if (active) {
-            source.subscribe(o);
-            return;
-        }
-        try {
-            active = true;
-            instrumenter.beforeInvocation();
-            source.subscribe(o);
-        } finally {
-            instrumenter.afterInvocation(false);
-            active = false;
-        }
+        instrumenter.run(() -> source.subscribe(o));
     }
 
     @Override
     public void connect(Consumer<? super Disposable> connection) {
-        if (active) {
-            source.connect(connection);
-            return;
-        }
-        try {
-            active = true;
-            instrumenter.beforeInvocation();
-            source.connect(connection);
-        } finally {
-            instrumenter.afterInvocation(false);
-            active = false;
-        }
+        instrumenter.run(() -> source.connect(connection));
     }
 }

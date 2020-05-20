@@ -33,6 +33,20 @@ import static java.util.Objects.requireNonNull;
 @SuppressWarnings("ReactiveStreamsSubscriberImplementation")
 public class ConditionalInstrumentedSubscriber<T> implements Subscriber<T> {
 
+    private final Subscriber<T> subscriber;
+    private final ConditionalInstrumenter instrumenter;
+
+    /**
+     * Default constructor.
+     *
+     * @param subscriber   The source subscriber
+     * @param instrumenter The instrumenter
+     */
+    public ConditionalInstrumentedSubscriber(Subscriber<T> subscriber, ConditionalInstrumenter instrumenter) {
+        this.subscriber = requireNonNull(subscriber, "subscriber");
+        this.instrumenter = requireNonNull(instrumenter, "instrumenter");
+    }
+
     /**
      * Factory method to wrap a given {@link Subscriber} with a {@link ConditionalInstrumenter}. If {@code subscriber}
      * implements {@link FlowableSubscriber} the returned wrapped instance will also do so.
@@ -48,20 +62,6 @@ public class ConditionalInstrumentedSubscriber<T> implements Subscriber<T> {
         } else {
             return new ConditionalInstrumentedSubscriber<>(subscriber, instrumenter);
         }
-    }
-
-    private final Subscriber<T> subscriber;
-    private final ConditionalInstrumenter instrumenter;
-
-    /**
-     * Default constructor.
-     *
-     * @param subscriber   The source subscriber
-     * @param instrumenter The instrumenter
-     */
-    public ConditionalInstrumentedSubscriber(Subscriber<T> subscriber, ConditionalInstrumenter instrumenter) {
-        this.subscriber = requireNonNull(subscriber, "subscriber");
-        this.instrumenter = requireNonNull(instrumenter, "instrumenter");
     }
 
     @Override
