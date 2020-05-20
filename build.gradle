@@ -137,7 +137,7 @@ ext {
             ],
             'micronaut.cassandra': [
                     version:micronautCassandraVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.cassandra',
                     name:'micronaut-cassandra'
             ],
             'micronaut.hibernate.validator': [

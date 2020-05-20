@@ -37,6 +37,9 @@ Some dependencies have new Maven Group IDs so you may need to update your depend
 |`io.micronaut.configuration:micronaut-mongo`
 |`io.micronaut.mongodb:micronaut-mongo-reactive`
 
+|`io.micronaut.configuration:micronaut-cassandra`
+|`io.micronaut.cassandra:micronaut-cassandra`
+
 |===
 
 === Other Breaking Changes
