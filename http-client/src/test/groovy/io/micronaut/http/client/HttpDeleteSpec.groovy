@@ -94,7 +94,7 @@ class HttpDeleteSpec extends Specification {
     }
 
     void "test delete annotation with HttpRequest<Void> injection"() {
-        def client = embeddedServer.applicationContext.getBean(MyDeleteClient)
+        def client = myDeleteClient
 
         when:
         String val = client.voidRequest()
