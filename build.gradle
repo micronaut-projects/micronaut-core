@@ -347,7 +347,7 @@ ext {
             ],
             'micronaut.mongo': [
                     version:micronautMongoVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.mongodb',
                     name:'micronaut-mongo-reactive',
                     modules:['micronaut-mongo-core', 'micronaut-mongo-sync']
             ],
