@@ -23,6 +23,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.ast.Element;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -31,6 +32,7 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
@@ -50,13 +52,13 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     public static final String FIELD_PARENT = "$parent";
 
     protected static final org.objectweb.asm.commons.Method METHOD_INVOKE_INTERNAL = org.objectweb.asm.commons.Method.getMethod(
-        ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethod.class, "invokeInternal", Object.class, Object[].class));
+            ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethod.class, "invokeInternal", Object.class, Object[].class));
     protected static final org.objectweb.asm.commons.Method METHOD_IS_ABSTRACT = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(ExecutableMethod.class, "isAbstract"));
     protected static final org.objectweb.asm.commons.Method METHOD_IS_SUSPEND = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(ExecutableMethod.class, "isSuspend"));
     protected static final Method METHOD_GET_TARGET = Method.getMethod("java.lang.reflect.Method resolveTargetMethod()");
-    private  static final Type TYPE_REFLECTION_UTILS = Type.getType(ReflectionUtils.class);
+    private static final Type TYPE_REFLECTION_UTILS = Type.getType(ReflectionUtils.class);
     private static final org.objectweb.asm.commons.Method METHOD_GET_REQUIRED_METHOD = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getRequiredMethod", Class.class, String.class, Class[].class));
 
@@ -81,6 +83,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param isInterface          Whether is an interface
      * @param isDefault            Whether the method is a default method
      * @param isSuspend            Whether the method is Kotlin suspend function
+     * @param originatingElement   The originating element
      * @param annotationMetadata   The annotation metadata
      */
     public ExecutableMethodWriter(
@@ -90,8 +93,9 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             boolean isInterface,
             boolean isDefault,
             boolean isSuspend,
+            Element originatingElement,
             AnnotationMetadata annotationMetadata) {
-        super(methodClassName, annotationMetadata, true);
+        super(methodClassName, originatingElement, annotationMetadata, true);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.beanFullClassName = beanFullClassName;
         this.methodProxyShortName = methodProxyShortName;
@@ -113,6 +117,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param isAbstract           Whether the method is abstract
      * @param isDefault            Whether the method is a default method
      * @param isSuspend            Whether the method is Kotlin suspend function
+     * @param originatingElement The originating element
      * @param annotationMetadata   The annotation metadata
      */
     public ExecutableMethodWriter(
@@ -123,8 +128,9 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             boolean isAbstract,
             boolean isDefault,
             boolean isSuspend,
+            Element originatingElement,
             AnnotationMetadata annotationMetadata) {
-        super(methodClassName, annotationMetadata, true);
+        super(methodClassName, originatingElement, annotationMetadata, true);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.beanFullClassName = beanFullClassName;
         this.methodProxyShortName = methodProxyShortName;
@@ -196,7 +202,8 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
     /**
      * Write the method.
-     *  @param declaringType              The declaring type
+     *
+     * @param declaringType              The declaring type
      * @param returnType                 The return type
      * @param genericReturnType          The generic return type
      * @param returnTypeGenericTypes     The return type generics
@@ -221,10 +228,10 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
         int modifiers = isStatic ? ACC_SYNTHETIC | ACC_STATIC : ACC_SYNTHETIC;
         classWriter.visit(V1_8, modifiers,
-            internalName,
-            null,
-            Type.getInternalName(AbstractExecutableMethod.class),
-            null);
+                internalName,
+                null,
+                Type.getInternalName(AbstractExecutableMethod.class),
+                null);
 
         classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
 
@@ -247,9 +254,9 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             constructorDescriptor = DESCRIPTOR_DEFAULT_CONSTRUCTOR;
         }
         constructorWriter = new GeneratorAdapter(executorMethodConstructor,
-            Opcodes.ACC_PUBLIC,
-            CONSTRUCTOR_NAME,
-            constructorDescriptor);
+                Opcodes.ACC_PUBLIC,
+                CONSTRUCTOR_NAME,
+                constructorDescriptor);
 
         if (hasOuter) {
             constructorWriter.loadThis();
@@ -281,41 +288,41 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         } else {
             // Argument.of(genericReturnType, returnTypeGenericTypes)
             buildArgumentWithGenerics(
-                constructorWriter,
-                methodName,
-                Collections.singletonMap(genericReturnType, returnTypeGenericTypes)
+                    constructorWriter,
+                    methodName,
+                    Collections.singletonMap(genericReturnType, returnTypeGenericTypes)
             );
         }
 
         if (hasArgs) {
             // 4th argument: the generic types
             pushBuildArgumentsForMethod(
-                getTypeReferenceForName(getClassName()),
-                classWriter,
-                constructorWriter,
-                genericArgumentTypes,
-                argumentAnnotationMetadata,
-                genericTypes,
-                loadTypeMethods);
+                    getTypeReferenceForName(getClassName()),
+                    classWriter,
+                    constructorWriter,
+                    genericArgumentTypes,
+                    argumentAnnotationMetadata,
+                    genericTypes,
+                    loadTypeMethods);
 
             for (AnnotationMetadata value : argumentAnnotationMetadata.values()) {
                 DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value);
             }
             // now invoke super(..) if no arg constructor
             invokeConstructor(
-                executorMethodConstructor,
-                AbstractExecutableMethod.class,
-                Class.class,
-                String.class,
-                Argument.class,
-                Argument[].class);
+                    executorMethodConstructor,
+                    AbstractExecutableMethod.class,
+                    Class.class,
+                    String.class,
+                    Argument.class,
+                    Argument[].class);
         } else {
             invokeConstructor(
-                executorMethodConstructor,
-                AbstractExecutableMethod.class,
-                Class.class,
-                String.class,
-                Argument.class);
+                    executorMethodConstructor,
+                    AbstractExecutableMethod.class,
+                    Class.class,
+                    String.class,
+                    Argument.class);
         }
         constructorWriter.visitInsn(RETURN);
         constructorWriter.visitMaxs(DEFAULT_MAX_STACK, 1);
@@ -358,14 +365,14 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         String invokeDescriptor = METHOD_INVOKE_INTERNAL.getDescriptor();
         String invokeInternalName = METHOD_INVOKE_INTERNAL.getName();
         GeneratorAdapter invokeMethod = new GeneratorAdapter(classWriter.visitMethod(
-            Opcodes.ACC_PUBLIC,
-            invokeInternalName,
-            invokeDescriptor,
-            null,
-            null),
-            ACC_PUBLIC,
-            invokeInternalName,
-            invokeDescriptor
+                Opcodes.ACC_PUBLIC,
+                invokeInternalName,
+                invokeDescriptor,
+                null,
+                null),
+                ACC_PUBLIC,
+                invokeInternalName,
+                invokeDescriptor
         );
 
         buildInvokeMethod(declaringTypeObject, methodName, returnType, argumentTypeClasses, invokeMethod);
@@ -389,7 +396,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className)) {
+        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, getOriginatingElement())) {
             outputStream.write(classWriter.toByteArray());
         }
     }

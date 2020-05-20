@@ -15,6 +15,7 @@
  */
 package io.micronaut.validation.internal;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.*;
@@ -33,6 +34,12 @@ public class InternalApiTypeElementVisitor implements TypeElementVisitor<Object,
     private static final String IO_MICRONAUT = "io.micronaut";
 
     private boolean warned = false;
+
+    @NonNull
+    @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
+    }
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {

@@ -30,6 +30,8 @@ import io.micronaut.http.client.netty.DefaultHttpClient
 import io.micronaut.jackson.annotation.JacksonFeatures
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
+import spock.lang.AutoCleanup
+import spock.lang.IgnoreIf
 import spock.lang.Retry
 import spock.lang.Specification
 
@@ -40,7 +42,8 @@ import javax.inject.Singleton
  * @author Graeme Rocher
  * @since 1.0
  */
-
+@Retry(mode = Retry.Mode.SETUP_FEATURE_CLEANUP)
+@IgnoreIf({env["GITHUB_WORKFLOW"]})
 class ClientScopeSpec extends Specification {
 
     @Retry

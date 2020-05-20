@@ -1792,6 +1792,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             return clockProvider;
         }
 
+        @Nullable
+        @Override
+        public Object getRootBean() {
+            return validatedObjects.isEmpty() ? null : validatedObjects.iterator().next();
+        }
+
         Path.Node addPropertyNode(String name, @Nullable DefaultPropertyNode container) {
             final DefaultPropertyNode node;
             if (container != null) {

@@ -16,6 +16,8 @@
 package io.micronaut.validation.validator.constraints;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
+
 import javax.validation.ClockProvider;
 
 /**
@@ -38,4 +40,13 @@ public interface ConstraintValidatorContext {
      * @since 2.0
      */
     @NonNull ClockProvider getClockProvider();
+
+    /**
+     * In case of using this constraint validator with {@code javax.validation.ConstraintValidator} returns null, because JRS-303 doesn't
+     * support passing a root bean in their validation context.
+     *
+     * @return The root bean under validation.
+     */
+    @Nullable Object getRootBean();
+    
 }

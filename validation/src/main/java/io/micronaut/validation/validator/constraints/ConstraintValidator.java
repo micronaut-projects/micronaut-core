@@ -71,6 +71,12 @@ public interface ConstraintValidator<A extends Annotation, T> extends javax.vali
             public ClockProvider getClockProvider() {
                 return context.getClockProvider();
             }
+
+            @Nullable
+            @Override
+            public Object getRootBean() {
+                return null;
+            }
         });
     }
 }

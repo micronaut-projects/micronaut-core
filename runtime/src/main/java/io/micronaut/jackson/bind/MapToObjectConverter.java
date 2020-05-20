@@ -15,16 +15,16 @@
  */
 package io.micronaut.jackson.bind;
 
+import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.BeanPropertyBinder;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.InstantiationUtils;
 import javax.inject.Provider;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.BiFunction;
 
 /**
  * A class that uses the {@link BeanPropertyBinder} to bind maps to {@link Object} instances.
@@ -47,26 +47,20 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
 
     @Override
     public Optional<Object> convert(Map map, Class<Object> targetType, ConversionContext context) {
-        final BiFunction<Object, Map<?, ?>, Object> propertiesBinderFunction = (object, properties) -> {
-            Map bindMap = new LinkedHashMap(properties.size());
-            for (Map.Entry entry : properties.entrySet()) {
-                Object key = entry.getKey();
-                bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
-            }
-            return beanPropertyBinder.get().bind(object, bindMap);
-        };
-
-        Optional<Object> instance = InstantiationUtils.tryInstantiate(targetType, map, context)
-                    .map(object -> propertiesBinderFunction.apply(object, map));
-
-        if (instance.isPresent()) {
-            return instance;
-        } else if (targetType.isInstance(map)) {
-            return Optional.of(map);
+        ArgumentConversionContext<Object> conversionContext;
+        if (context instanceof ArgumentConversionContext) {
+            conversionContext = (ArgumentConversionContext<Object>) context;
         } else {
-            return InstantiationUtils
-                    .tryInstantiate(targetType)
-                    .map(object -> propertiesBinderFunction.apply(object, map));
+            conversionContext = ConversionContext.of(targetType);
         }
+        Map mapWithExtraProps = new LinkedHashMap(map.size());
+        for (Map.Entry entry : ((Map<?, ?>) map).entrySet()) {
+            Object key = entry.getKey();
+            mapWithExtraProps.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
+        }
+        ArgumentBinder binder = this.beanPropertyBinder.get();
+        ArgumentBinder.BindingResult result = binder.bind(conversionContext, mapWithExtraProps);
+        Optional opt = result.getValue();
+        return opt;
     }
 }

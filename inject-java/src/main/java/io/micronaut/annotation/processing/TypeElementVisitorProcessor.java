@@ -75,16 +75,37 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         this.loadedVisitors = new ArrayList<>(typeElementVisitors.size());
 
-        for (TypeElementVisitor visitor : typeElementVisitors) {
-            try {
-                loadedVisitors.add(new LoadedVisitor(
-                    visitor,
-                    javaVisitorContext,
-                    genericUtils,
-                    processingEnv
-                ));
-            } catch (TypeNotPresentException | NoClassDefFoundError e) {
-                // ignored, means annotations referenced are not on the classpath
+        for (TypeElementVisitor<?, ?> visitor : typeElementVisitors) {
+            TypeElementVisitor.VisitorKind visitorKind = visitor.getVisitorKind();
+            TypeElementVisitor.VisitorKind incrementalProcessorKind = getIncrementalProcessorKind();
+            // workaround for Micronaut Data until it is upgraded to Micronaut 2.x
+            if (visitor.getClass().getName().startsWith("io.micronaut.data")) {
+                if (incrementalProcessorKind == TypeElementVisitor.VisitorKind.ISOLATING) {
+                    try {
+                        loadedVisitors.add(new LoadedVisitor(
+                                visitor,
+                                javaVisitorContext,
+                                genericUtils,
+                                processingEnv
+                        ));
+                    } catch (TypeNotPresentException | NoClassDefFoundError e) {
+                        // ignored, means annotations referenced are not on the classpath
+                    }
+                }
+            } else {
+
+                if (incrementalProcessorKind == visitorKind) {
+                    try {
+                        loadedVisitors.add(new LoadedVisitor(
+                                visitor,
+                                javaVisitorContext,
+                                genericUtils,
+                                processingEnv
+                        ));
+                    } catch (TypeNotPresentException | NoClassDefFoundError e) {
+                        // ignored, means annotations referenced are not on the classpath
+                    }
+                }
             }
 
         }
@@ -99,6 +120,36 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             }
         }
 
+    }
+
+    /**
+     * @return The loaded visitors.
+     */
+    protected List<LoadedVisitor> getLoadedVisitors() {
+        return loadedVisitors;
+    }
+
+    /**
+     *
+     * @return The incremental processor type.
+     * @see #GRADLE_PROCESSING_AGGREGATING
+     * @see #GRADLE_PROCESSING_ISOLATING
+     */
+    protected TypeElementVisitor.VisitorKind getIncrementalProcessorKind() {
+        String type = getIncrementalProcessorType();
+        if (type.equals(GRADLE_PROCESSING_AGGREGATING)) {
+            return TypeElementVisitor.VisitorKind.AGGREGATING;
+        }
+        return TypeElementVisitor.VisitorKind.ISOLATING;
+    }
+
+    @Override
+    public Set<String> getSupportedAnnotationTypes() {
+        if (loadedVisitors.isEmpty()) {
+            return Collections.emptySet();
+        } else {
+            return super.getSupportedAnnotationTypes();
+        }
     }
 
     @Override
@@ -122,31 +173,30 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 
-        TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
-        TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
+        if (!loadedVisitors.isEmpty()) {
 
-        roundEnv.getRootElements()
-                .stream()
-                .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))
-                .filter(element -> element.getAnnotation(Generated.class) == null)
-                .map(modelUtils::classElementFor)
-                .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
-                .forEach((typeElement) -> {
-                    String className = typeElement.getQualifiedName().toString();
-                    List<LoadedVisitor> matchedVisitors = loadedVisitors.stream().filter((v) -> v.matches(typeElement)).collect(Collectors.toList());
-                    typeElement.accept(new ElementVisitor(typeElement, matchedVisitors), className);
-                });
+            TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
+            TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
 
-        for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            try {
-                loadedVisitor.getVisitor().finish(javaVisitorContext);
-            } catch (Throwable e) {
-                error("Error finalizing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
+            roundEnv.getRootElements()
+                    .stream()
+                    .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))
+                    .filter(element -> element.getAnnotation(Generated.class) == null)
+                    .map(modelUtils::classElementFor)
+                    .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
+                    .forEach((typeElement) -> {
+                        String className = typeElement.getQualifiedName().toString();
+                        List<LoadedVisitor> matchedVisitors = loadedVisitors.stream().filter((v) -> v.matches(typeElement)).collect(Collectors.toList());
+                        typeElement.accept(new ElementVisitor(typeElement, matchedVisitors), className);
+                    });
+
+            for (LoadedVisitor loadedVisitor : loadedVisitors) {
+                try {
+                    loadedVisitor.getVisitor().finish(javaVisitorContext);
+                } catch (Throwable e) {
+                    error("Error finalizing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
+                }
             }
-        }
-
-        if (roundEnv.processingOver()) {
-            javaVisitorContext.finish();
         }
 
         return false;
@@ -217,7 +267,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         @Override
         public Object visitType(TypeElement classElement, Object o) {
 
-
             for (LoadedVisitor visitor : visitors) {
                 final io.micronaut.inject.ast.Element resultingElement = visitor.visit(classElement, typeAnnotationMetadata);
                 if (resultingElement != null) {
@@ -229,7 +278,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             // don't process inner class unless this is the visitor for it
             boolean shouldVisit = !JavaModelUtils.isClass(enclosingElement) ||
                     concreteClass.getQualifiedName().equals(classElement.getQualifiedName());
-
             if (shouldVisit) {
                 if (typeAnnotationMetadata.hasStereotype(Introduction.class) || (typeAnnotationMetadata.hasStereotype(Introspected.class) && modelUtils.isAbstract(classElement))) {
                     classElement.asType().accept(new PublicAbstractMethodVisitor<Object, Object>(classElement, modelUtils, elementUtils) {
@@ -244,16 +292,63 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                         }
                     }, null);
                     return null;
-                } else {
-                    TypeElement superClass = modelUtils.superClassFor(classElement);
-                    if (superClass != null && !modelUtils.isObjectClass(superClass) && !superClass.getQualifiedName().toString().equals("java.lang.Enum")) {
-                        superClass.accept(this, o);
-                    }
-
+                } else if (JavaModelUtils.isEnum(classElement)) {
                     return scan(classElement.getEnclosedElements(), o);
+                } else {
+                    return scan(enclosedElements(classElement), o);
                 }
             } else {
                 return null;
+            }
+        }
+
+        private List<? extends Element> enclosedElements(TypeElement classElement) {
+            List<Element> enclosedElements = new ArrayList<>(classElement.getEnclosedElements());
+            TypeElement superClass = modelUtils.superClassFor(classElement);
+            // collect fields and methods, skip overrides
+            while (superClass != null && !modelUtils.isObjectClass(superClass)) {
+                List<? extends Element> elements = superClass.getEnclosedElements();
+                for (Element elt1: elements) {
+                    if (elt1 instanceof ExecutableElement) {
+                        checkMethodOverride(enclosedElements, elt1);
+                    } else if (elt1 instanceof VariableElement) {
+                        checkFieldHide(enclosedElements, elt1);
+                    }
+                }
+                superClass = modelUtils.superClassFor(superClass);
+            }
+            return enclosedElements;
+        }
+
+        private void checkFieldHide(List<Element> enclosedElements, Element elt1) {
+            boolean hides = false;
+            for (Element elt2: enclosedElements) {
+                if (elt1.equals(elt2) || ! (elt2 instanceof VariableElement)) {
+                    continue;
+                }
+                if (elementUtils.hides(elt2, elt1)) {
+                    hides = true;
+                    break;
+                }
+            }
+            if (! hides) {
+                enclosedElements.add(elt1);
+            }
+        }
+
+        private void checkMethodOverride(List<Element> enclosedElements, Element elt1) {
+            boolean overrides = false;
+            for (Object elt2: enclosedElements) {
+                if (elt1.equals(elt2) || ! (elt2 instanceof ExecutableElement)) {
+                    continue;
+                }
+                if (elementUtils.overrides((ExecutableElement) elt2, (ExecutableElement) elt1,  modelUtils.classElementFor((ExecutableElement) elt2))) {
+                    overrides = true;
+                    break;
+                }
+            }
+            if (! overrides) {
+                enclosedElements.add(elt1);
             }
         }
 

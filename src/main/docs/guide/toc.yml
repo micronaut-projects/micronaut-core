@@ -182,6 +182,7 @@ messaging:
   title: Message-Driven Microservices
   kafka: Kafka Support
   rabbitmq: RabbitMQ Support
+  nats: Nats.io Support
 commandLineApps:
   title: Standalone Command Line Applications
   picocli:

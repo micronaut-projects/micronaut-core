@@ -15,12 +15,14 @@
  */
 package io.micronaut.validation.routes;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.RawSegment;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.Segment;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.MethodElement;
@@ -52,6 +54,20 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMe
     private List<RouteValidationRule> rules = new ArrayList<>();
     private boolean skipValidation = false;
     private final DefaultPropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(null, new DefaultConversionService());
+
+    @NonNull
+    @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
+    }
+
+    @Override
+    public Set<String> getSupportedAnnotationNames() {
+        return CollectionUtils.setOf(
+            Controller.class.getName(),
+            "io.micronaut.http.client.annotation.Client"
+        );
+    }
 
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {

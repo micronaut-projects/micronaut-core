@@ -40,6 +40,7 @@ public class MyConfig {
     Inner inner;
     protected int defaultPort = 9999;
     protected Integer anotherPort;
+    private List<InnerVal> innerVals;
 
     private int maxSize;
     @ReadableBytes
@@ -234,5 +235,25 @@ public class MyConfig {
 
     public void setInner(Inner inner) {
         this.inner = inner;
+    }
+
+    public List<InnerVal> getInnerVals() {
+        return innerVals;
+    }
+
+    public void setInnerVals(List<InnerVal> innerVals) {
+        this.innerVals = innerVals;
+    }
+}
+
+class InnerVal {
+    private Integer expireUnsignedSeconds;
+
+    public Integer getExpireUnsignedSeconds() {
+        return expireUnsignedSeconds;
+    }
+
+    public void setExpireUnsignedSeconds(Integer expireUnsignedSeconds) {
+        this.expireUnsignedSeconds = expireUnsignedSeconds;
     }
 }

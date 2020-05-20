@@ -20,8 +20,6 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.inject.writer.ClassWriterOutputVisitor;
-
 import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -51,6 +49,14 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      * Annotation processor option used to add additional annotation patterns to process.
      */
     protected static final String MICRONAUT_PROCESSING_ANNOTATIONS = "micronaut.processing.annotations";
+    /**
+     * Constant for aggregating processor.
+     */
+    protected static final String GRADLE_PROCESSING_AGGREGATING = "org.gradle.annotation.processing.aggregating";
+    /**
+     * Constant for isolating processor.
+     */
+    protected static final String GRADLE_PROCESSING_ISOLATING = "org.gradle.annotation.processing.isolating";
 
     protected Messager messager;
     protected Filer filer;
@@ -60,10 +66,10 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected GenericUtils genericUtils;
     protected ModelUtils modelUtils;
     protected MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
-    protected ClassWriterOutputVisitor classWriterOutputVisitor;
+    protected AnnotationProcessingOutputVisitor classWriterOutputVisitor;
     protected JavaVisitorContext javaVisitorContext;
     private boolean incremental = false;
-    private Set<String> supportedAnnotationTypes = new HashSet<>(5);
+    private final Set<String> supportedAnnotationTypes = new HashSet<>(5);
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
@@ -83,12 +89,22 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     public Set<String> getSupportedOptions() {
         final Set<String> options;
         if (incremental) {
-            options = CollectionUtils.setOf("org.gradle.annotation.processing.aggregating");
+            options = CollectionUtils.setOf(getIncrementalProcessorType());
         } else {
             options = new HashSet<>(5);
         }
         options.addAll(super.getSupportedOptions());
         return options;
+    }
+
+    /**
+     *
+     * @return The incremental processor type.
+     * @see #GRADLE_PROCESSING_AGGREGATING
+     * @see #GRADLE_PROCESSING_ISOLATING
+     */
+    protected String getIncrementalProcessorType() {
+        return GRADLE_PROCESSING_ISOLATING;
     }
 
     @Override
@@ -99,7 +115,12 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                     "io.micronaut.*"
             );
             types.addAll(supportedAnnotationTypes);
-            types.addAll(AbstractAnnotationMetadataBuilder.getMappedAnnotationNames());
+            Set<String> mappedAnnotationNames = AbstractAnnotationMetadataBuilder.getMappedAnnotationNames();
+            for (String mappedAnnotationName : mappedAnnotationNames) {
+                if (!mappedAnnotationName.contains("Nullable") && !mappedAnnotationName.contains("NotNull")) {
+                    types.add(mappedAnnotationName);
+                }
+            }
             return types;
         } else {
             return Collections.singleton("*");

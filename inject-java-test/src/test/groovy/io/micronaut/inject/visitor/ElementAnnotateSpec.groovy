@@ -75,6 +75,8 @@ class TestListener {
 
         expect:
         definition.hasAnnotation(Ann)
+        !definition.booleanValue(Ann, "aggregating").orElse(false)
+        definition.booleanValue(Ann, "isolating").orElse(false)
         definition.getValue(Ann, "foo", String).get() == 'bar'
         definition.findMethod("receive", String).get().hasAnnotation(Ann)
     }
@@ -119,7 +121,7 @@ class Test {
     static class MyTypeElementVisitorProcessor extends TypeElementVisitorProcessor {
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
-            return [new MyAnnotatingTypeElementVisitor(), new IntrospectedTypeElementVisitor()]
+            return [new MyAnnotatingTypeElementVisitor(), new IntrospectedTypeElementVisitor(), new AggregatingAnnotatingTypeElementVisitor()]
         }
     }
 
@@ -131,10 +133,16 @@ class Test {
         }
 
         @Override
+        VisitorKind getVisitorKind() {
+            return VisitorKind.ISOLATING;
+        }
+
+        @Override
         void visitClass(ClassElement element, VisitorContext context) {
             if (!element.hasStereotype(Introduction)) {
                 element.annotate(Ann) { AnnotationValueBuilder builder ->
                     builder.member("foo", "bar")
+                    builder.member("isolating", "true")
                 }
             }
 
@@ -152,6 +160,23 @@ class Test {
         void visitMethod(MethodElement element, VisitorContext context) {
             element.annotate(Ann) { AnnotationValueBuilder builder ->
                 builder.member("foo", "bar")
+            }
+        }
+    }
+
+    static class AggregatingAnnotatingTypeElementVisitor implements TypeElementVisitor {
+
+        @Override
+        int getOrder() {
+            return 100
+        }
+
+        @Override
+        void visitClass(ClassElement element, VisitorContext context) {
+            if (!element.hasStereotype(Introduction)) {
+                element.annotate(Ann) { AnnotationValueBuilder builder ->
+                    builder.member("aggregating", "true")
+                }
             }
         }
     }

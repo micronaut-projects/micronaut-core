@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.visitor;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -29,6 +30,12 @@ public class AllClassesVisitor implements TypeElementVisitor<Object, Object> {
 
     public AllClassesVisitor() {
         reset();
+    }
+
+    @NonNull
+    @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
     }
 
     public void reset() {

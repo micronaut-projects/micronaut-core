@@ -15,6 +15,9 @@
  */
 package io.micronaut.inject.writer;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.inject.ast.Element;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collections;
@@ -33,11 +36,27 @@ public interface ClassWriterOutputVisitor {
      * Visits a new class and returns the output stream with which should be written the bytes of the class to be
      * generated.
      *
-     * @param classname the fully qualified classname
+     * Note that this method should only be called from a {@link io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind#AGGREGATING} visitor from within the {@link io.micronaut.inject.visitor.TypeElementVisitor#finish(io.micronaut.inject.visitor.VisitorContext)} method. If the file
+     *
+     * @param classname          the fully qualified classname
      * @return the output stream to write to
      * @throws IOException if an error occurs creating the output stream
      */
-    OutputStream visitClass(String classname) throws IOException;
+    default OutputStream visitClass(String classname) throws IOException {
+        return visitClass(classname, null);
+    }
+
+    /**
+     * Visits a new class and returns the output stream with which should be written the bytes of the class to be
+     * generated.
+     *
+     * @param classname          the fully qualified classname
+     * @param originatingElement The originating element
+     * @return the output stream to write to
+     * @throws IOException if an error occurs creating the output stream
+     */
+    OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException;
+
 
     /**
      * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class

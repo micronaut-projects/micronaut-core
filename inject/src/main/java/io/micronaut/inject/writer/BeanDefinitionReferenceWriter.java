@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.ast.Element;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -55,10 +56,15 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     /**
      * @param beanTypeName       The bean type name
      * @param beanDefinitionName The bean definition name
+     * @param originatingElement The originating element
      * @param annotationMetadata The annotation metadata
      */
-    public BeanDefinitionReferenceWriter(String beanTypeName, String beanDefinitionName, AnnotationMetadata annotationMetadata) {
-        super(beanDefinitionName + REF_SUFFIX, annotationMetadata, true);
+    public BeanDefinitionReferenceWriter(
+            String beanTypeName,
+            String beanDefinitionName,
+            Element originatingElement,
+            AnnotationMetadata annotationMetadata) {
+        super(beanDefinitionName + REF_SUFFIX, originatingElement, annotationMetadata, true);
         this.beanTypeName = beanTypeName;
         this.beanDefinitionName = beanDefinitionName;
         this.beanDefinitionReferenceClassName = beanDefinitionName + REF_SUFFIX;
@@ -73,7 +79,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
      */
     @Override
     public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
-        try (OutputStream outputStream = outputVisitor.visitClass(getBeanDefinitionQualifiedClassName())) {
+        try (OutputStream outputStream = outputVisitor.visitClass(getBeanDefinitionQualifiedClassName(), getOriginatingElement())) {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
         }
@@ -119,7 +125,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
         Type superType = Type.getType(AbstractBeanDefinitionReference.class);
-        startPublicClass(classWriter, beanDefinitionClassInternalName, superType);
+        startService(classWriter, BeanDefinitionReference.class, beanDefinitionClassInternalName, superType);
         Type beanDefinitionType = getTypeReference(beanDefinitionName);
         writeAnnotationMetadataStaticInitializer(classWriter);
 

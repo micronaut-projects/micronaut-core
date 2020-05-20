@@ -15,6 +15,7 @@
  */
 package io.micronaut.validation.async;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -32,6 +33,12 @@ import java.util.concurrent.CompletionStage;
  */
 @Internal
 public final class AsyncTypeElementVisitor implements TypeElementVisitor<Object, Async> {
+
+    @NonNull
+    @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
+    }
 
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {

@@ -137,7 +137,7 @@ ext {
             ],
             'micronaut.cassandra': [
                     version:micronautCassandraVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.cassandra',
                     name:'micronaut-cassandra'
             ],
             'micronaut.hibernate.validator': [
@@ -159,6 +159,11 @@ ext {
                     version:micronautRabbitMQVersion,
                     group:'io.micronaut.configuration',
                     name:'micronaut-rabbitmq'
+            ],
+            'micronaut.nats': [
+                    version:micronautNatsIoVersion,
+                    group:'io.micronaut.nats',
+                    name:'micronaut-nats'
             ],
             'micronaut.graphql': [
                     version:micronautGraphQLVersion,
@@ -342,7 +347,7 @@ ext {
             ],
             'micronaut.mongo': [
                     version:micronautMongoVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.mongodb',
                     name:'micronaut-mongo-reactive',
                     modules:['micronaut-mongo-core', 'micronaut-mongo-sync']
             ],
@@ -359,7 +364,7 @@ ext {
             'mongo' : [
                     version: mongoVersion,
                     group  : 'org.mongodb',
-                    modules: ['mongodb-driver-async', 'mongo-java-driver']
+                    modules: ['mongodb-driver-async', 'mongodb-driver-sync', 'mongodb-driver-core']
             ],
             'mongo.reactive'           : [
                     version: mongoReactiveVersion,
@@ -558,7 +563,7 @@ ext {
             'micronaut.security'       : [
                     version : micronautSecurityVersion,
                     group   : 'io.micronaut',
-                    modules : ['micronaut-security-jwt', 'micronaut-security-session']
+                    modules : ['micronaut-security', 'micronaut-security-annotations', 'micronaut-security-jwt', 'micronaut-security-session']
             ],
             'micronaut.security.configuration'  : [
                     version : micronautSecurityVersion,

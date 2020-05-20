@@ -24,11 +24,15 @@ import java.lang.annotation.Target;
  * A marker annotation for methods that are generated though an annotation processor.
  *
  * @author David Bidorff
+ * @author graemerocher
  * @since 2.0
  */
 @Target({ElementType.PACKAGE, ElementType.TYPE, ElementType.METHOD, ElementType.CONSTRUCTOR,
     ElementType.FIELD, ElementType.LOCAL_VARIABLE, ElementType.PARAMETER})
 @Retention(RetentionPolicy.CLASS)
 public @interface Generated {
-
+    /**
+     * @return The name of the ServiceLoader service this generated type should be registered with (if any).
+     */
+    String service() default "";
 }

@@ -111,7 +111,7 @@ class FormController {
 
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
         def stream = new ByteArrayOutputStream()
-        new AnnotationMetadataWriter(className, toWrite)
+        new AnnotationMetadataWriter(className, null, toWrite)
                 .writeTo(stream)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
         ClassLoader classLoader = new ClassLoader() {
