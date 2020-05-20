@@ -38,7 +38,7 @@ dependencies {
     compileOnly dependencyVersion("reactor")
     compileOnly dependencyVersion("rxjava1.interop")
     compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.3'
+    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.7'
     compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.3.4'
     compileOnly "ch.qos.logback:logback-classic:1.2.3"
     testImplementation "ch.qos.logback:logback-classic:1.2.3"
