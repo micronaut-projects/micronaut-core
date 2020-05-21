@@ -34,7 +34,6 @@ import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
-import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
@@ -45,7 +44,6 @@ import spock.lang.Stepwise
  * @author Rvanderwerf
  * @since 1.0
  */
-@Ignore
 @Stepwise
 class AWSParameterStoreClientSpec extends Specification {
 
@@ -65,22 +63,20 @@ class AWSParameterStoreClientSpec extends Specification {
         createTestData()
     }
 
+    @Ignore
     void "test is a configuration client"() {
         expect:
         client instanceof AWSParameterStoreConfigClient
         client instanceof ConfigurationClient
     }
 
+    @Ignore
     void "test discovery property sources from AWS Systems Manager Parameter Store - StringList, String, and SecureString"() {
-
         given:
-
         Environment environment = embeddedServer.environment
 
         when:
-
         Publisher<List<PropertySource>> propertySourcesPublisher = client.getPropertySources(environment)
-
 
         then: "verify property source characteristics"
 
@@ -95,7 +91,6 @@ class AWSParameterStoreClientSpec extends Specification {
         propertySources[1].get("foo") == "bar"
         propertySources[1].order > propertySources[0].order
         propertySources[1].toList().size() == 1
-
     }
 
     def cleanupSpec() {
@@ -103,7 +98,6 @@ class AWSParameterStoreClientSpec extends Specification {
     }
 
     private createTestData() {
-
         PutParameterRequest putParameterRequest = new PutParameterRequest()
         putParameterRequest.type = "StringList"
         putParameterRequest.name = "/config/application"
