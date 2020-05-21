@@ -57,10 +57,10 @@ public final class MdcInstrumenter implements InvocationInstrumenterFactory, Rea
 
                 @Override
                 public void afterInvocation(boolean cleanup) {
-                    if (oldContextMap != null && !oldContextMap.isEmpty()) {
-                        MDC.setContextMap(oldContextMap);
-                    } else {
+                    if (cleanup || oldContextMap == null || oldContextMap.isEmpty()) {
                         MDC.clear();
+                    } else {
+                        MDC.setContextMap(oldContextMap);
                     }
                 }
             };
