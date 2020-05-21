@@ -16,6 +16,8 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.Instrumentation;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -31,7 +33,7 @@ import org.reactivestreams.Subscription;
 @SuppressWarnings("ReactiveStreamsSubscriberImplementation")
 class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent {
     private final Subscriber<T> source;
-    private final RunOnceInvocationInstrumenter instrumenter;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -41,26 +43,34 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
      */
     RxInstrumentedSubscriber(Subscriber<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = new RunOnceInvocationInstrumenter(instrumenterFactory.create());
+        this.instrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
     }
 
     @Override
     public void onSubscribe(Subscription s) {
-        instrumenter.run(() -> source.onSubscribe(s));
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            source.onSubscribe(s);
+        }
     }
 
     @Override
     public void onNext(T t) {
-        instrumenter.run(() -> source.onNext(t));
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            source.onNext(t);
+        }
     }
 
     @Override
     public void onError(Throwable t) {
-        instrumenter.run(() -> source.onError(t));
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            source.onError(t);
+        }
     }
 
     @Override
     public void onComplete() {
-        instrumenter.run(source::onComplete);
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            source.onComplete();
+        }
     }
 }

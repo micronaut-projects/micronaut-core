@@ -16,6 +16,8 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.Instrumentation;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.SingleObserver;
 import io.reactivex.disposables.Disposable;
 
@@ -30,7 +32,7 @@ import io.reactivex.disposables.Disposable;
 @Internal
 final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, RxInstrumentedComponent {
     private final SingleObserver<T> source;
-    private final RunOnceInvocationInstrumenter instrumenter;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -40,21 +42,27 @@ final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, RxInst
      */
     RxInstrumentedSingleObserver(SingleObserver<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = new RunOnceInvocationInstrumenter(instrumenterFactory.create());
+        this.instrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        instrumenter.run(() -> source.onSubscribe(d));
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            source.onSubscribe(d);
+        }
     }
 
     @Override
     public void onError(Throwable t) {
-        instrumenter.run(() -> source.onError(t));
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            source.onError(t);
+        }
     }
 
     @Override
     public void onSuccess(T value) {
-        instrumenter.run(() -> source.onSuccess(value));
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            source.onSuccess(value);
+        }
     }
 }
