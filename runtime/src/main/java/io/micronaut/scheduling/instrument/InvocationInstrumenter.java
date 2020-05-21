@@ -18,8 +18,14 @@ package io.micronaut.scheduling.instrument;
 import io.micronaut.core.util.CollectionUtils;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+
 import java.util.Collection;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+
+import static io.micronaut.core.util.ArgumentUtils.requireNonNull;
 
 /**
  * An interface for invocation instrumentation.
@@ -40,6 +46,11 @@ public interface InvocationInstrumenter {
 
         @Override
         public void afterInvocation(boolean cleanup) {
+        }
+
+        @Override
+        public @NonNull Instrumentation newInstrumentation() {
+            return Instrumentation.noop();
         }
     };
 
@@ -63,6 +74,16 @@ public interface InvocationInstrumenter {
     }
 
     /**
+     * TODO
+     *
+     * @return
+     * @since 2.0
+     */
+    default @NonNull Instrumentation newInstrumentation() {
+        return new DefaultInstrumentation(this);
+    }
+
+    /**
      * Combines multiple instrumenters into one.
      *
      * @param invocationInstrumenters instrumenters to combine
@@ -79,7 +100,7 @@ public interface InvocationInstrumenter {
     }
 
     /**
-     * Wrappers {@link Runnable} with instrumentation invocations.
+     * Wraps {@link Runnable} with instrumentation invocations.
      *
      * @param runnable                {@link Runnable} to be wrapped
      * @param invocationInstrumenters instrumenters to be used
@@ -94,7 +115,7 @@ public interface InvocationInstrumenter {
 
 
     /**
-     * Wrappers {@link Callable} with instrumentation invocations.
+     * Wraps {@link Callable} with instrumentation invocations.
      *
      * @param callable                {@link Callable} to be wrapped
      * @param invocationInstrumenters instrumenters to be used
@@ -109,7 +130,7 @@ public interface InvocationInstrumenter {
     }
 
     /**
-     * Wrappers {@link Runnable} with instrumentation invocations.
+     * Wraps {@link Runnable} with instrumentation invocations.
      *
      * @param runnable               {@link Runnable} to be wrapped
      * @param invocationInstrumenter instrumenter to be used
@@ -123,7 +144,7 @@ public interface InvocationInstrumenter {
     }
 
     /**
-     * Wrappers {@link Callable} with instrumentation invocations.
+     * Wraps {@link Callable} with instrumentation invocations.
      *
      * @param callable               {@link Callable} to be wrapped
      * @param invocationInstrumenter instrumenter to be used
@@ -137,4 +158,69 @@ public interface InvocationInstrumenter {
         return new InvocationInstrumenterWrappedCallable<>(invocationInstrumenter, callable);
     }
 
+    /**
+     * Wraps the {@code executor} so that every tasks submitted to it will be executed instrumented with the given
+     * {@code invocationInstrumenter}. Execution itself will be delegated to the underlying {@code executor}, but it has
+     * to be considered that all instrumentation will be done with this very same {@code invocationInstrumenter}
+     * instance. This is especially useful when follow-up actions of a given task need to be registered, where a new
+     * instrumenter, thus a new wrapped executor instance belongs to each task.
+     * <p/>
+     * The returned wrapped executor be of subtype {@link ExecutorService} or {@link ScheduledExecutorService} if the
+     * input executor instance implemented those interfaces.
+     *
+     * @param executor               the executor to wrap
+     * @param invocationInstrumenter the instrumenter to be used upon task executions with the returned executor
+     * @return the wrapped executor
+     */
+    static Executor instrument(@NonNull Executor executor, @NonNull InvocationInstrumenter invocationInstrumenter) {
+        requireNonNull("executor", executor);
+        requireNonNull("invocationInstrumenter", invocationInstrumenter);
+        if (executor instanceof ScheduledExecutorService) {
+            return new InstrumentedScheduledExecutorService() {
+                @Override
+                public ScheduledExecutorService getTarget() {
+                    return (ScheduledExecutorService) executor;
+                }
+
+                @Override
+                public <T> Callable<T> instrument(Callable<T> callable) {
+                    return InvocationInstrumenter.instrument(callable, invocationInstrumenter);
+                }
+
+                @Override
+                public Runnable instrument(Runnable runnable) {
+                    return InvocationInstrumenter.instrument(runnable, invocationInstrumenter);
+                }
+            };
+        } else if (executor instanceof ExecutorService) {
+            return new InstrumentedExecutorService() {
+                @Override
+                public ExecutorService getTarget() {
+                    return (ExecutorService) executor;
+                }
+
+                @Override
+                public <T> Callable<T> instrument(Callable<T> callable) {
+                    return InvocationInstrumenter.instrument(callable, invocationInstrumenter);
+                }
+
+                @Override
+                public Runnable instrument(Runnable runnable) {
+                    return InvocationInstrumenter.instrument(runnable, invocationInstrumenter);
+                }
+            };
+        } else {
+            return new InstrumentedExecutor() {
+                @Override
+                public Executor getTarget() {
+                    return executor;
+                }
+
+                @Override
+                public Runnable instrument(Runnable runnable) {
+                    return InvocationInstrumenter.instrument(runnable, invocationInstrumenter);
+                }
+            };
+        }
+    }
 }
