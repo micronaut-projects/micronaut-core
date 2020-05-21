@@ -74,9 +74,10 @@ public interface InvocationInstrumenter {
     }
 
     /**
-     * TODO
-     *
-     * @return
+     * @return a one-time {@link Instrumentation} instance which to be used in a try-with-resources to do the
+     * instrumentation. When using this approach {@link #beforeInvocation()} will already be invoked by the time
+     * this method invocation returns. {@link Instrumentation#close()} will by default invoke {@link #afterInvocation()}
+     * without cleanup. To force cleanup invoke {@link Instrumentation#forceCleanup()} on the retuned instance.
      * @since 2.0
      */
     default @NonNull Instrumentation newInstrumentation() {

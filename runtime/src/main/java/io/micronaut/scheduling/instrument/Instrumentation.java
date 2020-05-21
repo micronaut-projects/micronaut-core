@@ -18,7 +18,18 @@ package io.micronaut.scheduling.instrument;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
- * TODO
+ * Instrumentation represents an ongoing instrumentation with a given {@link InvocationInstrumenter} if any. When the
+ * instance is returned to the caller it should already have executed {@link InvocationInstrumenter#beforeInvocation()}.
+ * When assigning a newly instantiated instance in a try-with-resources block it will automatically execute
+ * {@link InvocationInstrumenter#afterInvocation()} upon leaving the protected block.
+ * <p/>
+ * To force cleanup after the invocation, use the instance returned by {@link #forceCleanup()} instead, such as:
+ * <p/>
+ * <pre>
+ * try (Instrumentation ignored = instrumenter.newInstrumentation().forceCleanup()) {
+ *     ...
+ * }
+ * </pre>
  *
  * @author lgathy
  * @since 2.0
@@ -26,34 +37,35 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 public interface Instrumentation extends AutoCloseable {
 
     /**
-     * TODO
-     *
-     * @return
+     * @return {@code true} if and only if the given instrumentation is in progress, meaning that {@link
+     * InvocationInstrumenter#beforeInvocation()} has already been invoked but {@link
+     * InvocationInstrumenter#afterInvocation()} or {@link InvocationInstrumenter#afterInvocation(boolean)} has not yet
+     * been called.
      */
     boolean isActive();
 
     /**
-     * TODO
+     * Closes the active instrumentation according to {@link InvocationInstrumenter#afterInvocation(boolean)}.
      *
-     * @param cleanup
+     * @param cleanup Whether to enforce cleanup
      */
     void close(boolean cleanup);
 
     /**
-     * TODO
+     * Closes the active instrumentation as defined in {@link InvocationInstrumenter#afterInvocation()}.
      */
     @Override
-    default void close() {
-        close(false);
-    }
+    void close();
 
     /**
-     * TODO
+     * Return an instance which guarantees that cleanup will be forced to the instrumenter upon closing. The returned
+     * instance will always invoke {@link InvocationInstrumenter#afterInvocation(boolean)} with {@code cleanup=true}
+     * even if {@link #close(boolean)} gets called with {@code cleanup=false}
      *
-     * @return
+     * @return a new instance which forces cleanup upon leaving the protected block.
      */
     default @NonNull Instrumentation forceCleanup() {
-        class ForcedCleanup implements Instrumentation {
+        return new Instrumentation() {
 
             @Override
             public boolean isActive() {
@@ -74,14 +86,11 @@ public interface Instrumentation extends AutoCloseable {
             public @NonNull Instrumentation forceCleanup() {
                 return this;
             }
-        }
-        return new ForcedCleanup();
+        };
     }
 
     /**
-     * TODO
-     *
-     * @return
+     * @return an instance which does no instrumentation
      */
     static @NonNull Instrumentation noop() {
         return NoopInstrumentation.INSTANCE;

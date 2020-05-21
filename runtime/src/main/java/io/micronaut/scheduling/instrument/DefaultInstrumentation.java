@@ -16,7 +16,16 @@
 package io.micronaut.scheduling.instrument;
 
 /**
- * TODO
+ * The default {@link Instrumentation} implementation. When using in a try-with-resources block will act identical to:
+ * <p/>
+ * <pre>
+ * try {
+ *     instrumenter.beforeInvocation();
+ *     ...
+ * } finally {
+ *     instrumenter.afterInvocation();
+ * }
+ * </pre>
  *
  * @author lgathy
  * @since 2.0
@@ -26,9 +35,9 @@ public final class DefaultInstrumentation implements Instrumentation {
     private final InvocationInstrumenter instrumenter;
 
     /**
-     * TODO
+     * Default constructor.
      *
-     * @param instrumenter
+     * @param instrumenter The instrumenter to be used in the instrumentation
      */
     public DefaultInstrumentation(InvocationInstrumenter instrumenter) {
         instrumenter.beforeInvocation();
@@ -43,5 +52,10 @@ public final class DefaultInstrumentation implements Instrumentation {
     @Override
     public void close(boolean cleanup) {
         instrumenter.afterInvocation(cleanup);
+    }
+
+    @Override
+    public void close() {
+        instrumenter.afterInvocation();
     }
 }

@@ -28,32 +28,6 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenter;
  */
 public final class RunOnceInvocationInstrumenter implements InvocationInstrumenter {
 
-    /**
-     * TODO
-     *
-     * @param factory
-     * @return
-     */
-    public static @NonNull InvocationInstrumenter create(@NonNull RxInstrumenterFactory factory) {
-        return wrap(factory.create());
-    }
-
-    /**
-     * TODO
-     *
-     * @param instrumenter
-     * @return
-     */
-    public static @NonNull InvocationInstrumenter wrap(@Nullable InvocationInstrumenter instrumenter) {
-        if (instrumenter == null) {
-            return InvocationInstrumenter.NOOP;
-        }
-        if (instrumenter instanceof RunOnceInvocationInstrumenter) {
-            return instrumenter;
-        }
-        return new RunOnceInvocationInstrumenter(instrumenter);
-    }
-
     private final InvocationInstrumenter instrumenter;
     private Instrumentation activeInstrumentation;
 
@@ -67,12 +41,7 @@ public final class RunOnceInvocationInstrumenter implements InvocationInstrument
         this.activeInstrumentation = null;
     }
 
-    /**
-     * TODO
-     *
-     * @return
-     */
-    public boolean isInstrumentationActive() {
+    private boolean isInstrumentationActive() {
         return activeInstrumentation != null;
     }
 
@@ -81,24 +50,30 @@ public final class RunOnceInvocationInstrumenter implements InvocationInstrument
         if (isInstrumentationActive()) {
             return Instrumentation.noop();
         }
-        Instrumentation instrumentation = instrumenter.newInstrumentation();
-        if (!instrumentation.isActive()) {
-            return instrumentation;
+        Instrumentation delegatedInstrumentation = instrumenter.newInstrumentation();
+        if (!delegatedInstrumentation.isActive()) {
+            return delegatedInstrumentation;
         }
-        class RunOnceInstrumentation implements Instrumentation {
+        activeInstrumentation = new Instrumentation() {
 
             @Override
             public boolean isActive() {
-                return instrumentation.isActive();
+                return delegatedInstrumentation.isActive();
             }
 
             @Override
             public void close(boolean cleanup) {
-                instrumentation.close(cleanup);
+                delegatedInstrumentation.close(cleanup);
                 activeInstrumentation = null;
             }
-        }
-        return activeInstrumentation = new RunOnceInstrumentation();
+
+            @Override
+            public void close() {
+                delegatedInstrumentation.close();
+                activeInstrumentation = null;
+            }
+        };
+        return activeInstrumentation;
     }
 
     @Override
@@ -121,5 +96,45 @@ public final class RunOnceInvocationInstrumenter implements InvocationInstrument
                 activeInstrumentation = null;
             }
         }
+    }
+
+    /**
+     * Creates a new {@link InvocationInstrumenter} with the given {@code factory} and wraps it immediately.
+     * <p/>
+     * Equivalent to: {@code wrap(factory.create())}
+     *
+     * @param factory The instrumenter factory to create instrumenter with.
+     * @return an instrumenter created by the factory protected against multiple chained invocations.
+     */
+    public static @NonNull InvocationInstrumenter create(@NonNull RxInstrumenterFactory factory) {
+        return wrap(factory.create());
+    }
+
+    /**
+     * Wraps the given instrumenter if necessary to guarantee that it will only instrument once if it gets called
+     * multiple times in a chain. Thus the following code:
+     * <p/>
+     * <pre>
+     * InvocationInstrumenter delegate = ...;
+     * InvocationInstrumenter onlyOnce = RunOnceInvocationInstrumenter.wrap(delegate);
+     * try (Instrumentation outer = onlyOnce.newInstrumentation()) {
+     *     try (Instrumentation inner = onlyOnce.newInstrumentation()) {
+     *         ...
+     *     }
+     * }
+     * </pre>
+     * will only invoke {@code delegate.beforeInvocation()} and {@code delegate.afterInvocation()} once.
+     *
+     * @param instrumenter The instrumenter to protect against multiple chained invocations.
+     * @return the protected instrumenter instance.
+     */
+    public static @NonNull InvocationInstrumenter wrap(@Nullable InvocationInstrumenter instrumenter) {
+        if (instrumenter == null) {
+            return InvocationInstrumenter.NOOP;
+        }
+        if (instrumenter instanceof RunOnceInvocationInstrumenter) {
+            return instrumenter;
+        }
+        return new RunOnceInvocationInstrumenter(instrumenter);
     }
 }
