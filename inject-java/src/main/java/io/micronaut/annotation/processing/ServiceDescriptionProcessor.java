@@ -15,8 +15,8 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.util.StringUtils;
 
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
@@ -55,16 +55,15 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
             for (Element element : elements) {
                 if (element instanceof TypeElement) {
                     String name = ((TypeElement) element).getQualifiedName().toString();
-                    AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(element);
-                    String serviceName = annotationMetadata.stringValue(
-                            Generated.class,
-                            "service"
-                    ).orElse(null);
-
-                    if (serviceName != null) {
-                        serviceDescriptors.computeIfAbsent(serviceName, s1 -> new HashSet<>())
-                                .add(name);
+                    Generated generated = element.getAnnotation(Generated.class);
+                    if (generated != null) {
+                        String serviceName = generated.service();
+                        if (StringUtils.isNotEmpty(serviceName)) {
+                            serviceDescriptors.computeIfAbsent(serviceName, s1 -> new HashSet<>())
+                                    .add(name);
+                        }
                     }
+
                 }
 
             }
