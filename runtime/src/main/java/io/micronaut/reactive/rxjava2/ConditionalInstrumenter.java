@@ -15,19 +15,15 @@
  */
 package io.micronaut.reactive.rxjava2;
 
-import io.micronaut.scheduling.instrument.Instrumenters;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.scheduling.instrument.DefaultInstrumentation;
+import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-
-import java.util.concurrent.Callable;
-import java.util.function.Supplier;
 
 /**
  * Interface of a special group of instrumenters where the instrumentation is omitted if the condition defined by the
- * {@link #isActive()} method is evaluated to {@code false} before each invocation. Therefore, conditional instrumenter
- * instances can safely be reused multiple times inside the same reactive call chain.
- * <p/>
- * Execute instrumentation on-demand via the built-in default methods: {@link #call(Callable)},
- * {@link #invoke(Supplier)} and {@link #run(Runnable)}.
+ * {@link #testInstrumentationNeeded()} method is evaluated to {@code false} before each invocation. Therefore,
+ * conditional instrumenter instances can safely be reused multiple times inside the same reactive call chain.
  *
  * @author lgathy
  * @since 2.0
@@ -35,63 +31,16 @@ import java.util.function.Supplier;
 public interface ConditionalInstrumenter extends InvocationInstrumenter {
 
     /**
-     * Determines if the instrumenter is active at the current invocation context. Instrumentation should only be
-     * applied when this method returns {@code false}.
+     * Determines if instrumentation is needed at the current invocation context. {@link #newInstrumentation()} will
+     * return {@link Instrumentation#noop()} whenever this method returns {@code false}, thus it's safe to do the
+     * instrumentation in a try-with-resource block with {@link InvocationInstrumenter#newInstrumentation()}.
      *
-     * @return {@code true} if the instrumenter is already active
+     * @return {@code true} if instrumentation is needed
      */
-    boolean isActive();
+    boolean testInstrumentationNeeded();
 
-    /**
-     * Instruments the given {@link Runnable}, Instrumenter methods {@link #beforeInvocation()} and
-     * {@link #afterInvocation()} are only executed if {@link #isActive()} returns {@code false}. Otherwise
-     * {@code action.run();} will be called without instrumentation.
-     *
-     * @param action the {@link Runnable} to execute
-     */
-    default void run(Runnable action) {
-        if (isActive()) {
-            action.run();
-            return;
-        }
-        Instrumenters.runWith(action, this);
-    }
-
-    /**
-     * Instruments the given {@link Callable}, Instrumenter methods {@link #beforeInvocation()} and
-     * {@link #afterInvocation()} are only executed if {@link #isActive()} returns {@code false}. Otherwise
-     * {@code callable.call();} will be called without instrumentation.
-     * <p/>
-     * Use {@link #invoke(Supplier)} instead whenever the callable does not declare to throw checked exceptions.
-     *
-     * @param callable The {@link Callable} to execute
-     * @param <T>      The return type
-     * @return the result of {@code callable.call();}
-     * @throws Exception if thrown by {@code callable.call()}
-     */
-    default <T> T call(Callable<T> callable) throws Exception {
-        if (isActive()) {
-            return callable.call();
-        }
-        return Instrumenters.callWith(callable, this);
-    }
-
-    /**
-     * Instruments the given {@link Supplier}, Instrumenter methods {@link #beforeInvocation()} and
-     * {@link #afterInvocation()} are only executed if {@link #isActive()} returns {@code false}. Otherwise
-     * {@code supplier.get();} will be called without instrumentation.
-     * <p/>
-     * Use {@link #call(Callable)} instead if the instrumented code declares to throw checked exceptions and you
-     * want it to propagate outside of this invocation.
-     *
-     * @param supplier the {@link Supplier} to execute
-     * @param <T>      The return type
-     * @return the result of {@code supplier.get();}
-     */
-    default <T> T invoke(Supplier<T> supplier) {
-        if (isActive()) {
-            return supplier.get();
-        }
-        return Instrumenters.supplyWith(supplier, this);
+    @Override
+    default @NonNull Instrumentation newInstrumentation() {
+        return testInstrumentationNeeded() ? new DefaultInstrumentation(this) : Instrumentation.noop();
     }
 }

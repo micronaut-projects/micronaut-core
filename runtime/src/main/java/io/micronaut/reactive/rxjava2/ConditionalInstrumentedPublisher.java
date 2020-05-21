@@ -15,6 +15,7 @@
  */
 package io.micronaut.reactive.rxjava2;
 
+import io.micronaut.scheduling.instrument.Instrumentation;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
@@ -58,6 +59,8 @@ public class ConditionalInstrumentedPublisher<T> implements Publisher<T> {
 
     @Override
     public void subscribe(Subscriber<? super T> subscriber) {
-        instrumenter.run(() -> publisher.subscribe(ConditionalInstrumentedSubscriber.wrap(subscriber, instrumenter)));
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            publisher.subscribe(ConditionalInstrumentedSubscriber.wrap(subscriber, instrumenter));
+        }
     }
 }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.reactive.rxjava2;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.reactivex.FlowableSubscriber;
 
 /**
@@ -35,7 +36,7 @@ public class ConditionalInstrumentedFlowableSubscriber<T> extends ConditionalIns
      * @param instrumenter The instrumenter
      */
     public ConditionalInstrumentedFlowableSubscriber(
-            FlowableSubscriber<T> subscriber, ConditionalInstrumenter instrumenter) {
+            @NonNull FlowableSubscriber<T> subscriber, @NonNull ConditionalInstrumenter instrumenter) {
         super(subscriber, instrumenter);
     }
 }

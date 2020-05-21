@@ -15,6 +15,8 @@
  */
 package io.micronaut.reactive.rxjava2;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.scheduling.instrument.Instrumentation;
 import io.reactivex.FlowableSubscriber;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -42,7 +44,7 @@ public class ConditionalInstrumentedSubscriber<T> implements Subscriber<T> {
      * @param subscriber   The source subscriber
      * @param instrumenter The instrumenter
      */
-    public ConditionalInstrumentedSubscriber(Subscriber<T> subscriber, ConditionalInstrumenter instrumenter) {
+    public ConditionalInstrumentedSubscriber(@NonNull Subscriber<T> subscriber, @NonNull ConditionalInstrumenter instrumenter) {
         this.subscriber = requireNonNull(subscriber, "subscriber");
         this.instrumenter = requireNonNull(instrumenter, "instrumenter");
     }
@@ -56,7 +58,7 @@ public class ConditionalInstrumentedSubscriber<T> implements Subscriber<T> {
      * @param <T>          The type
      * @return The wrapped subscriber
      */
-    public static <T> Subscriber<T> wrap(Subscriber<T> subscriber, ConditionalInstrumenter instrumenter) {
+    public static @NonNull <T> Subscriber<T> wrap(@NonNull Subscriber<T> subscriber, @NonNull ConditionalInstrumenter instrumenter) {
         if (subscriber instanceof FlowableSubscriber) {
             return new ConditionalInstrumentedFlowableSubscriber<>((FlowableSubscriber<T>) subscriber, instrumenter);
         } else {
@@ -66,21 +68,29 @@ public class ConditionalInstrumentedSubscriber<T> implements Subscriber<T> {
 
     @Override
     public final void onSubscribe(Subscription s) {
-        instrumenter.run(() -> subscriber.onSubscribe(s));
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            subscriber.onSubscribe(s);
+        }
     }
 
     @Override
     public void onNext(T t) {
-        instrumenter.run(() -> subscriber.onNext(t));
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            subscriber.onNext(t);
+        }
     }
 
     @Override
     public void onError(Throwable t) {
-        instrumenter.run(() -> subscriber.onError(t));
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            subscriber.onError(t);
+        }
     }
 
     @Override
     public void onComplete() {
-        instrumenter.run(subscriber::onComplete);
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            subscriber.onComplete();
+        }
     }
 }

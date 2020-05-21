@@ -20,7 +20,8 @@ import org.slf4j.MDC;
 
 import java.util.Objects;
 
-import static java.util.Objects.requireNonNull;
+import static io.micronaut.core.util.ArgumentUtils.requireNonNull;
+
 
 /**
  * Conditional instrumenter to set a given key/value pair in {@link MDC}.
@@ -44,13 +45,13 @@ public class MdcKeyValuePairInstrumenter implements ConditionalInstrumenter {
      * @param value The value to be put into MDC
      */
     public MdcKeyValuePairInstrumenter(String key, String value) {
-        this.key = requireNonNull(key, "key");
-        this.value = requireNonNull(value, "value");
+        this.key = requireNonNull("key", key);
+        this.value = requireNonNull("value", value);
     }
 
     @Override
-    public boolean isActive() {
-        return Objects.equals(MDC.get(key), value);
+    public boolean testInstrumentationNeeded() {
+        return !Objects.equals(MDC.get(key), value);
     }
 
     @Override
