@@ -18,6 +18,7 @@ package io.micronaut.core.serialize;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.serialize.exceptions.SerializationException;
+import io.micronaut.core.type.Argument;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -67,6 +68,25 @@ public class JdkSerializer implements ObjectSerializer {
     public <T> Optional<T> deserialize(InputStream inputStream, Class<T> requiredType) throws SerializationException {
         try {
             try (ObjectInputStream objectIn = createObjectInput(inputStream, requiredType)) {
+                try {
+                    Object readObject = objectIn.readObject();
+
+                    return conversionService.convert(readObject, requiredType);
+                } catch (ClassCastException cce) {
+                    throw new SerializationException("Invalid type deserialized from stream: " + cce.getMessage(), cce);
+                } catch (ClassNotFoundException e) {
+                    throw new SerializationException("Type not found deserializing from stream: " + e.getMessage(), e);
+                }
+            }
+        } catch (IOException e) {
+            throw new SerializationException("I/O error occurred during deserialization: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public <T> Optional<T> deserialize(InputStream inputStream, Argument<T> requiredType) throws SerializationException {
+        try {
+            try (ObjectInputStream objectIn = createObjectInput(inputStream, requiredType.getType())) {
                 try {
                     Object readObject = objectIn.readObject();
 

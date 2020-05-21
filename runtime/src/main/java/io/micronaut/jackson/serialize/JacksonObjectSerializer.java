@@ -16,9 +16,12 @@
 package io.micronaut.jackson.serialize;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.core.serialize.ObjectSerializer;
 import io.micronaut.core.serialize.exceptions.SerializationException;
+import io.micronaut.core.type.Argument;
+import io.micronaut.jackson.JacksonConfiguration;
 
 import javax.inject.Singleton;
 import java.io.IOException;
@@ -75,6 +78,26 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     public <T> Optional<T> deserialize(InputStream inputStream, Class<T> requiredType) throws SerializationException {
         try {
             return Optional.ofNullable(objectMapper.readValue(inputStream, requiredType));
+        } catch (IOException e) {
+            throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public <T> Optional<T> deserialize(byte[] bytes, Argument<T> requiredType) throws SerializationException {
+        try {
+            JavaType javaType = JacksonConfiguration.constructType(requiredType, objectMapper.getTypeFactory());
+            return Optional.ofNullable(objectMapper.readValue(bytes, javaType));
+        } catch (IOException e) {
+            throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public <T> Optional<T> deserialize(InputStream inputStream, Argument<T> requiredType) throws SerializationException {
+        try {
+            JavaType javaType = JacksonConfiguration.constructType(requiredType, objectMapper.getTypeFactory());
+            return Optional.ofNullable(objectMapper.readValue(inputStream, javaType));
         } catch (IOException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
