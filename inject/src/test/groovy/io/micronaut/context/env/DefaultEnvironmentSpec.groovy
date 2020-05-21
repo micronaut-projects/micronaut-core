@@ -423,7 +423,7 @@ class DefaultEnvironmentSpec extends Specification {
 
         when:
         System.clearProperty("config.prop")
-        envs = SystemLambda.withEnvironmentVariable("CONFIG_PROP", "env-var")
+        SystemLambda.withEnvironmentVariable("CONFIG_PROP", "env-var")
                 .execute(() -> {
                     env = new DefaultEnvironment({["first", "second"]}).start()
                 })

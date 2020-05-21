@@ -138,18 +138,14 @@ class PropertySourcePropertyResolverSpec extends Specification {
                 PropertySource.of("test", [(property): value] + values)
         )
 
-        def envs = SystemLambda.withEnvironmentVariable("FOO_BAR", "foo bar")
-        .and("FOO_BAR_1", "foo bar 1")
-        .set()
-
         expect:
-        resolver.getProperty(key, Object).isPresent()
-        resolver.getProperty(key, type)
-        resolver.getProperty(key, type).get() == expected
-        resolver.containsProperty(key)
-
-        cleanup:
-        envs.restore()
+        SystemLambda.withEnvironmentVariable("FOO_BAR", "foo bar")
+                .and("FOO_BAR_1", "foo bar 1")
+                .execute(() -> {
+                    assert resolver.getProperty(key, Object).isPresent()
+                    assert resolver.getProperty(key, type).get() == expected
+                    assert resolver.containsProperty(key)
+                })
 
         where:
         property      | value                                                | key           | type    | expected
