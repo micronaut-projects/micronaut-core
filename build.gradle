@@ -300,7 +300,7 @@ ext {
             ],
             'micronaut.micrometer': [
                     version:micronautMicrometerVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.micrometer',
                     name:'micronaut-micrometer-core',
                     modules:[
                             'micronaut-micrometer-registry-appoptics',

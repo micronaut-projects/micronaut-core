@@ -32,6 +32,3 @@ snippet::io.micronaut.docs.streaming.HeadlineFlowClient[tags="imports, class, st
 
 <1> The `@Get` method is defined as processing responses of type `APPLICATION_JSON_STREAM`
 <2> A `Flow` is used as the return type
-
-
-NOTE: Due to the way Kotlin compiler generates bytecode for coroutines they are currently https://github.com/oracle/graal/issues/366[unsupported] out-of-the-box in GraalVM. There is, however, a https://github.com/HewlettPackard/kraal[workaround] for this problem.
