@@ -14,15 +14,11 @@ import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
-import org.reactivestreams.Subscription
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import spock.lang.AutoCleanup
-import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Specification
-
-import java.util.logging.Logger
 
 class MDCSpec extends Specification {
 
@@ -34,8 +30,6 @@ class MDCSpec extends Specification {
     @Shared @AutoCleanup
     RxHttpClient client = RxHttpClient.create(embeddedServer.URL)
 
-
-    @PendingFeature(reason = "Requires reworking the instrumentation APIs - again")
     void "test MDC doesn't leak"() {
         expect:
         100.times {
@@ -73,12 +67,10 @@ class MDCSpec extends Specification {
                 LOG.warn("MDC should have been empty here.")
             }
             LOG.info("Storing traceId in MDC: " + traceIdHeader)
+            MDC.put(TRACE_ID_MDC_KEY, traceIdHeader)
 
             return Flowable
                     .fromPublisher(chain.proceed(request))
-                    .doOnSubscribe({ Subscription s ->
-                        MDC.put(TRACE_ID_MDC_KEY, traceIdHeader)
-                    })
                     .doFinally{->
                         LOG.info("Removing traceId id from MDC: {}", MDC.get(TRACE_ID_MDC_KEY))
                         MDC.clear()
@@ -90,5 +82,6 @@ class MDCSpec extends Specification {
             return -1
         }
     }
+
 
 }

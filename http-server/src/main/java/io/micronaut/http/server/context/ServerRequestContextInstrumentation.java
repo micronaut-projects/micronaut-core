@@ -16,7 +16,6 @@
 package io.micronaut.http.server.context;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
@@ -36,29 +35,7 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
 
     @Override
     public InvocationInstrumenter newInvocationInstrumenter() {
-        return ServerRequestContext.currentRequest().map(invocationRequest -> new InvocationInstrumenter() {
-
-            private HttpRequest<Object> currentRequest;
-            private boolean isSet = false;
-
-            @Override
-            public void beforeInvocation() {
-                currentRequest = ServerRequestContext.currentRequest().orElse(null);
-                if (invocationRequest != currentRequest) {
-                    isSet = true;
-                    ServerRequestContext.set(invocationRequest);
-                }
-            }
-
-            @Override
-            public void afterInvocation(boolean cleanup) {
-                if (isSet || cleanup) {
-                    ServerRequestContext.set(cleanup ? null : currentRequest);
-                    isSet = false;
-                }
-            }
-
-        }).orElse(null);
+        return ServerRequestContext.currentRequest().map(ServerRequestContextInvocationInstrumenter::new).orElse(null);
     }
 
     @Override
