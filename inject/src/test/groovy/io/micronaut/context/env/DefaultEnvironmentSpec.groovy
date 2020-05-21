@@ -412,22 +412,26 @@ class DefaultEnvironmentSpec extends Specification {
         when:
         System.setProperty("micronaut.config.files", "classpath:config-files.yml,classpath:config-files2.yml")
         System.setProperty("config.prop", "system-property")
-        def envs = SystemLambda.withEnvironmentVariable("CONFIG_PROP", "env-var")
-                .set()
-        Environment env = new DefaultEnvironment({["first", "second"]}).start()
+        Environment env
+        SystemLambda.withEnvironmentVariable("CONFIG_PROP", "env-var")
+        .execute(() -> {
+            env = new DefaultEnvironment({["first", "second"]}).start()
+        })
 
         then: "System properties have highest precedence"
         env.getRequiredProperty("config.prop", String.class) == "system-property"
 
         when:
         System.clearProperty("config.prop")
-        env = new DefaultEnvironment({["first", "second"]}).start()
+        envs = SystemLambda.withEnvironmentVariable("CONFIG_PROP", "env-var")
+                .execute(() -> {
+                    env = new DefaultEnvironment({["first", "second"]}).start()
+                })
 
         then: "Environment variables have next highest precedence"
         env.getRequiredProperty("config.prop", String.class) == "env-var"
 
         when:
-        envs.restore()
         env = new DefaultEnvironment({["first", "second"]}).start()
 
         then: "Config files last in the list have precedence over those first in the list"
@@ -468,20 +472,28 @@ class DefaultEnvironmentSpec extends Specification {
         env.activeNames == ["test"] as Set
 
         when:
-        environmentVariables.set("MICRONAUT_ENVIRONMENTS", "first,second,third")
-        env = new DefaultEnvironment({[]}).start()
+        SystemLambda.withEnvironmentVariable("MICRONAUT_ENVIRONMENTS", "first,second,third")
+        .execute(() -> {
+            env = new DefaultEnvironment({[]}).start()
+        })
 
         then: // env has priority over deduced
         env.activeNames == ["test", "first", "second", "third"] as Set
 
         when:
-        env = new DefaultEnvironment({["specified"]}).start()
+        SystemLambda.withEnvironmentVariable("MICRONAUT_ENVIRONMENTS", "first,second,third")
+                .execute(() -> {
+                    env = new DefaultEnvironment({["specified"]}).start()
+                })
 
         then: // specified has priority over env
         env.activeNames == ["test", "first", "second", "third", "specified"] as Set
 
         when:
-        env = new DefaultEnvironment({["second"]}).start()
+        SystemLambda.withEnvironmentVariable("MICRONAUT_ENVIRONMENTS", "first,second,third")
+                .execute(() -> {
+                    env = new DefaultEnvironment({["second"]}).start()
+                })
 
         then: // specified has priority over env, even if already set in env
         env.activeNames == ["test", "first", "third", "second"] as Set
