@@ -19,10 +19,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.MethodElement;
@@ -48,9 +46,7 @@ public class RequestBeanParameterRule implements RouteValidationRule {
 
     private List<String> validate(ParameterElement parameterElement) {
         List<String> errors = new ArrayList<>();
-        List<PropertyElement> bindableProperties = parameterElement.getType().getBeanProperties().stream()
-                .filter(p -> p.hasStereotype(Bindable.class) || p.getType().isAssignable(HttpRequest.class))
-                .collect(Collectors.toList());
+        List<PropertyElement> beanProperties = parameterElement.getType().getBeanProperties();
         Optional<MethodElement> primaryConstructor = parameterElement.getType().getPrimaryConstructor();
 
         if (primaryConstructor.isPresent() && primaryConstructor.get().getParameters().length > 0) {
@@ -68,7 +64,7 @@ public class RequestBeanParameterRule implements RouteValidationRule {
                             + "\nNote2: In case you have multiple @Creator constructors, first is used as primary constructor."));
 
             // Check readonly bindable properties can be set via constructor
-            bindableProperties.stream()
+            beanProperties.stream()
                     .filter(PropertyElement::isReadOnly)
                     .filter(p -> constructorParameters.stream().noneMatch(constructorProperty -> constructorProperty.getName().equals(p.getName())))
                     .forEach(p -> errors.add(
@@ -79,7 +75,7 @@ public class RequestBeanParameterRule implements RouteValidationRule {
                                     + "\nNote2: In case you have multiple @Creator constructors, first is used as primary constructor."));
         } else {
             // Check readonly bindable properties
-            bindableProperties.stream()
+            beanProperties.stream()
                     .filter(PropertyElement::isReadOnly)
                     .forEach(p -> errors.add("Bindable property [" + p.getName()  + "] for type [" + parameterElement.getType().getName() + "]"
                             + " is Read only and cannot be set during initialization.\n"

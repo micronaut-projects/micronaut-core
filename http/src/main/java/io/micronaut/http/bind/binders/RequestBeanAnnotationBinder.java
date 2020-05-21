@@ -23,7 +23,6 @@ import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
-import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -72,8 +71,7 @@ public class RequestBeanAnnotationBinder<T> extends AbstractAnnotatedArgumentBin
 
         if (hasAnnotation) {
             BeanIntrospection<T> introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
-            Map<String, BeanProperty<T, Object>> bindableProperties = introspection.getBeanProperties().stream()
-                    .filter(p -> p.getType().isAssignableFrom(HttpRequest.class) || p.hasStereotype(Bindable.class))
+            Map<String, BeanProperty<T, Object>> beanProperties = introspection.getBeanProperties().stream()
                     .collect(Collectors.toMap(Named::getName, (p) -> p));
 
             if (introspection.getConstructorArguments().length > 0) {
@@ -83,25 +81,21 @@ public class RequestBeanAnnotationBinder<T> extends AbstractAnnotatedArgumentBin
                 for (int i = 0; i < constructorArguments.length; i++) {
                     @SuppressWarnings("unchecked")
                     Argument<Object> constructorArgument = (Argument<Object>) constructorArguments[i];
-                    if (HttpRequest.class.isAssignableFrom(constructorArgument.getType())) {
-                        argumentValues[i] = source;
+                    BeanProperty<T, Object> bp = beanProperties.get(constructorArgument.getName());
+                    Argument<Object> argumentToBind;
+                    if (bp != null) {
+                        argumentToBind = bp.asArgument();
                     } else {
-                        BeanProperty<T, Object> bp = bindableProperties.get(constructorArgument.getName());
-                        Argument<Object> argumentToBind;
-                        if (bp != null) {
-                            argumentToBind = bp.asArgument();
-                        } else {
-                            argumentToBind = constructorArgument;
-                        }
-                        Optional<Object> bindableResult = getBindableResult(source, argumentToBind);
-                        argumentValues[i] = constructorArgument.isOptional() ? bindableResult : bindableResult.orElse(null);
+                        argumentToBind = constructorArgument;
                     }
+                    Optional<Object> bindableResult = getBindableResult(source, argumentToBind);
+                    argumentValues[i] = constructorArgument.isOptional() ? bindableResult : bindableResult.orElse(null);
                 }
                 return () -> Optional.of(introspection.instantiate(false, argumentValues));
             } else {
                 // Handle injection with setters, we checked that all values are writable at compile time
                 T bean = introspection.instantiate();
-                for (BeanProperty<T, Object> property : bindableProperties.values()) {
+                for (BeanProperty<T, Object> property : beanProperties.values()) {
                     Argument<Object> propertyArgument = property.asArgument();
                     Optional<Object> bindableResult = getBindableResult(source, propertyArgument);
                     property.set(bean, propertyArgument.isOptional()
@@ -127,9 +121,6 @@ public class RequestBeanAnnotationBinder<T> extends AbstractAnnotatedArgumentBin
 
     private Optional<Object> getBindableResult(ArgumentConversionContext<Object> conversionContext, HttpRequest<?> source) {
         Argument<Object> argument = conversionContext.getArgument();
-        if (argument.getType().isAssignableFrom(HttpRequest.class)) {
-            return Optional.of(source);
-        }
         Optional<ArgumentBinder<Object, HttpRequest<?>>> binder = requestBinderRegistry.findArgumentBinder(argument, source);
         if (!binder.isPresent()) {
             throw new UnsatisfiedArgumentException(argument);
