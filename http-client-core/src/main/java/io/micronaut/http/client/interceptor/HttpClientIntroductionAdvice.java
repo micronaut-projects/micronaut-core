@@ -127,7 +127,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        if (!context.hasAnnotation(Client.class)) {
+        if (!context.hasStereotype(Client.class)) {
             throw new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context);
         }
 
@@ -391,7 +391,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
             final Class<?> methodDeclaringType = declaringType;
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
-                boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.isTrue(Consumes.class, "single");
+                boolean isSingle = returnType.isSingleResult() || returnType.isCompletable();
                 Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
 
 

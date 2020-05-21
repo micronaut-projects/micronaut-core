@@ -28,7 +28,7 @@ import io.netty.channel.socket.SocketChannel;
 
 /**
  * Factory for EventLoopGroup.
- * 
+ *
  * @author croudet
  * @author graemerocher
  * @since 1.2.0
@@ -106,7 +106,7 @@ public interface EventLoopGroupFactory {
 
     /**
      * Creates a default EventLoopGroup.
-     * 
+     *
      * @param ioRatio The io ratio.
      * @return An EventLoopGroup.
      * @deprecated Use {@link #createEventLoopGroup(EventLoopGroupConfiguration, ThreadFactory)} instead
@@ -118,7 +118,7 @@ public interface EventLoopGroupFactory {
 
     /**
      * Returns the server channel class.
-     * 
+     *
      * @return A ServerChannelClass.
      */
     @NonNull Class<? extends ServerSocketChannel> serverSocketChannelClass();
@@ -140,4 +140,5 @@ public interface EventLoopGroupFactory {
      * @return A SocketChannel.
      */
     @NonNull Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration);
+
 }

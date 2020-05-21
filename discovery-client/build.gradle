@@ -10,33 +10,40 @@ dependencies {
         exclude module:'micronaut-http-client'
         exclude module:'micronaut-inject'
     }
-    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.725'
-    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.725'
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.784'
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.784'
     compileOnly group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.688'
 
     // used by AWSParameterStoreConfigClient
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.683'
 
-    testImplementation "org.testcontainers:spock:1.13.0"
+    // used by OracleCloudVaultConfigurationClient
+    compileOnly group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-vault', version: '1.15.4'
+    compileOnly group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-secrets', version: '1.15.4'
+    compileOnly group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-common', version: '1.15.4'
+
+    testImplementation "org.testcontainers:spock:1.14.1"
 
     testImplementation dependencyVersion("micronaut.aws"), {
         exclude module:'micronaut-http-client'
         exclude module:'micronaut-inject'
     }
 
-    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.725'
-    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.725'
+    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.784'
+    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.783'
     testImplementation group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
     testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
     testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
 
+    testImplementation group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-vault', version: '1.15.4'
+    testImplementation group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-secrets', version: '1.15.4'
+    testImplementation group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-common', version: '1.15.4'
     testImplementation project(":management")
     testImplementation project(":http-server-netty")
     testImplementation project(":inject-java")
     testImplementation project(":inject-groovy")
     testImplementation "com.amazonaws:aws-java-sdk-ec2:1.11.683"
-    testImplementation dependencyVersion("reactor")
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
     testRuntimeOnly dependencyVersion("snakeyaml")

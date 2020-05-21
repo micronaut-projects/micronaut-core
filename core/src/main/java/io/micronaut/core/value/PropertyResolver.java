@@ -22,6 +22,8 @@ import io.micronaut.core.type.Argument;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
@@ -66,6 +68,25 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @return An optional containing the property value if it exists
      */
     @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext);
+
+    /**
+     * Returns a collection of properties entries under the given key. For example given the following keys:
+     *
+     * <pre>
+     *
+     * <code>datasource.default.url=localhost
+     * datasource.another.url=someother</code>
+     * </pre>
+     *
+     * Calling {@code getPropertyEntries(String)} with a value of {@code datasource} will result in a collection
+     * containing {@code default} and {@code other}.
+     *
+     * @param name The name to resolve
+     * @return The property entries.
+     */
+    default @NonNull Collection<String> getPropertyEntries(@NonNull String name) {
+        return Collections.emptySet();
+    }
 
     /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>

@@ -19,7 +19,10 @@ import io.micronaut.core.beans.BeanIntrospection;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
+import javax.validation.Constraint;
 import javax.validation.ConstraintViolation;
+import javax.validation.Valid;
 import java.util.Set;
 
 /**
@@ -31,6 +34,15 @@ import java.util.Set;
  * @since 1.2
  */
 public interface Validator extends javax.validation.Validator {
+
+    /**
+     * Annotation used to define an object as valid.
+     */
+    String ANN_VALID = Valid.class.getName();
+    /**
+     * Annotation used to define a constraint.
+     */
+    String ANN_CONSTRAINT = Constraint.class.getName();
 
     /**
      * Overridden variation that returns a {@link ExecutableMethodValidator}.

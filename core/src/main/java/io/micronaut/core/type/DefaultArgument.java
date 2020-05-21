@@ -69,6 +69,20 @@ public class DefaultArgument<T> implements Argument<T> {
 
     /**
      * @param type               The type
+     * @param annotationMetadata The annotation metadata
+     * @param genericTypes       The generic types
+     */
+    public DefaultArgument(Class<T> type, AnnotationMetadata annotationMetadata, Argument... genericTypes) {
+        this(type,
+                null,
+                annotationMetadata,
+                ArrayUtils.isNotEmpty(genericTypes) ? initializeTypeParameters(genericTypes) : Collections.EMPTY_MAP,
+                genericTypes
+        );
+    }
+
+    /**
+     * @param type               The type
      * @param name               The name
      * @param annotationMetadata The annotation metadata
      * @param typeParameters     The map of parameters
@@ -153,12 +167,15 @@ public class DefaultArgument<T> implements Argument<T> {
 
     @Override
     public String getName() {
+        if (name == null) {
+            return getType().getSimpleName();
+        }
         return name;
     }
 
     @Override
     public String toString() {
-        return type.getSimpleName() + " " + name;
+        return type.getSimpleName() + " " + getName();
     }
 
     @Override
@@ -183,7 +200,7 @@ public class DefaultArgument<T> implements Argument<T> {
         }
         DefaultArgument<?> that = (DefaultArgument<?>) o;
         return Objects.equals(type, that.type) &&
-            Objects.equals(name, that.name) &&
+            Objects.equals(getName(), that.getName()) &&
             Objects.equals(typeParameters, that.typeParameters);
     }
 
@@ -194,7 +211,7 @@ public class DefaultArgument<T> implements Argument<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, name, typeParameters);
+        return Objects.hash(type, getName(), typeParameters);
     }
 
     private static Map<String, Argument<?>> initializeTypeParameters(Argument[] genericTypes) {

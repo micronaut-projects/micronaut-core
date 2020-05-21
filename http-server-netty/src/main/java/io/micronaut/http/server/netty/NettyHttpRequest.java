@@ -15,8 +15,10 @@
  */
 package io.micronaut.http.server.netty;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.SupplierUtil;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -25,10 +27,16 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.*;
+import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
+import io.micronaut.http.netty.NettyHttpParameters;
+import io.micronaut.http.netty.NettyHttpRequestBuilder;
+import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.cookies.NettyCookies;
+import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.InternalServerException;
@@ -36,8 +44,11 @@ import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.multipart.AbstractHttpData;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
@@ -45,9 +56,9 @@ import io.netty.util.ReferenceCounted;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -66,7 +77,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
     private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
-    private final MutableConvertibleValues<Object> attributes;
+    private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
     private Map<Integer, AbstractHttpData> receivedData = new LinkedHashMap<>();
@@ -95,10 +106,20 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             channel.attr(KEY).set(this);
         }
         this.serverConfiguration = serverConfiguration;
-        this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = SupplierUtil.memoizedNonEmpty(() -> Optional.ofNullable((T) buildBody()));
+    }
+
+    @Override
+    public MutableHttpRequest<T> mutate() {
+        return new NettyMutableHttpRequest();
+    }
+
+    @NonNull
+    @Override
+    public Optional<Object> getAttribute(CharSequence name) {
+        return Optional.ofNullable(getAttributes().getValue(Objects.requireNonNull(name, "Name cannot be null").toString()));
     }
 
     @Override
@@ -167,7 +188,17 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
-        return this.attributes;
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        if (attributes == null) {
+            synchronized (this) { // double check
+                attributes = this.attributes;
+                if (attributes == null) {
+                    attributes = new MutableConvertibleValuesMap<>(new HashMap<>(4));
+                    this.attributes = attributes;
+                }
+            }
+        }
+        return attributes;
     }
 
     @Override
@@ -258,9 +289,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             ReferenceCounted referenceCounted = (ReferenceCounted) this.body;
             releaseIfNecessary(referenceCounted);
         }
-        for (Map.Entry<String, Object> attribute : attributes) {
-            Object value = attribute.getValue();
-            releaseIfNecessary(value);
+        if (attributes != null) {
+            for (Object value : attributes.values()) {
+                releaseIfNecessary(value);
+            }
         }
         if (nettyRequest instanceof StreamedHttpRequest) {
             ((StreamedHttpRequest) nettyRequest).closeIfNoSubscriber();
@@ -366,6 +398,150 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(KEY);
         return attr.getAndSet(null);
+    }
+
+    /**
+     * Mutable version of the request.
+     */
+    private class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder {
+
+        private URI uri = NettyHttpRequest.this.uri;
+        private MutableHttpParameters httpParameters;
+        private Object body;
+
+        @Override
+        public MutableHttpRequest<T> cookie(Cookie cookie) {
+            if (cookie instanceof NettyCookie) {
+                NettyCookie nettyCookie = (NettyCookie) cookie;
+                String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+                headers.add(HttpHeaderNames.COOKIE, value);
+            }
+            return this;
+        }
+
+        @Override
+        public MutableHttpRequest<T> uri(URI uri) {
+            this.uri = uri;
+            if (uri.getQuery() != null) {
+                // have to re-initialize parameters
+                this.httpParameters = null;
+            }
+            return this;
+        }
+
+        @Override
+        public <T1> MutableHttpRequest<T1> body(T1 body) {
+            this.body = body;
+            return (MutableHttpRequest<T1>) this;
+        }
+
+        @Override
+        public MutableHttpHeaders getHeaders() {
+            return headers;
+        }
+
+        @NonNull
+        @Override
+        public MutableConvertibleValues<Object> getAttributes() {
+            return NettyHttpRequest.this.getAttributes();
+        }
+
+        @NonNull
+        @Override
+        public Optional<T> getBody() {
+            if (body != null) {
+                return Optional.of((T) body);
+            }
+            return NettyHttpRequest.this.getBody();
+        }
+
+        @NonNull
+        @Override
+        public Cookies getCookies() {
+            return NettyHttpRequest.this.getCookies();
+        }
+
+        @Override
+        public MutableHttpParameters getParameters() {
+            MutableHttpParameters httpParameters = this.httpParameters;
+            if (httpParameters == null) {
+                synchronized (this) { // double check
+                    httpParameters = this.httpParameters;
+                    if (httpParameters == null) {
+                        QueryStringDecoder queryStringDecoder = createDecoder(uri.toString());
+                        httpParameters = new NettyHttpParameters(queryStringDecoder.parameters(), conversionService, null);
+                        this.httpParameters = httpParameters;
+                    }
+                }
+            }
+            return httpParameters;
+        }
+
+        @NonNull
+        @Override
+        public HttpMethod getMethod() {
+            return NettyHttpRequest.this.getMethod();
+        }
+
+        @NonNull
+        @Override
+        public URI getUri() {
+            if (uri != null) {
+                return uri;
+            }
+            return NettyHttpRequest.this.getUri();
+        }
+
+        @NonNull
+        @Override
+        public io.netty.handler.codec.http.FullHttpRequest toFullHttpRequest() {
+            io.netty.handler.codec.http.HttpRequest nr = NettyHttpRequest.this.nettyRequest;
+            if (nr instanceof io.netty.handler.codec.http.FullHttpRequest) {
+                return (io.netty.handler.codec.http.FullHttpRequest) NettyHttpRequest.this.nettyRequest;
+            } else {
+                return new DefaultFullHttpRequest(
+                        nr.protocolVersion(),
+                        nr.method(),
+                        nr.uri(),
+                        Unpooled.EMPTY_BUFFER,
+                        nr.headers(),
+                        EmptyHttpHeaders.INSTANCE
+                );
+            }
+        }
+
+        @NonNull
+        @Override
+        public StreamedHttpRequest toStreamHttpRequest() {
+            if (isStream()) {
+                return (StreamedHttpRequest) NettyHttpRequest.this.nettyRequest;
+            } else {
+                io.netty.handler.codec.http.FullHttpRequest fullHttpRequest = toFullHttpRequest();
+                DefaultStreamedHttpRequest request = new DefaultStreamedHttpRequest(
+                        fullHttpRequest.protocolVersion(),
+                        fullHttpRequest.method(),
+                        fullHttpRequest.uri(),
+                        true,
+                        Publishers.just(new DefaultLastHttpContent(fullHttpRequest.content()))
+                );
+                request.headers().setAll(fullHttpRequest.headers());
+                return request;
+            }
+        }
+
+        @NonNull
+        @Override
+        public io.netty.handler.codec.http.HttpRequest toHttpRequest() {
+            if (isStream()) {
+                return toStreamHttpRequest();
+            }
+            return toFullHttpRequest();
+        }
+
+        @Override
+        public boolean isStream() {
+            return NettyHttpRequest.this.nettyRequest instanceof StreamedHttpRequest;
+        }
     }
 
 }

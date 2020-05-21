@@ -53,13 +53,13 @@ Consider the following two examples:
 
 snippet::io.micronaut.docs.aop.advice.type.MyFactory[tags="class", indent=0, title="AOP Advice at the type level of a `@Factory`"]
 
-The above example will cache creation of `MyBean` bean, according to the semantics defined by the ann:cache.annotation.Cacheable[] cache configuration.
+The above example will log the time it takes to create the `MyBean` bean.
 
 Now consider this example:
 
 snippet::io.micronaut.docs.aop.advice.method.MyFactory[tags="class", indent=0, title="AOP Advice at the method level of a `@Factory`"]
 
-The above example will cache all of the public methods of the `MyBean` bean, but not the bean creation.
+The above example will log the time it takes to execute all of the public methods of the `MyBean` bean, but not the bean creation.
 
 The rationale for this behaviour is that you may at times wish to apply advice to a factory and at other times apply advice to the bean produced by the factory.
 

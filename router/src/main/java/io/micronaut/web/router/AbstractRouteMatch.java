@@ -30,7 +30,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
 import io.micronaut.http.sse.Event;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -81,6 +80,36 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     }
 
     @Override
+    public final boolean isSuspended() {
+        return this.abstractRoute.isSuspended();
+    }
+
+    @Override
+    public final boolean isReactive() {
+        return this.abstractRoute.isReactive();
+    }
+
+    @Override
+    public final boolean isSingleResult() {
+        return this.abstractRoute.isSingleResult();
+    }
+
+    @Override
+    public final boolean isSpecifiedSingle() {
+        return this.abstractRoute.isSpecifiedSingle();
+    }
+
+    @Override
+    public final boolean isAsync() {
+        return this.abstractRoute.isAsync();
+    }
+
+    @Override
+    public final boolean isVoid() {
+        return this.abstractRoute.isVoid();
+    }
+
+    @Override
     public T getTarget() {
         return executableMethod.getTarget();
     }
@@ -118,12 +147,6 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         String bodyArgument = abstractRoute.bodyArgumentName;
         if (bodyArgument != null) {
             return Optional.ofNullable(requiredInputs.get(bodyArgument));
-        } else {
-            for (Argument argument : getArguments()) {
-                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
-                    return Optional.of(argument);
-                }
-            }
         }
         return Optional.empty();
     }
@@ -426,7 +449,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     protected abstract RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments);
 
     private String resolveInputName(Argument requiredArgument) {
-        String inputName = requiredArgument.getAnnotationMetadata().stringValue(Bindable.class).orElse(null);
+        String inputName = requiredArgument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(null);
         if (StringUtils.isEmpty(inputName)) {
             inputName = requiredArgument.getName();
         }

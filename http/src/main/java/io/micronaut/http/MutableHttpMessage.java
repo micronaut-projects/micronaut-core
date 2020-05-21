@@ -39,8 +39,9 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
      *
      * @param body The body
      * @return This message
+     * @param <T> The new body type
      */
-    MutableHttpMessage<B> body(B body);
+    <T> MutableHttpMessage<T> body(T body);
 
     /**
      * Mutate the headers with the given consumer.

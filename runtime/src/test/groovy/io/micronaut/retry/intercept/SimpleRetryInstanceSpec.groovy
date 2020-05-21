@@ -17,6 +17,7 @@ package io.micronaut.retry.intercept
 
 import io.micronaut.discovery.exceptions.DiscoveryException
 import io.micronaut.discovery.registration.RegistrationException
+import io.micronaut.retry.annotation.DefaultRetryPredicate
 import spock.lang.Specification
 
 import java.time.Duration
@@ -35,8 +36,7 @@ class SimpleRetryInstanceSpec extends Specification {
                 2,
                 Duration.of(1, ChronoUnit.SECONDS),
                 null,
-                Collections.singletonList(DiscoveryException.class),
-                Collections.emptyList()
+                new DefaultRetryPredicate(Collections.singletonList(DiscoveryException.class), Collections.emptyList())
         )
         RuntimeException r = new RuntimeException("bad")
 
@@ -53,8 +53,7 @@ class SimpleRetryInstanceSpec extends Specification {
                 2,
                 Duration.of(1, ChronoUnit.SECONDS),
                 null,
-                Collections.emptyList(),
-                Collections.singletonList(DiscoveryException.class)
+                new DefaultRetryPredicate(Collections.emptyList(), Collections.singletonList(DiscoveryException.class))
         )
         RuntimeException r = new RuntimeException("bad")
 

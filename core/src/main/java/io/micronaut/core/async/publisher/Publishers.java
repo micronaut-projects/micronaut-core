@@ -16,6 +16,7 @@
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
@@ -44,14 +45,19 @@ public class Publishers {
     @SuppressWarnings("ConstantName")
     private static final List<Class<?>> SINGLE_TYPES = new ArrayList<>(3);
 
+    private static final List<Class<?>> COMPLETABLE_TYPES = new ArrayList<>(3);
+
     static {
         ClassLoader classLoader = Publishers.class.getClassLoader();
         Publishers.SINGLE_TYPES.add(CompletableFuturePublisher.class);
         Publishers.SINGLE_TYPES.add(JustPublisher.class);
+        COMPLETABLE_TYPES.add(Completable.class);
         List<String> typeNames = Arrays.asList(
             "io.reactivex.Observable",
             "reactor.core.publisher.Flux",
-            "kotlinx.coroutines.flow.Flow"
+            "kotlinx.coroutines.flow.Flow",
+            "io.reactivex.rxjava3.core.Flowable",
+            "io.reactivex.rxjava3.core.Observable"
         );
         for (String name : typeNames) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
@@ -61,12 +67,57 @@ public class Publishers {
                 "io.reactivex.Single",
                 "reactor.core.publisher.Mono",
                 "io.reactivex.Maybe",
-                "io.reactivex.Completable")) {
+                "io.reactivex.rxjava3.core.Single",
+                "io.reactivex.rxjava3.core.Maybe"
+                )) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             aClass.ifPresent(aClass1 -> {
                 Publishers.SINGLE_TYPES.add(aClass1);
                 Publishers.REACTIVE_TYPES.add(aClass1);
             });
+        }
+
+        for (String name : Arrays.asList("io.reactivex.Completable", "io.reactivex.rxjava3.core.Completable")) {
+            Optional<Class> aClass = ClassUtils.forName(name, classLoader);
+            aClass.ifPresent(aClass1 -> {
+                Publishers.COMPLETABLE_TYPES.add(aClass1);
+                Publishers.REACTIVE_TYPES.add(aClass1);
+            });
+        }
+    }
+
+    /**
+     * Registers an additional reactive type. Should be called during application static initialization.
+     * @param type The type
+     * @since 2.0
+     */
+    public static void registerReactiveType(Class<?> type) {
+        if (type != null) {
+            REACTIVE_TYPES.add(type);
+        }
+    }
+
+    /**
+     * Registers an additional reactive single type. Should be called during application static initialization.
+     * @param type The type
+     * @since 2.0
+     */
+    public static void registerReactiveSingle(Class<?> type) {
+        if (type != null) {
+            registerReactiveType(type);
+            SINGLE_TYPES.add(type);
+        }
+    }
+
+    /**
+     * Registers an additional reactive completable type. Should be called during application static initialization.
+     * @param type The type
+     * @since 2.0
+     */
+    public static void registerReactiveCompletable(Class<?> type) {
+        if (type != null) {
+            registerReactiveType(type);
+            COMPLETABLE_TYPES.add(type);
         }
     }
 
@@ -74,7 +125,7 @@ public class Publishers {
      * @return A list of known reactive types.
      */
     public static List<Class<?>> getKnownReactiveTypes() {
-        return Collections.unmodifiableList(REACTIVE_TYPES);
+        return Collections.unmodifiableList(new ArrayList<>(REACTIVE_TYPES));
     }
 
     /**
@@ -309,7 +360,6 @@ public class Publishers {
         }
     }
 
-
     /**
      * Does the given reactive type emit a single result.
      *
@@ -318,6 +368,21 @@ public class Publishers {
      */
     public static boolean isSingle(Class<?> type) {
         for (Class<?> reactiveType : SINGLE_TYPES) {
+            if (reactiveType.isAssignableFrom(type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Does the given reactive type emit a single result.
+     *
+     * @param type The type
+     * @return True it does
+     */
+    public static boolean isCompletable(Class<?> type) {
+        for (Class<?> reactiveType : COMPLETABLE_TYPES) {
             if (reactiveType.isAssignableFrom(type)) {
                 return true;
             }

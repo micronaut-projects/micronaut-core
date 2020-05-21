@@ -16,15 +16,13 @@
 package io.micronaut.validation
 
 import groovy.json.JsonSlurper
-import io.micronaut.cache.AsyncCacheErrorHandler
-import io.micronaut.cache.CacheErrorHandler
-import io.micronaut.cache.CacheManager
-import io.micronaut.cache.interceptor.CacheInterceptor
+import io.micronaut.aop.InterceptPhase
+import io.micronaut.aop.InvocationContext
+import io.micronaut.aop.MethodInterceptor
+import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.exceptions.BeanInstantiationException
-import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -47,7 +45,6 @@ import javax.validation.constraints.Max
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotNull
 import javax.validation.constraints.Size
-import java.util.concurrent.ExecutorService
 
 /**
  * @author Graeme Rocher
@@ -57,12 +54,28 @@ class ValidatedSpec extends Specification {
 
     def "test order"() {
         given:
-        def list = [new CacheInterceptor(Mock(CacheManager), Mock(CacheErrorHandler), Mock(AsyncCacheErrorHandler), Mock(ExecutorService), Mock(BeanContext)), new ValidatingInterceptor(null, null)]
+        def list = [new MethodInterceptor<Object, Object>() {
+
+            @Override
+            int getOrder() {
+                return InterceptPhase.CACHE.getPosition()
+            }
+
+            @Override
+            Object intercept(MethodInvocationContext context) {
+                return null
+            }
+
+            @Override
+            Object intercept(InvocationContext context) {
+                return null
+            }
+        }, new ValidatingInterceptor(null, null)]
         OrderUtil.sort(list)
 
         expect:
         list[0] instanceof ValidatingInterceptor
-        list[1] instanceof CacheInterceptor
+        list[1] instanceof MethodInterceptor
     }
 
     def "test validated annotation validates beans"() {
@@ -98,7 +111,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(ConstraintViolationException)
-        e.message == "string: must not be null"
+        e.message == "String: must not be null"
 
         cleanup:
         beanContext.close()
@@ -114,7 +127,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(ConstraintViolationException)
-        e.message == "bar: must not be null"
+        e.message == "Bar: must not be null"
 
         cleanup:
         beanContext.close()
@@ -130,7 +143,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(ConstraintViolationException)
-        e.message == "bar.prop: must not be null"
+        e.message == "Bar.prop: must not be null"
 
         cleanup:
         beanContext.close()
@@ -146,7 +159,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(ConstraintViolationException)
-        e.message == "list[0].prop: must not be null"
+        e.message == "List[0].prop: must not be null"
 
         cleanup:
         beanContext.close()
@@ -162,7 +175,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(ConstraintViolationException)
-        e.message == "map[barObj].prop: must not be null"
+        e.message == "Map[barObj].prop: must not be null"
 
         cleanup:
         beanContext.close()

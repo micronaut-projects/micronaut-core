@@ -1,0 +1,16 @@
+A common requirement in Microservice environments is to proxy requests in a Gateway Microservice to other backend Microservices.
+
+The regular api:http.client.HttpClient[] API is designed around simplifying exchange of messages and is not really designed for proxying requests. For this use case you should use the the api:http.client.ProxyHttpClient[] which can be used from a <<filters, HTTP Server Filter>> to proxy requests to backend Microservices.
+
+The following example demonstrates rewriting requests under the URI `/proxy` to the URI `/real` onto the same server (clearly in a real environment you would generally proxy onto another server):
+
+snippet::io.micronaut.docs.http.client.proxy.ProxyFilter[tags="imports,class", indent=0, title="Customizing the Netty pipeline for Logbook"]
+
+<1> The filter extends api:http.filter.OncePerRequestHttpServerFilter[]
+<2> The api:http.client.ProxyHttpClient[] is injected into the constructor.
+<3> The `proxy` method is used to proxy the request
+<4> The request is mutated to modify the URI and include an additional header
+<5> Here the api:http.uri.UriBuilder[] API is used to rewrite the URI
+<6> Additional request and response headers are included
+
+NOTE: The api:http.client.ProxyHttpClient[] API is a low level API that can be used to build a higher level abstraction such as an API Gateway.

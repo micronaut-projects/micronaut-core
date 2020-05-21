@@ -65,6 +65,11 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
         return nettyHeaders;
     }
 
+    @Override
+    public final boolean contains(String name) {
+        return nettyHeaders.contains(name);
+    }
+
     /**
      * Sets the underlying netty headers.
      *

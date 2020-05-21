@@ -199,7 +199,7 @@ public final class StringUtils {
             return null;
         }
         StringTokenizer st = new StringTokenizer(str, delimiters);
-        List<String> tokens = new ArrayList();
+        List<String> tokens = new ArrayList<>();
         while (st.hasMoreTokens()) {
             String token = st.nextToken();
             if (trimTokens) {
@@ -260,7 +260,11 @@ public final class StringUtils {
             uri = "";
         }
         uri = baseUri + uri;
-        return uri.replaceAll("[\\/]{2,}", "/");
+        if (uri.startsWith("/")) {
+            return uri.replaceAll("[//]{2,}", "/");
+        } else {
+            return uri.replaceAll("(?<=[^:])[//]{2,}", "/");
+        }
     }
 
     /**

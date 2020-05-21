@@ -93,8 +93,6 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
                                 new HttpHeadersTextMap(response.getHeaders())
                         );
 
-                        String spanName = resolveSpanName(request);
-                        span.setOperationName(spanName);
                         setResponseTags(request, response, span);
                     }
                 }

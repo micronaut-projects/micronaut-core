@@ -56,6 +56,11 @@ public class WebSocketStateBinderRegistry implements ArgumentBinderRegistry<WebS
     }
 
     @Override
+    public <T, ST> void addRequestArgumentBinder(ArgumentBinder<T, ST> binder) {
+        requestBinderRegistry.addRequestArgumentBinder(binder);
+    }
+
+    @Override
     public <T> Optional<ArgumentBinder<T, WebSocketState>> findArgumentBinder(Argument<T> argument, WebSocketState source) {
         Optional<ArgumentBinder<T, HttpRequest<?>>> argumentBinder = requestBinderRegistry.findArgumentBinder(argument, source.getOriginatingRequest());
         if (argumentBinder.isPresent()) {

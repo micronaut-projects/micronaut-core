@@ -18,10 +18,14 @@ package io.micronaut.http.server.netty.consumes
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Produces
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import spock.lang.Unroll
 
 import static io.micronaut.http.MediaType.*
 
@@ -108,9 +112,24 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         body == "json"
     }
 
+    @Unroll
+    void "test pick most specific route for #uri"() {
+        given:
+        def result = rxClient.retrieve(HttpRequest.GET("/hello$uri").accept("text/html", "*/*;q=0.8")).blockingFirst()
+
+        expect:
+        result == expected
+
+        where:
+        uri      | expected
+        '/Tom'   | 'Hey Tom!  It\'s been a long time.  How have you been?'
+        '/other' | 'Hello other'
+    }
+
+
     @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
     @Controller("/test-consumes")
-    static class MyController  {
+    static class MyController {
 
         @Post(consumes = APPLICATION_JSON)
         HttpResponse posta(@Body String body) {
@@ -130,7 +149,7 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
 
     @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
     @Controller("/test-consumes-all")
-    static class MyControllerForAll  {
+    static class MyControllerForAll {
 
         @Post(consumes = ALL)
         HttpResponse posta(@Body String body) {
@@ -140,7 +159,7 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
 
     @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
     @Controller("/test-accept")
-    static class MyOtherController  {
+    static class MyOtherController {
 
         //If the content type is json, this method should be chosen even for /foo
         @Post(uri = "/{name}", consumes = APPLICATION_JSON)
@@ -151,6 +170,23 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         @Post(uri = "/foo", consumes = ALL)
         HttpResponse postc(@Body String body) {
             HttpResponse.ok("all")
+        }
+    }
+
+    @Controller("/hello")
+    @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
+    static class AController {
+
+        @Get("/{name}")
+        @Produces(TEXT_PLAIN)
+        String sayHello(String name) {
+            return "Hello " + name
+        }
+
+        @Get("/Tom")
+        @Produces(TEXT_PLAIN)
+        String sayHelloToTom() {
+            return "Hey Tom!  It's been a long time.  How have you been?"
         }
     }
 }

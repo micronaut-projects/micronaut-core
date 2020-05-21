@@ -17,8 +17,11 @@ package io.micronaut.retry.intercept;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.retry.RetryState;
 import io.micronaut.retry.RetryStateBuilder;
+import io.micronaut.retry.annotation.DefaultRetryPredicate;
+import io.micronaut.retry.annotation.RetryPredicate;
 import io.micronaut.retry.annotation.Retryable;
 
 import java.time.Duration;
@@ -40,6 +43,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static final String MAX_DELAY = "maxDelay";
     private static final String INCLUDES = "includes";
     private static final String EXCLUDES = "excludes";
+    private static final String PREDICATE = "predicate";
     private static final int DEFAULT_RETRY_ATTEMPTS = 3;
 
     private final AnnotationMetadata annotationMetadata;
@@ -59,21 +63,31 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
                                                              .orElseThrow(() -> new IllegalStateException("Missing @Retryable annotation"));
         int attempts = retry.get(ATTEMPTS, Integer.class).orElse(DEFAULT_RETRY_ATTEMPTS);
         Duration delay = retry.get(DELAY, Duration.class).orElse(Duration.ofSeconds(1));
-        List<Class<? extends Throwable>> includes = resolveIncludes(retry, INCLUDES);
-        List<Class<? extends Throwable>> excludes = resolveIncludes(retry, EXCLUDES);
+        Class<? extends RetryPredicate> predicateClass = retry.get(PREDICATE, Class.class)
+                                                              .orElse(DefaultRetryPredicate.class);
+        RetryPredicate predicate = createPredicate(predicateClass, retry);
 
         return new SimpleRetry(
             attempts,
             retry.get(MULTIPLIER, Double.class).orElse(0d),
             delay,
             retry.get(MAX_DELAY, Duration.class).orElse(null),
-            includes,
-            excludes
+            predicate
         );
     }
 
+    private static RetryPredicate createPredicate(Class<? extends RetryPredicate> predicateClass, AnnotationValue<Retryable> retry) {
+        if (predicateClass.equals(DefaultRetryPredicate.class)) {
+            List<Class<? extends Throwable>> includes = resolveIncludes(retry, INCLUDES);
+            List<Class<? extends Throwable>> excludes = resolveIncludes(retry, EXCLUDES);
+            return new DefaultRetryPredicate(includes, excludes);
+        } else {
+            return InstantiationUtils.instantiate(predicateClass);
+        }
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private List<Class<? extends Throwable>> resolveIncludes(AnnotationValue<Retryable> retry, String includes) {
+    private static List<Class<? extends Throwable>> resolveIncludes(AnnotationValue<Retryable> retry, String includes) {
         Class<?>[] values = retry.classValues(includes);
         return (List) Collections.unmodifiableList(Arrays.asList(values));
     }

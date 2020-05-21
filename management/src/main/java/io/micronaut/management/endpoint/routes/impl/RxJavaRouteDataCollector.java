@@ -20,18 +20,14 @@ import io.micronaut.http.MediaType;
 import io.micronaut.management.endpoint.routes.RouteData;
 import io.micronaut.management.endpoint.routes.RouteDataCollector;
 import io.micronaut.management.endpoint.routes.RoutesEndpoint;
-import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.UriRoute;
 import io.reactivex.Flowable;
-import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -46,16 +42,12 @@ import java.util.stream.Stream;
 public class RxJavaRouteDataCollector implements RouteDataCollector<Map<String, Object>> {
 
     private final RouteData routeData;
-    private final ExecutorService executorService;
 
     /**
      * @param routeData       The RouteData
-     * @param executorService The executor service
      */
-    public RxJavaRouteDataCollector(RouteData routeData,
-                                    @Named(TaskExecutors.IO) ExecutorService executorService) {
+    public RxJavaRouteDataCollector(RouteData routeData) {
         this.routeData = routeData;
-        this.executorService = executorService;
     }
 
     @Override
@@ -65,7 +57,6 @@ public class RxJavaRouteDataCollector implements RouteDataCollector<Map<String, 
 
         return Flowable
             .fromIterable(routeList)
-            .subscribeOn(Schedulers.from(executorService))
             .collectInto(routeMap, (map, route) ->
                 map.put(getRouteKey(route), routeData.getData(route))
             ).toFlowable();

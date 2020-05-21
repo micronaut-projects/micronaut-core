@@ -53,12 +53,13 @@ class ServerRedirectSpec extends Specification {
         given:"An HTTPS URL issues an HTTPS"
         YoutubeClient youtubeClient=  embeddedServer.getApplicationContext().getBean(YoutubeClient)
         def client = HttpClient.create(new URL("https://www.youtube.com"))
+        def declarativeResult = youtubeClient.test().blockingGet()
         def response= client
                 .toBlocking().retrieve("/")
-
+//
         expect:"The response was returned and doesn't loop"
         response
-        youtubeClient.test().blockingGet()
+        declarativeResult
 
         cleanup:
         client.close()
@@ -119,7 +120,7 @@ class ServerRedirectSpec extends Specification {
                 .blockingFirst()
 
         then:
-        response == "data: The Stand\n\n"
+        response == "data: The Stand"
     }
 
     void "test redirect headers"() {
@@ -216,17 +217,16 @@ class ServerRedirectSpec extends Specification {
 
         @Get("/text")
         @Produces([MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON_STREAM])
-        Flowable<HttpResponse<?>> title(final HttpHeaders headers) {
+        HttpResponse<Flowable<?>> title(final HttpHeaders headers) {
             if (headers.accept().contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
-                return Flowable.just(HttpResponse.ok("The Stand").contentType(MediaType.TEXT_EVENT_STREAM))
+                return HttpResponse.ok(Flowable.just("The Stand")).contentType(MediaType.TEXT_EVENT_STREAM)
             }
-            return Flowable.just(HttpResponse.ok(new Book(title: "The Stand")).contentType(MediaType.APPLICATION_JSON_STREAM))
-
+            return HttpResponse.ok(Flowable.just(new Book(title: "The Stand"))).contentType(MediaType.APPLICATION_JSON_STREAM)
         }
 
     }
 
-    @Client("https://youtube.com")
+    @Client("https://www.youtube.com")
     static interface YoutubeClient {
         @Get
         Single<String> test()

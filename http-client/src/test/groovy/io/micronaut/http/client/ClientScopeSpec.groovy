@@ -30,6 +30,8 @@ import io.micronaut.http.client.netty.DefaultHttpClient
 import io.micronaut.jackson.annotation.JacksonFeatures
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
+import spock.lang.AutoCleanup
+import spock.lang.IgnoreIf
 import spock.lang.Retry
 import spock.lang.Specification
 
@@ -41,13 +43,13 @@ import javax.inject.Singleton
  * @since 1.0
  */
 @Retry(mode = Retry.Mode.SETUP_FEATURE_CLEANUP)
+@IgnoreIf({env["GITHUB_WORKFLOW"]})
 class ClientScopeSpec extends Specification {
 
-    EmbeddedServer embeddedServer
-    ApplicationContext applicationContext
-
-    void setup() {
-        embeddedServer = ApplicationContext.run(EmbeddedServer, [
+    @Retry
+    void "test client scope annotation method injection"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': 'ClientScopeSpec',
                 'from.config': '/',
                 'micronaut.server.port':'${random.port}',
@@ -57,120 +59,86 @@ class ClientScopeSpec extends Specification {
                 'micronaut.http.services.other-service.url': 'http://localhost:${micronaut.server.port}',
                 'micronaut.http.services.other-service.path': "/scope"])
 
-        applicationContext = embeddedServer.applicationContext
-    }
-
-    void cleanup() {
-        embeddedServer.close()
-    }
-
-    void "test client scope annotation method injection"() {
-        given:
+        def applicationContext = embeddedServer.applicationContext
         MyService myService = applicationContext.getBean(MyService)
-
-        MyJavaService myJavaService = applicationContext.getBean(MyJavaService)
-
-        expect:
-        myService.get() == 'success'
-        myJavaService.client == myService.client
-        myJavaService.rxHttpClient == myService.rxHttpClient
-
-        cleanup:
-        embeddedServer.close()
-    }
-
-    void "test client scope annotation field injection"() {
-        given:
-        MyServiceField myService = applicationContext.getBean(MyServiceField)
-
-        MyJavaService myJavaService = applicationContext.getBean(MyJavaService)
-
-        expect:
-        myService.get() == 'success'
-        myJavaService.client == myService.client
-        myJavaService.rxHttpClient == myService.rxHttpClient
-    }
-
-    void "test client scope annotation constructor injection"() {
-        given:
-        MyServiceConstructor myService = applicationContext.getBean(MyServiceConstructor)
-
-        MyJavaService myJavaService = applicationContext.getBean(MyJavaService)
-
-        expect:
-        myService.get() == 'success'
-        myJavaService.client == myService.client
-        myJavaService.rxHttpClient == myService.rxHttpClient
-    }
-
-    void "test client scope with path in annotation"() {
-        given:
-        MyService myService = applicationContext.getBean(MyService)
-        MyServiceField myServiceField = applicationContext.getBean(MyServiceField)
-
-        expect:
-        myService.getPath() == 'success'
-        myServiceField.getPath() == 'success'
-    }
-
-    void "test injection after declarative client"() {
-        given:
-        MyDeclarativeService client = applicationContext.getBean(MyDeclarativeService)
 
         when:
+        MyJavaService myJavaService = applicationContext.getBean(MyJavaService)
+
+        then:
+        myService.get() == 'success'
+        myJavaService.client == myService.client
+        myJavaService.rxHttpClient == myService.rxHttpClient
+
+        when:"test client scope annotation field injection"
+        MyServiceField myServiceField = applicationContext.getBean(MyServiceField)
+
+
+        then:
+        myServiceField.get() == 'success'
+        myJavaService.client == myServiceField.client
+        myJavaService.rxHttpClient == myServiceField.rxHttpClient
+
+        when:"test client scope annotation constructor injection"
+        MyServiceConstructor serviceConstructor = applicationContext.getBean(MyServiceConstructor)
+
+
+        then:
+        serviceConstructor.get() == 'success'
+        myJavaService.client == serviceConstructor.client
+        myJavaService.rxHttpClient == serviceConstructor.rxHttpClient
+
+
+        and:"test client scope with path in annotation"
+        myService.getPath() == 'success'
+        myServiceField.getPath() == 'success'
+
+        when:"test injection after declarative client"
+        MyDeclarativeService client = applicationContext.getBean(MyDeclarativeService)
         client.name()
 
         then:
         thrown(HttpClientException)
-
-        when:
-        MyJavaService myJavaService = applicationContext.getBean(MyJavaService)
-
-        then:
         Flowable.fromPublisher(((DefaultHttpClient) myJavaService.client)
                 .resolveRequestURI(HttpRequest.GET("/foo"))).blockingFirst().toString() == "http://localhost:${embeddedServer.port}/foo"
-    }
 
-    void "test service definition with declarative client with jackson features"() {
-        MyServiceJacksonFeatures client = applicationContext.getBean(MyServiceJacksonFeatures)
+        when:"test service definition with declarative client with jackson features"
+        MyServiceJacksonFeatures jacksonFeatures = applicationContext.getBean(MyServiceJacksonFeatures)
 
-        expect:
-        client.name() == "success"
-    }
+        then:
+        jacksonFeatures.name() == "success"
 
-    void "test no base path with the declarative client"() {
-        NoBasePathService client = applicationContext.getBean(NoBasePathService)
+        when:"test no base path with the declarative client"
+        NoBasePathService noBasePathService = applicationContext.getBean(NoBasePathService)
 
-        expect:
-        client.name("http://localhost:${embeddedServer.port}/scope") == "success"
+        then:
+        noBasePathService.name("http://localhost:${embeddedServer.port}/scope") == "success"
 
         when:
-        client.name("/scope")
+        noBasePathService.name("/scope")
 
         then:
         def ex = thrown(NoHostException)
         ex.message == "Request URI specifies no host to connect to"
-    }
 
-    void "test no base path with client scope"() {
-        RxHttpClient client = applicationContext.getBean(MyService).noIdClient
-
-        expect:
-        client.toBlocking().retrieve("http://localhost:${embeddedServer.port}/scope") == "success"
-
-        when:
-        client.toBlocking().retrieve("/scope")
+        when:"test no base path with client scope"
+        RxHttpClient noIdClient = myService.noIdClient
 
         then:
-        def ex = thrown(NoHostException)
-        ex.message == "Request URI specifies no host to connect to"
-    }
+        noIdClient.toBlocking().retrieve("http://localhost:${embeddedServer.port}/scope") == "success"
 
-    void "test injected instances are different/same"() {
+        when:
+        noIdClient.toBlocking().retrieve("/scope")
+
+        then:
+        ex = thrown(NoHostException)
+        ex.message == "Request URI specifies no host to connect to"
+
+        when:
         InstanceEquals bean = applicationContext.getBean(InstanceEquals)
         InstanceDoesNotEqual bean2 = applicationContext.getBean(InstanceDoesNotEqual)
 
-        expect:
+        then:
         bean.client.is(bean.client2)
         !bean.client.is(bean2.client) //value is different
         !bean.client2.is(bean2.client2) //bean2 has configuration
@@ -187,6 +155,9 @@ class ClientScopeSpec extends Specification {
         !bean.clientConfiguration.is(bean2.client2) // configuration is different
 
         bean.rxClient.is(bean.client)
+
+        cleanup:
+        embeddedServer.close()
     }
 
     @Controller('/scope')

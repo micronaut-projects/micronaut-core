@@ -21,10 +21,7 @@ import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.TypeConverter;
-import io.micronaut.core.convert.TypeConverterRegistrar;
+import io.micronaut.core.convert.*;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.naming.conventions.StringConvention;
@@ -38,6 +35,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
 import javax.inject.Provider;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -99,7 +97,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         });
     }
 
-
     /**
      * Construct a new ApplicationContext for the given environment name and classloader.
      *
@@ -140,7 +137,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param configuration The application context configuration
      * @return The environment instance
      */
-    protected @NonNull DefaultEnvironment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
+    protected @NonNull Environment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
         return new RuntimeConfiguredEnvironment(configuration);
     }
 
@@ -191,6 +188,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @NonNull
     @Override
+    public Collection<String> getPropertyEntries(@NonNull String name) {
+        return environment.getPropertyEntries(name);
+    }
+
+    @NonNull
+    @Override
     public Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
         return getEnvironment().getProperties(name, keyFormat);
     }
@@ -212,14 +215,19 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
+    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans, List<BeanDefinitionReference> parallelBeans) {
         initializeTypeConverters(this);
-        super.initializeContext(contextScopeBeans, processedBeans);
+        super.initializeContext(contextScopeBeans, processedBeans, parallelBeans);
     }
 
     @Override
     protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType, BeanDefinition<?> filter, boolean filterProxied) {
         Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(beanType, filter, filterProxied);
+        return transformIterables(candidates, filterProxied);
+    }
+
+    @Override
+    protected <T> Collection<BeanDefinition<T>> transformIterables(Collection<BeanDefinition<T>> candidates, boolean filterProxied) {
         if (!candidates.isEmpty()) {
 
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
@@ -232,10 +240,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     prefix.substring(0, prefix.length() - (isList ? 3 : 2)))
                             .orElseGet(() -> candidate.stringValue(EachProperty.class).orElse(null));
                     String primaryPrefix = candidate.stringValue(EachProperty.class, "primary").orElse(null);
-
                     if (StringUtils.isNotEmpty(property)) {
                         if (isList) {
-                            List entries = getProperty(property, List.class, Collections.emptyList());
+                            List entries = getEnvironment().getProperty(property, List.class, Collections.emptyList());
                             if (!entries.isEmpty()) {
                                 for (int i = 0; i < entries.size(); i++) {
                                     if (entries.get(i) != null) {
@@ -254,15 +261,15 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 }
                             }
                         } else {
-                            Map entries = getProperty(property, Map.class, Collections.emptyMap());
-                            if (!entries.isEmpty()) {
-                                for (Object key : entries.keySet()) {
+                            Collection<String> propertyEntries = getEnvironment().getPropertyEntries(property);
+                            if (!propertyEntries.isEmpty()) {
+                                for (String key : propertyEntries) {
                                     BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
-                                    if (primaryPrefix != null && primaryPrefix.equals(key.toString())) {
+                                    if (primaryPrefix != null && primaryPrefix.equals(key)) {
                                         delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
                                     }
                                     delegate.put(EachProperty.class.getName(), delegate.getBeanType());
-                                    delegate.put(Named.class.getName(), key.toString());
+                                    delegate.put(Named.class.getName(), key);
 
                                     if (delegate.isEnabled(this)) {
                                         transformedCandidates.add(delegate);
@@ -622,12 +629,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         @Override
-        protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
+        protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans, List<BeanDefinitionReference> parallelBeans) {
             // no-op .. @Context scope beans are not started for bootstrap
         }
 
         @Override
-        protected void processParallelBeans() {
+        protected void processParallelBeans(List<BeanDefinitionReference> parallelBeans) {
             // no-op
         }
 

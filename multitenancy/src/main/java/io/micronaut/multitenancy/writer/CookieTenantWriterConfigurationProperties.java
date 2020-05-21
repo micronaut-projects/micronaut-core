@@ -16,10 +16,11 @@
 package io.micronaut.multitenancy.writer;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.http.cookie.SameSite;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import java.time.Duration;
+import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
 /**
@@ -69,10 +70,13 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
 
     @Nullable
     private String cookiePath = DEFAULT_COOKIEPATH;
+    
+    @Nullable
+    private SameSite sameSite;
 
     private Boolean cookieHttpOnly = DEFAULT_HTTPONLY;
     private Boolean cookieSecure = DEFAULT_SECURE;
-    private Duration cookieMaxAge;
+    private TemporalAmount cookieMaxAge;
     private boolean enabled = DEFAULT_ENABLED;
 
     @Override
@@ -152,7 +156,7 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
      * @return The max age to use for the cookie
      */
     @Override
-    public Optional<Duration> getCookieMaxAge() {
+    public Optional<TemporalAmount> getCookieMaxAge() {
         return Optional.ofNullable(cookieMaxAge);
     }
 
@@ -192,7 +196,22 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
      * Sets the maximum age of the cookie.
      * @param cookieMaxAge The maximum age of the cookie
      */
-    public void setCookieMaxAge(Duration cookieMaxAge) {
+    public void setCookieMaxAge(TemporalAmount cookieMaxAge) {
         this.cookieMaxAge = cookieMaxAge;
+    }
+
+    @Override
+    public Optional<SameSite> getCookieSameSite() {
+        return Optional.ofNullable(sameSite);
+    }
+    
+    /**
+     * Determines if this this {@link io.micronaut.http.cookie.Cookie} can be sent along cross-site requests.
+     * For more information, please look
+     *  <a href="https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-05">here</a>
+     * @param sameSite SameSite value
+     */
+    public void setCookieSameSite(SameSite sameSite) {
+         this.sameSite = sameSite;
     }
 }

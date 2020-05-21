@@ -17,6 +17,7 @@ package io.micronaut.docs.writable
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.MediaType
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -31,7 +32,9 @@ class WritableSpec extends Specification {
 
     void "test render template"() {
         expect:
-        client.toBlocking().retrieve('/template/welcome') == 'Dear Fred Flintstone. Nice to meet you.'
+        HttpResponse<String> resp = client.toBlocking().exchange('/template/welcome', String)
+        resp.body() == 'Dear Fred Flintstone. Nice to meet you.'
+        resp.contentType.get() == MediaType.TEXT_PLAIN_TYPE
     }
 
     void "test the correct headers are applied"() {

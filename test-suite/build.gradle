@@ -30,7 +30,6 @@ dependencies {
     testImplementation project(":function-client")
     testImplementation project(":function-web")
     testImplementation project(":session")
-    testImplementation dependencyVersion("reactor")
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
@@ -47,7 +46,7 @@ dependencies {
     testImplementation dependencyVersion("jaeger")
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     // tag::testcontainers-dependencies[]
-    testImplementation "org.testcontainers:spock:1.13.0"
+    testImplementation "org.testcontainers:spock:1.14.1"
     // end::testcontainers-dependencies[]
     testImplementation 'org.awaitility:awaitility:4.0.2'
 
@@ -65,6 +64,7 @@ dependencies {
     testImplementation 'io.netty:netty-tcnative:2.0.29.Final'
     testImplementation 'io.netty:netty-tcnative-boringssl-static:2.0.29.Final'
     testImplementation "io.netty:netty-tcnative-boringssl-static:2.0.29.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
+    testImplementation 'org.zalando:logbook-netty:2.1.0'
 }
 
 //tasks.withType(Test) {

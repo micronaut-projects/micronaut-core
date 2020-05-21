@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.Indexed;
+
 /**
  * Allows hooking modifying the resulting publisher prior to returning it from the client. Useful for customization
  * per reactive framework.
@@ -22,6 +24,7 @@ package io.micronaut.http.client;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Indexed(ReactiveClientResultTransformer.class)
 public interface ReactiveClientResultTransformer {
 
     /**

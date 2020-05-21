@@ -15,6 +15,7 @@
  */
 package io.micronaut.visitors
 
+import io.micronaut.http.annotation.Controller
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.ast.EnumElement
 import spock.lang.IgnoreIf
@@ -23,6 +24,85 @@ import spock.util.environment.Jvm
 import java.util.function.Supplier
 
 class ClassElementSpec extends AbstractTypeElementSpec {
+
+    void "test visit inherited controller classes"() {
+        buildBeanDefinition('test.TestController', '''
+package test;
+
+import io.micronaut.http.annotation.*;
+import javax.inject.Inject;
+
+@Controller("/test")
+public class TestController extends BaseTestController {
+
+    @Get("/getMethod")
+    public String getMethod(int[] argument) {
+        return null;
+    }
+
+    @Get("/hello/annotinbase")
+    @Override
+    public String baseOverrideAnnotInBase(String name) {
+        return name;
+    }
+
+    @Get("/noannotinbase")
+    @Override
+    public String baseOverrideNoAnnotInBase(String name) {
+        return name;
+    }
+
+    @Get("/hellohello")
+    @Override
+    public String hellohello(String name) {
+        return name;
+    }
+
+}
+
+class BaseTestController extends Base {
+
+    public String hello(String name) {
+        return name;
+    }
+
+    @Get("/base")
+    public String base(String name) {
+        return name;
+    }
+
+    public String baseOverrideAnnotInBase(String name) {
+        return name;
+    }
+
+    @Get("/noannotinbase")
+    public String baseOverrideNoAnnotInBase(String name) {
+        return name;
+    }
+
+}
+
+class Base {
+
+    public String hellohello(String name) {
+        return name;
+    }
+}
+
+class B {
+
+    @Get("/b")
+    public String b(String name) {
+        return name;
+    }
+
+}
+''')
+        expect:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 6
+        ControllerGetVisitor.VISITED_METHOD_ELEMENTS.size() == 5
+    }
 
     void "test visit methods that take and return arrays"() {
         buildBeanDefinition('test.TestController', '''
@@ -33,12 +113,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController {
-    
+
     @Get("/getMethod")
     public String[] getMethod(int[] argument) {
         return null;
     }
-    
+
 
 }
 ''')
@@ -60,12 +140,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController {
-    
+
     @Get("/getMethod")
     public HttpMethod getMethod(HttpMethod argument) {
         return null;
     }
-    
+
 
 }
 ''')
@@ -88,12 +168,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController {
-    
+
     @Get("/getMethod")
     public int getMethod(long argument) {
         return 0;
     }
-    
+
 
 }
 ''')
@@ -114,12 +194,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {
-    
+
     @Get("/getMethod")
     public T getMethod(T argument) {
         return null;
     }
-    
+
 
 }
 
@@ -145,12 +225,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController implements java.util.function.Supplier<String> {
-    
+
     @Get("/getMethod")
     public String get() {
         return null;
     }
-    
+
 
 }
 
@@ -170,12 +250,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {
-    
+
     @Get("/getMethod")
     public T[] getMethod(T[] argument) {
         return null;
     }
-    
+
 
 }
 
@@ -200,12 +280,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController {
-    
+
     @Get("/getMethod")
     public <T extends Foo> T getMethod(T argument) {
         return null;
     }
-    
+
 
 }
 
@@ -228,12 +308,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController<MT extends Foo> {
-    
+
     @Get("/getMethod")
     public java.util.List<MT> getMethod(java.util.Set<MT> argument) {
         return null;
     }
-    
+
 
 }
 

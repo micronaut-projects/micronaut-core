@@ -4,7 +4,7 @@ dependencies {
         
     api project(":router")
     api project(":runtime")
-    compileOnly project(":jdbc")
+    compileOnly dependencyVersion("micronaut.jdbc")
 
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")
@@ -12,15 +12,8 @@ dependencies {
     testImplementation dependencyModuleVersion("micronaut.sql", "micronaut-jdbc-tomcat")
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation dependencyVersion("h2")
-    testImplementation "mysql:mysql-connector-java:8.0.19"
+    testImplementation "mysql:mysql-connector-java:8.0.20"
 
     compileOnly "ch.qos.logback:logback-classic:1.2.3"
 }
 
-configurations.all {
-    resolutionStrategy.dependencySubstitution {
-        substitute module("io.micronaut:micronaut-jdbc") with project(":jdbc")
-    }
-}
-
-//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

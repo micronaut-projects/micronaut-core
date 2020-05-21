@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 
@@ -220,5 +221,15 @@ public interface ExecutionHandleLocator {
         return this.<T, R>findExecutionHandle(bean, method, arguments).orElseThrow(() ->
             new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + bean + "]")
         );
+    }
+
+    /**
+     * Create an execution handle for the given bean definition and method.
+     * @param beanDefinition The bean definition
+     * @param method The method
+     * @return The execution handle
+     */
+    default MethodExecutionHandle<?, Object> createExecutionHandle(BeanDefinition<?> beanDefinition, ExecutableMethod<Object, ?> method) {
+        throw new UnsupportedOperationException("No such method [" + method + "(" + Arrays.stream(method.getArgumentTypes()).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanDefinition.getBeanType() + "]");
     }
 }

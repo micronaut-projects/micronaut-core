@@ -36,7 +36,7 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
+import javax.inject.Provider;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -46,13 +46,12 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author James Kleeh
  * @since 1.3.0
  */
-@Singleton
 public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     
     private final BeanLocator beanLocator;
-    private final HttpServerConfiguration httpServerConfiguration;
+    private final Provider<HttpServerConfiguration> httpServerConfiguration;
 
     /**
      * Default constructor.
@@ -60,7 +59,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
      * @param beanLocator The bean locator
      * @param httpServerConfiguration The server configuration
      */
-    public MultipartBodyArgumentBinder(BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration) {
+    public MultipartBodyArgumentBinder(BeanLocator beanLocator, Provider<HttpServerConfiguration> httpServerConfiguration) {
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;
     }
@@ -84,7 +83,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                 HttpContentProcessor<?> processor = beanLocator.findBean(HttpContentSubscriberFactory.class,
                         new ConsumesMediaTypeQualifier<>(MediaType.MULTIPART_FORM_DATA_TYPE))
                         .map(factory -> factory.build(nettyHttpRequest))
-                        .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
+                        .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration.get()));
 
                 //noinspection unchecked
                 return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument) context.getArgument()) {

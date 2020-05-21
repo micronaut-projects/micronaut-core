@@ -54,6 +54,7 @@ import java.util.stream.Collectors;
 @Requires(beans = HealthEndpoint.class)
 @Requires(property = HealthEndpoint.PREFIX + ".jdbc.enabled", notEquals = StringUtils.FALSE)
 @Requires(classes = DataSourceResolver.class)
+@Requires(beans = DataSource.class)
 public class JdbcIndicator implements HealthIndicator {
 
     private static final String NAME = "jdbc";

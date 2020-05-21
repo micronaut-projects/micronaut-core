@@ -3,8 +3,10 @@ package io.micronaut.jackson.modules
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.JsonUnwrapped
 import com.fasterxml.jackson.annotation.JsonView
 import com.fasterxml.jackson.databind.ObjectMapper
+import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.hateoas.JsonError
@@ -108,6 +110,21 @@ class BeanIntrospectionModuleSpec extends Specification {
         )
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
+        when:"json unwrapped is used"
+        def plant = new Plant(name: "Rose", attributes: new Attributes(hasFlowers: true, color: "green"))
+        def str = objectMapper.writeValueAsString(plant)
+
+        then:"The result is correct"
+        str == '{"name":"Rose","color":"green","hasFlowers":true}'
+
+        when:"deserializing"
+        def read = objectMapper.readValue(str, Plant)
+
+        then:
+        read == plant
+        read.attributes.color == 'green'
+        read.attributes.hasFlowers
+
         when:
         Book b = objectMapper.readValue('{"opt":null,"book_title":"The Stand", "book_pages":1000,"author":{"name":"Fred"}}', Book)
 
@@ -142,6 +159,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         result.contains('"book_title":')
         result.contains('"book_pages":')
 
+
         cleanup:
         ctx.close()
     }
@@ -171,6 +189,33 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         then:
         result == '{"message":"Page Not Found","_links":{"self":{"href":"/","templated":false}}}'
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test that introspected serialization works for JsonCreator.Mode.DELEGATING"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        Edition e = objectMapper.readValue('{"book_title":"The Stand"}', Edition)
+
+        then:
+        ctx.getBean(JacksonConfiguration).beanIntrospectionModule
+        ctx.containsBean(BeanIntrospectionModule)
+        e.title == 'The Stand'
+
+        when:
+        def sw = new StringWriter()
+        objectMapper.writeValue(sw, e)
+        def result = sw.toString()
+
+        then:
+        result.contains('"title":"The Stand"')
 
         cleanup:
         ctx.close()
@@ -220,7 +265,34 @@ class BeanIntrospectionModuleSpec extends Specification {
         String name
     }
 
-    //Used for @JsonView
+    @Introspected
+    static class Edition {
+
+        String title
+
+        @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+        static Edition fromBook(Book book) {
+            return new Edition(title: book.title)
+        }
+
+    }
+
+    @Introspected
+    @EqualsAndHashCode
+    static class Plant {
+        String name
+        @JsonUnwrapped
+        Attributes attributes
+    }
+
+    @Introspected
+    @EqualsAndHashCode
+    static class Attributes {
+        String color
+        boolean hasFlowers
+
+    }
+        //Used for @JsonView
     static class PublicView {}
     static class AllView extends PublicView {}
 

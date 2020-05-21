@@ -19,6 +19,7 @@ import io.micronaut.context.AbstractBeanConfiguration;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanConfiguration;
+import io.micronaut.inject.ast.Element;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -47,10 +48,14 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
 
     /**
      * @param packageName        The package name
+     * @param originatingElement The originating element
      * @param annotationMetadata The annotation metadata
      */
-    public BeanConfigurationWriter(String packageName, AnnotationMetadata annotationMetadata) {
-        super(packageName + '.' + CLASS_SUFFIX, annotationMetadata, true);
+    public BeanConfigurationWriter(
+            String packageName,
+            Element originatingElement,
+            AnnotationMetadata annotationMetadata) {
+        super(packageName + '.' + CLASS_SUFFIX, originatingElement, annotationMetadata, true);
         this.packageName = packageName;
         this.configurationClassName = targetClassType.getClassName();
         this.configurationClassInternalName = targetClassType.getInternalName();
@@ -58,7 +63,7 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName)) {
+        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName, getOriginatingElement())) {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
         }
@@ -72,7 +77,7 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
             Class<AbstractBeanConfiguration> superType = AbstractBeanConfiguration.class;
             Type beanConfigurationType = Type.getType(superType);
 
-            startPublicClass(classWriter, configurationClassInternalName, beanConfigurationType);
+            startService(classWriter, BeanConfiguration.class, configurationClassInternalName, beanConfigurationType);
             writeAnnotationMetadataStaticInitializer(classWriter);
 
             writeConstructor(classWriter);

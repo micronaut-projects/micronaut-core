@@ -328,7 +328,6 @@ public class MediaType implements CharSequence {
     private static final String SEMICOLON = ";";
 
     @SuppressWarnings("ConstantName")
-    private static final Logger LOG = LoggerFactory.getLogger(MediaType.class);
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
     private static Map<String, String> mediaTypeFileExtensions;
     @SuppressWarnings("ConstantName")
@@ -420,9 +419,6 @@ public class MediaType implements CharSequence {
             this.type = withoutArgs.substring(0, i);
             this.subtype = withoutArgs.substring(i + 1);
         } else {
-            if (LOG.isWarnEnabled()) {
-                LOG.warn("Failed to parse media type [{}]", name);
-            }
             throw new IllegalArgumentException("Invalid mime type: " + name);
         }
 
@@ -772,8 +768,9 @@ public class MediaType implements CharSequence {
             }
             return result;
         } catch (IOException ex) {
-            if (LOG.isWarnEnabled()) {
-                LOG.warn("Failed to load mime types for file extension detection!");
+            Logger logger = LoggerFactory.getLogger(MediaType.class);
+            if (logger.isWarnEnabled()) {
+                logger.warn("Failed to load mime types for file extension detection!");
             }
         }
 

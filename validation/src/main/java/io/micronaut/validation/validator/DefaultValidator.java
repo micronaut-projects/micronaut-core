@@ -44,6 +44,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.InjectionPoint;
+import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
@@ -340,7 +341,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(object, groups);
         Set overallViolations = new HashSet<>(5);
 
-        final Path.Node node = context.addMethodNode(method.getMethodName(), method.getArgumentTypes());
+        final Path.Node node = context.addMethodNode(method);
         try {
             @SuppressWarnings("unchecked")
             final Class<T> rootClass = (Class<T>) object.getClass();
@@ -380,7 +381,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(object, groups);
         Set overallViolations = new HashSet<>(5);
 
-        final Path.Node node = context.addMethodNode(method.getMethodName(), method.getArgumentTypes());
+        final Path.Node node = context.addMethodNode(method);
         try {
             @SuppressWarnings("unchecked")
             final Class<T> rootClass = (Class<T>) object.getClass();
@@ -688,8 +689,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
             final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
 
-            final boolean hasValid = annotationMetadata.hasStereotype(Valid.class);
-            final boolean hasConstraint = annotationMetadata.hasStereotype(Constraint.class);
+            final boolean hasValid = annotationMetadata.hasStereotype(Validator.ANN_VALID);
+            final boolean hasConstraint = annotationMetadata.hasStereotype(Validator.ANN_CONSTRAINT);
 
 
             if (!hasValid && !hasConstraint) {
@@ -1791,6 +1792,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             return clockProvider;
         }
 
+        @Nullable
+        @Override
+        public Object getRootBean() {
+            return validatedObjects.isEmpty() ? null : validatedObjects.iterator().next();
+        }
+
         Path.Node addPropertyNode(String name, @Nullable DefaultPropertyNode container) {
             final DefaultPropertyNode node;
             if (container != null) {
@@ -1815,9 +1822,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             currentPath.nodes.removeLast();
         }
 
-        @SuppressWarnings("unchecked")
-        Path.Node addMethodNode(String methodName, Class[] argumentTypes) {
-            final DefaultMethodNode methodNode = new DefaultMethodNode(methodName, Arrays.asList(argumentTypes));
+        Path.Node addMethodNode(MethodReference<?, ?> reference) {
+            final DefaultMethodNode methodNode = new DefaultMethodNode(reference);
             currentPath.nodes.add(methodNode);
             return methodNode;
         }
@@ -1831,7 +1837,33 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         }
 
         Path.Node addConstructorNode(String simpleName, Argument<?>... constructorArguments) {
-            final DefaultConstructorNode node = new DefaultConstructorNode(simpleName, Arrays.stream(constructorArguments).map(Argument::getType).collect(Collectors.toList()));
+            final DefaultConstructorNode node = new DefaultConstructorNode(new MethodReference<Object, Object>() {
+
+                @Override
+                public Argument[] getArguments() {
+                    return constructorArguments;
+                }
+
+                @Override
+                public Method getTargetMethod() {
+                    return null;
+                }
+
+                @Override
+                public ReturnType<Object> getReturnType() {
+                    return null;
+                }
+
+                @Override
+                public Class getDeclaringType() {
+                    return null;
+                }
+
+                @Override
+                public String getMethodName() {
+                    return simpleName;
+                }
+            });
             currentPath.nodes.add(node);
             return node;
         }
@@ -1897,8 +1929,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
      * Constructor node.
      */
     private final class DefaultConstructorNode extends DefaultMethodNode implements Path.ConstructorNode {
-        DefaultConstructorNode(String name, List<Class<?>> parameterTypes) {
-            super(name, parameterTypes);
+        public DefaultConstructorNode(MethodReference<Object, Object> methodReference) {
+            super(methodReference);
         }
 
         @Override
@@ -1912,22 +1944,20 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
      */
     private class DefaultMethodNode implements Path.MethodNode {
 
-        private final String name;
-        private final List<Class<?>> parameterTypes;
+        private final MethodReference<?, ?> methodReference;
 
-        DefaultMethodNode(String name, List<Class<?>> parameterTypes) {
-            this.name = name;
-            this.parameterTypes = parameterTypes;
+        public DefaultMethodNode(MethodReference<?, ?> methodReference) {
+            this.methodReference = methodReference;
         }
 
         @Override
         public List<Class<?>> getParameterTypes() {
-            return parameterTypes;
+            return Arrays.asList(methodReference.getArgumentTypes());
         }
 
         @Override
         public String getName() {
-            return name;
+            return methodReference.getMethodName();
         }
 
         @Override

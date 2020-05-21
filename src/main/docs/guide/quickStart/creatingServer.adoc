@@ -20,7 +20,7 @@ $ ./gradlew run
 [main] INFO  io.micronaut.runtime.Micronaut - Startup completed in 972ms. Server Running: http://localhost:28933
 ----
 
-If you have created a Maven based project, use `./mvnw compile exec:exec` instead.
+If you have created a Maven based project, use `./mvnw mn:run` instead.
 
 NOTE: For Windows the ./ before commands is not needed
 

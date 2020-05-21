@@ -25,6 +25,7 @@ import io.micronaut.ast.groovy.utils.PublicAbstractMethodVisitor
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.Generated
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
@@ -63,6 +64,7 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached
 @GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
 class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitAware {
 
+    private static ClassNode generatedNode = new ClassNode(Generated)
     protected static Map<String, LoadedVisitor> loadedVisitors = null
     private CompilationUnit compilationUnit
 
@@ -75,7 +77,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
 
         GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, compilationUnit)
         for (ClassNode classNode in classes) {
-            if (!(classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
+            if (!(classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers())) && classNode.getAnnotations(generatedNode).empty) {
                 Collection<LoadedVisitor> matchedVisitors = loadedVisitors.values().findAll { v -> v.matches(classNode) }
 
                 List<LoadedVisitor> values = new ArrayList<>(matchedVisitors)

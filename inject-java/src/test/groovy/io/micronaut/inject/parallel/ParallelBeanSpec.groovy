@@ -27,7 +27,6 @@ class ParallelBeanSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 3, delay: 0.5)
 
         expect:
-        ctx.getActiveBeanRegistrations(ParallelBean).isEmpty()
         conditions.eventually {
             ctx.getActiveBeanRegistrations(ParallelBean).size() == 1
         }

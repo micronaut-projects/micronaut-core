@@ -17,6 +17,7 @@ package io.micronaut.context.scope;
 
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
@@ -32,6 +33,7 @@ import java.util.Optional;
  * @see javax.inject.Scope
  * @since 1.0
  */
+@Indexed(CustomScope.class)
 public interface CustomScope<A extends Annotation> {
 
     /**

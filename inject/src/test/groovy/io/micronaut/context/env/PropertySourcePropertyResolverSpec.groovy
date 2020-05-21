@@ -32,6 +32,20 @@ import spock.lang.Unroll
  */
 class PropertySourcePropertyResolverSpec extends Specification {
 
+    void "test resolve property entries"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [DATASOURCE_DEFAULT_URL: 'xxx', DATASOURCE_OTHER_URL:'xxx'], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE),
+                PropertySource.of("test",
+                        ['datasource.third.url': 'xxx'],
+                        PropertySource.PropertyConvention.JAVA_PROPERTIES
+                )
+        )
+
+        expect:
+        resolver.getPropertyEntries("datasource") == ['default', 'other', 'third'] as Set
+    }
+
     void "test resolve raw properties"() {
         given:
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
@@ -44,6 +58,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         )
 
         expect:
+        resolver.getPropertyEntries("twitter") == ['oauth2'] as Set
         resolver.containsProperty('TWITTER_OAUTH2_ACCESS_TOKEN')
         resolver.getProperty('TWITTER_OAUTH2_ACCESS_TOKEN', String).get() == 'xxx'
         resolver.containsProperty("camelCase.URL")

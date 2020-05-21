@@ -15,18 +15,13 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -38,7 +33,7 @@ import java.util.function.Predicate;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, AnnotationMetadataProvider {
+public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, RouteInfo<R> {
 
     /**
      * The declaring type of the route.

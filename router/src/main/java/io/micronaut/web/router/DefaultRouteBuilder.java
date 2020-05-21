@@ -15,17 +15,23 @@
  */
 package io.micronaut.web.router;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.filter.HttpFilter;
@@ -34,13 +40,10 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.web.router.exceptions.RoutingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Qualifier;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -121,7 +124,22 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public FilterRoute addFilter(String pathPattern, Supplier<HttpFilter> filter) {
-        DefaultFilterRoute route = new DefaultFilterRoute(pathPattern, filter);
+        DefaultFilterRoute route = new DefaultFilterRoute(
+                pathPattern,
+                filter,
+                (AnnotationMetadataResolver) executionHandleLocator
+        );
+        filterRoutes.add(route);
+        return route;
+    }
+
+    @Override
+    public FilterRoute addFilter(String pathPattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> beanDefinition) {
+        DefaultFilterRoute route = new BeanDefinitionFilterRoute(
+                pathPattern,
+                beanLocator,
+                beanDefinition
+        );
         filterRoutes.add(route);
         return route;
     }
@@ -389,20 +407,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * @return The uri route corresponding to the method.
      */
     protected UriRoute buildBeanRoute(String httpMethodName, HttpMethod httpMethod, String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        io.micronaut.context.Qualifier<?> qualifier = beanDefinition.getAnnotationTypeByStereotype(Qualifier.class).map(aClass -> Qualifiers.byAnnotation(beanDefinition, aClass)).orElse(null);
-        if (qualifier == null && beanDefinition.isIterable() && beanDefinition instanceof NameResolver) {
-            qualifier = ((NameResolver) beanDefinition).resolveName()
-                    .map(Qualifiers::byName).orElse(null);
-        }
-        MethodExecutionHandle<?, Object> executionHandle = executionHandleLocator.findExecutionHandle(beanDefinition.getBeanType(), qualifier, method.getMethodName(), method.getArgumentTypes())
-                .orElseThrow(() -> new RoutingException("No such route: " + beanDefinition.getBeanType().getName() + "." + method));
+        MethodExecutionHandle<?, Object> executionHandle = executionHandleLocator
+                                                                .createExecutionHandle(beanDefinition, (ExecutableMethod<Object, ?>) method);
         return buildRoute(httpMethodName, httpMethod, uri, executionHandle);
     }
 
     /**
      * Abstract class for base {@link MethodBasedRoute}.
      */
-    abstract class AbstractRoute implements MethodBasedRoute {
+    abstract class AbstractRoute implements MethodBasedRoute, RouteInfo<Object> {
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
         protected final MethodExecutionHandle<?, ?> targetMethod;
         protected final ConversionService<?> conversionService;
@@ -410,6 +423,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected List<MediaType> producesMediaTypes;
         protected String bodyArgumentName;
         protected Argument<?> bodyArgument;
+        private final boolean isVoid;
+        private final boolean suspended;
+        private final boolean reactive;
+        private final boolean single;
+        private final boolean async;
+        private final boolean specifiedSingle;
 
         /**
          * @param targetMethod The target method execution handle
@@ -429,6 +448,58 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             if (ArrayUtils.isNotEmpty(types)) {
                 this.consumesMediaTypes = Arrays.asList(types);
             }
+            suspended = targetMethod.getExecutableMethod().isSuspend();
+            reactive = RouteInfo.super.isReactive();
+            async = RouteInfo.super.isAsync();
+            single = RouteInfo.super.isSingleResult();
+            isVoid = RouteInfo.super.isVoid();
+            specifiedSingle = RouteInfo.super.isSpecifiedSingle();
+            for (Argument argument : targetMethod.getArguments()) {
+                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
+                    this.bodyArgument = argument;
+                }
+            }
+        }
+
+        @NonNull
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return targetMethod.getAnnotationMetadata();
+        }
+
+        @Override
+        public ReturnType<?> getReturnType() {
+            return targetMethod.getReturnType();
+        }
+
+        @Override
+        public boolean isSuspended() {
+            return suspended;
+        }
+
+        @Override
+        public boolean isReactive() {
+            return reactive;
+        }
+
+        @Override
+        public boolean isSingleResult() {
+            return single;
+        }
+
+        @Override
+        public boolean isSpecifiedSingle() {
+            return specifiedSingle;
+        }
+
+        @Override
+        public boolean isAsync() {
+            return async;
+        }
+
+        @Override
+        public boolean isVoid() {
+            return isVoid;
         }
 
         @Override

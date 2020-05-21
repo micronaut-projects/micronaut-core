@@ -20,7 +20,6 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.reactivex.Flowable
-import reactor.core.publisher.Flux
 // end::imports[]
 
 // tag::class[]
@@ -32,7 +31,7 @@ interface HeadlineClient {
 // end::class[]
 
     @Get(value = "/headlines", processes = MediaType.APPLICATION_JSON_STREAM) // <1>
-    Flux<Headline> streamFlux()
+    Flowable<Headline> streamFlux()
 // tag::endclass[]
 }
 // end::endclass[]

@@ -37,7 +37,7 @@ class TextPlainCodecSpec extends Specification {
         codec.encode(val, bufferFactory)
 
         then:
-        1 * bufferFactory.buffer(2, 2) >> Stub(ByteBuffer)
+        1 * bufferFactory.wrap(_) >> Stub(ByteBuffer)
     }
 
     void "test additional type configuration"() {

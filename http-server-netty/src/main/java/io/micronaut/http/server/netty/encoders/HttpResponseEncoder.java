@@ -189,7 +189,7 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Encoding emitted response object [{}] using codec: {}", body, codec);
             }
-            byteBuf = (ByteBuf) codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+            byteBuf = codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
         }
         return byteBuf;
     }

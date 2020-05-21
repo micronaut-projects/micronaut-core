@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.Environment;
@@ -27,12 +28,10 @@ import io.micronaut.discovery.metadata.ServiceInstanceMetadataContributor;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Implements the {@link EmbeddedServerInstance} interface for Netty.
@@ -47,29 +46,29 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
     private final String id;
     private final NettyHttpServer nettyHttpServer;
     private final Environment environment;
-    private final ComputeInstanceMetadataResolver computeInstanceMetadataResolver;
     private final List<ServiceInstanceMetadataContributor> metadataContributors;
+    private final BeanLocator beanLocator;
 
     private ConvertibleValues<String> instanceMetadata;
 
     /**
-     * @param id                              The id
-     * @param nettyHttpServer                 The {@link NettyHttpServer}
-     * @param environment                     The Environment
-     * @param computeInstanceMetadataResolver The {@link ComputeInstanceMetadataResolver}
-     * @param metadataContributors            The {@link ServiceInstanceMetadataContributor}
+     * @param id                   The id
+     * @param nettyHttpServer      The {@link NettyHttpServer}
+     * @param environment          The Environment
+     * @param beanLocator          The bean locator
+     * @param metadataContributors The {@link ServiceInstanceMetadataContributor}
      */
     NettyEmbeddedServerInstance(
-        @Parameter String id,
-        @Parameter NettyHttpServer nettyHttpServer,
-        Environment environment,
-        @Nullable ComputeInstanceMetadataResolver computeInstanceMetadataResolver,
-        List<ServiceInstanceMetadataContributor> metadataContributors) {
+            @Parameter String id,
+            @Parameter NettyHttpServer nettyHttpServer,
+            Environment environment,
+            BeanLocator beanLocator,
+            List<ServiceInstanceMetadataContributor> metadataContributors) {
 
         this.id = id;
         this.nettyHttpServer = nettyHttpServer;
         this.environment = environment;
-        this.computeInstanceMetadataResolver = computeInstanceMetadataResolver;
+        this.beanLocator = beanLocator;
         this.metadataContributors = metadataContributors;
     }
 
@@ -92,11 +91,10 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
     public ConvertibleValues<String> getMetadata() {
         if (instanceMetadata == null) {
             Map<String, String> cloudMetadata = new HashMap<>();
-            if (computeInstanceMetadataResolver != null) {
-                Optional<? extends ComputeInstanceMetadata> resolved = computeInstanceMetadataResolver.resolve(environment);
-                if (resolved.isPresent()) {
-                    cloudMetadata = resolved.get().getMetadata();
-                }
+            ComputeInstanceMetadata computeInstanceMetadata = beanLocator.findBean(ComputeInstanceMetadataResolver.class)
+                    .flatMap(computeInstanceMetadataResolver -> computeInstanceMetadataResolver.resolve(environment)).orElse(null);
+            if (computeInstanceMetadata != null) {
+                cloudMetadata = computeInstanceMetadata.getMetadata();
             }
             if (CollectionUtils.isNotEmpty(metadataContributors)) {
                 for (ServiceInstanceMetadataContributor metadataContributor : metadataContributors) {
@@ -104,9 +102,9 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
                 }
             }
             Map<String, String> metadata = nettyHttpServer.getServerConfiguration()
-                .getApplicationConfiguration()
-                .getInstance()
-                .getMetadata();
+                    .getApplicationConfiguration()
+                    .getInstance()
+                    .getMetadata();
             if (cloudMetadata != null) {
                 cloudMetadata.putAll(metadata);
             }

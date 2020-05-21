@@ -4,10 +4,9 @@ buildscript {
     }
     dependencies {
         classpath "org.grails:grails-docs:$grailsVersion"
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.5'
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
         classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
-        classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.2.1"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.2"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
@@ -24,7 +23,6 @@ plugins {
     id 'com.github.ben-manes.versions' version '0.27.0'
 }
 
-apply plugin: "io.sdkman.vendors"
 apply plugin: 'org.aim42.htmlSanityCheck'
 
 repositories {
@@ -133,13 +131,13 @@ ext {
             ],
             'micronaut.kafka': [
                     version:micronautKafkaVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.kafka',
                     name:'micronaut-kafka',
                     modules:['micronaut-kafka-streams']
             ],
             'micronaut.cassandra': [
                     version:micronautCassandraVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.cassandra',
                     name:'micronaut-cassandra'
             ],
             'micronaut.hibernate.validator': [
@@ -154,13 +152,18 @@ ext {
             ],
             'micronaut.picocli': [
                     version:micronautPicocliVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.picocli',
                     name:'micronaut-picocli'
             ],
             'micronaut.rabbitmq': [
                     version:micronautRabbitMQVersion,
                     group:'io.micronaut.configuration',
                     name:'micronaut-rabbitmq'
+            ],
+            'micronaut.nats': [
+                    version:micronautNatsIoVersion,
+                    group:'io.micronaut.nats',
+                    name:'micronaut-nats'
             ],
             'micronaut.graphql': [
                     version:micronautGraphQLVersion,
@@ -187,7 +190,18 @@ ext {
                     version:micronautGcpVersion,
                     group:'io.micronaut.gcp',
                     name:'micronaut-gcp-common',
-                    modules:['micronaut-gcp-tracing']
+                    modules:['micronaut-gcp-tracing', 'micronaut-gcp-function-http', 'micronaut-gcp-function', 'micronaut-gcp-http-client']
+            ],
+            'micronaut.azure': [
+                    version:micronautAzureVersion,
+                    group:'io.micronaut.azure',
+                    name:'micronaut-azure-function',
+                    modules:['micronaut-azure-function-http']
+            ],
+            'azure.function': [
+                    version:'1.3.1',
+                    group:'com.microsoft.azure.functions',
+                    name:'azure-functions-java-library'
             ],
             'micronaut.elasticsearch': [
                 version:micronautElasticsearch,
@@ -208,7 +222,13 @@ ext {
                     version:micronautAwsVersion,
                     group:'io.micronaut.aws',
                     name:'micronaut-function-aws-api-proxy',
-                    modules: ['micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa']
+                    modules: ['micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver']
+            ],
+            'micronaut.kotlin': [
+                    version:micronautKotlinVersion,
+                    group:'io.micronaut.kotlin',
+                    name:'micronaut-kotlin-runtime',
+                    modules: ['micronaut-ktor', 'micronaut-kotlin-extension-functions']
             ],
             'micronaut.gorm': [
                     version:micronautGroovyVersion,
@@ -265,8 +285,8 @@ ext {
             'junit5'               : [
                     version: junit5Version,
                     group  : 'org.junit.jupiter',
-                    name   : 'junit-jupiter-api',
-                    modules: ['junit-jupiter-engine', 'junit-jupiter-params']
+                    name   : 'junit-jupiter',
+                    modules: ['junit-jupiter-api', 'junit-jupiter-engine', 'junit-jupiter-params']
             ],
             'junitVintage'         : [
                     version: junit5Version,
@@ -280,7 +300,7 @@ ext {
             ],
             'micronaut.micrometer': [
                     version:micronautMicrometerVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.micrometer',
                     name:'micronaut-micrometer-core',
                     modules:[
                             'micronaut-micrometer-registry-appoptics',
@@ -309,21 +329,31 @@ ext {
                     name:'micronaut-spring-annotation',
                     modules:['micronaut-spring-boot', 'micronaut-spring-boot-annotation', 'micronaut-spring-context', 'micronaut-spring-web', 'micronaut-spring-web-annotation']
             ],
+            'micronaut.spring.core': [
+                    version:micronautSpringCoreVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-spring'
+            ],
             'micronaut.sql': [
                     version:micronautSqlVersion,
                     group:'io.micronaut.configuration',
                     name:'micronaut-hibernate-jpa',
-                    modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-dbcp', 'micronaut-postgres-reactive', 'micronaut-jasync-sql', 'micronaut-jooq', 'micronaut-jdbi']
+                    modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-ucp', 'micronaut-jdbc-dbcp', 'micronaut-jasync-sql', 'micronaut-jooq', 'micronaut-jdbi', 'micronaut-hibernate-jpa-spring', 'micronaut-vertx-mysql-client', 'micronaut-vertx-pg-client']
+            ],
+            'micronaut.jdbc': [
+                    version:micronautJdbcVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-jdbc'
             ],
             'micronaut.mongo': [
                     version:micronautMongoVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.mongodb',
                     name:'micronaut-mongo-reactive',
                     modules:['micronaut-mongo-core', 'micronaut-mongo-sync']
             ],
             'micronaut.redis': [
                     version:micronautRedisVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.redis',
                     name:'micronaut-redis-lettuce'
             ],
             'micronaut.neo4j': [
@@ -334,7 +364,7 @@ ext {
             'mongo' : [
                     version: mongoVersion,
                     group  : 'org.mongodb',
-                    modules: ['mongodb-driver-async', 'mongo-java-driver']
+                    modules: ['mongodb-driver-async', 'mongodb-driver-sync', 'mongodb-driver-core']
             ],
             'mongo.reactive'           : [
                     version: mongoReactiveVersion,
@@ -391,6 +421,11 @@ ext {
                     name   : 'spring-core',
                     modules: ['spring-context', 'spring-tx', 'spring-orm', 'spring-jdbc']
             ],
+            springboot                 : [
+                version: springBootVersion,
+                group  : 'org.springframework.boot',
+                modules: ['spring-boot-starter', 'spring-boot-starter-web']
+            ],
             snakeyaml                  : [
                     version: yamlVersion,
                     group  : 'org.yaml',
@@ -412,6 +447,16 @@ ext {
                     group  : 'io.swagger.core.v3',
                     name   : 'swagger-core',
                     modules: ['swagger-models', 'swagger-annotations']
+            ],
+            'google.function.framework'                    : [
+                    version: '1.0.1',
+                    group  : 'com.google.cloud.functions',
+                    name   : 'functions-framework-api'
+            ],
+            'google.function.invoker'                    : [
+                    version: '1.0.0-alpha-2-rc4',
+                    group  : 'com.google.cloud.functions.invoker',
+                    name   : 'java-function-invoker'
             ],
             'reactive.streams'         : [
                     version: reactiveStreamsVersion,
@@ -437,6 +482,21 @@ ext {
                     version: rxJava2Version,
                     group  : 'io.reactivex.rxjava2',
                     name   : 'rxjava'
+            ],
+            'micronaut.rxjava3'        : [
+                    version: micronautRxJava3Version,
+                    group  : 'io.micronaut.rxjava3',
+                    name   : 'micronaut-rxjava3'
+            ],
+            'micronaut.rxjava1'        : [
+                    version: micronautRxJava1Version,
+                    group  : 'io.micronaut.rxjava1',
+                    name   : 'micronaut-rxjava1'
+            ],
+            'micronaut.reactor'        : [
+                    version: micronautReactorVersion,
+                    group  : 'io.micronaut.reactor',
+                    name   : 'micronaut-reactor'
             ],
             reactor                    : [
                     version: reactorVersion,
@@ -503,7 +563,7 @@ ext {
             'micronaut.security'       : [
                     version : micronautSecurityVersion,
                     group   : 'io.micronaut',
-                    modules : ['micronaut-security-jwt', 'micronaut-security-session']
+                    modules : ['micronaut-security', 'micronaut-security-annotations', 'micronaut-security-jwt', 'micronaut-security-session']
             ],
             'micronaut.security.configuration'  : [
                     version : micronautSecurityVersion,
@@ -529,12 +589,18 @@ ext {
             'micronaut.cache': [
                     version:micronautCacheVersion,
                     group:'io.micronaut.cache',
-                    modules: ['micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop']
+                    modules: ['micronaut-cache-caffeine', 'micronaut-cache-core', 'micronaut-cache-management', 'micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop', 'micronaut-cache-infinispan']
             ],
             'micronaut.servlet': [
                 version:micronautServlet,
                 group:'io.micronaut.servlet',
+                name:'micronaut-servlet-core',
                 modules: ['micronaut-http-server-tomcat', 'micronaut-http-server-jetty', 'micronaut-http-server-undertow']
+            ],
+            'micronaut.jaxrs': [
+                version: micronautJaxrsVersion,
+                group  : 'io.micronaut.jaxrs',
+                modules: ['micronaut-jaxrs-server', 'micronaut-jaxrs-processor']
             ],
     ]
 
@@ -616,7 +682,7 @@ subprojects { Project subproject ->
         shadowJarEnabled = false
     }
 
-    if (subproject.name.contains("bom")) {
+    if (subproject.name.contains("bom") || subproject.name.contains("parent")) {
         return
     }
 
@@ -781,16 +847,6 @@ allprojects {
         }
     }
     apply from: rootProject.file('gradle/license.gradle')
-}
-
-sdkman {
-    api = "https://vendors.sdkman.io"
-    consumerKey = System.getenv("GVM_SDKVENDOR_KEY") ?: project.hasProperty("gvmSdkvendorKey") ? project.gvmSdkvendorKey : ''
-    consumerToken = System.getenv("GVM_SDKVENDOR_TOKEN") ?: project.hasProperty("gvmSdkvendorToken") ? project.gvmSdkvendorToken : ''
-    candidate = "micronaut"
-    version = project.version
-    url = "https://github.com/micronaut-projects/micronaut-core/releases/download/v${project.version}/micronaut-${project.version}.zip"
-    hashtag = "#micronautfw"
 }
 
 htmlSanityCheck {

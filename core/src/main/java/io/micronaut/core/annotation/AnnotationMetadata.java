@@ -1220,7 +1220,7 @@ public interface AnnotationMetadata extends AnnotationSource {
         if (annotation != null) {
             Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
             if (repeatable != null) {
-                return hasAnnotation(repeatable.value());
+                return hasAnnotation(repeatable.value().getName());
             } else {
                 return hasAnnotation(annotation.getName());
             }
@@ -1240,7 +1240,7 @@ public interface AnnotationMetadata extends AnnotationSource {
         if (annotation != null) {
             Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
             if (repeatable != null) {
-                return hasStereotype(repeatable.value());
+                return hasStereotype(repeatable.value().getName());
             } else {
                 return hasStereotype(annotation.getName());
             }
@@ -1295,7 +1295,7 @@ public interface AnnotationMetadata extends AnnotationSource {
         if (annotation != null) {
             Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
             if (repeatable != null) {
-                return hasDeclaredAnnotation(repeatable.value());
+                return hasDeclaredAnnotation(repeatable.value().getName());
             } else {
                 return hasDeclaredAnnotation(annotation.getName());
             }
@@ -1313,7 +1313,7 @@ public interface AnnotationMetadata extends AnnotationSource {
         if (stereotype != null) {
             Repeatable repeatable = stereotype.getAnnotation(Repeatable.class);
             if (repeatable != null) {
-                return hasDeclaredStereotype(repeatable.value());
+                return hasDeclaredStereotype(repeatable.value().getName());
             } else {
                 return hasDeclaredStereotype(stereotype.getName());
             }

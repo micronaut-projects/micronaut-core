@@ -21,7 +21,7 @@ class NullableParameterRuleSpec extends AbstractTypeElementSpec {
 
     void "test nullable parameter"() {
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -40,10 +40,10 @@ class Foo {
 """)
 
         then:
-        noExceptionThrown()
+            noExceptionThrown()
 
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -62,10 +62,10 @@ class Foo {
 """)
 
         then:
-        noExceptionThrown()
+            noExceptionThrown()
 
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -83,11 +83,11 @@ class Foo {
 """)
 
         then:
-        def ex = thrown(RuntimeException)
-        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            def ex = thrown(RuntimeException)
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
 
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -105,12 +105,12 @@ class Foo {
 """)
 
         then:
-        noExceptionThrown()
+            noExceptionThrown()
     }
 
     void "test query optional parameter"() {
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -128,13 +128,13 @@ class Foo {
 """)
 
         then:
-        def ex = thrown(RuntimeException)
-        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            def ex = thrown(RuntimeException)
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
     }
 
     void "test ampersand optional parameter"() {
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -152,13 +152,13 @@ class Foo {
 """)
 
         then:
-        def ex = thrown(RuntimeException)
-        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            def ex = thrown(RuntimeException)
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
     }
 
     void "test required argument doesn't fail compilation"() {
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -177,12 +177,12 @@ class Foo {
 """)
 
         then:
-        noExceptionThrown()
+            noExceptionThrown()
     }
 
     void "test nullable with multiple uris"() {
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -201,10 +201,10 @@ class Foo {
 """)
 
         then:
-        noExceptionThrown()
+            noExceptionThrown()
 
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -223,11 +223,11 @@ class Foo {
 """)
 
         then: "abc is optional because /{?def} may be matched and it does not have {abc}"
-        def ex = thrown(RuntimeException)
-        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            def ex = thrown(RuntimeException)
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
 
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -244,11 +244,11 @@ class Foo {
 
 """)
         then: "abc is optional because it is optional in at least one template"
-        ex = thrown(RuntimeException)
-        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex = thrown(RuntimeException)
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
 
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -265,10 +265,10 @@ class Foo {
 
 """)
         then:
-        noExceptionThrown()
+            noExceptionThrown()
 
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -286,10 +286,10 @@ class Foo {
 
 """)
         then:
-        noExceptionThrown()
+            noExceptionThrown()
 
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -306,11 +306,11 @@ class Foo {
 
 """)
         then: "abc is optional because it is optional in at least one template"
-        ex = thrown(RuntimeException)
-        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex = thrown(RuntimeException)
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
 
         when:
-        buildTypeElement("""
+            buildTypeElement("""
 
 package test;
 
@@ -328,7 +328,406 @@ class Foo {
 
 """)
         then:
-        ex = thrown(RuntimeException)
+            ex = thrown(RuntimeException)
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+    }
+
+    void "test nullable parameter with RequestBean"() {
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+import javax.annotation.Nullable;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("{/abc}")
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+        
+        @Nullable
+        @PathVariable
+        private String abc;
+        
+        public String getAbc() { return abc; }
+        public void setAbc(String abc) { this.abc = abc; }
+        
+    }
+    
+}
+
+""")
+        then:
+            noExceptionThrown()
+
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+import javax.annotation.Nullable;
+import java.util.Optional;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("{/abc}")
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+        
+        @PathVariable
+        private Optional<String> abc;
+        
+        public Optional<String> getAbc() { return abc; }
+        public void setAbc(Optional<String> abc) { this.abc = abc; }
+
+    }
+    
+}
+
+""")
+
+        then:
+            noExceptionThrown()
+
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("{/abc}")
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+        
+        @PathVariable
+        private String abc;
+        
+        public String getAbc() { return abc; }
+        public void setAbc(String abc) { this.abc = abc; }
+    }
+    
+}
+
+""")
+        then:
+            def ex = thrown(RuntimeException)
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("{/abc}")
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+        
+        @PathVariable(defaultValue = "x")
+        private String abc;
+        
+        public String getAbc() { return abc; }
+        public void setAbc(String abc) { this.abc = abc; }
+        
+    }
+    
+}
+
+""")
+
+        then:
+            noExceptionThrown()
+
+    }
+
+    void "test query optional parameter with RequestBean"() {
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+import java.util.Optional;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/{?abc}")
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+        
+        @QueryValue
+        private Optional<String> abc;
+        
+        public Optional<String> getAbc() { return abc; }
+        public void setAbc(Optional<String> abc) { this.abc = abc; }
+    }
+    
+}
+
+""")
+
+        then:
+            noExceptionThrown()
+
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/{?abc}")
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+        
+        @QueryValue
+        private String abc;
+        
+        public String getAbc() { return abc; }
+        public void setAbc(String abc) { this.abc = abc; }
+        
+    }
+    
+}
+
+""")
+
+        then:
+            def ex = thrown(RuntimeException)
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+    }
+
+    void "test ampersand optional RequestBean parameter"() {
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/{&abc}")
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+        
+        @PathVariable
+        private String abc;
+        
+        public String getAbc() { return abc; }
+        public void setAbc(String abc) { this.abc = abc; }
+
+        
+    }
+    
+}
+
+""")
+
+        then:
+            def ex = thrown(RuntimeException)
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+    }
+
+    void "test nullable with multiple uris with RequestBean"() {
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+import javax.annotation.Nullable;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{abc}", "/{?def}"})
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+   
+    @Introspected
+    private static class Bean {
+        
+        @PathVariable
+        private String abc;
+        
+        @Nullable
+        @PathVariable
+        private String def;
+        
+        public String getAbc() { return abc; }
+        public void setAbc(String abc) { this.abc = abc; }
+        
+        public String getDef() { return def; }
+        public void setDef(String def) { this.def = def; }
+        
+    }
+    
+}
+
+""")
+
+        then: "abc is optional because /{?def} may be matched and it does not have {abc}"
+        def ex = thrown(RuntimeException)
         ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{?abc}", "/{abc}"})
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+        
+        @PathVariable
+        private String abc;
+        
+        public String getAbc() { return abc; }
+        public void setAbc(String abc) { this.abc = abc; }
+        
+    }
+    
+}
+
+""")
+        then: "abc is optional because it is optional in at least one template"
+            ex = thrown(RuntimeException)
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+import javax.annotation.Nullable;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{?abc}", "/{?abc}"})
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+        
+        @Nullable
+        @PathVariable
+        private String abc;
+        
+        public String getAbc() { return abc; }
+        public void setAbc(String abc) { this.abc = abc; }
+        
+    }
+    
+}
+
+""")
+        then:
+        noExceptionThrown()
+
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{abc}", "/{abc}"})
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+    
+    @Introspected
+    private static class Bean {
+        
+        @PathVariable
+        private String abc;
+        
+        public String getAbc() { return abc; }
+        public void setAbc(String abc) { this.abc = abc; }
+        
+    }
+    
+}
+
+""")
+        then:
+            noExceptionThrown()
+
+
     }
 }

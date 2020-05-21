@@ -73,6 +73,10 @@ consul:
       tags:
         - hello
         - world
+      # Alters the metadata
+      meta:
+        some: value
+        instance_type: t2.medium
       # Alters the retry count
       retry-count: 5
       # Alters fail fast behaviour

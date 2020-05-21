@@ -1,0 +1,47 @@
+This section covers the steps required to upgrade a Micronaut 1.x application to Micronaut 2.x.
+
+=== Thread Pool Selection Now Manual
+
+If your application does blocking I/O such as communication via JDBC or JPA you should annotate all controllers that interact with these blocking resources with the ann:scheduling.annotation.ExecuteOn[] annotation specifying either the default I/O thread pool or a thread pool that you configure an manage to deal with these blocking interactions. For example:
+
+snippet::io.micronaut.docs.http.server.executeon.PersonController[tags="imports,class", indent=0,title="Using @ExecuteOn"]
+
+<1> The ann:scheduling.annotation.ExecuteOn[] annotation is used to execute the operation on the I/O thread pool
+
+NOTE: If you wish to return to the previous behaviour as defined in Micronaut 1.x you can set `micronaut.server.thread-selection` to `AUTO` in configuration.
+
+=== Compilation Error with classes in `io.micronaut.cache` package
+
+If your application fails to compile due to missing classes in the `io.micronaut.cache` you need to add a dependency on a cache implementation, for example the default cache implementation was Caffeine and this can be restored with the following dependency:
+
+dependency:io.micronaut.cache:micronaut-cache-caffeine[]
+
+=== Compilation Error with classes in `javax.annotation` package
+
+If you application fails to compile referencing classes in the `javax.annotation` package such as `@Nullable` and `@Nonnull` you should update your project to instead import `edu.umd.cs.findbugs.annotations` from Spot Bugs.
+
+=== New Group IDs
+
+Some dependencies have new Maven Group IDs so you may need to update your dependency. The following table summarizes changes to group IDs:
+
+.Updated Maven Group IDs
+|===
+|Previous ID|New ID
+
+|`io.micronaut.configuration:micronaut-kafka`
+|`io.micronaut.kafka:micronaut-kafka`
+
+|`io.micronaut.configuration:micronaut-redis`
+|`io.micronaut.redis:micronaut-redis`
+
+|`io.micronaut.configuration:micronaut-mongo`
+|`io.micronaut.mongodb:micronaut-mongo-reactive`
+
+|`io.micronaut.configuration:micronaut-cassandra`
+|`io.micronaut.cassandra:micronaut-cassandra`
+
+|===
+
+=== Other Breaking Changes
+
+If the above cases don't cover your use case see the section on <<breaks, Breaking Changes>> for a list of other changes that are regarded as breaking in this release.

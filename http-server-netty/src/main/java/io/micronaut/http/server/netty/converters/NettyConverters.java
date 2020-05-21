@@ -25,10 +25,12 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.netty.buffer.*;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.WriteBufferWaterMark;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
@@ -39,6 +41,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -53,17 +56,21 @@ public class NettyConverters implements TypeConverterRegistrar {
 
     private final ConversionService<?> conversionService;
     private final Provider<MediaTypeCodecRegistry> decoderRegistryProvider;
+    private final ChannelOptionFactory channelOptionFactory;
 
     /**
      * Default constructor.
      * @param conversionService The conversion service
      * @param decoderRegistryProvider The decoder registry provider
+     * @param channelOptionFactory The decoder channel option factory
      */
     public NettyConverters(ConversionService<?> conversionService,
                            //Prevent early initialization of the codecs
-                           Provider<MediaTypeCodecRegistry> decoderRegistryProvider) {
+                           Provider<MediaTypeCodecRegistry> decoderRegistryProvider,
+                           ChannelOptionFactory channelOptionFactory) {
         this.conversionService = conversionService;
         this.decoderRegistryProvider = decoderRegistryProvider;
+        this.channelOptionFactory = channelOptionFactory;
     }
 
     @Override
@@ -74,11 +81,7 @@ public class NettyConverters implements TypeConverterRegistrar {
                 (TypeConverter<CharSequence, ChannelOption>) (object, targetType, context) -> {
                     String str = object.toString();
                     String name = NameUtils.underscoreSeparate(str).toUpperCase(Locale.ENGLISH);
-                    ChannelOption<Object> channelOption = ChannelOption.valueOf(name);
-                    if (channelOption != null) {
-                        return Optional.of(channelOption);
-                    }
-                    return Optional.empty();
+                    return Optional.of(channelOptionFactory.channelOption(name));
                 }
         );
         conversionService.addConverter(
@@ -151,6 +154,32 @@ public class NettyConverters implements TypeConverterRegistrar {
                 Attribute.class,
                 Object.class,
                 nettyAttributeToObjectConverter()
+        );
+
+        conversionService.addConverter(
+                String.class,
+                ChannelOption.class,
+                s -> channelOptionFactory.channelOption(NameUtils.environmentName(s))
+        );
+
+        conversionService.addConverter(
+                Map.class,
+                WriteBufferWaterMark.class,
+                (map, targetType, context) -> {
+                    Object h = map.get("high");
+                    Object l = map.get("low");
+                    if (h != null && l != null) {
+                        try {
+                            int high = Integer.parseInt(h.toString());
+                            int low = Integer.parseInt(l.toString());
+                            return Optional.of(new WriteBufferWaterMark(low, high));
+                        } catch (NumberFormatException e) {
+                            context.reject(e);
+                            return Optional.empty();
+                        }
+                    }
+                    return Optional.empty();
+                }
         );
     }
 

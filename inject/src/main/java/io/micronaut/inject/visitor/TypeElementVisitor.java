@@ -15,8 +15,11 @@
  */
 package io.micronaut.inject.visitor;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.reflect.GenericTypeUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.FieldElement;
@@ -95,6 +98,29 @@ public interface TypeElementVisitor<C, E> extends Ordered {
     }
 
     /**
+     * @return The supported default annotation names.
+     */
+    default Set<String> getSupportedAnnotationNames() {
+        Class<?>[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(getClass(), TypeElementVisitor.class);
+
+        if (classes.length == 2) {
+            Class<?> classType = classes[0];
+            if (classType == Object.class) {
+                return Collections.singleton("*");
+            } else {
+                Class<?> methodType = classes[1];
+                if (methodType != Object.class) {
+                    return CollectionUtils.setOf(classType.getName(), methodType.getName());
+                } else {
+                    return CollectionUtils.setOf(classType.getName());
+                }
+
+            }
+        }
+        return Collections.singleton("*");
+    }
+
+    /**
      * Called once when processor loads.
      *
      * Used to expose visitors custom processor options.
@@ -104,5 +130,32 @@ public interface TypeElementVisitor<C, E> extends Ordered {
     @Experimental
     default Set<String> getSupportedOptions() {
         return Collections.emptySet();
+    }
+
+    /**
+     * @return The visitor kind.
+     */
+    default @NonNull VisitorKind getVisitorKind() {
+        return VisitorKind.AGGREGATING;
+    }
+
+    /**
+     * Implementors of the {@link TypeElementVisitor} interface should specify what kind of visitor it is.
+     *
+     * If the visitor looks at multiple {@link io.micronaut.inject.ast.Element} and builds a file that references
+     * multiple {@link io.micronaut.inject.ast.Element} (meaning it doesn't have an originating element) then
+     * {@link VisitorKind#AGGREGATING} should be used
+     *
+     * If the visitor generates classes from an originating {@link io.micronaut.inject.ast.Element} then {@link VisitorKind#ISOLATING} should be used.
+     */
+    enum VisitorKind {
+        /**
+         * A visitor that generates a file for each visited element and calls
+         */
+        ISOLATING,
+        /**
+         * A visitor that generates a one or more files in the {@link #finish(VisitorContext)} method computed from visiting multiple {@link io.micronaut.inject.ast.Element} instances.
+         */
+        AGGREGATING
     }
 }

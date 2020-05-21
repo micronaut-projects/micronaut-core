@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
 
@@ -38,6 +39,11 @@ public interface BeanDefinitionVisitor {
      * The suffix use for generated AOP intercepted types.
      */
     String PROXY_SUFFIX = "$Intercepted";
+
+    /**
+     * @return The element where the bean definition originated from.
+     */
+    @Nullable Element getOriginatingElement();
 
     /**
      * Visits a no arguments constructor. Either this method or
@@ -295,6 +301,7 @@ public interface BeanDefinitionVisitor {
      * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         The annotation metadata for the method
      * @param isInterface                If the method belongs to an interface
+     * @param isDefault                  If the method is a default method
      * @return The {@link ExecutableMethodWriter}.
      */
     ExecutableMethodWriter visitExecutableMethod(Object declaringType,
@@ -307,7 +314,8 @@ public interface BeanDefinitionVisitor {
                                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                                  Map<String, Map<String, Object>> genericTypes,
                                                  @Nullable AnnotationMetadata annotationMetadata,
-                                                 boolean isInterface);
+                                                 boolean isInterface,
+                                                 boolean isDefault);
 
     /**
      * Visits a field injection point.
@@ -367,13 +375,15 @@ public interface BeanDefinitionVisitor {
      * @param field              The name of the field that represents the builder
      * @param annotationMetadata The annotation metadata associated with the field
      * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
+     * @param isInterface        Whether the builder type is an interface or not
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderField(
             Object type,
             String field,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder);
+            ConfigurationMetadataBuilder metadataBuilder,
+            boolean isInterface);
 
     /**
      * Begin defining a configuration builder.
@@ -382,13 +392,15 @@ public interface BeanDefinitionVisitor {
      * @param methodName         The name of the method that returns the builder
      * @param annotationMetadata The annotation metadata associated with the field
      * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
+     * @param isInterface        Whether the builder type is an interface or not
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
             Object type,
             String methodName,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder);
+            ConfigurationMetadataBuilder metadataBuilder,
+            boolean isInterface);
 
     /**
      * Visit a configuration builder method.

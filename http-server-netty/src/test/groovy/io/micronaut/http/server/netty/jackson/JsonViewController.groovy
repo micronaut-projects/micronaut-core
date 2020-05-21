@@ -19,6 +19,8 @@ import com.fasterxml.jackson.annotation.JsonView
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.reactivex.Flowable
+import io.reactivex.Single
 
 @Controller("/jsonview")
 class JsonViewController {
@@ -48,4 +50,21 @@ class JsonViewController {
         return HttpResponse.ok(TEST_MODEL)
     }
 
+    @JsonView(Views.Public)
+    @Get("/reactive")
+    Flowable<TestModel> publicReactiveView() {
+        return Flowable.just(TEST_MODEL)
+    }
+
+    @JsonView(Views.Public)
+    @Get("/reactive/single")
+    Single<TestModel> publicSingleView() {
+        return Single.just(TEST_MODEL)
+    }
+
+    @JsonView(Views.Public)
+    @Get("/reactive/multiple")
+    Flowable<TestModel> publicReactiveViewMultiple() {
+        return Flowable.just(TEST_MODEL, TEST_MODEL)
+    }
 }

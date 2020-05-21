@@ -1,6 +1,7 @@
 introduction:
   title: Introduction
   whatsNew: What's New?
+  upgrading: Upgrading to Micronaut 2.x
 quickStart:
   title: Quick Start
   buildCLI:
@@ -23,7 +24,9 @@ ioc:
   qualifiers: Bean Qualifiers
   scopes:
     title: Scopes
-    builtInScopes: Built-In Scopes
+    builtInScopes:
+      title: Built-In Scopes
+      eagerInit: Eager Initialization of Singletons
     refreshable: Refreshable Scope
     metaScopes: Scopes on Meta Annotations
   factories: Bean Factories
@@ -103,6 +106,7 @@ httpServer:
   serverConfiguration:
     title: Configuring the HTTP Server
     threadPools: Configuring Server Thread Pools
+    nettyPipeline: Configuring the Netty Pipeline
     cors: Configuring CORS
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
@@ -121,6 +125,7 @@ httpClient:
     clientConfiguration: Configuring HTTP clients
     lowLevelClientError: Error Responses
     bindErrors: Bind Errors
+  proxyClient: Proxying Requests with ProxyHttpClient
   clientAnnotation:
     title: Declarative HTTP Clients with @Client
     clientParameters: Customizing Parameter Binding
@@ -142,6 +147,7 @@ cloud:
     distributedConfigurationVault: HashiCorp Vault Support
     distributedConfigurationSpringCloud: Spring Cloud Config Support
     distributedConfigurationAwsParameterStore: AWS Parameter Store Support
+    distributedConfigurationOracleCloudVault: Oracle Cloud Vault Support
   serviceDiscovery:
     title: Service Discovery
     serviceDiscoveryConsul: Consul Support
@@ -176,12 +182,18 @@ messaging:
   title: Message-Driven Microservices
   kafka: Kafka Support
   rabbitmq: RabbitMQ Support
+  nats: Nats.io Support
 commandLineApps:
   title: Standalone Command Line Applications
   picocli:
     title: Picocli Support
 configurations:
   title: Configurations
+  reactiveConfigs:
+    title: Configurations for Reactive Programming
+    rxjava3: RxJava 3 Support
+    reactor: Reactor Support
+    rxjava1: RxJava 1 Support
   dataAccess:
     title: Configurations for Data Access
     sqlSupport: Configuring a SQL Data Source
@@ -250,9 +262,8 @@ cli:
     title: Reloading
     automaticRestart: Automatic Restart
     jrebel: JRebel
-    springloaded: Spring-Loaded
-    gradleReload: Reloading with Gradle
-    ideReload: Reloading with an IDE
+    gradleReload: Recompiling with Gradle
+    ideReload: Recompiling with an IDE
   proxy: Proxy Configuration
 appendix:
   title: Appendices

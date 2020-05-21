@@ -1,22 +1,22 @@
-Micronaut supports reactive and non-blocking client to connect to Postgres using https://github.com/reactiverse/reactive-pg-client[reactive-pg-client], allowing  to handle many database connections with a single thread.
+Micronaut supports reactive and non-blocking client to connect to Postgres using https://github.com/eclipse-vertx/vertx-sql-client/tree/master/vertx-pg-client[vertx-pg-client], allowing to handle many database connections with a single thread.
 
 == Configuring the Reactive Postgres Client
 
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI, supply the `postgres-reactive` feature to configure the Reactive Postgres client in your project:
+If you are creating your project using the Micronaut CLI, supply the `vertx-pg-client` feature to configure the Reactive Postgres client in your project:
 ----
-$ mn create-app my-app --features postgres-reactive
+$ mn create-app my-app --features vertx-pg-client
 ----
 ====
 
-To configure the Reactive Postgres client you should first add `postgres-reactive` module to your classpath:
+To configure the Reactive Postgres client you should first add `vertx-pg-client` module to your classpath:
 
 [source,groovy]
 .build.gradle
 ----
-compile "io.micronaut.configuration:micronaut-postgres-reactive"
+compile "io.micronaut.configuration:micronaut-vertx-pg-client"
 ----
 
 For more information see the https://micronaut-projects.github.io/micronaut-sql/latest/guide/#pgclient[Configuring Reactive Postgres] section of the https://github.com/micronaut-projects/micronaut-sql[Micronaut SQL libraries] project.

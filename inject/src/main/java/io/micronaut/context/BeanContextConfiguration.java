@@ -16,6 +16,12 @@
 package io.micronaut.context;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.context.annotation.ConfigurationReader;
+
+import javax.inject.Singleton;
+import java.lang.annotation.Annotation;
+import java.util.Collections;
+import java.util.Set;
 
 /**
  * Configuration for the {@link BeanContext}.
@@ -39,7 +45,7 @@ public interface BeanContextConfiguration {
      * @since 2.0
      */
     default boolean isEagerInitSingletons() {
-        return false;
+        return getEagerInitAnnotated().contains(Singleton.class);
     }
 
     /**
@@ -48,6 +54,13 @@ public interface BeanContextConfiguration {
      * @since 2.0
      */
     default boolean isEagerInitConfiguration() {
-        return false;
+        return getEagerInitAnnotated().contains(ConfigurationReader.class);
+    }
+
+    /**
+     * @return A set of annotated classes that should be eagerly initialized
+     */
+    default Set<Class<? extends Annotation>> getEagerInitAnnotated() {
+        return Collections.emptySet();
     }
 }

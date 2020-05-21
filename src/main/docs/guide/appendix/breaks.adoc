@@ -16,6 +16,14 @@ snippet::io.micronaut.docs.http.server.executeon.PersonController[tags="imports,
 
 NOTE: If you wish to return to the previous behaviour as defined in Micronaut 1.x you can set `micronaut.server.thread-selection` to `AUTO` in configuration.
 
+=== Micronaut Cache Moved Out Of Runtime
+
+The `micronaut-runtime` module in Micronaut 1.x included support for caching AOP with the `@Cache` annotation. The core caching library and a default implementation based on caffeine were included.
+
+If you are using the caffeine backed cache support, you must add a dependency to continue doing so. Add `io.micronaut.cache:micronaut-cache-caffeine` to your build to maintain the existing functionality. The new caffeine cache module no longer uses the internal shadowed caffeine version and declares its own normal dependency on caffeine. You may need to exclude the transitive dependency in order to prevent conflicts with other versions that may be being pulled in.
+
+The management endpoint for caches is no longer included by default in the `micronaut-management` module. If you would like to use the caches endpoint, add a dependency on `io.micronaut.cache:micronaut-cache-management`.
+
 === Support for RxJava 1.x Removed from Core
 
 RxJava 1.x support is no longer included in core by default. You can re-enable suppot by adding the following dependency:
@@ -113,7 +121,7 @@ micronaut:
 
 ----
 
-You can lon longer inject an HTTP client with `@Named("foo")`:
+You can no longer inject an HTTP client with `@Named("foo")`:
 
 [source,java]
 ----
@@ -203,10 +211,6 @@ To bind to a map with flat keys, add the ann:core.convert.format.MapFormat[] ann
 
 The no longer used group for Graal is no longer part of the bom. While upgrading if you depend on Graal you may see `Could not find com.oracle.substratevm:svm:.`. To resolve the issue, change the dependency group to `org.graalvm.nativeimage`.
 
-=== Cookie Configuration
-
-The `getCookieMaxAge` method has been changed to return a `java.time.Duration`.
-
 === `@Retryable` and `@CircuitBreaker` Exception Handling
 
 `@Retryable` and `@CircuitBreaker` in previous versions of Micronaut resolved `includes` and `excludes` explicitly. Any exception thrown had to exactly match one of the exceptions specified. This has been changed to now also include subclasses of the exception types specified.
@@ -230,3 +234,7 @@ my.message=We love Micronaut''s documentation
 ----
 
 NOTE: This change also applies to messages in custom constraint annotations, which interpolate the message via the message source api.
+
+=== Environment Order Bugfix
+
+Environments specified through the application context builder have priority over environments deduced or supplied through the MICRONAUT_ENVIRONMENTS environment variable, or the equivalent system property. A bug in the logic however did not change the order of a specified environment if it previously was found or deduced. This issue manifested itself with `@MicronautTest(environments = "test")`. The `test` environment is already deduced for tests, so it retained the order of other deduced environments, and was able to be overriden by `MICRONAUT_ENVIRONMENTS=dev`. In Micronaut 1.x configuration for `dev` would have overridden `test`. In Micronaut 2.x `test` will override `dev`.

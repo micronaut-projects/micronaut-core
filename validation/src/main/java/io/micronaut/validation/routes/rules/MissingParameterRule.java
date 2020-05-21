@@ -15,15 +15,22 @@
  */
 package io.micronaut.validation.routes.rules;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.validation.routes.RouteValidationResult;
-
-import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Validates all route uri variables are present in the route arguments.
@@ -37,7 +44,7 @@ public class MissingParameterRule implements RouteValidationRule {
     public RouteValidationResult validate(List<UriMatchTemplate> templates, ParameterElement[] parameters, MethodElement method) {
 
         Set<String> variables = templates.stream().flatMap(t -> t.getVariableNames().stream()).collect(Collectors.toSet());
-        List<String> routeVariables = Arrays.stream(parameters).map(ParameterElement::getName).collect(Collectors.toList());
+        Set<String> routeVariables = Arrays.stream(parameters).map(ParameterElement::getName).collect(Collectors.toCollection(LinkedHashSet::new));
 
         routeVariables.addAll(Arrays.stream(parameters)
                 .filter(p -> p.hasAnnotation(Body.class))
@@ -46,6 +53,15 @@ public class MissingParameterRule implements RouteValidationRule {
                 .flatMap(t -> t.getBeanProperties().stream())
                 .map(PropertyElement::getName)
                 .collect(Collectors.toList()));
+
+        // RequestBean has properties inside
+        routeVariables.addAll(Arrays.stream(parameters)
+                .filter(p -> p.hasAnnotation(RequestBean.class))
+                .map(ParameterElement::getType)
+                .flatMap(t -> t.getBeanProperties().stream())
+                .filter(p -> p.hasStereotype(Bindable.class))
+                .map(p -> p.getAnnotationMetadata().stringValue(Bindable.class).orElse(p.getName()))
+                .collect(Collectors.toSet()));
 
         List<String> errorMessages = new ArrayList<>();
 

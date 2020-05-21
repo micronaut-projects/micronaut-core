@@ -1,0 +1,1 @@
+RxJava 2 is the default reactive programming library used by Micronaut, however individual modules for other reactive libraries have been added.

@@ -113,7 +113,7 @@ EOF
 
 == Storing Configuration as File References
 
-Another option popular option is https://github.com/breser/git2consul[git2consul] which mirrors the contents of a Git repository to Consul's Key/Value store.
+Another popular option is https://github.com/breser/git2consul[git2consul] which mirrors the contents of a Git repository to Consul's Key/Value store.
 
 You can setup a Git repository that contains files like `application.yml`, `hello-world-test.json` etc. and the contents of these files are cloned to Consul.
 

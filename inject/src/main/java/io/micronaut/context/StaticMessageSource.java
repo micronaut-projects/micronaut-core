@@ -37,7 +37,7 @@ public class StaticMessageSource extends AbstractMessageSource {
     /**
      * Adds a message to the default locale.
      * @param code The code
-     * @param message The the message
+     * @param message The message
      * @return This message source
      */
     public @NonNull StaticMessageSource addMessage(@NonNull String code, @NonNull String message) {
@@ -51,7 +51,7 @@ public class StaticMessageSource extends AbstractMessageSource {
      * Adds a message to the default locale.
      * @param locale The locale
      * @param code The code
-     * @param message The the message
+     * @param message The message
      * @return This message source
      */
     public @NonNull StaticMessageSource addMessage(@NonNull Locale locale, @NonNull String code, @NonNull String message) {
@@ -69,9 +69,7 @@ public class StaticMessageSource extends AbstractMessageSource {
         ArgumentUtils.requireNonNull("context", context);
         final String msg = messageMap.get(new MessageKey(context.getLocale(), code));
         if (msg != null) {
-            return Optional.of(
-                    msg
-            );
+            return Optional.of(msg);
         } else {
             return Optional.ofNullable(messageMap.get(new MessageKey(Locale.getDefault(), code)));
         }

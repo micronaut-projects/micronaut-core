@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.context.BeanLocator;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.MethodConvention;
@@ -89,6 +90,17 @@ public interface RouteBuilder {
      * @return The {@link FilterRoute}
      */
     FilterRoute addFilter(String pathPattern, Supplier<HttpFilter> filter);
+
+    /**
+     * Add a filter.
+     *
+     * @param pathPattern The path pattern for the filter
+     * @param beanLocator The bean locator
+     * @param beanDefinition The bean definition
+     * @return The {@link FilterRoute}
+     * @since 2.0
+     */
+    FilterRoute addFilter(String pathPattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> beanDefinition);
 
     /**
      * <p>Builds the necessary mappings to treat the given class as a REST endpoint.</p>
@@ -442,7 +454,6 @@ public interface RouteBuilder {
     default UriRoute POST(String uri, ExecutableMethod<?, ?> method) {
         return POST(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
     }
-
 
     /**
      * <p>Route the specified URI template to the specified target.</p>

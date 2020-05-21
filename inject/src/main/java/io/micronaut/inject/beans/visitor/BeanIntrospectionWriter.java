@@ -34,6 +34,7 @@ import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
@@ -68,6 +69,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final Map<String, Collection<AnnotationValueIndex>> indexes = new HashMap<>(2);
     private final Map<String, GeneratorAdapter> localLoadTypeMethods = new HashMap<>();
     private final ClassElement classElement;
+    private boolean executed = false;
     private int propertyIndex = 0;
     private MethodElement constructor;
     private MethodElement defaultConstructor;
@@ -78,7 +80,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * @param beanAnnotationMetadata The bean annotation metadata
      */
     BeanIntrospectionWriter(ClassElement classElement, AnnotationMetadata beanAnnotationMetadata) {
-        super(computeReferenceName(classElement.getName()), beanAnnotationMetadata, true);
+        super(computeReferenceName(classElement.getName()), classElement, beanAnnotationMetadata, true);
         final String name = classElement.getName();
         this.classElement = classElement;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -92,11 +94,17 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * Constructor used to generate a reference for already compiled classes.
      * @param generatingType The originating type
      * @param index A unique index
+     * @param originatingElement The originating element
      * @param classElement The class element
      * @param beanAnnotationMetadata The bean annotation metadata
      */
-    BeanIntrospectionWriter(String generatingType, int index, ClassElement classElement, AnnotationMetadata beanAnnotationMetadata) {
-        super(computeReferenceName(generatingType) + index, beanAnnotationMetadata, true);
+    BeanIntrospectionWriter(
+            String generatingType,
+            int index,
+            ClassElement originatingElement,
+            ClassElement classElement,
+            AnnotationMetadata beanAnnotationMetadata) {
+        super(computeReferenceName(generatingType) + index, originatingElement, beanAnnotationMetadata, true);
         final String className = classElement.getName();
         this.classElement = classElement;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -183,16 +191,23 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        // write the reference
-        writeIntrospectionReference(classWriterOutputVisitor);
-        // write the introspection
-        writeIntrospectionClass(classWriterOutputVisitor);
+        if (!executed) {
+
+            // Run only once
+            executed = true;
+
+            // write the reference
+            writeIntrospectionReference(classWriterOutputVisitor);
+            // write the introspection
+            writeIntrospectionClass(classWriterOutputVisitor);
+
+        }
     }
 
     private void writeIntrospectionClass(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         final Type superType = Type.getType(AbstractBeanIntrospection.class);
 
-        try (OutputStream introspectionStream = classWriterOutputVisitor.visitClass(introspectionName)) {
+        try (OutputStream introspectionStream = classWriterOutputVisitor.visitClass(introspectionName, getOriginatingElement())) {
 
             startFinalClass(introspectionWriter, introspectionType.getInternalName(), superType);
             final GeneratorAdapter constructorWriter = startConstructor(introspectionWriter);
@@ -338,7 +353,13 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             instantiateInternal.invokeConstructor(beanType, new Method("<init>", constructorDescriptor));
         } else if (constructor.isStatic()) {
             final String methodDescriptor = getMethodDescriptor(beanType, (Collection) argumentTypes);
-            instantiateInternal.invokeStatic(beanType, new Method(constructor.getName(), methodDescriptor));
+            Method method = new Method(constructor.getName(), methodDescriptor);
+            if (classElement.isInterface()) {
+                instantiateInternal.visitMethodInsn(Opcodes.INVOKESTATIC, beanType.getInternalName(), method.getName(),
+                        method.getDescriptor(), true);
+            } else {
+                instantiateInternal.invokeStatic(beanType, method);
+            }
         } else if (isCompanion) {
             instantiateInternal.invokeVirtual(getTypeReference(constructor.getDeclaringType().getName()), new Method(constructor.getName(), getMethodDescriptor(beanType, (Collection) argumentTypes)));
         }
@@ -388,8 +409,8 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         final String referenceName = targetClassType.getClassName();
         classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, referenceName);
 
-        try (OutputStream referenceStream = classWriterOutputVisitor.visitClass(referenceName)) {
-            startPublicFinalClass(referenceWriter, targetClassType.getInternalName(), superType);
+        try (OutputStream referenceStream = classWriterOutputVisitor.visitClass(referenceName, getOriginatingElement())) {
+            startService(referenceWriter, BeanIntrospectionReference.class, targetClassType.getInternalName(), superType);
             final ClassWriter classWriter = generateClassBytes(referenceWriter);
             for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {
                 generatorAdapter.visitMaxs(1, 1);

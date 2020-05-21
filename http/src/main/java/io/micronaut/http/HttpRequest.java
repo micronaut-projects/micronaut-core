@@ -66,6 +66,15 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     @NonNull URI getUri();
 
     /**
+     * Returns a new request object that allows mutation.
+     * @return The mutable request
+     * @since 2.0.0
+     */
+    default MutableHttpRequest<B> mutate() {
+        throw new UnsupportedOperationException("Request is immutable");
+    }
+
+    /**
      * @return The http version of the request.
      */
     default HttpVersion getHttpVersion() {

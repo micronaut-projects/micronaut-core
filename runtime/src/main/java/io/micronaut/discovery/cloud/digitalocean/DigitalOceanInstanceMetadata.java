@@ -16,6 +16,7 @@
 package io.micronaut.discovery.cloud.digitalocean;
 
 import io.micronaut.context.env.ComputePlatform;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.discovery.cloud.AbstractComputeInstanceMetadata;
 
 /**
@@ -24,6 +25,7 @@ import io.micronaut.discovery.cloud.AbstractComputeInstanceMetadata;
  * @author Alvaro Sanchez-Mariscal
  * @since 1.1
  */
+@Introspected
 public class DigitalOceanInstanceMetadata extends AbstractComputeInstanceMetadata {
 
     private final ComputePlatform computePlatform = ComputePlatform.DIGITAL_OCEAN;

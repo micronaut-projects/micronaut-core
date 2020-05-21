@@ -55,6 +55,11 @@ import java.lang.annotation.*;
 public @interface FilterMatcher {
 
     /**
+     * The name of this annotation.
+     */
+    String NAME = FilterMatcher.class.getName();
+
+    /**
      * @return The methods to match. Defaults to all
      */
     HttpMethod[] methods() default {};

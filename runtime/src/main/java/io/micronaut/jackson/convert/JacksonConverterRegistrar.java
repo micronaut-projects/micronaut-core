@@ -15,26 +15,29 @@
  */
 package io.micronaut.jackson.convert;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ContainerNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.type.TypeFactory;
+import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.BeanPropertyBinder;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.TypeConverter;
-import io.micronaut.core.convert.TypeConverterRegistrar;
+import io.micronaut.core.convert.*;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.jackson.JacksonConfiguration;
 
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.*;
-import java.util.function.BiFunction;
+import java.io.IOException;
 
 /**
  * Converter registrar for Jackson.
@@ -142,27 +145,21 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
      */
     protected TypeConverter<Map, Object> mapToObjectConverter() {
         return (map, targetType, context) -> {
-            final BiFunction<Object, Map<?, ?>, Object> propertiesBinderFunction = (object, properties) -> {
-                Map bindMap = new LinkedHashMap(properties.size());
-                for (Map.Entry entry : properties.entrySet()) {
-                    Object key = entry.getKey();
-                    bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
-                }
-                return beanPropertyBinder.get().bind(object, bindMap);
-            };
-
-            Optional<Object> instance = InstantiationUtils.tryInstantiate(targetType, map, context)
-                    .map(object -> propertiesBinderFunction.apply(object, map));
-
-            if (instance.isPresent()) {
-                return instance;
-            } else if (targetType.isInstance(map)) {
-                return Optional.of(map);
+            ArgumentConversionContext<Object> conversionContext;
+            if (context instanceof ArgumentConversionContext) {
+                conversionContext = (ArgumentConversionContext<Object>) context;
             } else {
-                return InstantiationUtils
-                        .tryInstantiate(targetType)
-                        .map(object -> propertiesBinderFunction.apply(object, map));
+                conversionContext = ConversionContext.of(targetType);
             }
+            Map mapWithExtraProps = new LinkedHashMap(map.size());
+            for (Map.Entry entry : ((Map<?, ?>) map).entrySet()) {
+                Object key = entry.getKey();
+                mapWithExtraProps.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
+            }
+            ArgumentBinder binder = this.beanPropertyBinder.get();
+            ArgumentBinder.BindingResult result = binder.bind(conversionContext, mapWithExtraProps);
+            Optional opt = result.getValue();
+            return opt;
         };
     }
 
@@ -196,10 +193,23 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
                 if (CharSequence.class.isAssignableFrom(targetType) && node instanceof ObjectNode) {
                     return Optional.of(node.toString());
                 } else {
-                    Object result = objectMapper.get().treeToValue(node, targetType);
+                    Argument<Object> argument = null;
+                    if (node instanceof ContainerNode && context instanceof ArgumentConversionContext && targetType.getTypeParameters().length != 0) {
+                        argument = ((ArgumentConversionContext<Object>) context).getArgument();
+                    }
+                    Object result;
+                    if (argument != null) {
+                        ObjectMapper om = this.objectMapper.get();
+                        JsonParser jsonParser = om.treeAsTokens(node);
+                        TypeFactory typeFactory = om.getTypeFactory();
+                        JavaType javaType = JacksonConfiguration.constructType(argument, typeFactory);
+                        result = om.readValue(jsonParser, javaType);
+                    } else {
+                        result = this.objectMapper.get().treeToValue(node, targetType);
+                    }
                     return Optional.ofNullable(result);
                 }
-            } catch (JsonProcessingException e) {
+            } catch (IOException e) {
                 context.reject(e);
                 return Optional.empty();
             }

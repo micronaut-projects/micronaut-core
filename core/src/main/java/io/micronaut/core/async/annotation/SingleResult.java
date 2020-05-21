@@ -33,6 +33,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 public @interface SingleResult {
     /**
+     * The class name.
+     */
+    String NAME = SingleResult.class.getName();
+
+    /**
      * Whether the result is a single result.
      *
      * @return True if it is.

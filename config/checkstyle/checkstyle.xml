@@ -125,7 +125,7 @@
         <!-- See http://checkstyle.sf.net/config_sizes.html -->
         <!-- <module name="LineLength"/> -->
         <module name="ParameterNumber">
-            <property name="max" value="12"/>
+            <property name="max" value="14"/>
         </module>
 
         <!-- Checks for whitespace                               -->

@@ -47,7 +47,7 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
 
     private HttpMethod method;
     private URI uri;
-    private B body;
+    private Object body;
 
     /**
      * Simple {@link MutableHttpRequest} implementation.
@@ -87,9 +87,9 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
     }
 
     @Override
-    public MutableHttpRequest<B> body(B body) {
+    public <T> MutableHttpRequest<T> body(T body) {
         this.body = body;
-        return this;
+        return (MutableHttpRequest<T>) this;
     }
 
     @Override
@@ -124,6 +124,6 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
 
     @Override
     public Optional<B> getBody() {
-        return Optional.ofNullable(this.body);
+        return (Optional<B>) Optional.ofNullable(this.body);
     }
 }

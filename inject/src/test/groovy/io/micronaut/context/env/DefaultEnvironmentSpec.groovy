@@ -460,6 +460,33 @@ class DefaultEnvironmentSpec extends Specification {
         env.getRequiredProperty("config.prop", String.class) == "application.yml"
     }
 
+    void "test specified names have precedence, even if deduced"() {
+        when:
+        Environment env = new DefaultEnvironment({[]}).start()
+
+        then:
+        env.activeNames == ["test"] as Set
+
+        when:
+        environmentVariables.set("MICRONAUT_ENVIRONMENTS", "first,second,third")
+        env = new DefaultEnvironment({[]}).start()
+
+        then: // env has priority over deduced
+        env.activeNames == ["test", "first", "second", "third"] as Set
+
+        when:
+        env = new DefaultEnvironment({["specified"]}).start()
+
+        then: // specified has priority over env
+        env.activeNames == ["test", "first", "second", "third", "specified"] as Set
+
+        when:
+        env = new DefaultEnvironment({["second"]}).start()
+
+        then: // specified has priority over env, even if already set in env
+        env.activeNames == ["test", "first", "third", "second"] as Set
+    }
+
     private static Environment startEnv(String files) {
         new DefaultEnvironment({["test"]}) {
             protected String readPropertySourceListKeyFromEnvironment() {

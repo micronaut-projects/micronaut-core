@@ -142,12 +142,35 @@ class ConsulMockAutoRegistrationSpec extends Specification {
         anotherServer.stop()
     }
 
+    void "test that a service can be registered with metadata"() {
+        when: "creating another server instance"
+        def serviceName = 'another-server'
+        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['micronaut.application.name'      : serviceName,
+                                                                               'consul.client.registration.meta': [foo:'bar',  key:'value'],
+                                                                               'consul.client.host'             : 'localhost',
+                                                                               'consul.client.port'             : consulServer.port])
+
+        PollingConditions conditions = new PollingConditions(timeout: 3)
+
+        then:
+        Thread.sleep(30000)
+        conditions.eventually {
+            List<HealthEntry> entry = Flowable.fromPublisher(client.getHealthyServices(serviceName)).blockingFirst()
+            entry.size() == 1
+            entry[0].service.meta == [foo:'bar',  key:'value']
+        }
+
+        cleanup:
+        anotherServer.stop()
+    }
+
     void "test that a service can be registered with an HTTP health check"() {
         when: "creating another server instance"
         def serviceName = 'another-server'
         EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['micronaut.application.name'            : serviceName,
                                                                                'consul.client.registration.check.http': true,
                                                                                'consul.client.registration.tags'      : ['foo', 'bar'],
+                                                                               'consul.client.registration.meta'      : [foo:'bar',  key:'value'],
                                                                                'consul.client.host'                   : 'localhost',
                                                                                'consul.client.port'                   : consulServer.port])
 
@@ -161,10 +184,10 @@ class ConsulMockAutoRegistrationSpec extends Specification {
             entry[0].service.tags == ['foo', 'bar']
             MockConsulServer.newEntries.get(serviceName).checks.size() == 1
             MockConsulServer.newEntries.get(serviceName).tags == ['foo', 'bar']
+            MockConsulServer.newEntries.get(serviceName).meta == [foo:'bar',  key:'value']
             MockConsulServer.newEntries.get(serviceName).checks[0] instanceof HTTPCheck
             MockConsulServer.newEntries.get(serviceName).checks[0].HTTP == new URL(expectedCheckURI)
             MockConsulServer.newEntries.get(serviceName).checks[0].status == 'passing'
-
         }
 
         cleanup:
@@ -178,6 +201,7 @@ class ConsulMockAutoRegistrationSpec extends Specification {
                                                                                'consul.client.registration.check.http'                          : true,
                                                                                'consul.client.registration.check.deregisterCriticalServiceAfter': '90m',
                                                                                'consul.client.registration.tags'                                : ['foo', 'bar'],
+                                                                               'consul.client.registration.meta'                                : [key: 'value'],
                                                                                'consul.client.host'                                             : 'localhost',
                                                                                'consul.client.port'                                             : consulServer.port])
 
@@ -191,6 +215,7 @@ class ConsulMockAutoRegistrationSpec extends Specification {
             entry[0].service.tags == ['foo', 'bar']
             MockConsulServer.newEntries.get(serviceName).checks.size() == 1
             MockConsulServer.newEntries.get(serviceName).tags == ['foo', 'bar']
+            MockConsulServer.newEntries.get(serviceName).meta == [key: 'value']
             MockConsulServer.newEntries.get(serviceName).checks[0] instanceof HTTPCheck
             MockConsulServer.newEntries.get(serviceName).checks[0].HTTP == new URL(expectedCheckURI)
             MockConsulServer.newEntries.get(serviceName).checks[0].deregisterCriticalServiceAfter() == Duration.ofMinutes(90)
@@ -208,6 +233,7 @@ class ConsulMockAutoRegistrationSpec extends Specification {
                                                                                'consul.client.registration.check.http'         : true,
                                                                                'consul.client.registration.check.tlsSkipVerify': true,
                                                                                'consul.client.registration.tags'               : ['foo', 'bar'],
+                                                                               'consul.client.registration.meta'               : [key: 'value'],
                                                                                'consul.client.host'                            : 'localhost',
                                                                                'consul.client.port'                            : consulServer.port])
 
@@ -222,6 +248,7 @@ class ConsulMockAutoRegistrationSpec extends Specification {
             entry[0].service.tags == ['foo', 'bar']
             MockConsulServer.newEntries.get(serviceName).checks.size() == 1
             MockConsulServer.newEntries.get(serviceName).tags == ['foo', 'bar']
+            MockConsulServer.newEntries.get(serviceName).meta == [key: 'value']
             MockConsulServer.newEntries.get(serviceName).checks[0] instanceof HTTPCheck
             MockConsulServer.newEntries.get(serviceName).checks[0].HTTP == new URL(expectedCheckURI)
             MockConsulServer.newEntries.get(serviceName).checks[0].isTLSSkipVerify()
@@ -239,6 +266,7 @@ class ConsulMockAutoRegistrationSpec extends Specification {
                                                                                'consul.client.registration.check.http'  : true,
                                                                                'consul.client.registration.check.method': 'POST',
                                                                                'consul.client.registration.tags'        : ['foo', 'bar'],
+                                                                               'consul.client.registration.meta'        : [key: 'value'],
                                                                                'consul.client.host'                     : 'localhost',
                                                                                'consul.client.port'                     : consulServer.port])
 
@@ -252,6 +280,7 @@ class ConsulMockAutoRegistrationSpec extends Specification {
             entry[0].service.tags == ['foo', 'bar']
             MockConsulServer.newEntries.get(serviceName).checks.size() == 1
             MockConsulServer.newEntries.get(serviceName).tags == ['foo', 'bar']
+            MockConsulServer.newEntries.get(serviceName).meta == [key: 'value']
             MockConsulServer.newEntries.get(serviceName).checks[0] instanceof HTTPCheck
             MockConsulServer.newEntries.get(serviceName).checks[0].HTTP == new URL(expectedCheckURI)
             MockConsulServer.newEntries.get(serviceName).checks[0].method.get() == HttpMethod.POST

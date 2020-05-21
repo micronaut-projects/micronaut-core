@@ -15,7 +15,9 @@
  */
 package io.micronaut.inject.writer;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -24,18 +26,16 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import org.jetbrains.annotations.NotNull;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
@@ -62,6 +62,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     protected static final Type TYPE_OBJECT = Type.getType(Object.class);
     protected static final Type TYPE_CLASS = Type.getType(Class.class);
     protected static final int DEFAULT_MAX_STACK = 13;
+    protected static final Type TYPE_GENERATED = Type.getType(Generated.class);
 
     protected static final Map<String, String> NAME_TO_TYPE_MAP = new HashMap<>();
     private static final Method METHOD_CREATE_ARGUMENT_SIMPLE = Method.getMethod(
@@ -103,11 +104,20 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         NAME_TO_TYPE_MAP.put("float", "F");
     }
 
+    protected final Element originatingElement;
+
+    /**
+     * @param originatingElement The originating element
+     */
+    protected AbstractClassFileWriter(Element originatingElement) {
+        this.originatingElement = originatingElement;
+    }
+
     /**
      * Pushes type arguments onto the stack.
      *
      * @param generatorAdapter The generator adapter
-     * @param declaringElement     The declaring class element of the generics
+     * @param declaringElement The declaring class element of the generics
      * @param types            The type references
      */
     protected static void pushTypeArgumentElements(
@@ -249,7 +259,8 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     /**
      * Builds generic type arguments recursively.
-     *  @param generatorAdapter The generator adapter to use
+     *
+     * @param generatorAdapter The generator adapter to use
      * @param argumentName     The argument name
      * @param typeReference    The type name
      * @param classElement     The class element that declares the generics
@@ -520,8 +531,9 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     /**
      * Writes a method that returns a boolean value with the value supplied by the given supplier.
-     * @param classWriter The class writer
-     * @param methodName The method name
+     *
+     * @param classWriter   The class writer
+     * @param methodName    The method name
      * @param valueSupplier The supplier
      */
     protected void writeBooleanMethod(ClassWriter classWriter, String methodName, Supplier<Boolean> valueSupplier) {
@@ -535,6 +547,14 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         isSingletonMethod.returnValue();
         isSingletonMethod.visitMaxs(1, 1);
         isSingletonMethod.visitEnd();
+    }
+
+    /**
+     * @return The originating element
+     */
+    public @Nullable
+    Element getOriginatingElement() {
+        return this.originatingElement;
     }
 
     /**
@@ -1048,6 +1068,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V1_8, ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
     /**
@@ -1057,6 +1078,30 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     protected void startPublicClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V1_8, ACC_PUBLIC | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
+    }
+
+    /**
+     * @param classWriter       The current class writer
+     * @param serviceType       The service type
+     * @param internalClassName The class name
+     * @param superType         The super type
+     */
+    protected void startService(ClassVisitor classWriter, Class<?> serviceType, String internalClassName, Type superType) {
+        startService(classWriter, serviceType.getName(), internalClassName, superType);
+    }
+
+    /**
+     * @param classWriter       The current class writer
+     * @param serviceName       The service name
+     * @param internalClassName The class name
+     * @param superType         The super type
+     */
+    protected void startService(ClassVisitor classWriter, String serviceName, String internalClassName, Type superType) {
+        classWriter.visit(V1_8, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, internalClassName, null, superType.getInternalName(), null);
+        AnnotationVisitor annotationVisitor = classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
+        annotationVisitor.visit("service", serviceName);
+        annotationVisitor.visitEnd();
     }
 
     /**
@@ -1066,6 +1111,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     protected void startFinalClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V1_8, ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
     /**
@@ -1077,6 +1123,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     protected void startPublicFinalClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V1_8, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
     /**
@@ -1087,6 +1134,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     protected void startClass(ClassWriter classWriter, String className, Type superType, String genericSignature) {
         classWriter.visit(V1_8, ACC_SYNTHETIC, className, genericSignature, superType.getInternalName(), null);
+        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
     /**

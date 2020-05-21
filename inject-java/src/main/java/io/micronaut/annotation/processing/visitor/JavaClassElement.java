@@ -58,7 +58,8 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      */
-    protected JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
+    @Internal
+    public JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
         super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
@@ -155,7 +156,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                 }
                 if (element.getKind() == ElementKind.METHOD && element instanceof ExecutableElement) {
                     Set<Modifier> modifiers = element.getModifiers();
-                    if (modifiers.contains(Modifier.PUBLIC) && !modifiers.contains(Modifier.STATIC) && !modifiers.contains(Modifier.ABSTRACT)) {
+                    if (modifiers.contains(Modifier.PUBLIC) && !modifiers.contains(Modifier.STATIC)) {
                         ExecutableElement executableElement = (ExecutableElement) element;
                         String methodName = executableElement.getSimpleName().toString();
                         if (methodName.contains("$")) {

@@ -41,6 +41,7 @@ import java.util.concurrent.ExecutorService;
 @Singleton
 public class DefaultExecutorSelector implements ExecutorSelector {
 
+    private static final String EXECUTE_ON = ExecuteOn.class.getName();
     private final BeanLocator beanLocator;
 
     /**
@@ -53,7 +54,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
 
     @Override
     public Optional<ExecutorService> select(MethodReference method, ThreadSelection threadSelection) {
-        final String name = method.stringValue(ExecuteOn.class).orElse(null);
+        final String name = method.stringValue(EXECUTE_ON).orElse(null);
         if (name != null) {
             final ExecutorService executorService;
             try {

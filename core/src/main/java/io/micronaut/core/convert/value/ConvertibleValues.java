@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.convert.value;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -71,6 +72,17 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      */
     default boolean contains(String name) {
         return get(name, Argument.OBJECT_ARGUMENT).isPresent();
+    }
+
+    /**
+     * Get a raw value without any conversion.
+     *
+     * @param name The key name
+     * @return True if it is
+     * @since 2.0.0
+     */
+    default @Nullable V getValue(CharSequence name) {
+        return (V) get(name, Argument.OBJECT_ARGUMENT).orElse(null);
     }
 
     /**

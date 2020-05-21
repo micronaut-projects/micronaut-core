@@ -23,7 +23,6 @@ import io.micronaut.retry.event.CircuitClosedEvent
 import io.micronaut.retry.event.CircuitOpenEvent
 import io.micronaut.retry.event.RetryEvent
 import io.micronaut.retry.event.RetryEventListener
-import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -214,7 +213,6 @@ class CircuitBreakerSpec extends Specification{
     static class CounterService {
         int countValue = 0
         int countRx = 0
-        int countReact = 0
         int countThreshold = 3
 
 
@@ -239,14 +237,5 @@ class CircuitBreakerSpec extends Specification{
             })
         }
 
-        Mono<Integer> getCountMono() {
-            Mono.fromCallable({->
-                countReact++
-                if(countReact < countThreshold) {
-                    throw new IllegalStateException("Bad count")
-                }
-                return countReact
-            })
-        }
     }
 }

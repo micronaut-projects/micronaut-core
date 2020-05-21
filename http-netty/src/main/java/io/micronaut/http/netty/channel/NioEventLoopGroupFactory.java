@@ -32,7 +32,7 @@ import java.util.concurrent.ThreadFactory;
 
 /**
  * Factory for NioEventLoopGroup.
- * 
+ *
  * @author croudet
  */
 @Internal
@@ -94,6 +94,7 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
      *
      * @return NioServerSocketChannel.
      */
+    @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return NioServerSocketChannel.class;
     }

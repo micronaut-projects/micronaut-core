@@ -17,6 +17,7 @@ package io.micronaut.function.executor;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
+import io.micronaut.context.ApplicationContextProvider;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.StringUtils;
@@ -25,6 +26,10 @@ import io.micronaut.inject.ExecutableMethod;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
+import javax.annotation.PreDestroy;
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Optional;
 
 /**
@@ -35,7 +40,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-class AbstractExecutor<C> {
+class AbstractExecutor<C> implements ApplicationContextProvider, Closeable, AutoCloseable  {
 
     /**
      * The current {@link ApplicationContext}.
@@ -121,6 +126,21 @@ class AbstractExecutor<C> {
                     .getEnvironment();
         } else {
             return applicationContext.getEnvironment();
+        }
+    }
+
+    @Override
+    public ApplicationContext getApplicationContext() {
+        return this.applicationContext;
+    }
+
+    @Override
+    @PreDestroy
+    public void close() throws IOException {
+        try {
+            applicationContext.close();
+        } catch (Exception e) {
+            // ignore
         }
     }
 }

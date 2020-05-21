@@ -39,6 +39,16 @@ public interface HttpHeaders extends Headers {
     String ACCEPT = "Accept";
 
     /**
+     * {@code "Accept-CH"}.
+     */
+    String ACCEPT_CH = "Accept-CH";
+
+    /**
+     * {@code "Accept-CH"}.
+     */
+    String ACCEPT_CH_LIFETIME = "Accept-CH-Lifetime";
+
+    /**
      * {@code "Accept-Charset"}.
      */
     String ACCEPT_CHARSET = "Accept-Charset";
@@ -144,6 +154,11 @@ public interface HttpHeaders extends Headers {
     String CONTENT_DISPOSITION = "Content-Disposition";
 
     /**
+     * {@code "Content-DPR"}.
+     */
+    String CONTENT_DPR = "Content-DPR";
+
+    /**
      * {@code "Content-Encoding"}.
      */
     String CONTENT_ENCODING = "Content-Encoding";
@@ -189,9 +204,34 @@ public interface HttpHeaders extends Headers {
     String COOKIE = "Cookie";
 
     /**
+     * {@code "Cross-Origin-Resource-Policy"}.
+     */
+    String CROSS_ORIGIN_RESOURCE_POLICY = "Cross-Origin-Resource-Policy";
+
+    /**
      * {@code "Date"}.
      */
     String DATE = "Date";
+
+    /**
+     * {@code "Device-Memory"}.
+     */
+    String DEVICE_MEMORY = "Device-Memory";
+
+    /**
+     * {@code "Downlink"}.
+     */
+    String DOWNLINK = "Downlink";
+
+    /**
+     * {@code "DPR"}.
+     */
+    String DPR = "DPR";
+
+    /**
+     * {@code "ECT"}.
+     */
+    String ECT = "ECT";
 
     /**
      * {@code "ETag"}.
@@ -207,6 +247,11 @@ public interface HttpHeaders extends Headers {
      * {@code "Expires"}.
      */
     String EXPIRES = "Expires";
+
+    /**
+     * {@code "Feature-Policy"}.
+     */
+    String FEATURE_POLICY = "Feature-Policy";
 
     /**
      * {@code "Forwarded"}.
@@ -254,6 +299,11 @@ public interface HttpHeaders extends Headers {
     String LAST_MODIFIED = "Last-Modified";
 
     /**
+     * {@code "Link"}.
+     */
+    String LINK = "Link";
+
+    /**
      * {@code "Location"}.
      */
     String LOCATION = "Location";
@@ -294,9 +344,24 @@ public interface HttpHeaders extends Headers {
     String REFERER = "Referer";
 
     /**
+     * {@code "Referrer-Policy"}.
+     */
+    String REFERRER_POLICY = "Referrer-Policy";
+
+    /**
      * {@code "Retry-After"}.
      */
     String RETRY_AFTER = "Retry-After";
+
+    /**
+     * {@code "RTT"}.
+     */
+    String RTT = "RTT";
+
+    /**
+     * {@code "Save-Data"}.
+     */
+    String SAVE_DATA = "Save-Data";
 
     /**
      * {@code "Sec-WebSocket-Key1"}.
@@ -354,6 +419,11 @@ public interface HttpHeaders extends Headers {
     String SET_COOKIE2 = "Set-Cookie2";
 
     /**
+     * {@code "Source-Map"}.
+     */
+    String SOURCE_MAP = "SourceMap";
+
+    /**
      * {@code "TE"}.
      */
     String TE = "TE";
@@ -389,6 +459,11 @@ public interface HttpHeaders extends Headers {
     String VIA = "Via";
 
     /**
+     * {@code "Viewport-Width"}.
+     */
+    String VIEWPORT_WIDTH = "Viewport-Width";
+
+    /**
      * {@code "Warning"}.
      */
     String WARNING = "Warning";
@@ -407,6 +482,11 @@ public interface HttpHeaders extends Headers {
      * {@code "WebSocket-Protocol"}.
      */
     String WEBSOCKET_PROTOCOL = "WebSocket-Protocol";
+
+    /**
+     * {@code "Width"}.
+     */
+    String WIDTH = "Width";
 
     /**
      * {@code "WWW-Authenticate"}.

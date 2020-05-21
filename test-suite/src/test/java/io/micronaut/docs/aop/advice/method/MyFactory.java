@@ -15,17 +15,17 @@
  */
 package io.micronaut.docs.aop.advice.method;
 
-import io.micronaut.cache.annotation.Cacheable;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.docs.aop.advice.MyBean;
+import io.micronaut.docs.aop.advice.Timed;
 
 // tag::class[]
 @Factory
 public class MyFactory {
 
     @Prototype
-    @Cacheable("my-cache")
+    @Timed
     public MyBean myBean() {
         return new MyBean();
     }

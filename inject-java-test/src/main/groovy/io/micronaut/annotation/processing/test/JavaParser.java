@@ -19,9 +19,7 @@ import com.google.testing.compile.JavaFileObjects;
 import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.util.Context;
-import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
-import io.micronaut.annotation.processing.PackageConfigurationInjectProcessor;
-import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
+import io.micronaut.annotation.processing.*;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -186,8 +184,10 @@ public class JavaParser implements Closeable {
     protected @NonNull List<Processor> getAnnotationProcessors() {
         List<Processor> processors = new ArrayList<>();
         processors.add(getTypeElementVisitorProcessor());
+        processors.add(getAggregatingTypeElementVisitorProcessor());
         processors.add(new PackageConfigurationInjectProcessor());
         processors.add(getBeanDefinitionInjectProcessor());
+        processors.add(new ServiceDescriptionProcessor());
         return processors;
     }
 
@@ -206,6 +206,15 @@ public class JavaParser implements Closeable {
      */
     protected @NonNull TypeElementVisitorProcessor getTypeElementVisitorProcessor() {
         return new TypeElementVisitorProcessor();
+    }
+
+    /**
+     * The type element visitor processor to use.
+     *
+     * @return The type element visitor processor
+     */
+    protected @NonNull AggregatingTypeElementVisitorProcessor getAggregatingTypeElementVisitorProcessor() {
+        return new AggregatingTypeElementVisitorProcessor();
     }
 
     @Override

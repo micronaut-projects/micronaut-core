@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -28,7 +27,6 @@ import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.reactivex.Observable;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Optional;
 
@@ -38,8 +36,6 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
-@Requires(classes = Observable.class)
 @Internal
 public class ObservableBodyBinder extends DefaultBodyAnnotationBinder<Observable> implements NonBlockingBodyArgumentBinder<Observable> {
 

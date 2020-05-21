@@ -109,7 +109,7 @@ class ContentNegotiationSpec extends Specification {
 
         where:
         contentType                     | expectedContentType             | expectedBody
-        null                            | MediaType.APPLICATION_XML_TYPE | '<bad>Bad things happened</bad>'
+        null                            | MediaType.APPLICATION_XML_TYPE  | '<bad>Bad things happened</bad>'
         MediaType.APPLICATION_XML_TYPE  | MediaType.APPLICATION_XML_TYPE  | '<bad>Bad things happened</bad>'
         MediaType.APPLICATION_JSON_TYPE | MediaType.APPLICATION_JSON_TYPE | '{"message":"Bad things happened"}'
     }
@@ -133,12 +133,13 @@ class ContentNegotiationSpec extends Specification {
         response != null
         response.getContentType().get() == expectedContentType
         response.body() == expectedBody
+        response.status() == status
 
         where:
-        contentType                     | expectedContentType             | expectedBody
-        null                            | MediaType.APPLICATION_XML_TYPE | '<bad>not a good request</bad>'
-        MediaType.APPLICATION_XML_TYPE  | MediaType.APPLICATION_XML_TYPE  | '<bad>not a good request</bad>'
-        MediaType.APPLICATION_JSON_TYPE | MediaType.APPLICATION_JSON_TYPE | '{"message":"not a good request"}'
+        contentType                     | status                 | expectedContentType             | expectedBody
+        null                            | HttpStatus.BAD_REQUEST | MediaType.APPLICATION_XML_TYPE  | '<bad>not a good request</bad>'
+        MediaType.APPLICATION_XML_TYPE  | HttpStatus.BAD_REQUEST | MediaType.APPLICATION_XML_TYPE  | '<bad>not a good request</bad>'
+        MediaType.APPLICATION_JSON_TYPE | HttpStatus.BAD_REQUEST | MediaType.APPLICATION_JSON_TYPE | '{"message":"not a good request"}'
     }
 
     @Controller("/negotiate")

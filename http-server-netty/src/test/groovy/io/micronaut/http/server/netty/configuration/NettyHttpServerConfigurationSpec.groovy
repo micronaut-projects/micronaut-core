@@ -15,18 +15,44 @@
  */
 package io.micronaut.http.server.netty.configuration
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.AppenderBase
+import java.util.ArrayList
+import java.util.List
+
+import org.slf4j.LoggerFactory
+
 import io.micronaut.http.server.HttpServerConfiguration
+import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.ChannelOption
+import io.netty.channel.epoll.Epoll
+import io.netty.channel.epoll.EpollChannelOption
+import io.netty.channel.epoll.EpollServerSocketChannel
+import io.netty.channel.kqueue.KQueueChannelOption
+import io.netty.channel.unix.UnixChannelOption
+import io.netty.util.internal.logging.InternalLogger
+import io.netty.util.internal.logging.InternalLoggerFactory
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpMethod
+import io.micronaut.http.netty.channel.EpollEventLoopGroupFactory
+import io.micronaut.http.netty.channel.EventLoopGroupFactory
+import io.micronaut.http.netty.channel.converters.ChannelOptionFactory
+import io.micronaut.http.netty.channel.converters.DefaultChannelOptionFactory
+import io.micronaut.http.netty.channel.converters.EpollChannelOptionFactory
+import io.micronaut.http.netty.channel.converters.KQueueChannelOptionFactory
 import io.micronaut.http.server.cors.CorsOriginConfiguration
 import io.micronaut.http.server.netty.NettyHttpServer
+import io.micronaut.http.server.types.files.SystemFile
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.time.Duration
+import java.util.AbstractMap.SimpleEntry
 
 /**
  * @author Graeme Rocher
@@ -57,11 +83,118 @@ class NettyHttpServerConfigurationSpec extends Specification {
         'idle-timeout'       | 'idleTimeout'      | '-1s' | Duration.ofSeconds(-1)
     }
 
-    void "test netty server use native transport"() {
+    void "test netty server epoll native channel option conversion"() {
+        given:
+        ChannelOptionFactory epollChannelOptionFactory = new EpollChannelOptionFactory()
+
+        when:
+        ChannelOption option = epollChannelOptionFactory.channelOption("TCP_QUICKACK")
+
+        then:
+        option == EpollChannelOption.TCP_QUICKACK
+
+        when:
+        option = epollChannelOptionFactory.channelOption("SO_BACKLOG")
+
+        then:
+        option == ChannelOption.SO_BACKLOG
+
+        when:
+        option = epollChannelOptionFactory.channelOption("DOMAIN_SOCKET_READ_MODE")
+
+        then:
+        option == UnixChannelOption.DOMAIN_SOCKET_READ_MODE
+
+        when:
+        option = epollChannelOptionFactory.channelOption("SO_SNDLOWAT")
+
+        then:
+        option != KQueueChannelOption.SO_SNDLOWAT
+
+        when:
+        option = epollChannelOptionFactory.channelOption("WRITE_BUFFER_WATER_MARK")
+
+        then:
+        option == ChannelOption.WRITE_BUFFER_WATER_MARK
+    }
+
+    void "test netty server kqueue native channel option conversion"() {
+        given:
+        ChannelOptionFactory kqueueChannelOptionFactory = new KQueueChannelOptionFactory()
+
+        when:
+        ChannelOption option = kqueueChannelOptionFactory.channelOption("TCP_QUICKACK")
+
+        then:
+        option != EpollChannelOption.TCP_QUICKACK
+
+        when:
+        option = kqueueChannelOptionFactory.channelOption("SO_BACKLOG")
+
+        then:
+        option == ChannelOption.SO_BACKLOG
+
+        when:
+        option = kqueueChannelOptionFactory.channelOption("DOMAIN_SOCKET_READ_MODE")
+
+        then:
+        option == UnixChannelOption.DOMAIN_SOCKET_READ_MODE
+
+        when:
+        option = kqueueChannelOptionFactory.channelOption("SO_SNDLOWAT")
+
+        then:
+        option == KQueueChannelOption.SO_SNDLOWAT
+
+        when:
+        option = kqueueChannelOptionFactory.channelOption("WRITE_BUFFER_WATER_MARK")
+
+        then:
+        option == ChannelOption.WRITE_BUFFER_WATER_MARK
+    }
+
+    void "test netty server default channel option conversion"() {
+        given:
+        ChannelOptionFactory channelOptionFactory = new DefaultChannelOptionFactory()
+
+        when:
+        ChannelOption option = channelOptionFactory.channelOption("TCP_QUICKACK")
+
+        then:
+        option != EpollChannelOption.TCP_QUICKACK
+
+        when:
+        option = channelOptionFactory.channelOption("SO_BACKLOG")
+
+        then:
+        option == ChannelOption.SO_BACKLOG
+
+        when:
+        option = channelOptionFactory.channelOption("DOMAIN_SOCKET_READ_MODE")
+
+        then:
+        option != UnixChannelOption.DOMAIN_SOCKET_READ_MODE
+
+        when:
+        option = channelOptionFactory.channelOption("SO_SNDLOWAT")
+
+        then:
+        option != KQueueChannelOption.SO_SNDLOWAT
+
+        when:
+        option = channelOptionFactory.channelOption("WRITE_BUFFER_WATER_MARK")
+
+        then:
+        option == ChannelOption.WRITE_BUFFER_WATER_MARK
+    }
+
+    @IgnoreIf({ ! Epoll.isAvailable() })
+    void "test netty server use native transport configuration"() {
         given:
         ApplicationContext beanContext = new DefaultApplicationContext("test")
         beanContext.environment.addPropertySource(PropertySource.of("test",
-              ['micronaut.server.netty.use-native-transport': true]
+              ['micronaut.server.netty.use-native-transport': true,
+               'micronaut.server.netty.childOptions.tcpQuickack': true]
 
         ))
         beanContext.start()
@@ -71,8 +204,72 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         then:
         config.useNativeTransport
+        config.childOptions.size() == 1
+
+        when:
+        def option = config.childOptions.keySet().first()
+
+        then:
+        option == EpollChannelOption.TCP_QUICKACK
 
         cleanup:
+        beanContext.close()
+    }
+
+    @IgnoreIf({ ! Epoll.isAvailable() })
+    void "test netty server use native transport"() {
+        given:
+        InternalLogger logger = InternalLoggerFactory.getInstance(ServerBootstrap.class)
+        MemoryAppender appender = new MemoryAppender()
+        Logger l = (Logger) LoggerFactory.getLogger(ServerBootstrap.class);
+        l.addAppender(appender);
+        appender.start()
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+              ['micronaut.server.netty.use-native-transport': true,
+               'micronaut.server.netty.childOptions.tcpQuickack': true]
+
+        ))
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+        EventLoopGroupFactory eventLoopGroupFactory = beanContext.getBean(EventLoopGroupFactory)
+
+        then:
+        config.useNativeTransport
+        config.childOptions.size() == 1
+
+        when:
+        def option = config.childOptions.keySet().first()
+
+        then:
+        option == EpollChannelOption.TCP_QUICKACK
+        eventLoopGroupFactory.serverSocketChannelClass() == EpollServerSocketChannel.class
+
+        when:
+        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        server.start()
+
+        then:
+        server != null
+
+        when:
+        server.stop()
+        Thread.sleep(1000L)
+        def error = null
+        for (String message: appender.getEvents()) {
+            if (message.contains('Unknown channel option \'TCP_QUICKACK\'')) {
+                error = message
+                break
+            }
+        }
+
+        then:
+        error == null
+
+        cleanup:
+        server.stop()
         beanContext.close()
     }
 
@@ -84,7 +281,10 @@ class NettyHttpServerConfigurationSpec extends Specification {
                  'micronaut.server.netty.worker.threads'       : 8,
                  'micronaut.server.netty.parent.threads'       : 8,
                  'micronaut.server.multipart.maxFileSize'      : 2048,
-                 'micronaut.server.maxRequestSize'             : '2MB']
+                 'micronaut.server.maxRequestSize'             : '2MB',
+                 'micronaut.server.netty.childOptions.write_buffer_water_mark.high': 262143,
+                 'micronaut.server.netty.childOptions.write_buffer_water_mark.low' : 65535
+                ]
 
         ))
         beanContext.start()
@@ -96,8 +296,11 @@ class NettyHttpServerConfigurationSpec extends Specification {
         !config.useNativeTransport
         config.maxRequestSize == 2097152
         config.multipart.maxFileSize == 2048
-        config.childOptions.size() == 1
+        config.childOptions.size() == 2
         config.childOptions.keySet().first() instanceof ChannelOption
+        config.childOptions.keySet()[1] instanceof ChannelOption
+        config.childOptions.get(ChannelOption.WRITE_BUFFER_WATER_MARK).high == 262143
+        config.childOptions.get(ChannelOption.WRITE_BUFFER_WATER_MARK).low == 65535
         !config.host.isPresent()
         config.parent.numOfThreads == 8
         config.worker.numOfThreads == 8
@@ -157,6 +360,22 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         cleanup:
         beanContext.close()
+    }
+
+}
+
+class MemoryAppender extends AppenderBase<ILoggingEvent> {
+    private final List<String> events = new ArrayList<>();
+
+    @Override
+    protected void append(ILoggingEvent e) {
+        synchronized (events) {
+            events.add(e.toString());
+        }
+    }
+
+    public List<String> getEvents() {
+        return events;
     }
 
 }

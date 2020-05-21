@@ -15,11 +15,14 @@
  */
 package io.micronaut.http;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.uri.UriBuilder;
 
 import java.net.URI;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -63,13 +66,26 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     MutableHttpRequest<B> uri(URI uri);
 
     @Override
-    MutableHttpRequest<B> body(B body);
+    <T> MutableHttpRequest<T> body(T body);
 
     @Override
     MutableHttpHeaders getHeaders();
 
     @Override
     MutableHttpParameters getParameters();
+
+    /**
+     * Alters the URI of the request with the given URI builder.
+     *
+     * @param consumer A consumer that accepts the URI
+     * @return The modified request
+     */
+    default @NonNull MutableHttpRequest<B> uri(@NonNull Consumer<UriBuilder> consumer) {
+        Objects.requireNonNull(consumer, "URI builder cannot be null");
+        UriBuilder builder = UriBuilder.of(getUri());
+        consumer.accept(builder);
+        return uri(builder.build());
+    }
 
     /**
      * Sets the acceptable {@link MediaType} instances via the {@link HttpHeaders#ACCEPT} header.

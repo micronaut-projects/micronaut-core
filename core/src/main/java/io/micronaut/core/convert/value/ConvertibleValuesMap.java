@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.convert.value;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 
@@ -61,6 +62,17 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
     public ConvertibleValuesMap(Map<? extends CharSequence, V> map, ConversionService<?> conversionService) {
         this.map = map;
         this.conversionService = conversionService;
+    }
+
+    @Nullable
+    @Override
+    public V getValue(CharSequence name) {
+        return name != null ? map.get(name) : null;
+    }
+
+    @Override
+    public boolean contains(String name) {
+        return name != null && map.containsKey(name);
     }
 
     @Override

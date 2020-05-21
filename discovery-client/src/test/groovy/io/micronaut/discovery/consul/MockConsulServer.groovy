@@ -16,6 +16,7 @@
 package io.micronaut.discovery.consul
 
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.util.StringUtils
 import io.micronaut.discovery.consul.client.v1.*
@@ -27,7 +28,6 @@ import io.micronaut.http.annotation.QueryValue
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
-import reactor.core.publisher.Mono
 
 import javax.annotation.Nullable
 import javax.validation.constraints.NotNull
@@ -93,11 +93,12 @@ class MockConsulServer implements ConsulOperations {
 
     @Override
     @Get("/kv/{+key}")
-    Mono<List<KeyValue>> readValues(String key) {
+    @SingleResult
+    Flowable<List<KeyValue>> readValues(String key) {
         key = URLDecoder.decode(key, "UTF-8")
         Map<String, List<KeyValue>> found = keyvalues.findAll { entry -> entry.key.startsWith(key)}
         if(found) {
-            return Mono.just(found.values().stream().flatMap({ values -> values.stream() })
+            return Flowable.just(found.values().stream().flatMap({ values -> values.stream() })
                                    .collect(Collectors.toList()))
         }
         else {
@@ -107,15 +108,16 @@ class MockConsulServer implements ConsulOperations {
 
                 List<KeyValue> values = keyvalues.get(prefix)
                 if(values) {
-                    return Mono.just(values.findAll({it.key.startsWith(key)}))
+                    return Flowable.just(values.findAll({it.key.startsWith(key)}))
                 }
             }
         }
-        return Mono.just(Collections.emptyList())
+        return Flowable.just(Collections.emptyList())
     }
 
     @Override
-    Mono<List<KeyValue>> readValues(String key,
+    @SingleResult
+    Flowable<List<KeyValue>> readValues(String key,
                                     @Nullable @QueryValue("dc") String datacenter,
                                     @Nullable Boolean raw, @Nullable String seperator) {
         return readValues(key)

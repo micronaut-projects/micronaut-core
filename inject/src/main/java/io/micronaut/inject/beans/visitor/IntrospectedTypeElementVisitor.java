@@ -191,6 +191,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                                 element.getName(),
                                 index.getAndIncrement(),
+                                element,
                                 ce,
                                 metadata ? element.getAnnotationMetadata() : null
                         );
@@ -214,6 +215,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                                 element.getName(),
                                 j++,
+                                element,
                                 classElement,
                                 metadata ? element.getAnnotationMetadata() : null
                         );
@@ -231,6 +233,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
             processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, element, writer);
         }
+    }
+
+    @NonNull
+    @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
     }
 
     @Override
@@ -271,7 +279,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             Set<AnnotationValue> indexedAnnotations,
             ClassElement ce,
             BeanIntrospectionWriter writer) {
-        if (ce.isAbstract()) {
+        Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
+        if (ce.isAbstract() && !constructorElement.isPresent()) {
             currentAbstractIntrospection = new AbstractIntrospection(
                     writer,
                     includes,
@@ -283,7 +292,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             abstractIntrospections.add(currentAbstractIntrospection);
         } else {
             final List<PropertyElement> beanProperties = ce.getBeanProperties();
-            Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
 
             final MethodElement constructor = constructorElement.orElse(null);
             process(

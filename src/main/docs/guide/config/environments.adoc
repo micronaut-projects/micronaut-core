@@ -1,4 +1,4 @@
-The application environment is modelled by the api:context.env.Environment interface, which allows specifying one or many unique environment names when creating an api:context.ApplicationContext[].
+The application environment is modelled by the api:context.env.Environment[] interface, which allows specifying one or many unique environment names when creating an api:context.ApplicationContext[].
 
 snippet::io.micronaut.docs.context.env.EnvironmentSpec[tags="env",indent=0,title="Initializing the Environment"]
 
@@ -17,6 +17,21 @@ $ java -Dmicronaut.environments=foo,bar -jar myapp.jar
 The above activates environments called `foo` and `bar`.
 
 Finally, the Cloud environment names are also detected. See the section on <<cloudConfiguration,Cloud Configuration>> for more information.
+
+== Environment Priority
+
+Micronaut will load property sources based off the environments specified, and if the same property key exists in multiple property sources specific to an environment, the environment order determines which value will be used.
+
+Micronaut uses the following hierarchy for environment processing (lowest priority to highest priority):
+
+* Deduced environments
+* Environments from the `micronaut.environments` system property
+* Environments from the `MICRONAUT_ENVIRONMENTS` environment variable
+* Environments specified explicitly through the application context builder
++
+NOTE: This also applies to `@MicronautTest(environments = )`
++
+
 
 == Disabling Environment Detection
 

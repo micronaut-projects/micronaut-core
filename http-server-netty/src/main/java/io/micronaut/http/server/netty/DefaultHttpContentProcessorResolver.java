@@ -30,6 +30,8 @@ import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.Set;
@@ -54,14 +56,15 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
     private static final Set<Class> RAW_BODY_TYPES = CollectionUtils.setOf(String.class, byte[].class, ByteBuffer.class);
 
     private final BeanLocator beanLocator;
-    private final NettyHttpServerConfiguration serverConfiguration;
+    private final Provider<NettyHttpServerConfiguration> serverConfiguration;
+    private NettyHttpServerConfiguration nettyServerConfiguration;
 
     /**
      * @param beanLocator         The bean locator to search for processors with
      * @param serverConfiguration The server configuration
      */
     DefaultHttpContentProcessorResolver(BeanLocator beanLocator,
-                                        NettyHttpServerConfiguration serverConfiguration) {
+                                        Provider<NettyHttpServerConfiguration> serverConfiguration) {
         this.beanLocator = beanLocator;
         this.serverConfiguration = serverConfiguration;
     }
@@ -114,7 +117,7 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
     }
 
     private HttpContentProcessor<?> resolve(NettyHttpRequest<?> request, boolean rawBodyType) {
-        Supplier<DefaultHttpContentProcessor> defaultHttpContentProcessor = () -> new DefaultHttpContentProcessor(request, serverConfiguration);
+        Supplier<DefaultHttpContentProcessor> defaultHttpContentProcessor = () -> new DefaultHttpContentProcessor(request, getServerConfiguration());
 
         if (rawBodyType) {
             return defaultHttpContentProcessor.get();
@@ -130,4 +133,17 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
         }
     }
 
+    private NettyHttpServerConfiguration getServerConfiguration() {
+        NettyHttpServerConfiguration nettyHttpServerConfiguration = this.nettyServerConfiguration;
+        if (nettyHttpServerConfiguration == null) {
+            synchronized (this) { // double check
+                nettyHttpServerConfiguration = this.nettyServerConfiguration;
+                if (nettyHttpServerConfiguration == null) {
+                    nettyHttpServerConfiguration = serverConfiguration.get();
+                    this.nettyServerConfiguration = nettyHttpServerConfiguration;
+                }
+            }
+        }
+        return nettyHttpServerConfiguration;
+    }
 }

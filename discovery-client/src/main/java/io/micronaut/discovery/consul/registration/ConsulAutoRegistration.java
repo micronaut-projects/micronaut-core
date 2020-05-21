@@ -48,6 +48,7 @@ import java.net.URL;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -169,6 +170,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
             if (StringUtils.isNotEmpty(applicationName)) {
                 NewServiceEntry serviceEntry = new NewServiceEntry(applicationName);
                 List<String> tags = new ArrayList<>(registration.getTags());
+                Map<String, String> meta = new HashMap<>(registration.getMeta());
 
                 String address;
                 if (registration.isPreferIpAddress()) {
@@ -187,7 +189,8 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
 
                 serviceEntry.address(address)
                     .port(instance.getPort())
-                    .tags(tags);
+                    .tags(tags)
+                    .meta(meta);
 
                 String serviceId = idGenerator.generateId(environment, instance);
                 serviceEntry.id(serviceId);

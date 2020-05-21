@@ -125,8 +125,7 @@ public class TextPlainCodec implements MediaTypeCodec {
     @Override
     public <T, B> ByteBuffer<B> encode(T object, ByteBufferFactory<?, B> allocator) throws CodecException {
         byte[] bytes = encode(object);
-        int len = bytes.length;
 
-        return allocator.buffer(len, len).write(bytes);
+        return allocator.wrap(bytes);
     }
 }

@@ -989,6 +989,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             if (type != null) {
                 return new Class[] { type };
             }
+        } else if (value instanceof AnnotationValue[]) {
+            AnnotationValue[] array = (AnnotationValue[]) value;
+            int len = array.length;
+            if (len > 0) {
+                if (len == 1) {
+                    return array[0].classValues();
+                } else {
+                    return Arrays.stream(array)
+                            .flatMap(annotationValue -> Stream.of(annotationValue.classValues())).toArray(Class[]::new);
+                }
+            }
+        } else if (value instanceof AnnotationValue) {
+            return ((AnnotationValue) value).classValues();
         } else if (value instanceof Object[]) {
             Object[] values = (Object[]) value;
             if (values instanceof Class[]) {
