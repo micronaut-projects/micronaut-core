@@ -1,4 +1,4 @@
-By default the server runs on port 8080. However, you can set the server to run on a specific port:
+By default the server runs on port 8080. However, you can set the server to run on a specific port by updating application.yml in resources:
 
 [source, yaml]
 ----
