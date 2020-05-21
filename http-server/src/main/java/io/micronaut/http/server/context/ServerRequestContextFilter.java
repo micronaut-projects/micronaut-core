@@ -57,14 +57,16 @@ public final class ServerRequestContextFilter implements HttpServerFilter {
         try {
             invocationInstrumenter.beforeInvocation();
             Publisher<MutableHttpResponse<?>> actual = chain.proceed(request);
+            InvocationInstrumenter invocationInstrumenterAfterProceed
+                    = InvocationInstrumenter.combine(getInvocationInstrumenter(request));
             return new Publisher<MutableHttpResponse<?>>() {
                 @Override
-                public void subscribe(Subscriber<? super MutableHttpResponse<?>> s) {
-                    invocationInstrumenter.beforeInvocation();
+                public void subscribe(Subscriber<? super MutableHttpResponse<?>> actualSubscriber) {
+                    invocationInstrumenterAfterProceed.beforeInvocation();
                     try {
-                        actual.subscribe(s);
+                        actual.subscribe(actualSubscriber);
                     } finally {
-                        invocationInstrumenter.afterInvocation();
+                        invocationInstrumenterAfterProceed.afterInvocation();
                     }
                 }
             };
