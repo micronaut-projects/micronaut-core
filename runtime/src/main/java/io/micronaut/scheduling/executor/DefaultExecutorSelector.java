@@ -18,6 +18,7 @@ package io.micronaut.scheduling.executor;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.NonBlocking;
+import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
@@ -27,10 +28,12 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 
 /**
  * Default implementation of the {@link ExecutorSelector} interface that regards methods that return reactive types as non-blocking.
@@ -43,13 +46,15 @@ public class DefaultExecutorSelector implements ExecutorSelector {
 
     private static final String EXECUTE_ON = ExecuteOn.class.getName();
     private final BeanLocator beanLocator;
+    private final Supplier<ExecutorService> ioExecutor;
 
     /**
      * Default constructor.
      * @param beanLocator The bean locator
      */
-    protected DefaultExecutorSelector(BeanLocator beanLocator) {
+    protected DefaultExecutorSelector(BeanLocator beanLocator, @javax.inject.Named(TaskExecutors.IO) Provider<ExecutorService> ioExecutor) {
         this.beanLocator = beanLocator;
+        this.ioExecutor = SupplierUtil.memoized(ioExecutor::get);
     }
 
     @Override
@@ -83,8 +88,10 @@ public class DefaultExecutorSelector implements ExecutorSelector {
                         }
                     }
                 }
-                return beanLocator.findBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO));
+                return Optional.of(ioExecutor.get());
             }
+        } else if (threadSelection == ThreadSelection.IO) {
+            return Optional.of(ioExecutor.get());
         }
         return Optional.empty();
     }

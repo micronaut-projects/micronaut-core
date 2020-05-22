@@ -966,28 +966,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         ChannelHandlerContext context = request.getChannelHandlerContext();
         // Select the most appropriate Executor
         ExecutorService executor;
-        final ThreadSelection threadSelection = serverConfiguration.getThreadSelection();
-        switch (threadSelection) {
-            case MANUAL:
-                if (route instanceof MethodReference) {
-                    executor = executorSelector.select((MethodReference) route, threadSelection).orElse(null);
-                } else {
-                    executor = null;
-                }
-                break;
-            case IO:
-                executor = getIoExecutor();
-                break;
-            case AUTO:
-            default:
-                if (route instanceof MethodReference) {
-                    executor = executorSelector.select((MethodReference) route, threadSelection).orElse(null);
-                } else {
-                    executor = null;
-                }
-                break;
+        if (route instanceof MethodReference) {
+            executor = executorSelector.select((MethodReference) route, serverConfiguration.getThreadSelection()).orElse(null);
+        } else {
+            executor = null;
         }
-
 
         boolean isErrorRoute = false;
         route = buildExecutableRoute(
