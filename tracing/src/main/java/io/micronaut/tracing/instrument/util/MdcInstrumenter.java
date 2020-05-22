@@ -57,6 +57,9 @@ public final class MdcInstrumenter implements InvocationInstrumenterFactory, Rea
             @Override
             public void beforeInvocation() {
                 oldContextMap = MDC.getCopyOfContextMap();
+                if (oldContextMap == null || oldContextMap.isEmpty()) {
+                    LOG.debug("{} pushes data to MDC: {}", this, contextMap);
+                }
                 if (contextMap != null) {
                     MDC.setContextMap(contextMap);
                 }
@@ -67,6 +70,7 @@ public final class MdcInstrumenter implements InvocationInstrumenterFactory, Rea
                 if (oldContextMap != null && !oldContextMap.isEmpty()) {
                     MDC.setContextMap(oldContextMap);
                 } else {
+                    LOG.debug("{} clears MDC", this);
                     MDC.clear();
                 }
             }

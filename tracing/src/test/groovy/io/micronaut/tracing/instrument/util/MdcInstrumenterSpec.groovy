@@ -3,6 +3,8 @@ package io.micronaut.tracing.instrument.util
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.scheduling.instrument.InvocationInstrumenter
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -13,6 +15,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
 
 class MdcInstrumenterSpec extends Specification {
+    static final Logger LOG = LoggerFactory.getLogger(MdcInstrumenterSpec.class)
     static final String key = 'foo'
     static final String value = 'bar'
 
@@ -20,6 +23,7 @@ class MdcInstrumenterSpec extends Specification {
     MdcInstrumenter mdcInstrumenter = new MdcInstrumenter()
 
     def cleanup() {
+        LOG.info('Clearing MDC')
         MDC.clear()
     }
 
