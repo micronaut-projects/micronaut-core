@@ -22,7 +22,6 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
-import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import org.reactivestreams.Publisher;
@@ -54,18 +53,25 @@ public final class ServerRequestContextFilter implements HttpServerFilter {
 
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        try (Instrumentation instrumentation = InvocationInstrumenter.combine(getInvocationInstrumenter(request)).newInstrumentation()) {
+        InvocationInstrumenter invocationInstrumenter = InvocationInstrumenter.combine(getInvocationInstrumenter(request));
+        try {
+            invocationInstrumenter.beforeInvocation();
             Publisher<MutableHttpResponse<?>> actual = chain.proceed(request);
             InvocationInstrumenter invocationInstrumenterAfterProceed
                     = InvocationInstrumenter.combine(getInvocationInstrumenter(request));
             return new Publisher<MutableHttpResponse<?>>() {
                 @Override
                 public void subscribe(Subscriber<? super MutableHttpResponse<?>> actualSubscriber) {
-                    try (Instrumentation ignored = invocationInstrumenterAfterProceed.newInstrumentation()) {
+                    invocationInstrumenterAfterProceed.beforeInvocation();
+                    try {
                         actual.subscribe(actualSubscriber);
+                    } finally {
+                        invocationInstrumenterAfterProceed.afterInvocation();
                     }
                 }
             };
+        } finally {
+            invocationInstrumenter.afterInvocation();
         }
     }
 

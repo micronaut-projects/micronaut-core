@@ -16,7 +16,6 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Maybe;
 import io.reactivex.MaybeObserver;
@@ -49,8 +48,11 @@ final class RxInstrumentedMaybe<T> extends Maybe<T> implements RxInstrumentedCom
 
     @Override
     protected void subscribeActual(MaybeObserver<? super T> o) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        try {
+            instrumenter.beforeInvocation();
             source.subscribe(o);
+        } finally {
+            instrumenter.afterInvocation(false);
         }
     }
 }

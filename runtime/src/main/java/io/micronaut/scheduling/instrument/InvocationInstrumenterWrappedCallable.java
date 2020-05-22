@@ -20,9 +20,10 @@ import io.micronaut.core.annotation.Internal;
 import java.util.concurrent.Callable;
 
 /**
- * Wraps {@link Callable} and invokes {@link InvocationInstrumenter}.
+ * Wrappes {@link Callable} and invokes {@link InvocationInstrumenter}.
  *
  * @param <V> callable generic parameter
+ *
  * @author Denis Stepanov
  * @since 1.3
  */
@@ -36,7 +37,7 @@ final class InvocationInstrumenterWrappedCallable<V> implements Callable<V> {
      * @param invocationInstrumenter instrumenter to be invoked
      * @param callable               original callable
      */
-    public InvocationInstrumenterWrappedCallable(InvocationInstrumenter invocationInstrumenter, Callable<V> callable) {
+    InvocationInstrumenterWrappedCallable(InvocationInstrumenter invocationInstrumenter, Callable<V> callable) {
         this.invocationInstrumenter = invocationInstrumenter;
         this.callable = callable;
     }
@@ -45,12 +46,16 @@ final class InvocationInstrumenterWrappedCallable<V> implements Callable<V> {
      * Wrapped call.
      *
      * @return new wrapped instance
-     * @throws Exception if error
+     * @throws Exception if erro
      */
     @Override
     public V call() throws Exception {
-        try (Instrumentation ignored = invocationInstrumenter.newInstrumentation().forceCleanup()) {
+        try {
+            invocationInstrumenter.beforeInvocation();
             return callable.call();
+        } finally {
+            invocationInstrumenter.afterInvocation(true);
         }
     }
+
 }

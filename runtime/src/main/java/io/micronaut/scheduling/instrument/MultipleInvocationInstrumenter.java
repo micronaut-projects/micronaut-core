@@ -34,7 +34,7 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
     private static final Logger LOG = LoggerFactory.getLogger(InvocationInstrumenter.class);
 
     private final Collection<InvocationInstrumenter> invocationInstrumenters;
-    private final Deque<Instrumentation> activeInstrumentations;
+    private final Deque<InvocationInstrumenter> executedInstrumenters;
 
     /**
      * Creates new instance.
@@ -43,7 +43,7 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
      */
     MultipleInvocationInstrumenter(Collection<InvocationInstrumenter> invocationInstrumenters) {
         this.invocationInstrumenters = invocationInstrumenters;
-        this.activeInstrumentations = new ArrayDeque<>(invocationInstrumenters.size());
+        this.executedInstrumenters = new ArrayDeque<>(invocationInstrumenters.size());
     }
 
     /**
@@ -52,20 +52,20 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
     @Override
     public void beforeInvocation() {
         for (InvocationInstrumenter instrumenter : invocationInstrumenters) {
-            activeInstrumentations.push(instrumenter.newInstrumentation());
+            instrumenter.beforeInvocation();
+            executedInstrumenters.push(instrumenter);
         }
     }
 
     /**
      * Invokes afterInvocation for multiple instrumenters.
-     *
      * @param cleanup Whether to cleanup
      */
     @Override
     public void afterInvocation(boolean cleanup) {
-        while (!activeInstrumentations.isEmpty()) {
+        while (!executedInstrumenters.isEmpty()) {
             try {
-                activeInstrumentations.pop().close(cleanup);
+                executedInstrumenters.pop().afterInvocation(cleanup);
             } catch (Exception e) {
                 LOG.warn("After instrumentation invocation error: {}", e.getMessage(), e);
             }

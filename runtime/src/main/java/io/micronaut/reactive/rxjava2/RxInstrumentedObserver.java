@@ -16,7 +16,6 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
@@ -33,6 +32,7 @@ import io.reactivex.disposables.Disposable;
 final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComponent {
     private final Observer<T> source;
     private final InvocationInstrumenter instrumenter;
+    private boolean active;
 
     /**
      * Default constructor.
@@ -42,34 +42,73 @@ final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComp
      */
     RxInstrumentedObserver(Observer<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
+        this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        if (instrumenter == null || active) {
             source.onSubscribe(d);
+        } else {
+            try {
+                active = true;
+                instrumenter.beforeInvocation();
+                source.onSubscribe(d);
+            } finally {
+                instrumenter.afterInvocation(false);
+                active = false;
+            }
         }
     }
 
     @Override
     public void onNext(T t) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        if (instrumenter == null || active) {
             source.onNext(t);
+        } else {
+            try {
+                active = true;
+                instrumenter.beforeInvocation();
+                source.onNext(t);
+            } finally {
+                instrumenter.afterInvocation(false);
+                active = false;
+            }
         }
     }
 
+    @SuppressWarnings("Duplicates")
     @Override
     public void onError(Throwable t) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        if (instrumenter == null || active) {
             source.onError(t);
+        } else {
+            try {
+                active = true;
+                instrumenter.beforeInvocation();
+                source.onError(t);
+            } finally {
+                instrumenter.afterInvocation(false);
+                active = false;
+            }
         }
     }
 
+    @SuppressWarnings("Duplicates")
     @Override
     public void onComplete() {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        if (instrumenter == null || active) {
             source.onComplete();
+        } else {
+            try {
+                active = true;
+                instrumenter.beforeInvocation();
+                source.onComplete();
+            } finally {
+                instrumenter.afterInvocation(false);
+                active = false;
+            }
         }
     }
+
 }
