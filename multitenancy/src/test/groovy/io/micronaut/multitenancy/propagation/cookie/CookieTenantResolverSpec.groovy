@@ -33,11 +33,13 @@ import io.micronaut.multitenancy.writer.HttpHeaderTenantWriter
 import io.micronaut.multitenancy.writer.TenantWriter
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
 
 @Stepwise
+@Retry(mode = Retry.Mode.SETUP_FEATURE_CLEANUP)
 class CookieTenantResolverSpec extends Specification {
 
     static final SPEC_NAME_PROPERTY = 'spec.name'
