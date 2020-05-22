@@ -15,6 +15,7 @@
  */
 package io.micronaut.scheduling.executor;
 
+import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.annotation.NonBlocking;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
@@ -53,6 +54,8 @@ public class DefaultExecutorSelector implements ExecutorSelector {
     public Optional<ExecutorService> select(MethodReference method) {
         if (method.hasStereotype(NonBlocking.class)) {
             return Optional.empty();
+        } else if (method.hasStereotype(Blocking.class)) {
+            return Optional.of(ioExecutor);
         } else {
             Class returnType = method.getReturnType().getType();
             if (isNonBlocking(returnType)) {
@@ -67,8 +70,8 @@ public class DefaultExecutorSelector implements ExecutorSelector {
                     }
                 }
             }
+            return Optional.of(ioExecutor);
         }
-        return Optional.of(ioExecutor);
     }
 
     private boolean isNonBlocking(Class type) {
