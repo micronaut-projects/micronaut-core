@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.*;
+import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.event.*;
 import io.micronaut.context.exceptions.*;
 import io.micronaut.context.processor.AnnotationProcessor;
@@ -41,6 +42,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.*;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
+import io.micronaut.core.value.PropertyResolver;
+import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -125,7 +128,11 @@ public class DefaultBeanContext implements BeanContext {
             AnnotationMetadataResolver.class,
             BeanLocator.class,
             ApplicationEventPublisher.class,
-            ExecutionHandleLocator.class
+            ExecutionHandleLocator.class,
+            ApplicationContext.class,
+            PropertyResolver.class,
+            ValueResolver.class,
+            PropertyPlaceholderResolver.class
     );
     private final Set<Class> indexedTypes = CollectionUtils.setOf(
             ResourceLoader.class,

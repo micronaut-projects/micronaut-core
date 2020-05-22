@@ -21,8 +21,9 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
+import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.retry.annotation.Fallback;
@@ -127,19 +128,16 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
      */
     public Optional<? extends MethodExecutionHandle<?, Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
         Class<?> declaringType = context.getDeclaringType();
-        Optional<? extends MethodExecutionHandle<?, Object>> result = beanContext
-                .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
-        if (!result.isPresent()) {
-            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(declaringType);
-            for (Class i : allInterfaces) {
-                result = beanContext
-                    .findExecutionHandle(i, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
-                if (result.isPresent()) {
-                    return result;
-                }
+        BeanDefinition<?> beanDefinition = beanContext.findBeanDefinition(declaringType, Qualifiers.byStereotype(Fallback.class)).orElse(null);
+        if (beanDefinition != null) {
+            ExecutableMethod<?, Object> fallBackMethod =
+                    beanDefinition.findMethod(context.getMethodName(), context.getArgumentTypes()).orElse(null);
+            if (fallBackMethod != null) {
+                MethodExecutionHandle<?, Object> executionHandle = beanContext.createExecutionHandle(beanDefinition, (ExecutableMethod<Object, ?>) fallBackMethod);
+                return Optional.of(executionHandle);
             }
         }
-        return result;
+        return Optional.empty();
     }
 
     @SuppressWarnings("unchecked")

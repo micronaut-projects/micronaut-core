@@ -217,6 +217,7 @@ public class ReflectionUtils {
      * @param argumentTypes The argument types
      * @return An {@link Optional} contains the method or empty
      */
+    @Internal
     public static Optional<Method> findMethod(Class type, String name, Class... argumentTypes) {
         Class currentType = type;
         while (currentType != null) {
@@ -240,6 +241,7 @@ public class ReflectionUtils {
      * @return An {@link Optional} contains the method or empty
      */
     @UsedByGeneratedCode
+    @Internal
     public static Method getRequiredMethod(Class type, String name, Class... argumentTypes) {
         try {
             return type.getDeclaredMethod(name, argumentTypes);
@@ -293,6 +295,7 @@ public class ReflectionUtils {
      * @param name The name
      * @return An {@link Optional} contains the method or empty
      */
+    @Internal
     public static Field getRequiredField(Class type, String name) {
         try {
             return type.getDeclaredField(name);
@@ -309,6 +312,7 @@ public class ReflectionUtils {
      * @param name The field name
      * @return An {@link Optional} of field
      */
+    @Internal
     public static Optional<Field> findField(Class type, String name) {
         Optional<Field> declaredField = findDeclaredField(type, name);
         if (!declaredField.isPresent()) {
@@ -328,7 +332,9 @@ public class ReflectionUtils {
      * @param type  The type
      * @param name  The field name
      * @param value The value
+     * @deprecated This method uses reflection. Do not use.
      */
+    @Deprecated
     public static void setFieldIfPossible(Class type, String name, Object value) {
         Optional<Field> declaredField = findDeclaredField(type, name);
         if (declaredField.isPresent()) {

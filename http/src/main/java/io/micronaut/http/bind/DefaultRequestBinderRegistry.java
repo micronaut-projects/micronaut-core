@@ -19,6 +19,7 @@ import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
@@ -34,6 +35,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.*;
+import java.util.function.BiConsumer;
 
 import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
@@ -115,11 +117,24 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
             AnnotatedRequestArgumentBinder<?, ?> annotatedRequestArgumentBinder = (AnnotatedRequestArgumentBinder) binder;
             Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
             if (binder instanceof TypedRequestArgumentBinder) {
-                TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
+                TypedRequestArgumentBinder<?> typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
                 Argument argumentType = typedRequestArgumentBinder.argumentType();
                 byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), (RequestArgumentBinder) binder);
-                if (((TypedRequestArgumentBinder) binder).supportsSuperTypes()) {
+                List<Class<?>> superTypes = typedRequestArgumentBinder.superTypes();
+                if (CollectionUtils.isNotEmpty(superTypes)) {
+                    for (Class<?> superType : superTypes) {
+                        byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(superType), annotationType), (RequestArgumentBinder) binder);
+                    }
+                } else if (typedRequestArgumentBinder.supportsSuperTypes()) {
                     Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType.getType());
+                    if (ClassUtils.REFLECTION_LOGGER.isWarnEnabled()) {
+                        ClassUtils.REFLECTION_LOGGER.warn(
+                                "Request argument binder [{}] triggered the use of reflection for types {}",
+                                typedRequestArgumentBinder,
+                                allInterfaces
+                        );
+                    }
+
                     for (Class<?> itfce : allInterfaces) {
                         byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(itfce), annotationType), (RequestArgumentBinder) binder);
                     }
@@ -172,11 +187,17 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
             RequestArgumentBinder requestArgumentBinder = byTypeAndAnnotation.get(key1);
             if (requestArgumentBinder == null) {
                 Class<?> javaType = key1.type.getType();
-                Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(javaType);
-                for (Class itfce : allInterfaces) {
-                    requestArgumentBinder = byTypeAndAnnotation.get(new TypeAndAnnotation(Argument.of(itfce), annotationType));
-                    if (requestArgumentBinder != null) {
-                        break;
+                for (Map.Entry<TypeAndAnnotation, RequestArgumentBinder> entry : byTypeAndAnnotation.entrySet()) {
+                    TypeAndAnnotation typeAndAnnotation = entry.getKey();
+                    if (typeAndAnnotation.annotation == annotationType) {
+
+                        Argument<?> t = typeAndAnnotation.type;
+                        if (t.getType().isAssignableFrom(javaType)) {
+                            requestArgumentBinder = entry.getValue();
+                            if (requestArgumentBinder != null) {
+                                break;
+                            }
+                        }
                     }
                 }
 

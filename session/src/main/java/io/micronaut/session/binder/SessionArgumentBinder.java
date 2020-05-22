@@ -61,6 +61,11 @@ public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session
     }
 
     @Override
+    public boolean supportsSuperTypes() {
+        return false;
+    }
+
+    @Override
     public ArgumentBinder.BindingResult<Session> bind(ArgumentConversionContext<Session> context, HttpRequest<?> source) {
         if (!source.getAttributes().contains(OncePerRequestHttpServerFilter.getKey(HttpSessionFilter.class))) {
             // the filter hasn't been executed
