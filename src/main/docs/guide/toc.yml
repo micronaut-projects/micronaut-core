@@ -164,19 +164,10 @@ cloud:
     jaeger: Tracing with Jaeger
 serverlessFunctions:
   title: Serverless Functions
-  writingFunctions:
-    title: Writing Functions
-    functionApplication: FunctionApplication
-    functionBean: FunctionBean
-    groovyFunctions: Groovy Functions
-  runningFunctions:
-    title: Running Functions
-    functionWeb: Functions as Web Applications
-    functionCLI: Functions as CLI Applications
-  deployingFunctions:
-    title: Deploying Functions
-    lambdaFunctions: Deploying Functions to AWS Lambda
-    openFaasFunctions: Deploying Functions to OpenFaaS
+  awsLambda: AWS Lambda
+  gcpFunction: Google Cloud Function
+  gcpCloudRun: Google CLoud Run
+  azureFunction: Azure Function
   callingFunctions: Calling Functions with FunctionClient
 messaging:
   title: Message-Driven Microservices

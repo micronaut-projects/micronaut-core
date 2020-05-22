@@ -185,6 +185,12 @@ See the <<clientConfiguration, HTTP Client Configuration>> section for informati
 
 In addition, as of Micronaut 2.0 all operations are by default executed on the `EventLoop` and users can optionally use the new ann:scheduling.annotation.ExecuteOn[] annotation to specify a named executor to execute an operation on if required (for example to offload blocking operations such as interactions with JPA/JDBC to a specific thread pool).
 
+==== Support for `@RequestBean`
+
+It is now possible to bind the properties of a POJO argument to a `@Controller` to request parameters, headers and so on using the ann:http.annotation.RequestBean[] annotation.
+
+Thanks to Github user https://github.com/asodja[asodja] for this contribution.
+
 ==== Micronaut Servlet
 
 Micronaut now includes support for creating https://github.com/micronaut-projects/micronaut-servlet[Servlet applications] and users can use the command line to create an application that targets popular Servlet containers:
@@ -288,19 +294,29 @@ To use the Reactor HTTP client add:
 
 dependency:io.micronaut.rxjava3:micronaut-reactor-http-client[scope="compile"]
 
+==== New Micronaut NATS module
+
+A new messaging module for https://nats.io[Nats.io] has been included in Micronaut core.
+
+See the documentation for https://micronaut-projects.github.io/micronaut-nats/latest/guide/[Micronaut Nats] for more information.
+
+Thanks to https://github.com/grimmjo[Joachim Grimm] for this contribution.
+
 ==== Module Upgrades
 
 * Micronaut Neo4j - `1.3.0` -> `2.0.0`
 * Micronaut Mongo - `1.3.0` -> `2.0.0`
-* Micronaut SQL - `1.3.0` -> `2.0.0.RC1`
-* Micronaut Cache - `1.2.0` -> `2.0.0.M1`
-* Micronaut AWS - `1.3.9` -> `2.0.0.M2`
-* Micronaut Security - `1.4.0` -> `2.0.0.M2`
+* Micronaut SQL - `1.3.0` -> `2.2.1`
+* Micronaut Cache - `1.2.0` -> `2.0.0.RC1`
+* Micronaut AWS - `1.3.9` -> `2.0.0.RC1`
+* Micronaut Security - `1.4.0` -> `2.0.0.RC1`
+* Micronaut Micrometer - `1.3.1` -> `2.0.0.RC2`
+* Micronaut GCP - `1.1.0` -> `2.0.0.RC1`
 
 ==== Dependency Upgrades
 
-* Hibernate `5.4.10.Final` -> `5.4.12.Final`
-* Groovy `2.5.8` -> `2.5.11`
-* Mongo Reactive Streams `1.13.0` -> `4.0.1`
-* Mongo Java Driver `3.12.0` -> `4.0.1`
+* Hibernate `5.4.10.Final` -> `5.4.16.Final`
+* Groovy `2.5.8` -> `3.0.3`
+* Mongo Reactive Streams `1.13.0` -> `4.0.2`
+* Mongo Java Driver `3.12.0` -> `4.0.2`
 * Jaeger `1.0.0` -> `1.2.0`
