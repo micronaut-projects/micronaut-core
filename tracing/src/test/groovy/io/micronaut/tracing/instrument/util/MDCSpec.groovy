@@ -46,9 +46,15 @@ class MDCSpec extends Specification {
 
         @Get("/mdc-test")
         HttpResponse<String> getMdc() {
-            Map<String, String> mdc = MDC.getCopyOfContextMap()
-            println ("Thread = " + Thread.currentThread().getName())
-            return HttpResponse.ok(mdc.get(RequestIdFilter.TRACE_ID_MDC_KEY))
+            Map<String, String> mdc = MDC.getCopyOfContextMap() ?: [:]
+            Thread currentThread = Thread.currentThread()
+            println ("Thread = " + currentThread.getName())
+            String traceId = mdc.get(RequestIdFilter.TRACE_ID_MDC_KEY)
+            if (traceId == null) {
+                println ('traceId: ' + MDC.get(RequestIdFilter.TRACE_ID_MDC_KEY))
+                throw new IllegalStateException("Missing traceId")
+            }
+            return HttpResponse.ok(traceId)
         }
     }
 
