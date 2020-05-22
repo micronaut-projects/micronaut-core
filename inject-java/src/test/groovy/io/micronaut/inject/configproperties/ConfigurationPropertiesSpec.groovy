@@ -62,7 +62,6 @@ class ConfigurationPropertiesSpec extends Specification {
         ctx.close()
     }
 
-    @Ignore
     void "test configuration properties binding"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
