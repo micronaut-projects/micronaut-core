@@ -20,11 +20,11 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class MDCSpec extends Specification {
+class MDCSpec2 extends Specification {
 
     @Shared @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'mdc.test.enabled':true
+            'mdc.test2.enabled':true
     ])
 
     @Shared @AutoCleanup
@@ -41,7 +41,7 @@ class MDCSpec extends Specification {
     }
 
     @Controller
-    @Requires(property = 'mdc.test.enabled')
+    @Requires(property = 'mdc.test2.enabled')
     static class MDCController {
 
         @Get("/mdc-test")
@@ -53,7 +53,7 @@ class MDCSpec extends Specification {
     }
 
     @Filter("/**")
-    @Requires(property = 'mdc.test.enabled')
+    @Requires(property = 'mdc.test2.enabled')
     static class RequestIdFilter extends OncePerRequestHttpServerFilter {
 
         private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(RequestIdFilter.class)
@@ -69,12 +69,7 @@ class MDCSpec extends Specification {
             LOG.info("Storing traceId in MDC: " + traceIdHeader)
             MDC.put(TRACE_ID_MDC_KEY, traceIdHeader)
 
-            return Flowable
-                    .fromPublisher(chain.proceed(request))
-                    .doFinally{->
-                        LOG.info("Removing traceId id from MDC: {}", MDC.get(TRACE_ID_MDC_KEY))
-                        MDC.clear()
-                    }
+            return chain.proceed(request)
         }
 
         @Override

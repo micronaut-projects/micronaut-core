@@ -16,6 +16,7 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.parallel.ParallelFlowable;
 import org.reactivestreams.Subscriber;
@@ -56,22 +57,20 @@ final class RxInstrumentedParallelFlowable<T> extends ParallelFlowable<T> implem
         if (!validate(s)) {
             return;
         }
-        if (instrumenter != null) {
-            int n = s.length;
-            @SuppressWarnings("unchecked")
-            Subscriber<? super T>[] parents = new Subscriber[n];
-            for (int i = 0; i < n; i++) {
-                Subscriber<? super T> z = s[i];
-                parents[i] = RxInstrumentedWrappers.wrap(z, instrumenterFactory);
-            }
-            try {
-                instrumenter.beforeInvocation();
-                source.subscribe(parents);
-            } finally {
-                instrumenter.afterInvocation(false);
-            }
-        } else {
+        InvocationInstrumenter instrumenter = this.instrumenter;
+        if (instrumenter == null) {
             source.subscribe(s);
+            return;
+        }
+        int n = s.length;
+        @SuppressWarnings("unchecked")
+        Subscriber<? super T>[] parents = new Subscriber[n];
+        for (int i = 0; i < n; i++) {
+            Subscriber<? super T> z = s[i];
+            parents[i] = RxInstrumentedWrappers.wrap(z, instrumenterFactory);
+        }
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            source.subscribe(parents);
         }
     }
 }

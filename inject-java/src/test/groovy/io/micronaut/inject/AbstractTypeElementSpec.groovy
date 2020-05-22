@@ -18,6 +18,7 @@ package io.micronaut.inject
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
+import edu.umd.cs.findbugs.annotations.NonNull
 import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AnnotationUtils
 import io.micronaut.annotation.processing.GenericUtils
@@ -28,6 +29,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
+import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.inject.writer.BeanConfigurationWriter
@@ -39,6 +41,7 @@ import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
+import java.lang.annotation.Annotation
 
 /**
  * @author Graeme Rocher
@@ -196,7 +199,11 @@ abstract class AbstractTypeElementSpec extends Specification {
         return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
     }
 
-    private static JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
+    protected List<AnnotationMapper<? extends Annotation>> getLocalAnnotationMappers(@NonNull String annotationName) {
+        return Collections.emptyList()
+    }
+
+    private JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
         def context = new Context()
         def env = JavacProcessingEnvironment.instance(context)
         try {
@@ -210,7 +217,27 @@ abstract class AbstractTypeElementSpec extends Specification {
         GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
         AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, genericUtils, env.filer) {
         }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, modelUtils)
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, modelUtils) {
+            @Override
+            protected List<AnnotationMapper<? extends Annotation>> getAnnotationMappers(@NonNull String annotationName) {
+                def loadedMappers = super.getAnnotationMappers(annotationName)
+                def localMappers = getLocalAnnotationMappers(annotationName)
+                if (localMappers) {
+                    def newList = []
+                    if (loadedMappers) {
+                        newList.addAll(loadedMappers)
+                    }
+                    newList.addAll(localMappers)
+                    return newList
+                } else {
+                    if (localMappers) {
+                        return loadedMappers
+                    } else {
+                        return Collections.emptyList()
+                    }
+                }
+            }
+        }
         return builder
     }
 }

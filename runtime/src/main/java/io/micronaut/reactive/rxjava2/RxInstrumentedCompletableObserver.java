@@ -16,6 +16,7 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.CompletableObserver;
 import io.reactivex.disposables.Disposable;
@@ -31,7 +32,6 @@ import io.reactivex.disposables.Disposable;
 final class RxInstrumentedCompletableObserver implements CompletableObserver, RxInstrumentedComponent {
     private final CompletableObserver source;
     private final InvocationInstrumenter instrumenter;
-    private boolean active;
 
     /**
      * Default constructor.
@@ -41,55 +41,27 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Rx
      */
     RxInstrumentedCompletableObserver(CompletableObserver source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = instrumenterFactory.create();
+        this.instrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        if (instrumenter == null || active) {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.onSubscribe(d);
-        } else {
-            try {
-                active = true;
-                instrumenter.beforeInvocation();
-                source.onSubscribe(d);
-            } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
-            }
         }
     }
 
     @Override
     public void onError(Throwable t) {
-        if (instrumenter == null || active) {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.onError(t);
-        } else {
-            try {
-                active = true;
-                instrumenter.beforeInvocation();
-                source.onError(t);
-            } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
-            }
         }
     }
 
     @Override
     public void onComplete() {
-        if (instrumenter == null || active) {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.onComplete();
-        } else {
-            try {
-                active = true;
-                instrumenter.beforeInvocation();
-                source.onComplete();
-            } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
-            }
         }
     }
-
 }
