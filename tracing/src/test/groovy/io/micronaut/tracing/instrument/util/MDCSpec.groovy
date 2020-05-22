@@ -35,7 +35,7 @@ class MDCSpec extends Specification {
         100.times {
             String traceId = UUID.randomUUID().toString()
             HttpRequest<Object> request = HttpRequest.GET("/mdc-test").header("traceId", traceId)
-            String response = client.retrieve(request).blockingFirst()
+            String response = client.toBlocking().retrieve(request)
             assert response == traceId
         }
     }
