@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.NonBlocking;
 import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -78,20 +79,19 @@ public class DefaultExecutorSelector implements ExecutorSelector {
             } else if (method.hasStereotype(Blocking.class)) {
                 return Optional.of(ioExecutor.get());
             } else {
-                Class returnType = method.getReturnType().getType();
-                if (isNonBlocking(returnType)) {
-                    return Optional.empty();
-                }
-                if (HttpResponse.class.isAssignableFrom(returnType)) {
+                ReturnType returnType = method.getReturnType();
+                Class argumentType = returnType.getType();
+                if (HttpResponse.class.isAssignableFrom(argumentType)) {
                     Optional<Argument<?>> generic = method.getReturnType().getFirstTypeVariable();
                     if (generic.isPresent()) {
-                        Class argumentType = generic.get().getType();
-                        if (isNonBlocking(argumentType)) {
-                            return Optional.empty();
-                        }
+                        argumentType = generic.get().getType();
                     }
                 }
-                return Optional.of(ioExecutor.get());
+                if (isNonBlocking(argumentType)) {
+                    return Optional.empty();
+                } else {
+                    return Optional.of(ioExecutor.get());
+                }
             }
         } else if (threadSelection == ThreadSelection.IO) {
             return Optional.of(ioExecutor.get());
