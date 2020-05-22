@@ -1,0 +1,46 @@
+To deploy to https://cloud.google.com/run[Google Cloud Run] we recommend using https://github.com/GoogleContainerTools/jib[JIB] to containerize your application.
+
+[TIP]
+.Using the CLI
+====
+Creating an application with JIB:
+----
+$ mn create-app my-app --features jib
+----
+Or with Micronaut Launch
+----
+$ curl https://launch.micronaut.io/example.zip\?features\=jib -o example.zip
+$ unzip example.zip -d example
+----
+====
+
+With JIB setup to deploy your application to Google Container Registry you can simple run:
+
+[source, bash]
+----
+$ ./gradlew jib
+----
+
+You are now ready to deploy your application :
+
+[source, bash]
+----
+$ gcloud run deploy --image gcr.io/[PROJECT ID]/example --platform=managed --allow-unauthenticated
+----
+
+Where `[PROJECT ID]` is replaced for your project ID. You should be asked to specify a region and see output like the following:
+
+[source]
+----
+Service name: (example):
+Deploying container to Cloud Run service [example] in project [PROJECT_ID] region [us-central1]
+
+✓ Deploying... Done.
+  ✓ Creating Revision...
+  ✓ Routing traffic...
+  ✓ Setting IAM Policy...
+Done.
+Service [example] revision [example-00004] has been deployed and is serving 100 percent of traffic at https://example-9487r97234-uc.a.run.app
+----
+
+The URL is the URL of your Cloud Run application.

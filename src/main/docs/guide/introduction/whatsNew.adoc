@@ -10,6 +10,26 @@ Micronaut has been updated to support JDK 14.
 
 Startup time has been further improved in this release with typical startup time for a new application around 20% faster.
 
+==== Improvements to Bean Introspections
+
+Bean introspections have been improved to support static creator methods, interfaces and enums. This means you can define a bean introspection on an interface with a private implementation such as:
+
+.Introspections on interfaces
+[source,java]
+----
+import io.micronaut.core.annotation.Creator;
+
+@io.micronaut.core.annotation.Introspected
+interface Example {
+    String getName();
+
+    @Creator
+    static Example create(String name) {
+        return () -> name;
+    }
+}
+----
+
 ==== Support for Analyzing the Injection Point
 
 Micronaut's Dependency Injection implementation has been improved such that you can now receive an api:inject.InjectionPoint[] instance to any ann:context.annotation.Factory[] method. This makes it possible to customize how the bean is created based on the annotation metadata at the point at which the bean is injected.
@@ -165,6 +185,12 @@ See the <<clientConfiguration, HTTP Client Configuration>> section for informati
 
 In addition, as of Micronaut 2.0 all operations are by default executed on the `EventLoop` and users can optionally use the new ann:scheduling.annotation.ExecuteOn[] annotation to specify a named executor to execute an operation on if required (for example to offload blocking operations such as interactions with JPA/JDBC to a specific thread pool).
 
+==== Support for `@RequestBean`
+
+It is now possible to bind the properties of a POJO argument to a `@Controller` to request parameters, headers and so on using the ann:http.annotation.RequestBean[] annotation.
+
+Thanks to Github user https://github.com/asodja[asodja] for this contribution.
+
 ==== Micronaut Servlet
 
 Micronaut now includes support for creating https://github.com/micronaut-projects/micronaut-servlet[Servlet applications] and users can use the command line to create an application that targets popular Servlet containers:
@@ -216,6 +242,10 @@ You can now write Serverless functions that target Google Cloud Function using M
 
 You can now write Serverless functions that target Microsoft Azure using Micronaut. See the https://micronaut-projects.github.io/micronaut-azure/1.0.x/guide/[Micronaut Azure] documentation and https://github.com/micronaut-projects/micronaut-azure/tree/master/examples/azure-functions-example[example application] for more information.
 
+==== Improvements to Micronaut AWS
+
+https://micronaut-projects.github.io/micronaut-aws/2.0.x/guide/#whatsNew[Micronaut AWS 2.0.0] includes a number of improvements to support for AWS Lambda and AWS in general including new client modules for AWS SDK 2.0, cold start improvements on Lambda and improvements to the support for Amazon Alexa.
+
 === Module Improvements
 
 Micronaut is more modular than ever, with several components now available in separate modules and upgrades to those modules.
@@ -264,19 +294,29 @@ To use the Reactor HTTP client add:
 
 dependency:io.micronaut.rxjava3:micronaut-reactor-http-client[scope="compile"]
 
+==== New Micronaut NATS module
+
+A new messaging module for https://nats.io[Nats.io] has been included in Micronaut core.
+
+See the documentation for https://micronaut-projects.github.io/micronaut-nats/latest/guide/[Micronaut Nats] for more information.
+
+Thanks to https://github.com/grimmjo[Joachim Grimm] for this contribution.
+
 ==== Module Upgrades
 
 * Micronaut Neo4j - `1.3.0` -> `2.0.0`
 * Micronaut Mongo - `1.3.0` -> `2.0.0`
-* Micronaut SQL - `1.3.0` -> `2.0.0.RC1`
-* Micronaut Cache - `1.2.0` -> `2.0.0.M1`
-* Micronaut AWS - `1.3.9` -> `2.0.0.M2`
-* Micronaut Security - `1.4.0` -> `2.0.0.M2`
+* Micronaut SQL - `1.3.0` -> `2.2.1`
+* Micronaut Cache - `1.2.0` -> `2.0.0.RC1`
+* Micronaut AWS - `1.3.9` -> `2.0.0.RC1`
+* Micronaut Security - `1.4.0` -> `2.0.0.RC1`
+* Micronaut Micrometer - `1.3.1` -> `2.0.0.RC2`
+* Micronaut GCP - `1.1.0` -> `2.0.0.RC1`
 
 ==== Dependency Upgrades
 
-* Hibernate `5.4.10.Final` -> `5.4.12.Final`
-* Groovy `2.5.8` -> `2.5.11`
-* Mongo Reactive Streams `1.13.0` -> `4.0.1`
-* Mongo Java Driver `3.12.0` -> `4.0.1`
+* Hibernate `5.4.10.Final` -> `5.4.16.Final`
+* Groovy `2.5.8` -> `3.0.3`
+* Mongo Reactive Streams `1.13.0` -> `4.0.2`
+* Mongo Java Driver `3.12.0` -> `4.0.2`
 * Jaeger `1.0.0` -> `1.2.0`

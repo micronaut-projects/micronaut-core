@@ -1,0 +1,37 @@
+Support for Google Cloud Function is implemented in the https://micronaut-projects.github.io/micronaut-gcp/2.0.x/guide/#cloudFunction[Micronaut GCP] subproject.
+
+==== Simple Functions with Cloud Function
+
+You can implement Cloud Functions with Micronaut that implement directly the https://github.com/GoogleCloudPlatform/functions-framework-java[Cloud Function Framework API]. See the documentation on https://micronaut-projects.github.io/micronaut-gcp/2.0.x/guide/#simpleFunctions[Simple Functions] for more information.
+
+[TIP]
+.Using the CLI
+====
+To create a Google Cloud Function:
+----
+$ mn create-function-app my-app --features google-cloud-function
+----
+Or with Micronaut Launch
+----
+$ curl https://launch.micronaut.io/create/function/example\?features\=google-cloud-function -o example.zip
+$ unzip example.zip -d example
+----
+====
+
+==== HTTP Functions with Cloud Function
+
+You can deploy regular Micronaut applications that use ann:http.annotation.Controller[] etc. using Micronaut's support for HTTP Functions. See the documentation on https://micronaut-projects.github.io/micronaut-gcp/2.0.x/guide/#httpFunctions[Google Cloud HTTP Functions] for more information.
+
+[TIP]
+.Using the CLI
+====
+To create a Google Cloud HTTP Function:
+----
+$ mn create-app my-app --features google-cloud-function
+----
+Or with Micronaut Launch
+----
+$ curl https://launch.micronaut.io/example.zip\?features\=google-cloud-function -o example.zip
+$ unzip example.zip -d example
+----
+====

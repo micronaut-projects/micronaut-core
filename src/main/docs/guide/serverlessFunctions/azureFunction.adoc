@@ -1,0 +1,37 @@
+Support for Azure Function is implemented in the https://micronaut-projects.github.io/micronaut-azure/1.0.x/guide/index.html#azureFunction[Micronaut Azure] subproject.
+
+==== Simple Functions with Azure Function
+
+You can implement Azure Functions with Micronaut that implement directly the https://docs.microsoft.com/en-us/azure/azure-functions/functions-reference-java?tabs=consumption[Azure Function Java SDK]. See the documentation on https://micronaut-projects.github.io/micronaut-azure/1.0.x/guide/index.html#azureFunction[Azure Functions] for more information.
+
+[TIP]
+.Using the CLI
+====
+To create an Azure Function:
+----
+$ mn create-function-app my-app --features azure-function
+----
+Or with Micronaut Launch
+----
+$ curl https://launch.micronaut.io/create/function/example\?features\=azure-function -o example.zip
+$ unzip example.zip -d example
+----
+====
+
+==== HTTP Functions with Azure Function
+
+You can deploy regular Micronaut applications that use ann:http.annotation.Controller[] etc. using Micronaut's support for Azure HTTP Functions. See the documentation on https://micronaut-projects.github.io/micronaut-azure/1.0.x/guide/index.html#azureFunction[Google Azure HTTP Functions] for more information.
+
+[TIP]
+.Using the CLI
+====
+To create a Azure HTTP Function:
+----
+$ mn create-app my-app --features azure-function
+----
+Or with Micronaut Launch
+----
+$ curl https://launch.micronaut.io/example.zip\?features\=azure-function -o example.zip
+$ unzip example.zip -d example
+----
+====

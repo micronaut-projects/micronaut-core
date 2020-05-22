@@ -10,8 +10,8 @@ dependencies {
         exclude module:'micronaut-http-client'
         exclude module:'micronaut-inject'
     }
-    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.784'
-    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.784'
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.787'
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.787'
     compileOnly group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.688'
 
@@ -23,15 +23,15 @@ dependencies {
     compileOnly group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-secrets', version: '1.15.4'
     compileOnly group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-common', version: '1.15.4'
 
-    testImplementation "org.testcontainers:spock:1.14.1"
+    testImplementation "org.testcontainers:spock:1.14.2"
 
     testImplementation dependencyVersion("micronaut.aws"), {
         exclude module:'micronaut-http-client'
         exclude module:'micronaut-inject'
     }
 
-    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.784'
-    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.783'
+    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.787'
+    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.786'
     testImplementation group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
     testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
     testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'

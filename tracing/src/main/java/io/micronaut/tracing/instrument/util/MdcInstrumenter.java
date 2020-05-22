@@ -20,6 +20,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import javax.inject.Singleton;
@@ -37,35 +39,38 @@ import java.util.Map;
 @Internal
 public final class MdcInstrumenter implements InvocationInstrumenterFactory, ReactiveInvocationInstrumenterFactory {
 
+    private static final Logger LOG = LoggerFactory.getLogger(MdcInstrumenter.class);
+
+
     /**
      * Creates optional invocation instrumenter.
+     *
      * @return An optional that contains the invocation instrumenter
      */
     @Override
     public InvocationInstrumenter newInvocationInstrumenter() {
         Map<String, String> contextMap = MDC.getCopyOfContextMap();
-        if (contextMap != null && !contextMap.isEmpty()) {
-            return new InvocationInstrumenter() {
+        return new InvocationInstrumenter() {
 
-                Map<String, String> oldContextMap;
+            Map<String, String> oldContextMap;
 
-                @Override
-                public void beforeInvocation() {
-                    oldContextMap = MDC.getCopyOfContextMap();
+            @Override
+            public void beforeInvocation() {
+                oldContextMap = MDC.getCopyOfContextMap();
+                if (contextMap != null) {
                     MDC.setContextMap(contextMap);
                 }
+            }
 
-                @Override
-                public void afterInvocation(boolean cleanup) {
-                    if (oldContextMap != null && !oldContextMap.isEmpty()) {
-                        MDC.setContextMap(oldContextMap);
-                    } else {
-                        MDC.clear();
-                    }
+            @Override
+            public void afterInvocation(boolean cleanup) {
+                if (oldContextMap != null && !oldContextMap.isEmpty()) {
+                    MDC.setContextMap(oldContextMap);
+                } else {
+                    MDC.clear();
                 }
-            };
-        }
-        return null;
+            }
+        };
     }
 
     @Override

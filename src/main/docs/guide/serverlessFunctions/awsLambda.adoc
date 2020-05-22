@@ -1,0 +1,37 @@
+Support for AWS Lambda is implemented in the https://micronaut-projects.github.io/micronaut-aws/latest/guide/#whatsNew[Micronaut AWS] subproject.
+
+==== Simple Functions with AWS Lambda
+
+You can implement AWS Request Handlers with Micronaut that implement directly the AWS Lambda SDK API. See the documentation on https://micronaut-projects.github.io/micronaut-aws/latest/guide/#requestHandlers[Micronaut Request Handlers] for more information.
+
+[TIP]
+.Using the CLI
+====
+To create an AWS Lambda Function:
+----
+$ mn create-function-app my-app --features aws-lambda
+----
+Or with Micronaut Launch
+----
+$ curl https://launch.micronaut.io/create/function/example\?features\=aws-lambda -o example.zip
+$ unzip example.zip -d example
+----
+====
+
+==== HTTP Functions with AWS Lambda
+
+You can deploy regular Micronaut applications that use ann:http.annotation.Controller[] etc. using Micronaut's support for AWS API Gateway. See the documentation on https://micronaut-projects.github.io/micronaut-aws/snapshot/guide/#apiProxy[AWS API Gateway Support] for more information.
+
+[TIP]
+.Using the CLI
+====
+To create an AWS API Gateway Proxy application:
+----
+$ mn create-app my-app --features aws-lambda
+----
+Or with Micronaut Launch
+----
+$ curl https://launch.micronaut.io/example.zip\?features\=aws-lambda -o example.zip
+$ unzip example.zip -d example
+----
+====

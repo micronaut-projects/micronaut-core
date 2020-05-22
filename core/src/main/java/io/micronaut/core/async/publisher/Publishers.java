@@ -353,10 +353,10 @@ public class Publishers {
         if (object instanceof CompletableFuture) {
             @SuppressWarnings("unchecked") Publisher<T> futurePublisher = (Publisher<T>) Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
             return ConversionService.SHARED.convert(futurePublisher, publisherType)
-                    .orElseThrow(() -> new IllegalArgumentException("Unsupported Reactive type: " + object.getClass()));
+                    .orElseThrow(() -> unconvertibleError(object, publisherType));
         } else {
             return ConversionService.SHARED.convert(object, publisherType)
-                    .orElseThrow(() -> new IllegalArgumentException("Unsupported Reactive type: " + object.getClass()));
+                    .orElseThrow(() -> unconvertibleError(object, publisherType));
         }
     }
 
@@ -390,6 +390,10 @@ public class Publishers {
         return false;
     }
 
+    private static <T> IllegalArgumentException unconvertibleError(Object object, Class<T> publisherType) {
+        return new IllegalArgumentException("Cannot convert reactive type [" + object.getClass() + "] to type [" + publisherType + "]. Ensure that you have the necessary Reactive module on your classpath. For example for Reactor you should have 'micronaut-reactor'.");
+    }
+    
     /**
      * A publisher for a value.
      *
