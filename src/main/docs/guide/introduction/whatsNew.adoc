@@ -6,6 +6,10 @@ Micronaut {version} includes the following changes:
 
 Micronaut has been updated to support JDK 14.
 
+==== Groovy 3
+
+Micronaut now supports applications written in Groovy 3.
+
 ==== Startup Performance Improvements
 
 Startup time has been further improved in this release with typical startup time for a new application around 20% faster.
