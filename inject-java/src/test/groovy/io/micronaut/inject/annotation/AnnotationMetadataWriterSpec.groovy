@@ -27,6 +27,8 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.ExecutableMethod
 import io.micronaut.retry.annotation.Recoverable
 
 import javax.inject.Qualifier
@@ -40,6 +42,30 @@ import java.lang.annotation.Retention
  * @since 1.0
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
+
+    void "test write annotation metadata defaults"() {
+        given:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.Test', '''\
+package test;
+
+import io.micrometer.core.annotation.Timed;
+
+@javax.inject.Singleton
+class Test {
+    @Timed
+    @io.micronaut.context.annotation.Executable
+    void testMethod() {}
+}
+''')
+        def method = beanDefinition.getRequiredMethod('testMethod')
+        def metadata = method.getAnnotationMetadata()
+        def timedAnn = metadata.getAnnotation(Timed)
+
+        expect:
+        timedAnn != null
+        metadata.getDefaultValue(Timed, "longTask", Boolean.class).isPresent()
+        !timedAnn.getRequiredValue('longTask', Boolean.class)
+    }
 
     void "test javax nullable on field"() {
         given:
