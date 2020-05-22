@@ -18,7 +18,7 @@ package io.micronaut.scheduling.instrument;
 import io.micronaut.core.annotation.Internal;
 
 /**
- * Wrappes {@link Runnable} and invokes {@link InvocationInstrumenter}.
+ * Wraps {@link Runnable} and invokes {@link InvocationInstrumenter}.
  *
  * @author Denis Stepanov
  * @since 1.3
@@ -43,11 +43,8 @@ final class InvocationInstrumenterWrappedRunnable implements Runnable {
      */
     @Override
     public void run() {
-        try {
-            invocationInstrumenter.beforeInvocation();
+        try (Instrumentation ignore = invocationInstrumenter.newInstrumentation().forceCleanup()) {
             runnable.run();
-        } finally {
-            invocationInstrumenter.afterInvocation(true);
         }
     }
 }
