@@ -103,6 +103,17 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
+    protected AnnotatedNode getAnnotationMember(AnnotatedNode originatingElement, CharSequence member) {
+        if (originatingElement instanceof ClassNode) {
+            def methods = ((ClassNode) originatingElement).getMethods(member.toString())
+            if (methods) {
+                return methods.iterator().next()
+            }
+        }
+        return null
+    }
+
+    @Override
     protected RetentionPolicy getRetentionPolicy(@NonNull AnnotatedNode annotation) {
         List<AnnotationNode> annotations = annotation.getAnnotations()
         for(ann in annotations) {
@@ -415,6 +426,10 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             }
             // for some reason this is necessary to produce correct array type in Groovy
             return ConversionService.SHARED.convert(converted, Array.newInstance(arrayType, 0).getClass()).orElse(null)
+        } else if (annotationValue != null) {
+            if (ClassUtils.isJavaLangType(annotationValue.getClass())) {
+                return annotationValue
+            }
         }
         return null
     }

@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
@@ -237,6 +238,20 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return annotationMirror.getElementValues();
     }
 
+    @Nullable
+    @Override
+    protected Element getAnnotationMember(Element originatingElement, CharSequence member) {
+        if (originatingElement instanceof TypeElement) {
+            List<? extends Element> enclosedElements = originatingElement.getEnclosedElements();
+            for (Element enclosedElement : enclosedElements) {
+                if (enclosedElement instanceof ExecutableElement && enclosedElement.getSimpleName().toString().equals(member.toString())) {
+                    return enclosedElement;
+                }
+            }
+        }
+        return null;
+    }
+
     @Override
     protected OptionalValues<?> getAnnotationValues(Element originatingElement, Element member, Class<?> annotationType) {
         List<? extends AnnotationMirror> annotationMirrors = member.getAnnotationMirrors();
@@ -282,6 +297,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             final MetadataAnnotationValueVisitor visitor = new MetadataAnnotationValueVisitor(originatingElement);
             ((javax.lang.model.element.AnnotationValue) annotationValue).accept(visitor, this);
             return visitor.resolvedValue;
+        } else if (memberName != null && annotationValue != null) {
+            if (ClassUtils.isJavaLangType(annotationValue.getClass())) {
+                // only allow basic types
+                return annotationValue;
+            }
         }
         return null;
     }
