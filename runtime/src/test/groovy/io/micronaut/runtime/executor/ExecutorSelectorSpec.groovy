@@ -16,6 +16,7 @@
 package io.micronaut.runtime.executor
 
 import io.micronaut.scheduling.executor.ThreadSelection
+import io.micronaut.core.annotation.Blocking
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
@@ -52,12 +53,13 @@ class ExecutorSelectorSpec extends Specification {
         applicationContext.stop()
 
         where:
-        methodName              | present
-        "someMethod"            | true
-        "someNonBlockingMethod" | false
-        "someReactiveMethod"    | false
-        "someFutureMethod"      | false
-        "someStageMethod"       | false
+        methodName                   | present
+        "someMethod"                 | true
+        "someBlockingReactiveMethod" | true
+        "someNonBlockingMethod"      | false
+        "someReactiveMethod"         | false
+        "someFutureMethod"           | false
+        "someStageMethod"            | false
     }
 
 
@@ -77,6 +79,9 @@ class MyService {
     }
 
     Single someReactiveMethod() {}
+
+    @Blocking
+    Single someBlockingReactiveMethod() {}
 
     CompletableFuture someFutureMethod() {}
 

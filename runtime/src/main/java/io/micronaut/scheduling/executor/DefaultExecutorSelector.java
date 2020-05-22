@@ -17,6 +17,7 @@ package io.micronaut.scheduling.executor;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.annotation.NonBlocking;
 import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.async.publisher.Publishers;
@@ -74,6 +75,8 @@ public class DefaultExecutorSelector implements ExecutorSelector {
         } else if (threadSelection == ThreadSelection.AUTO) {
             if (method.hasStereotype(NonBlocking.class)) {
                 return Optional.empty();
+            } else if (method.hasStereotype(Blocking.class)) {
+                return Optional.of(ioExecutor.get());
             } else {
                 Class returnType = method.getReturnType().getType();
                 if (isNonBlocking(returnType)) {
