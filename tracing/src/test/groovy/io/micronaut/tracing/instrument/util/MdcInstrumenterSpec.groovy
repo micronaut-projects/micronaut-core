@@ -112,6 +112,36 @@ class MdcInstrumenterSpec extends Specification {
         MDC.get(key) == value2
     }
 
+    def "empty context should't clean MDC"() {
+        when:
+        MDC.put(key, value)
+        MDC.remove(key) // Make empty context
+        def mdcBeforeNew = MDC.copyOfContextMap
+        def instrumenterWithEmptyContext = mdcInstrumenter.newInvocationInstrumenter()
+        MDC.put("contextValue", "contextValue")
+        def instrumenterWithContext = mdcInstrumenter.newInvocationInstrumenter()
+        MDC.clear()
+        Runnable runnable = InvocationInstrumenter.instrument({
+            MDC.put("inside1", "inside1")
+            InvocationInstrumenter.instrument({
+                assert MDC.get("contextValue") == "contextValue"
+                assert MDC.get("inside1") == "inside1"
+
+                MDC.put("inside2", "inside2")
+            } as Runnable, instrumenterWithEmptyContext).run()
+            assert MDC.get("contextValue") == "contextValue"
+            assert MDC.get("inside1") == "inside1"
+            assert MDC.get("inside2") == null
+        } as Runnable, instrumenterWithContext)
+        runnable.run()
+
+        then:
+        mdcBeforeNew.isEmpty()
+        MDC.get(key) == null
+        MDC.get("XXX") == null
+        MDC.get("aaa") == null
+    }
+
     void "test MDC instrumenter with Executor"() {
 
         given:
