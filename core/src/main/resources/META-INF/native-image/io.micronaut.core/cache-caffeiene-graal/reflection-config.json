@@ -1,0 +1,10 @@
+[
+  {
+    "name": "io.micronaut.caffeine.cache.SSAW",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.micronaut.caffeine.cache.PSAW",
+    "allDeclaredConstructors": true
+  }
+]
