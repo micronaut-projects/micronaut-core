@@ -20,8 +20,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import javax.inject.Singleton;
@@ -39,9 +37,6 @@ import java.util.Map;
 @Internal
 public final class MdcInstrumenter implements InvocationInstrumenterFactory, ReactiveInvocationInstrumenterFactory {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MdcInstrumenter.class);
-
-
     /**
      * Creates optional invocation instrumenter.
      *
@@ -57,10 +52,7 @@ public final class MdcInstrumenter implements InvocationInstrumenterFactory, Rea
             @Override
             public void beforeInvocation() {
                 oldContextMap = MDC.getCopyOfContextMap();
-                if (oldContextMap == null || oldContextMap.isEmpty()) {
-                    LOG.debug("{} pushes data to MDC: {}", this, contextMap);
-                }
-                if (contextMap != null) {
+                if (contextMap != null && !contextMap.isEmpty()) {
                     MDC.setContextMap(contextMap);
                 }
             }
@@ -70,7 +62,6 @@ public final class MdcInstrumenter implements InvocationInstrumenterFactory, Rea
                 if (oldContextMap != null && !oldContextMap.isEmpty()) {
                     MDC.setContextMap(oldContextMap);
                 } else {
-                    LOG.debug("{} clears MDC", this);
                     MDC.clear();
                 }
             }
