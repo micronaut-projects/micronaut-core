@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
@@ -30,8 +31,12 @@ import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.netty.buffer.ByteBufHolder;
 import org.reactivestreams.Subscription;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Future;
 
 /**
  * A {@link NonBlockingBodyArgumentBinder} that handles {@link CompletableFuture} instances.
@@ -54,6 +59,17 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
     public CompletableFutureBodyBinder(HttpContentProcessorResolver httpContentProcessorResolver, ConversionService conversionService) {
         super(conversionService);
         this.httpContentProcessorResolver = httpContentProcessorResolver;
+    }
+
+    @Override
+    public boolean supportsSuperTypes() {
+        return false;
+    }
+
+    @NonNull
+    @Override
+    public List<Class<?>> superTypes() {
+        return Arrays.asList(CompletionStage.class, Future.class);
     }
 
     @Override

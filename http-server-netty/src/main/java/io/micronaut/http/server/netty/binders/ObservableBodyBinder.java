@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -25,9 +26,12 @@ import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.reactivex.Observable;
+import io.reactivex.ObservableSource;
 import org.reactivestreams.Publisher;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -51,6 +55,17 @@ public class ObservableBodyBinder extends DefaultBodyAnnotationBinder<Observable
                                 HttpContentProcessorResolver httpContentProcessorResolver) {
         super(conversionService);
         this.publisherBodyBinder = new PublisherBodyBinder(conversionService, httpContentProcessorResolver);
+    }
+
+    @Override
+    public boolean supportsSuperTypes() {
+        return false;
+    }
+
+    @NonNull
+    @Override
+    public List<Class<?>> superTypes() {
+        return Collections.singletonList(ObservableSource.class);
     }
 
     @Override

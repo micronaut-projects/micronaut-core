@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.*;
+import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.event.*;
 import io.micronaut.context.exceptions.*;
 import io.micronaut.context.processor.AnnotationProcessor;
@@ -37,11 +38,12 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.GenericTypeUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.*;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
+import io.micronaut.core.value.PropertyResolver;
+import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -120,7 +122,18 @@ public class DefaultBeanContext implements BeanContext {
     private final Map<Class, Collection<BeanDefinitionReference>> beanIndex = new ConcurrentHashMap<>(12);
 
     private final ClassLoader classLoader;
-    private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
+    private final Set<Class> thisInterfaces = CollectionUtils.setOf(
+            BeanDefinitionRegistry.class,
+            BeanContext.class,
+            AnnotationMetadataResolver.class,
+            BeanLocator.class,
+            ApplicationEventPublisher.class,
+            ExecutionHandleLocator.class,
+            ApplicationContext.class,
+            PropertyResolver.class,
+            ValueResolver.class,
+            PropertyPlaceholderResolver.class
+    );
     private final Set<Class> indexedTypes = CollectionUtils.setOf(
             ResourceLoader.class,
             TypeConverter.class,

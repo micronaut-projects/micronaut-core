@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -25,10 +26,13 @@ import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.reactivex.Maybe;
+import io.reactivex.MaybeSource;
 import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -52,6 +56,12 @@ public class MaybeBodyBinder extends DefaultBodyAnnotationBinder<Maybe> implemen
                            HttpContentProcessorResolver httpContentProcessorResolver) {
         super(conversionService);
         this.publisherBodyBinder = new PublisherBodyBinder(conversionService, httpContentProcessorResolver);
+    }
+
+    @NonNull
+    @Override
+    public List<Class<?>> superTypes() {
+        return Collections.singletonList(MaybeSource.class);
     }
 
     @Override

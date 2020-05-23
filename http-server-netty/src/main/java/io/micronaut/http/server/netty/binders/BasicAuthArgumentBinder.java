@@ -36,6 +36,11 @@ import java.util.Optional;
 public class BasicAuthArgumentBinder implements TypedRequestArgumentBinder<BasicAuth> {
 
     @Override
+    public boolean supportsSuperTypes() {
+        return false;
+    }
+
+    @Override
     public Argument<BasicAuth> argumentType() {
         return Argument.of(BasicAuth.class);
     }
