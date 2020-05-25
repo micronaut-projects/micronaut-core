@@ -17,6 +17,7 @@ package io.micronaut.discovery.cloud.aws;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.micronaut.context.env.ComputePlatform;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.discovery.cloud.AbstractComputeInstanceMetadata;
 
 /**
@@ -26,6 +27,7 @@ import io.micronaut.discovery.cloud.AbstractComputeInstanceMetadata;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Introspected
 public class AmazonEC2InstanceMetadata extends AbstractComputeInstanceMetadata {
 
     private final ComputePlatform computePlatform = ComputePlatform.AMAZON_EC2;
