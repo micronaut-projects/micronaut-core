@@ -39,33 +39,33 @@ public final class MdcInstrumenter implements InvocationInstrumenterFactory, Rea
 
     /**
      * Creates optional invocation instrumenter.
+     *
      * @return An optional that contains the invocation instrumenter
      */
     @Override
     public InvocationInstrumenter newInvocationInstrumenter() {
         Map<String, String> contextMap = MDC.getCopyOfContextMap();
-        if (contextMap != null && !contextMap.isEmpty()) {
-            return new InvocationInstrumenter() {
+        return new InvocationInstrumenter() {
 
-                Map<String, String> oldContextMap;
+            Map<String, String> oldContextMap;
 
-                @Override
-                public void beforeInvocation() {
-                    oldContextMap = MDC.getCopyOfContextMap();
+            @Override
+            public void beforeInvocation() {
+                oldContextMap = MDC.getCopyOfContextMap();
+                if (contextMap != null && !contextMap.isEmpty()) {
                     MDC.setContextMap(contextMap);
                 }
+            }
 
-                @Override
-                public void afterInvocation(boolean cleanup) {
-                    if (oldContextMap != null && !oldContextMap.isEmpty()) {
-                        MDC.setContextMap(oldContextMap);
-                    } else {
-                        MDC.clear();
-                    }
+            @Override
+            public void afterInvocation(boolean cleanup) {
+                if (oldContextMap != null && !oldContextMap.isEmpty()) {
+                    MDC.setContextMap(oldContextMap);
+                } else {
+                    MDC.clear();
                 }
-            };
-        }
-        return null;
+            }
+        };
     }
 
     @Override
