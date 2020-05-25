@@ -15,7 +15,6 @@ dependencies {
     testImplementation project(":http-netty")
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
-    testImplementation project(":http-client")
     testImplementation dependencyVersion("netty")
 }
 

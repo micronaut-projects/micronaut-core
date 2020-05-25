@@ -53,7 +53,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
  * <li><b>%{<format>}t</b> - Date and time. If the argument is ommitted the Common Log Format format is used ("'['dd/MMM/yyyy:HH:mm:ss Z']'").
  * If the format starts with begin: (default) the time is taken at the beginning of the request processing. If it starts with end: it is the time when the log entry gets written, close to the end of the request processing.
  * The format should follow the DateTimeFormatter syntax.</li>
- * <li><b>%{<property>}u</b> - Remote user that was authenticated. Returns the session id if the argument is omitted or the specified property</li>
+ * <li><b>%u</b> - Remote user that was authenticated. Not implemented. Prints '-'.</li>
  * <li><b>%U</b> - Requested URI</li>
  * <li><b>%v</b> - Local server name</li>
  * <li><b>%D</b> - Time taken to process the request, in millis</li>
@@ -79,11 +79,11 @@ public class AccessLogFormatParser {
      */
     public static final String COMMON_LOG_FORMAT = "%h %l %u %t \"%r\" %s %b";
 
-    private List<IndexedLogElement> onRequestElements = new ArrayList<>();
-    private List<IndexedLogElement> onResponseHeadersElements = new ArrayList<>();
-    private List<IndexedLogElement> onResponseWriteElements = new ArrayList<>();
-    private List<IndexedLogElement> onLastResponseWriteElements = new ArrayList<>();
-    private List<IndexedLogElement> constantElements = new ArrayList<>();
+    private final List<IndexedLogElement> onRequestElements = new ArrayList<>();
+    private final List<IndexedLogElement> onResponseHeadersElements = new ArrayList<>();
+    private final List<IndexedLogElement> onResponseWriteElements = new ArrayList<>();
+    private final List<IndexedLogElement> onLastResponseWriteElements = new ArrayList<>();
+    private final List<IndexedLogElement> constantElements = new ArrayList<>();
     private String[] elements;
 
     /**
@@ -254,8 +254,8 @@ public class AccessLogFormatParser {
             return RemoteHostElement.INSTANCE;
         case RequestProtocolElement.REQUEST_PROTOCOL:
             return RequestProtocolElement.INSTANCE;
-        case SessionElement.SESSION:
-            return new SessionElement(param);
+        case "u":
+            return ConstantElement.UNKNOWN;
         case "l":
             return ConstantElement.UNKNOWN;
         case RequestMethodElement.REQUEST_METHOD:

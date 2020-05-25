@@ -24,19 +24,19 @@ class AccessLogFormatParserSpec extends Specification {
         AccessLogFormatParser parser = new AccessLogFormatParser(null);
 
         expect:
-        parser.toString() == "%h - %u %t \"%r\" %s %b"
+        parser.toString() == "%h - - %t \"%r\" %s %b"
 
         when:
         parser = new AccessLogFormatParser(AccessLogFormatParser.COMMON_LOG_FORMAT)
 
         then:
-        parser.toString() == "%h - %u %t \"%r\" %s %b"
+        parser.toString() == "%h - - %t \"%r\" %s %b"
 
         when:
         parser = new AccessLogFormatParser(AccessLogFormatParser.COMBINED_LOG_FORMAT)
 
         then:
-        parser.toString() == "%h - %u %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\""
+        parser.toString() == "%h - - %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\""
     }
 
     def "test access log format parser for custom formats"() {
@@ -44,19 +44,19 @@ class AccessLogFormatParserSpec extends Specification {
         AccessLogFormatParser parser = new AccessLogFormatParser("%h %l %u %t \"%r\" %s %b %% some string");
 
         expect:
-        parser.toString() == "%h - %u %t \"%r\" %s %b %% some string"
+        parser.toString() == "%h - - %t \"%r\" %s %b %% some string"
 
         when:
         parser = new AccessLogFormatParser("%h %l %u %{'['dd.MM.yyyy']'}t \"%r\" %s %b")
 
         then:
-        parser.toString() == "%h - %u %{'['dd.MM.yyyy']'}t \"%r\" %s %b"
+        parser.toString() == "%h - - %{'['dd.MM.yyyy']'}t \"%r\" %s %b"
 
         when:
         parser = new AccessLogFormatParser("%h %l %u %t \"%r\" %s %b \"%{cookie1}C\" \"%{cookie2}c\"")
 
         then:
-        parser.toString() == "%h - %u %t \"%r\" %s %b \"%{cookie1}C\" \"%{cookie2}c\""
+        parser.toString() == "%h - - %t \"%r\" %s %b \"%{cookie1}C\" \"%{cookie2}c\""
     }
 
     def "test access log format parser for invalid formats"() {

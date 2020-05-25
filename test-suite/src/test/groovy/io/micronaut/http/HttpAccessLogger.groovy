@@ -130,36 +130,6 @@ class HttpAccessLoggerSpec extends Specification {
 
     }
 
-     void "test simple session - access logger"() {
-        when:
-        appender.events.clear()
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/sessiontest/simple"), String
-        ))
-        HttpResponse<String> response = flowable.blockingFirst()
-
-        then:
-        response.getBody().get() == "not in session"
-        response.header(HttpHeaders.AUTHORIZATION_INFO)
-        // host - - [25/May/2020:15:14:00 -0400] "GET /get/simple HTTP/1.1" 200 7
-        // host - f9d1c6b2-2980-4e6a-826c-bdfc6a21417c [25/May/2020:15:14:00 -0400] "GET /sessiontest/simple HTTP/1.1" 200 14
-        !appender.headLog(10).contains(" - - [")
-
-        when:
-        def sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO)
-        flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/sessiontest/simple")
-                        .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
-                , String
-        ))
-        response = flowable.blockingFirst()
-
-        then:
-        response.getBody().get() == "value in session"
-        response.header(HttpHeaders.AUTHORIZATION_INFO)
-        !appender.headLog(10).contains(" - - [")
-    }
-
     @Controller("/get")
     static class GetController {
 
@@ -171,19 +141,6 @@ class HttpAccessLoggerSpec extends Specification {
         @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
         HttpResponse error() {
             return HttpResponse.serverError().body("Server error")
-        }
-
-    }
-
-    @Controller('/sessiontest')
-    static class SessionController {
-
-        @Get("/simple")
-        String simple(Session session) {
-            return session.get("myValue").orElseGet({
-                session.put("myValue", "value in session")
-                "not in session"
-            })
         }
 
     }

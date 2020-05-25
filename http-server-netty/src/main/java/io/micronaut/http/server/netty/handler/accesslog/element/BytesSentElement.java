@@ -24,7 +24,7 @@ import java.util.Set;
  * @author croudet
  * @since 2.0
  */
-class BytesSentElement implements LogElement {
+final class BytesSentElement implements LogElement {
     /**
      * The bytes sent marker (set dask when 0.)
      */

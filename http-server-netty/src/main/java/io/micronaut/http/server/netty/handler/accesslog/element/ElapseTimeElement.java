@@ -28,7 +28,7 @@ import io.netty.handler.codec.http.HttpHeaders;
  * @author croudet
  * @since 2.0
  */
-class ElapseTimeElement implements LogElement {
+final class ElapseTimeElement implements LogElement {
     /**
      * The elapse time marker (seconds.)
      */

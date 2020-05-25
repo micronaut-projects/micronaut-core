@@ -30,7 +30,7 @@ import io.netty.handler.codec.http.HttpHeaders;
  * @author croudet
  * @since 2.0
  */
-class DateTimeElement implements LogElement {
+final class DateTimeElement implements LogElement {
 
     /**
      * The date/time marker.

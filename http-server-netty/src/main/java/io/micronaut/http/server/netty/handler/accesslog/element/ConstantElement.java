@@ -27,7 +27,7 @@ import io.netty.handler.codec.http.HttpHeaders;
  * @author croudet
  * @since 2.0
  */
-class ConstantElement implements LogElement {
+final class ConstantElement implements LogElement {
 
     /**
      * The unknown value: '-'

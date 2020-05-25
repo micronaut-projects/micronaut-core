@@ -26,7 +26,7 @@ import io.netty.handler.codec.http.HttpHeaders;
  * @author croudet
  * @since 2.0
  */
-class HeaderElement extends AbstractHttpMessageLogElement {
+final class HeaderElement extends AbstractHttpMessageLogElement {
     /**
      * The request header marker.
      */
