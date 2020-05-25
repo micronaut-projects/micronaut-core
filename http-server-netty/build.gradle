@@ -5,6 +5,7 @@ dependencies {
     api project(":http-server")
     api project(":core")
     api project(":http-netty")
+    api project(":session")
     api dependencyVersion("netty")
 
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"

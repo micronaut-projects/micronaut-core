@@ -114,6 +114,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int compressionLevel = DEFAULT_COMPRESSIONLEVEL;
     private boolean useNativeTransport = DEFAULT_USE_NATIVE_TRANSPORT;
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
+    private AccessLogger accessLogger;
 
     /**
      * Default empty constructor.
@@ -139,6 +140,22 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             List<ChannelPipelineListener> pipelineCustomizers) {
         super(applicationConfiguration);
         this.pipelineCustomizers = pipelineCustomizers;
+    }
+
+    /**
+     * Returns the AccessLogger configuration.
+     * @return The AccessLogger configuration.
+     */
+    public AccessLogger getAccessLogger() {
+        return accessLogger;
+    }
+
+    /**
+     * Sets the AccessLogger configuration.
+     * @param accessLogger The configuration .
+     */
+    public void setAccessLogger(AccessLogger accessLogger) {
+        this.accessLogger = accessLogger;
     }
 
     /**
@@ -400,6 +417,65 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setCompressionLevel(@ReadableBytes int compressionLevel) {
         this.compressionLevel = compressionLevel;
+    }
+
+    /**
+     * Access logger configuration.
+     */
+    @ConfigurationProperties("access-logger")
+    public static class AccessLogger {
+        private boolean enabled;
+        private String loggerName;
+        private String logFormat;
+
+        /**
+         * Returns whether the access logger is enabled.
+         * @return Whether the access logger is enabled.
+         */
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * Enables or Disables the access logger.
+         * @param enabled The flag.
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        /**
+         * The logger name to use. Access logs will be logged at info level.
+         * @return The logger name.
+         */
+        public String getLoggerName() {
+            return loggerName;
+        }
+
+        /**
+         * Sets the logger name to use. If not specified 'HTTP_ACCESS_LOGGER' will be used.
+         * @param loggerName A logger name,
+         */
+        public void setLoggerName(String loggerName) {
+            this.loggerName = loggerName;
+        }
+
+        /**
+         * Returns the log format to use.
+         * @return The log format.
+         */
+        public String getLogFormat() {
+            return logFormat;
+        }
+
+        /**
+         * Sets the log format to use. When not specified, the Common Log Format (CLF) will be used.
+         * @param logFormat The log format.
+         */
+        public void setLogFormat(String logFormat) {
+            this.logFormat = logFormat;
+        }
+
     }
 
     /**
