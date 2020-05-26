@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -32,10 +31,10 @@ import io.netty.handler.codec.http.HttpHeaders;
  * @since 2.0
  */
 public class AccessLog {
-    private List<IndexedLogElement> onRequestHeadersElements = new ArrayList<>();
-    private List<IndexedLogElement> onResponseHeadersElements = new ArrayList<>();
-    private List<IndexedLogElement> onResponseWriteElements = new ArrayList<>();
-    private List<IndexedLogElement> onLastResponseWriteElements = new ArrayList<>();
+    private final List<IndexedLogElement> onRequestHeadersElements;
+    private final List<IndexedLogElement> onResponseHeadersElements;
+    private final List<IndexedLogElement> onResponseWriteElements;
+    private final List<IndexedLogElement> onLastResponseWriteElements;
     private String[] elements;
 
     /**
