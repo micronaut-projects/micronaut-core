@@ -35,7 +35,7 @@ public class AccessLog {
     private final List<IndexedLogElement> onResponseHeadersElements;
     private final List<IndexedLogElement> onResponseWriteElements;
     private final List<IndexedLogElement> onLastResponseWriteElements;
-    private String[] elements;
+    private final String[] elements;
 
     /**
      * Creates an AccessLog.
