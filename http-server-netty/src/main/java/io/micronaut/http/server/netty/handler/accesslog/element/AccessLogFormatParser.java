@@ -149,18 +149,16 @@ public class AccessLogFormatParser {
         }
         List<LogElement> logElements = tokenize(spec);
         elements = new String[logElements.size()];
-        Map<LogElement, IndexedLogElement> map = new IdentityHashMap<>();
         for (int i = 0; i < elements.length; ++i) {
             LogElement element = logElements.get(i);
+            IndexedLogElement indexedLogElement = new IndexedLogElement(element, i);
             if (element.events().isEmpty()) {
                 // constants
-                constantElements.add(new IndexedLogElement(element, i));
-                // fill log
+                constantElements.add(indexedLogElement);
+                // pre-fill log values with constant
                 elements[i] = element.onRequestHeaders(null, null, null, null, null);
                 continue;
             }
-            final int index = i;
-            IndexedLogElement indexedLogElement = map.computeIfAbsent(element, key -> new IndexedLogElement(key, index));
             if (element.events().contains(LogElement.Event.ON_LAST_RESPONSE_WRITE)) {
                 onLastResponseWriteElements.add(indexedLogElement);
             }
@@ -337,5 +335,26 @@ public class AccessLogFormatParser {
         public String toString() {
             return delegate.toString();
         }
+
+        @Override
+        public int hashCode() {
+            return index;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            IndexedLogElement other = (IndexedLogElement) obj;
+            return index == other.index;
+        }
+
     }
 }

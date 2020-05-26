@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -39,7 +40,7 @@ public final class ConstantElement implements LogElement {
      */
     public static final ConstantElement UNKNOWN = new ConstantElement(UNKNOWN_VALUE);
 
-    private static final Set<Event> EVENTS = EnumSet.noneOf(Event.class);
+    private static final Set<Event> EVENTS = Collections.unmodifiableSet(EnumSet.noneOf(Event.class));
 
     private final String value;
 

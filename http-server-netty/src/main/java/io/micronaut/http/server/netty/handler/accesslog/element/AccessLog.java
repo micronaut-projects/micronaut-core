@@ -118,11 +118,13 @@ public class AccessLog {
      * @param accessLogger A logger.
      */
     public void log(Logger accessLogger) {
-        final StringBuilder b = new StringBuilder(elements.length * 5);
-        for (int i = 0; i < elements.length; ++i) {
-            b.append(elements[i] == null ? ConstantElement.UNKNOWN_VALUE : elements[i]);
+        if (accessLogger.isInfoEnabled()) {
+            final StringBuilder b = new StringBuilder(elements.length * 5);
+            for (int i = 0; i < elements.length; ++i) {
+                b.append(elements[i] == null ? ConstantElement.UNKNOWN_VALUE : elements[i]);
+            }
+            accessLogger.info(b.toString());
         }
-        accessLogger.info(b.toString());
     }
 
     private void resetIndexedLogElement(IndexedLogElement elt) {

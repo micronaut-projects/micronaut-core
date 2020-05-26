@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -34,7 +35,7 @@ final class BytesSentElement implements LogElement {
      */
     public static final String BYTES_SENT = "B";
 
-    private static final Set<Event> EVENTS = EnumSet.of(Event.ON_RESPONSE_WRITE, Event.ON_LAST_RESPONSE_WRITE);
+    private static final Set<Event> EVENTS = Collections.unmodifiableSet(EnumSet.of(Event.ON_RESPONSE_WRITE, Event.ON_LAST_RESPONSE_WRITE));
 
     private final boolean dashIfZero;
     private long bytesSent;

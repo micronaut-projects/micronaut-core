@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -38,7 +39,7 @@ final class ElapseTimeElement implements LogElement {
      */
     public static final String ELAPSE_TIME_MILLIS = "D";
 
-    private static final Set<Event> EVENTS = EnumSet.of(Event.ON_REQUEST_HEADERS, Event.ON_LAST_RESPONSE_WRITE);
+    private static final Set<Event> EVENTS = Collections.unmodifiableSet(EnumSet.of(Event.ON_REQUEST_HEADERS, Event.ON_LAST_RESPONSE_WRITE));
 
     private final boolean inSeconds;
     private long start;

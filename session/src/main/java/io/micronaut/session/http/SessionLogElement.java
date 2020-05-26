@@ -18,7 +18,6 @@ package io.micronaut.session.http;
 import io.micronaut.http.server.netty.handler.accesslog.element.ConstantElement;
 import io.micronaut.http.server.netty.handler.accesslog.element.LogElement;
 
-import java.util.Optional;
 import java.util.Set;
 
 import io.micronaut.http.server.netty.NettyHttpRequest;
@@ -67,12 +66,11 @@ public class SessionLogElement implements LogElement {
         if (request == null) {
             return ConstantElement.UNKNOWN_VALUE;
         }
-        Optional<Session> session = SessionForRequest.find(request);
-        if (session.isPresent()) {
-            return property == null ? session.get().getId() : session.get().get(property).map(Object::toString).orElse(ConstantElement.UNKNOWN_VALUE);
-        } else {
-            return ConstantElement.UNKNOWN_VALUE;
-        }
+        return SessionForRequest.find(request).map(this::value).orElse(ConstantElement.UNKNOWN_VALUE);
+    }
+
+    private String value(Session session) {
+        return property == null ? session.getId() : session.get(property).map(Object::toString).orElse(ConstantElement.UNKNOWN_VALUE);
     }
 
     @Override

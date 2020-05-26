@@ -37,7 +37,7 @@ abstract class AbstractHttpMessageLogElement implements LogElement {
      */
     protected abstract String value(HttpHeaders headers);
 
-    private String wrapValue(String value) {
+    private static String wrapValue(String value) {
         // Does the value contain a " ? If so must encode it
         if (value == null || ConstantElement.UNKNOWN_VALUE.equals(value) || value.isEmpty()) {
             return ConstantElement.UNKNOWN_VALUE;
