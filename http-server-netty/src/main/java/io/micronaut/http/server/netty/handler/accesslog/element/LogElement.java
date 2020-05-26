@@ -28,15 +28,15 @@ import io.netty.handler.codec.http.HttpHeaders;
  * @author croudet
  * @since 2.0
  */
-interface LogElement {
+public interface LogElement {
     /**
      * Events.
      */
     enum Event {
         ON_REQUEST_HEADERS, ON_RESPONSE_HEADERS, ON_RESPONSE_WRITE, ON_LAST_RESPONSE_WRITE;
 
-        static final Set<Event> REQUEST_HEADERS_EVENTS = EnumSet.of(Event.ON_REQUEST_HEADERS);
-        static final Set<Event> RESPONSE_HEADERS_EVENTS = EnumSet.of(Event.ON_RESPONSE_HEADERS);
+        public static final Set<Event> REQUEST_HEADERS_EVENTS = EnumSet.of(Event.ON_REQUEST_HEADERS);
+        public static final Set<Event> RESPONSE_HEADERS_EVENTS = EnumSet.of(Event.ON_RESPONSE_HEADERS);
     }
 
     /**

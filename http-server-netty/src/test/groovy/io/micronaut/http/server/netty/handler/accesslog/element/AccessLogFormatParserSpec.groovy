@@ -64,13 +64,13 @@ class AccessLogFormatParserSpec extends Specification {
         AccessLogFormatParser parser = new AccessLogFormatParser("%h %l %u %t \"%r\" % %b");
 
         then:
-        IllegalArgumentException exception = thrown()
+        parser.toString() == "%h - - %t \"%r\" -%b"
 
         when:
         parser = new AccessLogFormatParser("%h %l %u %t \"%r\" %z %b")
 
         then:
-        exception = thrown()
+        parser.toString() == "%h - - %t \"%r\" - %b"
 
     }
 

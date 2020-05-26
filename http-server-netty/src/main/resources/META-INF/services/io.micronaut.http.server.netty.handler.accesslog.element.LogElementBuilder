@@ -1,0 +1,15 @@
+io.micronaut.http.server.netty.handler.accesslog.element.BytesSentElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.CookieElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.DateTimeElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.ElapseTimeElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.HeaderElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.LocalHostElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.LocalIpElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.LocalPortElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.RemoteHostElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.RemoteIpElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.RequestLineElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.RequestMethodElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.RequestProtocolElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.RequestUriElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.ResponseCodeElementBuilder

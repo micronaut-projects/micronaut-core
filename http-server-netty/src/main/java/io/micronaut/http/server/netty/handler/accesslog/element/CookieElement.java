@@ -42,17 +42,13 @@ final class CookieElement extends AbstractHttpMessageLogElement {
     /**
      * Creates a CookieLogElement.
      *
-     * @param headerName The header name, either COOKIE or SET_COOKIE. Default to COOKIE.
+     * @param forRequest true for request cookie, false for response cookie.
      * @param cookieName The cookie name.
      */
-    CookieElement(final String headerName, final String cookieName) {
-        if (HttpHeaderNames.COOKIE.toString().equals(headerName) || HttpHeaderNames.SET_COOKIE.toString().equals(headerName)) {
-            this.headerName = headerName;
-        } else {
-            this.headerName = HttpHeaderNames.COOKIE.toString();
-        }
+    CookieElement(boolean forRequest, final String cookieName) {
         this.cookieName = cookieName;
-        this.events = HttpHeaderNames.COOKIE.toString().equals(this.headerName) ? Event.REQUEST_HEADERS_EVENTS : Event.RESPONSE_HEADERS_EVENTS;
+        this.headerName = forRequest ? HttpHeaderNames.COOKIE.toString() : HttpHeaderNames.SET_COOKIE.toString();
+        this.events = forRequest ? Event.REQUEST_HEADERS_EVENTS : Event.RESPONSE_HEADERS_EVENTS;
     }
 
     @Override

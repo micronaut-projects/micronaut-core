@@ -24,9 +24,13 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import io.micronaut.core.io.service.ServiceDefinition;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http.HttpHeaderNames;
 
 /**
  * The access log format parser.
@@ -79,12 +83,27 @@ public class AccessLogFormatParser {
      */
     public static final String COMMON_LOG_FORMAT = "%h %l %u %t \"%r\" %s %b";
 
+    private static final List<LogElementBuilder> LOG_ELEMENT_BUILDERS;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AccessLogFormatParser.class);
+
     private final List<IndexedLogElement> onRequestElements = new ArrayList<>();
     private final List<IndexedLogElement> onResponseHeadersElements = new ArrayList<>();
     private final List<IndexedLogElement> onResponseWriteElements = new ArrayList<>();
     private final List<IndexedLogElement> onLastResponseWriteElements = new ArrayList<>();
     private final List<IndexedLogElement> constantElements = new ArrayList<>();
     private String[] elements;
+
+    static {
+        SoftServiceLoader<LogElementBuilder> builders = SoftServiceLoader.load(LogElementBuilder.class, LogElementBuilder.class.getClassLoader());
+        LOG_ELEMENT_BUILDERS = new ArrayList<>();
+        for (ServiceDefinition<LogElementBuilder> definition : builders) {
+            if (definition.isPresent()) {
+                LOG_ELEMENT_BUILDERS.add(definition.load());
+            }
+        }
+        trimToSize(LOG_ELEMENT_BUILDERS);
+    }
 
     /**
      * Creates an AccessLogFormatParser.
@@ -162,8 +181,8 @@ public class AccessLogFormatParser {
         trimToSize(constantElements);
     }
 
-    private static void trimToSize(List<IndexedLogElement> l) {
-        ((ArrayList<IndexedLogElement>) l).trimToSize();
+    private static <T> void trimToSize(List<T> l) {
+        ((ArrayList<T>) l).trimToSize();
     }
 
     private List<LogElement> tokenize(String spec) {
@@ -176,6 +195,7 @@ public class AccessLogFormatParser {
             state = nextState(logElements, state, token, c);
         }
         if (state != 0 || logElements.isEmpty()) {
+            LOGGER.warn("Invalid access log format: {}", spec);
             throw new IllegalArgumentException("Invalid access log format: " + spec);
         }
         checkConstantElement(logElements, token);
@@ -236,53 +256,15 @@ public class AccessLogFormatParser {
         }
     }
 
-    private static LogElement fromToken(String pattern, String param) {
-        switch (pattern) {
-        case RemoteIpElement.REMOTE_IP:
-            return RemoteIpElement.INSTANCE;
-        case LocalIpElement.LOCAL_IP:
-            return LocalIpElement.INSTANCE;
-        case BytesSentElement.BYTES_SENT_DASH:
-            return new BytesSentElement(true);
-        case BytesSentElement.BYTES_SENT:
-            return new BytesSentElement(false);
-        case ElapseTimeElement.ELAPSE_TIME_MILLIS:
-            return new ElapseTimeElement(false);
-        case ElapseTimeElement.ELAPSE_TIME_SECONDS:
-            return new ElapseTimeElement(true);
-        case RemoteHostElement.REMOTE_HOST:
-            return RemoteHostElement.INSTANCE;
-        case RequestProtocolElement.REQUEST_PROTOCOL:
-            return RequestProtocolElement.INSTANCE;
-        case "u":
-            return ConstantElement.UNKNOWN;
-        case "l":
-            return ConstantElement.UNKNOWN;
-        case RequestMethodElement.REQUEST_METHOD:
-            return RequestMethodElement.INSTANCE;
-        case LocalPortElement.LOCAL_PORT:
-            return LocalPortElement.INSTANCE;
-        case RequestLineElement.REQUEST_LINE:
-            return RequestLineElement.INSTANCE;
-        case ResponseCodeElement.RESPONSE_CODE:
-            return ResponseCodeElement.INSTANCE;
-        case DateTimeElement.DATE_TIME:
-            return new DateTimeElement(param);
-        case LocalHostElement.LOCAL_HOST:
-            return LocalHostElement.INSTANCE;
-        case RequestUriElement.REQUEST_URI:
-            return RequestUriElement.INSTANCE;
-        case HeaderElement.REQUEST_HEADER:
-            return param == null ? HeadersElement.forRequest() : new HeaderElement(true, param);
-        case HeaderElement.RESPONSE_HEADER:
-            return param == null ? HeadersElement.forResponse() : new HeaderElement(false, param);
-        case CookieElement.REQUEST_COOKIE:
-            return param == null ? CookiesElement.forRequest() : new CookieElement(HttpHeaderNames.COOKIE.toString(), param);
-        case CookieElement.RESPONSE_COOKIE:
-            return param == null ? CookiesElement.forResponse() : new CookieElement(HttpHeaderNames.SET_COOKIE.toString(), param);
-        default:
-            throw new IllegalArgumentException("Invalid pattern: %" + pattern);
+    private LogElement fromToken(String pattern, String param) {
+        for (LogElementBuilder builder: LOG_ELEMENT_BUILDERS) {
+            LogElement logElement = builder.build(pattern, param);
+            if (logElement != null) {
+                return logElement;
+            }
         }
+        LOGGER.warn("Unknown access log marker: %{}", pattern);
+        return ConstantElement.UNKNOWN;
     }
 
     /**
