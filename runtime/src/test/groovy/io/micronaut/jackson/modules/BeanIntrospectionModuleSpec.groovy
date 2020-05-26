@@ -180,7 +180,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         error.message == 'Page Not Found'
         error.links.size() == 1
         error.links.get("self").isPresent()
-        error.links.get("self").get().first().href == URI.create('/')
+        error.links.get("self").get().first().href == '/'
 
         when:
         def sw = new StringWriter()

@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.hateoas;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 
 import java.net.URI;
@@ -30,10 +32,10 @@ import java.util.Optional;
 @Introspected
 public class DefaultLink implements Link, Link.Builder {
 
-    final URI href;
+    final String href;
     private boolean templated;
-    private URI profile;
-    private URI deprecation;
+    private String profile;
+    private String deprecation;
     private String title;
     private String hreflang;
     private MediaType type;
@@ -42,12 +44,15 @@ public class DefaultLink implements Link, Link.Builder {
     /**
      * @param uri The URI
      */
-    protected DefaultLink(URI uri) {
+    protected DefaultLink(String uri) {
+        if (StringUtils.isEmpty(uri)) {
+            throw new IllegalArgumentException("URI cannot be empty");
+        }
         this.href = uri;
     }
 
     @Override
-    public URI getHref() {
+    public String getHref() {
         return href;
     }
 
@@ -59,13 +64,29 @@ public class DefaultLink implements Link, Link.Builder {
 
     @Override
     public Builder profile(URI profile) {
-        this.profile = profile;
+        if (profile != null) {
+            this.profile = profile.toString();
+        }
         return this;
     }
 
     @Override
     public Builder deprecation(URI deprecation) {
-        this.deprecation = deprecation;
+        if (deprecation != null) {
+            this.deprecation = deprecation.toString();
+        }
+        return this;
+    }
+
+    @Override
+    public Builder profile(@Nullable String profileURI) {
+        this.profile = profileURI;
+        return this;
+    }
+
+    @Override
+    public Builder deprecation(@Nullable String deprecationURI) {
+        this.deprecation = deprecationURI;
         return this;
     }
 
@@ -104,12 +125,12 @@ public class DefaultLink implements Link, Link.Builder {
     }
 
     @Override
-    public Optional<URI> getDeprecation() {
+    public Optional<String> getDeprecation() {
         return deprecation == null ? Optional.empty() : Optional.of(deprecation);
     }
 
     @Override
-    public Optional<URI> getProfile() {
+    public Optional<String> getProfile() {
         return profile == null ? Optional.empty() : Optional.of(profile);
     }
 

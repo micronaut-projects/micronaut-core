@@ -17,6 +17,7 @@ package io.micronaut.http.hateoas;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalMultiValues;
@@ -138,6 +139,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
      */
     @SuppressWarnings("unchecked")
     @Internal
+    @ReflectiveAccess
     protected final void setLinks(Map<String, Object> links) {
         for (Map.Entry<String, Object> entry : links.entrySet()) {
             String name = entry.getKey();
@@ -151,11 +153,19 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
 
     private void link(String name, Map<String, Object> linkMap) {
         ConvertibleValues<Object> values = ConvertibleValues.of(linkMap);
-        Optional<URI> uri = values.get(Link.HREF, URI.class);
+        Optional<String> uri = values.get(Link.HREF, String.class);
         uri.ifPresent(uri1 -> {
             Link.Builder link = Link.build(uri1);
-
-            // TODO: build remaining properties
+            values.get("templated", Boolean.class)
+                    .ifPresent(link::templated);
+            values.get("hreflang", String.class)
+                    .ifPresent(link::hreflang);
+            values.get("title", String.class)
+                    .ifPresent(link::title);
+            values.get("profile", String.class)
+                    .ifPresent(link::profile);
+            values.get("deprecation", String.class)
+                    .ifPresent(link::deprecation);
             link(name, link.build());
         });
     }
