@@ -52,7 +52,6 @@ public class SessionLogElement implements LogElement {
      */
     SessionLogElement(String property) {
         this.property = property;
-        System.out.println("SESSION ELEMENT");
     }
 
     @Override
