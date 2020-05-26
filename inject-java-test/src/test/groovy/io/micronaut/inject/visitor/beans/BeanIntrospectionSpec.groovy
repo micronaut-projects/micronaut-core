@@ -198,6 +198,88 @@ public class ValidatedConfig {
         introspection != null
     }
 
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on getters with inner class"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+public class ValidatedConfig {
+
+    private URL url;
+
+    @NotNull
+    public URL getUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+    
+    public static class Inner {
+    
+    }
+    
+}
+''')
+        expect:
+        introspection != null
+    }
+
+    void "test generate bean introspection for inner @ConfigurationProperties"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig$Another','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+class ValidatedConfig {
+
+    private URL url;
+
+    @NotNull
+    public URL getUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+    
+    public static class Inner {
+    
+    }
+    
+    @ConfigurationProperties("another")
+    static class Another {
+    
+        private URL url;
+
+        @NotNull
+        public URL getUrl() {
+            return url;
+        }
+    
+        public void setUrl(URL url) {
+            this.url = url;
+        }
+    }
+}
+''')
+        expect:
+        introspection != null
+    }
+
     void "test generate bean introspection for @ConfigurationProperties with validation rules on fields"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
 package test;

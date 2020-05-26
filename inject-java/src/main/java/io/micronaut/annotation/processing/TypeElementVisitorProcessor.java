@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing;
 import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Introspected;
@@ -257,17 +258,16 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         private final TypeElement concreteClass;
         private final List<LoadedVisitor> visitors;
-        private AnnotationMetadata typeAnnotationMetadata;
 
         ElementVisitor(TypeElement concreteClass, List<LoadedVisitor> visitors) {
             this.concreteClass = concreteClass;
             this.visitors = visitors;
-            this.typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
         }
 
         @Override
         public Object visitType(TypeElement classElement, Object o) {
 
+            AnnotationMetadata typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(classElement);
             for (LoadedVisitor visitor : visitors) {
                 final io.micronaut.inject.ast.Element resultingElement = visitor.visit(classElement, typeAnnotationMetadata);
                 if (resultingElement != null) {
@@ -296,7 +296,20 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 } else if (JavaModelUtils.isEnum(classElement)) {
                     return scan(classElement.getEnclosedElements(), o);
                 } else {
-                    return scan(enclosedElements(classElement), o);
+                    List<? extends Element> elements = enclosedElements(classElement);
+                    Object value = null;
+                    for (Element element: elements) {
+                        value = scan(element, o);
+                        if (element instanceof TypeElement) {
+                            TypeElement typeElement = (TypeElement) element;
+                            for (LoadedVisitor visitor : visitors) {
+                                if (visitor.matches(typeElement)) {
+                                    value = scan(enclosedElements(typeElement), o);
+                                }
+                            }
+                        }
+                    }
+                    return value;
                 }
             } else {
                 return null;
@@ -356,7 +369,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         @Override
         public Object visitExecutable(ExecutableElement executableElement, Object o) {
             AnnotationMetadata methodAnnotationMetadata = new AnnotationMetadataHierarchy(
-                    typeAnnotationMetadata,
+                    annotationUtils.getAnnotationMetadata(executableElement.getEnclosingElement()),
                     annotationUtils.getAnnotationMetadata(executableElement)
             );
             if (executableElement.getSimpleName().toString().equals("<init>")) {

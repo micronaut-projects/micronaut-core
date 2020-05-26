@@ -790,7 +790,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             try {
                 String valueAnnStr = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
 
-                Class argumentType;
+                Class<?> argumentType;
                 boolean isCollection = false;
                 if (Collection.class.isAssignableFrom(argument.getType())) {
                     argumentType = argument.getFirstTypeVariable().map(Argument::getType).orElse((Class) Object.class);
@@ -799,7 +799,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     argumentType = argument.getType();
                 }
 
-                if (isInnerConfiguration(argumentType)) {
+                if (isInnerConfiguration(argumentType, context)) {
                     Qualifier qualifier = resolveQualifier(resolutionContext, argument, true);
                     if (isCollection) {
                         Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
@@ -1031,7 +1031,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 path.pushConstructorResolve(this, argument);
                 try {
                     Object bean;
-                    Qualifier qualifier = resolveQualifier(resolutionContext, argument, isInnerConfiguration(argument.getType()));
+                    Qualifier qualifier = resolveQualifier(resolutionContext, argument, isInnerConfiguration(argument.getType(), context));
                     if (Qualifier.class.isAssignableFrom(argumentType)) {
                         bean = qualifier;
                     } else {
@@ -1239,7 +1239,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 String valueAnnVal = annotationMetadata.stringValue(Value.class).orElse(null);
                 Argument<?> fieldArgument = injectionPoint.asArgument();
 
-                Class argumentType;
+                Class<?> argumentType;
                 boolean isCollection = false;
                 if (Collection.class.isAssignableFrom(injectionPoint.getType())) {
                     argumentType = fieldArgument.getFirstTypeVariable().map(Argument::getType).orElse((Class) Object.class);
@@ -1247,7 +1247,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 } else {
                     argumentType = fieldArgument.getType();
                 }
-                if (isInnerConfiguration(argumentType)) {
+                if (isInnerConfiguration(argumentType, context)) {
                     Qualifier qualifier = resolveQualifier(resolutionContext, fieldArgument, true);
                     if (isCollection) {
                         Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
@@ -1748,13 +1748,14 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         return null;
     }
 
-    private boolean isInnerConfiguration(Class argumentType) {
+    private boolean isInnerConfiguration(Class<?> argumentType, BeanContext beanContext) {
         return isConfigurationProperties &&
                 argumentType.getName().indexOf('$') > -1 &&
                 !argumentType.isEnum() &&
                 !argumentType.isPrimitive() &&
                 Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers()) &&
-                isInnerOfAnySuperclass(argumentType);
+                isInnerOfAnySuperclass(argumentType) &&
+                beanContext.findBeanDefinition(argumentType).map(bd -> bd.hasStereotype(ConfigurationReader.class) || bd.isIterable()).isPresent();
     }
 
     private boolean isInnerOfAnySuperclass(Class argumentType) {
