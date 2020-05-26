@@ -18,7 +18,6 @@ package io.micronaut.annotation.processing;
 import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Introspected;
