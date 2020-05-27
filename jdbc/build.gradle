@@ -4,6 +4,7 @@ dependencies {
     api project(":inject")
 
     compileOnly project(":spring")
+    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
     compileOnly dependencyModuleVersion("spring", "spring-jdbc")
     compileOnly dependencyModuleVersion("spring", "spring-tx")
 }
