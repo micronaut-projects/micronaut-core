@@ -592,7 +592,7 @@ ext {
                     modules: ['micronaut-cache-caffeine', 'micronaut-cache-core', 'micronaut-cache-management', 'micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop', 'micronaut-cache-infinispan']
             ],
             'micronaut.servlet': [
-                version:micronautServlet,
+                version:micronautServletVersion,
                 group:'io.micronaut.servlet',
                 name:'micronaut-servlet-core',
                 modules: ['micronaut-http-server-tomcat', 'micronaut-http-server-jetty', 'micronaut-http-server-undertow']
