@@ -58,13 +58,13 @@ Within the `/config` folder Micronaut will search values within the following fo
 |`/config/application`
 |Configuration shared by all applications
 
-|`/config/application,prod`
+|`/config/application-prod`
 |Configuration shared by all applications for the `prod` api:context.env.Environment[]
 
 |`/config/[APPLICATION_NAME]`
 |Application specific configuration, example `/config/hello-world`
 
-|`/config/[APPLICATION_NAME],prod`
+|`/config/[APPLICATION_NAME]-prod`
 |Application specific configuration for an active api:context.env.Environment[]
 
 |===
