@@ -61,7 +61,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
     private List<AbstractIntrospection> abstractIntrospections = new ArrayList<>();
-    private ClassElement lastConfigurationReader;
     private AbstractIntrospection currentAbstractIntrospection;
 
     @Override
@@ -74,15 +73,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void visitClass(ClassElement element, VisitorContext context) {
         // reset
         currentAbstractIntrospection = null;
-        lastConfigurationReader = null;
         if (!element.isPrivate()) {
             if (element.hasStereotype(Introspected.class)) {
                 final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
                 if (introspected != null && !writers.containsKey(element.getName())) {
                     processIntrospected(element, context, introspected);
                 }
-            } else if (element.hasStereotype(ConfigurationReader.class)) {
-                this.lastConfigurationReader = element;
             }
         }
     }
@@ -90,7 +86,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     @Override
     public void visitConstructor(ConstructorElement element, VisitorContext context) {
         final ClassElement declaringType = element.getDeclaringType();
-        if (lastConfigurationReader != null && lastConfigurationReader.getName().equals(declaringType.getName())) {
+        if (element.getDeclaringType().hasStereotype(ConfigurationReader.class)) {
             final ParameterElement[] parameters = element.getParameters();
             introspectIfValidated(context, declaringType, parameters);
         }
@@ -100,7 +96,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void visitMethod(MethodElement element, VisitorContext context) {
         final ClassElement declaringType = element.getDeclaringType();
         final String methodName = element.getName();
-        if (lastConfigurationReader != null && lastConfigurationReader.getName().equals(declaringType.getName())) {
+        if (declaringType.hasStereotype(ConfigurationReader.class)) {
             if (methodName.startsWith("get")) {
                 final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
                 if (hasConstraints) {
@@ -133,7 +129,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     @Override
     public void visitField(FieldElement element, VisitorContext context) {
         final ClassElement declaringType = element.getDeclaringType();
-        if (lastConfigurationReader != null && lastConfigurationReader.getName().equals(declaringType.getName())) {
+        if (declaringType.hasStereotype(ConfigurationReader.class)) {
             if (!writers.containsKey(declaringType.getName())) {
                 final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
                 if (hasConstraints) {

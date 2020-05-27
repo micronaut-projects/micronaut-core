@@ -362,6 +362,34 @@ class NettyHttpServerConfigurationSpec extends Specification {
         beanContext.close()
     }
 
+    void "test netty server access logger configuration"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+              ['micronaut.server.netty.access-logger.enabled': true,
+               'micronaut.server.netty.access-logger.logger-name': 'mylogger',
+               'micronaut.server.netty.access-logger.log-format': "%h %l %u %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\""]
+
+        ))
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+
+        then:
+        config.accessLogger
+
+        when:
+        def accessLogConfig = config.accessLogger
+
+        then:
+        accessLogConfig.enabled
+        accessLogConfig.logFormat == "%h %l %u %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\""
+        accessLogConfig.loggerName == 'mylogger'
+
+        cleanup:
+        beanContext.close()
+    }
 }
 
 class MemoryAppender extends AppenderBase<ILoggingEvent> {
