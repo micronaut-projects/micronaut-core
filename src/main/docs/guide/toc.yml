@@ -110,6 +110,7 @@ httpServer:
     cors: Configuring CORS
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
+    accessLogger: Enabling Access Logger
   views:
     title: Server Side View Rendering
   openapi: OpenAPI / Swagger Support

@@ -1,0 +1,85 @@
+In the spirit of http://httpd.apache.org/docs/current/mod/mod_log_config.html[apache mod_log_config] and  https://tomcat.apache.org/tomcat-10.0-doc/config/valve.html#Access_Logging[Tomcat Access Log Valve], it is possible to enabled an access logger for
+ the http server (it works for both http/1 and http/2.)
+
+To enable and configure the access logger, in `application.yml` set:
+
+.Enabling the access logger
+[source,yaml]
+----
+micronaut:
+    server:
+        netty:
+           access-logger:
+              enabled: true # Enables the access logger
+              logger-name: my-access-logger # A logger name, default is `HTTP_ACCESS_LOGGER`
+              log-format: common # A log format, default is Common Log Format
+----
+
+==== Logback Configuration
+
+In addition to enabling the access logger, you have to add a logger for the specified or default logger name.
+For instance using the default logger name for logback:
+
+.Logback configuration
+[source,xml]
+----        
+<appender 
+    name="httpAccessLogAppender"
+    class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <append>true</append>
+    <file>log/http-access.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+        <!-- daily rollover -->
+        <fileNamePattern>log/http-access-%d{yyyy-MM-dd}.log
+        </fileNamePattern>
+        <maxHistory>7</maxHistory>
+    </rollingPolicy>
+    <encoder>
+        <charset>UTF-8</charset>
+        <pattern>%msg%n</pattern>
+    </encoder>
+        <immediateFlush>true</immediateFlush>
+</appender>
+
+<logger name="HTTP_ACCESS_LOGGER" additivity="false" level="info">
+    <appender-ref ref="httpAccessLogAppender" />
+</logger>
+----
+
+The pattern should only have the message marker as other elements will be processed by the access logger.
+
+==== Log Format
+
+The syntax is based on http://httpd.apache.org/docs/current/mod/mod_log_config.html[Apache httpd log format].
+ 
+Here are the supported markers:
+
+* *%a* - Remote IP address
+* *%A* - Local IP address
+* *%b* - Bytes sent, excluding HTTP headers, or '-' if no bytes were sent
+* *%B* - Bytes sent, excluding HTTP headers
+* *%h* - Remote host name
+* *%H* - Request protocol
+* *%{<header>}i* - Request header. If the argument is omitted (*%i*) all headers will be printed
+* *%{<header>}o* - Response header. If the argument is omitted (*%o*) all headers will be printed
+* *%{<cookie>}C* - Request cookie (COOKIE). If the argument is omitted (*%C*) all cookies will be printed
+* *%{<cookie>}c* - Response cookie (SET_COOKIE). If the argument is omitted (*%c*) all cookies will be printed
+* *%l* - Remote logical username from identd (always returns '-')
+* *%m* - Request method
+* *%p* - Local port
+* *%q* - Query string (excluding the '?' character)
+* *%r* - First line of the request
+* *%s* - HTTP status code of the response
+* *%{<format>}t* - Date and time. If the argument is ommitted the Common Log Format format is used ("'['dd/MMM/yyyy:HH:mm:ss Z']'").
+* If the format starts with begin: (default) the time is taken at the beginning of the request processing. If it starts with end: it is the time when the log entry gets written, close to the end of the request processing.
+* The format should follow the DateTimeFormatter syntax.
+* *%{property}u* - Remote user that was authenticated. When *micronaut-session* is on the classpath, returns the session id if the argument is omitted or the specified property otherwise prints '-'
+* *%U* - Requested URI
+* *%v* - Local server name
+* *%D* - Time taken to process the request, in millis
+* *%T* - Time taken to process the request, in seconds
+
+In addition, the following aliases for commonly utilized patterns:
+
+* *common* - <code>%h %l %u %t "%r" %s %b</code> Common Log Format (CLF)
+* *combined* - <code>%h %l %u %t "%r" %s %b "%{Referer}i" "%{User-Agent}i"</code> Combined Log Format
