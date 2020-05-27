@@ -15,15 +15,20 @@
  */
 package io.micronaut.scheduling.async;
 
+import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.Async;
 import io.micronaut.scheduling.exceptions.TaskExecutionException;
+import io.reactivex.Flowable;
+import io.reactivex.schedulers.Schedulers;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +36,7 @@ import javax.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.function.BiConsumer;
 
 /**
@@ -56,6 +62,11 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     @Override
+    public int getOrder() {
+        return InterceptPhase.ASYNC.getPosition();
+    }
+
+    @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         String executorName = context.stringValue(Async.class).orElse(TaskExecutors.SCHEDULED);
         ExecutorService executorService = beanLocator.findBean(ExecutorService.class, Qualifiers.byName(executorName)).orElseThrow(() ->
@@ -63,7 +74,7 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
         );
         ReturnType<Object> rt = context.getReturnType();
         Class<?> returnType = rt.getType();
-        if (CompletionStage.class.isAssignableFrom(returnType)) {
+        if (CompletionStage.class.isAssignableFrom(returnType) || Future.class.isAssignableFrom(returnType)) {
             CompletableFuture newFuture = new CompletableFuture();
 
             executorService.submit(() -> {
@@ -92,6 +103,16 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
                 }
             });
             return null;
+        } else if (Publishers.isConvertibleToPublisher(returnType)) {
+            Object result = context.proceed();
+            Flowable<?> flowable = Publishers.convertPublisher(result, Flowable.class);
+            CompletableFuture<Object> newFuture = new CompletableFuture<>();
+            flowable.subscribeOn(Schedulers.from(executorService))
+                    .subscribe(
+                            newFuture::complete,
+                            newFuture::completeExceptionally
+                    );
+            return Publishers.convertPublisher(Publishers.fromCompletableFuture(newFuture), returnType);
         } else {
             throw new TaskExecutionException("Method [" + context.getExecutableMethod() + "] must return either void, or an instance of Publisher or CompletionStage");
         }

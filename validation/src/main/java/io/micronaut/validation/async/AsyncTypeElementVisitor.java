@@ -17,6 +17,7 @@ package io.micronaut.validation.async;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
@@ -43,7 +44,9 @@ public final class AsyncTypeElementVisitor implements TypeElementVisitor<Object,
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         ClassElement returnType = element.getReturnType();
-        boolean isValid = returnType != null && (returnType.isAssignable(CompletionStage.class) || returnType.isAssignable(void.class));
+        boolean isValid = returnType != null &&
+                (returnType.isAssignable(CompletionStage.class) || returnType.isAssignable(void.class) ||
+                        Publishers.getKnownReactiveTypes().stream().anyMatch(returnType::isAssignable));
 
         if (!isValid) {
             context.fail("Method must return void or a subtype of CompletionStage", element);

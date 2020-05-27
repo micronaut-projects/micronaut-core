@@ -32,13 +32,13 @@ class EventListenerSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 1)
 
         then:
-        !a.invoked
         t.invoked
         t.invocationCount == 1
         g.invoked
 
         conditions.eventually {
             a.invoked
+            a.completableInvoked
         }
 
         cleanup:

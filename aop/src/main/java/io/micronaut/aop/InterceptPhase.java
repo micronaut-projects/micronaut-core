@@ -41,7 +41,10 @@ public enum InterceptPhase {
      * Retry phase of execution.
      */
     RETRY(-60),
-
+    /**
+     * Async phase of execution.
+     */
+    ASYNC(-40),
     /**
      * Transaction phase of execution.
      */
