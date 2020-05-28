@@ -43,6 +43,8 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
 
     String MICRONAUT_BASE_OPTION_NAME = "micronaut";
     String MICRONAUT_PROCESSING_PROJECT_DIR = "micronaut.processing.project.dir";
+    String MICRONAUT_PROCESSING_GROUP = "micronaut.processing.group";
+    String MICRONAUT_PROCESSING_MODULE = "micronaut.processing.module";
 
     /**
      * Allows printing informational messages.
