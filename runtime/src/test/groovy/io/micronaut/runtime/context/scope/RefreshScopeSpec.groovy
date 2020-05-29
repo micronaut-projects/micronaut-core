@@ -22,10 +22,8 @@ import io.micronaut.context.env.Environment
 import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
-import io.micronaut.runtime.context.scope.refresh.RefreshInterceptor
 import io.micronaut.runtime.context.scope.refresh.RefreshScope
 import io.micronaut.scheduling.TaskExecutors
-import org.junit.Rule
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
 
@@ -83,6 +81,7 @@ class RefreshScopeSpec extends Specification {
                 command.run()
             }
         }, Qualifiers.byName(TaskExecutors.IO))
+        RefreshScope refreshScope = beanContext.getBean(RefreshScope.class)
 
         when:
         RefreshBean bean = beanContext.getBean(RefreshBean)
@@ -90,6 +89,8 @@ class RefreshScopeSpec extends Specification {
         then:
         bean.testValue() == 'test'
         bean.testConfigProps() == 'test'
+        refreshScope.refreshableBeans.size() == 1
+        refreshScope.locks.size() == 1
 
         when:
         System.setProperty("foo.bar", "bar")
@@ -100,6 +101,8 @@ class RefreshScopeSpec extends Specification {
         then:
         bean.testValue() == 'bar'
         bean.testConfigProps() == 'bar'
+        refreshScope.refreshableBeans.size() == 1
+        refreshScope.locks.size() == 1
 
         cleanup:
         beanContext?.stop()

@@ -20,7 +20,7 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 
 /**
- * Server request context invocation instrumenter
+ * Server request context invocation instrumenter.
  *
  * @author dstepanov
  * @since 2.0
