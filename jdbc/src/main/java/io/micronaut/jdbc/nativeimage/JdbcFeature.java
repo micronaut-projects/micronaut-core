@@ -196,6 +196,8 @@ final class JdbcFeature implements Feature {
 
             RuntimeClassInitialization.initializeAtBuildTime(SQL_SERVER_DRIVER);
 
+            initializeAtBuildTime(access, "com.microsoft.sqlserver.jdbc.Util");
+            initializeAtBuildTime(access, "com.microsoft.sqlserver.jdbc.SQLServerException");
             registerAllIfPresent(access, "com.microsoft.sqlserver.jdbc.SQLServerDriver");
 
             ResourcesRegistry resourcesRegistry = getResourceRegistry();
