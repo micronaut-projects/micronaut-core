@@ -28,7 +28,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
 
-import javax.annotation.processing.SupportedOptions;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -46,11 +45,6 @@ import java.util.stream.Collectors;
  * @author Iván López
  * @since 1.1
  */
-@SupportedOptions({
-        VisitorContext.MICRONAUT_PROCESSING_PROJECT_DIR,
-        VisitorContext.MICRONAUT_PROCESSING_GROUP,
-        VisitorContext.MICRONAUT_PROCESSING_MODULE
-})
 public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Object> {
     /**
      * The position of the visitor.

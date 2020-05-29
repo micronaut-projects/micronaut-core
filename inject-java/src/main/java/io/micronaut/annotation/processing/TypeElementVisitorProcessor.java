@@ -55,7 +55,13 @@ import static javax.lang.model.element.ElementKind.FIELD;
  * @author graemerocher
  * @since 1.0
  */
-@SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS})
+@SupportedOptions({
+        AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL,
+        AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS,
+        VisitorContext.MICRONAUT_PROCESSING_PROJECT_DIR,
+        VisitorContext.MICRONAUT_PROCESSING_GROUP,
+        VisitorContext.MICRONAUT_PROCESSING_MODULE
+})
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
 
     private List<LoadedVisitor> loadedVisitors;
