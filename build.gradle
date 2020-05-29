@@ -157,7 +157,7 @@ ext {
             ],
             'micronaut.rabbitmq': [
                     version:micronautRabbitMQVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.rabbitmq',
                     name:'micronaut-rabbitmq'
             ],
             'micronaut.nats': [
