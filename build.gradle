@@ -335,30 +335,15 @@ ext {
                     name:'micronaut-spring'
             ],
             'micronaut.sql': [
-                    version:micronautSqlVersion,
-                    group:'io.micronaut.configuration',
-                    name:'micronaut-hibernate-jpa',
-<<<<<<< HEAD
-                    modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-ucp', 'micronaut-jdbc-dbcp', 'micronaut-jasync-sql', 'micronaut-jooq', 'micronaut-jdbi', 'micronaut-hibernate-jpa-spring', 'micronaut-vertx-mysql-client', 'micronaut-vertx-pg-client']
+                version:micronautSqlVersion,
+                group:'io.micronaut.configuration',
+                name:'micronaut-hibernate-jpa',
+                modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-ucp', 'micronaut-jdbc-dbcp', 'micronaut-jasync-sql', 'micronaut-jooq', 'micronaut-jdbi', 'micronaut-hibernate-jpa-spring', 'micronaut-vertx-mysql-client', 'micronaut-vertx-pg-client']
             ],
             'micronaut.jdbc': [
-                    version:micronautJdbcVersion,
-                    group:'io.micronaut',
-                    name:'micronaut-jdbc'
-=======
-                    modules: [
-                            'micronaut-hibernate-jpa-spring',
-                            'micronaut-jasync-sql',
-                            'micronaut-jdbc-dbcp',
-                            'micronaut-jdbc-hikari',
-                            'micronaut-jdbc-tomcat',
-                            'micronaut-jdbi',
-                            'micronaut-jooq',
-                            'micronaut-postgres-reactive',
-                            'micronaut-vertx-mysql-client',
-                            'micronaut-vertx-pg-client'
-                    ]
->>>>>>> 1.3.x
+                version:micronautJdbcVersion,
+                group:'io.micronaut',
+                name:'micronaut-jdbc'
             ],
             'micronaut.mongo': [
                     version:micronautMongoVersion,
