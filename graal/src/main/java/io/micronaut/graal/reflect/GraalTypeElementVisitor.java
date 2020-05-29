@@ -28,7 +28,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
 
-import javax.annotation.processing.SupportedOptions;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -46,7 +45,6 @@ import java.util.stream.Collectors;
  * @author Iván López
  * @since 1.1
  */
-@SupportedOptions({VisitorContext.MICRONAUT_PROCESSING_PROJECT_DIR})
 public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Object> {
     /**
      * The position of the visitor.
@@ -263,7 +261,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         }
 
         try {
-            String path = buildNativeImagePath();
+            String path = buildNativeImagePath(visitorContext);
             String reflectFile = path + REFLECTION_CONFIG_JSON;
             String propsFile = path + NATIVE_IMAGE_PROPERTIES;
 
@@ -326,7 +324,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 Set<String> resourceFiles = findResourceFiles(Paths.get(projectDir.get().toString(), RESOURCES_DIR).toFile(), new ArrayList<>());
 
                 if (!resourceFiles.isEmpty()) {
-                    String path = buildNativeImagePath();
+                    String path = buildNativeImagePath(visitorContext);
                     String resourcesFile = path + RESOURCE_CONFIG_JSON;
 
                     final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(resourcesFile);
@@ -393,12 +391,19 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         return resourceFiles;
     }
 
-    private String buildNativeImagePath() {
+    private String buildNativeImagePath(VisitorContext visitorContext) {
+
+        String group = visitorContext.getOptions().get(VisitorContext.MICRONAUT_PROCESSING_GROUP);
+        String module = visitorContext.getOptions().get(VisitorContext.MICRONAUT_PROCESSING_MODULE);
+
+        if (group != null && module != null) {
+            return "native-image/" + group + "/" + module + "/";
+        }
+
         String basePackage = packages.stream()
                 .distinct()
                 .min(Comparator.comparingInt(String::length)).orElse("io.micronaut");
 
-        String module;
         if (basePackage.startsWith("io.micronaut.")) {
             module = basePackage.substring("io.micronaut.".length()).replace('.', '-');
             basePackage = "io.micronaut";
