@@ -220,8 +220,8 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
                 lock.lock();
                 if (definition instanceof DisposableBeanDefinition) {
                     ((DisposableBeanDefinition) definition).dispose(beanContext, bean);
-                    locks.remove(bean);
                 }
+                locks.remove(bean);
             } finally {
                 lock.unlock();
             }
