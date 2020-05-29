@@ -209,7 +209,7 @@ ext {
                     version:micronautGroovyVersion,
                     group:'io.micronaut.configuration',
                     name:'micronaut-gorm-common',
-                    modules:['micronaut-multitenancy-gorm', 'micronaut-neo4j-gorm', 'micronaut-mongo-gorm', 'micronaut-hibernate-gorm']
+                    modules:['micronaut-multitenancy-gorm', 'micronaut-neo4j-gorm', 'micronaut-mongo-gorm', 'micronaut-hibernate-gorm', 'micronaut-graphql-gorm']
             ],
             'micronaut.liquibase': [
                 version:micronautLiquibase,
@@ -308,7 +308,18 @@ ext {
                     version:micronautSqlVersion,
                     group:'io.micronaut.configuration',
                     name:'micronaut-hibernate-jpa',
-                    modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-dbcp', 'micronaut-postgres-reactive', 'micronaut-jasync-sql', 'micronaut-jooq']
+                    modules: [
+                            'micronaut-hibernate-jpa-spring',
+                            'micronaut-jasync-sql',
+                            'micronaut-jdbc-dbcp',
+                            'micronaut-jdbc-hikari',
+                            'micronaut-jdbc-tomcat',
+                            'micronaut-jdbi',
+                            'micronaut-jooq',
+                            'micronaut-postgres-reactive',
+                            'micronaut-vertx-mysql-client',
+                            'micronaut-vertx-pg-client'
+                    ]
             ],
             'micronaut.mongo': [
                     version:micronautMongoVersion,
