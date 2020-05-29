@@ -96,12 +96,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void visitMethod(MethodElement element, VisitorContext context) {
         final ClassElement declaringType = element.getDeclaringType();
         final String methodName = element.getName();
-        if (declaringType.hasStereotype(ConfigurationReader.class)) {
-            if (methodName.startsWith("get")) {
-                final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
-                if (hasConstraints) {
-                    processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
-                }
+        if (declaringType.hasStereotype(ConfigurationReader.class) && methodName.startsWith("get") && !writers.containsKey(declaringType.getName())) {
+            final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
+            if (hasConstraints) {
+                processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
             }
         }
 
@@ -129,12 +127,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     @Override
     public void visitField(FieldElement element, VisitorContext context) {
         final ClassElement declaringType = element.getDeclaringType();
-        if (declaringType.hasStereotype(ConfigurationReader.class)) {
-            if (!writers.containsKey(declaringType.getName())) {
-                final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
-                if (hasConstraints) {
-                    processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
-                }
+        if (declaringType.hasStereotype(ConfigurationReader.class) && !writers.containsKey(declaringType.getName())) {
+            final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
+            if (hasConstraints) {
+                processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
             }
         }
     }

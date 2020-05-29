@@ -238,3 +238,25 @@ NOTE: This change also applies to messages in custom constraint annotations, whi
 === Environment Order Bugfix
 
 Environments specified through the application context builder have priority over environments deduced or supplied through the MICRONAUT_ENVIRONMENTS environment variable, or the equivalent system property. A bug in the logic however did not change the order of a specified environment if it previously was found or deduced. This issue manifested itself with `@MicronautTest(environments = "test")`. The `test` environment is already deduced for tests, so it retained the order of other deduced environments, and was able to be overriden by `MICRONAUT_ENVIRONMENTS=dev`. In Micronaut 1.x configuration for `dev` would have overridden `test`. In Micronaut 2.x `test` will override `dev`.
+
+=== Introspections and Inner Classes
+
+A bug in Micronaut 1.x caused bean introspections to be generated for inner classes of classes annotated with `@Introspected`. That also applies to classes where `@Introspection` is a meta annotation, like `@Entity`. This may have an impact for GraalVM users that rely on accesses to those classes without using reflection. For example:
+
+```
+@Entity
+public class Pet {
+    ...
+    private PetType type = PetType.DOG;
+    // getters & setters
+
+    public enum PetType {
+        DOG,
+        CAT
+    }
+}
+```
+
+Previously a bean introspection would have been generated for `PetType`. That is no longer the case. If the type should be introspected, simply add the annotation.
+
+
