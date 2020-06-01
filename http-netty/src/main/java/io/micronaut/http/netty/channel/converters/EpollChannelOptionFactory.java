@@ -20,7 +20,6 @@ import javax.inject.Singleton;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.http.netty.channel.EpollAvailabilityCondition;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.epoll.Epoll;
@@ -34,7 +33,6 @@ import io.netty.channel.unix.UnixChannelOption;
 @Internal
 @Singleton
 @Requires(classes = Epoll.class, condition = EpollAvailabilityCondition.class)
-@TypeHint(value = EpollChannelOption.class, accessType = TypeHint.AccessType.ALL_DECLARED_FIELDS)
 public class EpollChannelOptionFactory implements ChannelOptionFactory {
 
     static {
