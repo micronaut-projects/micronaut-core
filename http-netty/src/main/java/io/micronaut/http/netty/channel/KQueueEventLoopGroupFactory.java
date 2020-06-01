@@ -44,7 +44,7 @@ import java.util.concurrent.ThreadFactory;
 @Requires(classes = KQueue.class, condition = KQueueAvailabilityCondition.class)
 @Named(EventLoopGroupFactory.NATIVE)
 @BootstrapContextCompatible
-class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
+public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a KQueueEventLoopGroup.
