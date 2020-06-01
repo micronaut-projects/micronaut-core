@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonRootName;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
 import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
+import io.micronaut.core.annotation.ReflectiveAccess;
 
 /**
  * A simple interface for indicating which <em>datacenter</em> a particular instance belongs.
@@ -43,5 +44,6 @@ public interface DataCenterInfo {
     /**
      * @return The name
      */
+    @ReflectiveAccess
     Name getName();
 }
