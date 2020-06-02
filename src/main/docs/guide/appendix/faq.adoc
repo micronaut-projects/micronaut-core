@@ -23,7 +23,7 @@ For Microservices and Serverless functions where it is critical that startup tim
 
 ==== Does Micronaut support Scala?
 
-Micronaut supports any JVM language that supports the Annotation Processor API. Scala currently does not support this API. However, Groovy also doesn't support this API and special support has been built that processes the Groovy AST. It may be technically possible to support Scala future if a similar module to `inject-groovy` is built, but as of this writing Scala is not supported.
+Micronaut supports any JVM language that supports the Annotation Processor API. Scala currently does not support this API. However, Groovy also doesn't support this API and special support has been built that processes the Groovy AST. It may be technically possible to support Scala in the future if a module similar to `inject-groovy` is built, but as of this writing Scala is not supported.
 
 
 ==== Can Micronaut be used for purposes other than Microservices?
