@@ -4,6 +4,8 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.docs.server.json.Person
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -114,6 +116,14 @@ class Http2RequestSpec extends Specification {
         then:
         result == 'Version: HTTP_2_0'
 
+        when:"A post request is performed"
+        def response = client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
+                .blockingFirst()
+
+        then:
+        response.status() == HttpStatus.OK
+        response.body() == 'Version: HTTP_2_0 test'
+
         cleanup:
         server.close()
     }
@@ -149,6 +159,11 @@ class Http2RequestSpec extends Specification {
         @Get(produces = MediaType.TEXT_HTML)
         String index(HttpRequest<?> request) {
             return "Version: ${request.httpVersion}"
+        }
+
+        @Post(processes =  MediaType.TEXT_PLAIN)
+        String post(HttpRequest<?> request, @Body String body) {
+            return "Version: ${request.httpVersion} " + body
         }
 
         @Get(value = '/stream', produces = MediaType.TEXT_PLAIN)
