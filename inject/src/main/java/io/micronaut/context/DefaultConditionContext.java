@@ -47,6 +47,7 @@ class DefaultConditionContext<B extends AnnotationMetadataProvider> implements C
     /**
      * @param beanContext The bean context
      * @param component   The component type
+     * @param resolutionContext The resolution context
      */
     DefaultConditionContext(DefaultBeanContext beanContext, B component, BeanResolutionContext resolutionContext) {
         this.beanContext = beanContext;

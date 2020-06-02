@@ -15,7 +15,6 @@
  */
 package io.micronaut.context.condition;
 
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Introspected;
 
 import java.util.function.Predicate;
