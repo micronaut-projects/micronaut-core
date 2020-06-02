@@ -15,7 +15,6 @@
  */
 package io.micronaut.health;
 
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Introspected;
@@ -34,13 +33,12 @@ import static java.lang.Boolean.FALSE;
 public final class HeartbeatDiscoveryClientCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
-        final ApplicationContext beanContext = (ApplicationContext) context.getBeanContext();
-        final CompositeDiscoveryClient compositeDiscoveryClient = beanContext.getBean(CompositeDiscoveryClient.class);
+        final CompositeDiscoveryClient compositeDiscoveryClient = context.getBean(CompositeDiscoveryClient.class);
         final boolean hasDiscovery = compositeDiscoveryClient.getDiscoveryClients().length > 0;
         if (hasDiscovery) {
             return true;
         } else {
-            final Boolean enabled = beanContext.getProperty(HeartbeatConfiguration.ENABLED, ArgumentConversionContext.BOOLEAN).orElse(FALSE);
+            final Boolean enabled = context.getProperty(HeartbeatConfiguration.ENABLED, ArgumentConversionContext.BOOLEAN).orElse(FALSE);
             if (!enabled) {
                 context.fail("Heartbeat not enabled since no Discovery client active");
             }

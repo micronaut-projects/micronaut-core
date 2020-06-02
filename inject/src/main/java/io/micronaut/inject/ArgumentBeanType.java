@@ -15,7 +15,9 @@
  */
 package io.micronaut.inject;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
@@ -85,6 +87,11 @@ public final class ArgumentBeanType<T> implements BeanType<T>, Argument<T> {
 
     @Override
     public boolean isEnabled(BeanContext context) {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return true;
     }
 }

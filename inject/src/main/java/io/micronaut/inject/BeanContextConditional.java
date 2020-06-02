@@ -15,9 +15,11 @@
  */
 package io.micronaut.inject;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.BeanContext;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.context.BeanResolutionContext;
 
 /**
  * Interface for other types that are conditional within a context.
@@ -34,5 +36,16 @@ public interface BeanContextConditional {
      * @param context The context
      * @return True if it is
      */
-    boolean isEnabled(@NonNull BeanContext context);
+    default boolean isEnabled(@NonNull BeanContext context) {
+        return isEnabled(context, null);
+    }
+
+    /**
+     * Return whether this component is enabled for the given context.
+     *
+     * @param context The context
+     * @param resolutionContext The bean resolution context
+     * @return True if it is
+     */
+    boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext);
 }

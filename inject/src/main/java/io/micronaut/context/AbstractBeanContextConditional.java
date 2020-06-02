@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.Failure;
@@ -40,10 +41,12 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
     static final Logger LOG = LoggerFactory.getLogger(Condition.class);
 
     @Override
-    public boolean isEnabled(@NonNull BeanContext context) {
+    public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
-        DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(context, this);
+        DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(
+                (DefaultBeanContext) context,
+                this, resolutionContext);
         boolean enabled = condition == null || condition.matches(conditionContext);
         if (LOG.isDebugEnabled() && !enabled) {
             if (this instanceof BeanConfiguration) {

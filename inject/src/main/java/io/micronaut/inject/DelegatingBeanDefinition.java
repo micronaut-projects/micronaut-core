@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -155,6 +156,11 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     @Override
     default boolean isEnabled(BeanContext context) {
         return getTarget().isEnabled(context);
+    }
+
+    @Override
+    default boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+        return getTarget().isEnabled(context, resolutionContext);
     }
 
     @Override

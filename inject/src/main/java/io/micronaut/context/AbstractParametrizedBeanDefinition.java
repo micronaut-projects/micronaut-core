@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
@@ -98,7 +99,7 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
                 String argumentName = requiredArgument.getName();
                 if (!requiredArgumentValues.containsKey(argumentName) && !requiredArgument.isNullable()) {
                     if (eachBeanType.filter(type -> type == requiredArgument.getType()).isPresent()) {
-                        return null;
+                        throw new DisabledBeanException("@EachBean parameter disabled for argument: " + requiredArgument.getName());
                     }
                     throw new BeanInstantiationException(resolutionContext, "Missing bean argument value: " + argumentName);
                 }

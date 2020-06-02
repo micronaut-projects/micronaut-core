@@ -15,8 +15,6 @@
  */
 package io.micronaut.scheduling.io.watch;
 
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.BeanContext;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Introspected;
@@ -36,22 +34,18 @@ import java.util.List;
 public class FileWatchCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
-        BeanContext beanContext = context.getBeanContext();
-        if (beanContext instanceof ApplicationContext) {
-            List<String> paths = ((ApplicationContext) beanContext)
-                    .getEnvironment()
-                    .getProperty(FileWatchConfiguration.PATHS, ConversionContext.LIST_OF_STRING)
-                    .orElse(null);
+        List<String> paths = context
+                .getProperty(FileWatchConfiguration.PATHS, ConversionContext.LIST_OF_STRING)
+                .orElse(null);
 
-            if (CollectionUtils.isNotEmpty(paths)) {
+        if (CollectionUtils.isNotEmpty(paths)) {
 
 
-                boolean matchedPaths = paths.stream().anyMatch(p -> new File(p).exists());
-                if (!matchedPaths) {
-                    context.fail("File watch disabled because no paths matching the watch pattern exist (Paths: " + paths + ")");
-                }
-                return matchedPaths;
+            boolean matchedPaths = paths.stream().anyMatch(p -> new File(p).exists());
+            if (!matchedPaths) {
+                context.fail("File watch disabled because no paths matching the watch pattern exist (Paths: " + paths + ")");
             }
+            return matchedPaths;
         }
 
         context.fail("File watch disabled because no watch paths specified");

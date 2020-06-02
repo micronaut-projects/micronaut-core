@@ -14,9 +14,9 @@ NOTE: If you take this approach, then you should not invoke other bean methods i
 
 TIP: To allow the resulting bean to participate in the application context shutdown process, annotate the method with link:{api}/io/micronaut/context/annotation/Bean.html[@Bean] and set the `preDestroy` argument to the name of the method that should be called to close the bean.
 
-=== Nullability
+=== Programmatically Disabling Beans
 
-Factory methods can return null to allow for beans to be created conditionally. The use of ann:context.annotation.Requires[] should always be the preferred method to conditionally create beans and returning null from a factory method should only be done if using ann:context.annotation.Requires[] is not possible.
+Factory methods can return throw api:context.exceptions.DisabledBeanException[] to allow for beans to be disabled conditionally. The use of ann:context.annotation.Requires[] should always be the preferred method to conditionally create beans and throwing an exception a factory method should only be done if using ann:context.annotation.Requires[] is not possible.
 
 For example:
 
