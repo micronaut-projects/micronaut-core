@@ -32,14 +32,14 @@ import io.netty.channel.epoll.EpollServerSocketChannel;
 
 /**
  * Factory for EpollEventLoopGroup.
- * 
+ *
  * @author croudet
  */
 @Singleton
 @Requires(property = "micronaut.server.netty.use-native-transport", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Requires(classes = Epoll.class, condition = EpollAvailabilityCondition.class)
 @Internal
-class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
+public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
 
     private static EpollEventLoopGroup withIoRatio(EpollEventLoopGroup group, @Nullable Integer ioRatio) {
         if (ioRatio != null) {
@@ -47,10 +47,10 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
         }
         return group;
     }
-    
+
     /**
      * Creates an EpollEventLoopGroup.
-     * 
+     *
      * @param threads The number of threads to use.
      * @param ioRatio The io ratio.
      * @return An EpollEventLoopGroup.
@@ -62,7 +62,7 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates an EpollEventLoopGroup.
-     * 
+     *
      * @param threads       The number of threads to use.
      * @param threadFactory The thread factory.
      * @param ioRatio       The io ratio.
@@ -75,7 +75,7 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates an EpollEventLoopGroup.
-     * 
+     *
      * @param threads  The number of threads to use.
      * @param executor An Executor.
      * @param ioRatio  The io ratio.
@@ -88,7 +88,7 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a default EpollEventLoopGroup.
-     * 
+     *
      * @param ioRatio The io ratio.
      * @return An EpollEventLoopGroup.
      */
@@ -99,9 +99,10 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Returns the server channel class.
-     * 
+     *
      * @return EpollServerSocketChannel.
      */
+    @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return EpollServerSocketChannel.class;
     }
