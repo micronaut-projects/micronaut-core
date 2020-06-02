@@ -164,6 +164,10 @@ Requesting a single instance of that bean would result in the "ford" instance be
 
 NOTE: This change does not apply to an explicit primary defined in the annotation (`@EachProperty(value = "cars", primary = "ford")`), nor requesting the instance by a qualifier (`@Named("ford") CarConfig carConfig`).
 
+=== No Longer Possible to Return Null to Disable a Bean
+
+It is no longer possible to return `null` from a ann:context.annotation.Factory[] bean method to disable the bean. You should now throw api:context.exceptions.DisabledBeanException[] instead.
+
 === Invalid Configuration File Locations
 
 Specifying a file with `micronaut.config.files`, either through the system property or environment variable, that does not exist or cannot be read will now result in the application failing to startup. In previous versions of Micronaut a warning would be logged and the file would be ignored.

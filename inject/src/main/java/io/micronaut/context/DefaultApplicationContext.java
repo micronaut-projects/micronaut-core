@@ -221,13 +221,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType, BeanDefinition<?> filter, boolean filterProxied) {
-        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(beanType, filter, filterProxied);
-        return transformIterables(candidates, filterProxied);
+    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Class<T> beanType, BeanDefinition<?> filter, boolean filterProxied) {
+        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(resolutionContext, beanType, filter, filterProxied);
+        return transformIterables(resolutionContext, candidates, filterProxied);
     }
 
     @Override
-    protected <T> Collection<BeanDefinition<T>> transformIterables(Collection<BeanDefinition<T>> candidates, boolean filterProxied) {
+    protected <T> Collection<BeanDefinition<T>> transformIterables(BeanResolutionContext resolutionContext, Collection<BeanDefinition<T>> candidates, boolean filterProxied) {
         if (!candidates.isEmpty()) {
 
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
@@ -254,7 +254,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                         delegate.put("Array", index);
                                         delegate.put(Named.class.getName(), index);
 
-                                        if (delegate.isEnabled(this)) {
+                                        if (delegate.isEnabled(this, resolutionContext)) {
                                             transformedCandidates.add(delegate);
                                         }
                                     }
@@ -271,7 +271,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     delegate.put(EachProperty.class.getName(), delegate.getBeanType());
                                     delegate.put(Named.class.getName(), key);
 
-                                    if (delegate.isEnabled(this)) {
+                                    if (delegate.isEnabled(this, resolutionContext)) {
                                         transformedCandidates.add(delegate);
                                     }
                                 }
@@ -287,7 +287,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         continue;
                     }
 
-                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(dependentType, null, filterProxied);
+                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, dependentType, null, filterProxied);
                     if (!dependentCandidates.isEmpty()) {
                         for (BeanDefinition dependentCandidate : dependentCandidates) {
 
@@ -325,7 +325,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     if (qualifier instanceof Named) {
                                         delegate.put(Named.class.getName(), ((Named) qualifier).getName());
                                     }
-                                    if (delegate.isEnabled(this)) {
+                                    if (delegate.isEnabled(this, resolutionContext)) {
                                         transformedCandidates.add((BeanDefinition<T>) delegate);
                                     }
                                 }
@@ -359,7 +359,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                                     delegate.put("Array", index);
                                                     delegate.put(Named.class.getName(), index);
 
-                                                    if (delegate.isEnabled(this) &&
+                                                    if (delegate.isEnabled(this, resolutionContext) &&
                                                             containsProperties(prefix.replace("*", index))) {
                                                         transformedCandidates.add(delegate);
                                                     }
@@ -375,7 +375,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                                 delegate.put(EachProperty.class.getName(), delegate.getBeanType());
                                                 delegate.put(Named.class.getName(), key.toString());
 
-                                                if (delegate.isEnabled(this) &&
+                                                if (delegate.isEnabled(this, resolutionContext) &&
                                                         containsProperties(prefix.replace("*", key.toString()))) {
                                                     transformedCandidates.add(delegate);
                                                 }

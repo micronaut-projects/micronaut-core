@@ -35,10 +35,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
-import io.micronaut.context.exceptions.BeanContextException;
-import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.context.exceptions.DependencyInjectionException;
-import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.context.exceptions.*;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -1040,7 +1037,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     }
                     path.pop();
                     return bean;
-                } catch (NoSuchBeanException e) {
+                } catch (NoSuchBeanException | DisabledBeanException e) {
+                    if (e instanceof DisabledBeanException && AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                        AbstractBeanContextConditional.LOG.debug("Bean of type {} disabled for reason: {}", argumentType, e.getMessage());
+                    }
                     if (isNullable) {
                         path.pop();
                         return null;
@@ -1456,7 +1456,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 @SuppressWarnings("unchecked") Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, beanType, qualifier);
                 path.pop();
                 return bean;
-            } catch (NoSuchBeanException e) {
+            } catch (NoSuchBeanException | DisabledBeanException e) {
+                if (e instanceof DisabledBeanException && AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                    AbstractBeanContextConditional.LOG.debug("Bean of type {} disabled for reason: {}", beanType, e.getMessage());
+                }
                 if (injectionPoint.isDeclaredNullable()) {
                     path.pop();
                     return null;
@@ -1634,7 +1637,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                 path.pop();
                 return bean;
-            } catch (NoSuchBeanException e) {
+            } catch (NoSuchBeanException | DisabledBeanException e) {
+                if (e instanceof DisabledBeanException && AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                    AbstractBeanContextConditional.LOG.debug("Bean of type {} disabled for reason: {}", argumentType, e.getMessage());
+                }
                 if (argument.isDeclaredNullable()) {
                     path.pop();
                     return null;

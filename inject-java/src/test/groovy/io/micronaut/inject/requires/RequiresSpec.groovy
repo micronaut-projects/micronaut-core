@@ -69,7 +69,7 @@ class MyBean {
 ''')
 
         then:
-        beanDefinition.isEnabled(Mock(BeanContext))
+        beanDefinition.isEnabled(new DefaultBeanContext())
     }
 
     void "test requires classes with classes not present"() {

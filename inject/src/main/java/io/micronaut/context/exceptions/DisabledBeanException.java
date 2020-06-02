@@ -13,23 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.factories.nullable;
+package io.micronaut.context.exceptions;
 
-import io.micronaut.context.annotation.EachBean
-import io.micronaut.context.annotation.Factory
-import io.micronaut.context.exceptions.DisabledBeanException
+/**
+ * An exception that can be thrown to disable a bean programmatically from within a factory bean.
+ *
+ * @since 2.0
+ * @author graemerocher
+ */
+public class DisabledBeanException extends RuntimeException {
+    /**
+     * @param reason The reason the bean was disabled.
+     */
+    public DisabledBeanException(String reason) {
+        super(reason);
+    }
 
-// tag::class[]
-@Factory
-class EngineFactory {
-
-    @EachBean(EngineConfiguration)
-    Engine buildEngine(EngineConfiguration engineConfiguration) {
-        if (engineConfiguration.enabled) {
-            (Engine){ -> engineConfiguration.cylinders }
-        } else {
-            throw new DisabledBeanException("Engine configuration disabled")
-        }
+    @Override
+    public final synchronized Throwable fillInStackTrace() {
+        return this;
     }
 }
-// end::class[]

@@ -561,7 +561,12 @@ public class RequiresCondition implements Condition {
 
                 for (Class<?> type : missingBeans) {
                     // remove self by passing definition as filter
-                    final Collection<? extends BeanDefinition<?>> beanDefinitions = beanContext.findBeanCandidates(type, bd, true);
+                    final Collection<? extends BeanDefinition<?>> beanDefinitions = beanContext.findBeanCandidates(
+                            context.getBeanResolutionContext(),
+                            type,
+                            bd,
+                            true
+                    );
                     for (BeanDefinition<?> beanDefinition : beanDefinitions) {
                         if (!beanDefinition.isAbstract()) {
                             context.fail("Existing bean [" + beanDefinition.getName() + "] of type [" + type + "] registered in context");

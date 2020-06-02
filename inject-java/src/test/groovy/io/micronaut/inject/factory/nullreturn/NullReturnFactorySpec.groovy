@@ -83,21 +83,21 @@ class Test2 {}
         cs.size() == 2
         cs.any { it.name == "one" }
         cs.any { it.name == "two" }
-        factory.bCalls == 4
-        factory.cCalls == 3 //3 B beans
+        factory.bCalls == 5
+        factory.cCalls == 4
 
         expect: "1 is created for D"
         beanContext.getBeansOfType(D).size() == 1
         beanContext.getBean(D, Qualifiers.byName("one"))
-        factory.bCalls == 4
-        factory.cCalls == 3
-        factory.dCalls == 2 //2 C beans
+        factory.bCalls == 6
+        factory.cCalls == 6
+        factory.dCalls == 4 //2 C beans
 
         and: "1 is created for D2"
         beanContext.getBeansOfType(D2).size() == 1
         beanContext.getBean(D2, Qualifiers.byName("one"))
-        factory.bCalls == 4
-        factory.cCalls == 3
+        factory.bCalls == 7
+        factory.cCalls == 8
         factory.d2Calls == 4 //Called for 2 C beans and 2 null C beans
 
         when: "E injects F which returns null"
@@ -132,9 +132,9 @@ class Test2 {}
         beanContext.getBeansOfType(D).size() == 1
         beanContext.getBeansOfType(C).size() == 2
         beanContext.getBeansOfType(B).size() == 3
-        factory.bCalls == 4
-        factory.cCalls == 3
-        factory.dCalls == 2
+        factory.bCalls == 6
+        factory.cCalls == 6
+        factory.dCalls == 4
 
         cleanup:
         beanContext.close()

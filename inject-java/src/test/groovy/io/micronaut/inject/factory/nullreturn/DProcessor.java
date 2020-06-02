@@ -15,7 +15,9 @@
  */
 package io.micronaut.inject.factory.nullreturn;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.exceptions.DisabledBeanException;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -26,7 +28,10 @@ public class DProcessor {
 
     private final D d;
 
-    DProcessor(D d) {
+    DProcessor(@Nullable D d) {
+        if (d == null) {
+            throw new DisabledBeanException("Null D");
+        }
         this.d = d;
         constructed.incrementAndGet();
     }

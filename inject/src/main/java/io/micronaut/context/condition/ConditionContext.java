@@ -16,9 +16,13 @@
 package io.micronaut.context.condition;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanLocator;
+import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.value.PropertyResolver;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -29,7 +33,7 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConditionContext<T extends AnnotationMetadataProvider> {
+public interface ConditionContext<T extends AnnotationMetadataProvider> extends BeanLocator, PropertyResolver {
 
     /**
      * The component for which the condition is being evaluated.
@@ -42,6 +46,11 @@ public interface ConditionContext<T extends AnnotationMetadataProvider> {
      * @return The bean context
      */
     BeanContext getBeanContext();
+
+    /**
+     * @return The resolution context
+     */
+    BeanResolutionContext getBeanResolutionContext();
 
     /**
      * Fail the condition with the given message.
