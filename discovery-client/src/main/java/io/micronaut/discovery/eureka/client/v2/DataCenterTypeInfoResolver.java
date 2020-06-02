@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.jsontype.impl.ClassNameIdResolver;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import io.micronaut.core.annotation.Introspected;
 
 import java.io.IOException;
 
@@ -27,6 +28,7 @@ import java.io.IOException;
  *
  * @author Tomasz Bak
  */
+@Introspected
 class DataCenterTypeInfoResolver extends ClassNameIdResolver {
 
     /**
