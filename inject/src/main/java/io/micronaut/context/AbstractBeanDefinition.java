@@ -170,7 +170,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                                      boolean requiresReflection,
                                      Argument... arguments) {
 
-        AnnotationMetadata beanAnnotationMetadata = getAnnotationMetadata();
         this.type = type;
         this.isAbstract = Modifier.isAbstract(this.type.getModifiers());
         this.declaringType = type;
@@ -1037,10 +1036,20 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     }
                     path.pop();
                     return bean;
-                } catch (NoSuchBeanException | DisabledBeanException e) {
-                    if (e instanceof DisabledBeanException && AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                        AbstractBeanContextConditional.LOG.debug("Bean of type {} disabled for reason: {}", argumentType, e.getMessage());
+                } catch (DisabledBeanException e) {
+                    if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                        AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argumentType.getSimpleName(), e.getMessage());
                     }
+                    if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
+                        throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
+                    } else {
+                        if (isNullable) {
+                            path.pop();
+                            return null;
+                        }
+                        throw new DependencyInjectionException(resolutionContext, argument, e);
+                    }
+                } catch (NoSuchBeanException e) {
                     if (isNullable) {
                         path.pop();
                         return null;
@@ -1456,10 +1465,20 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 @SuppressWarnings("unchecked") Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, beanType, qualifier);
                 path.pop();
                 return bean;
-            } catch (NoSuchBeanException | DisabledBeanException e) {
-                if (e instanceof DisabledBeanException && AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                    AbstractBeanContextConditional.LOG.debug("Bean of type {} disabled for reason: {}", beanType, e.getMessage());
+            } catch (DisabledBeanException e) {
+                if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                    AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
                 }
+                if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
+                    throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
+                } else {
+                    if (injectionPoint.isDeclaredNullable()) {
+                        path.pop();
+                        return null;
+                    }
+                    throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
+                }
+            } catch (NoSuchBeanException e) {
                 if (injectionPoint.isDeclaredNullable()) {
                     path.pop();
                     return null;
@@ -1637,15 +1656,25 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                 path.pop();
                 return bean;
-            } catch (NoSuchBeanException | DisabledBeanException e) {
-                if (e instanceof DisabledBeanException && AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                    AbstractBeanContextConditional.LOG.debug("Bean of type {} disabled for reason: {}", argumentType, e.getMessage());
+            } catch (DisabledBeanException e) {
+                if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                    AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argumentType.getSimpleName(), e.getMessage());
                 }
+                if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
+                    throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
+                } else {
+                    if (argument.isDeclaredNullable()) {
+                        path.pop();
+                        return null;
+                    }
+                    throw new DependencyInjectionException(resolutionContext, argument, e);
+                }
+            } catch (NoSuchBeanException e) {
                 if (argument.isDeclaredNullable()) {
                     path.pop();
                     return null;
                 }
-                throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, e);
+                throw new DependencyInjectionException(resolutionContext, argument, e);
             }
         }
     }

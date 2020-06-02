@@ -69,7 +69,7 @@ public class NullableFactory {
     }
 
     @EachBean(B.class)
-    C getC(@Nullable B b) {
+    C getC(B b) {
         cCalls++;
         if (b == null || b.name.equals("three")) {
             throw new DisabledBeanException("Named three");
@@ -79,7 +79,7 @@ public class NullableFactory {
     }
 
     @EachBean(C.class)
-    D getD(@Nullable C c) {
+    D getD(C c) {
         dCalls++;
         if (c == null || c.name.equals("two")) {
             throw new DisabledBeanException("Named two");

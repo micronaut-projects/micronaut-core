@@ -84,28 +84,27 @@ class Test2 {}
         cs.any { it.name == "one" }
         cs.any { it.name == "two" }
         factory.bCalls == 5
-        factory.cCalls == 4
+        factory.cCalls == 3
 
         expect: "1 is created for D"
         beanContext.getBeansOfType(D).size() == 1
         beanContext.getBean(D, Qualifiers.byName("one"))
         factory.bCalls == 6
-        factory.cCalls == 6
-        factory.dCalls == 4 //2 C beans
+        factory.cCalls == 4
+        factory.dCalls == 2 //2 C beans
 
         and: "1 is created for D2"
         beanContext.getBeansOfType(D2).size() == 1
         beanContext.getBean(D2, Qualifiers.byName("one"))
         factory.bCalls == 7
-        factory.cCalls == 8
-        factory.d2Calls == 4 //Called for 2 C beans and 2 null C beans
+        factory.cCalls == 5
+        factory.d2Calls == 2 //Called for 2 C beans and 2 null C beans
 
         when: "E injects F which returns null"
         beanContext.getBean(E, Qualifiers.byName("one"))
 
         then: "only the each bean argument is handled for not found"
-        def ex = thrown(DependencyInjectionException)
-        ex.message.contains("Failed to inject value for parameter [f] of class: io.micronaut.inject.factory.nullreturn.E")
+        thrown(NoSuchBeanException)
 
         when:
         beanContext.getBean(F)
@@ -133,8 +132,8 @@ class Test2 {}
         beanContext.getBeansOfType(C).size() == 2
         beanContext.getBeansOfType(B).size() == 3
         factory.bCalls == 6
-        factory.cCalls == 6
-        factory.dCalls == 4
+        factory.cCalls == 4
+        factory.dCalls == 2
 
         cleanup:
         beanContext.close()
@@ -149,8 +148,8 @@ class Test2 {}
         DProcessor.constructed.get() == 1
         beanContext.getBeansOfType(ParameterDProcessor).size() == 1
         ParameterDProcessor.constructed.get() == 1
-        beanContext.getBeansOfType(NullableDProcessor).size() == 4
-        NullableDProcessor.constructed.get() == 4 //3 null D beans and 1 D bean
+        beanContext.getBeansOfType(NullableDProcessor).size() == 1
+        NullableDProcessor.constructed.get() == 1 //3 null D beans and 1 D bean
 
         when:
         beanContext.getBean(DProcessor, Qualifiers.byName("one"))

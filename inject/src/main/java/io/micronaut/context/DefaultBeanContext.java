@@ -711,12 +711,26 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> T getBean(Class<T> beanType, Qualifier<T> qualifier) {
-        return getBeanInternal(null, beanType, qualifier, true, true);
+        try {
+            return getBeanInternal(null, beanType, qualifier, true, true);
+        } catch (DisabledBeanException e) {
+            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
+            }
+            throw new NoSuchBeanException(beanType, qualifier);
+        }
     }
 
     @Override
     public <T> T getBean(Class<T> beanType) {
-        return getBeanInternal(null, beanType, null, true, true);
+        try {
+            return getBeanInternal(null, beanType, null, true, true);
+        } catch (DisabledBeanException e) {
+            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
+            }
+            throw new NoSuchBeanException(beanType, null);
+        }
     }
 
     @Override
@@ -1236,11 +1250,18 @@ public class DefaultBeanContext implements BeanContext {
             return Optional.of((T) this);
         }
 
-        T bean = getBeanInternal(resolutionContext, beanType, qualifier, true, false);
-        if (bean == null) {
+        try {
+            T bean = getBeanInternal(resolutionContext, beanType, qualifier, true, false);
+            if (bean == null) {
+                return Optional.empty();
+            } else {
+                return Optional.of(bean);
+            }
+        } catch (DisabledBeanException e) {
+            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
+            }
             return Optional.empty();
-        } else {
-            return Optional.of(bean);
         }
     }
 
@@ -2164,117 +2185,106 @@ public class DefaultBeanContext implements BeanContext {
             Qualifier<T> qualifier,
             boolean throwNonUnique,
             boolean throwNoSuchBean) {
-        try {
-            // allow injection the bean context
-            if (thisInterfaces.contains(beanType)) {
-                return (T) this;
-            }
+        // allow injection the bean context
+        if (thisInterfaces.contains(beanType)) {
+            return (T) this;
+        }
 
-            if (beanType == InjectionPoint.class) {
-                final BeanResolutionContext.Path path = resolutionContext != null ? resolutionContext.getPath() : null;
+        if (beanType == InjectionPoint.class) {
+            final BeanResolutionContext.Path path = resolutionContext != null ? resolutionContext.getPath() : null;
 
-                if (CollectionUtils.isNotEmpty(path)) {
-                    final Iterator<BeanResolutionContext.Segment<?>> i = path.iterator();
-                    final BeanResolutionContext.Segment<?> injectionPointSegment = i.next();
-                    if (i.hasNext()) {
-                        BeanResolutionContext.Segment segment = i.next();
-                        final BeanDefinition declaringBean = segment.getDeclaringType();
-                        if (declaringBean.hasStereotype(INTRODUCTION_TYPE)) {
-                            if (!i.hasNext()) {
-                                if (!injectionPointSegment.getArgument().isNullable()) {
-                                    throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
-                                } else {
-                                    return null;
-                                }
+            if (CollectionUtils.isNotEmpty(path)) {
+                final Iterator<BeanResolutionContext.Segment<?>> i = path.iterator();
+                final BeanResolutionContext.Segment<?> injectionPointSegment = i.next();
+                if (i.hasNext()) {
+                    BeanResolutionContext.Segment segment = i.next();
+                    final BeanDefinition declaringBean = segment.getDeclaringType();
+                    if (declaringBean.hasStereotype(INTRODUCTION_TYPE)) {
+                        if (!i.hasNext()) {
+                            if (!injectionPointSegment.getArgument().isNullable()) {
+                                throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
                             } else {
-                                segment = i.next();
+                                return null;
                             }
-                        }
-                        return (T) segment.getInjectionPoint();
-                    } else {
-                        if (!injectionPointSegment.getArgument().isNullable()) {
-                            throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
                         } else {
-                            return null;
+                            segment = i.next();
                         }
                     }
+                    return (T) segment.getInjectionPoint();
                 } else {
-                    throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                    if (!injectionPointSegment.getArgument().isNullable()) {
+                        throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                    } else {
+                        return null;
+                    }
                 }
+            } else {
+                throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
             }
-            BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
+        }
+        BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
 
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Looking up existing bean for key: {}", beanKey);
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Looking up existing bean for key: {}", beanKey);
+        }
+
+        T inFlightBean = resolutionContext != null ? resolutionContext.getInFlightBean(beanKey) : null;
+        if (inFlightBean != null) {
+            return inFlightBean;
+        }
+
+        BeanRegistration<T> beanRegistration = singletonObjects.get(beanKey);
+        if (beanRegistration != null) {
+            T bean = beanRegistration.bean;
+            if (bean == null && throwNoSuchBean) {
+                throw new NoSuchBeanException(beanType, qualifier);
+            } else {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", beanRegistration.bean, beanType, qualifier);
+                }
+                return bean;
             }
+        } else if (LOG.isTraceEnabled()) {
+            LOG.trace("No existing bean found for bean key: {}", beanKey);
+        }
 
-            T inFlightBean = resolutionContext != null ? resolutionContext.getInFlightBean(beanKey) : null;
-            if (inFlightBean != null) {
-                return inFlightBean;
-            }
+        synchronized (singletonObjects) {
 
-            BeanRegistration<T> beanRegistration = singletonObjects.get(beanKey);
-            if (beanRegistration != null) {
-                T bean = beanRegistration.bean;
-                if (bean == null && throwNoSuchBean) {
-                    throw new NoSuchBeanException(beanType, qualifier);
-                } else {
+            Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(resolutionContext, beanType, qualifier, throwNonUnique, false);
+            T bean;
+
+            if (concreteCandidate.isPresent()) {
+                BeanDefinition<T> definition = concreteCandidate.get();
+
+                bean = findExistingCompatibleSingleton(definition.getBeanType(), qualifier, definition);
+                if (bean != null) {
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", beanRegistration.bean, beanType, qualifier);
+                        LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", bean, beanType, qualifier);
                     }
                     return bean;
                 }
-            } else if (LOG.isTraceEnabled()) {
-                LOG.trace("No existing bean found for bean key: {}", beanKey);
-            }
 
-            synchronized (singletonObjects) {
-
-                Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(resolutionContext, beanType, qualifier, throwNonUnique, false);
-                T bean;
-
-                if (concreteCandidate.isPresent()) {
-                    BeanDefinition<T> definition = concreteCandidate.get();
-
-                    bean = findExistingCompatibleSingleton(definition.getBeanType(), qualifier, definition);
-                    if (bean != null) {
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", bean, beanType, qualifier);
-                        }
-                        return bean;
+                if (definition.isProvided() && beanType == definition.getBeanType()) {
+                    if (throwNoSuchBean) {
+                        throw new NoSuchBeanException(beanType, qualifier);
                     }
-
-                    if (definition.isProvided() && beanType == definition.getBeanType()) {
-                        if (throwNoSuchBean) {
-                            throw new NoSuchBeanException(beanType, qualifier);
-                        }
-                        return null;
-                    } else {
-                        bean = getBeanForDefinition(resolutionContext, beanType, qualifier, throwNoSuchBean, definition);
-                        if (bean == null && throwNoSuchBean) {
-                            throw new NoSuchBeanException(beanType, qualifier);
-                        } else {
-                            return bean;
-                        }
-                    }
-
+                    return null;
                 } else {
-                    bean = findExistingCompatibleSingleton(beanType, qualifier, null);
+                    bean = getBeanForDefinition(resolutionContext, beanType, qualifier, throwNoSuchBean, definition);
                     if (bean == null && throwNoSuchBean) {
                         throw new NoSuchBeanException(beanType, qualifier);
                     } else {
                         return bean;
                     }
                 }
-            }
-        } catch (DisabledBeanException e) {
-            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.LOG.debug("Bean of type {} disabled for reason: {}", beanType, e.getMessage());
-            }
-            if (throwNoSuchBean) {
-                throw new NoSuchBeanException(beanType, qualifier);
+
             } else {
-                return null;
+                bean = findExistingCompatibleSingleton(beanType, qualifier, null);
+                if (bean == null && throwNoSuchBean) {
+                    throw new NoSuchBeanException(beanType, qualifier);
+                } else {
+                    return bean;
+                }
             }
         }
     }
@@ -2949,7 +2959,7 @@ public class DefaultBeanContext implements BeanContext {
             }
         } catch (DisabledBeanException e) {
             if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.LOG.debug("Bean of type {} disabled for reason: {}", beanType, e.getMessage());
+                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
             }
         }
 
