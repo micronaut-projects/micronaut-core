@@ -32,14 +32,14 @@ import io.netty.channel.socket.ServerSocketChannel;
 
 /**
  * Factory for KQueueEventLoopGroup.
- * 
+ *
  * @author croudet
  */
 @Singleton
 @Requires(property = "micronaut.server.netty.use-native-transport", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Requires(classes = KQueue.class, condition = KQueueAvailabilityCondition.class)
 @Internal
-class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
+public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
 
     private static KQueueEventLoopGroup withIoRatio(KQueueEventLoopGroup group, @Nullable Integer ioRatio) {
         if (ioRatio != null) {
@@ -50,7 +50,7 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a KQueueEventLoopGroup.
-     * 
+     *
      * @param threads The number of threads to use.
      * @param ioRatio The io ratio.
      * @return A KQueueEventLoopGroup.
@@ -62,7 +62,7 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a KQueueEventLoopGroup.
-     * 
+     *
      * @param threads       The number of threads to use.
      * @param threadFactory The thread factory.
      * @param ioRatio       The io ratio.
@@ -75,7 +75,7 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a KQueueEventLoopGroup.
-     * 
+     *
      * @param threads  The number of threads to use.
      * @param executor An Executor.
      * @param ioRatio  The io ratio.
@@ -88,7 +88,7 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a default KQueueEventLoopGroup.
-     * 
+     *
      * @param ioRatio The io ratio.
      * @return A KQueueEventLoopGroup.
      */
@@ -99,9 +99,10 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Returns the server channel class.
-     * 
+     *
      * @return KQueueServerSocketChannel.
      */
+    @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return KQueueServerSocketChannel.class;
     }

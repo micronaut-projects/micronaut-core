@@ -30,13 +30,13 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 /**
  * Factory for NioEventLoopGroup.
- * 
+ *
  * @author croudet
  */
 @Singleton
 @Internal
 @Requires(missingBeans = { EpollEventLoopGroupFactory.class, KQueueEventLoopGroupFactory.class })
-class NioEventLoopGroupFactory implements EventLoopGroupFactory {
+public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
     private static NioEventLoopGroup withIoRatio(NioEventLoopGroup group, @Nullable Integer ioRatio) {
         if (ioRatio != null) {
@@ -47,7 +47,7 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a NioEventLoopGroup.
-     * 
+     *
      * @param threads The number of threads to use.
      * @param ioRatio The io ratio.
      * @return A NioEventLoopGroup.
@@ -59,7 +59,7 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a NioEventLoopGroup.
-     * 
+     *
      * @param threads       The number of threads to use.
      * @param threadFactory The thread factory.
      * @param ioRatio       The io ratio.
@@ -72,7 +72,7 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a NioEventLoopGroup.
-     * 
+     *
      * @param threads  The number of threads to use.
      * @param executor An Executor.
      * @param ioRatio  The io ratio.
@@ -85,7 +85,7 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a default NioEventLoopGroup.
-     * 
+     *
      * @param ioRatio The io ratio.
      * @return A NioEventLoopGroup.
      */
@@ -96,9 +96,10 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Returns the server channel class.
-     * 
+     *
      * @return NioServerSocketChannel.
      */
+    @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return NioServerSocketChannel.class;
     }
