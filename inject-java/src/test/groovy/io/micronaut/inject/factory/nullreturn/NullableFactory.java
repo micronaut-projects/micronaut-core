@@ -15,12 +15,14 @@
  */
 package io.micronaut.inject.factory.nullreturn;
 
-import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Parameter;
-import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.*;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.context.condition.Condition;
+import io.micronaut.context.condition.ConditionContext;
+import io.micronaut.context.exceptions.DisabledBeanException;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
+
 import javax.inject.Named;
 import javax.inject.Singleton;
 
@@ -63,14 +65,14 @@ public class NullableFactory {
     @Named("four")
     B getBFour() {
         bCalls++;
-        return null;
+        throw new DisabledBeanException("Named four");
     }
 
     @EachBean(B.class)
     C getC(B b) {
         cCalls++;
-        if (b.name.equals("three")) {
-            return null;
+        if (b == null || b.name.equals("three")) {
+            throw new DisabledBeanException("Named three");
         } else {
             return new C(b.name);
         }
@@ -79,8 +81,8 @@ public class NullableFactory {
     @EachBean(C.class)
     D getD(C c) {
         dCalls++;
-        if (c.name.equals("two")) {
-            return null;
+        if (c == null || c.name.equals("two")) {
+            throw new DisabledBeanException("Named two");
         } else {
             return new D();
         }
@@ -90,10 +92,10 @@ public class NullableFactory {
     D2 getD2(@Nullable C c) {
         d2Calls++;
         if (c == null) {
-            return null;
+            throw new DisabledBeanException("Null C");
         }
         if (c.name.equals("two")) {
-            return null;
+            throw new DisabledBeanException("Named two");
         } else {
             return new D2();
         }
@@ -103,7 +105,7 @@ public class NullableFactory {
     D3 getD3(@Parameter C c) {
         d3Calls++;
         if (c.name.equals("two")) {
-            return null;
+            throw new DisabledBeanException("Named two");
         } else {
             return new D3();
         }
@@ -116,7 +118,7 @@ public class NullableFactory {
 
     @Singleton
     F getF() {
-        return null;
+        throw new DisabledBeanException("Not active");
     }
 
 
@@ -142,3 +144,4 @@ class D2 {}
 class D3 {}
 class E {}
 class F {}
+

@@ -17,6 +17,7 @@ package io.micronaut.http.client;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
@@ -121,7 +122,7 @@ public class ServiceHttpClientFactory {
                     }));
             };
         }
-        return null;
+        throw new DisabledBeanException("HTTP Client Health Check not enabled");
     }
 
 }

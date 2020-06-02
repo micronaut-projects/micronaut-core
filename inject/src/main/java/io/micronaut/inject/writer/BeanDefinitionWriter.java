@@ -15,11 +15,11 @@
  */
 package io.micronaut.inject.writer;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.*;
 import io.micronaut.context.annotation.*;
-import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -38,9 +38,6 @@ import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
-
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 
 import javax.inject.Scope;
 import javax.inject.Singleton;
@@ -1860,12 +1857,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // store a reference to the bean being built at index 3
             int factoryVar = pushNewBuildLocalVariable();
 
-            Map<String, Integer> variableReplacements;
-            if (isParametrized) {
-                variableReplacements = Collections.emptyMap();
-            } else {
-                variableReplacements = processEachBeanArgument(methodAnnotationMetadata, argumentTypes, argumentAnnotationMetadata, buildMethodVisitor);
-            }
             buildMethodVisitor.visitVarInsn(ALOAD, factoryVar);
             pushCastToType(buildMethodVisitor, factoryClass);
 
@@ -1875,7 +1866,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         methodName,
                         Type.getMethodDescriptor(beanType), false);
             } else {
-                pushConstructorArguments(buildMethodVisitor, argumentTypes, argumentAnnotationMetadata, variableReplacements);
+                pushConstructorArguments(buildMethodVisitor, argumentTypes, argumentAnnotationMetadata);
 
                 String methodDescriptor = getMethodDescriptor(beanFullClassName, argumentTypes.values());
                 buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
@@ -1899,15 +1890,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             GeneratorAdapter buildMethodVisitor = this.buildMethodVisitor;
 
-            Map<String, Integer> variableReplacements;
-            if (isParametrized) {
-                variableReplacements = Collections.emptyMap();
-            } else {
-                variableReplacements = processEachBeanArgument(classMetadata, argumentTypes, argumentAnnotationMetadata, buildMethodVisitor);
-            }
             buildMethodVisitor.visitTypeInsn(NEW, beanType.getInternalName());
             buildMethodVisitor.visitInsn(DUP);
-            pushConstructorArguments(buildMethodVisitor, argumentTypes, argumentAnnotationMetadata, variableReplacements);
+            pushConstructorArguments(buildMethodVisitor, argumentTypes, argumentAnnotationMetadata);
             String constructorDescriptor = getConstructorDescriptor(argumentTypes.values());
             buildMethodVisitor.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
             // store a reference to the bean being built at index 3
@@ -1919,62 +1904,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    private Map<String, Integer> processEachBeanArgument(AnnotationMetadata ownerMetadata,
-                                                         Map<String, Object> argumentTypes,
-                                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                                         GeneratorAdapter buildMethodVisitor) {
-        Map<String, Integer> variableReplacements = new HashMap<>();
-
-        if (!argumentTypes.isEmpty()) {
-            Optional<String> eachBeanArgument = ownerMetadata.stringValue(EachBean.class);
-            if (eachBeanArgument.isPresent()) {
-                int size = argumentTypes.size();
-                Iterator<Map.Entry<String, Object>> iterator = argumentTypes.entrySet().iterator();
-                for (int i = 0; i < size; i++) {
-                    Map.Entry<String, Object> entry = iterator.next();
-                    if (entry.getValue().equals(eachBeanArgument.get())) {
-
-                        AnnotationMetadata argMetadata = argumentAnnotationMetadata.get(entry.getKey());
-
-                        buildMethodVisitor.visitInsn(ACONST_NULL);
-                        int eachBeanVar = pushNewBuildLocalVariable();
-
-                        Label tryStart = new Label();
-                        Label tryEnd = new Label();
-                        Label catchStart = new Label();
-                        Label catchEnd = new Label();
-                        buildMethodVisitor.visitTryCatchBlock(tryStart, tryEnd, catchStart, Type.getInternalName(BeanContextException.class));
-                        buildMethodVisitor.visitLabel(tryStart);
-
-
-                        pushConstructorArgument(buildMethodVisitor, entry.getKey(), entry.getValue(), argMetadata, i);
-                        buildMethodVisitor.visitVarInsn(ASTORE, eachBeanVar);
-
-                        buildMethodVisitor.visitLabel(tryEnd);
-                        buildMethodVisitor.visitJumpInsn(GOTO, catchEnd);
-
-                        buildMethodVisitor.visitLabel(catchStart);
-                        if (!argMetadata.hasAnnotation(AnnotationUtil.NULLABLE)) {
-                            buildMethodVisitor.visitInsn(ACONST_NULL);
-                            buildMethodVisitor.visitInsn(ARETURN);
-                        } else {
-                            buildMethodVisitor.pop();
-                        }
-                        buildMethodVisitor.visitLabel(catchEnd);
-
-                        variableReplacements.put(entry.getKey(), eachBeanVar);
-                        break;
-                    }
-                }
-            }
-        }
-        return variableReplacements;
-    }
-
     private void pushConstructorArguments(GeneratorAdapter buildMethodVisitor,
                                           Map<String, Object> argumentTypes,
-                                          Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                          Map<String, Integer> variableReplacements) {
+                                          Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
         int size = argumentTypes.size();
         if (size > 0) {
             Iterator<Map.Entry<String, Object>> iterator = argumentTypes.entrySet().iterator();
@@ -1982,12 +1914,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 Map.Entry<String, Object> entry = iterator.next();
                 AnnotationMetadata argMetadata = argumentAnnotationMetadata.get(entry.getKey());
 
-                Integer variable = variableReplacements.get(entry.getKey());
-                if (variable != null) {
-                    buildMethodVisitor.visitVarInsn(ALOAD, variable);
-                } else {
-                    pushConstructorArgument(buildMethodVisitor, entry.getKey(), entry.getValue(), argMetadata, i);
-                }
+                pushConstructorArgument(buildMethodVisitor, entry.getKey(), entry.getValue(), argMetadata, i);
             }
         }
     }
