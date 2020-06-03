@@ -243,7 +243,7 @@ ext {
             ],
             'micronaut.netflix': [
                     version:micronautNetflixVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.netflix',
                     name:'micronaut-netflix-archaius',
                     modules:['micronaut-netflix-hystrix', 'micronaut-netflix-ribbon']
             ],
