@@ -35,7 +35,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE})
-@Bean
 public @interface WebSocketComponent {
     /**
      * The default WebSocket URI.
