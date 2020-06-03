@@ -572,8 +572,8 @@ ext {
             ],
             'micronaut.views': [
                 version: micronautViewsVersion,
-                group  : 'io.micronaut',
-                modules: ['micronaut-views', 'micronaut-views-core', 'micronaut-views-freemarker', 'micronaut-views-handlebars', 'micronaut-views-thymeleaf', 'micronaut-views-velocity']
+                group  : 'io.micronaut.views',
+                modules: ['micronaut-views', 'micronaut-views-core', 'micronaut-views-freemarker', 'micronaut-views-handlebars', 'micronaut-views-thymeleaf', 'micronaut-views-velocity', 'micronaut-views-soy', 'micronaut-views-rocker']
             ],
             'micronaut.rss': [
                     version:micronautRssVersion,
