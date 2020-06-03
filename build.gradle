@@ -248,7 +248,7 @@ ext {
                     modules:['micronaut-netflix-hystrix', 'micronaut-netflix-ribbon']
             ],
             'micronaut.openapi': [
-                    version:micronautOpenApi,
+                    version:micronautOpenApiVersion,
                     group:'io.micronaut.configuration',
                     name:'micronaut-openapi'
             ],
@@ -443,7 +443,7 @@ ext {
                     name   : 'spock-core'
             ],
             swagger                    : [
-                    version: '2.1.1',
+                    version: swaggerVersion,
                     group  : 'io.swagger.core.v3',
                     name   : 'swagger-core',
                     modules: ['swagger-models', 'swagger-annotations']
