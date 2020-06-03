@@ -209,8 +209,8 @@ ext {
                 name:'micronaut-elasticsearch'
             ],
             'micronaut.flyway': [
-                version:micronautFlyway,
-                group:'io.micronaut.configuration',
+                version:micronautFlywayVersion,
+                group:'io.micronaut.flyway',
                 name:'micronaut-flyway'
             ],
             'micronaut.function-aws': [
