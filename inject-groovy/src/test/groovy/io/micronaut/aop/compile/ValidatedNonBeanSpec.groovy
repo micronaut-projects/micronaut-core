@@ -1,12 +1,13 @@
 package io.micronaut.aop.compile
 
 import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.inject.BeanDefinition
 
 class ValidatedNonBeanSpec extends AbstractBeanDefinitionSpec {
 
     void "test a class with only a validation annotation is not a bean"() {
         when:
-        buildBeanDefinition("test.DefaultContract", """
+        BeanDefinition beanDefinition = buildBeanDefinition("test.DefaultContract", """
 package test
 
 import javax.validation.constraints.NotNull
@@ -26,6 +27,6 @@ interface Contract {
 
 """)
         then:
-        thrown(ClassNotFoundException)
+        beanDefinition == null
     }
 }

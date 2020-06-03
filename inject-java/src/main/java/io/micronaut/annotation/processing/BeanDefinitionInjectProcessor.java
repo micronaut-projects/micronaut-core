@@ -838,46 +838,42 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
+            if (isDeclaredBean) {
+                Set<Modifier> modifiers = method.getModifiers();
+                boolean hasInvalidModifiers = modelUtils.isAbstract(method) || modifiers.contains(Modifier.STATIC) || methodAnnotationMetadata.hasAnnotation(Internal.class) || modelUtils.isPrivate(method);
+                boolean isPublic = modifiers.contains(Modifier.PUBLIC) && !hasInvalidModifiers;
+                boolean isExecutable =
+                        !hasInvalidModifiers &&
+                                (isExecutableThroughType(method.getEnclosingElement(), methodAnnotationMetadata, annotationMetadata, modifiers, isPublic) ||
+                                        annotationMetadata.hasStereotype(AROUND_TYPE));
 
-
-
-            Set<Modifier> modifiers = method.getModifiers();
-            boolean hasInvalidModifiers = modelUtils.isAbstract(method) || modifiers.contains(Modifier.STATIC) || methodAnnotationMetadata.hasAnnotation(Internal.class) || modelUtils.isPrivate(method);
-            boolean isPublic = modifiers.contains(Modifier.PUBLIC) && !hasInvalidModifiers;
-            boolean isExecutable =
-                    !hasInvalidModifiers &&
-                            (isExecutableThroughType(method.getEnclosingElement(), methodAnnotationMetadata, annotationMetadata, modifiers, isPublic) ||
-                                    annotationMetadata.hasStereotype(AROUND_TYPE));
-
-
-            boolean hasConstraints = false;
-            if (isDeclaredBean &&
-                    !methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
-                    method.getParameters()
-                            .stream()
-                            .anyMatch((p) -> annotationUtils.hasStereotype(p, ANN_CONSTRAINT) || annotationUtils.hasStereotype(p, ANN_VALID))) {
-                hasConstraints = true;
-                methodAnnotationMetadata = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder().annotate(
-                        methodAnnotationMetadata,
-                        io.micronaut.core.annotation.AnnotationValue.builder(ANN_VALIDATED).build()
-                );
-            }
-
-            if (isExecutable) {
-                visitExecutableMethod(method, methodAnnotationMetadata);
-                return null;
-            } else if (isConfigurationPropertiesType && !modelUtils.isPrivate(method) && !modelUtils.isStatic(method)) {
-                String methodName = method.getSimpleName().toString();
-                if (NameUtils.isSetterName(methodName) && method.getParameters().size() == 1) {
-                    visitConfigurationPropertySetter(method);
-                } else if (NameUtils.isGetterName(methodName)) {
-                    BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
-                    if (!writer.isValidated() && annotationUtils.hasStereotype(method, ANN_CONSTRAINT)) {
-                        writer.setValidated(true);
-                    }
+                boolean hasConstraints = false;
+                if (!methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
+                        method.getParameters()
+                                .stream()
+                                .anyMatch((p) -> annotationUtils.hasStereotype(p, ANN_CONSTRAINT) || annotationUtils.hasStereotype(p, ANN_VALID))) {
+                    hasConstraints = true;
+                    methodAnnotationMetadata = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder().annotate(
+                            methodAnnotationMetadata,
+                            io.micronaut.core.annotation.AnnotationValue.builder(ANN_VALIDATED).build()
+                    );
                 }
-            } else if (isPublic && hasConstraints) {
-                visitExecutableMethod(method, methodAnnotationMetadata);
+
+                if (isExecutable) {
+                    visitExecutableMethod(method, methodAnnotationMetadata);
+                } else if (isConfigurationPropertiesType && !modelUtils.isPrivate(method) && !modelUtils.isStatic(method)) {
+                    String methodName = method.getSimpleName().toString();
+                    if (NameUtils.isSetterName(methodName) && method.getParameters().size() == 1) {
+                        visitConfigurationPropertySetter(method);
+                    } else if (NameUtils.isGetterName(methodName)) {
+                        BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
+                        if (!writer.isValidated() && annotationUtils.hasStereotype(method, ANN_CONSTRAINT)) {
+                            writer.setValidated(true);
+                        }
+                    }
+                } else if (isPublic && hasConstraints) {
+                    visitExecutableMethod(method, methodAnnotationMetadata);
+                }
             }
 
             return null;

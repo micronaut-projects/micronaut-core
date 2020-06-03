@@ -79,5 +79,27 @@ class Parent {
         !definition.findMethod("packagePrivateMethod").isPresent()
         !definition.findMethod("protectedMethod").isPresent()
     }
+
+    void "bean definition should not be created for class with only executable methods"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+class MyBean {
+
+    @Executable
+    public int round(float num) {
+        return Math.round(num);
+    }
+}
+
+''')
+
+        expect:
+        definition == null
+    }
 }
 

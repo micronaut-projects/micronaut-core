@@ -25,7 +25,7 @@ abstract class GenericController<T> {
 
 """)
         then:
-        thrown(ClassNotFoundException)
+        definition == null
     }
 
     void "test the same method isn't written twice"() {
