@@ -81,7 +81,6 @@ class Parent {
         !definition.findMethod("protectedMethod").isPresent()
     }
 
-    @Ignore
     void "bean definition should not be created for class with only executable methods"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.MyBean','''\

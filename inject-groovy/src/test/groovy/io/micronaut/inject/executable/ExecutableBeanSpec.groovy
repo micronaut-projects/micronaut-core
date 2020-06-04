@@ -46,7 +46,6 @@ class ExecutableBean1 {
 
     }
 
-    @Ignore
     void "bean definition should not be created for class with only executable methods"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.MyBean','''\

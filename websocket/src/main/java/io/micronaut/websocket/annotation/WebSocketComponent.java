@@ -16,7 +16,6 @@
 package io.micronaut.websocket.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.websocket.WebSocketVersion;
 
 import java.lang.annotation.Documented;
@@ -35,7 +34,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE})
-@Bean
 public @interface WebSocketComponent {
     /**
      * The default WebSocket URI.
