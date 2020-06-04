@@ -224,6 +224,7 @@ management:
     title: Creating Endpoints
     endpointAnnotation: The Endpoint Annotation
     endpointMethod: Endpoint Methods
+    endpointSensitivity: Endpoint Sensitivity
     endpointConfiguration: Endpoint Configuration
   providedEndpoints:
     title: Built-In Endpoints

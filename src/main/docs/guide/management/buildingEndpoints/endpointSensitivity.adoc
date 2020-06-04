@@ -1,0 +1,15 @@
+Endpoint sensitivity can be controlled for the entire endpoint through the endpoint annotation and configuration. Individual methods can be configured independently from the endpoint as a whole, however. The ann:io.micronaut.management.endpoint.annotation.Sensitive[] annotation can be applied to methods to control their sensitivity.
+
+snippet::io.micronaut.docs.server.endpoint.AlertsEndpoint[tags="clazz", indent=0, title="AlertsEndpoint"]
+
+<1> The endpoint is not sensitive by default and the default prefix of `endpoints` is used.
+<2> This method is always sensitive, regardless of any other factors
+<3> The `property` value is appended to the prefix and id to lookup a configuration value
+
+If the configuration key `endpoints.alerts.add.sensitive` is set, that value will determine the sensitivity of the `addAlert` method.
+
+1. `endpoint` is the first token because that is the default value for `prefix` in the endpoint annotation and is not set explicity in this example.
+2. `alerts` is the next token because that is the endpoint id
+3. `add.sensitive` is the next token because that is the value set to the `property` member of the ann:io.micronaut.management.endpoint.annotation.Sensitive[] annotation.
+
+If the configuration key is not set, the `defaultValue` will be used (defaults to `true`).
