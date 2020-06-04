@@ -358,7 +358,7 @@ ext {
             ],
             'micronaut.neo4j': [
                     version:micronautNeo4jVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.neo4j',
                     name:'micronaut-neo4j-bolt'
             ],
             'mongo' : [
