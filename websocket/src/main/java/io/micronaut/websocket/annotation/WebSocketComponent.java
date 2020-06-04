@@ -16,6 +16,7 @@
 package io.micronaut.websocket.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.websocket.WebSocketVersion;
 
 import java.lang.annotation.Documented;
