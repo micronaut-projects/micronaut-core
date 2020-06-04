@@ -974,7 +974,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 boolean hasInvalidModifiers = methodNode.isStatic() || methodNode.isAbstract() || methodNode.isSynthetic() || methodAnnotationMetadata.hasAnnotation(Internal) || methodNode.isPrivate()
                 boolean isPublic = methodNode.isPublic() && !hasInvalidModifiers
                 boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable) || methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) && !hasInvalidModifiers
-                if (isDeclaredBean && isExecutable) {
+                if (isExecutable) {
                     visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
                 } else if (isConfigurationProperties && isPublic) {
                     if (NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
