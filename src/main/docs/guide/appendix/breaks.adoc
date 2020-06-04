@@ -263,4 +263,6 @@ public class Pet {
 
 Previously a bean introspection would have been generated for `PetType`. That is no longer the case. If the type should be introspected, simply add the annotation.
 
+=== Executable Methods
 
+A bug in Micronaut 1.x caused bean definitions to be created for classes that only declared executable annotations on one or more methods. Classes with executable methods must now be explicitly declared as a bean with a scope annotation in order for a bean definition to be created.

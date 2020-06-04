@@ -41,6 +41,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @WebSocketComponent
 @Introduction(interfaces = WebSocketSessionAware.class)
 @Type(ClientWebSocketInterceptor.class)
+@DefaultScope(Prototype.class)
 public @interface ClientWebSocket {
 
     /**

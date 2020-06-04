@@ -1,18 +1,34 @@
 The HTTP server is built on http://netty.io[Netty] which is designed as a non-blocking I/O toolkit in an event loop model.
 
-To configure the number of threads used by the Netty https://netty.io/4.0/api/io/netty/channel/EventLoop.html[EventLoop], you can use `application.yml`:
+The Netty worker event loop uses the "default" named event loop group. That event loop can be configured through `micronaut.server.netty.worker`, or `micronaut.netty.event-loops.default`, with the latter having precedence.
 
-.Configuring Netty Event Loop Threads
+include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration$Worker.adoc[]
+
+TIP: The parent event loop can be configured with `micronaut.server.netty.parent` with the same configuration options.
+
+The server can also be configured to use a different named worker event loop:
+
+.Using a different event loop for the server
 [source,yaml]
 ----
 micronaut:
     server:
         netty:
-           worker:
-              threads: 8 # number of netty worker threads
+            worker:
+                event-loop-group: other
+    netty:
+        event-loops:
+            other:
+                num-threads: 10
 ----
 
-NOTE: The default value is the value of the system property `io.netty.eventLoopThreads` or if not specified the available processors x 2
+NOTE: The default value for the number of threads is the value of the system property `io.netty.eventLoopThreads`, or if not specified, the available processors x 2.
+
+See the following table for configuring event loops:
+
+include::{includedir}configurationProperties/io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration.adoc[]
+
+==== Blocking Operations
 
 When dealing with blocking operations, Micronaut will shift the blocking operations to an unbound, caching I/O thread pool by default. You can configure the I/O thread pool using the api:scheduling.executor.ExecutorConfiguration[] named `io`. For example:
 
