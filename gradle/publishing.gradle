@@ -67,12 +67,12 @@ ext.pomInfo = {
 
 if (project.name != 'bom' && project.name != 'parent') {
     task sourcesJar(type: Jar) {
-        archiveClassifier.set('sources')
+        classifier = 'sources'
         from sourceSets.main.allJava
     }
 
     task javadocJar(type: Jar) {
-        archiveClassifier.set('javadoc')
+        classifier = 'javadoc'
         from javadoc.destinationDir
     }    
 }
