@@ -40,6 +40,9 @@ Some dependencies have new Maven Group IDs so you may need to update your depend
 |`io.micronaut.configuration:micronaut-cassandra`
 |`io.micronaut.cassandra:micronaut-cassandra`
 
+|`io.micronaut.configuration:micronaut-hibernate-validator`
+|`io.micronaut.beanvalidation:micronaut-hibernate-validator`
+
 |`io.micronaut.configuration:micronaut-micrometer-*`
 |`io.micronaut.micrometer:micronaut-micrometer-*`
 
