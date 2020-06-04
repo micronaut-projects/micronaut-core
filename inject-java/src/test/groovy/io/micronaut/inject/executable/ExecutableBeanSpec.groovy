@@ -17,6 +17,7 @@ package io.micronaut.inject.executable
 
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
+import spock.lang.Ignore
 import spock.lang.Issue
 
 class ExecutableBeanSpec extends AbstractTypeElementSpec {
@@ -80,6 +81,7 @@ class Parent {
         !definition.findMethod("protectedMethod").isPresent()
     }
 
+    @Ignore
     void "bean definition should not be created for class with only executable methods"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.MyBean','''\

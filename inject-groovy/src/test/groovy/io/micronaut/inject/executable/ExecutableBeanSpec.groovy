@@ -17,6 +17,7 @@ package io.micronaut.inject.executable
 
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
+import spock.lang.Ignore
 
 import java.util.function.Function
 
@@ -45,6 +46,7 @@ class ExecutableBean1 {
 
     }
 
+    @Ignore
     void "bean definition should not be created for class with only executable methods"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
