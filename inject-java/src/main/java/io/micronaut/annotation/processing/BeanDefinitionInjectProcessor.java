@@ -859,7 +859,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 );
             }
 
-            if (isExecutable) {
+            if (isDeclaredBean && isExecutable) {
                 visitExecutableMethod(method, methodAnnotationMetadata);
             } else if (isConfigurationPropertiesType && !modelUtils.isPrivate(method) && !modelUtils.isStatic(method)) {
                 String methodName = method.getSimpleName().toString();
