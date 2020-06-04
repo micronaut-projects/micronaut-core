@@ -142,7 +142,7 @@ ext {
             ],
             'micronaut.hibernate.validator': [
                     version:micronautHibernateValidatorVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.beanvalidation',
                     name:'micronaut-hibernate-validator'
             ],
             'micronaut.jmx': [
