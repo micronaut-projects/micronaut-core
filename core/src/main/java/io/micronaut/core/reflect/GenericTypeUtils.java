@@ -21,7 +21,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
 
@@ -203,7 +203,7 @@ public class GenericTypeUtils {
      * @return All generic interfaces
      */
     private static Set<Type> getAllGenericInterfaces(Class<?> aClass) {
-        Set<Type> interfaces = new HashSet<>();
+        Set<Type> interfaces = new LinkedHashSet<>();
         return populateInterfaces(aClass, interfaces);
     }
 
