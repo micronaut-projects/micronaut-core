@@ -200,7 +200,7 @@ ext {
             ],
             'micronaut.elasticsearch': [
                 version:micronautElasticSearchVersion,
-                group:'io.micronaut.configuration',
+                group:'io.micronaut.elasticsearch',
                 name:'micronaut-elasticsearch'
             ],
             'micronaut.flyway': [
