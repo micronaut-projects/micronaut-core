@@ -181,6 +181,11 @@ ext {
                     name:'micronaut-runtime-groovy',
                     modules:['micronaut-function-groovy']
             ],
+            'micronaut.aws': [
+                    version:micronautAwsVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-aws-common'
+            ],
             'micronaut.gcp': [
                     version:micronautGcpVersion,
                     group:'io.micronaut.gcp',
@@ -208,11 +213,16 @@ ext {
                 group:'io.micronaut.flyway',
                 name:'micronaut-flyway'
             ],
-            'micronaut.aws': [
+            'micronaut.function-aws': [
+                    version:micronautAwsVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-function-aws'
+            ],
+            'micronaut.function.aws': [
                     version:micronautAwsVersion,
                     group:'io.micronaut.aws',
                     name:'micronaut-function-aws-api-proxy',
-                    modules: ['micronaut-function-aws', 'micronaut-aws-common', 'micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver']
+                    modules: ['micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver']
             ],
             'micronaut.kotlin': [
                     version:micronautKotlinVersion,
