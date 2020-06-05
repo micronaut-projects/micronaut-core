@@ -1,29 +1,5 @@
 dependencies {
+    annotationProcessor project(":inject-java")
     api project(":function")
     api project(":http-client")
-    api dependencyVersion("micronaut.aws"), {
-        exclude module:'micronaut-http-client'
-        exclude module:'micronaut-inject'
-    }
-    annotationProcessor project(":inject-java")
-    compileOnly dependencyVersion("micronaut.function.aws"), {
-        exclude module:"micronaut-function"
-    }
-    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
-
-    testImplementation project(":http-server-netty")
-    testImplementation dependencyVersion("micronaut.function-aws"), {
-        exclude module:"micronaut-function"
-    }
-    testImplementation project(":function-web")
-    testImplementation dependencyModuleVersion("micronaut.groovy","micronaut-function-groovy"), {
-        exclude module:'micronaut-function'
-        exclude module:'micronaut-runtime-groovy'
-    }
-    testImplementation dependencyModuleVersion("micronaut.groovy","micronaut-runtime-groovy"), {
-        exclude module:'micronaut-inject'
-    }
-    testCompileOnly project(":inject-groovy")
-    testAnnotationProcessor project(":inject-java")
-    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }

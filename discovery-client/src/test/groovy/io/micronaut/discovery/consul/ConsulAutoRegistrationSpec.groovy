@@ -19,9 +19,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
-import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryClientResolver
-import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration
-import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.discovery.eureka.EurekaConfiguration
 import io.micronaut.discovery.eureka.client.v2.EurekaClient
@@ -238,10 +235,7 @@ class ConsulAutoRegistrationSpec extends Specification {
         embeddedServer.applicationContext.containsBean(ConsulConfiguration.ConsulDiscoveryConfiguration)
 
         and: "those beans doesn't exist"
-        !embeddedServer.applicationContext.containsBean(Route53AutoRegistrationConfiguration)
         !embeddedServer.applicationContext.containsBean(EurekaClient)
-        !embeddedServer.applicationContext.containsBean(Route53DiscoveryConfiguration)
-        !embeddedServer.applicationContext.containsBean(AWSServiceDiscoveryClientResolver)
 
         cleanup:
         embeddedServer.stop()

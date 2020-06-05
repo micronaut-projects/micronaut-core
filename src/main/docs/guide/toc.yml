@@ -169,7 +169,6 @@ serverlessFunctions:
   gcpFunction: Google Cloud Function
   gcpCloudRun: Google CLoud Run
   azureFunction: Azure Function
-  callingFunctions: Calling Functions with FunctionClient
 messaging:
   title: Message-Driven Microservices
   kafka: Kafka Support
