@@ -147,7 +147,7 @@ ext {
             ],
             'micronaut.jmx': [
                     version:micronautJmxVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.jmx',
                     name:'micronaut-jmx'
             ],
             'micronaut.picocli': [
@@ -200,7 +200,7 @@ ext {
             ],
             'micronaut.elasticsearch': [
                 version:micronautElasticSearchVersion,
-                group:'io.micronaut.configuration',
+                group:'io.micronaut.elasticsearch',
                 name:'micronaut-elasticsearch'
             ],
             'micronaut.flyway': [
