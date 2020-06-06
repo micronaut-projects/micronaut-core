@@ -237,7 +237,7 @@ ext {
                     modules:['micronaut-multitenancy-gorm', 'micronaut-neo4j-gorm', 'micronaut-mongo-gorm', 'micronaut-hibernate-gorm', 'micronaut-graphql-gorm']
             ],
             'micronaut.liquibase': [
-                version:micronautLiquibase,
+                version:micronautLiquibaseVersion,
                 group:'io.micronaut.configuration',
                 name:'micronaut-liquibase'
             ],
