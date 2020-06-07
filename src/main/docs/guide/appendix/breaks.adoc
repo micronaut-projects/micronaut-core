@@ -266,3 +266,9 @@ Previously a bean introspection would have been generated for `PetType`. That is
 === Executable Methods
 
 A bug in Micronaut 1.x caused bean definitions to be created for classes that only declared executable annotations on one or more methods. Classes with executable methods must now be explicitly declared as a bean with a scope annotation in order for a bean definition to be created.
+
+=== AWS FunctionClient Moved to AWS Module
+
+The AWS based function client has been made part of the https://github.com/micronaut-projects/micronaut-aws/[Micronaut AWS] project. If you need this functionality add the following dependency:
+
+dependency:io.micronaut.aws:micronaut-function-client-aws[]
