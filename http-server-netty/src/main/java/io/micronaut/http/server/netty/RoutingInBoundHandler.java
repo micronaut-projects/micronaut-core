@@ -1031,13 +1031,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             ).execute();
                         } else {
                             //noinspection unchecked
-                            filterAndEncodeResponse(
+                            MutableHttpResponse<Object> mutableHttpResponse = (MutableHttpResponse<Object>) message;
+                            encodeHttpResponse(
                                     context,
                                     request,
-                                    request,
-                                    (MutableHttpResponse<Object>) message,
-                                    mediaType,
-                                    true
+                                    mutableHttpResponse,
+                                    mutableHttpResponse.body(),
+                                    defaultResponseMediaType
                             );
                         }
                     } else if (body != null) {
