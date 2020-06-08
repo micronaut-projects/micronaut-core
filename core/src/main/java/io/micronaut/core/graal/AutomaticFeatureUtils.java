@@ -15,8 +15,10 @@
  */
 package io.micronaut.core.graal;
 
+import com.oracle.svm.core.configure.ResourcesRegistry;
 import com.oracle.svm.core.jdk.proxy.DynamicProxyRegistry;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.ArrayUtils;
 import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.hosted.Feature.BeforeAnalysisAccess;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
@@ -33,6 +35,7 @@ import java.util.Optional;
  * Utility methods for implementing Graal's {@link com.oracle.svm.core.annotate.AutomaticFeature}.
  *
  * @author Álvaro Sánchez-Mariscal
+ * @author graemerocher
  * @since 2.0.0
  */
 @Internal
@@ -64,7 +67,7 @@ public final class AutomaticFeatureUtils {
      * @param access the {@link BeforeAnalysisAccess} instance
      * @param className the class name
      */
-    public static void registerForRuntimeReflection(BeforeAnalysisAccess access, String className) {
+    public static void registerAllForRuntimeReflection(BeforeAnalysisAccess access, String className) {
         findClass(access, className).ifPresent(AutomaticFeatureUtils::registerAllAccess);
     }
 
@@ -117,6 +120,36 @@ public final class AutomaticFeatureUtils {
         }
     }
 
+    /**
+     * Adds resource patterns.
+     * @param patterns The patterns
+     */
+    public static void addResourcePatterns(String... patterns) {
+        if (ArrayUtils.isNotEmpty(patterns)) {
+            ResourcesRegistry resourcesRegistry = ImageSingletons.lookup(ResourcesRegistry.class);
+            if (resourcesRegistry != null) {
+                for (String resource : patterns) {
+                    resourcesRegistry.addResources(resource);
+                }
+            }
+        }
+    }
+
+    /**
+     * Adds resource bundles
+     * @param bundles The bundles
+     */
+    public static void addResourceBundles(String... bundles) {
+        if (ArrayUtils.isNotEmpty(bundles)) {
+            ResourcesRegistry resourcesRegistry = ImageSingletons.lookup(ResourcesRegistry.class);
+            if (resourcesRegistry != null) {
+                for (String resource : bundles) {
+                    resourcesRegistry.addResourceBundles(resource);
+                }
+            }
+        }
+    }
+
     private static void registerAllAccess(Class<?> clazz) {
         registerClassForRuntimeReflection(clazz);
         registerFieldsForRuntimeReflection(clazz);
@@ -126,7 +159,6 @@ public final class AutomaticFeatureUtils {
     private static void registerClassForRuntimeReflection(Class<?> clazz) {
         RuntimeReflection.register(clazz);
         RuntimeReflection.registerForReflectiveInstantiation(clazz);
-
     }
 
     private static void registerMethodsForRuntimeReflection(Class<?> clazz) {
