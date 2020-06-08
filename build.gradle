@@ -411,6 +411,11 @@ ext {
                     name   : 'lettuce-core'
 
             ],
+            logback                    : [
+                    version: '1.2.3',
+                    group  : 'ch.qos.logback',
+                    name   : 'logback-classic'
+            ],
             spring                     : [
                     version: springVersion,
                     group  : 'org.springframework',
