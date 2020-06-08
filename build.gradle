@@ -228,7 +228,7 @@ ext {
             ],
             'micronaut.liquibase': [
                     version:micronautLiquibaseVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.liquibase',
                     name:'micronaut-liquibase'
             ],
             'micronaut.netflix': [
