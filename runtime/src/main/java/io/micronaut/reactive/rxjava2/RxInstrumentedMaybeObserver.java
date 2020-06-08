@@ -32,7 +32,8 @@ import io.reactivex.disposables.Disposable;
 @Internal
 final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstrumentedComponent {
     private final MaybeObserver<T> source;
-    private final InvocationInstrumenter instrumenter;
+    private final InvocationInstrumenter onSubscribeInstrumenter;
+    private final InvocationInstrumenter onResultInstrumenter;
 
     /**
      * Default constructor.
@@ -42,33 +43,34 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstru
      */
     RxInstrumentedMaybeObserver(MaybeObserver<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
+        this.onSubscribeInstrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
+        this.onResultInstrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = onSubscribeInstrumenter.newInstrumentation()) {
             source.onSubscribe(d);
         }
     }
 
     @Override
     public void onError(Throwable t) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
             source.onError(t);
         }
     }
 
     @Override
     public void onSuccess(T value) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
             source.onSuccess(value);
         }
     }
 
     @Override
     public void onComplete() {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
             source.onComplete();
         }
     }

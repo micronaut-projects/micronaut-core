@@ -33,7 +33,8 @@ import org.reactivestreams.Subscription;
 @SuppressWarnings("ReactiveStreamsSubscriberImplementation")
 class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent {
     private final Subscriber<T> source;
-    private final InvocationInstrumenter instrumenter;
+    private final InvocationInstrumenter onSubscribeInstrumenter;
+    private final InvocationInstrumenter onResultInstrumenter;
 
     /**
      * Default constructor.
@@ -43,33 +44,34 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
      */
     RxInstrumentedSubscriber(Subscriber<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
+        this.onSubscribeInstrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
+        this.onResultInstrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
     }
 
     @Override
     public void onSubscribe(Subscription s) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = onSubscribeInstrumenter.newInstrumentation()) {
             source.onSubscribe(s);
         }
     }
 
     @Override
     public void onNext(T t) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
             source.onNext(t);
         }
     }
 
     @Override
     public void onError(Throwable t) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
             source.onError(t);
         }
     }
 
     @Override
     public void onComplete() {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
             source.onComplete();
         }
     }

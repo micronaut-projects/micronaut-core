@@ -31,7 +31,8 @@ import io.reactivex.disposables.Disposable;
 @Internal
 final class RxInstrumentedCompletableObserver implements CompletableObserver, RxInstrumentedComponent {
     private final CompletableObserver source;
-    private final InvocationInstrumenter instrumenter;
+    private final InvocationInstrumenter onSubscribeInstrumenter;
+    private final InvocationInstrumenter onResultInstrumenter;
 
     /**
      * Default constructor.
@@ -41,26 +42,27 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Rx
      */
     RxInstrumentedCompletableObserver(CompletableObserver source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
+        this.onSubscribeInstrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
+        this.onResultInstrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = onSubscribeInstrumenter.newInstrumentation()) {
             source.onSubscribe(d);
         }
     }
 
     @Override
     public void onError(Throwable t) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
             source.onError(t);
         }
     }
 
     @Override
     public void onComplete() {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
             source.onComplete();
         }
     }
