@@ -48,12 +48,12 @@ public class LoggersEndpoint {
     /**
      * Endpoint default enabled.
      */
-    public static final boolean DEFAULT_ENABLED = false;
+    public static final boolean DEFAULT_ENABLED = true;
 
     /**
      * Endpoint default sensitivity.
      */
-    public static final boolean DEFAULT_SENSITIVE = true;
+    public static final boolean DEFAULT_SENSITIVE = false;
 
     private final ManagedLoggingSystem loggingSystem;
     private final LoggersManager<Map<String, Object>> loggersManager;
