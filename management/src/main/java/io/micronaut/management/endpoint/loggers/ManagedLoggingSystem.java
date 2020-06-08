@@ -26,8 +26,7 @@ import java.util.Collection;
  * @author Matthew Moss
  * @since 1.0
  */
-@Deprecated
-public interface LoggingSystem extends io.micronaut.logging.LoggingSystem {
+public interface ManagedLoggingSystem extends io.micronaut.logging.LoggingSystem {
 
     /**
      * Returns all existing loggers.

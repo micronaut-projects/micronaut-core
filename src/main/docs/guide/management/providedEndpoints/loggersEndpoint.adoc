@@ -2,6 +2,8 @@
 The loggers endpoint returns information about the available loggers in the application and
 permits configuring the their log level.
 
+NOTE: The loggers endpoint is disabled by default and needs to be explicitly enabled with the setting `endpoints.loggers.enabled=true`.
+
 To get a collection of all loggers by name with their configured and effective log levels,
 send a GET request to /loggers. This will also provide a list of the available log levels.
 

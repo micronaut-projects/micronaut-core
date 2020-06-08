@@ -24,7 +24,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
 import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
-import io.micronaut.management.endpoint.loggers.LoggingSystem;
+import io.micronaut.management.endpoint.loggers.ManagedLoggingSystem;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
@@ -32,7 +32,7 @@ import java.util.Collection;
 import java.util.stream.Collectors;
 
 /**
- * An implementation of {@link LoggingSystem} that works with logback.
+ * An implementation of {@link ManagedLoggingSystem} that works with logback.
  *
  * @author Matthew Moss
  * @since 1.0
@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
 @Requires(beans = LoggersEndpoint.class)
 @Requires(classes = ch.qos.logback.classic.LoggerContext.class)
 @Replaces(io.micronaut.logging.impl.LogbackLoggingSystem.class)
-public class LogbackLoggingSystem implements LoggingSystem, io.micronaut.logging.LoggingSystem {
+public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.logging.LoggingSystem {
 
     @Override
     @NonNull

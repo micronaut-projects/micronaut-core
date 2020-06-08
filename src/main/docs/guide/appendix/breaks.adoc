@@ -16,7 +16,7 @@ snippet::io.micronaut.docs.http.server.executeon.PersonController[tags="imports,
 
 NOTE: If you wish to return to the previous behaviour as defined in Micronaut 1.x you can set `micronaut.server.thread-selection` to `AUTO` in configuration.
 
-=== Micronaut Cache Moved Out Of Runtime
+=== Micronaut Cache Removed from Core
 
 The `micronaut-runtime` module in Micronaut 1.x included support for caching AOP with the `@Cache` annotation. The core caching library and a default implementation based on caffeine were included.
 
@@ -26,9 +26,30 @@ The management endpoint for caches is no longer included by default in the `micr
 
 === Support for RxJava 1.x Removed from Core
 
-RxJava 1.x support is no longer included in core by default. You can re-enable suppot by adding the following dependency:
+RxJava 1.x support is no longer included in core by default. You can re-enable support by adding the following dependency:
 
-dependency:io.micronaut.rxjava1:micronaut-rxjava1[scope="compile", version="1.0.0"]
+dependency:io.micronaut.rxjava1:micronaut-rxjava1[]
+
+=== Support for Reactor Removed from Core
+
+Reactor support is no longer included in core by default. You can re-enable support by adding the following dependency:
+
+dependency:io.micronaut.reactor:micronaut-reactor[]
+
+=== Loggers Endpoint Disabled by Default
+
+Since logging can potentially leak sensitive information the `/loggers` endpoint is disabled by default and can be explicitly re-enabled as desired with:
+
+.Enabling the Loggers Endpoint
+[source,yaml]
+----
+endpoints:
+    loggers:
+        enabled: true
+        sensitive: false
+----
+
+Note that if it is preferable to require authentication so only use `sensitive: false` as a last resort.
 
 === Server Side Content Negotiation May Require Test Changes
 

@@ -52,21 +52,21 @@ public class LoggersEndpoint {
     /**
      * Endpoint default enabled.
      */
-    public static final boolean DEFAULT_ENABLED = true;
+    public static final boolean DEFAULT_ENABLED = false;
 
     /**
      * Endpoint default sensitivity.
      */
-    public static final boolean DEFAULT_SENSITIVE = false;
+    public static final boolean DEFAULT_SENSITIVE = true;
 
-    private final LoggingSystem loggingSystem;
+    private final ManagedLoggingSystem loggingSystem;
     private final LoggersManager<Map<String, Object>> loggersManager;
 
     /**
-     * @param loggingSystem the {@link LoggingSystem}
+     * @param loggingSystem the {@link io.micronaut.logging.LoggingSystem}
      * @param loggersManager the {@link LoggersManager}
      */
-    public LoggersEndpoint(LoggingSystem loggingSystem,
+    public LoggersEndpoint(ManagedLoggingSystem loggingSystem,
                            LoggersManager<Map<String, Object>> loggersManager) {
         this.loggingSystem = loggingSystem;
         this.loggersManager = loggersManager;
