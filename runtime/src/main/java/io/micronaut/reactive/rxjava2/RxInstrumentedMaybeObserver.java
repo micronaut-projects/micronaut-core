@@ -31,8 +31,8 @@ import io.reactivex.disposables.Disposable;
 @Internal
 final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstrumentedComponent {
     private final MaybeObserver<T> source;
-    private final InvocationInstrumenter instrumenter;
-    private boolean active;
+    private final InvocationInstrumenter onSubscribeInstrumenter;
+    private final InvocationInstrumenter onResultInstrumenter;
 
     /**
      * Default constructor.
@@ -42,69 +42,62 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstru
      */
     RxInstrumentedMaybeObserver(MaybeObserver<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = instrumenterFactory.create();
+        this.onSubscribeInstrumenter = instrumenterFactory.create();
+        this.onResultInstrumenter = instrumenterFactory.create();
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        if (instrumenter == null || active) {
+        if (onSubscribeInstrumenter == null) {
             source.onSubscribe(d);
         } else {
             try {
-                active = true;
-                instrumenter.beforeInvocation();
+                onSubscribeInstrumenter.beforeInvocation();
                 source.onSubscribe(d);
             } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
+                onSubscribeInstrumenter.afterInvocation();
             }
         }
     }
 
     @Override
     public void onError(Throwable t) {
-        if (instrumenter == null || active) {
+        if (onResultInstrumenter == null) {
             source.onError(t);
         } else {
             try {
-                active = true;
-                instrumenter.beforeInvocation();
+                onResultInstrumenter.beforeInvocation();
                 source.onError(t);
             } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
+                onResultInstrumenter.afterInvocation();
             }
         }
     }
 
     @Override
     public void onSuccess(T value) {
-        if (instrumenter == null || active) {
+        if (onResultInstrumenter == null) {
             source.onSuccess(value);
         } else {
             try {
-                active = true;
-                instrumenter.beforeInvocation();
+                onResultInstrumenter.beforeInvocation();
                 source.onSuccess(value);
             } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
+                onResultInstrumenter.afterInvocation();
             }
         }
     }
 
     @Override
     public void onComplete() {
-        if (instrumenter == null || active) {
+        if (onResultInstrumenter == null) {
             source.onComplete();
         } else {
             try {
-                active = true;
-                instrumenter.beforeInvocation();
+                onResultInstrumenter.beforeInvocation();
                 source.onComplete();
             } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
+                onResultInstrumenter.afterInvocation();
             }
         }
     }
