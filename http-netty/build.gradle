@@ -2,6 +2,7 @@ dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
     compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
+    compileOnly project(":graal")
     compileOnly dependencyModuleVersion("netty", "netty-transport-native-epoll")
     compileOnly dependencyModuleVersion("netty", "netty-transport-native-kqueue")
 

@@ -19,4 +19,4 @@
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.graal.reflect;
+package io.micronaut.graal;

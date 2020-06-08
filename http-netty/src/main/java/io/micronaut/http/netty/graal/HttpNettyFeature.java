@@ -17,11 +17,9 @@ package io.micronaut.http.netty.graal;
 
 import com.oracle.svm.core.annotate.AutomaticFeature;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.graal.AutomaticFeatureUtils;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
-import org.graalvm.nativeimage.hosted.RuntimeReflection;
-
-import java.lang.reflect.Field;
 
 /**
  * An HTTP Netty feature that configures the native channels.
@@ -41,20 +39,15 @@ public class HttpNettyFeature implements Feature {
                 "io.netty.channel.unix"
         );
 
-        registerFields(access, "io.netty.channel.kqueue.KQueueChannelOption");
-        registerFields(access, "io.netty.channel.epoll.EpollChannelOption");
+        registerClasses(access,
+                "io.netty.channel.kqueue.KQueueChannelOption", "io.netty.channel.epoll.EpollChannelOption");
     }
 
-    private void registerFields(FeatureAccess access, String n) {
-        Class<?> t = access.findClassByName(n);
-        if (t != null) {
-            RuntimeReflection.register(t);
-            RuntimeReflection.registerForReflectiveInstantiation(t);
-
-            Field[] fields = t.getFields();
-            for (Field field : fields) {
-                RuntimeReflection.register(field);
-            }
+    private void registerClasses(BeforeAnalysisAccess access, String... classes) {
+        for (String clazz : classes) {
+            AutomaticFeatureUtils.registerClassForRuntimeReflection(access, clazz);
+            AutomaticFeatureUtils.registerFieldsForRuntimeReflection(access, clazz);
         }
     }
+
 }

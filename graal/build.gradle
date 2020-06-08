@@ -3,6 +3,8 @@ dependencies {
     api project(":inject")
     api dependencyVersion("jackson.databind")
 
+    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
+
     testImplementation project(":inject")
     testImplementation project(":http")
     testImplementation project(":inject-java-test")
