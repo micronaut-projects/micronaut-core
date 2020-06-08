@@ -92,12 +92,18 @@ ext {
             'jackson.dataformat'       : [
                     version : jacksonVersion,
                     group   : 'com.fasterxml.jackson.dataformat',
-                    modules : ['jackson-dataformat-xml'],
+                    modules : ['jackson-dataformat-xml']
             ],
             jaeger                     : [
                     version: jaegerVersion,
                     group  : 'io.jaegertracing',
                     name   : 'jaeger-thrift'
+            ],
+            ktor                     : [
+                    version: ktorVersion,
+                    group  : 'io.ktor',
+                    name   : 'ktor-server-netty',
+                    modules : ['ktor-jackson', 'ktor-server-tomcat', 'ktor-server-jetty']
             ],
             'zipkin.reporter'          : [
                     version: zipkinReporterVersion,
