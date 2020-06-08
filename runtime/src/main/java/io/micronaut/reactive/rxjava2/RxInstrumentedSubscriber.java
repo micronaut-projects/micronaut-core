@@ -31,8 +31,8 @@ import org.reactivestreams.Subscription;
 @Internal
 class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent {
     private final Subscriber<T> source;
-    private final InvocationInstrumenter instrumenter;
-    private boolean active;
+    private final InvocationInstrumenter onSubscribeInstrumenter;
+    private final InvocationInstrumenter onResultInstrumenter;
 
     /**
      * Default constructor.
@@ -42,37 +42,34 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
      */
     RxInstrumentedSubscriber(Subscriber<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = instrumenterFactory.create();
+        this.onSubscribeInstrumenter = instrumenterFactory.create();
+        this.onResultInstrumenter = instrumenterFactory.create();
     }
 
     @Override
     public final void onSubscribe(Subscription s) {
-        if (instrumenter == null || active) {
+        if (onSubscribeInstrumenter == null) {
             source.onSubscribe(s);
         } else {
             try {
-                active = true;
-                instrumenter.beforeInvocation();
+                onSubscribeInstrumenter.beforeInvocation();
                 source.onSubscribe(s);
             } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
+                onSubscribeInstrumenter.afterInvocation();
             }
         }
     }
 
     @Override
     public void onNext(T t) {
-        if (instrumenter == null || active) {
+        if (onResultInstrumenter == null) {
             source.onNext(t);
         } else {
             try {
-                active = true;
-                instrumenter.beforeInvocation();
+                onResultInstrumenter.beforeInvocation();
                 source.onNext(t);
             } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
+                onResultInstrumenter.afterInvocation();
             }
         }
     }
@@ -80,32 +77,28 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
     @SuppressWarnings("Duplicates")
     @Override
     public void onError(Throwable t) {
-        if (instrumenter == null || active) {
+        if (onResultInstrumenter == null) {
             source.onError(t);
         } else {
             try {
-                active = true;
-                instrumenter.beforeInvocation();
+                onResultInstrumenter.beforeInvocation();
                 source.onError(t);
             } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
+                onResultInstrumenter.afterInvocation();
             }
         }
     }
 
     @Override
     public void onComplete() {
-        if (instrumenter == null || active) {
+        if (onResultInstrumenter == null) {
             source.onComplete();
         } else {
             try {
-                active = true;
-                instrumenter.beforeInvocation();
+                onResultInstrumenter.beforeInvocation();
                 source.onComplete();
             } finally {
-                instrumenter.afterInvocation(false);
-                active = false;
+                onResultInstrumenter.afterInvocation();
             }
         }
     }
