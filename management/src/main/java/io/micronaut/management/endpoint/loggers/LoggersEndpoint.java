@@ -23,7 +23,6 @@ import io.reactivex.Single;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.validation.constraints.NotBlank;
-import java.security.Principal;
 import java.util.Map;
 
 /**

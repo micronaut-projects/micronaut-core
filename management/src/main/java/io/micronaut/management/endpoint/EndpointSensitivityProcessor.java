@@ -25,8 +25,6 @@ import io.micronaut.management.endpoint.annotation.Sensitive;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import javax.validation.ConstraintViolationException;
-import javax.validation.ValidationException;
 import java.util.*;
 
 /**
