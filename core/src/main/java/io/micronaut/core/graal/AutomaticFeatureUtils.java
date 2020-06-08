@@ -1,4 +1,4 @@
-package io.micronaut.graal;
+package io.micronaut.core.graal;
 
 import com.oracle.svm.core.jdk.proxy.DynamicProxyRegistry;
 import io.micronaut.core.annotation.Internal;

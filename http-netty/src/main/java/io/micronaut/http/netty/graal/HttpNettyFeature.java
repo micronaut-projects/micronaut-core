@@ -17,7 +17,7 @@ package io.micronaut.http.netty.graal;
 
 import com.oracle.svm.core.annotate.AutomaticFeature;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.graal.AutomaticFeatureUtils;
+import io.micronaut.core.graal.AutomaticFeatureUtils;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 
