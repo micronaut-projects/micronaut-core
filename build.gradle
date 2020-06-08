@@ -514,6 +514,31 @@ ext {
                     group  : 'com.h2database',
                     name   : 'h2'
             ],
+            postgres                   : [
+                    version: '42.2.12',
+                    group  : 'org.postgresql',
+                    name   : 'postgresql'
+            ],
+            mysql                   : [
+                    version: '8.0.20',
+                    group  : 'mysql',
+                    name   : 'mysql-connector-java'
+            ],
+            mariadb                   : [
+                    version: '2.6.0',
+                    group  : 'org.mariadb.jdbc',
+                    name   : 'mariadb-java-client'
+            ],
+            ojdbc                   : [
+                    version: '19.3.0.0',
+                    group  : 'com.oracle.ojdbc',
+                    name   : 'ojdbc8'
+            ],
+            mssql                   : [
+                    version: '8.2.2.jre8',
+                    group  : 'com.microsoft.sqlserver',
+                    name   : 'mssql-jdbc'
+            ],
             tomcatJdbc                 : [
                     version: tomcatJdbcVersion,
                     group  : 'org.apache.tomcat',
