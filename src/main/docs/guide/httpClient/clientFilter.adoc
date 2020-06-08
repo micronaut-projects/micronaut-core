@@ -1,6 +1,6 @@
 Often, you need to include the same HTTP headers or URL parameters in a set of requests against a third-party API or when calling another Microservice.
 
-To simplify this, Micronaut includes the ability to define api:http.filter.HttpClientFilter[] classes that are applied to all matching HTTP clients.
+To simplify this, Micronaut includes the ability to define api:http.filter.HttpClientFilter[] classes that are applied to all matching HTTP client requests.
 
 As an example say you want to build a client to communicate with the https://bintray.com/docs/api/[Bintray REST API]. It would be terribly tedious to have to specify authentication for every single HTTP call.
 
@@ -20,6 +20,19 @@ snippet::io.micronaut.docs.client.ThirdPartyClientFilterSpec[tags="bintrayFilter
 <3> The `basicAuth` method is used include the HTTP BASIC credentials
 
 Now, whenever you invoke the `bintrayService.fetchRepositories()` method, the `Authorization` HTTP header is included in the request.
+
+=== Injecting Another Client into a HttpClientFilter
+
+It should be noted that in order to create a api:http.client.RxHttpClient[] Micronaut needs to resolve all of the `HttpClientFilter` instances which creates a circular dependency in the case where you need to inject another api:http.client.RxHttpClient[] or a `@Client` bean into an instance of a `HttpClientFilter`.
+
+To resolve this issue you should use the `javax.inject.Provider` interface to inject another api:http.client.RxHttpClient[] or a `@Client` bean into an instance of `HttpClientFilter`.
+
+The following example which implements a filter that allows https://cloud.google.com/run/docs/authenticating/service-to-service[authentication between services on Google Cloud Run] demonstrates how to use `Provider` to inject another client:
+
+snippet::io.micronaut.docs.client.filter.GoogleAuthFilter[tags="class"]
+
+<1> The `javax.inject.Provider` interface is used to inject another client, avoiding a circular reference
+<2> The `get()` method of the `Provider` interface is used to obtain the client instance.
 
 === Filter Matching By Annotation
 
