@@ -1278,12 +1278,13 @@ public class DefaultHttpClient implements
             boolean isStream,
             Consumer<ChannelHandlerContext> contextConsumer) {
         Bootstrap localBootstrap = this.bootstrap.clone();
+        String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
         localBootstrap.handler(new HttpClientInitializer(
                 sslCtx,
                 host,
                 port,
                 isStream,
-                request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT, String.class).map(ct -> ct.equals(MediaType.TEXT_EVENT_STREAM)).orElse(false), contextConsumer)
+                acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM), contextConsumer)
         );
         return doConnect(localBootstrap, host, port);
     }
@@ -1614,7 +1615,9 @@ public class DefaultHttpClient implements
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslCtx.newHandler(ch.alloc(), host, port));
         // We must wait for the handshake to finish and the protocol to be negotiated before configuring
         // the HTTP/2 components of the pipeline.
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_PROTOCOL_NEGOTIATOR, new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_2) {
+        pipeline.addLast(
+                ChannelPipelineCustomizer.HANDLER_HTTP2_PROTOCOL_NEGOTIATOR,
+                new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_2) {
 
             @Override
             public void handlerRemoved(ChannelHandlerContext ctx) {
@@ -1622,7 +1625,8 @@ public class DefaultHttpClient implements
                 // Connection Preface request has been sent. Once the Preface has been sent and
                 // removed then this handler is removed so we invoke the remaining logic once
                 // this handler removed
-                final Consumer<ChannelHandlerContext> contextConsumer = httpClientInitializer.contextConsumer;
+                final Consumer<ChannelHandlerContext> contextConsumer =
+                        httpClientInitializer.contextConsumer;
                 if (contextConsumer != null) {
                     contextConsumer.accept(ctx);
                 }
@@ -1633,9 +1637,13 @@ public class DefaultHttpClient implements
                 if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                     ChannelPipeline p = ctx.pipeline();
                     if (httpClientInitializer.stream) {
+                        // stream consumer manages backpressure and reads
                         ctx.channel().config().setAutoRead(false);
                     }
-                    p.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new Http2SettingsHandler(ch.newPromise()));
+                    p.addLast(
+                            ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS,
+                            new Http2SettingsHandler(ch.newPromise())
+                    );
                     httpClientInitializer.addEventStreamHandlerIfNecessary(p);
                     httpClientInitializer.addFinalHandler(p);
                     for (ChannelPipelineListener pipelineListener : pipelineListeners) {
@@ -1646,12 +1654,12 @@ public class DefaultHttpClient implements
                     httpClientInitializer.addHttp1Handlers(p);
                 } else {
                     ctx.close();
-                    throw new HttpClientException("unknown protocol: " + protocol);
+                    throw new HttpClientException("Unknown Protocol: " + protocol);
                 }
             }
         });
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, connectionHandler);
 
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, connectionHandler);
     }
 
     /**
@@ -2143,12 +2151,27 @@ public class DefaultHttpClient implements
             @Override
             public void handlerAdded(ChannelHandlerContext ctx) {
                 if (readTimeoutMillis != null) {
+
                     if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                        pipeline.addBefore(
-                                ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
-                                ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
-                                new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
-                        );
+                        Http2SettingsHandler settingsHandler = (Http2SettingsHandler) ctx.pipeline().get(HANDLER_HTTP2_SETTINGS);
+                        if (settingsHandler != null) {
+                            settingsHandler.promise.addListener(future -> {
+                                if (future.isSuccess()) {
+                                    pipeline.addBefore(
+                                            ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
+                                            ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
+                                            new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
+                                    );
+                                }
+
+                            });
+                        } else {
+                            pipeline.addBefore(
+                                    ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
+                                    ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
+                                    new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
+                            );
+                        }
                     } else {
                         pipeline.addBefore(
                                 ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,
@@ -2218,7 +2241,6 @@ public class DefaultHttpClient implements
         AtomicInteger integer = new AtomicInteger();
         int len = filters.size();
         return new ClientFilterChain() {
-            @SuppressWarnings("unchecked")
             @Override
             public Publisher<? extends io.micronaut.http.HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
 
@@ -2432,7 +2454,11 @@ public class DefaultHttpClient implements
                 });
 
                 if (connectionTimeAliveMillis != null) {
-                    ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_CONNECT_TTL, new ConnectTTLHandler(connectionTimeAliveMillis));
+                    ch.pipeline()
+                            .addLast(
+                                    ChannelPipelineCustomizer.HANDLER_CONNECT_TTL,
+                                    new ConnectTTLHandler(connectionTimeAliveMillis)
+                            );
                 }
             }
 
@@ -2733,7 +2759,9 @@ public class DefaultHttpClient implements
          * @param pipeline The pipeline
          */
         protected void addFinalHandler(ChannelPipeline pipeline) {
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsClientHandler() {
+            pipeline.addLast(
+                    ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
+                    new HttpStreamsClientHandler() {
                 @Override
                 public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                     if (evt instanceof IdleStateEvent) {

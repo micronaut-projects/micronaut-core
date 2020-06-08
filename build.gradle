@@ -92,12 +92,18 @@ ext {
             'jackson.dataformat'       : [
                     version : jacksonVersion,
                     group   : 'com.fasterxml.jackson.dataformat',
-                    modules : ['jackson-dataformat-xml'],
+                    modules : ['jackson-dataformat-xml']
             ],
             jaeger                     : [
                     version: jaegerVersion,
                     group  : 'io.jaegertracing',
                     name   : 'jaeger-thrift'
+            ],
+            ktor                     : [
+                    version: ktorVersion,
+                    group  : 'io.ktor',
+                    name   : 'ktor-server-netty',
+                    modules : ['ktor-jackson', 'ktor-server-tomcat', 'ktor-server-jetty']
             ],
             'zipkin.reporter'          : [
                     version: zipkinReporterVersion,
@@ -142,12 +148,12 @@ ext {
             ],
             'micronaut.hibernate.validator': [
                     version:micronautHibernateValidatorVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.beanvalidation',
                     name:'micronaut-hibernate-validator'
             ],
             'micronaut.jmx': [
                     version:micronautJmxVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.jmx',
                     name:'micronaut-jmx'
             ],
             'micronaut.picocli': [
@@ -181,11 +187,6 @@ ext {
                     name:'micronaut-runtime-groovy',
                     modules:['micronaut-function-groovy']
             ],
-            'micronaut.aws': [
-                    version:micronautAwsVersion,
-                    group:'io.micronaut.configuration',
-                    name:'micronaut-aws-common'
-            ],
             'micronaut.gcp': [
                     version:micronautGcpVersion,
                     group:'io.micronaut.gcp',
@@ -204,8 +205,8 @@ ext {
                     name:'azure-functions-java-library'
             ],
             'micronaut.elasticsearch': [
-                version:micronautElasticsearch,
-                group:'io.micronaut.configuration',
+                version:micronautElasticSearchVersion,
+                group:'io.micronaut.elasticsearch',
                 name:'micronaut-elasticsearch'
             ],
             'micronaut.flyway': [
@@ -213,16 +214,11 @@ ext {
                 group:'io.micronaut.flyway',
                 name:'micronaut-flyway'
             ],
-            'micronaut.function-aws': [
-                    version:micronautAwsVersion,
-                    group:'io.micronaut',
-                    name:'micronaut-function-aws'
-            ],
-            'micronaut.function.aws': [
+            'micronaut.aws': [
                     version:micronautAwsVersion,
                     group:'io.micronaut.aws',
                     name:'micronaut-function-aws-api-proxy',
-                    modules: ['micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver']
+                    modules: ['micronaut-aws-common','micronaut-function-aws','micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver']
             ],
             'micronaut.kotlin': [
                     version:micronautKotlinVersion,
@@ -237,9 +233,9 @@ ext {
                     modules:['micronaut-multitenancy-gorm', 'micronaut-neo4j-gorm', 'micronaut-mongo-gorm', 'micronaut-hibernate-gorm', 'micronaut-graphql-gorm']
             ],
             'micronaut.liquibase': [
-                version:micronautLiquibase,
-                group:'io.micronaut.configuration',
-                name:'micronaut-liquibase'
+                    version:micronautLiquibaseVersion,
+                    group:'io.micronaut.liquibase',
+                    name:'micronaut-liquibase'
             ],
             'micronaut.netflix': [
                     version:micronautNetflixVersion,
@@ -358,7 +354,7 @@ ext {
             ],
             'micronaut.neo4j': [
                     version:micronautNeo4jVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.neo4j',
                     name:'micronaut-neo4j-bolt'
             ],
             'mongo' : [
@@ -414,6 +410,11 @@ ext {
                     group  : 'io.lettuce',
                     name   : 'lettuce-core'
 
+            ],
+            logback                    : [
+                    version: '1.2.3',
+                    group  : 'ch.qos.logback',
+                    name   : 'logback-classic'
             ],
             spring                     : [
                     version: springVersion,
@@ -524,6 +525,31 @@ ext {
                     group  : 'com.h2database',
                     name   : 'h2'
             ],
+            postgres                   : [
+                    version: '42.2.12',
+                    group  : 'org.postgresql',
+                    name   : 'postgresql'
+            ],
+            mysql                   : [
+                    version: '8.0.20',
+                    group  : 'mysql',
+                    name   : 'mysql-connector-java'
+            ],
+            mariadb                   : [
+                    version: '2.6.0',
+                    group  : 'org.mariadb.jdbc',
+                    name   : 'mariadb-java-client'
+            ],
+            ojdbc                   : [
+                    version: '19.3.0.0',
+                    group  : 'com.oracle.ojdbc',
+                    name   : 'ojdbc8'
+            ],
+            mssql                   : [
+                    version: '8.2.2.jre8',
+                    group  : 'com.microsoft.sqlserver',
+                    name   : 'mssql-jdbc'
+            ],
             tomcatJdbc                 : [
                     version: tomcatJdbcVersion,
                     group  : 'org.apache.tomcat',
@@ -572,8 +598,8 @@ ext {
             ],
             'micronaut.views': [
                 version: micronautViewsVersion,
-                group  : 'io.micronaut',
-                modules: ['micronaut-views', 'micronaut-views-core', 'micronaut-views-freemarker', 'micronaut-views-handlebars', 'micronaut-views-thymeleaf', 'micronaut-views-velocity']
+                group  : 'io.micronaut.views',
+                modules: ['micronaut-views', 'micronaut-views-core', 'micronaut-views-freemarker', 'micronaut-views-handlebars', 'micronaut-views-thymeleaf', 'micronaut-views-velocity', 'micronaut-views-soy', 'micronaut-views-rocker']
             ],
             'micronaut.rss': [
                     version:micronautRssVersion,

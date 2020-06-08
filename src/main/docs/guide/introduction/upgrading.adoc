@@ -40,8 +40,33 @@ Some dependencies have new Maven Group IDs so you may need to update your depend
 |`io.micronaut.configuration:micronaut-cassandra`
 |`io.micronaut.cassandra:micronaut-cassandra`
 
+|`io.micronaut.configuration:micronaut-hibernate-validator`
+|`io.micronaut.beanvalidation:micronaut-hibernate-validator`
+
 |`io.micronaut.configuration:micronaut-micrometer-*`
 |`io.micronaut.micrometer:micronaut-micrometer-*`
+
+|`io.micronaut.configuration:micronaut-aws-common`
+|`io.micronaut.aws:micronaut-aws-common`
+
+|===
+
+=== AWS Module Changes
+
+The AWS functionality (including support for AWS ParameterStore, AWS Route53 and AWS Lambda Function Client) has been moved out of the Micronaut core therefore if you need AWS related functionality you should use the necessary module.
+
+.Updated AWS Modules
+|===
+|Package|New Dependency
+
+|`io.micronaut.function.client.aws`
+|`io.micronaut.aws:micronaut-function-client-aws`
+
+|`io.micronaut.discovery.aws.parameterstore`
+|`io.micronaut.aws:micronaut-aws-parameter-store`
+
+|`io.micronaut.discovery.aws.route53`
+|`io.micronaut.aws:micronaut-aws-route53`
 
 |===
 

@@ -99,23 +99,24 @@ class Test {
 
     void "test validate annotation values on parameter"() {
         when:
-        buildBeanIntrospection('test.Test', '''
+        buildBeanDefinition('test.Test', '''
 package test;
 
 import io.micronaut.validation.validator.ast.*;
 
-@io.micronaut.core.annotation.Introspected
+@javax.inject.Singleton
 class Test {
+
     @io.micronaut.context.annotation.Executable
     String getName(@SomeAnn("") String n) {
         return null;
-    };
+    }
 }
 ''')
 
         then:
         def e = thrown(RuntimeException)
-        e.message == '''test/Test.java:9: error: @SomeAnn.value: must not be blank
+        e.message == '''test/Test.java:10: error: @SomeAnn.value: must not be blank
     String getName(@SomeAnn("") String n) {
                                        ^'''
 

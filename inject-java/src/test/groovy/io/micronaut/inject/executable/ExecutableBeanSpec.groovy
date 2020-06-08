@@ -17,6 +17,7 @@ package io.micronaut.inject.executable
 
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
+import spock.lang.Ignore
 import spock.lang.Issue
 
 class ExecutableBeanSpec extends AbstractTypeElementSpec {

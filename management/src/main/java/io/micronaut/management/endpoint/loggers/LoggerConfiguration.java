@@ -19,7 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Represents the configuration of a {@link LoggingSystem} logger.
+ * Represents the configuration of a {@link ManagedLoggingSystem} logger.
  *
  * @author Matthew Moss
  * @author graemerocher

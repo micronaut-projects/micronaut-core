@@ -57,13 +57,29 @@ class LoggersEndpointSpec extends Specification {
     static final expectedBuiltinLoggers = ['io.micronaut', 'io.netty']
 
     void setup() {
-        server = ApplicationContext.run(EmbeddedServer)
+        server = ApplicationContext.run(EmbeddedServer, ['endpoints.loggers.enabled': true, 'endpoints.loggers.sensitive': false])
         client = server.applicationContext.createBean(RxHttpClient, server.URL)
     }
 
     void cleanup() {
         client.close()
         server.close()
+    }
+
+    void "test disabled by default"() {
+        given:
+        def otherServer = ApplicationContext.run(EmbeddedServer)
+        def client = otherServer.getApplicationContext().getBean(RxHttpClient)
+
+        when:
+        client.exchange("${otherServer.URL}/loggers").blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
+
+        cleanup:
+        otherServer.close()
     }
 
     void 'test that available log levels are returned from the endpoint'() {
