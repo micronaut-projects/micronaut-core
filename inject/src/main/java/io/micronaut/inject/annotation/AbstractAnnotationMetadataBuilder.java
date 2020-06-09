@@ -1199,19 +1199,27 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     public <A2 extends Annotation> AnnotationMetadata annotate(
             AnnotationMetadata annotationMetadata,
             AnnotationValue<A2> annotationValue) {
+        String annotationName = annotationValue.getAnnotationName();
         if (annotationMetadata instanceof DefaultAnnotationMetadata) {
-            final Optional<T> annotationMirror = getAnnotationMirror(annotationValue.getAnnotationName());
+            final Optional<T> annotationMirror = getAnnotationMirror(annotationName);
             final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) annotationMetadata;
             defaultMetadata.addDeclaredAnnotation(
-                    annotationValue.getAnnotationName(),
+                    annotationName,
                     annotationValue.getValues()
             );
             annotationMirror.ifPresent(annotationType -> {
+                final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(annotationName, annotationType);
+                processAnnotationDefaults(
+                        annotationType,
+                        defaultMetadata,
+                        annotationName,
+                        defaultValues
+                );
                 processAnnotationStereotypes(
                         defaultMetadata,
                         true,
                         annotationType,
-                        annotationValue.getAnnotationName(),
+                        annotationName,
                         DEFAULT_ANNOTATE_EXCLUDES
                 );
             });
@@ -1222,10 +1230,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     declaredMetadata
             );
         } else if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
-            final Optional<T> annotationMirror = getAnnotationMirror(annotationValue.getAnnotationName());
+            final Optional<T> annotationMirror = getAnnotationMirror(annotationName);
             final Map<CharSequence, Object> values = annotationValue.getValues();
             final Map<String, Map<CharSequence, Object>> declared = new HashMap<>(1);
-            declared.put(annotationValue.getAnnotationName(), values);
+            declared.put(annotationName, values);
             final DefaultAnnotationMetadata newMetadata = new DefaultAnnotationMetadata(
                     declared,
                     null,
@@ -1238,7 +1246,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             newMetadata,
                             true,
                             annotationType,
-                            annotationValue.getAnnotationName(),
+                            annotationName,
                             DEFAULT_ANNOTATE_EXCLUDES
                     )
             );

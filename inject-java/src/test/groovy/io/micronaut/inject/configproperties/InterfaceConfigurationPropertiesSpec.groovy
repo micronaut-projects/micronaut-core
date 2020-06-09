@@ -32,6 +32,7 @@ interface MyConfig {
 
 ''')
         then:
+        beanDefinition.getAnnotationMetadata().getAnnotationType(ConfigurationAdvice.class.getName()).isPresent()
         beanDefinition instanceof ValidatedBeanDefinition
         beanDefinition.getRequiredMethod("getHost")
             .stringValue(Property, "name").get() == 'foo.bar.host'
