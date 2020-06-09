@@ -140,11 +140,16 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
     }
 
     @Override
-    @PreDestroy
     public DefaultWatchThread stop() {
         active.set(false);
         closeWatchService();
         return this;
+    }
+
+    @Override
+    @PreDestroy
+    public void close() {
+        stop();
     }
 
     /**
