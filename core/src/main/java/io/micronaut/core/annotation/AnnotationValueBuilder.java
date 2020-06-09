@@ -87,7 +87,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return The {@link AnnotationValue}
      */
     public @NonNull AnnotationValue<T> build() {
-        if (retentionPolicy != RetentionPolicy.RUNTIME) {
+        if (retentionPolicy != RetentionPolicy.CLASS) {
             //noinspection unchecked
             return new AnnotationValue(annotationName, values) {
                 @NonNull
