@@ -19,9 +19,10 @@ import io.micronaut.core.annotation.Internal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Deque;
+import java.util.List;
+import java.util.ListIterator;
 
 /**
  * Implementation of {@link InvocationInstrumenter} which invoked multiple instrumenters.
@@ -33,8 +34,7 @@ import java.util.Deque;
 final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
     private static final Logger LOG = LoggerFactory.getLogger(InvocationInstrumenter.class);
 
-    private final Collection<InvocationInstrumenter> invocationInstrumenters;
-    private final Deque<Instrumentation> activeInstrumentations;
+    private final List<InvocationInstrumenter> invocationInstrumenters;
 
     /**
      * Creates new instance.
@@ -42,8 +42,7 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
      * @param invocationInstrumenters multiple instrumenters
      */
     MultipleInvocationInstrumenter(Collection<InvocationInstrumenter> invocationInstrumenters) {
-        this.invocationInstrumenters = invocationInstrumenters;
-        this.activeInstrumentations = new ArrayDeque<>(invocationInstrumenters.size());
+        this.invocationInstrumenters = new ArrayList<>(invocationInstrumenters);
     }
 
     /**
@@ -52,7 +51,13 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
     @Override
     public void beforeInvocation() {
         for (InvocationInstrumenter instrumenter : invocationInstrumenters) {
-            activeInstrumentations.push(instrumenter.newInstrumentation());
+            try {
+                instrumenter.beforeInvocation();
+            } catch (Exception e) {
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn("Before instrumentation invocation error: {}", e.getMessage(), e);
+                }
+            }
         }
     }
 
@@ -63,11 +68,14 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
      */
     @Override
     public void afterInvocation(boolean cleanup) {
-        while (!activeInstrumentations.isEmpty()) {
+        // invoke in reverse order
+        for (ListIterator<InvocationInstrumenter> iterator = invocationInstrumenters.listIterator(invocationInstrumenters.size()); iterator.hasPrevious(); ) {
             try {
-                activeInstrumentations.pop().close(cleanup);
+                iterator.previous().afterInvocation(cleanup);
             } catch (Exception e) {
-                LOG.warn("After instrumentation invocation error: {}", e.getMessage(), e);
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn("After instrumentation invocation error: {}", e.getMessage(), e);
+                }
             }
         }
     }
