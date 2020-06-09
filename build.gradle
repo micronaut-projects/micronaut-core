@@ -588,8 +588,8 @@ ext {
             ],
             'micronaut.security'       : [
                     version : micronautSecurityVersion,
-                    group   : 'io.micronaut',
-                    modules : ['micronaut-security', 'micronaut-security-annotations', 'micronaut-security-jwt', 'micronaut-security-session']
+                    group   : 'io.micronaut.security',
+                    modules : ['micronaut-security', 'micronaut-security-annotations', 'micronaut-security-jwt', 'micronaut-security-oauth2','micronaut-security-ldap', 'micronaut-security-session']
             ],
             'micronaut.security.configuration'  : [
                     version : micronautSecurityVersion,

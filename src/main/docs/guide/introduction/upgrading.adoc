@@ -31,6 +31,15 @@ Some dependencies have new Maven Group IDs so you may need to update your depend
 |`io.micronaut.configuration:micronaut-kafka`
 |`io.micronaut.kafka:micronaut-kafka`
 
+|`io.micronaut.configuration:micronaut-liquibase`
+|`io.micronaut.liquibase:micronaut-liquibase`
+
+|`io.micronaut.configuration:micronaut-flyway`
+|`io.micronaut.flyway:micronaut-flyway`
+
+|`io.micronaut.configuration:micronaut-views-*`
+|`io.micronaut.views:micronaut-views-*`
+
 |`io.micronaut.configuration:micronaut-redis`
 |`io.micronaut.redis:micronaut-redis`
 
@@ -46,8 +55,11 @@ Some dependencies have new Maven Group IDs so you may need to update your depend
 |`io.micronaut.configuration:micronaut-micrometer-*`
 |`io.micronaut.micrometer:micronaut-micrometer-*`
 
-|`io.micronaut.configuration:micronaut-aws-common`
-|`io.micronaut.aws:micronaut-aws-common`
+|`io.micronaut.configuration:micronaut-aws-*`
+|`io.micronaut.aws:micronaut-aws-*`
+
+|`io.micronaut:micronaut-security-*`
+|`io.micronaut.security:micronaut-security-*`
 
 |===
 
