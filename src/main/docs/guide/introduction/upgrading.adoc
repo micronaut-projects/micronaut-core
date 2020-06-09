@@ -84,7 +84,7 @@ The AWS functionality (including support for AWS ParameterStore, AWS Route53 and
 
 === Kubernetes Discovery Service deprecation
 
-The class `io.micronaut.discovery.kubernetes.KubernetesDiscoveryClient`, that was deprecated in Micronaut 1.2, has now been removed from Micronaut 2.0. The replacement is the new https://micronaut-projects.github.io/micronaut-kubernetes/1.0.0/guide/[Micronaut Kubernetes] module, with an improved support for running Micronaut applications in a Kubernetes cluster, including support for Kubernetes' ``ConfigMap``s, ``Secret``s and more.
+The class `io.micronaut.discovery.kubernetes.KubernetesDiscoveryClient`, that was deprecated in Micronaut 1.2, has now been removed from Micronaut 2.0. The replacement is the new https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/[Micronaut Kubernetes] module, with an improved support for running Micronaut applications in a Kubernetes cluster, including support for Kubernetes' ``ConfigMap``s, ``Secret``s and more.
 
 To use the new module, you need to add the following dependency:
 
