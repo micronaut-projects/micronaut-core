@@ -17,11 +17,8 @@ package io.micronaut.management.endpoint.loggers;
 
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.type.Argument;
-import io.micronaut.management.endpoint.annotation.Endpoint;
+import io.micronaut.management.endpoint.annotation.*;
 import io.micronaut.management.endpoint.EndpointConfiguration;
-import io.micronaut.management.endpoint.annotation.Read;
-import io.micronaut.management.endpoint.annotation.Selector;
-import io.micronaut.management.endpoint.annotation.Write;
 import io.reactivex.Single;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -34,9 +31,7 @@ import java.util.Map;
  * @author Matthew Moss
  * @since 1.0
  */
-@Endpoint(id = LoggersEndpoint.NAME,
-        defaultEnabled = LoggersEndpoint.DEFAULT_ENABLED,
-        defaultSensitive = LoggersEndpoint.DEFAULT_SENSITIVE)
+@Endpoint(id = LoggersEndpoint.NAME, defaultSensitive = LoggersEndpoint.DEFAULT_SENSITIVE)
 public class LoggersEndpoint {
 
     /**
@@ -52,15 +47,16 @@ public class LoggersEndpoint {
     /**
      * Endpoint default enabled.
      */
-    public static final boolean DEFAULT_ENABLED = false;
+    public static final boolean DEFAULT_ENABLED = true;
 
     /**
      * Endpoint default sensitivity.
      */
-    public static final boolean DEFAULT_SENSITIVE = true;
+    public static final boolean DEFAULT_SENSITIVE = false;
 
     private final ManagedLoggingSystem loggingSystem;
     private final LoggersManager<Map<String, Object>> loggersManager;
+    private boolean writeSensitive = true;
 
     /**
      * @param loggingSystem the {@link io.micronaut.logging.LoggingSystem}
@@ -94,6 +90,7 @@ public class LoggersEndpoint {
      * @param configuredLevel The {@link io.micronaut.logging.LogLevel} to set on the named logger
      */
     @Write
+    @Sensitive(property = "write-sensitive")
     public void setLogLevel(@NotBlank @Selector String name,
                             @Nullable io.micronaut.logging.LogLevel configuredLevel) {
         try {
@@ -107,4 +104,20 @@ public class LoggersEndpoint {
         }
     }
 
+    /**
+     * @return True if modifications require authentication
+     */
+    public boolean isWriteSensitive() {
+        return writeSensitive;
+    }
+
+    /**
+     * Determines whether modifications to the log level should
+     * require authentication. Default value (true).
+     *
+     * @param writeSensitive The write sensitivity option.
+     */
+    public void setWriteSensitive(boolean writeSensitive) {
+        this.writeSensitive = writeSensitive;
+    }
 }

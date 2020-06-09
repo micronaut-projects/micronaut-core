@@ -90,6 +90,10 @@ Due to the fact that JSR-305 has been cancelled and that this dependency has pot
 
 It is recommended users of Micronaut use this API instead (although the `javax.annotation.Nullable` and `javax.annotation.NotNull` annotations continue to be supported).
 
+==== Endpoint Sensitivity
+
+It is now possible to control the sensitivity of individual endpoint methods. The ann:io.micronaut.management.endpoint.annotation.Sensitive[] annotation can be applied to endpoint methods to allow for some methods to have a different sensitivity than the value supplied to the endpoint annotation.
+
 === CLI Features
 
 ==== New Native CLI

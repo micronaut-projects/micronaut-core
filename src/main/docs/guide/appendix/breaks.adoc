@@ -36,20 +36,16 @@ Reactor support is no longer included in core by default. You can re-enable supp
 
 dependency:io.micronaut.reactor:micronaut-reactor[]
 
-=== Loggers Endpoint Disabled by Default
+=== Loggers Endpoint Modifications Now Sensitive
 
-Since logging can potentially leak sensitive information the `/loggers` endpoint is disabled by default and can be explicitly re-enabled as desired with:
+The method on the loggers endpoint to modify logging is now sensitive by default. To revert to the previous behavior, apply the following configuration:
 
-.Enabling the Loggers Endpoint
 [source,yaml]
 ----
 endpoints:
     loggers:
-        enabled: true
-        sensitive: false
+        write-sensitive: false
 ----
-
-Note that if it is preferable to require authentication so only use `sensitive: false` as a last resort.
 
 === Server Side Content Negotiation May Require Test Changes
 
