@@ -249,7 +249,7 @@ ext {
                                 version: micronautDataVersion,
                                 group  : 'io.micronaut.data',
                                 name   : 'micronaut-data-model',
-                                modules: ['micronaut-data-hibernate-jpa', 'micronaut-data-jdbc', 'micronaut-data-processor', 'micronaut-data-runtime', 'micronaut-data-spring','micronaut-data-spring-jpa', 'micronaut-data-rx', 'micronaut-data-rx-hibernate']
+                                modules: ['micronaut-data-hibernate-jpa', 'micronaut-data-jdbc', 'micronaut-data-processor', 'micronaut-data-runtime', 'micronaut-data-spring','micronaut-data-spring-jpa', 'micronaut-data-tx', 'micronaut-data-tx-hibernate']
                         ],
             'micrometer'               : [
                     version: micrometerVersion,
