@@ -1,5 +1,6 @@
 package io.micronaut.scheduling.instrument
 
+import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.annotation.Client
@@ -9,6 +10,7 @@ import javax.inject.Inject
 import kotlin.test.assertTrue
 
 @MicronautTest
+@Property(name = "tracing.zipkin.enabled", value = "true")
 class MultipleInvocationInstrumenterSpec {
 
     @Inject
