@@ -15,8 +15,10 @@
  */
 package io.micronaut.tracing.instrument.util;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import io.opentracing.Scope;
@@ -60,18 +62,17 @@ public class OpenTracingInvocationInstrumenter implements TracingInvocationInstr
         if (activeSpan != null) {
             return new InvocationInstrumenter() {
 
-                Scope activeScope;
-
+                @NonNull
                 @Override
-                public void beforeInvocation() {
-                    activeScope = tracer.scopeManager().activate(activeSpan);
+                public Instrumentation newInstrumentation() {
+                    Scope activeScope = tracer.scopeManager().activate(activeSpan);
+                    return new Instrumentation() {
+                        @Override
+                        public void close(boolean cleanup) {
+                            activeScope.close();
+                        }
+                    };
                 }
-
-                @Override
-                public void afterInvocation(boolean cleanup) {
-                    activeScope.close();
-                }
-
             };
         }
         return null;

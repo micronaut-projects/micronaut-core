@@ -15,6 +15,7 @@
  */
 package io.micronaut.scheduling.instrument;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +35,7 @@ import java.util.ListIterator;
 final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
     private static final Logger LOG = LoggerFactory.getLogger(InvocationInstrumenter.class);
 
-    private final List<InvocationInstrumenter> invocationInstrumenters;
+    private final Collection<InvocationInstrumenter> invocationInstrumenters;
 
     /**
      * Creates new instance.
@@ -42,41 +43,32 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
      * @param invocationInstrumenters multiple instrumenters
      */
     MultipleInvocationInstrumenter(Collection<InvocationInstrumenter> invocationInstrumenters) {
-        this.invocationInstrumenters = new ArrayList<>(invocationInstrumenters);
+        this.invocationInstrumenters = invocationInstrumenters;
     }
 
-    /**
-     * Invokes beforeInvocation for multiple instrumenters.
-     */
+    @NonNull
     @Override
-    public void beforeInvocation() {
+    public Instrumentation newInstrumentation() {
+        List<Instrumentation> instrumentationList = new ArrayList<>(invocationInstrumenters.size());
         for (InvocationInstrumenter instrumenter : invocationInstrumenters) {
             try {
-                instrumenter.beforeInvocation();
+                instrumentationList.add(instrumenter.newInstrumentation());
             } catch (Exception e) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("Before instrumentation invocation error: {}", e.getMessage(), e);
-                }
+                LOG.warn("InvocationInstrumenter.newInstrumentation invocation error: {}", e.getMessage(), e);
             }
         }
-    }
-
-    /**
-     * Invokes afterInvocation for multiple instrumenters.
-     *
-     * @param cleanup Whether to cleanup
-     */
-    @Override
-    public void afterInvocation(boolean cleanup) {
-        // invoke in reverse order
-        for (ListIterator<InvocationInstrumenter> iterator = invocationInstrumenters.listIterator(invocationInstrumenters.size()); iterator.hasPrevious(); ) {
-            try {
-                iterator.previous().afterInvocation(cleanup);
-            } catch (Exception e) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("After instrumentation invocation error: {}", e.getMessage(), e);
+        return new Instrumentation() {
+            @Override
+            public void close(boolean cleanup) {
+                // invoke in reverse order
+                for (ListIterator<Instrumentation> iterator = instrumentationList.listIterator(instrumentationList.size()); iterator.hasPrevious(); ) {
+                    try {
+                        iterator.previous().close(cleanup);
+                    } catch (Exception e) {
+                        LOG.warn("Instrumentation.close invocation error: {}", e.getMessage(), e);
+                    }
                 }
             }
-        }
+        };
     }
 }

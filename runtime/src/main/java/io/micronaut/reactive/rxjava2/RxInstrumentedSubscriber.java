@@ -33,8 +33,7 @@ import org.reactivestreams.Subscription;
 @SuppressWarnings("ReactiveStreamsSubscriberImplementation")
 class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent {
     private final Subscriber<T> source;
-    private final InvocationInstrumenter onSubscribeInstrumenter;
-    private final InvocationInstrumenter onResultInstrumenter;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -44,34 +43,33 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
      */
     RxInstrumentedSubscriber(Subscriber<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.onSubscribeInstrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
-        this.onResultInstrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
+        this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
     public void onSubscribe(Subscription s) {
-        try (Instrumentation ignored = onSubscribeInstrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.onSubscribe(s);
         }
     }
 
     @Override
     public void onNext(T t) {
-        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.onNext(t);
         }
     }
 
     @Override
     public void onError(Throwable t) {
-        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.onError(t);
         }
     }
 
     @Override
     public void onComplete() {
-        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.onComplete();
         }
     }

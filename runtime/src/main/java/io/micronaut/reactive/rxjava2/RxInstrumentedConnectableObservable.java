@@ -44,7 +44,7 @@ final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable
      */
     RxInstrumentedConnectableObservable(ConnectableObservable<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
-        this.instrumenter = RunOnceInvocationInstrumenter.wrap(instrumenter);
+        this.instrumenter = instrumenter;
     }
 
     @Override

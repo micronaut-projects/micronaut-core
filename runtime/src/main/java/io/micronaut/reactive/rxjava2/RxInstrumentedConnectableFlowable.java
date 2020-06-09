@@ -44,7 +44,7 @@ final class RxInstrumentedConnectableFlowable<T> extends ConnectableFlowable<T> 
      */
     RxInstrumentedConnectableFlowable(ConnectableFlowable<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
-        this.instrumenter = RunOnceInvocationInstrumenter.wrap(instrumenter);
+        this.instrumenter = instrumenter;
     }
 
     @Override

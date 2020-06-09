@@ -39,50 +39,14 @@ public interface InvocationInstrumenter {
     /**
      * Noop implementation if {@link InvocationInstrumenter}.
      */
-    InvocationInstrumenter NOOP = new InvocationInstrumenter() {
-        @Override
-        public void beforeInvocation() {
-        }
-
-        @Override
-        public void afterInvocation(boolean cleanup) {
-        }
-
-        @Override
-        public @NonNull Instrumentation newInstrumentation() {
-            return Instrumentation.noop();
-        }
-    };
-
-    /**
-     * Before call.
-     */
-    void beforeInvocation();
-
-    /**
-     * After call.
-     *
-     * @param cleanup Whether to enforce cleanup
-     */
-    void afterInvocation(boolean cleanup);
-
-    /**
-     * After call defaults to not enforcing cleanup.
-     */
-    default void afterInvocation() {
-        afterInvocation(false);
-    }
+    InvocationInstrumenter NOOP = Instrumentation::noop;
 
     /**
      * @return a one-time {@link Instrumentation} instance which to be used in a try-with-resources to do the
-     * instrumentation. When using this approach {@link #beforeInvocation()} will already be invoked by the time
-     * this method invocation returns. {@link Instrumentation#close()} will by default invoke {@link #afterInvocation()}
-     * without cleanup. To force cleanup invoke {@link Instrumentation#forceCleanup()} on the retuned instance.
+     * instrumentation. To force cleanup invoke {@link Instrumentation#forceCleanup()} on the retuned instance.
      * @since 2.0
      */
-    default @NonNull Instrumentation newInstrumentation() {
-        return new DefaultInstrumentation(this);
-    }
+    @NonNull Instrumentation newInstrumentation();
 
     /**
      * Combines multiple instrumenters into one.
