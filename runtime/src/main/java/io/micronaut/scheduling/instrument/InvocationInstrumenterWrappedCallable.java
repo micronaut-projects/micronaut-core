@@ -36,7 +36,7 @@ final class InvocationInstrumenterWrappedCallable<V> implements Callable<V> {
      * @param invocationInstrumenter instrumenter to be invoked
      * @param callable               original callable
      */
-    public InvocationInstrumenterWrappedCallable(InvocationInstrumenter invocationInstrumenter, Callable<V> callable) {
+    InvocationInstrumenterWrappedCallable(InvocationInstrumenter invocationInstrumenter, Callable<V> callable) {
         this.invocationInstrumenter = invocationInstrumenter;
         this.callable = callable;
     }

@@ -16,6 +16,8 @@
 package io.micronaut.scheduling.instrument;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.Experimental;
+
 import java.util.concurrent.Executor;
 
 /**
@@ -25,6 +27,7 @@ import java.util.concurrent.Executor;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Experimental
 public interface InstrumentedExecutor extends Executor, RunnableInstrumenter {
 
     /**

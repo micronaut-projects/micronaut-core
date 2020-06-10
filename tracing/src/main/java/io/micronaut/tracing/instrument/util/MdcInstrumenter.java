@@ -15,7 +15,6 @@
  */
 package io.micronaut.tracing.instrument.util;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.Instrumentation;
@@ -47,27 +46,18 @@ public final class MdcInstrumenter implements InvocationInstrumenterFactory, Rea
     @Override
     public InvocationInstrumenter newInvocationInstrumenter() {
         Map<String, String> contextMap = MDC.getCopyOfContextMap();
-        return new InvocationInstrumenter() {
-
-            @NonNull
-            @Override
-            public Instrumentation newInstrumentation() {
-                Map<String, String> oldContextMap = MDC.getCopyOfContextMap();
-                if (contextMap != null && !contextMap.isEmpty()) {
-                    MDC.setContextMap(contextMap);
-                }
-                return new Instrumentation() {
-
-                    @Override
-                    public void close(boolean cleanup) {
-                        if (oldContextMap != null && !oldContextMap.isEmpty()) {
-                            MDC.setContextMap(oldContextMap);
-                        } else {
-                            MDC.clear();
-                        }
-                    }
-                };
+        return () -> {
+            Map<String, String> oldContextMap = MDC.getCopyOfContextMap();
+            if (contextMap != null && !contextMap.isEmpty()) {
+                MDC.setContextMap(contextMap);
             }
+            return (Instrumentation) cleanup -> {
+                if (oldContextMap != null && !oldContextMap.isEmpty()) {
+                    MDC.setContextMap(oldContextMap);
+                } else {
+                    MDC.clear();
+                }
+            };
         };
     }
 

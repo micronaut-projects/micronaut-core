@@ -15,12 +15,15 @@
  */
 package io.micronaut.scheduling.instrument;
 
+import io.micronaut.core.annotation.Experimental;
+
 /**
  * Interface for classes that instrument {@link Runnable} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
+@Experimental
 public interface RunnableInstrumenter {
     /**
      * Implementors can override to instrument a Runnable.

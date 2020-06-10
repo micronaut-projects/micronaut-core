@@ -43,7 +43,7 @@ final class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exec
      *
      * @param invocationInstrumenterFactories invocation instrumentation factories.
      */
-    public ExecutorServiceInstrumenter(List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
+    ExecutorServiceInstrumenter(List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
         this.invocationInstrumenterFactories = invocationInstrumenterFactories;
     }
 
