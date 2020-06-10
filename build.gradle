@@ -188,7 +188,7 @@ ext {
             ],
             'micronaut.groovy': [
                     version:micronautGroovyVersion,
-                    group:'io.micronaut',
+                    group:'io.micronaut.groovy',
                     name:'micronaut-runtime-groovy',
                     modules:['micronaut-function-groovy']
             ],
@@ -233,7 +233,7 @@ ext {
             ],
             'micronaut.gorm': [
                     version:micronautGroovyVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.groovy',
                     name:'micronaut-gorm-common',
                     modules:['micronaut-multitenancy-gorm', 'micronaut-neo4j-gorm', 'micronaut-mongo-gorm', 'micronaut-hibernate-gorm', 'micronaut-graphql-gorm']
             ],
@@ -596,11 +596,6 @@ ext {
                     version : micronautSecurityVersion,
                     group   : 'io.micronaut.security',
                     modules : ['micronaut-security', 'micronaut-security-annotations', 'micronaut-security-jwt', 'micronaut-security-oauth2','micronaut-security-ldap', 'micronaut-security-session']
-            ],
-            'micronaut.security.configuration'  : [
-                    version : micronautSecurityVersion,
-                    group   : 'io.micronaut.configuration',
-                    modules : ['micronaut-security-ldap', 'micronaut-security-oauth2']
             ],
             'micronaut.views': [
                 version: micronautViewsVersion,
