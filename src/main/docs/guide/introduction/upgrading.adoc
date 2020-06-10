@@ -28,38 +28,56 @@ Some dependencies have new Maven Group IDs so you may need to update your depend
 |===
 |Previous ID|New ID
 
+|`io.micronaut.configuration:micronaut-aws-*`
+|`io.micronaut.aws:micronaut-aws-*`
+
+|`io.micronaut.configuration:micronaut-cassandra`
+|`io.micronaut.cassandra:micronaut-cassandra`
+
+|`io.micronaut.configuration:micronaut-elasticsearch`
+|`io.micronaut.elasticsearch:micronaut-elasticsearch`
+
+|`io.micronaut.configuration:micronaut-flyway`
+|`io.micronaut.flyway:micronaut-flyway`
+
+|`io.micronaut.configuration:micronaut-hibernate-validator`
+|`io.micronaut.beanvalidation:micronaut-hibernate-validator`
+
+|`io.micronaut.configuration:micronaut-jmx`
+|`io.micronaut.jmx:micronaut-jmx`
+
 |`io.micronaut.configuration:micronaut-kafka`
 |`io.micronaut.kafka:micronaut-kafka`
 
 |`io.micronaut.configuration:micronaut-liquibase`
 |`io.micronaut.liquibase:micronaut-liquibase`
 
-|`io.micronaut.configuration:micronaut-flyway`
-|`io.micronaut.flyway:micronaut-flyway`
-
-|`io.micronaut.configuration:micronaut-views-*`
-|`io.micronaut.views:micronaut-views-*`
-
-|`io.micronaut.configuration:micronaut-redis`
-|`io.micronaut.redis:micronaut-redis`
+|`io.micronaut.configuration:micronaut-micrometer-*`
+|`io.micronaut.micrometer:micronaut-micrometer-*`
 
 |`io.micronaut.configuration:micronaut-mongo`
 |`io.micronaut.mongodb:micronaut-mongo-reactive`
 
-|`io.micronaut.configuration:micronaut-cassandra`
-|`io.micronaut.cassandra:micronaut-cassandra`
+|`io.micronaut.configuration:micronaut-neo4j`
+|`io.micronaut.neo4j:micronaut-neo4j`
 
-|`io.micronaut.configuration:micronaut-hibernate-validator`
-|`io.micronaut.beanvalidation:micronaut-hibernate-validator`
+|`io.micronaut.configuration:micronaut-netflix-*`
+|`io.micronaut.netflix:micronaut-netflix-*`
 
-|`io.micronaut.configuration:micronaut-micrometer-*`
-|`io.micronaut.micrometer:micronaut-micrometer-*`
+|`io.micronaut.configuration:micronaut-picocli`
+|`io.micronaut.picocli:micronaut-picocli`
 
-|`io.micronaut.configuration:micronaut-aws-*`
-|`io.micronaut.aws:micronaut-aws-*`
+|`io.micronaut.configuration:micronaut-rabbitmq`
+|`io.micronaut.rabbitmq:micronaut-rabbitmq`
+
+|`io.micronaut.configuration:micronaut-redis`
+|`io.micronaut.redis:micronaut-redis`
 
 |`io.micronaut:micronaut-security-*`
 |`io.micronaut.security:micronaut-security-*`
+
+|`io.micronaut.configuration:micronaut-views-*`
+|`io.micronaut.views:micronaut-views-*`
 
 |===
 
