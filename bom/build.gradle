@@ -6,8 +6,6 @@ group projectGroupId
 
 apply plugin: 'maven-publish'
 
-def profiles = new Properties()
-profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
 boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
 
 def excludedProjects = [
@@ -29,12 +27,7 @@ ext.extraPomInfo = {
 }
 dependencies {
     constraints {
-        for (profile in profiles) {
-            if (!isBuildSnapshot && version.toString().endsWith("-SNAPSHOT")) {
-                throw new RuntimeException("Cannot have a snapshot dependency on a profile [$profile.key] for a release!")
-            }
-            api "io.micronaut.profiles:$profile.key:$profile.value"
-        }
+        api platform("com.fasterxml.jackson:jackson-bom:$jacksonVersion")
 
         for (Project p : rootProject.subprojects) {
             if (!p.subprojects.empty) continue
