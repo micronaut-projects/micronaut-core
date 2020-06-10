@@ -30,11 +30,6 @@ ext.extraPomInfo = {
 }
 dependencies {
     constraints {
-        for (dep in bomVersions) {
-            def module = dep.value
-            println "${module.group}:${module.name}:${module.version}"
-            api platform("${module.group}:${module.name}:${module.version}".toString())
-        }
         for (Project p : rootProject.subprojects) {
             if (!p.subprojects.empty) continue
             if (p.name == "bom") continue
