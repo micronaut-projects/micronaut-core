@@ -16,6 +16,7 @@
 package io.micronaut.scheduling.instrument;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
 
 /**
@@ -26,6 +27,7 @@ import io.micronaut.core.annotation.Indexed;
  * @since 1.3
  */
 @Indexed(InvocationInstrumenterFactory.class)
+@Experimental
 public interface InvocationInstrumenterFactory {
 
     /**

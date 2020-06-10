@@ -18,10 +18,8 @@ package io.micronaut.tracing.brave;
 import brave.Tracing;
 import brave.propagation.CurrentTraceContext;
 import brave.propagation.TraceContext;
-import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory;
@@ -59,19 +57,9 @@ public final class BraveTracingInvocationInstrumenter implements ReactiveInvocat
     public InvocationInstrumenter newTracingInvocationInstrumenter() {
         final TraceContext invocationContext = currentTraceContext.get();
         if (invocationContext != null) {
-            return new InvocationInstrumenter() {
-
-                @NonNull
-                @Override
-                public Instrumentation newInstrumentation() {
-                    CurrentTraceContext.Scope activeScope = currentTraceContext.maybeScope(invocationContext);
-                    return new Instrumentation() {
-                        @Override
-                        public void close(boolean cleanup) {
-                            activeScope.close();
-                        }
-                    };
-                }
+            return () -> {
+                CurrentTraceContext.Scope activeScope = currentTraceContext.maybeScope(invocationContext);
+                return cleanup -> activeScope.close();
             };
         }
         return null;

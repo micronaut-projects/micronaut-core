@@ -41,7 +41,7 @@ final class ThreadFactoryInstrumenter implements BeanCreatedEventListener<Thread
      *
      * @param invocationInstrumenterFactories invocation instrumentation factories
      */
-    public ThreadFactoryInstrumenter(List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
+    ThreadFactoryInstrumenter(List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
         this.invocationInstrumenterFactories = invocationInstrumenterFactories;
     }
 
@@ -53,11 +53,17 @@ final class ThreadFactoryInstrumenter implements BeanCreatedEventListener<Thread
      */
     @Override
     public ThreadFactory onCreated(BeanCreatedEvent<ThreadFactory> event) {
-        if (invocationInstrumenterFactories.isEmpty()) {
+        Class<ThreadFactory> beanType = event.getBeanDefinition().getBeanType();
+        // Don't wrap sub interfaces for ThreadFactory
+        if (beanType == ThreadFactory.class) {
+            if (invocationInstrumenterFactories.isEmpty()) {
+                return event.getBean();
+            }
+            ThreadFactory original = event.getBean();
+            return r -> original.newThread(instrument(r));
+        } else {
             return event.getBean();
         }
-        ThreadFactory original = event.getBean();
-        return r -> original.newThread(instrument(r));
     }
 
     private Runnable instrument(Runnable runnable) {

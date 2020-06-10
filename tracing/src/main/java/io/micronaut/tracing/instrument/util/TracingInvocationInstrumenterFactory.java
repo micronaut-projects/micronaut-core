@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.instrument.util;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -25,6 +26,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
  * @author Denis Stepanov
  * @since 1.3
  */
+@Experimental
 public interface TracingInvocationInstrumenterFactory {
 
     /**

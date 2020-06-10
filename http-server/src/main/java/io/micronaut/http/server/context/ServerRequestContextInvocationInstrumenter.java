@@ -53,17 +53,12 @@ class ServerRequestContextInvocationInstrumenter implements InvocationInstrument
         } else {
             isSet = false;
         }
-        return new Instrumentation() {
-
-            @Override
-            public void close(boolean cleanup) {
-                if (cleanup) {
-                    ServerRequestContext.set(null);
-                } else if (isSet) {
-                    ServerRequestContext.set(currentRequest);
-                }
+        return cleanup -> {
+            if (cleanup) {
+                ServerRequestContext.set(null);
+            } else if (isSet) {
+                ServerRequestContext.set(currentRequest);
             }
-
         };
     }
 }

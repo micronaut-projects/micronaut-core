@@ -16,6 +16,7 @@
 package io.micronaut.scheduling.instrument;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.Experimental;
 
 /**
  * Instrumentation represents an ongoing instrumentation with a given context of {@link InvocationInstrumenter} if any.
@@ -31,6 +32,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
  * @author lgathy
  * @since 2.0
  */
+@Experimental
 public interface Instrumentation extends AutoCloseable {
 
     /**

@@ -57,16 +57,13 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
                 LOG.warn("InvocationInstrumenter.newInstrumentation invocation error: {}", e.getMessage(), e);
             }
         }
-        return new Instrumentation() {
-            @Override
-            public void close(boolean cleanup) {
-                // invoke in reverse order
-                for (ListIterator<Instrumentation> iterator = instrumentationList.listIterator(instrumentationList.size()); iterator.hasPrevious(); ) {
-                    try {
-                        iterator.previous().close(cleanup);
-                    } catch (Exception e) {
-                        LOG.warn("Instrumentation.close invocation error: {}", e.getMessage(), e);
-                    }
+        return cleanup -> {
+            // invoke in reverse order
+            for (ListIterator<Instrumentation> iterator = instrumentationList.listIterator(instrumentationList.size()); iterator.hasPrevious(); ) {
+                try {
+                    iterator.previous().close(cleanup);
+                } catch (Exception e) {
+                    LOG.warn("Instrumentation.close invocation error: {}", e.getMessage(), e);
                 }
             }
         };

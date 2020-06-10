@@ -15,6 +15,7 @@
  */
 package io.micronaut.scheduling.instrument;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.util.CollectionUtils;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -34,6 +35,7 @@ import static io.micronaut.core.util.ArgumentUtils.requireNonNull;
  * @author graemerocher
  * @since 1.3
  */
+@Experimental
 public interface InvocationInstrumenter {
 
     /**
