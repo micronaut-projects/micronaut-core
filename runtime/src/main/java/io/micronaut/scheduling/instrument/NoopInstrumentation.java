@@ -28,11 +28,6 @@ enum NoopInstrumentation implements Instrumentation {
     INSTANCE;
 
     @Override
-    public boolean isActive() {
-        return false;
-    }
-
-    @Override
     public void close(boolean cleanup) {
         // nothing to do
     }

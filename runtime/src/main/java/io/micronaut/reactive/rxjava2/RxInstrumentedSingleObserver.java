@@ -32,8 +32,7 @@ import io.reactivex.disposables.Disposable;
 @Internal
 final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, RxInstrumentedComponent {
     private final SingleObserver<T> source;
-    private final InvocationInstrumenter onSubscribeInstrumenter;
-    private final InvocationInstrumenter onResultInstrumenter;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -43,27 +42,26 @@ final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, RxInst
      */
     RxInstrumentedSingleObserver(SingleObserver<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.onSubscribeInstrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
-        this.onResultInstrumenter = RunOnceInvocationInstrumenter.create(instrumenterFactory);
+        this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        try (Instrumentation ignored = onSubscribeInstrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.onSubscribe(d);
         }
     }
 
     @Override
     public void onError(Throwable t) {
-        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.onError(t);
         }
     }
 
     @Override
     public void onSuccess(T value) {
-        try (Instrumentation ignored = onResultInstrumenter.newInstrumentation()) {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.onSuccess(value);
         }
     }
