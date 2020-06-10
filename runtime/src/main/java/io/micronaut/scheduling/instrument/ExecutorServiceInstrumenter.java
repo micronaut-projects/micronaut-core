@@ -58,45 +58,46 @@ final class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exec
         if (invocationInstrumenterFactories.isEmpty()) {
             return event.getBean();
         }
-        if (event.getBeanDefinition().getBeanType().getName().startsWith("io.netty")) {
-            // ignore Netty event loops
-            return event.getBean();
-        }
-        ExecutorService executorService = event.getBean();
-        if (executorService instanceof ScheduledExecutorService) {
-            return new InstrumentedScheduledExecutorService() {
-                @Override
-                public ScheduledExecutorService getTarget() {
-                    return (ScheduledExecutorService) executorService;
-                }
+        Class<ExecutorService> beanType = event.getBeanDefinition().getBeanType();
+        if (beanType == ExecutorService.class) {
+            ExecutorService executorService = event.getBean();
+            if (executorService instanceof ScheduledExecutorService) {
+                return new InstrumentedScheduledExecutorService() {
+                    @Override
+                    public ScheduledExecutorService getTarget() {
+                        return (ScheduledExecutorService) executorService;
+                    }
 
-                @Override
-                public <T> Callable<T> instrument(Callable<T> task) {
-                    return instrumentInvocation(task);
-                }
+                    @Override
+                    public <T> Callable<T> instrument(Callable<T> task) {
+                        return instrumentInvocation(task);
+                    }
 
-                @Override
-                public Runnable instrument(Runnable command) {
-                    return instrumentInvocation(command);
-                }
-            };
+                    @Override
+                    public Runnable instrument(Runnable command) {
+                        return instrumentInvocation(command);
+                    }
+                };
+            } else {
+                return new InstrumentedExecutorService() {
+                    @Override
+                    public ExecutorService getTarget() {
+                        return executorService;
+                    }
+
+                    @Override
+                    public <T> Callable<T> instrument(Callable<T> task) {
+                        return instrumentInvocation(task);
+                    }
+
+                    @Override
+                    public Runnable instrument(Runnable command) {
+                        return instrumentInvocation(command);
+                    }
+                };
+            }
         } else {
-            return new InstrumentedExecutorService() {
-                @Override
-                public ExecutorService getTarget() {
-                    return executorService;
-                }
-
-                @Override
-                public <T> Callable<T> instrument(Callable<T> task) {
-                    return instrumentInvocation(task);
-                }
-
-                @Override
-                public Runnable instrument(Runnable command) {
-                    return instrumentInvocation(command);
-                }
-            };
+            return event.getBean();
         }
     }
 
