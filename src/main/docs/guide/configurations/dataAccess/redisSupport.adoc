@@ -16,7 +16,7 @@ To configure the Lettuce driver you should first add the `redis-lettuce` module 
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:micronaut-redis-lettuce"
+compile "io.micronaut.redis:micronaut-redis-lettuce"
 ----
 
 You should then configure the URI of the Redis server you wish to communicate with in `application.yml`:

@@ -337,14 +337,9 @@ ext {
             ],
             'micronaut.sql': [
                 version:micronautSqlVersion,
-                group:'io.micronaut.configuration',
+                group:'io.micronaut.sql',
                 name:'micronaut-hibernate-jpa',
-                modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-ucp', 'micronaut-jdbc-dbcp', 'micronaut-jasync-sql', 'micronaut-jooq', 'micronaut-jdbi', 'micronaut-hibernate-jpa-spring', 'micronaut-vertx-mysql-client', 'micronaut-vertx-pg-client']
-            ],
-            'micronaut.jdbc': [
-                version:micronautJdbcVersion,
-                group:'io.micronaut',
-                name:'micronaut-jdbc'
+                modules:['micronaut-jdbc', 'micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-ucp', 'micronaut-jdbc-dbcp', 'micronaut-jasync-sql', 'micronaut-jooq', 'micronaut-jdbi', 'micronaut-hibernate-jpa-spring', 'micronaut-vertx-mysql-client', 'micronaut-vertx-pg-client']
             ],
             'micronaut.mongo': [
                     version:micronautMongoVersion,
@@ -555,11 +550,6 @@ ext {
                     version: '2.6.0',
                     group  : 'org.mariadb.jdbc',
                     name   : 'mariadb-java-client'
-            ],
-            ojdbc                   : [
-                    version: '19.3.0.0',
-                    group  : 'com.oracle.ojdbc',
-                    name   : 'ojdbc8'
             ],
             mssql                   : [
                     version: '8.2.2.jre8',

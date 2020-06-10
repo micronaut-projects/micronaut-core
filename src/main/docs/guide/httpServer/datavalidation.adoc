@@ -3,7 +3,7 @@ It is easy to validate incoming data with Micronaut's controllers with the
 
 First, add the Hibernate Validator configuration to your application:
 
-dependency:micronaut-hibernate-validator[groupId="io.micronaut.configuration"]
+dependency:micronaut-hibernate-validator[groupId="io.micronaut.beanvalidation"]
 
 We can validate parameters using `javax.validation` annotations and the api:validation.Validated[] annotation at the class level.
 

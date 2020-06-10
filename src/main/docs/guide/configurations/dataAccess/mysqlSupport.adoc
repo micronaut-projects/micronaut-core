@@ -16,7 +16,7 @@ To configure the Reactive MySQL client you should first add `vertx-mysql-client`
 [source,groovy]
 .build.gradle
 ----
-compile "io.micronaut.configuration:micronaut-vertx-mysql-client"
+compile "io.micronaut.sql:micronaut-vertx-mysql-client"
 ----
 
 For more information see the https://micronaut-projects.github.io/micronaut-sql/latest/guide/#mysqlclient[Configuring Reactive MySQL] section of the https://github.com/micronaut-projects/micronaut-sql[Micronaut SQL libraries] project.

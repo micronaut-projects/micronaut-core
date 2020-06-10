@@ -11,7 +11,7 @@ $ mn create-app my-app --features neo4j-bolt
 
 To configure the Neo4j Bolt driver you should first add the `neo4j-bolt` module to your classpath:
 
-dependency::micronaut-neo4j-bolt[groupId="io.micronaut.configuration"]
+dependency::micronaut-neo4j-bolt[groupId="io.micronaut.neo4j"]
 
 You should then configure the URI of the Neo4j server you wish to communicate with in `application.yml`:
 

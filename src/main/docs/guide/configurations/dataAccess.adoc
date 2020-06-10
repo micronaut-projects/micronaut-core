@@ -4,43 +4,43 @@ The table summarizes the configuration modules and the dependencies you should a
 |===
 |Dependency|Description
 
-|`io.micronaut.configuration:micronaut-jdbc-dbcp`
+|`io.micronaut.sql:micronaut-jdbc-dbcp`
 |Configures SQL jdk:javax.sql.DataSource[] instances using https://commons.apache.org/proper/commons-dbcp/[Commons DBCP]
 
-|`io.micronaut.configuration:micronaut-jdbc-hikari`
+|`io.micronaut.sql:micronaut-jdbc-hikari`
 |Configures SQL jdk:javax.sql.DataSource[] instances using https://brettwooldridge.github.io/HikariCP/[Hikari Connection Pool]
 
-|`io.micronaut.configuration:micronaut-jdbc-tomcat`
+|`io.micronaut.sql:micronaut-jdbc-tomcat`
 |Configures SQL jdk:javax.sql.DataSource[] instances using https://tomcat.apache.org/tomcat-7.0-doc/jdbc-pool.html[Tomcat Connection Pool]
 
-|`io.micronaut.configuration:micronaut-hibernate-jpa`
+|`io.micronaut.sql:micronaut-hibernate-jpa`
 |Configures Hibernate/JPA EntityManagerFactory beans
 
 |`io.micronaut.configuration:micronaut-hibernate-gorm`
 |Configures http://gorm.grails.org/latest/hibernate/manual[GORM for Hibernate] for Groovy applications
 
-|`io.micronaut.configuration:micronaut-mongo-reactive`
+|`io.micronaut.mongodb:micronaut-mongo-reactive`
 |Configures the http://mongodb.github.io/mongo-java-driver-reactivestreams[MongoDB Reactive Driver]
 
 |`io.micronaut.configuration:micronaut-mongo-gorm`
 |Configures http://gorm.grails.org/latest/mongodb/manual[GORM for MongoDB] for Groovy applications
 
-|`io.micronaut.configuration:micronaut-neo4j-bolt`
+|`io.micronaut.neo4j:micronaut-neo4j-bolt`
 |Configures the https://github.com/neo4j/neo4j-java-driver[Bolt Java Driver] for https://neo4j.com[Neo4j]
 
 |`io.micronaut.configuration:micronaut-neo4j-gorm`
 |Configures http://gorm.grails.org/latest/neo4j/manual[GORM for Neo4j] for Groovy applications
 
-|`io.micronaut.configuration:micronaut-vertx-mysql-client`
+|`io.micronaut.sql:micronaut-vertx-mysql-client`
 |Configures the https://github.com/eclipse-vertx/vertx-sql-client/tree/master/vertx-mysql-client[Reactive MySQL Client]
 
-|`io.micronaut.configuration:micronaut-vertx-pg-client`
+|`io.micronaut.sql:micronaut-vertx-pg-client`
 |Configures the https://github.com/eclipse-vertx/vertx-sql-client/tree/master/vertx-pg-client[Reactive Postgres Client]
 
-|`io.micronaut.configuration:micronaut-redis-lettuce`
+|`io.micronaut.redis:micronaut-redis-lettuce`
 |Configures the https://lettuce.io[Lettuce] driver for https://redis.io[Redis]
 
-|`io.micronaut.configuration:micronaut-cassandra`
+|`io.micronaut.cassandra:micronaut-cassandra`
 |Configures the https://github.com/datastax/java-driver[Datastax Java Driver] for http://cassandra.apache.org[Cassandra]
 
 |===
@@ -50,7 +50,7 @@ For example, to add support for MongoDB you define the following dependency:
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:micronaut-mongo-reactive"
+compile "io.micronaut.mongodb:micronaut-mongo-reactive"
 ----
 
 For Groovy users, Micronaut provides special support for http://gorm.grails.org[GORM].
