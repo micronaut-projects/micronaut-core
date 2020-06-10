@@ -91,6 +91,8 @@ final class JdbcFeature implements Feature {
                     "org.postgresql.util.SharedTimer"
             );
 
+            registerAllFields(access, "org.postgresql.PGProperty");
+
             ResourcesRegistry resourcesRegistry = getResourceRegistry();
             if (resourcesRegistry != null) {
                 resourcesRegistry.addResources("META-INF/services/java.sql.Driver");
@@ -185,6 +187,16 @@ final class JdbcFeature implements Feature {
         Field[] fields = t.getFields();
         for (Field field : fields) {
             RuntimeReflection.register(field);
+        }
+    }
+
+    private void registerAllFields(BeforeAnalysisAccess access, String n) {
+        Class<?> t = access.findClassByName(n);
+        if (t != null) {
+            Field[] fields = t.getFields();
+            for (Field field : fields) {
+                RuntimeReflection.register(field);
+            }
         }
     }
 
