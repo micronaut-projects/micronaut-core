@@ -27,8 +27,6 @@ ext.extraPomInfo = {
 }
 dependencies {
     constraints {
-        api platform("com.fasterxml.jackson:jackson-bom:$jacksonVersion")
-
         for (Project p : rootProject.subprojects) {
             if (!p.subprojects.empty) continue
             if (p.name == "bom") continue
