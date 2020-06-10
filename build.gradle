@@ -42,6 +42,11 @@ ext {
 ext {
 
     dependencyVersions = [
+            'commons.dbcp':[
+                    version: commonsDbcpVersion,
+                    group  : 'org.apache.commons',
+                    name   : 'commons-dbcp2'
+            ],
             groovy                     : [
                     version: groovyVersion,
                     group  : 'org.codehaus.groovy',
@@ -377,6 +382,12 @@ ext {
                     group:'org.neo4j.driver',
                     name:'neo4j-java-driver'
             ],
+            ojdbc                      : [
+                    version: ojdbcVersion,
+                    group  : 'com.oracle.database.jdbc',
+                    name   : 'ucp',
+                    modules: ['ojdbc8']
+            ],
             'jcache'                   : [
                     version: jcacheVersion,
                     group  : 'javax.cache',
@@ -508,6 +519,11 @@ ext {
                     version: validationVersion,
                     group  : 'javax.validation',
                     name   : 'validation-api'
+            ],
+            hikari                    : [
+                    version: hikariVersion,
+                    group  : 'com.zaxxer',
+                    name   : 'HikariCP'
             ],
             hystrix                    : [
                     version: hystrixVersion,
