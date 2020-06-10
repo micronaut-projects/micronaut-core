@@ -20,6 +20,7 @@ import io.micronaut.core.io.scan.ClassPathResourceLoader;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -81,5 +82,14 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      */
     default @NonNull ClassPathResourceLoader getResourceLoader() {
         return ClassPathResourceLoader.defaultLoader(getClassLoader());
+    }
+
+    /**
+     * The config locations
+     *
+     * @return The config locations
+     */
+    default @Nullable List<String> getOverrideConfigLocations() {
+        return null;
     }
 }

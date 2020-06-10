@@ -460,8 +460,24 @@ class DefaultEnvironmentSpec extends Specification {
         when:
         env = new DefaultEnvironment({[]}).start()
 
-        then: "Normal application files have the least precedence"
+        then: "Normal application files have the least precedence with config folder being last"
         env.getRequiredProperty("config.prop", String.class) == "application.yml"
+        env.getRequiredProperty("config-folder-prop", String.class) == "abc"
+    }
+
+    void "test custom config locations"() {
+        when:
+            ApplicationContext applicationContext = ApplicationContext.builder()
+                    .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
+                    .build()
+                    .start()
+
+        then: "Normal application files have the least precedence with config folder being last"
+            applicationContext.getRequiredProperty("config.prop", String.class) == "file:./custom-config/application.yml"
+            applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
+            applicationContext.getRequiredProperty("custom-config-file", String.class) == "abc"
+        cleanup:
+            applicationContext.stop()
     }
 
     void "test specified names have precedence, even if deduced"() {

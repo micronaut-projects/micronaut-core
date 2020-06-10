@@ -23,6 +23,8 @@ import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -34,34 +36,41 @@ import java.util.stream.Stream;
  */
 public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader {
 
-    private final Optional<File> baseDir;
+    private final Optional<Path> baseDirPath;
 
     /**
      * Default constructor.
      */
     public DefaultFileSystemResourceLoader() {
-        this.baseDir = Optional.empty();
+        this.baseDirPath = Optional.empty();
     }
 
     /**
-     * @param baseDir The base directory
+     * @param baseDirPath The base directory
      */
-    public DefaultFileSystemResourceLoader(File baseDir) {
-        this.baseDir = Optional.of(baseDir);
+    public DefaultFileSystemResourceLoader(File baseDirPath) {
+        this.baseDirPath = Optional.of(baseDirPath.toPath());
     }
 
     /**
      * @param path The path
      */
     public DefaultFileSystemResourceLoader(String path) {
-        this.baseDir = Optional.of(new File(normalize(path)));
+        this.baseDirPath = Optional.of(Paths.get(normalize(path)));
+    }
+
+    /**
+     * @param path The path
+     */
+    public DefaultFileSystemResourceLoader(Path path) {
+        this.baseDirPath = Optional.of(path);
     }
 
     @Override
     public Optional<InputStream> getResourceAsStream(String path) {
-        File file = getFile(normalize(path));
+        Path filePath = getFilePath(normalize(path));
         try {
-            return Optional.of(Files.newInputStream(file.toPath()));
+            return Optional.of(Files.newInputStream(filePath));
         } catch (IOException e) {
             return Optional.empty();
         }
@@ -69,10 +78,10 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
 
     @Override
     public Optional<URL> getResource(String path) {
-        File file = getFile(normalize(path));
-        if (file.exists() && file.canRead() && !file.isDirectory()) {
+        Path filePath = getFilePath(normalize(path));
+        if (Files.exists(filePath) && Files.isReadable(filePath) && !Files.isDirectory(filePath)) {
             try {
-                URL url = file.toURI().toURL();
+                URL url = filePath.toUri().toURL();
                 return Optional.of(url);
             } catch (MalformedURLException e) {
             }
@@ -82,7 +91,7 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
 
     @Override
     public Stream<URL> getResources(String name) {
-        throw new UnsupportedOperationException(getClass().getName() + " does not support retrieving a stream of resources");
+        return getResource(name).map(Stream::of).orElseGet(Stream::empty);
     }
 
     /**
@@ -104,7 +113,7 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
         return path;
     }
 
-    private File getFile(String path) {
-        return baseDir.map(dir -> new File(dir, path)).orElse(new File(path));
+    private Path getFilePath(String path) {
+        return baseDirPath.map(dir -> dir.resolve(path)).orElseGet(() -> Paths.get(path));
     }
 }
