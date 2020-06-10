@@ -609,7 +609,7 @@ ext {
             ],
             'micronaut.rss': [
                     version:micronautRssVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.rss',
                     modules : ['micronaut-rss', 'micronaut-itunespodcast']
 
             ],
