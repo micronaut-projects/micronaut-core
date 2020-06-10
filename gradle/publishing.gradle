@@ -114,6 +114,20 @@ publishing {
                             it.name().localPart == 'packaging'
                         } + pomInfo
 
+                        def dependenciesNode = xml.dependencyManagement.dependencies.dependency
+                        for (dep in bomVersions) {
+                            String property = "\${${dep.key}.version}"
+                            def module = dep.value
+                            dependenciesNode.last() + {
+                                delegate.dependency {
+                                    delegate.groupId module.group
+                                    delegate.artifactId module.name
+                                    delegate.version property
+                                    delegate.type 'pom'
+                                    delegate.scope 'import'
+                                }
+                            }
+                        }
 
                         for(dep in dependencyVersions) {
                             String property = "\${${dep.key}.version}"

@@ -23,12 +23,18 @@ ext.extraPomInfo = {
         for(dep in dependencyVersions) {
             "${dep.key}.version"(dep.value.version)
         }
+        for(dep in bomVersions) {
+            "${dep.key}.version"(dep.value.version)
+        }
     }
 }
 dependencies {
     constraints {
-        api platform("com.fasterxml.jackson:jackson-bom:$jacksonVersion")
-
+        for (dep in bomVersions) {
+            def module = dep.value
+            println "${module.group}:${module.name}:${module.version}"
+            api platform("${module.group}:${module.name}:${module.version}".toString())
+        }
         for (Project p : rootProject.subprojects) {
             if (!p.subprojects.empty) continue
             if (p.name == "bom") continue
