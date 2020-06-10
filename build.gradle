@@ -556,6 +556,11 @@ ext {
                     group  : 'com.microsoft.sqlserver',
                     name   : 'mssql-jdbc'
             ],
+            oracle                  : [
+                version: '19.3.0.0',
+                group  : 'com.oracle.ojdbc',
+                name   : 'ojdbc8'
+            ],
             tomcatJdbc                 : [
                     version: tomcatJdbcVersion,
                     group  : 'org.apache.tomcat',
