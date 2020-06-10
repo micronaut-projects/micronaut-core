@@ -23,7 +23,7 @@ Micronaut's implementation includes the following benefits:
 
 If you require full Bean Validator 2.0 compliance you can add the `micronaut-hibernate-validator` module to your classpath, which will replace Micronaut's implementation.
 
-dependency:micronaut-hibernate-validator[groupId="io.micronaut.configuration"]
+dependency:micronaut-hibernate-validator[groupId="io.micronaut.beanvalidation"]
 
 === Validating Bean Methods
 

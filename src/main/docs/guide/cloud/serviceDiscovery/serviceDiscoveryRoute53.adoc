@@ -33,17 +33,7 @@ micronaut:
 
 5. Make sure you have the following dependencies included in your build file:
 
-.Sample build.gradle
-[source,groovy]
-----
-compile "io.micronaut:micronaut-discovery-client"
-compile "io.micronaut.configuration:micronaut-aws-common"
-compile group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.297'
-compile group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.297'
-compile group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
-compile group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
-----
-
+dependency:io.micronaut.aws:micronaut-aws-route53[]
 
 6. On the client side, you will need the same dependencies and less configuration options:
 

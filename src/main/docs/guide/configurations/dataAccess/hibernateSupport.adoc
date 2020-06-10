@@ -13,7 +13,7 @@ Micronaut features built in support for configuring a http://hibernate.org[Hiber
 
 Once you have <<sqlSupport, configured one or many DataSources>> to use Hibernate, you will need to add the `hibernate-jpa` dependency to your build configuration:
 
-dependency:micronaut-hibernate-jpa[groupId="io.micronaut.configuration"]
+dependency:micronaut-hibernate-jpa[groupId="io.micronaut.sql"]
 
 For more information see the https://micronaut-projects.github.io/micronaut-sql/latest/guide/#hibernate[Configuring Hibernate] section of the https://github.com/micronaut-projects/micronaut-sql[Micronaut SQL libraries] project.
 

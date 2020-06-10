@@ -22,7 +22,7 @@ To quickly get up and running with Redis sessions you must also have the `redis-
 [source,groovy]
 ----
 compile "io.micronaut:micronaut-session"
-compile "io.micronaut.configuration:micronaut-redis-lettuce"
+compile "io.micronaut.redis:micronaut-redis-lettuce"
 ----
 
 And enable Redis sessions via configuration in `application.yml`:
