@@ -76,6 +76,12 @@ Some dependencies have new Maven Group IDs so you may need to update your depend
 |`io.micronaut.configuration:micronaut-redis`
 |`io.micronaut.redis:micronaut-redis`
 
+|`io.micronaut.configuration:micronaut-rss`
+|`io.micronaut.rss:micronaut-rss`
+
+|`io.micronaut.configuration:micronaut-itunespodcast`
+|`io.micronaut.rss:micronaut-itunespodcast`
+
 |`io.micronaut:micronaut-security-*`
 |`io.micronaut.security:micronaut-security-*`
 
