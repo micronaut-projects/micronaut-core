@@ -344,7 +344,7 @@ ext {
             'mongo' : [
                     version: mongoVersion,
                     group  : 'org.mongodb',
-                    modules: ['mongodb-driver-async', 'mongodb-driver-sync', 'mongodb-driver-core']
+                    modules: ['mongodb-driver-sync', 'mongodb-driver-core']
             ],
             'mongo.reactive'           : [
                     version: mongoReactiveVersion,
