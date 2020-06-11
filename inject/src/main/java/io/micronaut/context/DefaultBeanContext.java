@@ -100,6 +100,12 @@ public class DefaultBeanContext implements BeanContext {
     private static final String PARALLEL_TYPE = Parallel.class.getName();
     private static final String INDEXES_TYPE = Indexes.class.getName();
     private static final String REPLACES_ANN = Replaces.class.getName();
+    private static final Comparator<BeanRegistration> BEAN_REGISTRATION_COMPARATOR = (o1, o2) -> {
+        int order1 = getOrder(o1);
+        int order2 = getOrder(o2);
+        return Integer.compare(order1, order2);
+    };
+    
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
@@ -2768,7 +2774,7 @@ public class DefaultBeanContext implements BeanContext {
                 (eagerInitSingletons && beanDefinitionReference.isSingleton()) ||
                 (eagerInitStereotypesPresent && beanDefinitionReference.getAnnotationMetadata().hasStereotype(eagerInitStereotypes));
     }
-
+    conflict
     @NonNull
     private Collection<BeanDefinitionReference> resolveTypeIndex(Class<?> indexedType) {
         return beanIndex.computeIfAbsent(indexedType, aClass -> {
@@ -2902,13 +2908,6 @@ public class DefaultBeanContext implements BeanContext {
             return beans;
         }
     }
-
-    private static final Comparator<BeanRegistration> BEAN_REGISTRATION_COMPARATOR = (o1, o2) -> {
-        int order1 = getOrder(o1);
-        int order2 = getOrder(o2);
-        return Integer.compare(order1, order2);
-    };
-
 
     private static <T> int getOrder(BeanRegistration<T> registration) {
         Optional<AnnotationValue<Order>> annotation = registration.beanDefinition.findAnnotation(Order.class);
