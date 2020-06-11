@@ -90,9 +90,6 @@ Due to the fact that JSR-305 has been cancelled and that this dependency has pot
 
 It is recommended users of Micronaut use this API instead (although the `javax.annotation.Nullable` and `javax.annotation.NotNull` annotations continue to be supported).
 
-==== Endpoint Sensitivity
-
-It is now possible to control the sensitivity of individual endpoint methods. The ann:io.micronaut.management.endpoint.annotation.Sensitive[] annotation can be applied to endpoint methods to allow for some methods to have a different sensitivity than the value supplied to the endpoint annotation.
 
 === CLI Features
 
@@ -145,6 +142,32 @@ $ mn feature-diff --features=azure-function
 
 ----
 
+=== GraalVM Improvements
+
+Micronaut's support for GraalVM Native Image has been moved out of experimental status, which solidifies our commitment to continue improving support for native images.
+
+==== Automatic Static Resource Detection for Native Image
+
+It is not longer necessary to configure static resources for your Native Immage builds. The `micronaut-graal` annotation processor will automatically do this for you for all resources found in `src/main/resources`.
+
+==== Improved support for JDBC / Hibernate in Native Image
+
+It is no longer necessary to provide additional GraalVM related configuration to connect to databases via JDBC or Hibernate/JPA. Micronaut includes automatic support for the following drivers with GraalVM Native Image:
+
+* Oracle
+* MariaDB
+* Postgres
+* MS SQL
+* H2
+
+==== Support for Flyway Migrations in Native Image
+
+The Micronaut Flyway module has been https://micronaut-projects.github.io/micronaut-flyway/2.0.x/guide/index.html#graalvm[updated with GraalVM Native Image support] so you can now run database migrations in Native Image.
+
+==== Support for Native Image in AWS SDK v2
+
+Version 2.0 of the Micronaut AWS module https://micronaut-projects.github.io/micronaut-aws/2.0.x/guide/index.html#sdkv2[includes support for Native Image] for the majority of the v2 AWS APIs including S3, Dynamo DB, SES, SNS, and SQS which will be helpful for those developing native AWS Lambda functions with Micronaut + GraalVM.
+
 === Build Improvements
 
 ==== New Maven Parent POM
@@ -172,9 +195,13 @@ $ ./mvnw mn:run
 
 Whenever you make a change to a class file the server will restart automatically.
 
-==== Gradle 6.3 Update
+==== Gradle 6.5 Update
 
-For Gradle users who create new applications Gradle 6.3 is used which is compatible with JDK 14.
+For Gradle users who create new applications Gradle 6.5 is used which is compatible with JDK 14.
+
+==== Better Gradle Incremental Annotation Processing Support
+
+Gradle builds with Micronaut 2 for both Java and Kotlin should be significantly faster thanks to improved support for https://docs.gradle.org/current/userguide/java_plugin.html#sec:incremental_annotation_processing[Gradle incremental annotation processing].
 
 === HTTP Features
 
@@ -183,7 +210,6 @@ For Gradle users who create new applications Gradle 6.3 is used which is compati
 Micronaut's Netty-based HTTP client and server have been updated to support HTTP/2.
 
 See the <<http2Server, HTTP/2 documentation>> for more information on how to enable support for HTTP/2.
-
 
 ==== Threading Model and Event Loop Group Improvements
 
@@ -224,7 +250,6 @@ Micronaut will now process the `VCAP_APPLICATION` and `VCAP_SERVICES` environmen
 
 Thanks to https://github.com/fnonnenmacher[Fabian Nonnenmacher] for this contribution.
 
-
 ==== HTTP Client Improvements
 
 It is no longer necessary to use `@Client(..)` to inject a default api:http.client.RxHttpClient[] instance. You can now inject the default client simply with:
@@ -239,6 +264,25 @@ If no host is provided at the time of a request, a api:http.client.exceptions.No
 ==== API for Proxying Requests
 
 A new API for writing API gateways and proxying requests has been added. See the documentation on the <<proxyClient, ProxyHttpClient>> for more information.
+
+==== Endpoint Sensitivity
+
+It is now possible to control the sensitivity of individual endpoint methods. The ann:io.micronaut.management.endpoint.annotation.Sensitive[] annotation can be applied to endpoint methods to allow for some methods to have a different sensitivity than the value supplied to the endpoint annotation.
+
+==== Improvements to Instrumentation
+
+The Instrumentation mechanism for RxJava 2 has been improved to address issues with MDC and reduce the size of reactive stack traces. Thanks to https://github.com/dstepanov[Denis Stepanov] and https://github.com/lgathy[Lajos Gathy] for their contributions in this area.
+
+=== Kotlin Improvements
+
+==== Support for KTOR in Micronaut Launch
+
+You can generate a Micronaut + https://ktor.io/[Ktor] application from https://micronaut.io/launch/[Micronaut Launch] or via the command line.
+
+==== Micronaut Kotlin Extensions
+
+New https://micronaut-projects.github.io/micronaut-kotlin/1.0.x/guide/#extensionFunctions[Kotlin Extension Functions] are available that make the Kotlin + Micronaut experience that little bit better.
+
 
 === Serverless Improvements
 
@@ -264,11 +308,11 @@ Caching has been moved into a separate module and out of `micronaut-runtime`. If
 
 See the documentation for the https://micronaut-projects.github.io/micronaut-cache/2.0.x/guide/[Cache module] for more information.
 
-==== Micronaut SQL 2.1.0 Upgrade
+==== Micronaut SQL 2.3.0 Upgrade
 
-Micronaut SQL has been improved to default to Micronaut transaction management (making Spring management optional) and includes https://micronaut-projects.github.io/micronaut-sql/2.0.x/guide/#jdbi[support for Jdbi] (Thanks to https://github.com/drmaas[Dan Maas] for this contribution).
+Micronaut SQL has been improved to default to Micronaut transaction management (making Spring management optional) and includes https://micronaut-projects.github.io/micronaut-sql/2.3.x/guide/#jdbi[support for Jdbi] (Thanks to https://github.com/drmaas[Dan Maas] for this contribution).
 
-In addition, support has been added for https://micronaut-projects.github.io/micronaut-sql/latest/guide/#jdbc[Oracle Universal Connection Pool]. Thanks to https://github.com/recursivecodes[Todd Sharp] for this contribution.
+In addition, support has been added for https://micronaut-projects.github.io/micronaut-sql/2.3.x/guide/#jdbc[Oracle Universal Connection Pool]. Thanks to https://github.com/recursivecodes[Todd Sharp] for this contribution.
 
 ==== Micronaut Security 2.0.0 Upgrade
 
@@ -282,25 +326,25 @@ Whilst RxJava 2 remains the default, individual modules for other reactive libra
 
 For RxJava 3:
 
-dependency:io.micronaut.rxjava3:micronaut-rxjava3[scope="compile"]
+dependency:io.micronaut.rxjava3:micronaut-rxjava3[]
 
 For Reactor:
 
-dependency:io.micronaut.reactor:micronaut-reactor[scope="compile"]
+dependency:io.micronaut.reactor:micronaut-reactor[]
 
 And legacy support for RxJava 1:
 
-dependency:io.micronaut.rxjava1:micronaut-rxjava1[scope="compile"]
+dependency:io.micronaut.rxjava1:micronaut-rxjava1[]
 
 Included within the new RxJava 3 and Reactor modules are variants of api:http.client.RxHttpClient[] called `Rx3HttpClient` and `ReactorHttpClient` respectively.
 
 To use the RxJava 3 HTTP client add the following dependency:
 
-dependency:io.micronaut.rxjava3:micronaut-rxjava3-http-client[scope="compile"]
+dependency:io.micronaut.rxjava3:micronaut-rxjava3-http-client[]
 
 To use the Reactor HTTP client add:
 
-dependency:io.micronaut.rxjava3:micronaut-reactor-http-client[scope="compile"]
+dependency:io.micronaut.rxjava3:micronaut-reactor-http-client[]
 
 ==== New Micronaut NATS module
 
@@ -312,14 +356,17 @@ Thanks to https://github.com/grimmjo[Joachim Grimm] for this contribution.
 
 ==== Module Upgrades
 
-* Micronaut Neo4j - `1.3.0` -> `2.0.0`
-* Micronaut Mongo - `1.3.0` -> `2.0.0`
-* Micronaut SQL - `1.3.0` -> `2.2.1`
-* Micronaut Cache - `1.2.0` -> `2.0.0.RC1`
 * Micronaut AWS - `1.3.9` -> `2.0.0.RC1`
-* Micronaut Security - `1.4.0` -> `2.0.0.RC1`
+* Micronaut Cache - `1.2.0` -> `2.0.0.RC1`
+* Micronaut Data - `1.0.2` -> `1.1.0.RC2`
+* Micronaut GCP - `1.1.0` -> `2.0.0.RC2`
+* Micronaut gRPC - `1.1.1` -> `2.0.0.RC1`
 * Micronaut Micrometer - `1.3.1` -> `2.0.0.RC2`
-* Micronaut GCP - `1.1.0` -> `2.0.0.RC1`
+* Micronaut Mongo - `1.3.0` -> `2.1.0`
+* Micronaut Neo4j - `1.3.0` -> `3.0.0.RC1`
+* Micronaut SQL - `1.3.0` -> `2.3.0`
+* Micronaut Security - `1.4.0` -> `2.0.0.RC1`
+* Micronaut Spring - `1.0.2` -> `2.0.1`
 
 ==== Dependency Upgrades
 
