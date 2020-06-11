@@ -161,7 +161,7 @@ publishing {
                             }
                             visited.add(it)
                         }
-                        project.configurations.runtime.allDependencies.each {
+                        def runtimeHandler = {
                             if (visited.contains(it)) {
                                 return
                             }
@@ -181,6 +181,8 @@ publishing {
                             }
                             visited.add(it)
                         }
+                        project.configurations.implementation.allDependencies.each (runtimeHandler)
+                        project.configurations.runtimeOnly.allDependencies.each (runtimeHandler)
                     }
 
                     pom.withXml {
