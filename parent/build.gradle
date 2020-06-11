@@ -22,6 +22,35 @@ ext.extraPomInfo = {
                     delegate.version micronautMavenPluginVersion
                 }
                 delegate.plugin {
+                    groupId "com.github.os72"
+                    artifactId "protoc-jar-maven-plugin"
+                    delegate.version "3.11.4"
+                    delegate.executions {
+                        execution {
+                            phase('generate-sources')
+                            goals {
+                                goal("run")
+                            }
+                            delegate.configuration {
+                                addProtoSources('all')
+                                includeMavenTypes('direct')
+                                inputDirectories {
+                                    include('src/main/proto')
+                                }
+                                outputTargets {
+                                    outputTarget {
+                                        type("java")
+                                    }
+                                    outputTarget {
+                                        type("grpc-java")
+                                        pluginArtifact("io.grpc:protoc-gen-grpc-java:$grpcVersion")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                delegate.plugin {
                     groupId "org.codehaus.mojo"
                     artifactId "exec-maven-plugin"
                     delegate.version "1.6.0"
