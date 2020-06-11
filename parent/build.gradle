@@ -43,7 +43,7 @@ ext.extraPomInfo = {
                                     }
                                     outputTarget {
                                         type("grpc-java")
-                                        pluginArtifact("io.grpc:protoc-gen-grpc-java:$grpcVersion")
+                                        pluginArtifact('io.grpc:protoc-gen-grpc-java:${grpc.version}')
                                     }
                                 }
                             }
