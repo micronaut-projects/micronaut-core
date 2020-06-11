@@ -114,46 +114,11 @@ publishing {
                             it.name().localPart == 'packaging'
                         } + pomInfo
 
-                        def dependenciesNode = xml.dependencyManagement.dependencies.dependency
-                        for (dep in bomVersions) {
-                            String property = "\${${dep.key}.version}"
-                            def module = dep.value
-                            dependenciesNode.last() + {
-                                delegate.dependency {
-                                    delegate.groupId module.group
-                                    delegate.artifactId module.name
-                                    delegate.version property
-                                    delegate.type 'pom'
-                                    delegate.scope 'import'
-                                }
-                            }
-                        }
-
                         for(dep in dependencyVersions) {
-                            String property = "\${${dep.key}.version}"
-                            def info = dep.value
-                            def version = info.version
-                            def group = info.group
-                            if (group && version) {
-                                def modules = []
-                                if (info.name) {
-                                    modules << info.name
-                                }
-                                if (info.modules) {
-                                    modules.addAll(info.modules)
-                                }
-                                for (module in modules) {
-
-                                    def pomDep = xml.dependencyManagement.dependencies.dependency.find {
-                                        it.artifactId.text() == module &&
-                                                it.groupId.text() == group
-                                    }
-                                    if (pomDep != null) {
-                                        pomDep.version.first().setValue(property)
-                                    }
-                                }
-                                
-                            }
+                            setBomVersion(dep, xml)
+                        }
+                        for(dep in bomVersions) {
+                            setBomVersion(dep, xml)
                         }
                     }
 
@@ -243,6 +208,33 @@ publishing {
                 }
             }
         }
+    }
+}
+
+private void setBomVersion(Map.Entry<Object, Object> dep, xml) {
+    String property = "\${${dep.key}.version}"
+    def info = dep.value
+    def version = info.version
+    def group = info.group
+    if (group && version) {
+        def modules = []
+        if (info.name) {
+            modules << info.name
+        }
+        if (info.modules) {
+            modules.addAll(info.modules)
+        }
+        for (module in modules) {
+
+            def pomDep = xml.dependencyManagement.dependencies.dependency.find {
+                it.artifactId.text() == module &&
+                        it.groupId.text() == group
+            }
+            if (pomDep != null) {
+                pomDep.version.first().setValue(property)
+            }
+        }
+
     }
 }
 
