@@ -40,7 +40,23 @@ ext {
 }
 
 ext {
-
+    bomVersions = [
+            'jackson':[
+                    group:'com.fasterxml.jackson',
+                    name:'jackson-bom',
+                    version:jacksonVersion
+            ],
+            'grpc':[
+                    group:'io.grpc',
+                    name:'grpc-bom',
+                    version:grpcVersion
+            ],
+            'protobuf':[
+                    group:'com.google.protobuf',
+                    name:'protobuf-bom',
+                    version:protobufJavaVersion
+            ]
+    ]
     dependencyVersions = [
             'commons.dbcp':[
                     version: commonsDbcpVersion,
@@ -71,33 +87,6 @@ ext {
                     version: gormHibernateVersion,
                     group  : 'org.grails',
                     name   : 'grails-datastore-gorm-hibernate5'
-            ],
-            jackson                    : [
-                    version: jacksonVersion,
-                    group  : 'com.fasterxml.jackson.core',
-                    modules: ['jackson-core', 'jackson-annotations']
-            ],
-            'jackson.databind'         : [
-                    version: jacksonDatabindVersion,
-                    group  : 'com.fasterxml.jackson.core',
-                    name   : 'jackson-databind',
-            ],
-            'jackson.modules'          : [
-                    version: jacksonVersion,
-                    group  : 'com.fasterxml.jackson.module',
-                    name   : 'jackson-module-afterburner',
-                    modules: ['jackson-module-kotlin', 'jackson-module-parameter-names', 'jackson-module-jaxb-annotations']
-            ],
-            'jackson.datatype'         : [
-                    version: jacksonVersion,
-                    group  : 'com.fasterxml.jackson.datatype',
-                    name   : 'jackson-datatype-jdk8',
-                    modules: ['jackson-datatype-jsr310']
-            ],
-            'jackson.dataformat'       : [
-                    version : jacksonVersion,
-                    group   : 'com.fasterxml.jackson.dataformat',
-                    modules : ['jackson-dataformat-xml']
             ],
             jaeger                     : [
                     version: jaegerVersion,

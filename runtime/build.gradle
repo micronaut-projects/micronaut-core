@@ -8,29 +8,21 @@ dependencies {
     api project(':inject')
     api project(':aop')
     api dependencyVersion("validation")
-    api dependencyVersion("jackson.databind")
+    api "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
     api dependencyVersion("rxjava2")
-    api([
-            dependencyVersion('jackson.datatype'),
-            dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
-    ])
+    runtimeOnly "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
+    runtimeOnly "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
 
     compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
     compileOnly dependencyVersion("jcache")
 
-    compileOnly(
-        dependencyModuleVersion('jackson.modules', 'jackson-module-kotlin')
-    ) {
+    compileOnly("com.fasterxml.jackson.module:jackson-module-kotlin:$jacksonVersion") {
         transitive = false
     }
-    compileOnly(
-            dependencyVersion('jackson.modules')
-    ) {
+    compileOnly("com.fasterxml.jackson.module:jackson-module-afterburner:$jacksonVersion") {
         transitive = false
     }
-    compileOnly(
-        dependencyModuleVersion('jackson.modules', 'jackson-module-parameter-names')
-    ) {
+    compileOnly("com.fasterxml.jackson.module:jackson-module-parameter-names:$jacksonVersion") {
         transitive = false
     }
 

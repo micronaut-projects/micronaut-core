@@ -114,32 +114,11 @@ publishing {
                             it.name().localPart == 'packaging'
                         } + pomInfo
 
-
                         for(dep in dependencyVersions) {
-                            String property = "\${${dep.key}.version}"
-                            def info = dep.value
-                            def version = info.version
-                            def group = info.group
-                            if (group && version) {
-                                def modules = []
-                                if (info.name) {
-                                    modules << info.name
-                                }
-                                if (info.modules) {
-                                    modules.addAll(info.modules)
-                                }
-                                for (module in modules) {
-
-                                    def pomDep = xml.dependencyManagement.dependencies.dependency.find {
-                                        it.artifactId.text() == module &&
-                                                it.groupId.text() == group
-                                    }
-                                    if (pomDep != null) {
-                                        pomDep.version.first().setValue(property)
-                                    }
-                                }
-                                
-                            }
+                            setBomVersion(dep, xml)
+                        }
+                        for(dep in bomVersions) {
+                            setBomVersion(dep, xml)
                         }
                     }
 
@@ -229,6 +208,33 @@ publishing {
                 }
             }
         }
+    }
+}
+
+private void setBomVersion(Map.Entry<Object, Object> dep, xml) {
+    String property = "\${${dep.key}.version}"
+    def info = dep.value
+    def version = info.version
+    def group = info.group
+    if (group && version) {
+        def modules = []
+        if (info.name) {
+            modules << info.name
+        }
+        if (info.modules) {
+            modules.addAll(info.modules)
+        }
+        for (module in modules) {
+
+            def pomDep = xml.dependencyManagement.dependencies.dependency.find {
+                it.artifactId.text() == module &&
+                        it.groupId.text() == group
+            }
+            if (pomDep != null) {
+                pomDep.version.first().setValue(property)
+            }
+        }
+
     }
 }
 
