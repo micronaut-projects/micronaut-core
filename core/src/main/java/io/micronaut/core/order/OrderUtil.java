@@ -99,14 +99,26 @@ public class OrderUtil {
         Arrays.sort(objects, COMPARATOR);
     }
 
-    private static int getOrder(Object o) {
+    /**
+     * Get the order for the given object.
+     *
+     * @param o The object
+     * @return {@link Ordered#getOrder} when object is instance of Ordered otherwise {@link Ordered#LOWEST_PRECEDENCE}
+     */
+    public static int getOrder(Object o) {
         if (o instanceof Ordered) {
             return getOrder((Ordered) o);
         }
         return Ordered.LOWEST_PRECEDENCE;
     }
 
-    private static int getOrder(Ordered o) {
+    /**
+     * Get the order for the given Ordered object.
+     *
+     * @param o The ordered object
+     * @return the order
+     */
+    public static int getOrder(Ordered o) {
         return o.getOrder();
     }
 }
