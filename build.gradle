@@ -445,7 +445,7 @@ ext {
                     name   : 'functions-framework-api'
             ],
             'google.function.invoker'                    : [
-                    version: '1.0.0-alpha-2-rc4',
+                    version: '1.0.0-beta1',
                     group  : 'com.google.cloud.functions.invoker',
                     name   : 'java-function-invoker'
             ],
@@ -521,27 +521,27 @@ ext {
                     name   : 'h2'
             ],
             postgres                   : [
-                    version: '42.2.12',
+                    version: postgresDriverVersion,
                     group  : 'org.postgresql',
                     name   : 'postgresql'
             ],
             mysql                   : [
-                    version: '8.0.20',
+                    version: mysqlDriverVersion,
                     group  : 'mysql',
                     name   : 'mysql-connector-java'
             ],
             mariadb                   : [
-                    version: '2.6.0',
+                    version: mariadbDriverVersion,
                     group  : 'org.mariadb.jdbc',
                     name   : 'mariadb-java-client'
             ],
             mssql                   : [
-                    version: '8.2.2.jre8',
+                    version: mssqlDriverVersion,
                     group  : 'com.microsoft.sqlserver',
                     name   : 'mssql-jdbc'
             ],
             oracle                  : [
-                version: '19.3.0.0',
+                version: oracleDriverVersion,
                 group  : 'com.oracle.ojdbc',
                 name   : 'ojdbc8'
             ],
