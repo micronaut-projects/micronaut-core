@@ -33,7 +33,7 @@ javaPlatform {
 }
 dependencies {
     api platform("io.grpc:grpc-bom:$grpcVersion")
-    api platform("com.google.protobuf:protobuf-java-util:$protobufJavaVersion")
+    api platform("com.google.protobuf:protobuf-bom:$protobufJavaVersion")
     api platform("com.fasterxml.jackson:jackson-bom:$jacksonVersion")
     constraints {
         for (Project p : rootProject.subprojects) {
