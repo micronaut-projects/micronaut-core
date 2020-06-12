@@ -15,6 +15,7 @@
  */
 package io.micronaut.management.endpoint;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.StringUtils;
 
@@ -115,7 +116,7 @@ public class EndpointDefaultConfiguration {
      * Sets the port to expose endpoints via.
      * @param port The port
      */
-    public void setPort(Integer port) {
+    public void setPort(@Nullable Integer port) {
         this.port = port;
     }
 }
