@@ -15,15 +15,35 @@ repositories {
 
 boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
 
+def excludedProjects = [
+        "benchmarks",
+        "test-suite",
+        "test-suite-groovy",
+        "test-suite-helper",
+        "test-suite-kotlin",
+        "test-utils"
+]
 dependencies {
+    //Include Micronaut BOM
     implementation enforcedPlatform(project(":bom"))
 
+    //Include other BOMs
     for (dep in bomVersions) {
         def info = dep.value
         def versionExpr = info.version
-        api platform("$info.group:$info.name:$versionExpr")
+        implementation platform("$info.group:$info.name:$versionExpr")
     }
 
+    //Include core projects
+    for (Project p : rootProject.subprojects) {
+        if (!p.subprojects.empty) continue
+        if (p.name.contains("bom") || p.name.contains("parent")) continue
+        if (excludedProjects.contains(p.name)) continue
+
+        implementation "$p.group:micronaut-$p.name"
+    }
+
+    //Include the rest of dependencies
     for (dep in dependencyVersions) {
         def info = dep.value
         // don't include snapshots
@@ -44,11 +64,29 @@ dependencies {
     }
 }
 
-task validateBom() {
-        configurations.each { cfg ->
-            if (cfg.isCanBeResolved()) {
-                logger.quiet "Resolving configuration ${cfg.name}"
-                cfg.resolve()
-            }
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId = 'io.micronaut.internal'
+            artifactId = 'micronaut-bom-check'
+            version = project.version
+            from components.java
         }
+    }
+}
+
+publish.enabled = false
+
+task validateMicronautBom() {
+    rootProject.subprojects.each {
+        def pTML = it.tasks.findByName('publishToMavenLocal')
+        if (pTML) {
+            dependsOn pTML
+        }
+    }
+    configurations.each { cfg ->
+        if (cfg.isCanBeResolved()) {
+            cfg.resolve()
+        }
+    }
 }

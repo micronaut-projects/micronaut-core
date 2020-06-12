@@ -41,7 +41,7 @@ dependencies {
     constraints {
         for (Project p : rootProject.subprojects) {
             if (!p.subprojects.empty) continue
-            if (p.name == "bom") continue
+            if (p.name.contains("bom")) continue
             if (excludedProjects.contains(p.name)) continue
 
             api "$p.group:micronaut-$p.name:$p.version"
