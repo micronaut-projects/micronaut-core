@@ -742,6 +742,14 @@ subprojects { Project subproject ->
 //        options.incremental = true
 //    }
 
+    tasks.withType(JavaCompile) {
+        options.compilerArgs.addAll([
+                '-parameters',
+                "-Amicronaut.processing.group=$project.group",
+                "-Amicronaut.processing.module=micronaut-$project.name",
+        ])
+    }
+
     tasks.withType(Test) {
         useJUnitPlatform()
         jvmArgs '-Duser.country=US', '-Duser.language=en', '-Xmx2048m'
