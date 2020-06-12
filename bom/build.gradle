@@ -32,11 +32,12 @@ javaPlatform {
     allowDependencies()
 }
 dependencies {
-    for (entry in bomVersions) {
-        def dep = entry.value
-        api platform("$dep.group:$dep.name:$dep.version")
+    for (dep in bomVersions) {
+        def info = dep.value
+        def versionExpr = info.version
+        api platform("$info.group:$info.name:$versionExpr")
     }
-    
+
     constraints {
         for (Project p : rootProject.subprojects) {
             if (!p.subprojects.empty) continue

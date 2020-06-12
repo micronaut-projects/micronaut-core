@@ -5,7 +5,7 @@ dependencies {
     api project(":http-server")
     api project(":core")
     api project(":http-netty")
-    api dependencyVersion("netty")
+    api dependencyModuleVersion("netty", "netty-codec-http")
 
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
 

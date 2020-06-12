@@ -8,7 +8,7 @@ dependencies {
     api dependencyVersion("snakeyaml")
 
     compileOnly "javax.persistence:javax.persistence-api:2.2"
-    compileOnly dependencyVersion("groovy")
+    compileOnly dependencyModuleVersion("groovy", "groovy")
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
     compileOnly dependencyVersion("validation")
 

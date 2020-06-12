@@ -41,10 +41,43 @@ ext {
 
 ext {
     bomVersions = [
+            // Micronaut
+            'micronaut.views': [
+                    group: 'io.micronaut.views',
+                    name: 'micronaut-views-bom',
+                    version: micronautViewsVersion
+            ],
             'micronaut.groovy': [
-                group:'io.micronaut.groovy',
-                name:'micronaut-groovy-bom',
-                version:micronautGroovyVersion
+                    group: 'io.micronaut.groovy',
+                    name: 'micronaut-groovy-bom',
+                    version: micronautGroovyVersion
+            ],
+
+            //Third-party
+            'netty': [
+                    group: 'io.netty',
+                    name: 'netty-bom',
+                    version: nettyVersion
+            ],
+            'ktor': [
+                    group: 'io.ktor',
+                    name: 'ktor-bom',
+                    version: ktorVersion
+            ],
+            'groovy': [
+                    group: 'org.codehaus.groovy',
+                    name: 'groovy-bom',
+                    version: groovyVersion
+            ],
+            'micrometer': [
+                    name   : 'micrometer-bom',
+                    group  : 'io.micrometer',
+                    version: micrometerVersion
+            ],
+            'junit5': [
+                    group  : 'org.junit',
+                    name   : 'junit-bom',
+                    version: junit5Version
             ],
             'jackson':[
                     group:'com.fasterxml.jackson',
@@ -68,12 +101,6 @@ ext {
                     group  : 'org.apache.commons',
                     name   : 'commons-dbcp2'
             ],
-            groovy                     : [
-                    version: groovyVersion,
-                    group  : 'org.codehaus.groovy',
-                    name   : 'groovy',
-                    modules: ['groovy-test', 'groovy-test-junit5', 'groovy-ant', 'groovy-json', 'groovy-jmx', 'groovy-templates']
-            ],
             gorm                       : [
                     version: gormVersion,
                     group  : 'org.grails',
@@ -85,7 +112,7 @@ ext {
                             'grails-datastore-gorm-support',
                             'grails-datastore-gorm-test',
                             'grails-datastore-gorm-validation',
-                            'grails-datastore-gorm-web'
+                            'grails-datastore-web'
                     ]
             ],
             'gorm.hibernate'                       : [
@@ -97,12 +124,6 @@ ext {
                     version: jaegerVersion,
                     group  : 'io.jaegertracing',
                     name   : 'jaeger-thrift'
-            ],
-            ktor                     : [
-                    version: ktorVersion,
-                    group  : 'io.ktor',
-                    name   : 'ktor-server-netty',
-                    modules : ['ktor-jackson', 'ktor-server-tomcat', 'ktor-server-jetty']
             ],
             'zipkin.reporter'          : [
                     version: zipkinReporterVersion,
@@ -254,23 +275,6 @@ ext {
                                 name   : 'micronaut-data-model',
                                 modules: ['micronaut-data-hibernate-jpa', 'micronaut-data-jdbc', 'micronaut-data-processor', 'micronaut-data-runtime', 'micronaut-data-spring','micronaut-data-spring-jpa', 'micronaut-data-tx', 'micronaut-data-tx-hibernate']
                         ],
-            'micrometer'               : [
-                    version: micrometerVersion,
-                    group  : 'io.micrometer',
-                    name   : 'micrometer-core',
-                    modules: ['micrometer-registry-atlas', 'micrometer-registry-graphite', 'micrometer-registry-prometheus', 'micrometer-registry-statsd']
-            ],
-            'junit5'               : [
-                    version: junit5Version,
-                    group  : 'org.junit.jupiter',
-                    name   : 'junit-jupiter',
-                    modules: ['junit-jupiter-api', 'junit-jupiter-engine', 'junit-jupiter-params']
-            ],
-            'junitVintage'         : [
-                    version: junit5Version,
-                    group  : 'org.junit.vintage',
-                    name   : 'junit-vintage-engine'
-            ],
             'micronaut.xml':[
                 version:micronautXmlVersion,
                 group:'io.micronaut.xml',
@@ -359,18 +363,6 @@ ext {
                     version: jcacheVersion,
                     group  : 'javax.cache',
                     name   : 'cache-api'
-            ],
-            netty                      : [
-                    version: nettyVersion,
-                    group  : 'io.netty',
-                    name   : 'netty-codec-http',
-                    modules: ['netty-all', 'netty-buffer', 'netty-codec', 'netty-codec-dns', 'netty-codec-haproxy',
-                              'netty-codec-http2', 'netty-codec-memcache', 'netty-codec-mqtt',
-                              'netty-codec-redis', 'netty-codec-smtp', 'netty-codec-socks', 'netty-codec-stomp',
-                              'netty-codec-xml', 'netty-common', 'netty-dev-tools', 'netty-handler',
-                              'netty-handler-proxy', 'netty-resolver', 'netty-resolver-dns', 'netty-transport',
-                              'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt',
-                              'netty-transport-native-epoll', 'netty-transport-native-kqueue', 'netty-codec-http2']
             ],
             opentracing                : [
                     version: opentracingVersion,
@@ -574,11 +566,6 @@ ext {
                     group   : 'io.micronaut.security',
                     modules : ['micronaut-security', 'micronaut-security-annotations', 'micronaut-security-jwt', 'micronaut-security-oauth2','micronaut-security-ldap', 'micronaut-security-session']
             ],
-            'micronaut.views': [
-                version: micronautViewsVersion,
-                group  : 'io.micronaut.views',
-                modules: ['micronaut-views', 'micronaut-views-core', 'micronaut-views-freemarker', 'micronaut-views-handlebars', 'micronaut-views-thymeleaf', 'micronaut-views-velocity', 'micronaut-views-soy', 'micronaut-views-rocker']
-            ],
             'micronaut.rss': [
                     version:micronautRssVersion,
                     group:'io.micronaut.rss',
@@ -605,7 +592,7 @@ ext {
                 version: micronautJaxrsVersion,
                 group  : 'io.micronaut.jaxrs',
                 modules: ['micronaut-jaxrs-server', 'micronaut-jaxrs-processor']
-            ],
+            ]
     ]
 
     dependencyVersion = { String name ->
@@ -616,9 +603,9 @@ ext {
         return "$dep.group:$dep.name:$dep.version".toString()
     }
     dependencyModuleVersion = { String name, String module ->
-        def dep = dependencyVersions[name]
+        def dep = dependencyVersions[name] ?: bomVersions[name]
         if (dep == null) {
-            throw new IllegalArgumentException("No core dependency defined for name: $name")
+            throw new IllegalArgumentException("No core or BOM dependency defined for name: $name")
         }
         return "$dep.group:$module:$dep.version".toString()
     }
@@ -806,7 +793,7 @@ subprojects { Project subproject ->
         }
         compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testImplementation "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-        testImplementation dependencyVersion("groovy")
+        testImplementation dependencyModuleVersion("groovy", "groovy")
         testImplementation(dependencyVersion("spock")) {
             exclude module: 'groovy-all'
         }

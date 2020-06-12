@@ -21,7 +21,7 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    testImplementation dependencyVersion("micrometer")
+    testImplementation dependencyModuleVersion("micrometer", "micrometer-core")
     testImplementation project(":validation")
 
     testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'

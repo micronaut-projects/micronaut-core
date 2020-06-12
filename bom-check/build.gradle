@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'java-library'
+    id 'maven-publish'
 }
 
 repositories {
@@ -16,6 +17,12 @@ boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
 
 dependencies {
     implementation enforcedPlatform(project(":bom"))
+
+    for (dep in bomVersions) {
+        def info = dep.value
+        def versionExpr = info.version
+        api platform("$info.group:$info.name:$versionExpr")
+    }
 
     for (dep in dependencyVersions) {
         def info = dep.value
@@ -38,12 +45,10 @@ dependencies {
 }
 
 task validateBom() {
-    doLast {
         configurations.each { cfg ->
             if (cfg.isCanBeResolved()) {
-                println "Resolving configuration"
+                logger.quiet "Resolving configuration ${cfg.name}"
                 cfg.resolve()
             }
         }
-    }
 }

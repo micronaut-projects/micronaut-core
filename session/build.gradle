@@ -15,7 +15,7 @@ dependencies {
     testImplementation project(":http-netty")
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
-    testImplementation dependencyVersion("netty")
+    testImplementation dependencyModuleVersion("netty", "netty-codec-http")
 }
 
 
