@@ -105,7 +105,6 @@ public class DefaultBeanContext implements BeanContext {
         int order2 = getOrder(o2);
         return Integer.compare(order1, order2);
     };
-    
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
@@ -2774,7 +2773,7 @@ public class DefaultBeanContext implements BeanContext {
                 (eagerInitSingletons && beanDefinitionReference.isSingleton()) ||
                 (eagerInitStereotypesPresent && beanDefinitionReference.getAnnotationMetadata().hasStereotype(eagerInitStereotypes));
     }
-    conflict
+
     @NonNull
     private Collection<BeanDefinitionReference> resolveTypeIndex(Class<?> indexedType) {
         return beanIndex.computeIfAbsent(indexedType, aClass -> {
@@ -2842,7 +2841,7 @@ public class DefaultBeanContext implements BeanContext {
                         if (definition.isSingleton()) {
                             allCandidatesAreSingleton = true;
                         }
-                        if (definition.findAnnotation(Order.class).isPresent()) {
+                        if (definition.hasAnnotation(Order.class)) {
                             hasOrderAnnotation = true;
                         }
                         addCandidateToList(resolutionContext, beanType, definition, beansOfTypeList, qualifier, reduced.size() == 1);
@@ -2868,7 +2867,7 @@ public class DefaultBeanContext implements BeanContext {
                     if (!hasNonSingletonCandidate && !candidate.isSingleton()) {
                         hasNonSingletonCandidate = true;
                     }
-                    if (candidate.findAnnotation(Order.class).isPresent()) {
+                    if (candidate.hasAnnotation(Order.class)) {
                         hasOrderAnnotation = true;
                     }
                     addCandidateToList(resolutionContext, beanType, candidate, beansOfTypeList, qualifier, candidateCount == 1);
@@ -2893,11 +2892,11 @@ public class DefaultBeanContext implements BeanContext {
                 }
             }
 
-            Collection<T> beans = beanRegistrations.stream().flatMap(b -> Stream.of(b.getBean())).collect(StreamUtils.toImmutableCollection());
+            Collection<T> beans = beanRegistrations.stream().map(b -> b.getBean()).collect(StreamUtils.toImmutableCollection());
             if (allCandidatesAreSingleton) {
                 initializedObjectsByType.put(key, (Collection<Object>) beans);
             }
-            if (LOG.isDebugEnabled() && !beanRegistrations.isEmpty()) {
+            if (LOG.isDebugEnabled() && !beans.isEmpty()) {
                 if (hasQualifier) {
                     LOG.debug("Found {} beans for type [{} {}]: {} ", beanRegistrations.size(), qualifier, beanType.getName(), beanRegistrations);
                 } else {
@@ -2910,11 +2909,10 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private static <T> int getOrder(BeanRegistration<T> registration) {
-        Optional<AnnotationValue<Order>> annotation = registration.beanDefinition.findAnnotation(Order.class);
-        if (annotation.isPresent()) {
-            return annotation.get().intValue().orElse(Ordered.LOWEST_PRECEDENCE);
+        OptionalInt order = registration.beanDefinition.intValue(Order.class);
+        if (order.isPresent()) {
+            return order.getAsInt();
         }
-
         return OrderUtil.getOrder(registration.bean);
     }
 
