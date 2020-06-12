@@ -52,6 +52,16 @@ ext {
                     name: 'micronaut-groovy-bom',
                     version: micronautGroovyVersion
             ],
+            'micronaut.test': [
+                    group: 'io.micronaut.test',
+                    name: 'micronaut-test-bom',
+                    version: micronautTestVersion
+            ],
+            'micronaut.data': [
+                    group: 'io.micronaut.data',
+                    name: 'micronaut-data-bom',
+                    version: micronautDataVersion
+            ],
 
             //Third-party
             'netty': [
@@ -263,18 +273,6 @@ ext {
                     name   : 'micronaut-grpc-runtime',
                     modules: ['micronaut-grpc-annotation']
             ],
-            'micronaut.test'           : [
-                    version: micronautTestVersion,
-                    group  : 'io.micronaut.test',
-                    name   : 'micronaut-test-core',
-                    modules: ['micronaut-test-spock', 'micronaut-test-junit5', 'micronaut-test-kotlintest']
-            ],
-            'micronaut.data'           : [
-                                version: micronautDataVersion,
-                                group  : 'io.micronaut.data',
-                                name   : 'micronaut-data-model',
-                                modules: ['micronaut-data-hibernate-jpa', 'micronaut-data-jdbc', 'micronaut-data-processor', 'micronaut-data-runtime', 'micronaut-data-spring','micronaut-data-spring-jpa', 'micronaut-data-tx', 'micronaut-data-tx-hibernate']
-                        ],
             'micronaut.xml':[
                 version:micronautXmlVersion,
                 group:'io.micronaut.xml',
