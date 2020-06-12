@@ -1,0 +1,125 @@
+plugins {
+    id 'java'
+    id 'java-library'
+    id 'maven-publish'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    jcenter()
+    maven { url "https://repo.grails.org/grails/core" }
+    maven { url "https://dl.bintray.com/micronaut/core-releases-local" }
+    maven { url "https://oss.jfrog.org/artifactory/oss-snapshot-local" }
+}
+
+boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
+
+def excludedProjects = [
+        "benchmarks",
+        "test-suite",
+        "test-suite-groovy",
+        "test-suite-helper",
+        "test-suite-kotlin",
+        "test-utils"
+]
+dependencies {
+    //Include Micronaut BOM
+    implementation enforcedPlatform(project(":bom"))
+
+    //Include other BOMs
+    for (dep in bomVersions) {
+        def info = dep.value
+        def versionExpr = info.version
+        implementation platform("$info.group:$info.name:$versionExpr")
+    }
+
+    //Include core projects
+    for (Project p : rootProject.subprojects) {
+        if (!p.subprojects.empty) continue
+        if (p.name.contains("bom") || p.name.contains("parent")) continue
+        if (excludedProjects.contains(p.name)) continue
+
+        implementation "$p.group:micronaut-$p.name"
+    }
+
+    //Include the rest of dependencies
+    for (dep in dependencyVersions) {
+        def info = dep.value
+        // don't include snapshots
+        if (info.version.toString().endsWith("-SNAPSHOT") && !micronautSnapshot) {
+            continue
+        }
+
+        def versionExpr = dep.value.version
+
+        if (info.name) {
+            implementation "$info.group:$info.name:$versionExpr"
+        }
+        if (info.modules) {
+            for (m in info.modules) {
+                implementation "$info.group:$m:$versionExpr"
+            }
+        }
+    }
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId = 'io.micronaut.internal'
+            artifactId = 'micronaut-bom-check'
+            version = project.version
+            from components.java
+        }
+    }
+}
+
+publish.enabled = false
+
+task validateMicronautBom() {
+    rootProject.subprojects.each {
+        def pTML = it.tasks.findByName('publishToMavenLocal')
+        if (pTML) {
+            dependsOn pTML
+        }
+    }
+    configurations.each { cfg ->
+        if (cfg.isCanBeResolved()) {
+            cfg.resolve()
+        }
+    }
+}
+
+task validateThirdPartyBoms() {
+    for (dep in bomVersions) {
+        def info = dep.value
+        if (info.group.startsWith("io.micronaut")) continue
+
+        def componentId = "$info.group:$info.name:$info.version"
+
+        Configuration cfg = configurations.detachedConfiguration(dependencies.create(componentId))
+
+        cfg.incoming.resolutionResult.allDependencies { DependencyResult dr ->
+            def result = dependencies.createArtifactResolutionQuery()
+                    .forModule(info.group, info.name, info.version)
+                    .withArtifacts(MavenModule, MavenPomArtifact)
+                    .execute()
+
+            for (component in result.resolvedComponents) {
+                component.getArtifacts(MavenPomArtifact).each {
+                    def pom = new XmlSlurper().parse(it.file)
+
+                    pom.dependencyManagement.dependencies.dependency.each {
+                        if (!it.groupId.text().startsWith(info.group)) {
+                            throw new GradleException("Error validating BOM [${componentId}]: includes the dependency [${it.groupId}:${it.artifactId}:${it.version}] that doesn't belong to the group id of the BOM: [${info.group}]")
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+}
+
+check.dependsOn(validateMicronautBom, validateThirdPartyBoms)
