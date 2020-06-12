@@ -41,6 +41,11 @@ ext {
 
 ext {
     bomVersions = [
+            'micronaut.groovy': [
+                group:'io.micronaut.groovy',
+                name:'micronaut-groovy-bom',
+                version:micronautGroovyVersion
+            ],
             'jackson':[
                     group:'com.fasterxml.jackson',
                     name:'jackson-bom',
@@ -170,17 +175,6 @@ ext {
                     group:'io.micronaut.graphql',
                     name:'micronaut-graphql'
             ],
-            'micronaut.graphql.gorm': [
-                    version:micronautGraphQLGormVersion,
-                    group:'io.micronaut.graphql',
-                    name:'micronaut-graphql-gorm'
-            ],
-            'micronaut.groovy': [
-                    version:micronautGroovyVersion,
-                    group:'io.micronaut.groovy',
-                    name:'micronaut-runtime-groovy',
-                    modules:['micronaut-function-groovy']
-            ],
             'micronaut.gcp': [
                     version:micronautGcpVersion,
                     group:'io.micronaut.gcp',
@@ -219,12 +213,6 @@ ext {
                     group:'io.micronaut.kotlin',
                     name:'micronaut-kotlin-runtime',
                     modules: ['micronaut-ktor', 'micronaut-kotlin-extension-functions']
-            ],
-            'micronaut.gorm': [
-                    version:micronautGroovyVersion,
-                    group:'io.micronaut.groovy',
-                    name:'micronaut-gorm-common',
-                    modules:['micronaut-multitenancy-gorm', 'micronaut-neo4j-gorm', 'micronaut-mongo-gorm', 'micronaut-hibernate-gorm', 'micronaut-graphql-gorm']
             ],
             'micronaut.liquibase': [
                     version:micronautLiquibaseVersion,

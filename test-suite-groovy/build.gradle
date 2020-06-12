@@ -16,11 +16,11 @@ dependencies {
     testImplementation 'org.zalando:logbook-netty:2.1.0'
     testImplementation project(":function-client")
     testImplementation project(":function-web")
-    testImplementation dependencyModuleVersion("micronaut.groovy","micronaut-function-groovy"), {
+    testImplementation "io.micronaut.groovy:micronaut-function-groovy:$micronautGroovyVersion", {
         exclude module:'micronaut-function'
         exclude module:'micronaut-runtime-groovy'
     }
-    testImplementation dependencyModuleVersion("micronaut.groovy","micronaut-runtime-groovy"), {
+    testImplementation "io.micronaut.groovy:micronaut-runtime-groovy:$micronautGroovyVersion", {
         exclude module:'micronaut-inject'
     }
     testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'

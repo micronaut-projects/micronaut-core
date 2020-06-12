@@ -32,9 +32,11 @@ javaPlatform {
     allowDependencies()
 }
 dependencies {
-    api platform("io.grpc:grpc-bom:$grpcVersion")
-    api platform("com.google.protobuf:protobuf-bom:$protobufJavaVersion")
-    api platform("com.fasterxml.jackson:jackson-bom:$jacksonVersion")
+    for (entry in bomVersions) {
+        def dep = entry.value
+        api platform("$dep.group:$dep.name:$dep.version")
+    }
+    
     constraints {
         for (Project p : rootProject.subprojects) {
             if (!p.subprojects.empty) continue
