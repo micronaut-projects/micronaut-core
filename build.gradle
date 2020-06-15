@@ -678,8 +678,7 @@ subprojects { Project subproject ->
     group projectGroupId
 
     repositories {
-        maven { url "https://oss.jfrog.org/oss-snapshot-local" }
-        maven { url "https://repo.grails.org/grails/core" }
+        jcenter()
     }
 
     if (!subproject.name.contains("bom")) {

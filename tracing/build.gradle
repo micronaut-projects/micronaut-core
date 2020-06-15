@@ -8,21 +8,14 @@ dependencies {
 
     // the following are Tracing implementations and instrumentations which
     // are optionally loaded and not required
-    
-    compileOnly dependencyModuleVersion('micronaut.netflix', 'micronaut-netflix-hystrix'), {
-        exclude group:"io.micronaut", module:'micronaut-runtime'
-        exclude group:"io.micronaut.configuration", module:'micronaut-netflix-archaius'
-    }
+    compileOnly "com.netflix.hystrix:hystrix-core:$hystrixVersion"
     compileOnly dependencyVersion("brave.instrumentation")
     compileOnly dependencyVersion("zipkin.reporter")
     compileOnly 'io.zipkin.reporter:zipkin-reporter:1.1.2'
     compileOnly dependencyVersion("brave.opentracing")
 
     compileOnly dependencyVersion("jaeger")
-    testImplementation dependencyModuleVersion('micronaut.netflix', 'micronaut-netflix-hystrix'), {
-        exclude group:"io.micronaut", module:'micronaut-runtime'
-        exclude group:"io.micronaut.configuration", module:'micronaut-netflix-archaius'
-    }
+
     testImplementation project(":inject-groovy")
     testImplementation project(":discovery-client")
     testImplementation project(":inject-java")
