@@ -122,4 +122,6 @@ task validateThirdPartyBoms() {
     }
 }
 
-check.dependsOn(validateMicronautBom, validateThirdPartyBoms)
+task bomCheck(dependsOn: [validateMicronautBom, validateThirdPartyBoms])
+
+check.dependsOn(bomCheck)
