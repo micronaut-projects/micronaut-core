@@ -590,12 +590,7 @@ ext {
                 version: micronautJaxrsVersion,
                 group  : 'io.micronaut.jaxrs',
                 modules: ['micronaut-jaxrs-server', 'micronaut-jaxrs-processor']
-            ],
-            'micronaut.acme': [
-                    version: micronautAcmeVersion,
-                    group  : 'io.micronaut.acme',
-                    name   : 'micronaut-acme'
-            ],
+            ]
     ]
 
     dependencyVersion = { String name ->
