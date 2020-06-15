@@ -23,6 +23,7 @@ import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
@@ -42,6 +43,7 @@ final class JdbcFeature implements Feature {
     private static final String SQL_SERVER_DRIVER = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
     private static final String MARIADB_DRIVER = "org.mariadb.jdbc.Driver";
     private static final String ORACLE_DRIVER = "oracle.jdbc.OracleDriver";
+    private static final String MYSQL_DRIVER = "com.mysql.cj.jdbc.Driver";
 
     private ResourcesRegistry resourcesRegistry;
 
@@ -62,6 +64,8 @@ final class JdbcFeature implements Feature {
         // oracle
         handleOracle(access);
 
+        // mysql
+        handleMySql(access);
     }
 
     private void handleH2(BeforeAnalysisAccess access) {
@@ -190,12 +194,40 @@ final class JdbcFeature implements Feature {
         }
     }
 
+    private void registerAllForRuntimeReflection(BeforeAnalysisAccess access, String n) {
+        Class<?> t = access.findClassByName(n);
+        if (t != null) {
+            RuntimeReflection.register(t);
+            registerAllFields(access, n);
+            registerAllMethods(access, n);
+            registerAllConstructors(access, n);
+        }
+    }
+
     private void registerAllFields(BeforeAnalysisAccess access, String n) {
         Class<?> t = access.findClassByName(n);
         if (t != null) {
             Field[] fields = t.getFields();
             for (Field field : fields) {
                 RuntimeReflection.register(field);
+            }
+        }
+    }
+
+    private void registerAllMethods(BeforeAnalysisAccess access, String n) {
+        Class<?> t = access.findClassByName(n);
+        if (t != null) {
+            for (Method method : t.getMethods()) {
+                RuntimeReflection.register(method);
+            }
+        }
+    }
+
+    private void registerAllConstructors(BeforeAnalysisAccess access, String n) {
+        Class<?> t = access.findClassByName(n);
+        if (t != null) {
+            for (Constructor constructor : t.getConstructors()) {
+                RuntimeReflection.register(constructor);
             }
         }
     }
@@ -218,6 +250,31 @@ final class JdbcFeature implements Feature {
                 resourcesRegistry.addResources("javax.crypto.Cipher.class");
                 resourcesRegistry.addResourceBundles("com.microsoft.sqlserver.jdbc.SQLServerResource");
             }
+        }
+    }
+
+    private void handleMySql(BeforeAnalysisAccess access) {
+        Class<?> mysqlDriver = access.findClassByName(MYSQL_DRIVER);
+        if (mysqlDriver != null) {
+            registerAllAccess(mysqlDriver);
+
+            registerAllForRuntimeReflection(access, "com.mysql.cj.log.StandardLogger");
+            registerAllForRuntimeReflection(access, "com.mysql.cj.conf.url.SingleConnectionUrl");
+
+            registerAllIfPresent(access, "com.mysql.cj.protocol.StandardSocketFactory");
+            registerAllIfPresent(access, "com.mysql.cj.jdbc.AbandonedConnectionCleanupThread");
+
+            ResourcesRegistry resourcesRegistry = getResourceRegistry();
+            if (resourcesRegistry != null) {
+                resourcesRegistry.addResources("META-INF/services/java.sql.Driver");
+                resourcesRegistry.addResources("com/mysql/cj/TlsSettings.properties");
+                resourcesRegistry.addResources("com/mysql/cj/LocalizedErrorMessages.properties");
+                resourcesRegistry.addResources("com/mysql/cj/util/TimeZoneMapping.properties");
+                resourcesRegistry.addResourceBundles("com.mysql.cj.LocalizedErrorMessages");
+            }
+
+            RuntimeClassInitialization.initializeAtRunTime(MYSQL_DRIVER);
+            initializeAtRuntime(access, "java.sql.DriverManager");
         }
     }
 
