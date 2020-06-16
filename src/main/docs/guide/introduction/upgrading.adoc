@@ -117,6 +117,75 @@ To use the new module, you need to add the following dependency:
 
 dependency:io.micronaut.kubernetes:micronaut-kubernetes-discovery-client[]
 
+=== Transaction Management
+
+For Micronaut 2.0, we recommend you to use the native Micronaut-based transaction management instead of other alternatives such as Spring Transaction Management.
+
+You will use link:{jee7api}/javax/transaction/Transactional.html[Java EE 7 javax.transaction.Transactional annotation] and https://micronaut-projects.github.io/micronaut-data/latest/api/index.html[io.micronaut.transaction.annotation.ReadOnly] to mark your transaction demarcations.
+
+To use those annotations, you have to include the `micronaut-data-processor` dependency in your annotation processor configuration:
+
+dependency:io.micronaut.data:micronaut-data-processor[gradleScope="annotationProcessor"]
+
+If you use Hibernate/JPA, you will need to add as well:
+
+dependency:io.micronaut.data:micronaut-data-hibernate-jpa[]
+
+Then, code such as:
+
+[source,java]
+----
+import io.micronaut.spring.tx.annotation.Transactional;
+...
+..
+.
+@Singleton
+public class GenreRepositoryImpl implements GenreRepository {
+...
+..
+.
+    @Transactional(readOnly = true)
+    public Optional<Genre> findById(@NotNull Long id) {
+...
+..
+    }
+
+    @Transactional
+    public Genre save(@NotBlank String name) {
+    ...
+    ..
+    }
+}
+----
+
+becomes:
+
+[source,java]
+----
+import javax.transaction.Transactional;
+import io.micronaut.transaction.annotation.ReadOnly;
+...
+..
+.
+@Singleton
+public class GenreRepositoryImpl implements GenreRepository {
+...
+..
+.
+    @ReadOnly
+    public Optional<Genre> findById(@NotNull Long id) {
+...
+..
+    }
+
+    @Transactional
+    public Genre save(@NotBlank String name) {
+    ...
+    ..
+    }
+}
+----
+
 === Other Breaking Changes
 
 If the above cases don't cover your use case see the section on <<breaks, Breaking Changes>> for a list of other changes that are regarded as breaking in this release.
