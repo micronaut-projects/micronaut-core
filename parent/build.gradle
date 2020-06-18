@@ -68,17 +68,17 @@ ext.extraPomInfo = {
                 delegate.plugin {
                     groupId "com.google.cloud.functions"
                     artifactId "function-maven-plugin"
-                    delegate.version "0.9.2"
+                    delegate.version "0.9.3"
                 }
                 delegate.plugin {
                     groupId "com.google.cloud.tools"
                     artifactId "jib-maven-plugin"
-                    delegate.version "2.1.0"
+                    delegate.version "2.4.0"
                 }
                 delegate.plugin {
                     groupId "com.microsoft.azure"
                     artifactId "azure-functions-maven-plugin"
-                    delegate.version "1.4.1"
+                    delegate.version "1.5.0"
                 }
                 delegate.plugin {
                     groupId "org.apache.maven.plugins"

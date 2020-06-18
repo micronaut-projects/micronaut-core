@@ -7,10 +7,7 @@ plugins {
 repositories {
     mavenCentral()
     mavenLocal()
-    jcenter()
     maven { url "https://repo.grails.org/grails/core" }
-    maven { url "https://dl.bintray.com/micronaut/core-releases-local" }
-    maven { url "https://oss.jfrog.org/artifactory/oss-snapshot-local" }
 }
 
 boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
