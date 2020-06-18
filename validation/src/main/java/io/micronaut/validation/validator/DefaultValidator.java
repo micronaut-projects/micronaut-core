@@ -745,7 +745,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                 context,
                                 overallViolations,
                                 argument.getName(),
-                                parameterType,
+                                unwrappedValue.getClass(),
                                 finalIndex,
                                 annotationMetadata,
                                 unwrappedValue
