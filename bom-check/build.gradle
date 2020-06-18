@@ -88,7 +88,7 @@ task validateMicronautBom() {
     }
 }
 
-task validateThirdPartyBoms() {
+task validateThirdPartyBoms(dependsOn:['validateMicronautBom']) {
     for (dep in bomVersions) {
         def info = dep.value
         if (info.group.startsWith("io.micronaut")) continue
@@ -119,6 +119,6 @@ task validateThirdPartyBoms() {
     }
 }
 
-task bomCheck(dependsOn: [validateMicronautBom, validateThirdPartyBoms])
+task bomCheck(dependsOn: [validateThirdPartyBoms])
 
 check.dependsOn(bomCheck)
