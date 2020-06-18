@@ -11,8 +11,8 @@ micronaut:
         netty:
            access-logger:
               enabled: true # Enables the access logger
-              logger-name: my-access-logger # A logger name, default is `HTTP_ACCESS_LOGGER`
-              log-format: common # A log format, default is Common Log Format
+              logger-name: my-access-logger # A logger name, optional, default is `HTTP_ACCESS_LOGGER`
+              log-format: common # A log format, optional, default is Common Log Format
 ----
 
 ==== Logback Configuration
@@ -71,15 +71,15 @@ Here are the supported markers:
 * *%r* - First line of the request
 * *%s* - HTTP status code of the response
 * *%{<format>}t* - Date and time. If the argument is ommitted the Common Log Format format is used ("'['dd/MMM/yyyy:HH:mm:ss Z']'").
-* If the format starts with begin: (default) the time is taken at the beginning of the request processing. If it starts with end: it is the time when the log entry gets written, close to the end of the request processing.
-* The format should follow the DateTimeFormatter syntax.
+** If the format starts with begin: (default) the time is taken at the beginning of the request processing. If it starts with end: it is the time when the log entry gets written, close to the end of the request processing.
+** The format should follow the DateTimeFormatter syntax.
 * *%{property}u* - Remote user that was authenticated. When *micronaut-session* is on the classpath, returns the session id if the argument is omitted or the specified property otherwise prints '-'
 * *%U* - Requested URI
 * *%v* - Local server name
 * *%D* - Time taken to process the request, in millis
 * *%T* - Time taken to process the request, in seconds
 
-In addition, the following aliases for commonly utilized patterns:
+In addition, you can use the following aliases for commonly utilized patterns:
 
-* *common* - <code>%h %l %u %t "%r" %s %b</code> Common Log Format (CLF)
-* *combined* - <code>%h %l %u %t "%r" %s %b "%{Referer}i" "%{User-Agent}i"</code> Combined Log Format
+* *common* - `%h %l %u %t "%r" %s %b` for https://httpd.apache.org/docs/1.3/logs.html#common[Common Log Format] (CLF)
+* *combined* - `%h %l %u %t "%r" %s %b "%{Referer}i" "%{User-Agent}i"` for https://httpd.apache.org/docs/1.3/logs.html#combined[Combined Log Format]
