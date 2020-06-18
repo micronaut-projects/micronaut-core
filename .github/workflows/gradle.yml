@@ -31,7 +31,9 @@ jobs:
       with:
         java-version: ${{ matrix.java }}
     - name: Build with Gradle
-      run: ./gradlew check --no-daemon --parallel --continue
+      run: |
+        ./gradlew pTML
+        ./gradlew check --no-daemon --parallel --continue
     - name: Publish to JFrog OSS
       if: success() && github.event_name == 'push' && matrix.java == '8' && github.ref == 'refs/heads/master'
       env:
