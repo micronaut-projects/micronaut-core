@@ -136,4 +136,14 @@ public class JavaModelUtils {
             return qualifiedName.toString();
         }
     }
+
+    /**
+     * Get the array class name for the given type element. Handles {@link NestingKind}.
+     *
+     * @param typeElement The type element
+     * @return The class name
+     */
+    public static String getClassArrayName(TypeElement typeElement) {
+        return "[L" + getClassName(typeElement) + ";";
+    }
 }

@@ -30,6 +30,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
@@ -694,6 +695,15 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                     if (typeElement instanceof TypeElement) {
                         final String className = JavaModelUtils.getClassName((TypeElement) typeElement);
                         values.add(new AnnotationClassValue<>(className));
+                    }
+                } else if (t instanceof ArrayType) {
+                    TypeMirror componentType = ((ArrayType) t).getComponentType();
+                    if (componentType instanceof DeclaredType) {
+                        Element typeElement = ((DeclaredType) componentType).asElement();
+                        if (typeElement instanceof TypeElement) {
+                            final String className = JavaModelUtils.getClassArrayName((TypeElement) typeElement);
+                            values.add(new AnnotationClassValue<>(className));
+                        }
                     }
                 }
                 return null;

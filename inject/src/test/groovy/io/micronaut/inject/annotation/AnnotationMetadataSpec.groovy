@@ -4,6 +4,7 @@ import io.micronaut.context.annotation.EachBean
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.AnnotationValueBuilder
+import io.micronaut.core.annotation.TypeHint
 import spock.lang.Specification
 
 class AnnotationMetadataSpec extends Specification {
@@ -22,6 +23,14 @@ class AnnotationMetadataSpec extends Specification {
 
         expect:
         metadata.classValues(EachBean) == [AnnotationMetadataSpec, Specification] as Class[]
+    }
+
+    void "test string values with type"() {
+        given:
+        AnnotationMetadata metadata = newMetadata(AnnotationValue.builder(TypeHint).values(UUID[], UUID))
+
+        expect:
+        metadata.stringValues(TypeHint).size() == 2
     }
 
     AnnotationMetadata newMetadata(AnnotationValueBuilder...builders) {
