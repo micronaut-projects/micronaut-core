@@ -20,6 +20,15 @@ def excludedProjects = [
         "test-suite-kotlin",
         "test-utils"
 ]
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        for (Project p : rootProject.subprojects) {
+            if (!p.subprojects.empty) continue
+            if (excludedProjects.contains(p.name)) continue
+            substitute module("io.micronaut:micronaut-$p.name") with project(":$p.name")
+        }
+    }
+}
 dependencies {
     //Include Micronaut BOM
     implementation enforcedPlatform(project(":bom"))
@@ -37,7 +46,7 @@ dependencies {
         if (p.name.contains("bom") || p.name.contains("parent")) continue
         if (excludedProjects.contains(p.name)) continue
 
-        implementation "$p.group:micronaut-$p.name"
+        implementation p
     }
 
     //Include the rest of dependencies
