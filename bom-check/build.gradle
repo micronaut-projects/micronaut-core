@@ -6,7 +6,6 @@ plugins {
 
 repositories {
     mavenCentral()
-    mavenLocal()
     maven { url "https://repo.grails.org/grails/core" }
 }
 
@@ -84,12 +83,6 @@ publishing {
 publish.enabled = false
 
 task validateMicronautBom() {
-    rootProject.subprojects.each {
-        def pTML = it.tasks.findByName('publishToMavenLocal')
-        if (pTML) {
-            dependsOn pTML
-        }
-    }
     configurations.each { cfg ->
         if (cfg.isCanBeResolved()) {
             cfg.resolve()
