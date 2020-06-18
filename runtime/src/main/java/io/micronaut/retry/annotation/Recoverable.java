@@ -41,4 +41,13 @@ import java.lang.annotation.Target;
 @Around
 @Type(RecoveryInterceptor.class)
 public @interface Recoverable {
+    /**
+     * Used to specify the API to lookup fallbacks for. This is useful in cases
+     * where the fallback is not a direct subclass of the implementation.
+     *
+     * @return The API to lookup a fallback for
+     * @since 2.0.0
+     * @see Fallback
+     */
+    Class<?> api() default void.class;
 }

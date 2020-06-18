@@ -69,10 +69,12 @@ public @interface Client {
      * @return The type used to decode errors
      */
     Class<?> errorType() default JsonError.class;
+
     /**
      * @return The http client configuration bean to use
      */
     Class<? extends HttpClientConfiguration> configuration() default HttpClientConfiguration.class;
+
     /**
      * The HTTP version.
      *

@@ -27,6 +27,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.retry.annotation.Fallback;
+import io.micronaut.retry.annotation.Recoverable;
 import io.micronaut.retry.exception.FallbackException;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
@@ -126,7 +127,10 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
      * @return The fallback method if it is present
      */
     public Optional<? extends MethodExecutionHandle<?, Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
-        Class<?> declaringType = context.getDeclaringType();
+        Class<?> declaringType = context.classValue(Recoverable.class, "api").orElse(null);
+        if (declaringType == null) {
+            declaringType = context.getDeclaringType();
+        }
         BeanDefinition<?> beanDefinition = beanContext.findBeanDefinition(declaringType, Qualifiers.byStereotype(Fallback.class)).orElse(null);
         if (beanDefinition != null) {
             ExecutableMethod<?, Object> fallBackMethod =
