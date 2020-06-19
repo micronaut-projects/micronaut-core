@@ -23,7 +23,7 @@ Every time you change a class Micronaut's plugin will automatically restart the 
 
 === Gradle Restart
 
-For Gradle restart yoou can create a new application with the `file-watch` feature already configured using the CLI with the command `mn create-app myapp --features file-watch`
+For Gradle restart you can create a new application with the `file-watch` feature already configured using the CLI with the command `mn create-app myapp --features file-watch`
 
 This essentially introduces the following configuration to `application.yml`:
 
