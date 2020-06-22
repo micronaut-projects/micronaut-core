@@ -558,5 +558,9 @@ class Test {
         metadata.stringValues(TypeHint).size() == 2
         metadata.stringValues(TypeHint)[0] == '[Ljava.util.UUID;'
         metadata.stringValues(TypeHint)[1] == 'java.util.UUID'
+        metadata.classValues(TypeHint)[0] == UUID[].class
+        metadata.classValues(TypeHint)[1] == UUID.class
     }
+
+
 }
