@@ -421,7 +421,14 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                     }
                 } else if (exp instanceof ClassExpression) {
                     arrayType = AnnotationClassValue
-                    converted.add(new AnnotationClassValue<>(((ClassExpression) exp).type.name))
+                    ClassExpression classExp = ((ClassExpression) exp)
+                    String typeName
+                    if (classExp.type.isArray()) {
+                        typeName = "[L" + classExp.type.componentType.name + ";"
+                    } else {
+                        typeName = classExp.type.name
+                    }
+                    converted.add(new AnnotationClassValue<>(typeName))
                 }
             }
             // for some reason this is necessary to produce correct array type in Groovy
