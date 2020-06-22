@@ -6,8 +6,10 @@ import io.micronaut.context.annotation.ConfigurationInject
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.Creator
 import io.micronaut.core.bind.annotation.Bindable
+import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.visitor.VisitorContext
 
 import java.lang.annotation.Annotation
@@ -48,6 +50,32 @@ class Test {
         metadata.stringValue(Bindable).get() == 'test'
     }
 
+    void "test annotation mapper with repeated annotation values"() {
+        given:
+        def definition = buildBeanDefinition('test.Test', '''
+package test;
+
+@javax.inject.Singleton
+class Test {
+
+
+    @io.micronaut.context.annotation.Executable
+    Test create(@io.micronaut.inject.annotation.CustomHeader String query) {
+        return new Test();
+    }
+    
+}
+
+''')
+
+        expect:
+        definition != null
+        def header = definition.getRequiredMethod('create', String).arguments[0].synthesize(Header)
+        header != null
+        header.name() == 'test'
+        header.value() == 'test'
+    }
+
     @Override
     protected List<AnnotationMapper<? extends Annotation>> getLocalAnnotationMappers(@NonNull String annotationName) {
         if (annotationName == CustomCreator.name) {
@@ -85,6 +113,8 @@ class Test {
         }
     }
 
+
+
 }
 
 @Target(ElementType.METHOD)
@@ -94,3 +124,22 @@ class Test {
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @interface CustomQuery {}
+
+@Target(ElementType.PARAMETER)
+@Retention(RetentionPolicy.RUNTIME)
+@interface CustomHeader {}
+
+class CustomHeaderMapper implements TypedAnnotationMapper<CustomHeader> {
+
+    @Override
+    List<AnnotationValue<?>> map(AnnotationValue<CustomHeader> annotation, VisitorContext visitorContext) {
+        return Collections.singletonList(
+                AnnotationValue.builder(Header).member("name", "test").value("test").build()
+        )
+    }
+
+    @Override
+    Class<CustomHeader> annotationType() {
+        return CustomHeader
+    }
+}

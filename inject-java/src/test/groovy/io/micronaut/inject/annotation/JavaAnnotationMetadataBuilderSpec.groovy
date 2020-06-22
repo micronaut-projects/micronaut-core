@@ -22,7 +22,9 @@ import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.http.annotation.Header
 import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.ScopedProxy
 
@@ -35,6 +37,29 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class JavaAnnotationMetadataBuilderSpec extends AbstractTypeElementSpec {
+
+    void "test build repeated annotation values"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
+package test;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Target;
+import io.micronaut.inject.annotation.*;
+
+@javax.inject.Singleton
+class Test {
+
+    @io.micronaut.context.annotation.Executable
+    void test(@io.micronaut.http.annotation.Header(name="foo",value="bar") String foo) {}
+}
+
+''')
+
+        expect:
+        definition != null
+        definition.getRequiredMethod("test", String).arguments[0].isAnnotationPresent(Header)
+    }
 
     void "test self referencing annotation"() {
         given:
