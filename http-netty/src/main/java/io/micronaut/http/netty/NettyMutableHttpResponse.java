@@ -30,6 +30,7 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.netty.cookies.NettyCookie;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -57,7 +58,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
     final NettyHttpHeaders headers;
     private final ConversionService conversionService;
     private B body;
-    private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
+    private final Map<Class, Optional> convertedBodies = new ConcurrentLinkedHashMap.Builder().initialCapacity(1).build();
     private final MutableConvertibleValues<Object> attributes;
 
     private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
