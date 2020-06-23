@@ -119,6 +119,14 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
             if (element instanceof TypeElement) {
                 TypeElement superElement = (TypeElement) element;
                 if (!Object.class.getName().equals(superElement.getQualifiedName().toString())) {
+                    // if super type has type arguments, then build a parameterized ClassElement
+                    if (superclass instanceof DeclaredType && !((DeclaredType) superclass).getTypeArguments().isEmpty()) {
+                        return Optional.of(
+                                parameterizedClassElement(
+                                    superclass,
+                                    visitorContext,
+                                    visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement)));
+                    }
                     return Optional.of(
                             new JavaClassElement(
                                     superElement,

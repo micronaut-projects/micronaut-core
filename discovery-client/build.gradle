@@ -18,6 +18,7 @@ dependencies {
     testImplementation "com.fasterxml.jackson.module:jackson-module-jaxb-annotations:$jacksonVersion"
     testImplementation group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-secrets', version: '1.15.4'
     testImplementation group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-common', version: '1.15.4'
+
     testImplementation project(":management")
     testImplementation project(":http-server-netty")
     testImplementation project(":inject-java")
