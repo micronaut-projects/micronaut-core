@@ -186,6 +186,28 @@ public class GenreRepositoryImpl implements GenreRepository {
 }
 ----
 
+=== Micronaut 2 for Groovy Users
+
+Micronaut 2 defaults to Groovy 3 and Spock 2 both of which include significant changes at the language and testing framework level.
+
+NOTE: Some features of Micronaut 2 for Groovy users are currently in preview status including GORM 7.1 and Spock 2 support as these frameworks do not yet have stable releases.
+
+In the case of Spock 2 the most important change is that Spock 2 deprecates support for JUnit 4 and the associated JUnit 4 test runner and replaces it with JUnit 5 Platform.
+
+In the case of a Gradle build this change means that when upgrading to Micronaut 2 with Spock 2 you may find your tests don't execute at all which can give you the false sense of security that the upgrade was successful.
+
+To ensure your Spock 2 tests run in a Micronaut 2 Gradle build you must add the following configuration to your `build.gradle` to enable JUnit 5 platform:
+
+.Using JUnit Platform
+[source,groovy]
+----
+test {
+  useJUnitPlatform()
+}
+----
+
+With this configuration is place your Spock 2 tests will execute correctly.
+
 === Other Breaking Changes
 
 If the above cases don't cover your use case see the section on <<breaks, Breaking Changes>> for a list of other changes that are regarded as breaking in this release.
