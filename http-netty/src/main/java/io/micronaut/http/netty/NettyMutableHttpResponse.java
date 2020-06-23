@@ -57,7 +57,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
     final NettyHttpHeaders headers;
     private final ConversionService conversionService;
     private B body;
-    private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
+    private final Map<Class, Optional> convertedBodies = Collections.synchronizedMap(new LinkedHashMap<>(1));
     private final MutableConvertibleValues<Object> attributes;
 
     private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
