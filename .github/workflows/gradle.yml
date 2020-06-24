@@ -34,6 +34,12 @@ jobs:
       run: |
         ./gradlew pTML
         ./gradlew check --no-daemon --parallel --continue
+    - name: Publish Test Report
+      if: failure()
+      uses: scacap/action-surefire-report@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        report_paths: '**/build/test-results/test/TEST-*.xml'      
     - name: Publish to JFrog OSS
       if: success() && github.event_name == 'push' && matrix.java == '8' && github.ref == 'refs/heads/master'
       env:
