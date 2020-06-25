@@ -159,6 +159,7 @@ It is no longer necessary to provide additional GraalVM related configuration to
 * Postgres
 * MS SQL
 * H2
+* MySQL
 
 ==== Support for Flyway Migrations in Native Image
 
@@ -167,6 +168,19 @@ The Micronaut Flyway module has been https://micronaut-projects.github.io/micron
 ==== Support for Native Image in AWS SDK v2
 
 Version 2.0 of the Micronaut AWS module https://micronaut-projects.github.io/micronaut-aws/2.0.x/guide/index.html#sdkv2[includes support for Native Image] for the majority of the v2 AWS APIs including S3, Dynamo DB, SES, SNS, and SQS which will be helpful for those developing native AWS Lambda functions with Micronaut + GraalVM.
+
+==== Support for jOOQ in Native Image
+
+The Micronaut jOOQ module https://micronaut-projects.github.io/micronaut-sql/latest/guide/index.html#_graalvm_native_image[includes support for Native Image] and it's possible to use it with https://simpleflatmapper.org/[SimpleFlatMapper].
+
+==== Support for Redis in Native Image
+
+The Micronaut Redis module https://micronaut-projects.github.io/micronaut-redis/latest/guide/index.html#graalvm[includes support for Native Image]. There are still some pending uses cases that won't work because of how Lettuce driver works. Make sure you read the documentation.
+
+==== Support for Elasticsearch in Native Image
+
+The Micronaut Elasticsearch module https://micronaut-projects.github.io/micronaut-elasticsearch/latest/guide/index.html#graalvm[includes support for Native Image]
+
 
 === Build Improvements
 
