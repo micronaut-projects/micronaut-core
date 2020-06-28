@@ -390,6 +390,40 @@ class NettyHttpServerConfigurationSpec extends Specification {
         cleanup:
         beanContext.close()
     }
+
+    void "test netty server http2 configuration"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+              ['micronaut.server.netty.http2.max-frame-size': 20000,
+               'micronaut.server.netty.http2.max-concurrent-streams': 100,
+               'micronaut.server.netty.http2.push-enabled': false,
+               'micronaut.server.netty.http2.header-table-size': 200,
+               'micronaut.server.netty.http2.initial-window-size': 50,
+               'micronaut.server.netty.http2.max-header-list-size': 150]
+        ))
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+
+        then:
+        config.http2
+
+        when:
+        def http2 = config.http2
+
+        then:
+        http2.maxFrameSize == 20000
+        http2.maxConcurrentStreams == 100
+        !http2.pushEnabled
+        http2.headerTableSize == 200
+        http2.initialWindowSize == 50
+        http2.maxHeaderListSize == 150
+
+        cleanup:
+        beanContext.close()
+    }
 }
 
 class MemoryAppender extends AppenderBase<ILoggingEvent> {
