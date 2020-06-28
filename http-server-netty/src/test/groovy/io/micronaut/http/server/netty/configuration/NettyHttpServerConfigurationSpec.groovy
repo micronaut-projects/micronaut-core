@@ -302,8 +302,8 @@ class NettyHttpServerConfigurationSpec extends Specification {
         config.childOptions.get(ChannelOption.WRITE_BUFFER_WATER_MARK).high == 262143
         config.childOptions.get(ChannelOption.WRITE_BUFFER_WATER_MARK).low == 65535
         !config.host.isPresent()
-        config.parent.numOfThreads == 8
-        config.worker.numOfThreads == 8
+        config.parent.numThreads == 8
+        config.worker.numThreads == 8
 
         then:
         NettyHttpServer server = beanContext.getBean(NettyHttpServer)
