@@ -104,9 +104,10 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
     /**
      * @param response The response to modify
      */
+    @Override
     public void process(MutableHttpResponse response) {
         response.header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(getLength()));
-        delegate.ifPresent((type) -> type.process(response));
+        delegate.ifPresent(type -> type.process(response));
     }
 
     @Override
@@ -149,7 +150,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
                 }
             }
 
-            sendFileFuture.addListener((future) -> {
+            sendFileFuture.addListener(future -> {
                 try {
                     raf.close();
                 } catch (IOException e) {

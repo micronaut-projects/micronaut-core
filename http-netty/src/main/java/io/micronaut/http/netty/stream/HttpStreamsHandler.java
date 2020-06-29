@@ -307,7 +307,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         if (out.message instanceof FullHttpMessage) {
             // Forward as is
             ctx.writeAndFlush(out.message, out.promise);
-            out.promise.addListener((ChannelFutureListener) channelFuture -> executeInEventLoop(ctx, () -> {
+            out.promise.addListener(channelFuture -> executeInEventLoop(ctx, () -> {
                 sentOutMessage(ctx);
                 outgoing.remove();
                 flushNext(ctx);
@@ -354,7 +354,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         if (sendLastHttpContent) {
             ChannelPromise promise = outgoing.peek().promise;
             ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise).addListener(
-                (ChannelFutureListener) channelFuture -> executeInEventLoop(ctx, () -> {
+                channelFuture -> executeInEventLoop(ctx, () -> {
                     outgoing.remove();
                     sentOutMessage(ctx);
                     flushNext(ctx);

@@ -26,7 +26,6 @@ import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.RUNNING;
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.concurrent.EventExecutor;
 import org.reactivestreams.Subscriber;
@@ -174,9 +173,9 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     public void onNext(T t) {
         // Publish straight to the context.
         lastWriteFuture = ctx.writeAndFlush(t);
-        lastWriteFuture.addListener((ChannelFutureListener) future -> {
-            maybeRequestMore();
-        });
+        lastWriteFuture.addListener(future ->
+            maybeRequestMore()
+        );
     }
 
     @Override
@@ -192,7 +191,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
         if (lastWriteFuture == null) {
             complete();
         } else {
-            lastWriteFuture.addListener((ChannelFutureListener) channelFuture -> complete());
+            lastWriteFuture.addListener(channelFuture -> complete());
         }
     }
 

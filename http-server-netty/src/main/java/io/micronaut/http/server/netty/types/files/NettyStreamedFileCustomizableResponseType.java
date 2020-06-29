@@ -83,7 +83,7 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
         } else {
             response.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         }
-        delegate.ifPresent((type) -> type.process(response));
+        delegate.ifPresent(type -> type.process(response));
     }
 
     @Override

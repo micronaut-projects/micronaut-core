@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 
 /**
@@ -88,7 +88,7 @@ public class HttpDataReference {
         try {
             long readable = readableBytes(data);
             long offset = position.getAndUpdate(p -> readable);
-            int length = new Long(readable - offset).intValue();
+            int length = (int) (readable - offset);
             component = new Component(length, offset);
             components.add(component);
         } catch (IOException e) {
@@ -122,7 +122,7 @@ public class HttpDataReference {
         Component component = components.get(index);
         components.remove(index);
         updateComponentOffsets(index);
-        position.getAndUpdate((offset) -> offset - component.length);
+        position.getAndUpdate(offset -> offset - component.length);
     }
 
     private long readableBytes(HttpData httpData) throws IOException {
@@ -131,20 +131,6 @@ public class HttpDataReference {
         } else {
             return httpData.length();
         }
-    }
-
-    private ByteBuf createDelegate(ByteBuf byteBuf, BiFunction<ByteBuf, Integer, Boolean> onRelease) {
-        return new ByteBufDelegate(byteBuf) {
-            @Override
-            public boolean release() {
-                return onRelease.apply(byteBuf, 1);
-            }
-
-            @Override
-            public boolean release(int decrement) {
-                return onRelease.apply(byteBuf, decrement);
-            }
-        };
     }
 
     private void updateComponentOffsets(int index) {
@@ -195,6 +181,20 @@ public class HttpDataReference {
         private Component(int length, long offset) {
             this.length = length;
             this.offset = offset;
+        }
+
+        private ByteBuf createDelegate(ByteBuf byteBuf, BiPredicate<ByteBuf, Integer> onRelease) {
+            return new ByteBufDelegate(byteBuf) {
+                @Override
+                public boolean release() {
+                    return onRelease.test(byteBuf, 1);
+                }
+
+                @Override
+                public boolean release(int decrement) {
+                    return onRelease.test(byteBuf, decrement);
+                }
+            };
         }
 
         /**

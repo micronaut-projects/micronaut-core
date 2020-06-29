@@ -61,7 +61,7 @@ public class NettyClientHttpRequestFactory implements HttpRequestFactory {
 
     @Override
     public <T> MutableHttpRequest<T> options(String uri) {
-        return new NettyClientHttpRequest<T>(HttpMethod.OPTIONS, uri);
+        return new NettyClientHttpRequest<>(HttpMethod.OPTIONS, uri);
     }
 
     @Override

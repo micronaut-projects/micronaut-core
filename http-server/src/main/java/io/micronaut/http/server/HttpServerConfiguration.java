@@ -296,6 +296,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     /**
      * @return the context path for the web server
      */
+    @Override
     public String getContextPath() {
         return contextPath;
     }
@@ -471,7 +472,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          * The default max file size.
          */
         @SuppressWarnings("WeakerAccess")
-        public static final long DEFAULT_MAX_FILE_SIZE = 1024 * 1024; // 1MB
+        public static final long DEFAULT_MAX_FILE_SIZE = 1024L * 1024; // 1MB
 
         /**
          * The default disk value.
@@ -489,7 +490,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          * The default threshold value.
          */
         @SuppressWarnings("WeakerAccess")
-        public static final long DEFAULT_THRESHOLD = 1024 * 1024 * 10; // 10MB
+        public static final long DEFAULT_THRESHOLD = 1024L * 1024 * 10; // 10MB
 
         private File location;
         private long maxFileSize = DEFAULT_MAX_FILE_SIZE;

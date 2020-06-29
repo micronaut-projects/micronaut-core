@@ -38,7 +38,7 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
      * @param variableTypes  The variable types
      */
     public UriTypeMatchTemplate(CharSequence templateString, Class... variableTypes) {
-        super(templateString, new Object[]{variableTypes});
+        super(templateString, new Object[] {variableTypes});
         this.variableTypes = variableTypes == null ? new Class[0] : variableTypes;
     }
 
@@ -65,7 +65,7 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
      * @return The new URI template
      */
     public UriTypeMatchTemplate nest(CharSequence uriTemplate, Class... variableTypes) {
-        return (UriTypeMatchTemplate) super.nest(uriTemplate, new Object[]{variableTypes});
+        return (UriTypeMatchTemplate) super.nest(uriTemplate, new Object[] {variableTypes});
     }
 
     @Override
