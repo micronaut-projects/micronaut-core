@@ -1,4 +1,4 @@
-In certain cases you may which to create standalone command-line (CLI) applications that interact with your Microservice infrastructure.
+In certain cases you may wish to create standalone command-line (CLI) applications that interact with your Microservice infrastructure.
 
 Examples of applications like this include scheduled tasks, batch applications and general command line applications.
 
