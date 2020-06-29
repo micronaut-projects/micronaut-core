@@ -62,7 +62,7 @@ dependencies {
 
     // needed for HTTP/2 tests
     testImplementation 'io.netty:netty-tcnative:2.0.29.Final'
-    testImplementation 'io.netty:netty-tcnative-boringssl-static:2.0.29.Final'
+    testImplementation 'io.netty:netty-tcnative-boringssl-static:2.0.31.Final'
     testImplementation "io.netty:netty-tcnative-boringssl-static:2.0.29.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
     testImplementation 'org.zalando:logbook-netty:2.1.0'
     testImplementation "ch.qos.logback:logback-classic:1.2.3"
