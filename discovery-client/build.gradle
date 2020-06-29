@@ -8,7 +8,7 @@ dependencies {
     compileOnly project(":management")
     // used by OracleCloudVaultConfigurationClient
     compileOnly group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-vault', version: '1.19.0'
-    compileOnly group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-secrets', version: '1.15.4'
+    compileOnly group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-secrets', version: '1.19.0'
     compileOnly group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-common', version: '1.15.4'
 
     testImplementation "org.testcontainers:spock:1.14.2"
