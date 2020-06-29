@@ -29,6 +29,7 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 
 import javax.inject.Inject;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -115,19 +116,20 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private boolean useNativeTransport = DEFAULT_USE_NATIVE_TRANSPORT;
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
     private AccessLogger accessLogger;
+    private Http2Settings http2Settings = new Http2Settings();
 
     /**
      * Default empty constructor.
      */
     public NettyHttpServerConfiguration() {
-        this(null, Collections.EMPTY_LIST);
+        this(null, Collections.emptyList());
     }
 
     /**
      * @param applicationConfiguration The application configuration
      */
     public NettyHttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
-        this(applicationConfiguration, Collections.EMPTY_LIST);
+        this(applicationConfiguration, Collections.emptyList());
     }
 
     /**
@@ -156,6 +158,24 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setAccessLogger(AccessLogger accessLogger) {
         this.accessLogger = accessLogger;
+    }
+
+    /**
+     * Returns the Http2Settings.
+     * @return The Http2Settings.
+     */
+    public Http2Settings getHttp2() {
+        return http2Settings;
+    }
+
+    /**
+     * Sets the Http2Settings.
+     * @param http2 The Http2Settings.
+     */
+    public void setHttp2(Http2Settings http2) {
+        if (http2 != null) {
+            this.http2Settings = http2;
+        }
     }
 
     /**
@@ -420,6 +440,148 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * Http2 settings.
+     */
+    @ConfigurationProperties("http2")
+    public static class Http2Settings {
+        private final io.netty.handler.codec.http2.Http2Settings settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings();
+
+        /**
+         * Returns netty's http2 settings.
+         *
+         * @return io.netty.handler.codec.http2.Http2Settings.
+         */
+        public io.netty.handler.codec.http2.Http2Settings http2Settings() {
+            return settings;
+        }
+
+        /**
+         * Gets the {@code SETTINGS_HEADER_TABLE_SIZE} value. If unavailable, returns {@code null}.
+         *
+         * @return The header table size or {@code null}.
+         */
+        public Long getHeaderTableSize() {
+            return settings.headerTableSize();
+        }
+
+        /**
+         * Sets the {@code SETTINGS_HEADER_TABLE_SIZE} value.
+         *
+         * @param value The header table size.
+         * @throws IllegalArgumentException if verification of the setting fails.
+         */
+        public void setHeaderTableSize(Long value) {
+            if (value != null) {
+                settings.headerTableSize(value);
+            }
+        }
+
+        /**
+         * Gets the {@code SETTINGS_ENABLE_PUSH} value. If unavailable, returns {@code null}.
+         *
+         * @return The {@code SETTINGS_ENABLE_PUSH} value. If unavailable, returns {@code null}.
+         */
+        public Boolean getPushEnabled() {
+            return settings.pushEnabled();
+        }
+
+        /**
+         * Sets the {@code SETTINGS_ENABLE_PUSH} value.
+         *
+         * @param enabled The {@code SETTINGS_ENABLE_PUSH} value.
+         */
+        public void setPushEnabled(Boolean enabled) {
+            if (enabled != null) {
+                settings.pushEnabled(enabled);
+            }
+        }
+
+        /**
+         * Gets the {@code SETTINGS_MAX_CONCURRENT_STREAMS} value. If unavailable, returns {@code null}.
+         *
+         * @return The {@code SETTINGS_MAX_CONCURRENT_STREAMS} value. If unavailable, returns {@code null}.
+         */
+        public Long getMaxConcurrentStreams() {
+            return settings.maxConcurrentStreams();
+        }
+
+        /**
+         * Sets the {@code SETTINGS_MAX_CONCURRENT_STREAMS} value.
+         *
+         * @param value The {@code SETTINGS_MAX_CONCURRENT_STREAMS} value.
+         * @throws IllegalArgumentException if verification of the setting fails.
+         */
+        public void setMaxConcurrentStreams(Long value) {
+            if (value != null) {
+                settings.maxConcurrentStreams(value);
+            }
+        }
+
+        /**
+         * Gets the {@code SETTINGS_INITIAL_WINDOW_SIZE} value. If unavailable, returns {@code null}.
+         *
+         * @return The {@code SETTINGS_INITIAL_WINDOW_SIZE} value. If unavailable, returns {@code null}.
+         */
+        public Integer getInitialWindowSize() {
+            return settings.initialWindowSize();
+        }
+
+        /**
+         * Sets the {@code SETTINGS_INITIAL_WINDOW_SIZE} value.
+         *
+         * @param value The {@code SETTINGS_INITIAL_WINDOW_SIZE} value.
+         * @throws IllegalArgumentException if verification of the setting fails.
+         */
+        public void setInitialWindowSize(Integer value) {
+            if (value != null) {
+                settings.initialWindowSize(value);
+            }
+        }
+
+        /**
+         * Gets the {@code SETTINGS_MAX_FRAME_SIZE} value. If unavailable, returns {@code null}.
+         *
+         * @return The {@code SETTINGS_MAX_FRAME_SIZE} value. If unavailable, returns {@code null}.
+         */
+        public Integer getMaxFrameSize() {
+            return settings.maxFrameSize();
+        }
+
+        /**
+         * Sets the {@code SETTINGS_MAX_FRAME_SIZE} value.
+         *
+         * @param value The {@code SETTINGS_MAX_FRAME_SIZE} value.
+         * @throws IllegalArgumentException if verification of the setting fails.
+         */
+        public void setMaxFrameSize(Integer value) {
+            if (value != null) {
+                settings.maxFrameSize(value);
+            }
+        }
+
+        /**
+         * Gets the {@code SETTINGS_MAX_HEADER_LIST_SIZE} value. If unavailable, returns {@code null}.
+         *
+         * @return The {@code SETTINGS_MAX_HEADER_LIST_SIZE} value. If unavailable, returns {@code null}.
+         */
+        public Long getMaxHeaderListSize() {
+            return settings.maxHeaderListSize();
+        }
+
+        /**
+         * Sets the {@code SETTINGS_MAX_HEADER_LIST_SIZE} value.
+         *
+         * @param value The {@code SETTINGS_MAX_HEADER_LIST_SIZE} value.
+         * @throws IllegalArgumentException if verification of the setting fails.
+         */
+        public void setMaxHeaderListSize(Long value) {
+            if (value != null) {
+                settings.maxHeaderListSize(value);
+            }
+        }
+    }
+
+    /**
      * Access logger configuration.
      */
     @ConfigurationProperties("access-logger")
@@ -569,13 +731,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         public void setPreferNativeTransport(boolean preferNativeTransport) {
             this.preferNativeTransport = preferNativeTransport;
-        }
-
-        /**
-         * @return The number of threads to use
-         */
-        public int getNumOfThreads() {
-            return threads;
         }
 
         /**

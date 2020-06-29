@@ -605,7 +605,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 true
         );
         final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder()
-                .frameListener(http2ToHttpAdapter);
+                .frameListener(http2ToHttpAdapter)
+                .validateHeaders(serverConfiguration.isValidateHeaders())
+                .initialSettings(serverConfiguration.getHttp2().http2Settings());
 
         serverConfiguration.getLogLevel().ifPresent(logLevel ->
                 builder.frameLogger(new Http2FrameLogger(logLevel, NettyHttpServer.class))
