@@ -88,6 +88,9 @@ Some dependencies have new Maven Group IDs so you may need to update your depend
 |`io.micronaut.configuration:micronaut-views-*`
 |`io.micronaut.views:micronaut-views-*`
 
+|`io.micronaut.configuration:micronaut-jdbc-*`
+|`io.micronaut.sql:micronaut-jdbc-*`
+
 |===
 
 === AWS Module Changes
