@@ -750,7 +750,9 @@ allprojects {
 
 htmlSanityCheck {
     sourceDir = new File("${rootProject.buildDir}/docs/")
-    sourceDocuments = ["index.html"]
+    sourceDocuments = fileTree(sourceDir) {
+        include "index.html"
+    }
 }
 docs.finalizedBy(htmlSanityCheck)
 
