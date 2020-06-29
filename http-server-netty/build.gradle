@@ -22,7 +22,7 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
-    testImplementation 'io.micronaut.xml:micronaut-jackson-xml:1.0.0', {
+    testImplementation 'io.micronaut.xml:micronaut-jackson-xml:1.1.0', {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-http'
     }
