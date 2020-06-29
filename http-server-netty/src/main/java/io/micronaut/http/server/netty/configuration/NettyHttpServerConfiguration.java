@@ -734,6 +734,13 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         }
 
         /**
+         * @return The number of threads to use
+         */
+        public int getNumOfThreads() {
+            return threads;
+        }
+
+        /**
          * @return The I/O ratio to use
          */
         @Override
