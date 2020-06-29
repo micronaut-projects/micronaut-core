@@ -790,7 +790,11 @@ public class DefaultHttpClient implements
 
                     final NettyWebSocketClientHandler webSocketHandler;
                     try {
-                        URI webSocketURL = URI.create("ws://" + host + ":" + port + uri.getPath());
+                        String uriStr = "ws://" + host + ":" + port + uri.getPath();
+                        if (uri.getQuery() != null) {
+                            uriStr += "?" + uri.getQuery();
+                        }
+                        URI webSocketURL = URI.create(uriStr);
 
                         MutableHttpHeaders headers = request.getHeaders();
                         HttpHeaders customHeaders = EmptyHttpHeaders.INSTANCE;
