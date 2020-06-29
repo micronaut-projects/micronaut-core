@@ -64,7 +64,6 @@ public class ComputeInstanceMetadataResolverUtils {
             uc.setReadTimeout(readTimeoutMs);
             uc.setRequestMethod(HttpMethod.GET.name());
             uc.setDoOutput(true);
-            int responseCode = uc.getResponseCode();
             try (InputStream in = uc.getInputStream()) {
                 return objectMapper.readTree(in);
             }

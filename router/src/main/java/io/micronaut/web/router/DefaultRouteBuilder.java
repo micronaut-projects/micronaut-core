@@ -994,7 +994,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Optional<UriRouteMatch> match(String uri) {
             Optional<UriMatchInfo> matchInfo = uriMatchTemplate.match(uri);
-            return matchInfo.map((info) -> new DefaultUriRouteMatch(info, this, defaultCharset, conversionService));
+            return matchInfo.map(info -> new DefaultUriRouteMatch(info, this, defaultCharset, conversionService));
         }
 
         @Override

@@ -75,7 +75,7 @@ public class RouteVersionFilter implements RouteMatchFilter {
         ArgumentUtils.requireNonNull("request", request);
 
         if (resolvingStrategies == null || resolvingStrategies.isEmpty()) {
-            return (match) -> true;
+            return match -> true;
         }
 
         Optional<String> defaultVersion = defaultVersionProvider == null ? Optional.empty() : Optional.of(defaultVersionProvider.resolveDefaultVersion());
@@ -85,7 +85,7 @@ public class RouteVersionFilter implements RouteMatchFilter {
                 .filter(Objects::nonNull)
                 .findFirst();
 
-        return (match) -> {
+        return match -> {
             Optional<String> routeVersion = getVersion(match);
 
             if (routeVersion.isPresent()) {

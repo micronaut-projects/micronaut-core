@@ -143,9 +143,9 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                     .convert(result, Flowable.class)
                     .orElseThrow(() -> new IllegalStateException("Unconvertible Reactive type: " + result));
                 Flowable retryObservable = observable.onErrorResumeNext(retryFlowable(context, retryState, observable))
-                    .doOnNext(o -> {
-                        retryState.close(null);
-                    });
+                    .doOnNext(o ->
+                        retryState.close(null)
+                    );
 
                 return conversionService
                     .convert(retryObservable, returnType.asArgument())

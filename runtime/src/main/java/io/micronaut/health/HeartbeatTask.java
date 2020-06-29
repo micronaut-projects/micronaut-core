@@ -37,7 +37,6 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceReadyEvent
     private AtomicReference<ServiceInstance> eventReference = new AtomicReference<>();
 
     private final ApplicationEventPublisher eventPublisher;
-    private final HeartbeatConfiguration configuration;
     private final CurrentHealthStatus currentHealthStatus;
 
     /**
@@ -47,7 +46,6 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceReadyEvent
      */
     public HeartbeatTask(ApplicationEventPublisher eventPublisher, HeartbeatConfiguration configuration, CurrentHealthStatus currentHealthStatus) {
         this.eventPublisher = eventPublisher;
-        this.configuration = configuration;
         this.currentHealthStatus = currentHealthStatus;
     }
 

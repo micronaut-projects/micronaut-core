@@ -46,7 +46,7 @@ public class DiskSpaceIndicatorConfiguration implements Toggleable {
      * The default threshold value.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final long DEFAULT_THRESHOLD = 1024 * 1024 * 10; // 10MB
+    public static final long DEFAULT_THRESHOLD = 1024L * 1024 * 10; // 10MB
 
     private boolean enabled = DEFAULT_ENABLED;
     private File path = new File(DEFAULT_PATH);

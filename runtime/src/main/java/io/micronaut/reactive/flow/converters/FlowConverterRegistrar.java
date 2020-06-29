@@ -24,7 +24,6 @@ import kotlinx.coroutines.reactive.ReactiveFlowKt;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
-import java.util.function.Function;
 
 /**
  * Converts between a {@link Flow} and a {@link Publisher}.
@@ -38,7 +37,7 @@ public class FlowConverterRegistrar implements TypeConverterRegistrar {
     @Override
     public void register(ConversionService<?> conversionService) {
         // Flow
-        conversionService.addConverter(Flow.class, Flowable.class, (Function<Flow, Flowable>) flow ->
+        conversionService.addConverter(Flow.class, Flowable.class, flow ->
                 Flowable.fromPublisher(ReactiveFlowKt.asPublisher(flow))
         );
         conversionService.addConverter(Flow.class, Publisher.class, ReactiveFlowKt::asPublisher);

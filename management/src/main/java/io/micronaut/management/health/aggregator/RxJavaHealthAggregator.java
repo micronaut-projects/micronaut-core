@@ -74,7 +74,7 @@ public class RxJavaHealthAggregator implements HealthAggregator<HealthResult> {
 
     @Override
     public Publisher<HealthResult> aggregate(String name, Publisher<HealthResult> results) {
-        Single<HealthResult> result = Flowable.fromPublisher(results).toList().map((list) -> {
+        Single<HealthResult> result = Flowable.fromPublisher(results).toList().map(list -> {
             HealthStatus overallStatus = calculateOverallStatus(list);
             Object details = aggregateDetails(list);
             return HealthResult.builder(name, overallStatus).details(details).build();
