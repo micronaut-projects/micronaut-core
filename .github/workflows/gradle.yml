@@ -7,8 +7,9 @@ name: Java CI
 on:
   push:
     branches:
-      - master
-      - '[1-9]+.[0-9]+.x'
+      - *
+#      - master
+#      - '[1-9]+.[0-9]+.x'
   pull_request:
     branches:
       - master
@@ -50,11 +51,19 @@ jobs:
         env:
           BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
           BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
-        run: ./gradlew publish docs
+        run: ./gradlew publish docs --no-daemon
+      - name: Determine docs target repository
+        uses: haya14busa/action-cond@v1
+        id: docs_target
+        with:
+          cond: ${{ github.repository == 'micronaut-projects/micronaut-core' }}
+          if_true: "micronaut-projects/micronaut-docs"
+          if_false: ${{ github.repository }}
       - name: Publish to Github Pages
         if: success() && github.event_name == 'push' && matrix.java == '8'
         uses: micronaut-projects/github-pages-deploy-action@master
         env:
+          TARGET_REPOSITORY: ${{ steps.docs_target.outputs.value }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           BASE_BRANCH: ${{ env.githubBranch }}
           BRANCH: gh-pages
