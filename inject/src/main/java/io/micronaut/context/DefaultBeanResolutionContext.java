@@ -52,7 +52,7 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
     }
 
     @Override
-    public <T> void removeInFlightBean(BeanIdentifier beanIdentifier) {
+    public void removeInFlightBean(BeanIdentifier beanIdentifier) {
         singlesInCreation.remove(beanIdentifier);
     }
 

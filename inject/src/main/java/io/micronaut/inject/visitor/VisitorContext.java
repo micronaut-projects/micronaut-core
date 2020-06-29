@@ -83,6 +83,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @param path The path to the file
      * @return An optional file it was possible to create it
      */
+    @Override
     @Experimental
     Optional<GeneratedFile> visitMetaInfFile(String path);
 
@@ -92,6 +93,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @param path The path to the file
      * @return An optional file it was possible to create it
      */
+    @Override
     @Experimental
     Optional<GeneratedFile> visitGeneratedFile(String path);
 

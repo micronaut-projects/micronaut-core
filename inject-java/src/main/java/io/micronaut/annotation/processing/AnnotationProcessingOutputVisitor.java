@@ -86,16 +86,6 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         return generatedFiles.computeIfAbsent(path, s -> Optional.of(new GeneratedFileObject(path, StandardLocation.SOURCE_OUTPUT)));
     }
 
-    private FileObject openFileForReading(String path) {
-        return openedFiles.computeIfAbsent(path, s -> {
-            try {
-                return filer.getResource(StandardLocation.CLASS_OUTPUT, "", path);
-            } catch (IOException e) {
-                throw new ClassGenerationException("Unable to open file for path: " + path, e);
-            }
-        });
-    }
-
     /**
      * Class to handle generated files by the annotation processor.
      */
@@ -173,6 +163,16 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
             } catch (FileNotFoundException e) {
                 return null;
             }
+        }
+
+        private FileObject openFileForReading(String path) {
+            return openedFiles.computeIfAbsent(path, s -> {
+                try {
+                    return filer.getResource(StandardLocation.CLASS_OUTPUT, "", path);
+                } catch (IOException e) {
+                    throw new ClassGenerationException("Unable to open file for path: " + path, e);
+                }
+            });
         }
 
         private FileObject getOutputObject() throws IOException {

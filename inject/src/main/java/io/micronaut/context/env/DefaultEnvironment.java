@@ -333,13 +333,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
 
             if (StringUtils.isNotEmpty(deduceEnv)) {
-                boolean deduce = Boolean.valueOf(deduceEnv);
+                boolean deduce = Boolean.parseBoolean(deduceEnv);
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Environment deduction was set via environment variable to: " + deduce);
                 }
                 return deduce;
             } else if (StringUtils.isNotEmpty(deduceProperty)) {
-                boolean deduce = Boolean.valueOf(deduceProperty);
+                boolean deduce = Boolean.parseBoolean(deduceProperty);
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Environment deduction was set via system property to: " + deduce);
                 }
@@ -835,11 +835,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             final HttpURLConnection con = createConnection(GOOGLE_COMPUTE_METADATA);
             con.setRequestMethod("GET");
             con.setDoOutput(true);
-            int responseCode = con.getResponseCode();
             BufferedReader in = new BufferedReader(
                 new InputStreamReader(con.getInputStream()));
             String inputLine;
-            StringBuffer response = new StringBuffer();
+            StringBuilder response = new StringBuilder();
 
             while ((inputLine = in.readLine()) != null) {
                 response.append(inputLine);
@@ -858,10 +857,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @SuppressWarnings("MagicNumber")
     private static boolean isOracleCloudLinux() {
-        if (readFile(ORACLE_CLOUD_ASSET_TAG_FILE).toLowerCase().contains("oraclecloud")) {
-            return true;
-        }
-        return false;
+        return readFile(ORACLE_CLOUD_ASSET_TAG_FILE).toLowerCase().contains("oraclecloud");
     }
 
     private static Optional<Process> runWindowsCmd(String cmd) {
@@ -965,7 +961,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static boolean isDigitalOcean() {
         try {
             String sysVendor = new String(Files.readAllBytes(Paths.get(DO_SYS_VENDOR_FILE)));
-            return "digitalocean".equals(sysVendor.toLowerCase());
+            return "digitalocean".equalsIgnoreCase(sysVendor);
         } catch (IOException e) {
             return false;
         }

@@ -422,10 +422,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                             }
                         } else {
                             Optional<Qualifier> resolvedQualifier = delegate.get(javax.inject.Qualifier.class.getName(), Qualifier.class);
-                            if (resolvedQualifier.isPresent()) {
-                                if (resolvedQualifier.get().equals(qualifier)) {
-                                    return delegate;
-                                }
+                            if (resolvedQualifier.isPresent() && resolvedQualifier.get().equals(qualifier)) {
+                                return delegate;
                             }
                         }
                     }
@@ -568,6 +566,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             return refreshablePropertySources;
         }
 
+        @Override
         protected List<PropertySource> readPropertySourceList(String name) {
             return super.readPropertySourceList(name)
                     .stream()

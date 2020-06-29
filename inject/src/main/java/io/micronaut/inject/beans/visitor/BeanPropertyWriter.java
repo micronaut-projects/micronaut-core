@@ -246,7 +246,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         constructor.push(propertyName);
 
         // 4th argument: The annotation metadata
-        if (annotationMetadata != null && annotationMetadata instanceof DefaultAnnotationMetadata) {
+        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             final DefaultAnnotationMetadata annotationMetadata = (DefaultAnnotationMetadata) this.annotationMetadata;
             if (annotationMetadata.isEmpty()) {
                 constructor.visitInsn(ACONST_NULL);

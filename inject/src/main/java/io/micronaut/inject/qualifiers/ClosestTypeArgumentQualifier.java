@@ -23,7 +23,6 @@ import io.micronaut.inject.BeanType;
 import org.slf4j.Logger;
 
 import java.util.*;
-import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -67,7 +66,7 @@ public class ClosestTypeArgumentQualifier<T> extends TypeArgumentQualifier<T> {
                 })
                 .filter(entry -> entry.getValue() > -1)
                 .collect(StreamUtils.minAll(
-                        Comparator.comparingInt((ToIntFunction<Map.Entry<BT, Integer>>) Map.Entry::getValue),
+                        Comparator.comparingInt(Map.Entry::getValue),
                         Collectors.toList())
                 )
                 .stream()
@@ -80,7 +79,7 @@ public class ClosestTypeArgumentQualifier<T> extends TypeArgumentQualifier<T> {
      */
     protected int compare(List<Class> classesToCompare) {
         final Class[] typeArguments = getTypeArguments();
-        if (classesToCompare.size() == 0 && typeArguments.length == 0) {
+        if (classesToCompare.isEmpty() && typeArguments.length == 0) {
             return 0;
         } else if (classesToCompare.size() != typeArguments.length) {
             return -1;

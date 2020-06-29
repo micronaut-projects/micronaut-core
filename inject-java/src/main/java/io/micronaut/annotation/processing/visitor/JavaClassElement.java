@@ -171,7 +171,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                             return false;
                         }
 
-                        if (NameUtils.isGetterName(methodName) && executableElement.getParameters().size() == 0) {
+                        if (NameUtils.isGetterName(methodName) && executableElement.getParameters().isEmpty()) {
                             return true;
                         } else {
                             return NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1;
@@ -194,7 +194,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                 String methodName = executableElement.getSimpleName().toString();
                 final TypeElement declaringTypeElement = (TypeElement) executableElement.getEnclosingElement();
 
-                if (NameUtils.isGetterName(methodName) && executableElement.getParameters().size() == 0) {
+                if (NameUtils.isGetterName(methodName) && executableElement.getParameters().isEmpty()) {
                     String propertyName = NameUtils.getPropertyNameForGetter(methodName);
                     TypeMirror returnType = executableElement.getReturnType();
                     ClassElement getterReturnType;
@@ -211,18 +211,15 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                         getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo);
                     }
 
-                    if (getterReturnType != null) {
-
-                        BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                        configureDeclaringType(declaringTypeElement, beanPropertyData);
-                        beanPropertyData.type = getterReturnType;
-                        beanPropertyData.getter = executableElement;
-                        if (beanPropertyData.setter != null) {
-                            TypeMirror typeMirror = beanPropertyData.setter.getParameters().get(0).asType();
-                            ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
-                            if (setterParameterType == null || !setterParameterType.getName().equals(getterReturnType.getName())) {
-                                beanPropertyData.setter = null; // not a compatible setter
-                            }
+                    BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+                    configureDeclaringType(declaringTypeElement, beanPropertyData);
+                    beanPropertyData.type = getterReturnType;
+                    beanPropertyData.getter = executableElement;
+                    if (beanPropertyData.setter != null) {
+                        TypeMirror typeMirror = beanPropertyData.setter.getParameters().get(0).asType();
+                        ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
+                        if (!setterParameterType.getName().equals(getterReturnType.getName())) {
+                            beanPropertyData.setter = null; // not a compatible setter
                         }
                     }
                 } else if (NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1) {
@@ -230,18 +227,15 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                     TypeMirror typeMirror = executableElement.getParameters().get(0).asType();
                     ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
 
-                    if (setterParameterType != null) {
-
-                        BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                        configureDeclaringType(declaringTypeElement, beanPropertyData);
-                        ClassElement propertyType = beanPropertyData.type;
-                        if (propertyType != null) {
-                            if (propertyType.getName().equals(setterParameterType.getName())) {
-                                beanPropertyData.setter = executableElement;
-                            }
-                        } else {
+                    BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+                    configureDeclaringType(declaringTypeElement, beanPropertyData);
+                    ClassElement propertyType = beanPropertyData.type;
+                    if (propertyType != null) {
+                        if (propertyType.getName().equals(setterParameterType.getName())) {
                             beanPropertyData.setter = executableElement;
                         }
+                    } else {
+                        beanPropertyData.setter = executableElement;
                     }
                 }
             }
@@ -365,11 +359,6 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         return false;
     }
 
-    @Override
-    public AnnotationMetadata getAnnotationMetadata() {
-        return super.getAnnotationMetadata();
-    }
-
     @NonNull
     @Override
     public Optional<MethodElement> getPrimaryConstructor() {
@@ -415,9 +404,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         while (tpi.hasNext()) {
             TypeParameterElement tpe = tpi.next();
             ClassElement classElement = mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo);
-            if (classElement != null) {
-                map.put(tpe.toString(), classElement);
-            }
+            map.put(tpe.toString(), classElement);
         }
 
         return Collections.unmodifiableMap(map);
