@@ -71,7 +71,7 @@ class DefaultUriBuilder implements UriBuilder {
         final String query = uri.getQuery();
         if (query != null) {
             final Map parameters = new QueryStringDecoder(uri).parameters();
-            this.queryParams = new MutableConvertibleMultiValuesMap<String>(parameters);
+            this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
         } else {
             this.queryParams = new MutableConvertibleMultiValuesMap<>();
         }
@@ -115,7 +115,7 @@ class DefaultUriBuilder implements UriBuilder {
                 }
                 if (query != null) {
                     final Map parameters = new QueryStringDecoder(query).parameters();
-                    this.queryParams = new MutableConvertibleMultiValuesMap<String>(parameters);
+                    this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
                 }
@@ -133,7 +133,7 @@ class DefaultUriBuilder implements UriBuilder {
                 this.path = new StringBuilder(path);
                 if (query != null) {
                     final Map parameters = new QueryStringDecoder(uri.toString()).parameters();
-                    this.queryParams = new MutableConvertibleMultiValuesMap<String>(parameters);
+                    this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
                 }

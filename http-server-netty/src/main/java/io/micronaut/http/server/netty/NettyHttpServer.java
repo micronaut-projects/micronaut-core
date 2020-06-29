@@ -557,19 +557,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         }
     }
 
-    private void registerMicronautChannelHandlers(Map<String, ChannelHandler> channelHandlerMap) {
-        int i = 0;
-        for (ChannelHandler outboundHandlerAdapter : outboundHandlers) {
-            String name;
-            if (outboundHandlerAdapter instanceof Named) {
-                name = ((Named) outboundHandlerAdapter).getName();
-            } else {
-                name = ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND + NettyHttpServer.OUTBOUND_KEY + ++i;
-            }
-            channelHandlerMap.put(name, outboundHandlerAdapter);
-        }
-    }
-
     private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
         options.forEach((option, value) -> biConsumer.accept(option, channelOptionFactory.convertValue(option, value, environment)));
     }
@@ -675,6 +662,19 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             handlers.forEach(pipeline::addLast);
             for (ChannelPipelineListener pipelineListener : pipelineListeners) {
                 pipelineListener.onConnect(pipeline);
+            }
+        }
+
+        private void registerMicronautChannelHandlers(Map<String, ChannelHandler> channelHandlerMap) {
+            int i = 0;
+            for (ChannelOutboundHandler outboundHandlerAdapter : outboundHandlers) {
+                String name;
+                if (outboundHandlerAdapter instanceof Named) {
+                    name = ((Named) outboundHandlerAdapter).getName();
+                } else {
+                    name = ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND + NettyHttpServer.OUTBOUND_KEY + ++i;
+                }
+                channelHandlerMap.put(name, outboundHandlerAdapter);
             }
         }
 

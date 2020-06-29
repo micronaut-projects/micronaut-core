@@ -72,7 +72,7 @@ public class RequestBeanAnnotationBinder<T> extends AbstractAnnotatedArgumentBin
         if (hasAnnotation) {
             BeanIntrospection<T> introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
             Map<String, BeanProperty<T, Object>> beanProperties = introspection.getBeanProperties().stream()
-                    .collect(Collectors.toMap(Named::getName, (p) -> p));
+                    .collect(Collectors.toMap(Named::getName, p -> p));
 
             if (introspection.getConstructorArguments().length > 0) {
                 // Handle injection with Constructor or @Creator

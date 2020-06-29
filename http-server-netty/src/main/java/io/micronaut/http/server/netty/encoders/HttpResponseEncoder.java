@@ -124,12 +124,12 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
     }
 
     private void applyConfiguredHeaders(MutableHttpHeaders headers) {
-        if (serverConfiguration.isDateHeader() && !headers.contains("Date")) {
+        if (serverConfiguration.isDateHeader() && !headers.contains(HttpHeaders.DATE)) {
             headers.date(LocalDateTime.now());
         }
-        serverConfiguration.getServerHeader().ifPresent((server) -> {
-            if (!headers.contains("Server")) {
-                headers.add("Server", server);
+        serverConfiguration.getServerHeader().ifPresent(server -> {
+            if (!headers.contains(HttpHeaders.SERVER)) {
+                headers.add(HttpHeaderNames.SERVER, server);
             }
         });
     }
