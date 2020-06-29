@@ -37,7 +37,7 @@ class DefaultCommandLine implements CommandLine {
     private Properties systemProperties = new Properties();
     private LinkedHashMap<String, Object> undeclaredOptions = new LinkedHashMap<>();
     private LinkedHashMap<Option, Object> declaredOptions = new LinkedHashMap<>();
-    private List<String> remainingArgs = new ArrayList<String>();
+    private List<String> remainingArgs = new ArrayList<>();
     private String[] rawArguments = new String[0];
 
     @Override

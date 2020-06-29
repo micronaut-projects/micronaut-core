@@ -38,6 +38,7 @@ public class SupplierUtil {
             Supplier<T> delegate = this::initialize;
             boolean initialized;
 
+            @Override
             public T get() {
                 return delegate.get();
             }
@@ -66,6 +67,7 @@ public class SupplierUtil {
             Supplier<T> delegate = this::initialize;
             boolean initialized;
 
+            @Override
             public T get() {
                 return delegate.get();
             }
@@ -76,10 +78,8 @@ public class SupplierUtil {
                     if (value == null) {
                         return null;
                     }
-                    if (value instanceof Optional) {
-                        if (!((Optional) value).isPresent()) {
-                            return value;
-                        }
+                    if (value instanceof Optional && !((Optional) value).isPresent()) {
+                        return value;
                     }
                     delegate = () -> value;
                     initialized = true;

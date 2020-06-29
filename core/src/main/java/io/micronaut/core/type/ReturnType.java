@@ -95,9 +95,8 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
      */
     default boolean isSpecifiedSingle() {
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-        return annotationMetadata.hasStereotype(SingleResult.class) ?
-                annotationMetadata.booleanValue(SingleResult.NAME).orElse(true) :
-                false;
+        return annotationMetadata.hasStereotype(SingleResult.class) &&
+                annotationMetadata.booleanValue(SingleResult.NAME).orElse(true);
     }
 
     /**

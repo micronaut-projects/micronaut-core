@@ -297,7 +297,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         }
 
         Interceptor[] interceptorArray = Arrays.stream(interceptors)
-            .filter(i -> applicableClasses.stream().anyMatch((t) -> t.isInstance(i)))
+            .filter(i -> applicableClasses.stream().anyMatch(t -> t.isInstance(i)))
             .toArray(Interceptor[]::new);
         OrderUtil.sort(interceptorArray);
         return interceptorArray;

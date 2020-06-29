@@ -235,10 +235,8 @@ public final class StringUtils {
         if (dottedProperty == null) {
             return dottedProperty;
         }
-        Optional<String> converted = Optional.of(dottedProperty)
-            .map(value -> value.replace('.', '_'))
-            .map(value -> uppercase ? value.toUpperCase() : value);
-        return converted.get();
+        dottedProperty = dottedProperty.replace('.', '_');
+        return uppercase ?  dottedProperty.toUpperCase() : dottedProperty;
     }
 
     /**

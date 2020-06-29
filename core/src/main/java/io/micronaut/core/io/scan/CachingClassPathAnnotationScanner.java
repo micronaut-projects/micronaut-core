@@ -52,13 +52,13 @@ public class CachingClassPathAnnotationScanner extends ClassPathAnnotationScanne
 
     @Override
     protected List<Class> doScan(String annotation, String pkg) {
-        return initializedObjectsByType.computeIfAbsent(new CacheKey(annotation, pkg), (key) -> super.doScan(annotation, pkg));
+        return initializedObjectsByType.computeIfAbsent(new CacheKey(annotation, pkg), key -> super.doScan(annotation, pkg));
     }
 
     /**
      * Inner class CacheKey.
      */
-    private final class CacheKey implements Serializable {
+    private static final class CacheKey implements Serializable {
         final String annotation;
         final String pkg;
 

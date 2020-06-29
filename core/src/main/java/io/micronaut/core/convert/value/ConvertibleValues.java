@@ -199,7 +199,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
         String finalPrefix = prefix + '.';
         return names().stream()
             .filter(name -> name.startsWith(finalPrefix))
-            .collect(Collectors.toMap((name) -> name.substring(finalPrefix.length()), (name) -> get(name, valueType).orElse(null)));
+            .collect(Collectors.toMap(name -> name.substring(finalPrefix.length()), name -> get(name, valueType).orElse(null)));
     }
 
     @SuppressWarnings("NullableProblems")

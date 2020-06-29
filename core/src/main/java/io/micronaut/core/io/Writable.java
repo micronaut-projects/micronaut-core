@@ -46,6 +46,7 @@ public interface Writable extends Streamable {
      * @param outputStream The output stream
      * @throws IOException if an error occurred while outputting data to the writer
      */
+    @Override
     default void writeTo(OutputStream outputStream) throws IOException {
         writeTo(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
     }
@@ -56,6 +57,7 @@ public interface Writable extends Streamable {
      * @param file The file
      * @throws IOException if an error occurred while outputting data to the writer
      */
+    @Override
     default void writeTo(File file) throws IOException {
         try (OutputStream outputStream = Files.newOutputStream(file.toPath())) {
             writeTo(outputStream);
@@ -69,6 +71,7 @@ public interface Writable extends Streamable {
      * @param charset      The charset to use. Defaults to {@link StandardCharsets#UTF_8}
      * @throws IOException if an error occurred while outputting data to the writer
      */
+    @Override
     default void writeTo(OutputStream outputStream, @Nullable Charset charset) throws IOException {
         OutputStreamWriter writer = new OutputStreamWriter(outputStream, charset == null ? StandardCharsets.UTF_8 : charset);
         writeTo(writer);

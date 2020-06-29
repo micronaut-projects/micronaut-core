@@ -718,7 +718,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
             if (targetNumberType == Double.class) {
                 return Optional.of(object.doubleValue());
-            } 
+            }
             if (targetNumberType == BigInteger.class) {
                 if (object instanceof BigDecimal) {
                     return Optional.of(((BigDecimal) object).toBigInteger());
@@ -964,8 +964,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
         Optional<String> format = annotationMetadata.stringValue(Format.class);
         return format
-            .map((pattern) -> new SimpleDateFormat(pattern, context.getLocale()))
-            .orElse(new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));
+            .map(pattern -> new SimpleDateFormat(pattern, context.getLocale()))
+            .orElseGet(() -> new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));
     }
 
     private <S, T> ConvertiblePair newPair(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
