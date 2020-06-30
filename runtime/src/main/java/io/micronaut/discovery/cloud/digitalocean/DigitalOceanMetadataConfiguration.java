@@ -43,7 +43,9 @@ public class DigitalOceanMetadataConfiguration implements Toggleable {
      * The default url value.
      */
     @SuppressWarnings("WeakerAccess")
+    // CHECKSTYLE:OFF
     public static final String DEFAULT_URL = "http://169.254.169.254/metadata/v1.json";
+    // CHECKSTYLE:ON
 
     private String url = DEFAULT_URL;
     private boolean enabled = DEFAULT_ENABLED;

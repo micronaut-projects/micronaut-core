@@ -73,7 +73,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String GOOGLE_APPENGINE_ENVIRONMENT = "GAE_ENV";
     private static final int DEFAULT_READ_TIMEOUT = 500;
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
+    // CHECKSTYLE:OFF
     private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
+    // CHECKSTYLE:ON
     private static final String ORACLE_CLOUD_ASSET_TAG_FILE = "/sys/devices/virtual/dmi/id/chassis_asset_tag";
     private static final String ORACLE_CLOUD_WINDOWS_ASSET_TAG_CMD = "wmic systemenclosure get smbiosassettag";
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
@@ -822,7 +824,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
 
         //TODO check for azure and IBM
-        //Azure - see http://blog.mszcool.com/index.php/2015/04/detecting-if-a-virtual-machine-runs-in-microsoft-azure-linux-windows-to-protect-your-software-when-distributed-via-the-azure-marketplace/
+        //Azure - see https://blog.mszcool.com/index.php/2015/04/detecting-if-a-virtual-machine-runs-in-microsoft-azure-linux-windows-to-protect-your-software-when-distributed-via-the-azure-marketplace/
         //IBM - uses cloudfoundry, will have to use that to probe
         // if all else fails not a cloud server that we can tell
         return ComputePlatform.BARE_METAL;

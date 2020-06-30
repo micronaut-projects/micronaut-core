@@ -35,7 +35,7 @@ import io.netty.channel.socket.SocketChannel;
 /**
  * The access log format parser.
  *
- * The syntax is based on <a href="http://httpd.apache.org/docs/current/mod/mod_log_config.html">Apache httpd log format</a>.
+ * The syntax is based on <a href="https://httpd.apache.org/docs/current/mod/mod_log_config.html">Apache httpd log format</a>.
  * Here are the supported directives:
  * <ul>
  * <li><b>%a</b> - Remote IP address</li>

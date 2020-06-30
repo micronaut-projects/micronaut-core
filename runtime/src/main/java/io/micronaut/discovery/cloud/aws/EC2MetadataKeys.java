@@ -46,7 +46,9 @@ public enum EC2MetadataKeys {
     accountId("accountId");
 
     public static final String AWS_API_VERSION = "latest";
+    // CHECKSTYLE:OFF
     public static final String AWS_METADATA_URL = "http://169.254.169.254/" + AWS_API_VERSION + "/meta-data/";
+    // CHECKSTYLE:ON
 
     protected String path;
 

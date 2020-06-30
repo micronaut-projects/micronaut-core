@@ -62,7 +62,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * If this returns true, the {@link Cookie} cannot be accessed through client side script - But only if the
      * browser supports it.
      * <p>
-     * See <a href="http://www.owasp.org/index.php/HTTPOnly">here</a> for reference
+     * See <a href="https://www.owasp.org/index.php/HTTPOnly">here</a> for reference
      *
      * @return True if this {@link Cookie} is HTTP-only or false if it isn't
      */

@@ -48,13 +48,17 @@ public class GoogleComputeMetadataConfiguration implements Toggleable {
      * The default metadata url value.
      */
     @SuppressWarnings("WeakerAccess")
+    // CHECKSTYLE:OFF
     public static final String DEFAULT_METADATAURL = "http://metadata.google.internal/computeMetadata/v1/project/";
+    // CHECKSTYLE:ON
 
     /**
      * The default project metadata url value.
      */
     @SuppressWarnings("WeakerAccess")
+    // CHECKSTYLE:OFF
     public static final String DEFAULT_PROJECTMETADATAURL = "http://metadata.google.internal/project/v1/project/";
+    // CHECKSTYLE:ON
 
     /**
      * The default read timeout in seconds.

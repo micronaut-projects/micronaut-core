@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,8 +24,8 @@ import javax.annotation.concurrent.ThreadSafe;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  * @param <V> The value type
- * @see <a href="http://code.google.com/p/concurrentlinkedhashmap/">
- *      http://code.google.com/p/concurrentlinkedhashmap/</a>
+ * @see <a href="https://code.google.com/p/concurrentlinkedhashmap/">
+ *      https://code.google.com/p/concurrentlinkedhashmap/</a>
  */
 @ThreadSafe
 public interface Weigher<V> {

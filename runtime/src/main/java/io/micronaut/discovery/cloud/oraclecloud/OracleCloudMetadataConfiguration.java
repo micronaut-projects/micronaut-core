@@ -46,8 +46,10 @@ public class OracleCloudMetadataConfiguration implements Toggleable {
      * The default url value.
      */
     @SuppressWarnings("WeakerAccess")
+    // CHECKSTYLE:OFF
     public static final String DEFAULT_URL = "http://169.254.169.254/opc/v1/instance/";
     public static final String DEFAULT_VNIC_URL = "http://169.254.169.254/opc/v1/vnics/";
+    // CHECKSTYLE:ON
 
     private String url = DEFAULT_URL;
     private String metadataUrl;

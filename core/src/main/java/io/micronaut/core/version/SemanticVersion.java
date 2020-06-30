@@ -58,10 +58,10 @@ public class SemanticVersion implements Comparable<SemanticVersion> {
                 this.minor = Integer.valueOf(parts[1]);
                 this.patch = Integer.valueOf(parts[2]);
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Version number is not semantic [" + version + "]! Should be in the format d.d.d. See http://semver.org");
+                throw new IllegalArgumentException("Version number is not semantic [" + version + "]! Should be in the format d.d.d. See https://semver.org");
             }
         } else {
-            throw new IllegalArgumentException("Version number is not semantic. Should be in the format d.d.d. See http://semver.org");
+            throw new IllegalArgumentException("Version number is not semantic. Should be in the format d.d.d. See https://semver.org");
         }
     }
 
