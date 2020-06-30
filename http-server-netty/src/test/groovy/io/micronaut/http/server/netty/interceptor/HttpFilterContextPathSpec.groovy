@@ -9,6 +9,7 @@ import io.micronaut.http.server.netty.AbstractMicronautSpec
 
 class HttpFilterContextPathSpec extends AbstractMicronautSpec {
 
+    @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.server.context-path': '/context/path']
     }

@@ -58,6 +58,7 @@ public class ServiceEntry extends AbstractServiceEntry {
      *
      * @return The name of the service
      */
+    @Override
     public String getName() {
         return name;
     }

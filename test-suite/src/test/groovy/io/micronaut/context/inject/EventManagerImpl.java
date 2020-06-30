@@ -22,6 +22,7 @@ public class EventManagerImpl implements EventManager {
         this.serviceName = serviceName;
     }
 
+    @Override
     public void register(String id) {
 
     }

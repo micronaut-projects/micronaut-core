@@ -476,7 +476,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         }
 
         //noinspection unchecked
-        return (Set<ConstraintViolation<T>>) overallViolations;
+        return overallViolations;
     }
 
     private <T> void validateCascadePropertyInternal(DefaultConstraintValidatorContext context,
@@ -1056,7 +1056,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     @SuppressWarnings("unchecked")
     private <T> void validatePojoInternal(@NonNull Class<T> rootClass,
                                           @Nullable T object,
-                                          @NonNull Object[] argumentValues,
+                                          @Nullable Object[] argumentValues,
                                           @NonNull DefaultConstraintValidatorContext context,
                                           @NonNull Set overallViolations,
                                           @NonNull Class<?> parameterType,
@@ -1067,7 +1067,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 .findConstraintValidator(pojoConstraint, parameterType).orElse(null);
 
         if (constraintValidator != null) {
-            if (!constraintValidator.isValid((T) parameterValue, constraintAnnotation, context)) {
+            if (!constraintValidator.isValid(parameterValue, constraintAnnotation, context)) {
                 final String propertyValue = "";
                 BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
                 if (beanIntrospection == null) {
@@ -2065,6 +2065,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             return kind;
         }
 
+        @Override
         public boolean isInIterable() {
             return isInIterable;
         }

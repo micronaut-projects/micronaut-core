@@ -105,7 +105,7 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
                                         openTracer.activeSpan()
                                 );
 
-                                ((MutableHttpResponse) response).body(Publishers.convertPublisher(scopedPublisher, type));
+                                response.body(Publishers.convertPublisher(scopedPublisher, type));
                             }
                         }
                         serverHandler.handleSend(mapResponse(request, response), null, span);

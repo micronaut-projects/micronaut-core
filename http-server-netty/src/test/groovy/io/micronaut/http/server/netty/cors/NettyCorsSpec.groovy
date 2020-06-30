@@ -267,6 +267,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         ex.response.header(VARY) == ORIGIN
     }
 
+    @Override
     Map<String, Object> getConfiguration() {
         ['micronaut.server.cors.enabled': true,
         'micronaut.server.cors.configurations.foo.allowedOrigins': ['foo.com'],

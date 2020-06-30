@@ -72,6 +72,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param path The path
      * @return An optional resource
      */
+    @Override
     public Optional<InputStream> getResourceAsStream(String path) {
         if (!isDirectory(path)) {
             return Optional.ofNullable(classLoader.getResourceAsStream(prefixPath(path)));
@@ -85,6 +86,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param path The path
      * @return An optional resource
      */
+    @Override
     public Optional<URL> getResource(String path) {
         boolean isDirectory = isDirectory(path);
 
@@ -101,6 +103,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param path The path
      * @return A resource stream
      */
+    @Override
     public Stream<URL> getResources(String path) {
         Enumeration<URL> all;
         try {
@@ -119,6 +122,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     /**
      * @return The class loader used to retrieve resources
      */
+    @Override
     public ClassLoader getClassLoader() {
         return classLoader;
     }
@@ -127,6 +131,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param basePath The path to load resources
      * @return The resouce loader
      */
+    @Override
     public ResourceLoader forBase(String basePath) {
         return new DefaultClassPathResourceLoader(classLoader, basePath);
     }

@@ -140,26 +140,24 @@ public class AnnotatedFunctionRouteBuilder
                 routes.add(GET(functionPath, beanDefinition, method));
                 routes.add(HEAD(functionPath, beanDefinition, method));
             } else {
-                if (StringUtils.isNotEmpty(functionMethod)) {
-                    if (functionMethod.equals(methodName)) {
-                        Argument[] argumentTypes = method.getArguments();
-                        int argCount = argumentTypes.length;
-                        if (argCount < 3) {
-                            String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
-                            if (argCount == 0) {
-                                routes.add(GET(functionPath, beanDefinition, method));
-                                routes.add(HEAD(functionPath, beanDefinition, method));
-                            } else {
-                                UriRoute route = POST(functionPath, beanDefinition, method);
-                                routes.add(route);
-                                if (argCount == 2 || !ClassUtils.isJavaLangType(argumentTypes[0].getType())) {
-                                    if (consumes == null) {
-                                        consumes = new MediaType[] {MediaType.APPLICATION_JSON_TYPE};
-                                    }
-                                } else {
-                                    route.body(method.getArgumentNames()[0])
-                                            .consumesAll();
+                if (StringUtils.isNotEmpty(functionMethod) && functionMethod.equals(methodName)) {
+                    Argument[] argumentTypes = method.getArguments();
+                    int argCount = argumentTypes.length;
+                    if (argCount < 3) {
+                        String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
+                        if (argCount == 0) {
+                            routes.add(GET(functionPath, beanDefinition, method));
+                            routes.add(HEAD(functionPath, beanDefinition, method));
+                        } else {
+                            UriRoute route = POST(functionPath, beanDefinition, method);
+                            routes.add(route);
+                            if (argCount == 2 || !ClassUtils.isJavaLangType(argumentTypes[0].getType())) {
+                                if (consumes == null) {
+                                    consumes = new MediaType[] {MediaType.APPLICATION_JSON_TYPE};
                                 }
+                            } else {
+                                route.body(method.getArgumentNames()[0])
+                                        .consumesAll();
                             }
                         }
                     }

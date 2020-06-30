@@ -81,6 +81,7 @@ class LoadedVisitor implements Ordered {
         return getVisitor().getOrder()
     }
 
+    @Override
     boolean equals(o) {
         if (this.is(o)) return true
         if (getClass() != o.class) return false
@@ -92,6 +93,7 @@ class LoadedVisitor implements Ordered {
         return true
     }
 
+    @Override
     int hashCode() {
         return visitor.getClass().hashCode()
     }

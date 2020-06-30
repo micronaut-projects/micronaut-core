@@ -445,6 +445,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         response.body().contains('bar')
     }
 
+    @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.http.client.read-timeout': 300]
     }

@@ -97,6 +97,7 @@ class BeanWithPreDestroySpec extends Specification{
             return a
         }
 
+        @Override
         @PreDestroy
         void close() {
             noArgsDestroyCalled = true

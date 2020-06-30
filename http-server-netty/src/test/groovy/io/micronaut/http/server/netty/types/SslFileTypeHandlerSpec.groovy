@@ -40,6 +40,7 @@ class SslFileTypeHandlerSpec extends AbstractMicronautSpec {
         response.body() == "<html><head></head><body>HTML Page</body></html>"
     }
 
+    @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.ssl.enabled': true, 'micronaut.ssl.buildSelfSigned': true]
     }

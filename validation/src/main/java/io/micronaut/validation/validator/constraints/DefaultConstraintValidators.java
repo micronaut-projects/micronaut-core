@@ -79,7 +79,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
 
     private final DecimalMinValidator<Number> decimalMinValidatorNumber = DefaultConstraintValidators::compareNumber;
 
-    private final DigitsValidator<Number> digitsValidatorNumber = (value) -> {
+    private final DigitsValidator<Number> digitsValidatorNumber = value -> {
             if (value instanceof BigDecimal) {
                 return (BigDecimal) value;
             }

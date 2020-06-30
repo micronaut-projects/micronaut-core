@@ -160,7 +160,7 @@ public class OracleCloudVaultConfigurationClient implements ConfigurationClient 
 
             for (ListSecretsResponse response : responses) {
                 retrieved += response.getItems().size();
-                response.getItems().forEach((summary) -> {
+                response.getItems().forEach(summary -> {
                     String secretValue = getSecretValue(summary.getId());
                     secrets.put(
                             summary.getSecretName(),

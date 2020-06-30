@@ -20,10 +20,12 @@ import javax.inject.Singleton;
 // tag::class[]
 @Singleton
 public class V6Engine implements Engine {  // <2>
+    @Override
     public String start() {
         return "Starting V6";
     }
 
+    @Override
     public int getCylinders() {
         return 6;
     }
