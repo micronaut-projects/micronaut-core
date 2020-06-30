@@ -221,7 +221,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
         if (environment != null) {
 
             PropertyPlaceholderResolver resolver = environment.getPlaceholderResolver();
-            Function<Object, Object> valueMapper = (val) -> {
+            Function<Object, Object> valueMapper = val -> {
                 String[] values;
                 if (val instanceof CharSequence) {
                     values = new String[] { val.toString() };

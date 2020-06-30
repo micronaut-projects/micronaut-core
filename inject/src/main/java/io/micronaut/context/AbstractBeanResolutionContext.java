@@ -137,7 +137,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             while (i.hasNext()) {
                 path.append(i.next().toString());
                 if (i.hasNext()) {
-                    path.append(" --> ");
+                    path.append(RIGHT_ARROW);
                 }
             }
             return path.toString();

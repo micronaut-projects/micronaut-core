@@ -346,7 +346,7 @@ public class DefaultBeanContext implements BeanContext {
                     return qualifier.reduce(beanDefinition.getBeanType(), Stream.of(beanDefinition)).findFirst().isPresent();
                 })
                 .collect(Collectors.toList());
-        return (Collection<BeanRegistration<?>>) result;
+        return result;
     }
 
     @SuppressWarnings("unchecked")
@@ -363,7 +363,7 @@ public class DefaultBeanContext implements BeanContext {
                     return beanType.isAssignableFrom(beanDefinition.getBeanType());
                 })
                 .collect(Collectors.toList());
-        return (Collection<BeanRegistration<T>>) result;
+        return result;
     }
 
     @Override
@@ -1137,7 +1137,7 @@ public class DefaultBeanContext implements BeanContext {
             candidates = candidateStream.collect(Collectors.toList());
 
         } else {
-            return (Collection<BeanDefinition<?>>) Collections.EMPTY_LIST;
+            return Collections.emptyList();
         }
         if (CollectionUtils.isNotEmpty(candidates)) {
             filterProxiedTypes(candidates, true, true);
@@ -1160,10 +1160,10 @@ public class DefaultBeanContext implements BeanContext {
                     .map(ref -> ref.load(this))
                     .filter(candidate -> candidate.isEnabled(this))
                     .collect(Collectors.toList());
-            return (Collection<BeanDefinition<?>>) collection;
+            return collection;
         }
 
-        return (Collection<BeanDefinition<?>>) Collections.EMPTY_MAP;
+        return (Collection<BeanDefinition<?>>) Collections.emptyMap();
     }
 
     @SuppressWarnings("unchecked")
@@ -1174,7 +1174,7 @@ public class DefaultBeanContext implements BeanContext {
             final List refs = beanDefinitionsClasses.stream().filter(ref -> ref.isEnabled(this))
                     .collect(Collectors.toList());
 
-            return (Collection<BeanDefinitionReference<?>>) Collections.unmodifiableList(refs);
+            return Collections.unmodifiableList(refs);
         }
         return Collections.emptyList();
     }
@@ -1829,9 +1829,7 @@ public class DefaultBeanContext implements BeanContext {
         if (isSingleton) {
             BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanDefinition, declaredQualifier));
             if (beanRegistration != null) {
-                if (qualifier == null) {
-                    return beanRegistration.bean;
-                } else if (qualifier.reduce(beanType, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
+                if (qualifier == null || qualifier.reduce(beanType, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
                     return beanRegistration.bean;
                 }
             } else if (qualifier != null) {
@@ -2115,15 +2113,15 @@ public class DefaultBeanContext implements BeanContext {
             Class<? super T> superclass = bt.getSuperclass();
             if (superclass == Object.class) {
                 // interface introduction
-                return (clazz) -> clazz.isAssignableFrom(bt);
+                return clazz -> clazz.isAssignableFrom(bt);
             } else {
                 // abstract class introduction
-                return (clazz) -> clazz == superclass;
+                return clazz -> clazz == superclass;
             }
         }
         if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
             Class<? super T> superclass = bt.getSuperclass();
-            return (clazz) -> clazz == superclass || clazz == bt;
+            return clazz -> clazz == superclass || clazz == bt;
         }
         if (annotationMetadata.hasAnnotation(DefaultImplementation.class)) {
             Optional<Class> defaultImpl = annotationMetadata.classValue(DefaultImplementation.class);
@@ -2131,13 +2129,13 @@ public class DefaultBeanContext implements BeanContext {
                 defaultImpl = annotationMetadata.classValue(DefaultImplementation.class, "name");
             }
             if (defaultImpl.filter(impl -> impl == bt).isPresent()) {
-                return (clazz) -> clazz.isAssignableFrom(bt);
+                return clazz -> clazz.isAssignableFrom(bt);
             } else {
-                return (clazz) -> clazz == bt;
+                return clazz -> clazz == bt;
             }
         }
 
-        return (clazz) -> clazz != Object.class && clazz.isAssignableFrom(bt);
+        return clazz -> clazz != Object.class && clazz.isAssignableFrom(bt);
     }
 
     private <T> void doInject(BeanResolutionContext resolutionContext, T instance, BeanDefinition definition) {
@@ -2417,11 +2415,9 @@ public class DefaultBeanContext implements BeanContext {
             if (qualifier == null || qualifier.equals(key.qualifier)) {
                 BeanRegistration reg = entry.getValue();
                 if (beanType.isInstance(reg.bean)) {
-                    if (qualifier == null && definition != null) {
-                        if (!reg.beanDefinition.equals(definition)) {
-                            // different definition, so ignore
-                            return null;
-                        }
+                    if (qualifier == null && definition != null && !reg.beanDefinition.equals(definition)) {
+                        // different definition, so ignore
+                        return null;
                     }
                     synchronized (singletonObjects) {
                         bean = (T) reg.bean;
@@ -2620,7 +2616,7 @@ public class DefaultBeanContext implements BeanContext {
     private <T> T createAndRegisterSingletonInternal(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier) {
         if (definition instanceof NoInjectionBeanDefinition) {
             NoInjectionBeanDefinition<T> manuallyRegistered = (NoInjectionBeanDefinition) definition;
-            BeanRegistration<T> reg = (BeanRegistration<T>) singletonObjects.get(new BeanKey(manuallyRegistered.getBeanType(), manuallyRegistered.getQualifier()));
+            BeanRegistration<T> reg = singletonObjects.get(new BeanKey(manuallyRegistered.getBeanType(), manuallyRegistered.getQualifier()));
             if (reg == null) {
                 throw new IllegalStateException("Manually registered singleton no longer present in bean context");
             }
@@ -3000,7 +2996,7 @@ public class DefaultBeanContext implements BeanContext {
                     if (unsorted.stream()
                             .map(BeanRegistration::getBeanDefinition)
                             .map(BeanDefinition::getBeanType)
-                            .anyMatch(bt -> clazz.isAssignableFrom(bt))) {
+                            .anyMatch(clazz::isAssignableFrom)) {
                         found = true;
                         break;
                     }

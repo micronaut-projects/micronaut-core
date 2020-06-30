@@ -73,12 +73,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void visitClass(ClassElement element, VisitorContext context) {
         // reset
         currentAbstractIntrospection = null;
-        if (!element.isPrivate()) {
-            if (element.hasStereotype(Introspected.class)) {
-                final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
-                if (introspected != null && !writers.containsKey(element.getName())) {
-                    processIntrospected(element, context, introspected);
-                }
+        if (!element.isPrivate() && element.hasStereotype(Introspected.class)) {
+            final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
+            if (introspected != null && !writers.containsKey(element.getName())) {
+                processIntrospected(element, context, introspected);
             }
         }
     }

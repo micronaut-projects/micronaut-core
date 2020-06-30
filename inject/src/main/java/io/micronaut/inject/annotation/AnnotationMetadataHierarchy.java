@@ -277,7 +277,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         final Class[] classes = Arrays.stream(hierarchy)
                 .flatMap(am -> Stream.of(am.classValues(annotation, member)))
                 .toArray(Class[]::new);
-        return (Class<T>[]) classes;
+        return classes;
     }
 
     @Override

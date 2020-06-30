@@ -127,8 +127,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                                      AnnotationMetadata methodMetadata,
                                      boolean requiresReflection,
                                      Argument... arguments) {
-
-        AnnotationMetadata beanAnnotationMetadata = getAnnotationMetadata();
         this.type = producedType;
         this.isAbstract = false; // factory beans are never abstract
         this.declaringType = declaringType;
@@ -249,7 +247,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 return executableMethodMap
                         .values()
                         .stream()
-                        .filter((method) -> method.getMethodName().equals(name));
+                        .filter(method -> method.getMethodName().equals(name));
             }
         }
         return Stream.empty();
@@ -804,9 +802,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                         return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                     }
                 } else {
-                    String argumentName = argument.getName();
                     String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valueAnnStr);
-
 
                     ApplicationContext applicationContext = (ApplicationContext) context;
                     ArgumentConversionContext conversionContext = ConversionContext.of(argument);
@@ -1310,7 +1306,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             String... propertyPath) {
         if (context instanceof PropertyResolver) {
             PropertyResolver propertyResolver = (PropertyResolver) context;
-            Class<?> beanType = getBeanType();
             String pathString = propertyPath.length > 1 ? String.join(".", propertyPath) : propertyPath[0];
             String valString = resolvePropertyPath(resolutionContext, pathString);
 
@@ -1339,7 +1334,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             String propertyPath) {
         if (context instanceof PropertyResolver) {
             PropertyResolver propertyResolver = (PropertyResolver) context;
-            Class<?> beanType = getBeanType();
             String valString = substituteWildCards(resolutionContext, propertyPath);
 
             return propertyResolver.getProperty(valString, ConversionContext.of(propertyType));
@@ -1766,7 +1760,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private String substituteWildCards(BeanResolutionContext resolutionContext, String valString) {
         if (valString.indexOf('*') > -1) {
-            Optional<String> namedBean = resolutionContext.get(Named.class.getName(), ArgumentConversionContext.STRING);
+            Optional<String> namedBean = resolutionContext.get(Named.class.getName(), ConversionContext.STRING);
             if (namedBean.isPresent()) {
                 valString = valString.replace("*", namedBean.get());
             }
@@ -1908,7 +1902,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     if ((hasMetadata && argument.isAnnotationPresent(Parameter.class)) ||
                             (innerConfiguration && isIterable) ||
                             Qualifier.class == argument.getType()) {
-                        final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, ArgumentConversionContext.STRING);
+                        final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, ConversionContext.STRING);
                         qualifier = n.map(Qualifiers::byName).orElse(null);
                     }
                 }

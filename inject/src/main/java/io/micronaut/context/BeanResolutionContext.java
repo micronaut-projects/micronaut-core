@@ -84,9 +84,8 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * Removes a bean that is in the process of being created. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
      * @param beanIdentifier The bean identifier
-     * @param <T> THe instance type
      */
-    <T> void removeInFlightBean(BeanIdentifier beanIdentifier);
+    void removeInFlightBean(BeanIdentifier beanIdentifier);
 
     /**
      * Obtains an inflight bean for the given identifier. An "In Flight" bean is one that is currently being

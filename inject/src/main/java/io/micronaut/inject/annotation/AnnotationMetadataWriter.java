@@ -60,14 +60,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
-    private static final org.objectweb.asm.commons.Method METHOD_ARE_DEFAULTS_REGISTERED = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    DefaultAnnotationMetadata.class,
-                    "areAnnotationDefaultsRegistered",
-                    String.class
-            )
-    );
-
     private static final org.objectweb.asm.commons.Method METHOD_REGISTER_ANNOTATION_DEFAULTS = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     DefaultAnnotationMetadata.class,
@@ -204,6 +196,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * @param outputVisitor The {@link ClassWriterOutputVisitor}
      * @throws IOException If an error occurs
      */
+    @Override
     public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
         ClassWriter classWriter = generateClassBytes();
         if (classWriter != null) {
