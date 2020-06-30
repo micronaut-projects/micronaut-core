@@ -25,7 +25,6 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 
 import javax.inject.Singleton;
-import java.util.function.Function;
 
 /**
  * A {@link ByteBufferFactory} implementation for Netty.
@@ -46,8 +45,8 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
     private final ByteBufAllocator allocator;
 
     static {
-        ConversionService.SHARED.addConverter(ByteBuf.class, ByteBuffer.class, (Function<ByteBuf, ByteBuffer>) DEFAULT::wrap);
-        ConversionService.SHARED.addConverter(ByteBuffer.class, ByteBuf.class, (Function<ByteBuffer, ByteBuf>) byteBuffer -> {
+        ConversionService.SHARED.addConverter(ByteBuf.class, ByteBuffer.class, DEFAULT::wrap);
+        ConversionService.SHARED.addConverter(ByteBuffer.class, ByteBuf.class, byteBuffer -> {
             if (byteBuffer instanceof NettyByteBuffer) {
                 return (ByteBuf) byteBuffer.asNativeBuffer();
             }

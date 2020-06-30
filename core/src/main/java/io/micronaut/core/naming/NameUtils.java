@@ -136,7 +136,7 @@ public class NameUtils {
      */
     public static String dehyphenate(String name) {
         return Arrays.stream(name.split("-"))
-            .map((str) -> {
+            .map(str -> {
                 if (str.length() > 0 && Character.isLetter(str.charAt(0))) {
                     return Character.toUpperCase(str.charAt(0)) + str.substring(1);
                 }

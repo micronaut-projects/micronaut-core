@@ -179,10 +179,8 @@ class SimpleBeanInfo implements BeanInfo {
         }
 
         // isXXX return boolean
-        if (prefixLength == 2) {
-            if (!(propertyType == boolean.class)) {
-                return;
-            }
+        if (prefixLength == 2 && propertyType != boolean.class) {
+            return;
         }
 
         // validate parameter types

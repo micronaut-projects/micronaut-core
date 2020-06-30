@@ -56,7 +56,7 @@ class DefaultServiceDefinition<S> implements ServiceDefinition<S> {
     public <X extends Throwable> S orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
         final Class<S> type = loadedClass.orElseThrow(exceptionSupplier);
         try {
-            return type.newInstance();
+            return type.getDeclaredConstructor().newInstance();
         } catch (Throwable e) {
             throw exceptionSupplier.get();
         }
@@ -66,7 +66,7 @@ class DefaultServiceDefinition<S> implements ServiceDefinition<S> {
     public S load() {
         return loadedClass.map(aClass -> {
             try {
-                return aClass.newInstance();
+                return aClass.getDeclaredConstructor().newInstance();
             } catch (Throwable e) {
                 throw new ServiceConfigurationError("Error loading service [" + aClass.getName() + "]: " + e.getMessage(), e);
             }

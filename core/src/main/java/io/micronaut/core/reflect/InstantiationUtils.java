@@ -143,7 +143,7 @@ public class InstantiationUtils {
                 logger.debug("Cannot instantiate type [{}] without reflection. Attempting reflective instantiation", type);
             }
             try {
-                T bean = type.newInstance();
+                T bean = type.getDeclaredConstructor().newInstance();
                 if (type.isInstance(bean)) {
                     return bean;
                 }
@@ -209,7 +209,7 @@ public class InstantiationUtils {
                     if (log.isDebugEnabled()) {
                         log.debug("Reflectively instantiating type: " + type);
                     }
-                    return type.newInstance();
+                    return type.getDeclaredConstructor().newInstance();
                 } catch (Throwable e) {
                     throw new InstantiationException("Could not instantiate type [" + type.getName() + "]: " + e.getMessage(), e);
                 }
