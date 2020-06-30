@@ -74,7 +74,7 @@ public class SingleBodyBinder extends DefaultBodyAnnotationBinder<Single> implem
         Collection<Argument<?>> typeVariables = context.getArgument().getTypeVariables().values();
 
         BindingResult<Publisher> result = publisherBodyBinder.bind(
-            ConversionContext.of(Argument.of(Publisher.class, (Argument[]) typeVariables.toArray(Argument.ZERO_ARGUMENTS))),
+            ConversionContext.of(Argument.of(Publisher.class, typeVariables.toArray(Argument.ZERO_ARGUMENTS))),
             source
         );
         if (result.isPresentAndSatisfied()) {

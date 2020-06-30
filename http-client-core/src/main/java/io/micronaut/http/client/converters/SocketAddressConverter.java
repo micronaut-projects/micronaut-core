@@ -35,7 +35,7 @@ public class SocketAddressConverter implements TypeConverter<CharSequence, Socke
     public Optional<SocketAddress> convert(CharSequence object, Class<SocketAddress> targetType, ConversionContext context) {
         String[] parts = object.toString().split(":");
         if (parts.length == 2) {
-            int port = Integer.valueOf(parts[1]);
+            int port = Integer.parseInt(parts[1]);
             return Optional.of(new InetSocketAddress(parts[0], port));
         } else {
             return Optional.empty();

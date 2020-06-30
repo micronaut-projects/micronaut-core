@@ -55,7 +55,7 @@ public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCust
     @Override
     public Optional<NettyCustomizableResponseTypeHandler> findTypeHandler(Class<?> type) {
         return Optional
-            .ofNullable(handlerCache.computeIfAbsent(type, (clazz) ->
+            .ofNullable(handlerCache.computeIfAbsent(type, clazz ->
                 handlers.stream()
                     .filter(handler -> handler.supports(clazz))
                     .findFirst()

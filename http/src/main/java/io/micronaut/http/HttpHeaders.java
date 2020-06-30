@@ -507,7 +507,7 @@ public interface HttpHeaders extends Headers {
      */
     default Optional<ZonedDateTime> findDate(CharSequence name) {
         try {
-            return findFirst(name).map((str) -> {
+            return findFirst(name).map(str -> {
                     LocalDateTime localDateTime = LocalDateTime.parse(str, DateTimeFormatter.RFC_1123_DATE_TIME);
                     return ZonedDateTime.of(localDateTime, ZoneId.of("GMT"));
                 }

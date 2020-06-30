@@ -192,8 +192,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                     if (Publishers.isConvertibleToPublisher(result)) {
                         Flowable<?> flowable = Publishers.convertPublisher(result, Flowable.class);
                         flowable.subscribe(
-                                (o) -> { },
-                                (error) -> emitter.onError(new WebSocketSessionException("Error opening WebSocket client session: " + error.getMessage(), error)),
+                                o -> { },
+                                error -> emitter.onError(new WebSocketSessionException("Error opening WebSocket client session: " + error.getMessage(), error)),
                                 () -> {
                                     emitter.onNext(targetBean);
                                     emitter.onComplete();

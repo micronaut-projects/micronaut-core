@@ -82,7 +82,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
             @Override
             public void request(long n) {
-                extraMessages.updateAndGet((p) -> {
+                extraMessages.updateAndGet(p -> {
                     long newVal = p - n;
                     if (newVal < 0) {
                         subscription.request(n - p);
@@ -155,7 +155,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                 if (messages.isEmpty()) {
                     subscription.request(1);
                 } else {
-                    extraMessages.updateAndGet((p) -> p + messages.size() - 1);
+                    extraMessages.updateAndGet(p -> p + messages.size() - 1);
                     messages.stream().map(HttpData.class::cast).forEach(subscriber::onNext);
                 }
 

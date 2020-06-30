@@ -47,7 +47,7 @@ public class ServerSslConfiguration extends SslConfiguration {
             DefaultSslConfiguration defaultSslConfiguration,
             DefaultSslConfiguration.DefaultKeyConfiguration defaultKeyConfiguration,
             DefaultSslConfiguration.DefaultKeyStoreConfiguration defaultKeyStoreConfiguration,
-            DefaultSslConfiguration.TrustStoreConfiguration defaultTrustStoreConfiguration) {
+            SslConfiguration.TrustStoreConfiguration defaultTrustStoreConfiguration) {
         readExisting(defaultSslConfiguration, defaultKeyConfiguration, defaultKeyStoreConfiguration, defaultTrustStoreConfiguration);
     }
 

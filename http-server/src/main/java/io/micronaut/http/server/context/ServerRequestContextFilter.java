@@ -26,7 +26,6 @@ import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,12 +57,9 @@ public final class ServerRequestContextFilter implements HttpServerFilter {
             Publisher<MutableHttpResponse<?>> actual = chain.proceed(request);
             InvocationInstrumenter invocationInstrumenterAfterProceed
                     = InvocationInstrumenter.combine(getInvocationInstrumenter(request));
-            return new Publisher<MutableHttpResponse<?>>() {
-                @Override
-                public void subscribe(Subscriber<? super MutableHttpResponse<?>> actualSubscriber) {
-                    try (Instrumentation ignored = invocationInstrumenterAfterProceed.newInstrumentation()) {
-                        actual.subscribe(actualSubscriber);
-                    }
+            return actualSubscriber -> {
+                try (Instrumentation ignored = invocationInstrumenterAfterProceed.newInstrumentation()) {
+                    actual.subscribe(actualSubscriber);
                 }
             };
         }

@@ -82,7 +82,7 @@ public class RequestArgumentSatisfier {
             argumentValues = new LinkedHashMap<>(requiredArguments.size());
             // Begin try fulfilling the argument requirements
             for (Argument argument : requiredArguments) {
-                getValueForArgument(argument, request, satisfyOptionals).ifPresent((value) ->
+                getValueForArgument(argument, request, satisfyOptionals).ifPresent(value ->
                     argumentValues.put(argument.getName(), value));
             }
         }

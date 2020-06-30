@@ -23,6 +23,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -136,6 +137,15 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
             }
         }
         return false;
+    }
+
+    /**
+     * @return Is the return type {@link java.util.Optional}.
+     * @since 2.0.1
+     */
+    default boolean isOptional() {
+        Class<T> type = getType();
+        return type == Optional.class;
     }
 
     /**

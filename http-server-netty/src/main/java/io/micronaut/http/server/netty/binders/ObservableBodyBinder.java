@@ -79,7 +79,7 @@ public class ObservableBodyBinder extends DefaultBodyAnnotationBinder<Observable
         Collection<Argument<?>> typeVariables = context.getArgument().getTypeVariables().values();
 
         BindingResult<Publisher> result = publisherBodyBinder.bind(
-            ConversionContext.of(Argument.of(Publisher.class, (Argument[]) typeVariables.toArray(new Argument[0]))),
+            ConversionContext.of(Argument.of(Publisher.class, typeVariables.toArray(new Argument[0]))),
             source
         );
         if (result.isPresentAndSatisfied()) {

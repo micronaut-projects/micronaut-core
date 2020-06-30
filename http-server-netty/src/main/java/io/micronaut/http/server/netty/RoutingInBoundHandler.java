@@ -361,7 +361,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         return errorResultToResponse(result);
                     });
 
-                    filterPublisher(new AtomicReference<HttpRequest<?>>(nettyHttpRequest), routePublisher, ctx.executor(), nettyException)
+                    filterPublisher(new AtomicReference<>(nettyHttpRequest), routePublisher, ctx.executor(), nettyException)
                             .firstOrError()
                             .subscribe((mutableHttpResponse, throwable) -> {
                                 if (throwable != null) {
@@ -588,15 +588,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Flowable.just(finalResponse),
                 ctx.channel().eventLoop(),
                 skipOncePerRequest
-        ).singleOrError().subscribe((Consumer<MutableHttpResponse<?>>) mutableHttpResponse -> {
+        ).singleOrError().subscribe((Consumer<MutableHttpResponse<?>>) mutableHttpResponse ->
             encodeHttpResponse(
                     ctx,
                     nettyHttpRequest,
                     mutableHttpResponse,
                     mutableHttpResponse.body(),
                     defaultResponseMediaType
-            );
-        }, throwable -> exceptionCaughtInternal(ctx, throwable, nettyHttpRequest, false));
+            )
+        , throwable -> exceptionCaughtInternal(ctx, throwable, nettyHttpRequest, false));
     }
 
     private Optional<? extends FileCustomizableResponseType> matchFile(String path) {
@@ -711,7 +711,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ConcurrentHashMap<Integer, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
             ConversionService conversionService = ConversionService.SHARED;
             Subscription s;
-            LongConsumer onRequest = (num) -> pressureRequested.updateAndGet((p) -> {
+            LongConsumer onRequest = num -> pressureRequested.updateAndGet(p -> {
                 long newVal = p - num;
                 if (newVal < 0) {
                     s.request(num - p);
@@ -762,7 +762,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                             if (isPublisher) {
                                 Integer dataKey = System.identityHashCode(data);
-                                HttpDataReference dataReference = dataReferences.computeIfAbsent(dataKey, (key) -> new HttpDataReference(data));
+                                HttpDataReference dataReference = dataReferences.computeIfAbsent(dataKey, key -> new HttpDataReference(data));
                                 Argument typeVariable;
 
                                 if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
@@ -772,7 +772,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 }
                                 Class typeVariableType = typeVariable.getType();
 
-                                UnicastProcessor namedSubject = subjects.computeIfAbsent(name, (key) -> UnicastProcessor.create());
+                                UnicastProcessor namedSubject = subjects.computeIfAbsent(name, key -> UnicastProcessor.create());
 
                                 chunkedProcessing = PartData.class.equals(typeVariableType) ||
                                         Publishers.isConvertibleToPublisher(typeVariableType) ||
@@ -819,7 +819,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 Object part = data;
 
                                 if (chunkedProcessing) {
-                                    HttpDataReference.Component component = dataReference.addComponent((e) -> {
+                                    HttpDataReference.Component component = dataReference.addComponent(e -> {
                                         subject.onError(e);
                                         s.cancel();
                                     });
@@ -1222,10 +1222,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         });
                                     }
 
-                                    httpContentPublisher = Publishers.then(httpContentPublisher, httpContent -> {
+                                    httpContentPublisher = Publishers.then(httpContentPublisher, httpContent ->
                                         // once an http content is written, read the next item if it is available
-                                        context.read();
-                                    });
+                                        context.read()
+                                    );
 
                                     httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
                                             .doAfterTerminate(() -> cleanupRequest(context, request));
@@ -1845,10 +1845,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (serverConfiguration.isDateHeader() && !headers.contains(HttpHeaders.DATE)) {
             headers.date(LocalDateTime.now());
         }
-        if (serverHeader != null) {
-            if (!headers.contains(HttpHeaders.SERVER)) {
-                headers.add(HttpHeaders.SERVER, serverHeader);
-            }
+        if (serverHeader != null && !headers.contains(HttpHeaders.SERVER)) {
+            headers.add(HttpHeaders.SERVER, serverHeader);
         }
     }
 

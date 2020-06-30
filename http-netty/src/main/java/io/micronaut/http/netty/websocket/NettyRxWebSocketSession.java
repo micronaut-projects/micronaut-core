@@ -89,7 +89,7 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
         this.channel.attr(WEB_SOCKET_SESSION_KEY).set(this);
         this.codecRegistry = codecRegistry;
         this.messageEncoder = new WebSocketMessageEncoder(this.codecRegistry);
-        this.attributes = request.getAttribute("micronaut.SESSION", MutableConvertibleValues.class).orElseGet(() -> new MutableConvertibleValuesMap());
+        this.attributes = request.getAttribute("micronaut.SESSION", MutableConvertibleValues.class).orElseGet(MutableConvertibleValuesMap::new);
     }
 
     @Override

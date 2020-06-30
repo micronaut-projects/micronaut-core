@@ -604,10 +604,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             return path + templateString;
         } else {
             String value = getClientId(annotationMetadata);
-            if (StringUtils.isNotEmpty(value)) {
-                if (value.startsWith("/")) {
-                    return value + templateString;
-                }
+            if (StringUtils.isNotEmpty(value) && value.startsWith("/")) {
+                return value + templateString;
             }
             return templateString;
         }

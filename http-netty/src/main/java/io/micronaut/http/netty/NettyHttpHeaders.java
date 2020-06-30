@@ -82,7 +82,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         List<String> values = nettyHeaders.getAll(name);
-        if (values.size() > 0) {
+        if (!values.isEmpty()) {
             if (values.size() == 1 || !isCollectionOrArray(conversionContext.getArgument().getType())) {
                 return conversionService.convert(values.get(0), conversionContext);
             } else {

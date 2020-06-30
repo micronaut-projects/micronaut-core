@@ -81,7 +81,7 @@ public class TextPlainCodec implements MediaTypeCodec {
 
     @Override
     public Collection<MediaType> getMediaTypes() {
-        List<MediaType> mediaTypes = new ArrayList<>();
+        List<MediaType> mediaTypes = new ArrayList<>(additionalTypes.size() + 1);
         mediaTypes.add(MediaType.TEXT_PLAIN_TYPE);
         mediaTypes.addAll(additionalTypes);
         return mediaTypes;

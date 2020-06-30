@@ -173,7 +173,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     @Override
     default Optional<Locale> getLocale() {
         return getHeaders().findFirst(HttpHeaders.ACCEPT_LANGUAGE)
-            .map((text) -> {
+            .map(text -> {
                 int len = text.length();
                 if (len == 0 || (len == 1 && text.charAt(0) == '*')) {
                     return Locale.getDefault().toLanguageTag();
