@@ -214,7 +214,6 @@ public class CorsFilter implements HttpServerFilter {
         response.header(VARY, ORIGIN);
     }
 
-
     /**
      * @param origin   The origin
      * @param response The {@link MutableHttpResponse} object

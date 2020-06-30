@@ -164,7 +164,6 @@ public class CollectionUtils {
         return set;
     }
 
-
     /**
      * Convert an {@link Enumeration} to a {@link Iterable}.
      *

@@ -208,7 +208,6 @@ public interface ApplicationContextBuilder {
         return build().start();
     }
 
-
     /**
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type.
      *

@@ -108,7 +108,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         this.isSuspend = isSuspend;
     }
 
-
     /**
      * @param beanFullClassName    The bean full class name
      * @param methodClassName      The method class name
@@ -156,7 +155,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     public boolean isInterface() {
         return isInterface;
     }
-
 
     /**
      * @return Is the method a default method.

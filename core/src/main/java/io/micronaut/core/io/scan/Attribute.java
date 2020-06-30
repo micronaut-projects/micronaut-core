@@ -66,7 +66,6 @@ class Attribute {
         this.type = type;
     }
 
-
     /**
      * Reads a {@link #type type} attribute. This method must return a
      * <i>new</i> {@link Attribute} object, of type {@link #type type},

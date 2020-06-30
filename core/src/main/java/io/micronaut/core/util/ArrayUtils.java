@@ -144,7 +144,6 @@ public class ArrayUtils {
         }
     }
 
-
     /**
      * Produce an iterator for the given array.
      * @param array The array

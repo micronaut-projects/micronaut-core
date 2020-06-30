@@ -44,7 +44,6 @@ public class StaticServiceInstanceList implements ServiceInstanceList {
         this(id, loadBalancedURIs, null);
     }
 
-
     /**
      * Default constructor.
      * @param id The id

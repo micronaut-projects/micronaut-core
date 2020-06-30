@@ -35,7 +35,6 @@ public class StringToClassConverter implements TypeConverter<CharSequence, Class
     private final ClassLoader classLoader;
     private final Map<String, Optional<Class>> classCache = new ConcurrentHashMap<>();
 
-
     /**
      * @param classLoader The class loader
      */

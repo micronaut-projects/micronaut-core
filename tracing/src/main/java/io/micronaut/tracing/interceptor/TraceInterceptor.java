@@ -214,7 +214,6 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
         tagArguments(span, context);
     }
 
-
     /**
      * Logs an error to the span.
      *

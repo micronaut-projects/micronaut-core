@@ -58,7 +58,6 @@ public interface TypeElementVisitor<C, E> extends Ordered {
         // no-op
     }
 
-
     /**
      * Executed when a constructor is encountered that matches the <C> generic.
      *

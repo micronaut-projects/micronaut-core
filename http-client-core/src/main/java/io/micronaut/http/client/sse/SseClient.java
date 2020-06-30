@@ -53,7 +53,6 @@ public interface SseClient {
      */
     <I, B> Publisher<Event<B>> eventStream(HttpRequest<I> request, Argument<B> eventType);
 
-
     /**
      * <p>Perform an HTTP request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>
      * <p>

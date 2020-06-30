@@ -37,7 +37,6 @@ final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumen
     private final Publisher<T> source;
     private final InvocationInstrumenter instrumenter;
 
-
     /**
      * Default constructor.
      *

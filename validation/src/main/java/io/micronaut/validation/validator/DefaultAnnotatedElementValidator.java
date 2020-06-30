@@ -42,7 +42,6 @@ import java.util.Optional;
 @Internal
 public class DefaultAnnotatedElementValidator extends DefaultValidator implements AnnotatedElementValidator {
 
-
     /**
      * Default constructor.
      */

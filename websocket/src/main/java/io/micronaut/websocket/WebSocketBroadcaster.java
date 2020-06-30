@@ -145,7 +145,6 @@ public interface WebSocketBroadcaster {
         return broadcastAsync(message, mediaType, (o) -> true);
     }
 
-
     /**
      * When used on the server this method will broadcast a message to all open WebSocket connections.
      *

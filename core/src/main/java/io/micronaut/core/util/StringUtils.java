@@ -41,7 +41,6 @@ public final class StringUtils {
      */
     public static final String[] EMPTY_STRING_ARRAY = new String[0];
 
-
     /**
      * Constant for an empty String.
      */

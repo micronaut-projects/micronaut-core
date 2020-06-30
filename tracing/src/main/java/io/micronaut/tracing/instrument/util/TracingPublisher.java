@@ -82,7 +82,6 @@ public class TracingPublisher<T> implements Publisher<T> {
         this(publisher, tracer, spanBuilder, Publishers.isSingle(publisher.getClass()));
     }
 
-
     /**
      * Creates a new tracing publisher for the given arguments.
      *

@@ -176,7 +176,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         this.writeAnnotationDefaults = writeAnnotationDefaults;
     }
 
-
     /**
      * Constructs a new writer for the given class name and metadata.
      *

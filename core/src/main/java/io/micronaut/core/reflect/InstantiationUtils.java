@@ -41,7 +41,6 @@ import java.util.function.Supplier;
  */
 public class InstantiationUtils {
 
-
     /**
      * Try to instantiate the given class.
      *

@@ -320,7 +320,6 @@ public interface AnnotationMetadata extends AnnotationSource {
         return getValue(annotation, member, Argument.of(requiredType));
     }
 
-
     /**
      * Get the value of the given annotation member.
      *
@@ -657,7 +656,6 @@ public interface AnnotationMetadata extends AnnotationSource {
         return enumValue(annotation.getName(), member, enumType);
     }
 
-
     /**
      * The enum values for the given annotation.
      *
@@ -824,8 +822,6 @@ public interface AnnotationMetadata extends AnnotationSource {
 
         return classValue(annotation.getName(), member);
     }
-
-
 
     /**
      * The value as an {@link OptionalInt} for the given annotation and member.

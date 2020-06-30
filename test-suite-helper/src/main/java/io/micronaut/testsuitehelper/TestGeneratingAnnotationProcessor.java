@@ -28,7 +28,6 @@ import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.tools.FileObject;
-import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 
 @SupportedAnnotationTypes("*")
@@ -54,13 +53,13 @@ public class TestGeneratingAnnotationProcessor extends AbstractProcessor {
                 case "test":
                 case "test-classes":
 
-                    try (final Writer w = processingEnv.getFiler()
+                    try (Writer w = processingEnv.getFiler()
                         .createSourceFile("io.micronaut.test.generated.Example")
                         .openWriter()) {
                         w.write("package io.micronaut.test.generated;\n\npublic interface Example {}");
                     }
 
-                    try (final Writer w = processingEnv.getFiler()
+                    try (Writer w = processingEnv.getFiler()
                         .createSourceFile("io.micronaut.test.generated.IntrospectedExample")
                         .openWriter()) {
                         w.write("package io.micronaut.test.generated;\n\nimport io.micronaut.core.annotation.Introspected;\n\n@Introspected\npublic class IntrospectedExample {}");

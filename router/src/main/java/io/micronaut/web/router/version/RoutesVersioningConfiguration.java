@@ -59,7 +59,6 @@ public class RoutesVersioningConfiguration implements Toggleable {
         return enabled;
     }
 
-
     /**
      * @return The version to use if none can be resolved
      */

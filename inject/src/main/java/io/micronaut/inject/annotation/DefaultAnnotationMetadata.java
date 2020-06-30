@@ -1308,7 +1308,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         AnnotationMetadataSupport.registerAnnotationType(annotation);
     }
 
-
     /**
      * Adds a repeatable annotation value. If a value already exists will be added
      *

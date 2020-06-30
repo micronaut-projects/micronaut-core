@@ -65,7 +65,6 @@ public class TenantPropagationConfigurationProperties implements TenantPropagati
         this.serviceIdRegex = serviceIdRegex;
     }
 
-
     /**
      *
      * @return a regular expression to validate the target request uri against.
@@ -94,7 +93,6 @@ public class TenantPropagationConfigurationProperties implements TenantPropagati
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
-
 
     /**
      * Configures {@link io.micronaut.multitenancy.propagation.TenantPropagationHttpClientFilter} path. Default value {@value #DEFAULT_PATH}

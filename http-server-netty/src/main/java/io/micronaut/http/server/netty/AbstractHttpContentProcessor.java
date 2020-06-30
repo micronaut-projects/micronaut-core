@@ -42,7 +42,6 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     protected final AtomicLong receivedLength = new AtomicLong();
     protected final HttpServerConfiguration configuration;
 
-
     /**
      * @param nettyHttpRequest The {@link NettyHttpRequest}
      * @param configuration    The {@link HttpServerConfiguration}

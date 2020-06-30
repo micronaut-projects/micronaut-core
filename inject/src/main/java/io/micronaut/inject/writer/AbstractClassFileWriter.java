@@ -198,7 +198,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return classReference;
     }
 
-
     /**
      * Pushes type arguments onto the stack.
      *
@@ -255,7 +254,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 METHOD_CREATE_ARGUMENT_SIMPLE
         );
     }
-
 
     /**
      * Builds generic type arguments recursively.

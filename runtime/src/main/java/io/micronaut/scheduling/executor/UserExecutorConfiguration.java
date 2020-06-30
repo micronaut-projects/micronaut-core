@@ -45,7 +45,6 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     private Integer corePoolSize = AVAILABLE_PROCESSORS * 2;
     private Class<? extends ThreadFactory> threadFactoryClass;
 
-
     /**
      * Default Constructor.
      */

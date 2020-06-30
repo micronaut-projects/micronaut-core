@@ -33,7 +33,6 @@ import java.util.Set;
  */
 public abstract class PublicMethodVisitor<R, P> extends SuperclassAwareTypeVisitor<R, P> {
 
-
     /**
      * Default constructor.
      *

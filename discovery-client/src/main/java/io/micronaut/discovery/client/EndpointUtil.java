@@ -179,8 +179,6 @@ public class EndpointUtil {
         return serviceUrls;
     }
 
-
-
     /**
      * Get the list of EC2 URLs given the zone name.
      *

@@ -74,7 +74,6 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     private final WebSocketServerHandshaker handshaker;
     private final ApplicationEventPublisher eventPublisher;
 
-
     /**
      * Default constructor.
      * @param webSocketSessionRepository The web socket sessions repository

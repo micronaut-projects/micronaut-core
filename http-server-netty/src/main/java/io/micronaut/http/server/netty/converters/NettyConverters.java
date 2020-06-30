@@ -268,7 +268,6 @@ public class NettyConverters implements TypeConverterRegistrar {
         };
     }
 
-
     /**
      * @return A FileUpload to CompletedFileUpload converter
      */

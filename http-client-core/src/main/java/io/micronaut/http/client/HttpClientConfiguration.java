@@ -331,7 +331,6 @@ public abstract class HttpClientConfiguration {
         return Optional.ofNullable(readTimeout);
     }
 
-
     /**
      * For streaming requests and WebSockets, the {@link #getReadTimeout()} method does not apply instead a configurable
      * idle timeout is applied.
@@ -688,7 +687,6 @@ public abstract class HttpClientConfiguration {
         public int getMaxConnections() {
             return maxConnections;
         }
-
 
         /**
          * Sets the maximum number of connections. Defaults to no maximum.

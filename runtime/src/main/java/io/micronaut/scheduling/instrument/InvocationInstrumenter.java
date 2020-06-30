@@ -80,7 +80,6 @@ public interface InvocationInstrumenter {
         return instrument(runnable, combine(invocationInstrumenters));
     }
 
-
     /**
      * Wraps {@link Callable} with instrumentation invocations.
      *

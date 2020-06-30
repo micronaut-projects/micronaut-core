@@ -130,7 +130,6 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         return element.toString();
     }
 
-
     /**
      * Returns a class element with aligned generic information.
      * @param typeMirror The type mirror

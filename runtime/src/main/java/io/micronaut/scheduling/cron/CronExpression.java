@@ -218,7 +218,6 @@ public final class CronExpression {
         return nextTimeAfter(afterTime, afterTime.plusYears(FOUR));
     }
 
-
     /**
      * This will search for the next time within the next durationInMillis
      * millisecond. Be aware that the duration is specified in millis,
@@ -231,7 +230,6 @@ public final class CronExpression {
     public ZonedDateTime nextTimeAfter(ZonedDateTime afterTime, long durationInMillis) {
         return nextTimeAfter(afterTime, afterTime.plus(Duration.ofMillis(durationInMillis)));
     }
-
 
     /**
      * This will search for the next time within the given dateTimeBarrier.

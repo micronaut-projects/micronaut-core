@@ -319,7 +319,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return Optional.empty();
     }
 
-
     /**
      * The value of the given annotation member as a Class.
      *

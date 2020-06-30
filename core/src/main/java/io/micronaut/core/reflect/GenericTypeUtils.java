@@ -34,7 +34,6 @@ import java.util.Set;
  */
 public class GenericTypeUtils {
 
-
     /**
      * Resolves a single generic type argument for the given field.
      *
@@ -52,7 +51,6 @@ public class GenericTypeUtils {
         }
         return Optional.empty();
     }
-
 
     /**
      * Resolve all of the type arguments for the given interface from the given type. Also
@@ -77,7 +75,6 @@ public class GenericTypeUtils {
         return resolvedType.map(GenericTypeUtils::resolveTypeArguments)
                 .orElse(ReflectionUtils.EMPTY_CLASS_ARRAY);
     }
-
 
     /**
      * Resolve all of the type arguments for the given super type from the given type.

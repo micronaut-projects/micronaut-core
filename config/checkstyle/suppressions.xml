@@ -6,7 +6,7 @@
 
 <suppressions>
     <suppress checks="FileLength"
-              files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|BeanDefinitionInjectProcessor.java"/>
+              files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|BeanDefinitionInjectProcessor.java|AbstractBeanDefinition.java|DefaultValidator.java"/>
     <suppress checks="DeclarationOrder"
               files="UriTemplate.java"/>
     <suppress checks="Header"

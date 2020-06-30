@@ -146,8 +146,6 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
         };
     }
 
-
-
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.
      *
