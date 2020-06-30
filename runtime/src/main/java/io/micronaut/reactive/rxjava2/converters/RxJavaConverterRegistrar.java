@@ -23,7 +23,6 @@ import io.reactivex.*;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
-import java.util.function.Function;
 
 /**
  * Converters for RxJava.
@@ -41,25 +40,25 @@ public class RxJavaConverterRegistrar implements TypeConverterRegistrar {
     public void register(ConversionService<?> conversionService) {
 
         // Completable
-        conversionService.addConverter(Completable.class, Publisher.class, (Function<Completable, Publisher>) Completable::toFlowable);
-        conversionService.addConverter(Completable.class, Single.class, (Function<Completable, Single>) (completable) -> completable.toSingleDefault(new Object()));
-        conversionService.addConverter(Completable.class, Maybe.class, (Function<Completable, Maybe>) Completable::toMaybe);
-        conversionService.addConverter(Completable.class, Observable.class, (Function<Completable, Observable>) Completable::toObservable);
-        conversionService.addConverter(Object.class, Completable.class, (Function<Object, Completable>) (obj) -> Completable.complete());
+        conversionService.addConverter(Completable.class, Publisher.class, Completable::toFlowable);
+        conversionService.addConverter(Completable.class, Single.class, completable -> completable.toSingleDefault(new Object()));
+        conversionService.addConverter(Completable.class, Maybe.class, Completable::toMaybe);
+        conversionService.addConverter(Completable.class, Observable.class, Completable::toObservable);
+        conversionService.addConverter(Object.class, Completable.class, obj -> Completable.complete());
 
         // Maybe
-        conversionService.addConverter(Maybe.class, Publisher.class, (Function<Maybe, Publisher>) Maybe::toFlowable);
-        conversionService.addConverter(Maybe.class, Single.class, (Function<Maybe, Single>) Maybe::toSingle);
-        conversionService.addConverter(Maybe.class, Observable.class, (Function<Maybe, Observable>) Maybe::toObservable);
-        conversionService.addConverter(Maybe.class, Completable.class, (Function<Maybe, Completable>) Completable::fromMaybe);
-        conversionService.addConverter(Object.class, Maybe.class, (Function<Object, Maybe>) Maybe::just);
+        conversionService.addConverter(Maybe.class, Publisher.class, Maybe::toFlowable);
+        conversionService.addConverter(Maybe.class, Single.class, Maybe::toSingle);
+        conversionService.addConverter(Maybe.class, Observable.class, Maybe::toObservable);
+        conversionService.addConverter(Maybe.class, Completable.class, Completable::fromMaybe);
+        conversionService.addConverter(Object.class, Maybe.class, Maybe::just);
 
         // Observable
-        conversionService.addConverter(Observable.class, Publisher.class, (Function<Observable, Publisher>) observable -> observable.toFlowable(BackpressureStrategy.BUFFER));
-        conversionService.addConverter(Observable.class, Single.class, (Function<Observable, Single>) Observable::firstOrError);
-        conversionService.addConverter(Observable.class, Maybe.class, (Function<Observable, Maybe>) Observable::firstElement);
-        conversionService.addConverter(Observable.class, Completable.class, (Function<Observable, Completable>) Completable::fromObservable);
-        conversionService.addConverter(Object.class, Observable.class, (Function<Object, Observable>) o -> {
+        conversionService.addConverter(Observable.class, Publisher.class, observable -> observable.toFlowable(BackpressureStrategy.BUFFER));
+        conversionService.addConverter(Observable.class, Single.class, Observable::firstOrError);
+        conversionService.addConverter(Observable.class, Maybe.class, Observable::firstElement);
+        conversionService.addConverter(Observable.class, Completable.class, Completable::fromObservable);
+        conversionService.addConverter(Object.class, Observable.class, o -> {
             if (o instanceof Iterable) {
                 return Observable.fromIterable((Iterable) o);
             } else {
@@ -68,18 +67,18 @@ public class RxJavaConverterRegistrar implements TypeConverterRegistrar {
         });
 
         // Single
-        conversionService.addConverter(Single.class, Publisher.class, (Function<Single, Publisher>) Single::toFlowable);
-        conversionService.addConverter(Single.class, Maybe.class, (Function<Single, Maybe>) Single::toMaybe);
-        conversionService.addConverter(Single.class, Observable.class, (Function<Single, Observable>) Single::toObservable);
-        conversionService.addConverter(Single.class, Completable.class, (Function<Single, Completable>) Completable::fromSingle);
-        conversionService.addConverter(Object.class, Single.class, (Function<Object, Single>) Single::just);
+        conversionService.addConverter(Single.class, Publisher.class, Single::toFlowable);
+        conversionService.addConverter(Single.class, Maybe.class, Single::toMaybe);
+        conversionService.addConverter(Single.class, Observable.class, Single::toObservable);
+        conversionService.addConverter(Single.class, Completable.class, Completable::fromSingle);
+        conversionService.addConverter(Object.class, Single.class, Single::just);
 
         // Flowable
-        conversionService.addConverter(Flowable.class, Single.class, (Function<Flowable, Single>) Flowable::firstOrError);
-        conversionService.addConverter(Flowable.class, Maybe.class, (Function<Flowable, Maybe>) Flowable::firstElement);
-        conversionService.addConverter(Flowable.class, Observable.class, (Function<Flowable, Observable>) Flowable::toObservable);
-        conversionService.addConverter(Flowable.class, Completable.class, (Function<Flowable, Completable>) Completable::fromPublisher);
-        conversionService.addConverter(Object.class, Flowable.class, (Function<Object, Flowable>) o -> {
+        conversionService.addConverter(Flowable.class, Single.class, Flowable::firstOrError);
+        conversionService.addConverter(Flowable.class, Maybe.class, Flowable::firstElement);
+        conversionService.addConverter(Flowable.class, Observable.class, Flowable::toObservable);
+        conversionService.addConverter(Flowable.class, Completable.class, Completable::fromPublisher);
+        conversionService.addConverter(Object.class, Flowable.class, o -> {
             if (o instanceof Iterable) {
                 return Flowable.fromIterable((Iterable) o);
             } else {
@@ -90,16 +89,16 @@ public class RxJavaConverterRegistrar implements TypeConverterRegistrar {
         // Publisher
         conversionService.addConverter(
             Publisher.class, Flowable.class,
-            (Function<Publisher, Flowable>) publisher -> {
+            publisher -> {
                 if (publisher instanceof Flowable) {
                     return (Flowable) publisher;
                 }
                 return Flowable.fromPublisher(publisher);
             }
         );
-        conversionService.addConverter(Publisher.class, Single.class, (Function<Publisher, Single>) Single::fromPublisher);
-        conversionService.addConverter(Publisher.class, Observable.class, (Function<Publisher, Observable>) Observable::fromPublisher);
-        conversionService.addConverter(Publisher.class, Maybe.class, (Function<Publisher, Maybe>) publisher -> Flowable.fromPublisher(publisher).firstElement());
-        conversionService.addConverter(Publisher.class, Completable.class, (Function<Publisher, Completable>) Completable::fromPublisher);
+        conversionService.addConverter(Publisher.class, Single.class, Single::fromPublisher);
+        conversionService.addConverter(Publisher.class, Observable.class, Observable::fromPublisher);
+        conversionService.addConverter(Publisher.class, Maybe.class, publisher -> Flowable.fromPublisher(publisher).firstElement());
+        conversionService.addConverter(Publisher.class, Completable.class, Completable::fromPublisher);
     }
 }

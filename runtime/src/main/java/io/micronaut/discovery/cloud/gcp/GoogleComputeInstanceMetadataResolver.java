@@ -151,7 +151,7 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
                 JsonNode networkInterfaces = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.NETWORK_INTERFACES.getName());
                 if (networkInterfaces != null) {
 
-                    List<NetworkInterface> interfaces = new ArrayList<NetworkInterface>();
+                    List<NetworkInterface> interfaces = new ArrayList<>();
                     AtomicInteger networkCounter = new AtomicInteger(0);
                     GoogleComputeInstanceMetadata finalInstanceMetadata = instanceMetadata;
                     networkInterfaces.elements().forEachRemaining(

@@ -60,7 +60,6 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
         }
         ArgumentBinder binder = this.beanPropertyBinder.get();
         ArgumentBinder.BindingResult result = binder.bind(conversionContext, mapWithExtraProps);
-        Optional opt = result.getValue();
-        return opt;
+        return result.getValue();
     }
 }

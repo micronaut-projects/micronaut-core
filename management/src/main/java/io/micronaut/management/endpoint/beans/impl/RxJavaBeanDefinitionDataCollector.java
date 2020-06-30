@@ -51,7 +51,7 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
 
     @Override
     public Publisher<Map<String, Object>> getData(Collection<BeanDefinition<?>> beanDefinitions) {
-        return getBeans(beanDefinitions).map((beans) -> {
+        return getBeans(beanDefinitions).map(beans -> {
             Map<String, Object> beanData = new LinkedHashMap<>(1);
             beanData.put("beans", beans);
             return beanData;

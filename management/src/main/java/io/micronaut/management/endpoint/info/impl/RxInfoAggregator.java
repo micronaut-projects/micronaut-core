@@ -51,7 +51,7 @@ public class RxInfoAggregator implements InfoAggregator<Map<String, Object>> {
             PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver();
             list.stream()
                 .sorted((e1, e2) -> Integer.compare(e2.getKey(), e1.getKey()))
-                .forEach((entry) -> resolver.addPropertySource(entry.getValue()));
+                .forEach(entry -> resolver.addPropertySource(entry.getValue()));
             return resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED);
         }).toFlowable();
     }
@@ -70,7 +70,7 @@ public class RxInfoAggregator implements InfoAggregator<Map<String, Object>> {
             Single<Map.Entry<Integer, PropertySource>> single = Flowable
                 .fromPublisher(sources[i].getSource())
                 .first(new EmptyPropertySource())
-                .map((source) -> new AbstractMap.SimpleEntry<>(index, source));
+                .map(source -> new AbstractMap.SimpleEntry<>(index, source));
             publishers.add(single.toFlowable());
         }
         return Flowable.merge(publishers);
