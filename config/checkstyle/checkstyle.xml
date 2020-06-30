@@ -1,30 +1,31 @@
 <?xml version="1.0"?>
 <!DOCTYPE module PUBLIC
-        "-//Puppy Crawl//DTD Check Configuration 1.3//EN"
-        "http://checkstyle.sourceforge.net/dtds/configuration_1_3.dtd">
+        "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
 
 <!--
 
   Checkstyle configuration that checks the sun coding conventions from:
 
     - the Java Language Specification at
-      http://java.sun.com/docs/books/jls/second_edition/html/index.html
+      https://docs.oracle.com/javase/specs/jls/se11/html/index.html
 
-    - the Sun Code Conventions at http://java.sun.com/docs/codeconv/
+    - the Sun Code Conventions at https://www.oracle.com/technetwork/java/codeconvtoc-136057.html
 
     - the Javadoc guidelines at
-      http://java.sun.com/j2se/javadoc/writingdoccomments/index.html
+      https://www.oracle.com/technical-resources/articles/java/javadoc-tool.html
 
-    - the JDK Api documentation http://java.sun.com/j2se/docs/api/index.html
+    - the JDK Api documentation https://docs.oracle.com/en/java/javase/11/
 
     - some best practices
 
   Checkstyle is very configurable. Be sure to read the documentation at
-  http://checkstyle.sf.net (or in your downloaded distribution).
+  https://checkstyle.org (or in your downloaded distribution).
 
   Most Checks are configurable, be sure to consult the documentation.
 
   To completely disable a check, just comment it out or delete it from the file.
+  To suppress certain violations please review suppression filters.
 
   Finally, it is worth reading the documentation.
 
@@ -34,39 +35,37 @@
     <!--
         If you set the basedir property below, then all reported file
         names will be relative to the specified directory. See
-        http://checkstyle.sourceforge.net/5.x/config.html#Checker
+        https://checkstyle.org/config.html#Checker
 
         <property name="basedir" value="${basedir}"/>
     -->
 
-    <module name="RegexpHeader">
-        <!-- Requires a licence copyright notice in each file. -->
-        <property name="headerFile"
-                  value="${config_loc}/HEADER"/>
-    </module>
-
     <property name="fileExtensions" value="java, properties, xml"/>
 
     <!-- Checks that a package-info.java file exists for each package.     -->
-    <!-- See http://checkstyle.sf.net/config_javadoc.html#JavadocPackage -->
+    <!-- See https://checkstyle.org/config_javadoc.html#JavadocPackage -->
     <!--<module name="JavadocPackage"/>-->
 
     <!-- Checks whether files end with a new line.                        -->
-    <!-- See http://checkstyle.sf.net/config_misc.html#NewlineAtEndOfFile -->
+    <!-- See https://checkstyle.org/config_misc.html#NewlineAtEndOfFile -->
     <module name="NewlineAtEndOfFile">
         <property name="lineSeparator" value="lf"/>
     </module>
 
     <!-- Checks that property files contain the same keys.         -->
-    <!-- See http://checkstyle.sf.net/config_misc.html#Translation -->
+    <!-- See https://checkstyle.org/config_misc.html#Translation -->
     <module name="Translation"/>
 
+    <!-- Checks for Size Violations.                    -->
+    <!-- See https://checkstyle.org/config_sizes.html -->
+    <module name="FileLength"/>
+
     <!-- Checks for whitespace                               -->
-    <!-- See http://checkstyle.sf.net/config_whitespace.html -->
+    <!-- See https://checkstyle.org/config_whitespace.html -->
     <module name="FileTabCharacter"/>
 
     <!-- Miscellaneous other checks.                   -->
-    <!-- See http://checkstyle.sf.net/config_misc.html -->
+    <!-- See https://checkstyle.org/config_misc.html -->
     <!--     <module name="RegexpSingleline">
             <property name="format" value="\s+$"/>
             <property name="minimum" value="0"/>
@@ -75,25 +74,23 @@
         </module> -->
 
     <!-- Be able to ignore violations with @SuppressWarnings -->
-    <!-- See http://checkstyle.sf.net/config_filters.html#SuppressWarningsFilter -->
+    <!-- See https://checkstyle.org/config_filters.html#SuppressWarningsFilter -->
     <module name="SuppressWarningsFilter"/>
 
-    <!-- See http://checkstyle.sourceforge.net/config_filters.html#SuppressionFilter -->
-
+    <!-- See https://checkstyle.org/config_filters.html#SuppressionFilter -->
     <module name="SuppressionFilter">
         <property name="file" value="${config_loc}/suppressions.xml"/>
         <property name="optional" value="false"/>
     </module>
 
     <module name="TreeWalker">
-
         <module name="SuppressionCommentFilter"/>
 
         <!-- Needed for SuppressWarningsFilter -->
         <module name="SuppressWarningsHolder"/>
 
         <!-- Checks for Javadoc comments.                     -->
-        <!-- See http://checkstyle.sf.net/config_javadoc.html -->
+        <!-- See https://checkstyle.org/config_javadoc.html -->
         <module name="JavadocMethod">
             <property name="excludeScope" value="private"/>
         </module>
@@ -101,7 +98,7 @@
         <module name="JavadocStyle"/>
 
         <!-- Checks for Naming Conventions.                  -->
-        <!-- See http://checkstyle.sf.net/config_naming.html -->
+        <!-- See https://checkstyle.org/config_naming.html -->
         <module name="ConstantName"/>
         <module name="LocalVariableName"/>
         <module name="MethodName"/>
@@ -111,7 +108,7 @@
         <module name="TypeName"/>
 
         <!-- Checks for imports                              -->
-        <!-- See http://checkstyle.sf.net/config_import.html -->
+        <!-- See https://checkstyle.org/config_import.html -->
         <!-- <module name="AvoidStarImport"/> -->
         <module name="IllegalImport"/> <!-- defaults to sun.* packages -->
         <module name="RedundantImport"/>
@@ -120,14 +117,14 @@
         </module>
 
         <!-- Checks for Size Violations.                    -->
-        <!-- See http://checkstyle.sf.net/config_sizes.html -->
+        <!-- See https://checkstyle.org/config_sizes.html -->
         <!-- <module name="LineLength"/> -->
         <module name="ParameterNumber">
             <property name="max" value="12"/>
         </module>
 
         <!-- Checks for whitespace                               -->
-        <!-- See http://checkstyle.sf.net/config_whitespace.html -->
+        <!-- See https://checkstyle.org/config_whitespace.html -->
         <!-- <module name="EmptyForIteratorPad"/> -->
         <module name="GenericWhitespace"/>
         <!-- <module name="MethodParamPad"/> -->
@@ -146,14 +143,14 @@
         <module name="NoLineWrap"/>
 
         <!-- Modifier Checks                                    -->
-        <!-- See http://checkstyle.sf.net/config_modifiers.html -->
+        <!-- See https://checkstyle.org/config_modifiers.html -->
         <module name="ModifierOrder"/>
         <module name="RedundantModifier">
             <property name="tokens" value="METHOD_DEF,VARIABLE_DEF,ANNOTATION_FIELD_DEF,RESOURCE"/>
         </module>
 
         <!-- Checks for blocks. You know, those {}'s         -->
-        <!-- See http://checkstyle.sf.net/config_blocks.html -->
+        <!-- See https://checkstyle.org/config_blocks.html -->
         <module name="AvoidNestedBlocks"/>
         <module name="EmptyBlock"/>
         <module name="LeftCurly"/>
@@ -161,27 +158,27 @@
         <module name="RightCurly"/>
 
         <!-- Checks for common coding problems               -->
-        <!-- See http://checkstyle.sf.net/config_coding.html -->
+        <!-- See https://checkstyle.org/config_coding.html -->
         <module name="EmptyStatement"/>
         <module name="EqualsHashCode"/>
         <module name="IllegalInstantiation"/>
         <module name="InnerAssignment"/>
         <!--<module name="MagicNumber">-->
-        <!--<property name="ignoreFieldDeclaration" value="true"/>-->
-        <!--<property name="ignoreHashCodeMethod" value="true"/>-->
+            <!--<property name="ignoreFieldDeclaration" value="true"/>-->
+            <!--<property name="ignoreHashCodeMethod" value="true"/>-->
         <!--</module>-->
         <module name="MissingSwitchDefault"/>
         <module name="SimplifyBooleanExpression"/>
         <module name="SimplifyBooleanReturn"/>
 
         <!-- Checks for Inner assigment -->
-        <!-- See http://checkstyle.sourceforge.net/config_coding.html#InnerAssignment -->
+        <!-- See https://checkstyle.org/config_coding.html#InnerAssignment -->
         <module name="InnerAssignment">
             <property name="tokens" value="ASSIGN,PLUS_ASSIGN,MINUS_ASSIGN"/>
         </module>
 
         <!-- Checks for class design                         -->
-        <!-- See http://checkstyle.sf.net/config_design.html -->
+        <!-- See https://checkstyle.org/config_design.html -->
         <module name="DesignForExtension">
             <property name="ignoredAnnotations" value="Override"/>
         </module>
@@ -195,13 +192,13 @@
         <module name="DeclarationOrder"/>
 
         <!-- Miscellaneous other checks.                   -->
-        <!-- See http://checkstyle.sf.net/config_misc.html -->
+        <!-- See https://checkstyle.org/config_misc.html -->
         <module name="ArrayTypeStyle"/>
         <!-- <module name="FinalParameters"/> -->
         <module name="UpperEll"/>
 
         <!-- TodoComments -->
-        <!-- See http://checkstyle.sourceforge.net/config_misc.html#TodoComment -->
+        <!-- See https://checkstyle.org/config_misc.html#TodoComment -->
         <module name="TodoComment">
             <property name="severity" value="warning"/>
         </module>
