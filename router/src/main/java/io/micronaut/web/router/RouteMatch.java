@@ -105,6 +105,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
     /**
      * @return The return type
      */
+    @Override
     ReturnType<? extends R> getReturnType();
 
     /**

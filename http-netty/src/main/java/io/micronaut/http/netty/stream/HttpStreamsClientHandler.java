@@ -165,9 +165,11 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
                 awaiting100ContinueMessage.subscribe(new CancelledSubscriber<>());
                 awaiting100ContinueMessage = null;
                 awaiting100Continue.onSubscribe(new Subscription() {
+                    @Override
                     public void request(long n) {
                     }
 
+                    @Override
                     public void cancel() {
                     }
                 });

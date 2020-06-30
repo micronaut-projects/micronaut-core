@@ -124,6 +124,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     /**
      * @return The class name
      */
+    @Override
     String getName();
 
     /**

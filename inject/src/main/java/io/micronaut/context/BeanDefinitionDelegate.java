@@ -175,6 +175,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     /**
      * @return The bean definition type
      */
+    @Override
     public BeanDefinition<T> getTarget() {
         return definition;
     }

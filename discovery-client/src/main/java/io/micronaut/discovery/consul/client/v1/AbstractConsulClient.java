@@ -25,8 +25,6 @@ import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.discovery.consul.ConsulServiceInstance;
 import io.micronaut.http.client.annotation.Client;
 import org.reactivestreams.Publisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.util.ArrayList;
@@ -51,8 +49,6 @@ public abstract class AbstractConsulClient implements ConsulClient {
     static final String CONSUL_REGISTRATION_RETRY_DELAY = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retry-delay:3s}";
     static final String EXPR_CONSUL_CONFIG_RETRY_COUNT = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retry-count:3}";
     static final String EXPR_CONSUL_CONFIG_RETRY_DELAY = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retry-delay:1s}";
-
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractConsulClient.class);
 
     private ConsulConfiguration consulConfiguration = new ConsulConfiguration();
 

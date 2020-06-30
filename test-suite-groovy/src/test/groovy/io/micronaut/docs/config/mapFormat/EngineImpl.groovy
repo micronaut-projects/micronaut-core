@@ -29,6 +29,7 @@ class EngineImpl implements Engine {
         config.sensors
     }
 
+    @Override
     String start() {
         "Engine Starting V${config.cylinders} [sensors=${sensors.size()}]"
     }

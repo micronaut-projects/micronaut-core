@@ -98,6 +98,7 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
      * @param basePath The path to load resources
      * @return The resource loader
      */
+    @Override
     public ResourceLoader forBase(String basePath) {
         return new DefaultFileSystemResourceLoader(basePath);
     }

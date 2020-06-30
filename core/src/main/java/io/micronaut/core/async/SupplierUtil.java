@@ -38,6 +38,7 @@ public class SupplierUtil {
             Supplier<T> delegate = this::initialize;
             boolean initialized;
 
+            @Override
             public T get() {
                 return delegate.get();
             }
@@ -66,6 +67,7 @@ public class SupplierUtil {
             Supplier<T> delegate = this::initialize;
             boolean initialized;
 
+            @Override
             public T get() {
                 return delegate.get();
             }

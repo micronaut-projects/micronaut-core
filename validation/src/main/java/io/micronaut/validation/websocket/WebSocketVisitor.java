@@ -123,6 +123,6 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
         String parameterName = parameter.getName();
         ClassElement parameterType = parameter.getType();
 
-        return !parameter.hasStereotype(Bindable.class) && !variables.contains(parameterName) && (parameterType == null || Arrays.stream(validTypes).noneMatch(parameterType::isAssignable));
+        return !parameter.hasStereotype(Bindable.class) && !variables.contains(parameterName) && Arrays.stream(validTypes).noneMatch(parameterType::isAssignable);
     }
 }

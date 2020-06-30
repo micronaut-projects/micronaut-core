@@ -88,6 +88,7 @@ public class AsyncSingleResultPublisher<T> implements Publisher<T> {
          * Request execution.
          * @param n request number
          */
+        @Override
         public synchronized void request(long n) {
             if (n != 0 && !completed) {
                 completed = true;
@@ -113,6 +114,7 @@ public class AsyncSingleResultPublisher<T> implements Publisher<T> {
         /**
          * Cancel.
          */
+        @Override
         public synchronized void cancel() {
             completed = true;
             if (future != null) {

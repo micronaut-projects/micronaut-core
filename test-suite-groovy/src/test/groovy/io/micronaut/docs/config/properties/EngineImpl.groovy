@@ -31,6 +31,7 @@ class EngineImpl implements Engine {
         config.cylinders
     }
 
+    @Override
     String start() { // <2>
         "${config.manufacturer} Engine Starting V${config.cylinders} [rodLength=${config.crankShaft.rodLength.orElse(6.0d)}]"
     }

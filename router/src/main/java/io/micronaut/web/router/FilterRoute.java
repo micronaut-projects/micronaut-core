@@ -33,6 +33,7 @@ public interface FilterRoute extends HttpFilterResolver.FilterEntry<HttpFilter> 
     /**
      * @return The filter for this {@link FilterRoute}
      */
+    @Override
     HttpFilter getFilter();
 
     /**

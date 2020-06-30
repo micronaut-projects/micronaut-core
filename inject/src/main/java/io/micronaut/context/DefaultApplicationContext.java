@@ -568,6 +568,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             return refreshablePropertySources;
         }
 
+        @Override
         protected List<PropertySource> readPropertySourceList(String name) {
             return super.readPropertySourceList(name)
                     .stream()

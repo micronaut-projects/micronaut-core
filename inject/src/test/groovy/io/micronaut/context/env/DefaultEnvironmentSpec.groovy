@@ -517,6 +517,7 @@ class DefaultEnvironmentSpec extends Specification {
 
     private static Environment startEnv(String files) {
         new DefaultEnvironment({["test"]}) {
+            @Override
             protected String readPropertySourceListKeyFromEnvironment() {
                 files
             }

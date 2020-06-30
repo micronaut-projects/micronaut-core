@@ -33,6 +33,7 @@ public interface FieldInjectionPoint<B, T> extends InjectionPoint<B>, Annotation
     /**
      * @return The name of the field
      */
+    @Override
     String getName();
 
     /**

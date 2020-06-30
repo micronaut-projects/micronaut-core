@@ -131,6 +131,7 @@ public interface ClassElement extends TypedElement {
     /**
      * @return Whether the class element is abstract
      */
+    @Override
     default boolean isAbstract() {
         return false;
     }

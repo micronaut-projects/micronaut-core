@@ -204,6 +204,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * @param outputVisitor The {@link ClassWriterOutputVisitor}
      * @throws IOException If an error occurs
      */
+    @Override
     public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
         ClassWriter classWriter = generateClassBytes();
         if (classWriter != null) {

@@ -126,9 +126,7 @@ public class JaegerTracerFactory implements Closeable {
     @Requires(classes = JaegerTracer.Builder.class)
     Tracer jaegerTracer(JaegerTracer.Builder tracerBuilder) {
         Tracer tracer = tracerBuilder.build();
-        if (!GlobalTracer.isRegistered()) {
-            GlobalTracer.register(tracer);
-        }
+        GlobalTracer.registerIfAbsent(tracer);
         return tracer;
     }
 

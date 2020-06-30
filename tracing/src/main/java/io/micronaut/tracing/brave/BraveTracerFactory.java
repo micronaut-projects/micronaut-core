@@ -93,9 +93,7 @@ public class BraveTracerFactory {
     @Primary
     Tracer braveTracer(Tracing tracing) {
         BraveTracer braveTracer = BraveTracer.create(tracing);
-        if (!GlobalTracer.isRegistered()) {
-            GlobalTracer.register(braveTracer);
-        }
+        GlobalTracer.registerIfAbsent(braveTracer);
         return braveTracer;
     }
 

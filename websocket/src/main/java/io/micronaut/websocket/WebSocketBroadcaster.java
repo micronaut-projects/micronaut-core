@@ -58,7 +58,7 @@ public interface WebSocketBroadcaster {
      * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
      */
     default <T> Publisher<T> broadcast(T message, MediaType mediaType) {
-        return broadcast(message, mediaType, (s) -> true);
+        return broadcast(message, mediaType, s -> true);
     }
 
     /**
@@ -72,7 +72,7 @@ public interface WebSocketBroadcaster {
      * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
      */
     default <T> Publisher<T> broadcast(T message) {
-        return broadcast(message, MediaType.APPLICATION_JSON_TYPE, (s) -> true);
+        return broadcast(message, MediaType.APPLICATION_JSON_TYPE, s -> true);
     }
 
     /**
@@ -103,7 +103,7 @@ public interface WebSocketBroadcaster {
     default <T> CompletableFuture<T> broadcastAsync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
         CompletableFuture<T> future = new CompletableFuture<>();
         Flowable.fromPublisher(broadcast(message, mediaType, filter)).subscribe(
-                (o) -> { },
+                o -> { },
                 future::completeExceptionally,
                 () -> future.complete(message)
         );
@@ -118,7 +118,7 @@ public interface WebSocketBroadcaster {
      * @return A {@link CompletableFuture} that tracks the execution. {@link CompletableFuture#get()} and related methods will return the message on success, on error throw the underlying Exception.
      */
     default <T> CompletableFuture<T> broadcastAsync(T message) {
-        return broadcastAsync(message, MediaType.APPLICATION_JSON_TYPE, (o) -> true);
+        return broadcastAsync(message, MediaType.APPLICATION_JSON_TYPE, o -> true);
     }
 
     /**
@@ -142,7 +142,7 @@ public interface WebSocketBroadcaster {
      * @return A {@link CompletableFuture} that tracks the execution. {@link CompletableFuture#get()} and related methods will return the message on success, on error throw the underlying Exception.
      */
     default <T> CompletableFuture<T> broadcastAsync(T message, MediaType mediaType) {
-        return broadcastAsync(message, mediaType, (o) -> true);
+        return broadcastAsync(message, mediaType, o -> true);
     }
 
 
@@ -171,7 +171,7 @@ public interface WebSocketBroadcaster {
      * @param <T> The message type
      */
     default <T> void broadcastSync(T message) {
-        broadcastSync(message, MediaType.APPLICATION_JSON_TYPE, (o) -> true);
+        broadcastSync(message, MediaType.APPLICATION_JSON_TYPE, o -> true);
     }
 
     /**
@@ -193,6 +193,6 @@ public interface WebSocketBroadcaster {
      * @param <T> The message type
      */
     default <T> void broadcastSync(T message, MediaType mediaType) {
-        broadcastSync(message, mediaType, (o) -> true);
+        broadcastSync(message, mediaType, o -> true);
     }
 }

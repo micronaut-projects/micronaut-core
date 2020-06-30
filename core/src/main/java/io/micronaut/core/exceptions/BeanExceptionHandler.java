@@ -42,6 +42,7 @@ public interface BeanExceptionHandler<T, E extends Throwable> extends BiConsumer
      * @param bean The bean
      * @param throwable The error
      */
+    @Override
     default void accept(@Nullable T bean, @NonNull E throwable) {
         handle(bean, throwable);
     }
