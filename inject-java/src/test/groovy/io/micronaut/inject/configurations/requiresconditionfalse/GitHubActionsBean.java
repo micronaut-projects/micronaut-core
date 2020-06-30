@@ -18,5 +18,5 @@ package io.micronaut.inject.configurations.requiresconditionfalse;
 import javax.inject.Singleton;
 
 @Singleton
-public class TravisBean {
+public class GitHubActionsBean {
 }
