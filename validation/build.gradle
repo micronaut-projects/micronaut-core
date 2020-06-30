@@ -19,3 +19,9 @@ dependencies {
 
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+
+spotless {
+    java {
+        targetExclude '**/io/micronaut/validation/validator/constraints/EmailValidator.java'
+    }
+}

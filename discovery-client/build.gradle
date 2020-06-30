@@ -27,3 +27,11 @@ dependencies {
     testCompileOnly project(":inject-groovy")
     testRuntimeOnly dependencyVersion("snakeyaml")
 }
+
+spotless {
+    java {
+        targetExclude '**/io/micronaut/discovery/eureka/client/v2/AmazonInfo.java',
+                '**/io/micronaut/discovery/eureka/client/v2/DataCenterInfo.java',
+                '**/io/micronaut/discovery/eureka/client/v2/LeaseInfo.java'
+    }
+}

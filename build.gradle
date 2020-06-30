@@ -5,8 +5,8 @@ buildscript {
         maven { url "https://repo.grails.org/grails/core" }
     }
     dependencies {
-//        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.3.BUILD-SNAPSHOT"
-        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.2"
+        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.3.BUILD-SNAPSHOT"
+//        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.2"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
     }
@@ -732,6 +732,26 @@ subprojects { Project subproject ->
         testAnnotationProcessor "org.ow2.asm:asm:$asmVersion"
         testAnnotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
     }
+    spotless {
+        java {
+            targetExclude '**/io/micronaut/core/io/scan/AnnotationClassReader.java'
+            targetExclude '**/io/micronaut/core/io/scan/Attribute.java'
+            targetExclude '**/io/micronaut/core/io/scan/Context.java'
+            targetExclude '**/io/micronaut/core/util/clhm/**'
+            targetExclude '**/io/micronaut/core/util/AntPathMatcher.java'
+            targetExclude '**/io/micronaut/discovery/eureka/client/v2/AmazonInfo.java'
+            targetExclude '**/io/micronaut/discovery/eureka/client/v2/DataCenterInfo.java'
+            targetExclude '**/io/micronaut/discovery/eureka/client/v2/LeaseInfo.java'
+            targetExclude '**/io/micronaut/support/InMemoryJavaFileManager.java'
+            targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
+            targetExclude '**/org/atinject/tck/auto/Tck.kt'
+            targetExclude '**/io/micronaut/http/uri/QueryStringDecoder.java'
+        }
+        format 'javaMisc', {
+            targetExclude '**/io/micronaut/core/util/clhm/**'
+            targetExclude '**/io/micronaut/http/netty/stream/package-info.java'
+        }
+    }
 }
 apply plugin: "io.micronaut.build.docs"
 apply plugin: "io.micronaut.build.dependency-updates"
@@ -745,7 +765,6 @@ allprojects {
             testOutputDir file('build/classes/groovy/test')
         }
     }
-    apply from: rootProject.file('gradle/license.gradle')
 }
 
 htmlSanityCheck {
