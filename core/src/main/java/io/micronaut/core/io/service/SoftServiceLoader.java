@@ -141,10 +141,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 if (loaded.hasNext()) {
                     return true;
                 }
-                if (unloadedServices.hasNext()) {
-                    return true;
-                }
-                return false;
+                return unloadedServices.hasNext();
             }
 
             @Override
@@ -203,9 +200,9 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 try {
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
                         List<String> lines = reader.lines()
-                            .filter((line) -> line.length() != 0 && line.charAt(0) != '#')
+                            .filter(line -> line.length() != 0 && line.charAt(0) != '#')
                             .filter(condition)
-                            .map((line) -> {
+                            .map(line -> {
                                 int i = line.indexOf('#');
                                 if (i > -1) {
                                     line = line.substring(0, i);

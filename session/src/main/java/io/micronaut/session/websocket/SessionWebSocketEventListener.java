@@ -61,10 +61,8 @@ public class SessionWebSocketEventListener implements ApplicationEventListener<W
                 Session session = (Session) attributes;
                 if (session.isModified()) {
                     sessionStore.save(session).whenComplete((entries, throwable) -> {
-                        if (throwable != null) {
-                            if (LOG.isErrorEnabled()) {
-                                LOG.error("Error persisting session following WebSocket event: " + throwable.getMessage(), throwable);
-                            }
+                        if (throwable != null && LOG.isErrorEnabled()) {
+                            LOG.error("Error persisting session following WebSocket event: " + throwable.getMessage(), throwable);
                         }
                     });
                 }

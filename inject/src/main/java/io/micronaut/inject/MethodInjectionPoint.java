@@ -59,5 +59,6 @@ public interface MethodInjectionPoint<B, T> extends CallableInjectionPoint<B>, E
      * @param args     The arguments. Should match the types of getArguments()
      * @return The new value
      */
+    @Override
     T invoke(B instance, Object... args);
 }

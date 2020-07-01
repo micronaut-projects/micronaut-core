@@ -36,6 +36,7 @@ public interface FileSystemResourceLoader extends ResourceLoader {
      *             appended by a colon. Ex (classpath:, file:)
      * @return boolean
      */
+    @Override
     default boolean supportsPrefix(String path) {
         return path.startsWith("file:");
     }

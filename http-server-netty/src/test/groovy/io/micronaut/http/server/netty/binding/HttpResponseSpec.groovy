@@ -213,6 +213,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         Integer age
     }
 
+    @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.server.dateHeader': false]
     }

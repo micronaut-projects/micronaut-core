@@ -29,7 +29,6 @@ import java.nio.charset.Charset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -100,11 +99,6 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
             @Override
             public Map<String, Object> getVariableValues() {
                 return newVariables;
-            }
-
-            @Override
-            public Optional<Argument<?>> getRequiredInput(String name) {
-                return super.getRequiredInput(name);
             }
         };
     }

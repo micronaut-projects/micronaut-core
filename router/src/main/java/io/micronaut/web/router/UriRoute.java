@@ -40,6 +40,7 @@ public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
      * @param nested The nested routes
      * @return This route
      */
+    @Override
     UriRoute nest(Runnable nested);
 
     /**

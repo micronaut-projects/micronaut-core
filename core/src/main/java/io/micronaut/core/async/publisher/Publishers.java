@@ -351,7 +351,7 @@ public class Publishers {
         Objects.requireNonNull(object, "Argument [object] cannot be null");
         Objects.requireNonNull(publisherType, "Argument [publisherType] cannot be null");
         if (object instanceof CompletableFuture) {
-            @SuppressWarnings("unchecked") Publisher<T> futurePublisher = (Publisher<T>) Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
+            @SuppressWarnings("unchecked") Publisher<T> futurePublisher = Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
             return ConversionService.SHARED.convert(futurePublisher, publisherType)
                     .orElseThrow(() -> unconvertibleError(object, publisherType));
         } else {
@@ -393,7 +393,7 @@ public class Publishers {
     private static <T> IllegalArgumentException unconvertibleError(Object object, Class<T> publisherType) {
         return new IllegalArgumentException("Cannot convert reactive type [" + object.getClass() + "] to type [" + publisherType + "]. Ensure that you have the necessary Reactive module on your classpath. For example for Reactor you should have 'micronaut-reactor'.");
     }
-    
+
     /**
      * A publisher for a value.
      *

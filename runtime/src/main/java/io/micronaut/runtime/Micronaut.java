@@ -304,13 +304,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     protected void handleStartupException(Environment environment, Throwable exception) {
         Function<Throwable, Integer> exitCodeMapper = exitHandlers.computeIfAbsent(exception.getClass(), exceptionType -> (throwable -> 1));
         Integer code = exitCodeMapper.apply(exception);
-        if (code > 0) {
-            if (!environment.getActiveNames().contains(Environment.TEST)) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error starting Micronaut server: " + exception.getMessage(), exception);
-                }
-                System.exit(code);
+        if (code > 0 && !environment.getActiveNames().contains(Environment.TEST)) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error starting Micronaut server: " + exception.getMessage(), exception);
             }
+            System.exit(code);
         }
         throw new ApplicationStartupException("Error starting Micronaut server: " + exception.getMessage(), exception);
     }

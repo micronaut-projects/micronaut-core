@@ -107,7 +107,7 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
                 String sessionAttr;
 
                 if (body.isPresent()) {
-                    sessionAttr = routeMatch.flatMap((m) -> {
+                    sessionAttr = routeMatch.flatMap(m -> {
                         if (!m.hasAnnotation(SessionValue.class)) {
                             return Optional.empty();
                         } else {
@@ -133,14 +133,14 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
                     if (session.isNew() || session.isModified()) {
                         return Flowable
                             .fromPublisher(Publishers.fromCompletableFuture(() -> sessionStore.save(session)))
-                            .map((s) -> new SessionAndResponse(Optional.of(s), response));
+                            .map(s -> new SessionAndResponse(Optional.of(s), response));
                     }
                 } else if (sessionAttr != null) {
                     Session newSession = sessionStore.newSession();
                     newSession.put(sessionAttr, body.get());
                     return Flowable
                             .fromPublisher(Publishers.fromCompletableFuture(() -> sessionStore.save(newSession)))
-                            .map((s) -> new SessionAndResponse(Optional.of(s), response));
+                            .map(s -> new SessionAndResponse(Optional.of(s), response));
                 }
                 return Flowable.just(new SessionAndResponse(opt, response));
             });

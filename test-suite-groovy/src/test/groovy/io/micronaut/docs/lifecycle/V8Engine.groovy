@@ -30,6 +30,7 @@ class V8Engine implements Engine {
     int cylinders = 8
     boolean initialized = false // <2>
 
+    @Override
     String start() {
         if(!initialized) throw new IllegalStateException("Engine not initialized!")
 

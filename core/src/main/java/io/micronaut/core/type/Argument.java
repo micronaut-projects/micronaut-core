@@ -122,6 +122,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     /**
      * @return The name of the argument
      */
+    @Override
     @NonNull String getName();
 
     @Override

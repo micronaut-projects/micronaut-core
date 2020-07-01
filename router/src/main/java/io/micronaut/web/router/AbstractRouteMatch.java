@@ -285,7 +285,6 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                     } else {
                         if (argument.isNullable()) {
                             argumentList.add(null);
-                            continue;
                         } else {
 
                             List<ConversionError> conversionErrors = bindingResult.getConversionErrors();
@@ -387,10 +386,8 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 if (argumentValues.containsKey(argumentName)) {
 
                     Object value = argumentValues.get(argumentName);
-                    if (bodyArgument != null) {
-                        if (bodyArgument.getName().equals(argumentName)) {
-                            requiredArgument = bodyArgument;
-                        }
+                    if (bodyArgument != null && bodyArgument.getName().equals(argumentName)) {
+                        requiredArgument = bodyArgument;
                     }
 
                     if (hasRequiredArguments) {

@@ -240,12 +240,10 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
             .propertySources(propertySource)
             .start()
             .getBean(type);
-        if (bean != null) {
-            if (bean instanceof LifeCycle) {
-                LifeCycle lifeCycle = (LifeCycle) bean;
-                if (!lifeCycle.isRunning()) {
-                    lifeCycle.start();
-                }
+        if (bean instanceof LifeCycle) {
+            LifeCycle lifeCycle = (LifeCycle) bean;
+            if (!lifeCycle.isRunning()) {
+                lifeCycle.start();
             }
         }
 

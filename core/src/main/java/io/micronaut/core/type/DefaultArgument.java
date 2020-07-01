@@ -62,7 +62,7 @@ public class DefaultArgument<T> implements Argument<T> {
         this(type,
              name,
              annotationMetadata,
-             ArrayUtils.isNotEmpty(genericTypes) ? initializeTypeParameters(genericTypes) : Collections.EMPTY_MAP,
+             ArrayUtils.isNotEmpty(genericTypes) ? initializeTypeParameters(genericTypes) : Collections.emptyMap(),
              genericTypes
         );
     }
@@ -76,7 +76,7 @@ public class DefaultArgument<T> implements Argument<T> {
         this(type,
                 null,
                 annotationMetadata,
-                ArrayUtils.isNotEmpty(genericTypes) ? initializeTypeParameters(genericTypes) : Collections.EMPTY_MAP,
+                ArrayUtils.isNotEmpty(genericTypes) ? initializeTypeParameters(genericTypes) : Collections.emptyMap(),
                 genericTypes
         );
     }

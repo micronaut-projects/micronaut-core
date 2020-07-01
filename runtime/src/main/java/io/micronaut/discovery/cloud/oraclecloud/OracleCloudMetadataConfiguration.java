@@ -90,7 +90,7 @@ public class OracleCloudMetadataConfiguration implements Toggleable {
      * @return The metadata Url
      */
     public String getMetadataUrl() {
-        return url;
+        return metadataUrl;
     }
 
     /**
@@ -104,7 +104,7 @@ public class OracleCloudMetadataConfiguration implements Toggleable {
      * @return The instance document Url
      */
     public String getInstanceDocumentUrl() {
-        return url;
+        return instanceDocumentUrl;
     }
 
     /**

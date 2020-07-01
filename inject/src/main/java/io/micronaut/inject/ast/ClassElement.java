@@ -115,7 +115,7 @@ public interface ClassElement extends TypedElement {
      * @return The fields
      */
     default List<FieldElement> getFields() {
-        return getFields((modifiers) -> true);
+        return getFields(modifiers -> true);
     }
 
     /**
@@ -131,6 +131,7 @@ public interface ClassElement extends TypedElement {
     /**
      * @return Whether the class element is abstract
      */
+    @Override
     default boolean isAbstract() {
         return false;
     }

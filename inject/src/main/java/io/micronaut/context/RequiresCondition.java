@@ -507,7 +507,7 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesPresenceOfEntities(ConditionContext context, AnnotationValue<Requires> annotationValue) {
-        if (annotationValue.contains("entities")) {
+        if (annotationValue.contains(MEMBER_ENTITIES)) {
             Optional<AnnotationClassValue[]> classNames = annotationValue.get(MEMBER_ENTITIES, AnnotationClassValue[].class);
             if (classNames.isPresent()) {
                 BeanContext beanContext = context.getBeanContext();

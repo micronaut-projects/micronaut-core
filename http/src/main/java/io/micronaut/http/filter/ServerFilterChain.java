@@ -34,5 +34,6 @@ public interface ServerFilterChain extends FilterChain {
      * @param request The current request
      * @return A {@link Publisher} for the Http response
      */
+    @Override
     Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request);
 }

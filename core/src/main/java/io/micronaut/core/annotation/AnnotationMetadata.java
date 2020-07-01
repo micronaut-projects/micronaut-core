@@ -347,10 +347,8 @@ public interface AnnotationMetadata extends AnnotationSource {
 
             Optional<? extends AnnotationValue<? extends Annotation>> values = findAnnotation(annotation);
             Optional<T> value = values.flatMap(av -> av.get(member, requiredType));
-            if (!value.isPresent()) {
-                if (hasStereotype(annotation)) {
-                    return getDefaultValue(annotation, member, requiredType);
-                }
+            if (!value.isPresent() && hasStereotype(annotation)) {
+                return getDefaultValue(annotation, member, requiredType);
             }
             return value;
         }
@@ -563,10 +561,8 @@ public interface AnnotationMetadata extends AnnotationSource {
         ArgumentUtils.requireNonNull("requiredType", requiredType);
 
         Optional<T> value = findAnnotation(annotation).flatMap(av -> av.get(member, requiredType));
-        if (!value.isPresent()) {
-            if (hasStereotype(annotation)) {
-                return getDefaultValue(annotation, member, requiredType);
-            }
+        if (!value.isPresent() && hasStereotype(annotation)) {
+            return getDefaultValue(annotation, member, requiredType);
         }
         return value;
     }
@@ -794,9 +790,7 @@ public interface AnnotationMetadata extends AnnotationSource {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
-        Optional value = getValue(annotation, member, Class.class);
-        //noinspection unchecked
-        return value;
+        return getValue(annotation, member, Class.class);
     }
 
     /**

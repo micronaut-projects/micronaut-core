@@ -41,7 +41,6 @@ import javax.inject.Singleton;
 @Singleton
 public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements BeanDefinitionProcessor<Filter> {
 
-    private final BeanContext beanContext;
     private final ServerContextPathProvider contextPathProvider;
 
     /**
@@ -61,7 +60,6 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
             ConversionService<?> conversionService,
             @Nullable ServerContextPathProvider contextPathProvider) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
-        this.beanContext = beanContext;
         this.contextPathProvider = contextPathProvider;
     }
 

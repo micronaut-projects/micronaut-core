@@ -54,7 +54,7 @@ public class NonUniqueBeanException extends NoSuchBeanException {
      * @return The bean type requested
      */
     public <T> Class<T> getBeanType() {
-        return (Class<T>) targetType;
+        return targetType;
     }
 
     private static <T> String buildMessage(Iterator<BeanDefinition<T>> possibleCandidates) {

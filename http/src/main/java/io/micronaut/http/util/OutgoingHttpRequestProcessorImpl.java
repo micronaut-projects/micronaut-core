@@ -36,6 +36,7 @@ public class OutgoingHttpRequestProcessorImpl implements OutgoingHttpRequestProc
      * @param request The request
      * @return true if the request should be processed
      */
+    @Override
     public boolean shouldProcessRequest(OutgointRequestProcessorMatcher matcher, HttpRequest<?> request) {
         Optional<String> serviceId = request.getAttribute(HttpAttributes.SERVICE_ID.toString(), String.class);
         String uri = request.getUri().toString();

@@ -176,7 +176,6 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
             uc.setReadTimeout(readTimeoutMs);
             uc.setRequestMethod("GET");
             uc.setDoOutput(true);
-            int responseCode = uc.getResponseCode();
             try (BufferedReader in = new BufferedReader(
                 new InputStreamReader(uc.getInputStream()))) {
                 return IOUtils.readText(in);

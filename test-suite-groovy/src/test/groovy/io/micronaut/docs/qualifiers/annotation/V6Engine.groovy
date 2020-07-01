@@ -22,6 +22,7 @@ import javax.inject.Singleton
 class V6Engine implements Engine { // <2>
     int cylinders = 6
 
+    @Override
     String start() {
         "Starting V6"
     }

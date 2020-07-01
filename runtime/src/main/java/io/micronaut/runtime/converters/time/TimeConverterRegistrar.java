@@ -210,7 +210,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
     private DateTimeFormatter resolveFormatter(ConversionContext context) {
         Optional<String> format = context.getAnnotationMetadata().stringValue(Format.class);
         return format
-            .map((pattern) -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
+            .map(pattern -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
             .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
     }
 }

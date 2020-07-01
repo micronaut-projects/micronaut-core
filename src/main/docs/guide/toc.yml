@@ -12,7 +12,11 @@ quickStart:
     installWindows: Install through Binary on Windows
     buildSource: Building from Source
   creatingServer: Creating a Server Application
-  ideSetup: Setting up an IDE
+  ideSetup:
+    title: Setting up an IDE
+    ideaSetup: IntelliJ IDEA
+    eclipseSetup: Eclipse
+    vsCodeSetup: Visual Studio Code
   creatingClient: Creating a Client
   deployingApp: Deploying the Application
 ioc:

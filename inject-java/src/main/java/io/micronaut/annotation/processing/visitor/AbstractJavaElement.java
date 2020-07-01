@@ -211,30 +211,23 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 return mirrorToClassElement(bound, visitorContext, genericsInfo);
             } else {
 
-                ClassElement classElement = mirrorToClassElement(upperBound, visitorContext, genericsInfo);
-                if (classElement != null) {
-                    return classElement;
-                } else {
-                    return mirrorToClassElement(tv.getLowerBound(), visitorContext, genericsInfo);
-                }
+                return mirrorToClassElement(upperBound, visitorContext, genericsInfo);
             }
 
         } else if (returnType instanceof ArrayType) {
             ArrayType at = (ArrayType) returnType;
             TypeMirror componentType = at.getComponentType();
             ClassElement arrayType = mirrorToClassElement(componentType, visitorContext, genericsInfo);
-            if (arrayType != null) {
-                if (arrayType instanceof JavaPrimitiveElement) {
-                    JavaPrimitiveElement jpe = (JavaPrimitiveElement) arrayType;
-                    return jpe.toArray();
-                } else {
-                    return new JavaClassElement((TypeElement) arrayType.getNativeType(), arrayType, visitorContext) {
-                        @Override
-                        public boolean isArray() {
-                            return true;
-                        }
-                    };
-                }
+            if (arrayType instanceof JavaPrimitiveElement) {
+                JavaPrimitiveElement jpe = (JavaPrimitiveElement) arrayType;
+                return jpe.toArray();
+            } else {
+                return new JavaClassElement((TypeElement) arrayType.getNativeType(), arrayType, visitorContext) {
+                    @Override
+                    public boolean isArray() {
+                        return true;
+                    }
+                };
             }
         } else if (returnType instanceof PrimitiveType) {
             PrimitiveType pt = (PrimitiveType) returnType;

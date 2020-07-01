@@ -447,10 +447,7 @@ public final class CronExpression {
          * @return True/False if the value matches the field part
          */
         protected boolean matches(int val, FieldPart part) {
-            if (val >= part.from && val <= part.to && (val - part.from) % part.increment == 0) {
-                return true;
-            }
-            return false;
+            return val >= part.from && val <= part.to && (val - part.from) % part.increment == 0;
         }
     }
 

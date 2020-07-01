@@ -76,6 +76,7 @@ public class HttpClientResponseException extends HttpClientException implements 
     /**
      * @return The {@link HttpResponse}
      */
+    @Override
     public HttpResponse<?> getResponse() {
         return response;
     }

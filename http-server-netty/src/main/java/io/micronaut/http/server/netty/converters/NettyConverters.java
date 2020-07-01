@@ -78,7 +78,7 @@ public class NettyConverters implements TypeConverterRegistrar {
         conversionService.addConverter(
                 CharSequence.class,
                 ChannelOption.class,
-                (TypeConverter<CharSequence, ChannelOption>) (object, targetType, context) -> {
+                (object, targetType, context) -> {
                     String str = object.toString();
                     String name = NameUtils.underscoreSeparate(str).toUpperCase(Locale.ENGLISH);
                     return Optional.of(channelOptionFactory.channelOption(name));

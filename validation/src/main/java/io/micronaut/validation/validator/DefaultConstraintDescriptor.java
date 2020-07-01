@@ -98,7 +98,7 @@ class DefaultConstraintDescriptor<T extends Annotation> implements ConstraintDes
     @Override
     public Map<String, Object> getAttributes() {
         return annotationValue.getValues().entrySet().stream().collect(Collectors.toMap(
-                (entry) -> entry.getKey().toString(),
+                entry -> entry.getKey().toString(),
                 Map.Entry::getValue
         ));
     }

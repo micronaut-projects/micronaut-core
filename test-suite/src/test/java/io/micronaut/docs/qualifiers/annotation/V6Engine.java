@@ -22,10 +22,12 @@ import javax.inject.Singleton;
 public class V6Engine implements Engine { // <2>
     private int cylinders = 6;
 
+    @Override
     public int getCylinders() {
         return cylinders;
     }
 
+    @Override
     public String start() {
         return "Starting V6";
     }

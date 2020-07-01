@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
-    
+
     private final BeanLocator beanLocator;
     private final Provider<HttpServerConfiguration> httpServerConfiguration;
 
@@ -98,7 +98,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
 
                             @Override
                             public void request(long n) {
-                                if (partsRequested.getAndUpdate((prev) -> prev + n) == 0) {
+                                if (partsRequested.getAndUpdate(prev -> prev + n) == 0) {
                                     s.request(n);
                                 }
                             }

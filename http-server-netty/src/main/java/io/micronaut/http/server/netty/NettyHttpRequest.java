@@ -285,7 +285,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         for (ByteBufHolder byteBuf : receivedData.values()) {
             releaseIfNecessary(byteBuf);
         }
-        if (this.body != null && this.body instanceof ReferenceCounted) {
+        if (this.body instanceof ReferenceCounted) {
             ReferenceCounted referenceCounted = (ReferenceCounted) this.body;
             releaseIfNecessary(referenceCounted);
         }
@@ -337,7 +337,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     public void addContent(ByteBufHolder httpContent) {
         if (httpContent instanceof AbstractHttpData) {
-            receivedData.computeIfAbsent(System.identityHashCode(httpContent), (key) -> {
+            receivedData.computeIfAbsent(System.identityHashCode(httpContent), key -> {
                 httpContent.retain();
                 return (AbstractHttpData) httpContent;
             });

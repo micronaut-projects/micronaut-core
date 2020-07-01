@@ -102,6 +102,6 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
      */
     @SuppressWarnings("unchecked")
     public static <V> ConvertibleValues<V> empty() {
-        return (ConvertibleValues<V>) EMPTY;
+        return EMPTY;
     }
 }

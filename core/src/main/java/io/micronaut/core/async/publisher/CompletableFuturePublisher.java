@@ -66,6 +66,7 @@ class CompletableFuturePublisher<T> implements Publisher<T> {
         /**
          * @param n Number of elements to request to the upstream
          */
+        @Override
         public synchronized void request(long n) {
             if (n != 0 && !completed.get()) {
                 if (n < 0) {
@@ -101,6 +102,7 @@ class CompletableFuturePublisher<T> implements Publisher<T> {
         /**
          * Request the publisher to stop sending data and clean up resources.
          */
+        @Override
         public synchronized void cancel() {
             if (completed.compareAndSet(false, true)) {
                 if (future != null) {

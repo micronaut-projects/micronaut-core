@@ -68,12 +68,10 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
 
             }
         }
-        if (roundEnv.processingOver()) {
-            if (!serviceDescriptors.isEmpty()) {
-                classWriterOutputVisitor.writeServiceEntries(
-                        serviceDescriptors
-                );
-            }
+        if (roundEnv.processingOver() && !serviceDescriptors.isEmpty()) {
+            classWriterOutputVisitor.writeServiceEntries(
+                    serviceDescriptors
+            );
         }
         return true;
     }

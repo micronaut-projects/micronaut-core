@@ -164,30 +164,6 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
         return new DownstreamSubscription();
     }
 
-    private void processDemand(long demand) {
-        switch (upstreamState) {
-            case BUFFERING:
-            case FLOWING:
-                if (registerDemand(demand)) {
-                    flushBuffer();
-                }
-                break;
-
-            case DEMANDING:
-                registerDemand(demand);
-                break;
-
-            case IDLE:
-                if (registerDemand(demand)) {
-                    upstreamState = BackPressureState.DEMANDING;
-                    flushBuffer();
-                }
-                break;
-            default:
-
-        }
-    }
-
     private boolean registerDemand(long demand) {
         if (demand <= 0) {
             illegalDemand();
@@ -271,6 +247,30 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
         @Override
         public synchronized void cancel() {
             upstreamSubscription.cancel();
+        }
+
+        private void processDemand(long demand) {
+            switch (upstreamState) {
+                case BUFFERING:
+                case FLOWING:
+                    if (registerDemand(demand)) {
+                        flushBuffer();
+                    }
+                    break;
+
+                case DEMANDING:
+                    registerDemand(demand);
+                    break;
+
+                case IDLE:
+                    if (registerDemand(demand)) {
+                        upstreamState = BackPressureState.DEMANDING;
+                        flushBuffer();
+                    }
+                    break;
+                default:
+
+            }
         }
     }
 }

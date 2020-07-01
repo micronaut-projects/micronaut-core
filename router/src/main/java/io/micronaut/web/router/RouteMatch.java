@@ -105,6 +105,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
     /**
      * @return The return type
      */
+    @Override
     ReturnType<? extends R> getReturnType();
 
     /**
@@ -133,7 +134,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
      * {@link #execute()}
      */
     default boolean isExecutable() {
-        return getRequiredArguments().size() == 0;
+        return getRequiredArguments().isEmpty();
     }
 
     /**

@@ -339,7 +339,7 @@ public class DefaultHttpClient implements
         Optional<Duration> connectTimeout = configuration.getConnectTimeout();
         connectTimeout.ifPresent(duration -> this.bootstrap.option(
                 ChannelOption.CONNECT_TIMEOUT_MILLIS,
-                Long.valueOf(duration.toMillis()).intValue()
+                (int) duration.toMillis()
         ));
 
         for (Map.Entry<String, Object> entry : configuration.getChannelOptions().entrySet()) {
@@ -505,7 +505,7 @@ public class DefaultHttpClient implements
             @Override
             public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
                 Flowable<io.micronaut.http.HttpResponse<O>> publisher = DefaultHttpClient.this.exchange(request, bodyType, errorType);
-                return publisher.doOnNext((res) -> {
+                return publisher.doOnNext(res -> {
                     Optional<ByteBuf> byteBuf = res.getBody(ByteBuf.class);
                     byteBuf.ifPresent(bb -> {
                         if (bb.refCnt() > 0) {
@@ -528,7 +528,7 @@ public class DefaultHttpClient implements
             ((MutableHttpRequest) request).accept(MediaType.TEXT_EVENT_STREAM_TYPE);
         }
 
-        Flowable<Event<ByteBuffer<?>>> eventFlowable = Flowable.create(emitter ->
+        return Flowable.create(emitter ->
                 dataStream(request).subscribe(new Subscriber<ByteBuffer<?>>() {
                     private Subscription dataSubscription;
                     private CurrentEvent currentEvent;
@@ -646,8 +646,6 @@ public class DefaultHttpClient implements
                         emitter.onComplete();
                     }
                 }), BackpressureStrategy.BUFFER);
-
-        return eventFlowable;
     }
 
     @Override
@@ -694,8 +692,7 @@ public class DefaultHttpClient implements
     @SuppressWarnings("unchecked")
     @Override
     public <I> Flowable<Map<String, Object>> jsonStream(io.micronaut.http.HttpRequest<I> request) {
-        Flowable flowable = jsonStream(request, Map.class);
-        return flowable;
+        return (Flowable) jsonStream(request, Map.class);
     }
 
     @Override
@@ -715,7 +712,7 @@ public class DefaultHttpClient implements
     public <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, io.micronaut.http.MutableHttpRequest<?> request) {
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flowable.fromPublisher(uriPublisher)
-                .switchMap((resolvedURI) -> connectWebSocket(resolvedURI, request, clientEndpointType, null));
+                .switchMap(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, null));
     }
 
     @Override
@@ -727,7 +724,7 @@ public class DefaultHttpClient implements
         Publisher<URI> uriPublisher = resolveRequestURI(request);
 
         return Flowable.fromPublisher(uriPublisher)
-                .switchMap((resolvedURI) -> connectWebSocket(resolvedURI, request, clientEndpointType, webSocketBean));
+                .switchMap(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, webSocketBean));
 
     }
 
@@ -819,7 +816,7 @@ public class DefaultHttpClient implements
                 }
             });
 
-            bootstrap.connect().addListener((ChannelFutureListener) future -> {
+            bootstrap.connect().addListener(future -> {
                 if (!future.isSuccess()) {
                     emitter.onError(future.cause());
                 }
@@ -854,8 +851,7 @@ public class DefaultHttpClient implements
                                     response.status()
                             );
                             thisResponse.setBody(byteBuffer);
-                            HttpResponse<ByteBuffer<?>> finalResponse = new HttpResponseWrapper<>(thisResponse);
-                            return finalResponse;
+                            return (HttpResponse<ByteBuffer<?>>) new HttpResponseWrapper<>(thisResponse);
                         }).doAfterNext(res -> {
                             ByteBuffer<?> buffer = res.body();
                             if (buffer instanceof ReferenceCounted) {
@@ -1167,11 +1163,9 @@ public class DefaultHttpClient implements
 
             ChannelFuture closeFuture = channel.closeFuture();
             closeFuture.addListener(f2 -> {
-                if (!f2.isSuccess()) {
-                    if (log.isErrorEnabled()) {
-                        Throwable cause = f2.cause();
-                        log.error("Error closing request connection: " + cause.getMessage(), cause);
-                    }
+                if (!f2.isSuccess() && log.isErrorEnabled()) {
+                    Throwable cause = f2.cause();
+                    log.error("Error closing request connection: " + cause.getMessage(), cause);
                 }
             });
         }
@@ -1204,10 +1198,8 @@ public class DefaultHttpClient implements
 
             return Publishers.map(loadBalancer.select(getLoadBalancerDiscriminator()), server -> {
                         Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
-                        if (request instanceof MutableHttpRequest) {
-                            if (authInfo.isPresent()) {
-                                ((MutableHttpRequest) request).getHeaders().auth(authInfo.get());
-                            }
+                        if (request instanceof MutableHttpRequest && authInfo.isPresent()) {
+                            ((MutableHttpRequest) request).getHeaders().auth(authInfo.get());
                         }
                         return server.resolve(includeContextPath ? prependContextPath(requestURI) : requestURI);
                     }
@@ -1419,7 +1411,7 @@ public class DefaultHttpClient implements
         if (request instanceof MutableHttpRequest) {
             ((MutableHttpRequest<I>) request).uri(requestURI);
 
-            List<HttpClientFilter> filters = (List<HttpClientFilter>)
+            List<HttpClientFilter> filters =
                     filterResolver.resolveFilters(request, clientFilterEntries);
             if (parentRequest != null) {
                 filters.add(new ClientServerContextFilter(parentRequest));
@@ -1523,7 +1515,7 @@ public class DefaultHttpClient implements
                                 }
                             } else if (mediaTypeCodecRegistry != null) {
                                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                                ByteBuf encoded = registeredCodec.map(codec -> (ByteBuf) codec.encode(o, byteBufferFactory).asNativeBuffer())
+                                ByteBuf encoded = registeredCodec.map(codec -> codec.encode(o, byteBufferFactory).asNativeBuffer())
                                         .orElse(null);
                                 if (encoded != null) {
                                     if (log.isTraceEnabled()) {
@@ -1570,7 +1562,7 @@ public class DefaultHttpClient implements
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
                     } else if (mediaTypeCodecRegistry != null) {
                         Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                        bodyContent = registeredCodec.map(codec -> (ByteBuf) codec.encode(bodyValue, byteBufferFactory).asNativeBuffer())
+                        bodyContent = registeredCodec.map(codec -> codec.encode(bodyValue, byteBufferFactory).asNativeBuffer())
                                 .orElse(null);
                     }
                     if (bodyContent == null) {
@@ -1903,10 +1895,8 @@ public class DefaultHttpClient implements
         RequestKey requestKey = new RequestKey(requestURI);
         StringBuilder host = new StringBuilder(requestKey.getHost());
         int port = requestKey.getPort();
-        if (port > -1) {
-            if (port != 80 && port != 443) {
-                host.append(":").append(port);
-            }
+        if (port > -1 && port != 80 && port != 443) {
+            host.append(":").append(port);
         }
         return host.toString();
     }
@@ -2494,7 +2484,7 @@ public class DefaultHttpClient implements
 
     @Override
     public Flowable<MutableHttpResponse<?>> proxy(io.micronaut.http.HttpRequest<?> request) {
-        Flowable<MutableHttpResponse<?>> responsePublisher = Flowable.fromPublisher(resolveRequestURI(request))
+        return Flowable.fromPublisher(resolveRequestURI(request))
                 .flatMap(requestURI -> {
                     AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
                     Flowable<MutableHttpResponse<Object>> proxyResponsePublisher = Flowable.create(emitter -> {
@@ -2564,7 +2554,6 @@ public class DefaultHttpClient implements
                     );
                     return proxyResponsePublisher;
                 });
-        return responsePublisher;
     }
 
 
@@ -2607,6 +2596,7 @@ public class DefaultHttpClient implements
         /**
          * @param ch The channel
          */
+        @Override
         protected void initChannel(SocketChannel ch) {
             ChannelPipeline p = ch.pipeline();
 

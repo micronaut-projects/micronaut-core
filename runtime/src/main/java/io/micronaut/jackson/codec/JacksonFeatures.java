@@ -15,7 +15,7 @@
  */
 package io.micronaut.jackson.codec;
 
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -39,8 +39,8 @@ public final class JacksonFeatures {
      * Empty jackson features.
      */
     public JacksonFeatures() {
-        this.serializationFeatures = new HashMap<>();
-        this.deserializationFeatures = new HashMap<>();
+        this.serializationFeatures = new EnumMap<>(SerializationFeature.class);
+        this.deserializationFeatures = new EnumMap<>(DeserializationFeature.class);
     }
 
     /**

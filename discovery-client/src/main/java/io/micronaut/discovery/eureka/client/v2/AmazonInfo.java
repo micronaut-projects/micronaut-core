@@ -373,7 +373,6 @@ public class AmazonInfo implements DataCenterInfo {
                             } catch (InterruptedException e1) {
 
                             }
-                            continue;
                         }
                     }
                 }

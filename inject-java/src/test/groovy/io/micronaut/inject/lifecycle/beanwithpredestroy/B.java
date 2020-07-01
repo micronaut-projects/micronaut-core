@@ -39,6 +39,7 @@ public class B implements Closeable {
         return a;
     }
 
+    @Override
     @PreDestroy
     public void close() {
         noArgsDestroyCalled = true;
