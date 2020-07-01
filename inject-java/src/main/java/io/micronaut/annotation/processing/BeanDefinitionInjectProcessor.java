@@ -451,12 +451,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         qualifiedName.equals(classElementQualifiedName)) {
 
                     if (qualifiedName.equals(classElementQualifiedName)) {
-                        final boolean isBean = isAopProxyType ||
-                                isConfigurationPropertiesType ||
-                                typeAnnotationMetadata.hasStereotype(ANNOTATION_STEREOTYPES) ||
-                                (constructorParameterInfo.getAnnotationMetadata().hasStereotype(Inject.class));
-
-                        if (isBean) {
+                        if (isDeclaredBean) {
                             // we know this class has supported annotations so we need a beandef writer for it
                             PackageElement packageElement = elementUtils.getPackageOf(classElement);
                             if (packageElement.isUnnamed()) {

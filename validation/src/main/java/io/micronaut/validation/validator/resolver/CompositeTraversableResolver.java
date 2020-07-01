@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 
+import javax.inject.Singleton;
 import javax.validation.Path;
 import javax.validation.TraversableResolver;
 import java.lang.annotation.ElementType;
@@ -31,6 +32,7 @@ import java.util.List;
  * @since 1.2.0
  */
 @Primary
+@Singleton
 @Internal
 public class CompositeTraversableResolver implements TraversableResolver {
 

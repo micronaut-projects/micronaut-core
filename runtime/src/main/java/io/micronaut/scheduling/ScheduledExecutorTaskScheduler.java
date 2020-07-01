@@ -22,6 +22,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.cron.CronExpression;
 
 import javax.inject.Named;
+import javax.inject.Singleton;
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -37,6 +38,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Named(TaskExecutors.SCHEDULED)
 @Primary
+@Singleton
 public class ScheduledExecutorTaskScheduler implements TaskScheduler {
 
     private final ScheduledExecutorService executorService;
