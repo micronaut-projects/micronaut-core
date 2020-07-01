@@ -1375,7 +1375,7 @@ public class DefaultBeanContext implements BeanContext {
 
         Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(resolutionContext, beanType, qualifier, true, false);
         if (concreteCandidate.isPresent()) {
-            return new UnresolvedProvider<>(beanType, qualifier, this);
+            return new UnresolvedProvider<>(concreteCandidate.get(), this);
         } else {
             throw new NoSuchBeanException(beanType);
         }
