@@ -1,7 +1,6 @@
 group projectGroupId
+version projectVersion
 
-apply plugin: 'maven-publish'
-apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
 ext.startPomInfo = {
     delegate.parent {
         groupId projectGroupId
@@ -134,3 +133,5 @@ ext.extraPomInfo = {
         }
     }
 }
+
+apply plugin: "io.micronaut.build.publishing"
