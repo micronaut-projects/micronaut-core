@@ -819,13 +819,12 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         checkNotNull(key);
         checkNotNull(value);
 
-        final int weight = weigher.weightOf(key, value);
-        final WeightedValue<V> weightedValue = new WeightedValue<>(value, weight);
-
         final Node<K, V> node = data.get(key);
         if (node == null) {
             return null;
         }
+        final int weight = weigher.weightOf(key, value);
+        final WeightedValue<V> weightedValue = new WeightedValue<>(value, weight);
         for (;;) {
             final WeightedValue<V> oldWeightedValue = node.get();
             if (!oldWeightedValue.isAlive()) {
@@ -849,13 +848,13 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         checkNotNull(oldValue);
         checkNotNull(newValue);
 
-        final int weight = weigher.weightOf(key, newValue);
-        final WeightedValue<V> newWeightedValue = new WeightedValue<>(newValue, weight);
 
         final Node<K, V> node = data.get(key);
         if (node == null) {
             return false;
         }
+        final int weight = weigher.weightOf(key, newValue);
+        final WeightedValue<V> newWeightedValue = new WeightedValue<>(newValue, weight);
         for (;;) {
             final WeightedValue<V> weightedValue = node.get();
             if (!weightedValue.isAlive() || !weightedValue.contains(oldValue)) {

@@ -912,11 +912,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             return NAME_TO_TYPE_MAP.get(className);
         } else {
             String internalName = getInternalName(className);
-            StringBuilder start;
+            StringBuilder start = new StringBuilder(40);
             if (className.endsWith("[]")) {
-                start = new StringBuilder("[L" + internalName);
+                start.append("[L").append(internalName);
             } else {
-                start = new StringBuilder('L' + internalName);
+                start.append('L').append(internalName);
             }
             if (genericTypes != null && genericTypes.length > 0) {
                 start.append('<');
@@ -942,7 +942,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             builder.append(getTypeDescriptor(argumentType));
         }
 
-        builder.append(")");
+        builder.append(')');
 
         builder.append(getTypeDescriptor(returnType));
         return builder.toString();
@@ -961,7 +961,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             builder.append(getTypeDescriptor(argumentType));
         }
 
-        builder.append(")");
+        builder.append(')');
 
         builder.append(getTypeDescriptor(returnType));
         return builder.toString();
@@ -980,7 +980,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             builder.append(argumentType);
         }
 
-        builder.append(")");
+        builder.append(')');
 
         builder.append(returnTypeReference);
         return builder.toString();

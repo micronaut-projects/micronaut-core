@@ -181,12 +181,11 @@ public class GenericTypeUtils {
      * @return An optional with the resolved parameterized class
      */
     private static Optional<Class> resolveParameterizedTypeArgument(Type actualTypeArgument) {
-        ParameterizedType pt;
         if (actualTypeArgument instanceof Class) {
             return Optional.of((Class) actualTypeArgument);
         }
         if (actualTypeArgument instanceof ParameterizedType) {
-            pt = (ParameterizedType) actualTypeArgument;
+            ParameterizedType pt = (ParameterizedType) actualTypeArgument;
             Type rawType = pt.getRawType();
             if (rawType instanceof Class) {
                 return Optional.of((Class) rawType);

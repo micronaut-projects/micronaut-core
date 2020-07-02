@@ -145,18 +145,6 @@ public final class Parser {
             throw new RuntimeException(e);
         }
     }
-    /**
-     * Returns {@code true} if errors were found while parsing source files.
-     *
-     * <p>Normally, the parser reports error diagnostics, but in some cases there are no diagnostics;
-     * instead the parse tree contains {@linkplain ErroneousTree "erroneous"} nodes.
-     */
-    private static boolean foundParseErrors(
-            Iterable<? extends CompilationUnitTree> parsedCompilationUnits,
-            List<Diagnostic<? extends JavaFileObject>> diagnostics) {
-        return diagnostics.stream().map(Diagnostic::getKind).anyMatch(isEqual(ERROR))
-                || Iterables.any(parsedCompilationUnits, Parser::hasErrorNode);
-    }
 
     /**
      * Returns {@code true} if the tree contains at least one {@linkplain ErroneousTree "erroneous"}
@@ -196,11 +184,6 @@ public final class Parser {
 
     private static boolean isTrue(Boolean p) {
         return TRUE.equals(p);
-    }
-
-    private static ImmutableListMultimap<Diagnostic.Kind, Diagnostic<? extends JavaFileObject>>
-    sortDiagnosticsByKind(Iterable<Diagnostic<? extends JavaFileObject>> diagnostics) {
-        return Multimaps.index(diagnostics, input -> input.getKind());
     }
 
     /**

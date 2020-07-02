@@ -35,25 +35,21 @@ class TraceInterceptor implements Interceptor {
 
     @Override
     public Object intercept(InvocationContext context) {
-        if (LOG.isTraceEnabled()) {
-            if (context instanceof MethodExecutionHandle) {
-                MethodExecutionHandle handle = (MethodExecutionHandle) context;
+        if (LOG.isTraceEnabled() && context instanceof MethodExecutionHandle) {
+            MethodExecutionHandle handle = (MethodExecutionHandle) context;
 
-                Collection<MutableArgumentValue<?>> values = context.getParameters().values();
+            Collection<MutableArgumentValue<?>> values = context.getParameters().values();
 
-                LOG.trace("Invoking method {}#{}(..) with arguments {}",
-                        context.getTarget().getClass().getName(), handle.getMethodName(),
-                        values.stream().map(ArgumentValue::getValue).collect(Collectors.toList()));
-            }
+            LOG.trace("Invoking method {}#{}(..) with arguments {}",
+                    context.getTarget().getClass().getName(), handle.getMethodName(),
+                    values.stream().map(ArgumentValue::getValue).collect(Collectors.toList()));
         }
         Object result = context.proceed();
-        if (LOG.isTraceEnabled()) {
-            if (context instanceof MethodExecutionHandle) {
-                MethodExecutionHandle handle = (MethodExecutionHandle) context;
-                LOG.trace("Method {}#{}(..) returned result {}",
-                        context.getTarget().getClass().getName(), handle.getMethodName(),
-                        result);
-            }
+        if (LOG.isTraceEnabled() && context instanceof MethodExecutionHandle) {
+            MethodExecutionHandle handle = (MethodExecutionHandle) context;
+            LOG.trace("Method {}#{}(..) returned result {}",
+                    context.getTarget().getClass().getName(), handle.getMethodName(),
+                    result);
         }
         return result;
     }

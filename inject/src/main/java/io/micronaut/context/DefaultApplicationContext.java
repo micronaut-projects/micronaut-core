@@ -455,10 +455,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             if (typeArguments.size() == 2) {
                 Class source = typeArguments.get(0).getType();
                 Class target = typeArguments.get(1).getType();
-                if (source != null && target != null) {
-                    if (!(source == Object.class && target == Object.class)) {
-                        getConversionService().addConverter(source, target, typeConverter);
-                    }
+                if (source != null && target != null && !(source == Object.class && target == Object.class)) {
+                    getConversionService().addConverter(source, target, typeConverter);
                 }
             }
         }

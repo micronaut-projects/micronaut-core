@@ -226,13 +226,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Override
     @SuppressWarnings({"unchecked"})
     public Stream<ExecutableMethod<T, ?>> findPossibleMethods(String name) {
-        if (executableMethodMap != null) {
-            if (executableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
-                return executableMethodMap
-                        .values()
-                        .stream()
-                        .filter(method -> method.getMethodName().equals(name));
-            }
+        if (executableMethodMap != null && executableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
+            return executableMethodMap
+                    .values()
+                    .stream()
+                    .filter(method -> method.getMethodName().equals(name));
         }
         return Stream.empty();
     }
@@ -597,10 +595,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @SuppressWarnings({"unused"})
     @UsedByGeneratedCode
     protected Object injectAnother(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         if (bean == null) {
             throw new BeanInstantiationException(resolutionContext, "Bean factory returned null");
         }
+        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         return defaultContext.inject(resolutionContext, this, bean);
     }
 
@@ -617,7 +615,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     @UsedByGeneratedCode
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         boolean addInCreationHandling = isSingleton() && !CollectionUtils.isNotEmpty(postConstructMethods);
         DefaultBeanContext.BeanKey key = null;
         if (addInCreationHandling) {
@@ -643,6 +640,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             }
         }
 
+        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         for (int i = 0; i < methodInjectionPoints.size(); i++) {
             MethodInjectionPoint methodInjectionPoint = methodInjectionPoints.get(i);
             if (methodInjectionPoint.isPostConstructMethod() && methodInjectionPoint.requiresReflection()) {

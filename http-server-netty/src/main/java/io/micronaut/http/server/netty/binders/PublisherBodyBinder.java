@@ -96,7 +96,6 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                         if (LOG.isTraceEnabled()) {
                             LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
                         }
-                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
                         if (message instanceof ByteBufHolder) {
                             message = ((ByteBufHolder) message).content();
                             if (message instanceof EmptyByteBuf) {
@@ -104,6 +103,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                             }
                         }
 
+                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
                         Optional<?> converted = conversionService.convert(message, conversionContext);
 
                         if (converted.isPresent()) {

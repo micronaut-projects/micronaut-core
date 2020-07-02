@@ -122,13 +122,11 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
             final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), headers);
             final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
             final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
-            if (isHttp2) {
-                if (request instanceof NettyHttpRequest) {
-                    final io.netty.handler.codec.http.HttpHeaders nativeHeaders = ((NettyHttpRequest<?>) request).getNativeRequest().headers();
-                    final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
-                    if (streamId != null) {
-                        finalResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
-                    }
+            if (isHttp2 && request instanceof NettyHttpRequest) {
+                final io.netty.handler.codec.http.HttpHeaders nativeHeaders = ((NettyHttpRequest<?>) request).getNativeRequest().headers();
+                final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
+                if (streamId != null) {
+                    finalResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
                 }
             }
             context.write(finalResponse, context.voidPromise());

@@ -30,13 +30,10 @@ import java.util.Optional;
 @Deprecated
 public class NettyPartDataToArrayConverter implements TypeConverter<NettyPartData, byte[]> {
 
-    private final ConversionService conversionService;
-
     /**
      * @param conversionService The conversion service
      */
     protected NettyPartDataToArrayConverter(ConversionService conversionService) {
-        this.conversionService = conversionService;
     }
 
     @Override

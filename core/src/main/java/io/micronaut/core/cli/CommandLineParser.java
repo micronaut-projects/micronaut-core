@@ -190,7 +190,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
      * @param arg system arg
      */
     protected void processSystemArg(DefaultCommandLine cl, String arg) {
-        int i = arg.indexOf("=");
+        int i = arg.indexOf('=');
         String name = arg.substring(2, i);
         String value = arg.substring(i + 1, arg.length());
         cl.addSystemProperty(name, value);

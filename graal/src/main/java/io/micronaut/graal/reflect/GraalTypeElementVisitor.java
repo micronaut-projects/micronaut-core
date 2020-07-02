@@ -83,8 +83,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private static final String ALL_PUBLIC_METHODS = "allPublicMethods";
 
-    private static final String ALL_PUBLIC_FIELDS = "allPublicFields";
-
     private static final String ALL_DECLARED_FIELDS = "allDeclaredFields";
 
     private static final String NAME = "name";
@@ -166,10 +164,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     @SuppressWarnings("unchecked")
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
-        if (!isSubclass) {
-            if (element.hasDeclaredStereotype(ReflectiveAccess.class)) {
-                processMethodElement(element);
-            }
+        if (!isSubclass && element.hasDeclaredStereotype(ReflectiveAccess.class)) {
+            processMethodElement(element);
         }
     }
 
@@ -236,7 +232,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private void generateNativeImageProperties(VisitorContext visitorContext) {
         List<Map> json;
-        ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
 
         Optional<Path> projectDir = visitorContext.getProjectDir();
 
@@ -286,6 +281,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     ));
                 }
 
+                ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
                 try (Writer w = gf.openWriter()) {
                     visitorContext.info("Writing " + REFLECTION_CONFIG_JSON + " file to destination: " + gf.getName());
 

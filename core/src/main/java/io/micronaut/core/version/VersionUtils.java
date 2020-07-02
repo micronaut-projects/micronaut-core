@@ -52,7 +52,7 @@ public class VersionUtils {
                 String classPath = res.toString();
 
                 if (classPath.startsWith("jar")) {
-                    String manifestPath = classPath.substring(0, classPath.lastIndexOf("!") + 1) +
+                    String manifestPath = classPath.substring(0, classPath.lastIndexOf('!') + 1) +
                             "/META-INF/MANIFEST.MF";
                     Manifest manifest;
                     try {
