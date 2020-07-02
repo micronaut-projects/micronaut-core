@@ -17,7 +17,8 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.inject.BeanDefinition;
+
 import javax.inject.Provider;
 
 /**
@@ -30,31 +31,27 @@ import javax.inject.Provider;
 @Internal
 class UnresolvedProvider<T> implements Provider<T> {
 
-    private final Class<T> beanType;
-    private final Qualifier<T> qualifier;
+    private final BeanDefinition<T> beanDefinition;
     private final BeanContext context;
+    private T bean;
 
     /**
-     * @param beanType The bean type
+     * @param beanDefinition The bean definition
      * @param context  The bean context
      */
-    UnresolvedProvider(Class<T> beanType, BeanContext context) {
-        this(beanType, null, context);
-    }
-
-    /**
-     * @param beanType The bean type
-     * @param qualifier The qualifier to use
-     * @param context  The bean context
-     */
-    UnresolvedProvider(Class<T> beanType, @Nullable Qualifier<T> qualifier, BeanContext context) {
-        this.beanType = beanType;
+    UnresolvedProvider(BeanDefinition<T> beanDefinition, BeanContext context) {
+        this.beanDefinition = beanDefinition;
         this.context = context;
-        this.qualifier = qualifier;
     }
 
     @Override
     public T get() {
-        return context.getBean(beanType, qualifier);
+        if (beanDefinition.isSingleton()) {
+            if (bean == null) { // Allow concurrent access
+                bean = context.getBean(beanDefinition);
+            }
+            return bean;
+        }
+        return context.getBean(beanDefinition);
     }
 }
