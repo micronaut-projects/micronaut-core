@@ -416,8 +416,8 @@ public class RequiresCondition implements Condition {
                             return result;
                         } catch (Exception e) {
                             // non-semantic versioning in play
-                            char majorVersion = resolveJavaMajorVersion(javaVersion);
-                            char requiredVersion = resolveJavaMajorVersion(version);
+                            int majorVersion = resolveJavaMajorVersion(javaVersion);
+                            int requiredVersion = resolveJavaMajorVersion(version);
 
                             if (majorVersion >= requiredVersion) {
                                 return true;
@@ -439,20 +439,37 @@ public class RequiresCondition implements Condition {
         return true;
     }
 
-    private char resolveJavaMajorVersion(String javaVersion) {
-        char majorVersion = 0;
+    private int resolveJavaMajorVersion(String javaVersion) {
+        int majorVersion = 0;
         if (javaVersion.indexOf('.') > -1) {
             String[] tokens = javaVersion.split("\\.");
-            majorVersion = tokens[0].charAt(0);
-            if (Character.isDigit(majorVersion)) {
-                if (majorVersion == '1' && tokens.length > 1) {
-                    majorVersion = tokens[1].charAt(0);
+            String first = tokens[0];
+            if (first.length() == 1) {
+                majorVersion = first.charAt(0);
+                if (Character.isDigit(majorVersion)) {
+                    if (majorVersion == '1' && tokens.length > 1) {
+                        majorVersion = tokens[1].charAt(0);
+                    }
+                }
+            } else {
+                try {
+                    majorVersion = Integer.parseInt(first);
+                } catch (NumberFormatException e) {
+                    // ignore
                 }
             }
         } else {
-            char ch = javaVersion.charAt(0);
-            if (Character.isDigit(ch)) {
-                majorVersion = ch;
+            if (javaVersion.length() == 1) {
+                char ch = javaVersion.charAt(0);
+                if (Character.isDigit(ch)) {
+                    majorVersion = ch;
+                }
+            } else {
+                try {
+                    majorVersion = Integer.parseInt(javaVersion);
+                } catch (NumberFormatException e) {
+                    // ignore
+                }
             }
         }
         return majorVersion;
