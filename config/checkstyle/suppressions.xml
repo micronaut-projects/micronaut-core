@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 
 <!DOCTYPE suppressions PUBLIC
-        "-//Puppy Crawl//DTD Suppressions 1.1//EN"
-        "http://checkstyle.sourceforge.net/dtds/suppressions_1_1.dtd">
+        "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+        "https://checkstyle.org/dtds/suppressions_1_2.dtd">
 
 <suppressions>
     <suppress checks="FileLength"
-              files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|BeanDefinitionInjectProcessor.java"/>
+              files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|BeanDefinitionInjectProcessor.java|AbstractBeanDefinition.java|DefaultValidator.java"/>
     <suppress checks="DeclarationOrder"
               files="UriTemplate.java"/>
     <suppress checks="Header"

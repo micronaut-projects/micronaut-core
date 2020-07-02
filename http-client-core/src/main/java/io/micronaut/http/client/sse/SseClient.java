@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,7 +52,6 @@ public interface SseClient {
      * @return A {@link Publisher} that emits an {@link Event} with the data represented by the eventType argument
      */
     <I, B> Publisher<Event<B>> eventStream(HttpRequest<I> request, Argument<B> eventType);
-
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>

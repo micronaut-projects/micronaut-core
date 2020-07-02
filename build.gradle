@@ -1,26 +1,16 @@
 buildscript {
     repositories {
+        mavenLocal()
+        maven { url "https://oss.jfrog.org/oss-snapshot-local" }
+        maven { url "https://dl.bintray.com/micronaut/core-releases-local" }
         maven { url "https://repo.grails.org/grails/core" }
     }
     dependencies {
-        classpath "org.grails:grails-docs:$grailsVersion"
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.5'
-        classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
-        classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:6.0.0'
+        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.4.BUILD-SNAPSHOT"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
-        classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.2"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
-        classpath "io.micronaut.docs:micronaut-docs-asciidoc-extensions:$micronautDocsVersion"
-        classpath "io.micronaut.docs:micronaut-docs-gradle-plugins:$micronautDocsVersion", {
-            exclude module:'shadow'
-            exclude module:'plugin-shadow'
-        }
     }
-}
-
-plugins {
-    id 'com.github.hierynomus.license' version '0.15.0' apply false
-    id 'com.github.ben-manes.versions' version '0.27.0'
 }
 
 apply plugin: 'org.aim42.htmlSanityCheck'
@@ -28,15 +18,6 @@ apply plugin: 'org.aim42.htmlSanityCheck'
 repositories {
     maven { url "https://repo.grails.org/grails/core" }
     //maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
-}
-
-version project.projectVersion
-
-ext {
-    distInstallDir = file("$buildDir/dist-tmp")
-    homeBinDir = file("bin")
-    homeLibDir = file("lib")
-    homeSrcDir = file("src")
 }
 
 ext {
@@ -667,8 +648,6 @@ task testReportsAggregate {
 
 subprojects { Project subproject ->
 
-    version project.projectVersion
-
     ext {
         userOrg = "grails"
         isGrailsPlugin = false
@@ -682,78 +661,18 @@ subprojects { Project subproject ->
 
     group projectGroupId
 
-    repositories {
-        jcenter()
-    }
+    apply plugin: "io.micronaut.build.common"
+    apply plugin: "io.micronaut.build.dependency-updates"
+    apply plugin: "io.micronaut.build.publishing"
 
-    if (!subproject.name.contains("bom")) {
-        apply plugin: "groovy"
-        apply plugin: "java-library"
-
-        sourceCompatibility = '1.8'
-        targetCompatibility = '1.8'
-        compileJava.options.compilerArgs.add '-parameters'
-        compileTestJava.options.compilerArgs.add '-parameters'
-
-        if (
-        !subproject.name.startsWith('test-') &&
-                !subproject.toString().contains('build-projects') &&
-                        !subproject.toString().contains('benchmarks')
-        ) {
-
-            apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
-            apply plugin: 'checkstyle'
-
-            checkstyle {
-                toolVersion = 8.16
-                configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
-
-                // Per submodule
-                maxErrors = 0
-                maxWarnings = 10
-
-                showViolations = true
-            }
-
-            checkstyleTest.enabled = false
-        }
-    }
-
-    jar {
-        manifest {
-            attributes('Automatic-Module-Name': "${subproject.group}.${subproject.name}".replaceAll('[^\\w\\.\\$_]', "_"))
-            attributes('Implementation-Version': projectVersion)
-            attributes('Implementation-Title': 'Micronaut')
-        }
-    }
-
-//    tasks.withType(GroovyCompile).configureEach {
-//        options.incremental = true
-//    }
-
-    tasks.withType(JavaCompile) {
-        options.compilerArgs.addAll([
-                '-parameters',
-                "-Amicronaut.processing.group=$project.group",
-                "-Amicronaut.processing.module=micronaut-$project.name",
-        ])
+    micronautBuild {
+        enableBom = false
+        enableProcessing = false
     }
 
     tasks.withType(Test) {
         useJUnitPlatform()
-        jvmArgs '-Duser.country=US', '-Duser.language=en', '-Xmx2048m'
-        reports.html.enabled = !System.getenv("GITHUB_ACTIONS")
-        reports.junitXml.enabled = !System.getenv("GITHUB_ACTIONS")
-        testLogging {
-            exceptionFormat = 'full'
-        }
-        afterSuite {
-            System.out.print(".")
-            System.out.flush()
-        }
-        reports {
-          junitXml.enabled = true
-        }    
+        jvmArgs '-Xmx2048m'
         systemProperty "micronaut.cloud.platform", "OTHER"
     }
 
@@ -766,13 +685,9 @@ subprojects { Project subproject ->
 
     configurations {
         shadowCompile
-        documentation
         all {
             resolutionStrategy.eachDependency { DependencyResolveDetails details ->
                 String group = details.requested.group
-                if (group == 'org.codehaus.groovy') {
-                    details.useVersion(groovyVersion)
-                }
                 if (group == 'org.ow2.asm') {
                     details.useVersion(asmVersion)
                 }
@@ -791,12 +706,9 @@ subprojects { Project subproject ->
     def isDocumented = subproject.name != 'inject' && subproject.name != 'core' && subproject.name != 'aop' && !subproject.name.contains('asciidoc-config-props')
 
     dependencies {
-        documentation "org.codehaus.groovy:groovy-templates:$groovyVersion"
-        documentation "org.codehaus.groovy:groovy-dateutil:$groovyVersion"
         if (subproject.name != "bom") {
             api dependencyVersion("slf4j")
         }
-
 
         if (isDocumented) {
             annotationProcessor "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion", {
@@ -809,10 +721,7 @@ subprojects { Project subproject ->
         testImplementation(dependencyVersion("spock")) {
             exclude module: 'groovy-all'
         }
-        testImplementation "cglib:cglib-nodep:3.3.0"
-        testImplementation "org.objenesis:objenesis:3.1"
 
-        testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
         testImplementation "org.codehaus.groovy:groovy-test-junit5:$groovyVersion"
         compileOnly "org.ow2.asm:asm:$asmVersion"
         compileOnly "org.ow2.asm:asm-commons:$asmVersion"
@@ -824,22 +733,30 @@ subprojects { Project subproject ->
         testAnnotationProcessor "org.ow2.asm:asm:$asmVersion"
         testAnnotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
     }
-
-    groovydoc {
-        classpath += project.configurations.documentation
+    spotless {
+        java {
+            targetExclude '**/io/micronaut/core/io/scan/AnnotationClassReader.java'
+            targetExclude '**/io/micronaut/core/io/scan/Attribute.java'
+            targetExclude '**/io/micronaut/core/io/scan/Context.java'
+            targetExclude '**/io/micronaut/core/util/clhm/**'
+            targetExclude '**/io/micronaut/core/util/AntPathMatcher.java'
+            targetExclude '**/io/micronaut/discovery/eureka/client/v2/AmazonInfo.java'
+            targetExclude '**/io/micronaut/discovery/eureka/client/v2/DataCenterInfo.java'
+            targetExclude '**/io/micronaut/discovery/eureka/client/v2/LeaseInfo.java'
+            targetExclude '**/io/micronaut/support/InMemoryJavaFileManager.java'
+            targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
+            targetExclude '**/org/atinject/tck/auto/Tck.kt'
+            targetExclude '**/io/micronaut/http/uri/QueryStringDecoder.java'
+        }
+        format 'javaMisc', {
+            targetExclude '**/io/micronaut/core/util/clhm/**'
+            targetExclude '**/io/micronaut/http/netty/stream/package-info.java'
+        }
     }
-
-    task allDeps(type: DependencyReportTask) {}
 }
+apply plugin: "io.micronaut.build.docs"
+apply plugin: "io.micronaut.build.dependency-updates"
 
-apply from:"https://raw.githubusercontent.com/micronaut-projects/micronaut-docs/v$micronautDocsVersion/gradle/docs.gradle"
-
-// IDEA 2017.2 made a breaking change with IDE build output vs gradle build output
-// [see https://youtrack.jetbrains.com/issue/IDEA-175172]
-// the problem here is the gradle build uses <module-dir>/build/classes/main
-// while IDEA uses <module-dir>/out/production/..
-// As a result, compiling ast or java-inject module and using the IDEA test runner fails because the
-// generated bean classes for injection are in <module-dir>/build, not <module-dir>/out
 allprojects {
     apply plugin: 'idea'
 
@@ -849,13 +766,13 @@ allprojects {
             testOutputDir file('build/classes/groovy/test')
         }
     }
-    apply from: rootProject.file('gradle/license.gradle')
 }
 
 htmlSanityCheck {
     sourceDir = new File("${rootProject.buildDir}/docs/")
-    sourceDocuments = ["index.html"]
-
+    sourceDocuments = fileTree(sourceDir) {
+        include "index.html"
+    }
 }
 docs.finalizedBy(htmlSanityCheck)
 

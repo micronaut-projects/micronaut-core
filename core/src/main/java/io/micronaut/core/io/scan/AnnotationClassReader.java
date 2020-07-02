@@ -818,7 +818,6 @@ class AnnotationClassReader {
         return new Attribute(type).read(this, off, len, null, -1, null);
     }
 
-
     /**
      * Reads a byte value in {@link #b b}. <i>This method is intended for
      * {@link Attribute} sub classes, and is normally not needed by class

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -34,7 +34,6 @@ import java.util.Set;
  */
 public class GenericTypeUtils {
 
-
     /**
      * Resolves a single generic type argument for the given field.
      *
@@ -52,7 +51,6 @@ public class GenericTypeUtils {
         }
         return Optional.empty();
     }
-
 
     /**
      * Resolve all of the type arguments for the given interface from the given type. Also
@@ -77,7 +75,6 @@ public class GenericTypeUtils {
         return resolvedType.map(GenericTypeUtils::resolveTypeArguments)
                 .orElse(ReflectionUtils.EMPTY_CLASS_ARRAY);
     }
-
 
     /**
      * Resolve all of the type arguments for the given super type from the given type.
