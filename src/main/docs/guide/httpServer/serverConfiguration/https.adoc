@@ -32,7 +32,7 @@ $ openssl pkcs12 -export \
                  -inkey server.key \ # <2>
                  -out server.p12 \ # <3>
                  -name someAlias \ <4>
-                 -CAfile ca.crt -caname root
+                 -chain -CAfile ca.crt -caname root
 ----
 <1> The original `server.crt` file
 <2> The original `server.key` file
