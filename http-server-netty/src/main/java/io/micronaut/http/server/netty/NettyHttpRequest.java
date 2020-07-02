@@ -342,7 +342,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 return (AbstractHttpData) httpContent;
             });
         } else {
-            receivedContent.add(httpContent);
+            receivedContent.add(httpContent.retain());
         }
     }
 
@@ -374,6 +374,25 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     protected Charset initCharset(Charset characterEncoding) {
         return characterEncoding == null ? serverConfiguration.getDefaultCharset() : characterEncoding;
     }
+
+    /**
+     * @return Return true if the request is form data.
+     */
+    @Internal
+    final boolean isFormOrMultipartData() {
+        MediaType ct = headers.contentType().orElse(null);
+        return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || ct.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
+    }
+
+    /**
+     * @return Return true if the request is form data.
+     */
+    @Internal
+    final boolean isFormData() {
+        MediaType ct = headers.contentType().orElse(null);
+        return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+    }
+
 
     /**
      * Lookup the current request from the context.
