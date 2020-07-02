@@ -399,7 +399,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
 
     private ClientKey getClientKey(AnnotationMetadata metadata) {
         final HttpVersion httpVersion =
-                metadata.enumValue(Client.class, "version", HttpVersion.class).orElse(null);
+                metadata.enumValue(Client.class, "httpVersion", HttpVersion.class).orElse(null);
         String clientId = metadata.stringValue(Client.class).orElse(null);
         String path = metadata.stringValue(Client.class, "path").orElse(null);
         String filterAnnotation = metadata

@@ -700,251 +700,299 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private Subscriber<Object> buildSubscriber(NettyHttpRequest<?> request,
                                                ChannelHandlerContext context,
                                                RouteMatch<?> finalRoute) {
-        return new CompletionAwareSubscriber<Object>() {
-            Boolean alwaysAddContent = request.getContentType()
-                    .map(type -> type.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
-                    .orElse(false);
-            RouteMatch<?> routeMatch = finalRoute;
-            AtomicBoolean executed = new AtomicBoolean(false);
-            AtomicLong pressureRequested = new AtomicLong(0);
-            ConcurrentHashMap<String, UnicastProcessor> subjects = new ConcurrentHashMap<>();
-            ConcurrentHashMap<Integer, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
-            ConversionService conversionService = ConversionService.SHARED;
-            Subscription s;
-            LongConsumer onRequest = num -> pressureRequested.updateAndGet(p -> {
-                long newVal = p - num;
-                if (newVal < 0) {
-                    s.request(num - p);
-                    return 0;
-                } else {
-                    return newVal;
-                }
-            });
+        boolean isFormData = request.isFormOrMultipartData();
+        if (isFormData) {
+            return new CompletionAwareSubscriber<Object>() {
+                final boolean alwaysAddContent = request.isFormData();
+                RouteMatch<?> routeMatch = finalRoute;
+                final AtomicBoolean executed = new AtomicBoolean(false);
+                final AtomicLong pressureRequested = new AtomicLong(0);
+                final ConcurrentHashMap<String, UnicastProcessor> subjects = new ConcurrentHashMap<>();
+                final ConcurrentHashMap<Integer, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
+                final ConversionService conversionService = ConversionService.SHARED;
+                Subscription s;
+                final LongConsumer onRequest = num -> pressureRequested.updateAndGet(p -> {
+                    long newVal = p - num;
+                    if (newVal < 0) {
+                        s.request(num - p);
+                        return 0;
+                    } else {
+                        return newVal;
+                    }
+                });
 
-            Flowable processFlowable(Flowable flowable, Integer dataKey, boolean controlsFlow) {
-                if (controlsFlow) {
-                    flowable = flowable.doOnRequest(onRequest);
-                }
-                return flowable
-                        .doAfterTerminate(() -> {
-                            if (controlsFlow) {
-                                HttpDataReference dataReference = dataReferences.get(dataKey);
-                                dataReference.destroy();
-                            }
-                        });
-            }
-
-            @Override
-            protected void doOnSubscribe(Subscription subscription) {
-                this.s = subscription;
-                subscription.request(1);
-            }
-
-            @Override
-            protected void doOnNext(Object message) {
-                boolean executed = this.executed.get();
-                if (message instanceof ByteBufHolder) {
-                    if (message instanceof HttpData) {
-                        HttpData data = (HttpData) message;
-
-                        if (LOG.isTraceEnabled()) {
-                            LOG.trace("Received HTTP Data for request [{}]: {}", request, message);
-                        }
-
-                        String name = data.getName();
-                        Optional<Argument<?>> requiredInput = routeMatch.getRequiredInput(name);
-
-                        if (requiredInput.isPresent()) {
-                            Argument<?> argument = requiredInput.get();
-                            Supplier<Object> value;
-                            boolean isPublisher = Publishers.isConvertibleToPublisher(argument.getType());
-                            boolean chunkedProcessing = false;
-
-                            if (isPublisher) {
-                                Integer dataKey = System.identityHashCode(data);
-                                HttpDataReference dataReference = dataReferences.computeIfAbsent(dataKey, key -> new HttpDataReference(data));
-                                Argument typeVariable;
-
-                                if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                                    typeVariable = ARGUMENT_PART_DATA;
-                                } else {
-                                    typeVariable = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                Flowable processFlowable(Flowable flowable, Integer dataKey, boolean controlsFlow) {
+                    if (controlsFlow) {
+                        flowable = flowable.doOnRequest(onRequest);
+                    }
+                    return flowable
+                            .doAfterTerminate(() -> {
+                                if (controlsFlow) {
+                                    HttpDataReference dataReference = dataReferences.get(dataKey);
+                                    dataReference.destroy();
                                 }
-                                Class typeVariableType = typeVariable.getType();
+                            });
+                }
 
-                                UnicastProcessor namedSubject = subjects.computeIfAbsent(name, key -> UnicastProcessor.create());
+                @Override
+                protected void doOnSubscribe(Subscription subscription) {
+                    this.s = subscription;
+                    subscription.request(1);
+                }
 
-                                chunkedProcessing = PartData.class.equals(typeVariableType) ||
-                                        Publishers.isConvertibleToPublisher(typeVariableType) ||
-                                        ClassUtils.isJavaLangType(typeVariableType);
+                @Override
+                protected void doOnNext(Object message) {
+                    boolean executed = this.executed.get();
+                    if (message instanceof ByteBufHolder) {
+                        if (message instanceof HttpData) {
+                            HttpData data = (HttpData) message;
 
-                                if (Publishers.isConvertibleToPublisher(typeVariableType)) {
-                                    boolean streamingFileUpload = StreamingFileUpload.class.isAssignableFrom(typeVariableType);
-                                    if (streamingFileUpload) {
+                            if (LOG.isTraceEnabled()) {
+                                LOG.trace("Received HTTP Data for request [{}]: {}", request, message);
+                            }
+
+                            String name = data.getName();
+                            Optional<Argument<?>> requiredInput = routeMatch.getRequiredInput(name);
+
+                            if (requiredInput.isPresent()) {
+                                Argument<?> argument = requiredInput.get();
+                                Supplier<Object> value;
+                                boolean isPublisher = Publishers.isConvertibleToPublisher(argument.getType());
+                                boolean chunkedProcessing = false;
+
+                                if (isPublisher) {
+                                    Integer dataKey = System.identityHashCode(data);
+                                    HttpDataReference dataReference = dataReferences.computeIfAbsent(dataKey, key -> new HttpDataReference(data));
+                                    Argument typeVariable;
+
+                                    if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
                                         typeVariable = ARGUMENT_PART_DATA;
                                     } else {
-                                        typeVariable = typeVariable.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                                        typeVariable = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                                     }
-                                    dataReference.subject.getAndUpdate(subject -> {
-                                        if (subject == null) {
-                                            UnicastProcessor childSubject = UnicastProcessor.create();
-                                            Flowable flowable = processFlowable(childSubject, dataKey, true);
-                                            if (streamingFileUpload && data instanceof FileUpload) {
-                                                namedSubject.onNext(new NettyStreamingFileUpload(
+                                    Class typeVariableType = typeVariable.getType();
+
+                                    UnicastProcessor namedSubject = subjects.computeIfAbsent(name, key -> UnicastProcessor.create());
+
+                                    chunkedProcessing = PartData.class.equals(typeVariableType) ||
+                                            Publishers.isConvertibleToPublisher(typeVariableType) ||
+                                            ClassUtils.isJavaLangType(typeVariableType);
+
+                                    if (Publishers.isConvertibleToPublisher(typeVariableType)) {
+                                        boolean streamingFileUpload = StreamingFileUpload.class.isAssignableFrom(typeVariableType);
+                                        if (streamingFileUpload) {
+                                            typeVariable = ARGUMENT_PART_DATA;
+                                        } else {
+                                            typeVariable = typeVariable.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                                        }
+                                        dataReference.subject.getAndUpdate(subject -> {
+                                            if (subject == null) {
+                                                UnicastProcessor childSubject = UnicastProcessor.create();
+                                                Flowable flowable = processFlowable(childSubject, dataKey, true);
+                                                if (streamingFileUpload && data instanceof FileUpload) {
+                                                    namedSubject.onNext(new NettyStreamingFileUpload(
+                                                            (FileUpload) data,
+                                                            serverConfiguration.getMultipart(),
+                                                            getIoExecutor(),
+                                                            flowable));
+                                                } else {
+                                                    namedSubject.onNext(flowable);
+                                                }
+
+                                                return childSubject;
+                                            }
+                                            return subject;
+                                        });
+
+                                    }
+
+
+                                    UnicastProcessor subject;
+
+                                    final UnicastProcessor ds = dataReference.subject.get();
+                                    if (ds != null) {
+                                        subject = ds;
+                                    } else {
+                                        subject = namedSubject;
+                                    }
+
+                                    Object part = data;
+
+                                    if (chunkedProcessing) {
+                                        HttpDataReference.Component component = dataReference.addComponent(e -> {
+                                            subject.onError(e);
+                                            s.cancel();
+                                        });
+                                        if (component == null) {
+                                            return;
+                                        }
+                                        part = new NettyPartData(dataReference, component);
+                                    }
+
+                                    if (data instanceof FileUpload &&
+                                            StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
+                                        dataReference.upload.getAndUpdate(upload -> {
+                                            if (upload == null) {
+                                                return new NettyStreamingFileUpload(
                                                         (FileUpload) data,
                                                         serverConfiguration.getMultipart(),
                                                         getIoExecutor(),
-                                                        flowable));
-                                            } else {
-                                                namedSubject.onNext(flowable);
+                                                        processFlowable(subject, dataKey, true));
                                             }
-
-                                            return childSubject;
-                                        }
-                                        return subject;
-                                    });
-
-                                }
-
-
-                                UnicastProcessor subject;
-
-                                final UnicastProcessor ds = dataReference.subject.get();
-                                if (ds != null) {
-                                    subject = ds;
-                                } else {
-                                    subject = namedSubject;
-                                }
-
-                                Object part = data;
-
-                                if (chunkedProcessing) {
-                                    HttpDataReference.Component component = dataReference.addComponent(e -> {
-                                        subject.onError(e);
-                                        s.cancel();
-                                    });
-                                    if (component == null) {
-                                        return;
+                                            return upload;
+                                        });
                                     }
-                                    part = new NettyPartData(dataReference, component);
-                                }
 
-                                if (data instanceof FileUpload &&
-                                        StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                                    dataReference.upload.getAndUpdate(upload -> {
-                                        if (upload == null) {
-                                            return new NettyStreamingFileUpload(
-                                                    (FileUpload) data,
-                                                    serverConfiguration.getMultipart(),
-                                                    getIoExecutor(),
-                                                    processFlowable(subject, dataKey, true));
-                                        }
-                                        return upload;
-                                    });
-                                }
+                                    Optional<?> converted = conversionService.convert(part, typeVariable);
 
-                                Optional<?> converted = conversionService.convert(part, typeVariable);
+                                    converted.ifPresent(subject::onNext);
 
-                                converted.ifPresent(subject::onNext);
-
-                                if (data.isCompleted() && chunkedProcessing) {
-                                    subject.onComplete();
-                                }
-
-                                value = () -> {
-                                    StreamingFileUpload upload = dataReference.upload.get();
-                                    if (upload != null) {
-                                        return upload;
-                                    } else {
-                                        return processFlowable(namedSubject, dataKey, dataReference.subject.get() == null);
+                                    if (data.isCompleted() && chunkedProcessing) {
+                                        subject.onComplete();
                                     }
-                                };
 
-                            } else {
-                                if (data instanceof Attribute && !data.isCompleted()) {
-                                    request.addContent(data);
-                                    s.request(1);
-                                    return;
-                                } else {
                                     value = () -> {
-                                        if (data.refCnt() > 0) {
-                                            return data;
+                                        StreamingFileUpload upload = dataReference.upload.get();
+                                        if (upload != null) {
+                                            return upload;
                                         } else {
-                                            return null;
+                                            return processFlowable(namedSubject, dataKey, dataReference.subject.get() == null);
                                         }
                                     };
-                                }
-                            }
 
-                            if (!executed) {
-                                String argumentName = argument.getName();
-                                if (!routeMatch.isSatisfied(argumentName)) {
-                                    routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, value.get()));
+                                } else {
+                                    if (data instanceof Attribute && !data.isCompleted()) {
+                                        request.addContent(data);
+                                        s.request(1);
+                                        return;
+                                    } else {
+                                        value = () -> {
+                                            if (data.refCnt() > 0) {
+                                                return data;
+                                            } else {
+                                                return null;
+                                            }
+                                        };
+                                    }
                                 }
-                                if (isPublisher && chunkedProcessing) {
-                                    //accounting for the previous request
-                                    pressureRequested.incrementAndGet();
-                                }
-                                if (routeMatch.isExecutable() || message instanceof LastHttpContent) {
-                                    executeRoute();
-                                    executed = true;
-                                }
-                            }
 
-                            if (alwaysAddContent) {
+                                if (!executed) {
+                                    String argumentName = argument.getName();
+                                    if (!routeMatch.isSatisfied(argumentName)) {
+                                        routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, value.get()));
+                                    }
+                                    if (isPublisher && chunkedProcessing) {
+                                        //accounting for the previous request
+                                        pressureRequested.incrementAndGet();
+                                    }
+                                    if (routeMatch.isExecutable() || message instanceof LastHttpContent) {
+                                        executeRoute();
+                                        executed = true;
+                                    }
+                                }
+
+                                if (alwaysAddContent) {
+                                    request.addContent(data);
+                                }
+
+                                if (!executed || !chunkedProcessing) {
+                                    s.request(1);
+                                }
+
+                            } else {
                                 request.addContent(data);
-                            }
-
-                            if (!executed || !chunkedProcessing) {
                                 s.request(1);
                             }
-
                         } else {
-                            request.addContent(data);
+                            request.addContent((ByteBufHolder) message);
                             s.request(1);
                         }
                     } else {
-                        request.addContent((ByteBufHolder) message);
+                        ((NettyHttpRequest) request).setBody(message);
                         s.request(1);
                     }
-                } else {
-                    ((NettyHttpRequest) request).setBody(message);
-                    s.request(1);
                 }
-            }
 
-            @Override
-            protected void doOnError(Throwable t) {
-                try {
-                    s.cancel();
-                    exceptionCaught(context, t);
-                } catch (Exception e) {
-                    // should never happen
-                    writeDefaultErrorResponse(context, request, e, false);
-                }
-            }
-
-            @Override
-            protected void doOnComplete() {
-                for (UnicastProcessor subject : subjects.values()) {
-                    if (!subject.hasComplete()) {
-                        subject.onComplete();
-                    }
-                }
-                executeRoute();
-            }
-
-            private void executeRoute() {
-                if (executed.compareAndSet(false, true)) {
+                @Override
+                protected void doOnError(Throwable t) {
                     try {
-                        routeMatch = prepareRouteForExecution(routeMatch, request, false);
-                        routeMatch.execute();
+                        s.cancel();
+                        exceptionCaught(context, t);
                     } catch (Exception e) {
-                        context.pipeline().fireExceptionCaught(e);
+                        // should never happen
+                        writeDefaultErrorResponse(context, request, e, false);
                     }
                 }
-            }
-        };
+
+                @Override
+                protected void doOnComplete() {
+                    for (UnicastProcessor subject : subjects.values()) {
+                        if (!subject.hasComplete()) {
+                            subject.onComplete();
+                        }
+                    }
+                    executeRoute();
+                }
+
+                private void executeRoute() {
+                    if (executed.compareAndSet(false, true)) {
+                        try {
+                            routeMatch = prepareRouteForExecution(routeMatch, request, false);
+                            routeMatch.execute();
+                        } catch (Exception e) {
+                            context.pipeline().fireExceptionCaught(e);
+                        }
+                    }
+                }
+            };
+        } else {
+            return new CompletionAwareSubscriber<Object>() {
+                private Subscription s;
+                private RouteMatch<?> routeMatch = finalRoute;
+                private AtomicBoolean executed = new AtomicBoolean(false);
+
+                @Override
+                protected void doOnSubscribe(Subscription subscription) {
+                    this.s = subscription;
+                    subscription.request(1);
+                }
+
+                @Override
+                protected void doOnNext(Object message) {
+                    if (message instanceof ByteBufHolder) {
+                        request.addContent((ByteBufHolder) message);
+                        s.request(1);
+                    } else {
+                        ((NettyHttpRequest) request).setBody(message);
+                        s.request(1);
+                    }
+                }
+
+                @Override
+                protected void doOnError(Throwable t) {
+                    try {
+                        s.cancel();
+                        exceptionCaught(context, t);
+                    } catch (Exception e) {
+                        // should never happen
+                        writeDefaultErrorResponse(context, request, e, false);
+                    }
+                }
+
+                @Override
+                protected void doOnComplete() {
+                    if (executed.compareAndSet(false, true)) {
+                        try {
+                            routeMatch = prepareRouteForExecution(routeMatch, request, false);
+                            routeMatch.execute();
+                        } catch (Exception e) {
+                            context.pipeline().fireExceptionCaught(e);
+                        }
+                    }
+                }
+            };
+        }
+
     }
 
     private ExecutorService getIoExecutor() {
