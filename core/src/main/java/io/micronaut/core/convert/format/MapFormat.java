@@ -43,7 +43,7 @@ public @interface MapFormat {
     /**
      * @return The key format to apply to keys
      */
-    StringConvention keyFormat() default StringConvention.RAW;
+    StringConvention keyFormat() default StringConvention.HYPHENATED;
 
 
     /**
