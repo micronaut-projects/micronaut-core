@@ -10,8 +10,8 @@ dependencies {
     api dependencyVersion("validation")
     api "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
     api dependencyVersion("rxjava2")
-    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
-    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
+    api "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
+    api "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
 
     compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
     compileOnly dependencyVersion("jcache")
