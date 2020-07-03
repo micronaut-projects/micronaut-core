@@ -70,10 +70,8 @@ public interface Router {
      * @param <R>        The type
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    default @NonNull
-    <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
-        return find(httpMethod, uri, null);
-    }
+    @NonNull
+    <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context);
 
     /**
      * Finds all of the possible routes for the given HTTP method and URI.
