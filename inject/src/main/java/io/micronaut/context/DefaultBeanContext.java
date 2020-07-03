@@ -117,7 +117,8 @@ public class DefaultBeanContext implements BeanContext {
     private final Map<CharSequence, Object> attributes = Collections.synchronizedMap(new HashMap<>(5));
 
     private final Map<BeanKey, Collection<Object>> initializedObjectsByType = new ConcurrentHashMap<>(50);
-    private final Map<BeanKey, Optional<BeanDefinition>> beanConcreteCandidateCache = new ConcurrentLinkedHashMap.Builder<BeanKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
+    private final Map<BeanKey, Optional<BeanDefinition>> beanConcreteCandidateCache =
+            new ConcurrentLinkedHashMap.Builder<BeanKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
     private final Map<Class, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Class, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
     private final Map<Class, Collection<BeanDefinitionReference>> beanIndex = new ConcurrentHashMap<>(12);
 
@@ -1089,30 +1090,36 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public @NonNull
     <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         Qualifier<T> proxyQualifier = qualifier != null ? Qualifiers.byQualifiers(qualifier, PROXY_TARGET_QUALIFIER) : PROXY_TARGET_QUALIFIER;
         BeanKey key = new BeanKey(beanType, proxyQualifier);
 
-        return (Optional) beanConcreteCandidateCache.computeIfAbsent(key, beanKey -> {
-            BeanRegistration<T> beanRegistration = singletonObjects.get(beanKey);
+        Optional beanDefinition = beanConcreteCandidateCache.get(key);
+        //noinspection OptionalAssignedToNull
+        if (beanDefinition == null) {
+            BeanRegistration<T> beanRegistration = singletonObjects.get(key);
             if (beanRegistration != null) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", beanRegistration.bean, beanType, qualifier);
                 }
-                return Optional.of(beanRegistration.beanDefinition);
+                beanDefinition = Optional.of(beanRegistration.beanDefinition);
+            } else {
+                beanDefinition = findConcreteCandidateNoCache(
+                        null,
+                        (Class) beanType,
+                        proxyQualifier,
+                        true,
+                        false,
+                        false
+                );
             }
-            return findConcreteCandidateNoCache(
-                    null,
-                    (Class) beanType,
-                    proxyQualifier,
-                    true,
-                    false,
-                    false
-            );
-        });
+
+            beanConcreteCandidateCache.put(key, beanDefinition);
+        }
+        return beanDefinition;
     }
 
     @SuppressWarnings("unchecked")
@@ -1747,9 +1754,10 @@ public class DefaultBeanContext implements BeanContext {
             LOG.debug("Finding candidate beans for instance: {}", instance);
         }
         Collection<BeanDefinitionReference> beanDefinitionsClasses = this.beanDefinitionsClasses;
-        return beanCandidateCache.computeIfAbsent(instance.getClass(), aClass -> {
+        Class<?> beanType = instance.getClass();
+        Collection<BeanDefinition> beanDefinitions = beanCandidateCache.get(beanType);
+        if (beanDefinitions == null) {
             // first traverse component definition classes and load candidates
-
             if (!beanDefinitionsClasses.isEmpty()) {
 
                 List<BeanDefinition> candidates = beanDefinitionsClasses
@@ -1773,23 +1781,24 @@ public class DefaultBeanContext implements BeanContext {
                             .stream()
                             .filter(candidate ->
                                     !(candidate instanceof NoInjectionBeanDefinition) &&
-                                            candidate.getBeanType() == instance.getClass()
+                                            candidate.getBeanType() == beanType
                             )
                             .collect(Collectors.toList());
-                    return candidates;
+                    beanDefinitions = candidates;
                 }
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Resolved bean candidates {} for instance: {}", candidates, instance);
                 }
-                return candidates;
+                beanDefinitions = candidates;
             } else {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("No bean candidates found for instance: {}", instance);
                 }
-                return Collections.emptySet();
+                beanDefinitions = Collections.emptySet();
             }
-        });
-
+            beanCandidateCache.put(beanType, beanDefinitions);
+        }
+        return beanDefinitions;
     }
 
     /**
@@ -2453,16 +2462,28 @@ public class DefaultBeanContext implements BeanContext {
      * @param <T>             The bean generic type
      * @return The concrete bean definition candidate
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private <T> Optional<BeanDefinition<T>> findConcreteCandidate(
             BeanResolutionContext resolutionContext,
             Class<T> beanType,
             Qualifier<T> qualifier,
             boolean throwNonUnique,
             boolean includeProvided) {
-        return (Optional) beanConcreteCandidateCache.computeIfAbsent(new BeanKey(beanType, qualifier), beanKey ->
-                (Optional) findConcreteCandidateNoCache(resolutionContext, beanType, qualifier, throwNonUnique, includeProvided, true)
-        );
+        BeanKey bk = new BeanKey(beanType, qualifier);
+        Optional beanDefinition = beanConcreteCandidateCache.get(bk);
+        //noinspection OptionalAssignedToNull
+        if (beanDefinition == null) {
+            beanDefinition = findConcreteCandidateNoCache(
+                    resolutionContext,
+                    beanType,
+                    qualifier,
+                    throwNonUnique,
+                    includeProvided,
+                    true
+            );
+            beanConcreteCandidateCache.put(bk, beanDefinition);
+        }
+        return beanDefinition;
     }
 
     private <T> Optional<BeanDefinition<T>> findConcreteCandidateNoCache(
@@ -2775,7 +2796,13 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     private <T> Collection<BeanDefinition<T>> findBeanCandidatesInternal(BeanResolutionContext resolutionContext, Class<T> beanType) {
-        return (Collection) beanCandidateCache.computeIfAbsent(beanType, aClass -> (Collection) findBeanCandidates(resolutionContext, beanType, null, true));
+        @SuppressWarnings("rawtypes")
+        Collection beanDefinitions = beanCandidateCache.get(beanType);
+        if (beanDefinitions == null) {
+            beanDefinitions = findBeanCandidates(resolutionContext, beanType, null, true);
+            beanCandidateCache.put(beanType, beanDefinitions);
+        }
+        return beanDefinitions;
     }
 
     @SuppressWarnings("unchecked")
@@ -3310,7 +3337,7 @@ public class DefaultBeanContext implements BeanContext {
     /**
      * @param <T> The bean type
      */
-    private static class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefinitionReference<T> {
+    private final static class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefinitionReference<T> {
         private final Class<?> singletonClass;
         private final Map<Class<?>, List<Argument<?>>> typeArguments = new HashMap<>();
 
