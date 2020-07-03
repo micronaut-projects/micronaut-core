@@ -74,22 +74,12 @@ public class EurekaServiceInstance implements ServiceInstance {
     }
 
     @Override
-    public Optional<String> getRegion() {
-        @NotNull DataCenterInfo dataCenterInfo = instanceInfo.getDataCenterInfo();
-        if (dataCenterInfo instanceof AmazonInfo) {
-            String availabilityZone = ((AmazonInfo) dataCenterInfo).get(AmazonInfo.MetaDataKey.availabilityZone);
-            return Optional.ofNullable(availabilityZone);
-        }
-        return ServiceInstance.super.getZone();
-    }
-
-    @Override
     public Optional<String> getGroup() {
         String asgName = instanceInfo.getAsgName();
         if (StringUtils.isNotEmpty(asgName)) {
             return Optional.of(asgName);
         }
-        return ServiceInstance.super.getZone();
+        return ServiceInstance.super.getGroup();
     }
 
     /**
