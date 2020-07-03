@@ -41,7 +41,7 @@ public class BuildDebug {
         StringBuilder dump = new StringBuilder();
         for(ThreadInfo info : threadInfos)
         {
-            dump.append('"').append(info.getThreadName()).append('"').append("\n");
+            dump.append('"').append(info.getThreadName()).append('"').append('\n');
             Thread.State state = info.getThreadState();
             dump.append("STATE: ").append(state);
             StackTraceElement[] stes = info.getStackTrace();

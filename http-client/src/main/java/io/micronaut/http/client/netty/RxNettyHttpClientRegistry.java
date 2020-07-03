@@ -191,8 +191,6 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
             DefaultHttpClient clientBean = null;
             final String clientId = clientKey.clientId;
             final Class configurationClass = clientKey.configurationClass;
-            final String filterAnnotation = clientKey.filterAnnotation;
-            final String path = clientKey.path;
 
             if (clientId != null) {
                 clientBean = (DefaultHttpClient) this.beanContext
@@ -203,7 +201,8 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
                 throw new IllegalStateException("Referenced HTTP client configuration class must be an instance of HttpClientConfiguration for injection point: " + configurationClass);
             }
 
-
+            final String filterAnnotation = clientKey.filterAnnotation;
+            final String path = clientKey.path;
             if (clientBean != null && path == null && configurationClass == null && filterAnnotation == null) {
                 return clientBean;
             }

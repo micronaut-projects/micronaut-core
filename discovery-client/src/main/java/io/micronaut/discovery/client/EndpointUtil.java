@@ -152,14 +152,14 @@ public class EndpointUtil {
                     if (contextPath.isPresent()) {
                         final String path = contextPath.get();
                         if (!path.startsWith("/")) {
-                            sb.append("/");
+                            sb.append('/');
                         }
                         sb.append(path);
                         if (!path.endsWith("/")) {
-                            sb.append("/");
+                            sb.append('/');
                         }
                     } else {
-                        sb.append("/");
+                        sb.append('/');
                     }
                     String serviceUrl = sb.toString();
                     LOG.debug("The EC2 url is {}", serviceUrl);
@@ -208,7 +208,7 @@ public class EndpointUtil {
                 for (int ipCtr = 1; ipCtr < 5; ipCtr++) {
                     eipBuffer.append(ips[ipCtr]);
                     if (ipCtr < 4) {
-                        eipBuffer.append(".");
+                        eipBuffer.append('.');
                     }
                 }
                 eipsForZone.add(eipBuffer.toString());

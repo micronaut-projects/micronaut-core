@@ -1068,7 +1068,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
         if (constraintValidator != null) {
             if (!constraintValidator.isValid(parameterValue, constraintAnnotation, context)) {
-                final String propertyValue = "";
                 BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
                 if (beanIntrospection == null) {
                     throw new ValidationException("Passed object [" + parameterValue + "] cannot be introspected. Please annotate with @Introspected");
@@ -1076,6 +1075,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 AnnotationMetadata beanAnnotationMetadata = beanIntrospection.getAnnotationMetadata();
                 AnnotationValue<? extends Annotation> annotationValue = beanAnnotationMetadata.getAnnotation(pojoConstraint);
 
+                final String propertyValue = "";
                 final String messageTemplate = buildMessageTemplate(annotationValue, beanAnnotationMetadata);
                 final Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, beanAnnotationMetadata);
                 overallViolations.add(new DefaultConstraintViolation(
@@ -1745,14 +1745,14 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
     private <T> void failOnError(@NonNull BeanResolutionContext resolutionContext, Set<ConstraintViolation<T>> errors, Class<?> beanType) {
         if (!errors.isEmpty()) {
-            StringBuilder builder = new StringBuilder();
-            builder.append("Validation failed for bean definition [");
-            builder.append(beanType.getName());
-            builder.append("]\nList of constraint violations:[\n");
+            StringBuilder builder = new StringBuilder()
+                    .append("Validation failed for bean definition [")
+                    .append(beanType.getName())
+                    .append("]\nList of constraint violations:[\n");
             for (ConstraintViolation<?> violation : errors) {
-                builder.append("\t").append(violation.getPropertyPath()).append(" - ").append(violation.getMessage()).append("\n");
+                builder.append('\t').append(violation.getPropertyPath()).append(" - ").append(violation.getMessage()).append('\n');
             }
-            builder.append("]");
+            builder.append(']');
             throw new BeanInstantiationException(resolutionContext, builder.toString());
         }
     }

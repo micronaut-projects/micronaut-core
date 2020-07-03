@@ -198,7 +198,7 @@ class RxJava2Instrumentation implements AutoCloseable {
             RxJavaPlugins.setOnConnectableObservableAssembly(connectableObservable -> {
                 final ConnectableObservable wrapped = RxInstrumentedWrappers.wrap(connectableObservable, instrumenterFactory);
                 if (oldConnectableObservableHook != null) {
-                    return oldConnectableObservableHook.apply(connectableObservable);
+                    return oldConnectableObservableHook.apply(wrapped);
                 }
                 return wrapped;
             });

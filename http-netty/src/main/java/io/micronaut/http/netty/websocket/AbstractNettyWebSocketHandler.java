@@ -318,7 +318,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
                 Argument<?> bodyArgument = this.getBodyArgument();
                 Optional<?> converted = ConversionService.SHARED.convert(msg.content(), bodyArgument);
-                NettyRxWebSocketSession currentSession = getSession();
 
                 if (!converted.isPresent()) {
                     MediaType mediaType;
@@ -342,6 +341,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 if (converted.isPresent()) {
                     Object v = converted.get();
 
+                    NettyRxWebSocketSession currentSession = getSession();
                     ExecutableBinder<WebSocketState> executableBinder = new DefaultExecutableBinder<>(
                             Collections.singletonMap(bodyArgument, v)
                     );

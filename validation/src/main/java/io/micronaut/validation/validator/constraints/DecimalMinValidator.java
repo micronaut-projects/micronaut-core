@@ -47,8 +47,6 @@ public interface DecimalMinValidator<T> extends ConstraintValidator<DecimalMin, 
                                 .orElseThrow(() -> new ValidationException(s + " does not represent a valid BigDecimal format.")))
                 .orElseThrow(() -> new ValidationException("null does not represent a valid BigDecimal format."));
 
-        final boolean inclusive = annotationMetadata.get("inclusive", boolean.class).orElse(true);
-
 
         int result;
         try {
@@ -56,6 +54,7 @@ public interface DecimalMinValidator<T> extends ConstraintValidator<DecimalMin, 
         } catch (NumberFormatException nfe) {
             return false;
         }
+        final boolean inclusive = annotationMetadata.get("inclusive", boolean.class).orElse(true);
         return inclusive ? result >= 0 : result > 0;
     }
 

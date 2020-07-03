@@ -125,9 +125,9 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
         if (response.header(HttpHeaders.CACHE_CONTROL) == null) {
             FileTypeHandlerConfiguration.CacheControlConfiguration cacheConfig = configuration.getCacheControl();
-            StringBuilder header = new StringBuilder(cacheConfig.getPublic() ? "public" : "private");
-            header.append(", max-age=");
-            header.append(configuration.getCacheSeconds());
+            StringBuilder header = new StringBuilder(cacheConfig.getPublic() ? "public" : "private")
+                    .append(", max-age=")
+                    .append(configuration.getCacheSeconds());
             response.header(HttpHeaders.CACHE_CONTROL, header.toString());
         }
 

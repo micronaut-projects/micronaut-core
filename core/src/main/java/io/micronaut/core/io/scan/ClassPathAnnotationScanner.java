@@ -193,19 +193,17 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
      */
     protected void scanFile(String annotation, Path filePath, List<Class> classes) {
         String fileName = filePath.getFileName().toString();
-        if (fileName.endsWith(".class")) {
+        if (fileName.endsWith(".class") && fileName.indexOf('$') == -1) {
             // ignore generated classes
-            if (fileName.indexOf('$') == -1) {
-                try (InputStream inputStream = Files.newInputStream(filePath)) {
-                    scanInputStream(annotation, inputStream, classes);
-                } catch (IOException e) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Ignoring file [" + fileName + "] due to I/O error: " + e.getMessage(), e);
-                    }
-                } catch (ClassNotFoundException e) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Ignoring file [" + fileName + "]. Class not found: " + e.getMessage(), e);
-                    }
+            try (InputStream inputStream = Files.newInputStream(filePath)) {
+                scanInputStream(annotation, inputStream, classes);
+            } catch (IOException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Ignoring file [" + fileName + "] due to I/O error: " + e.getMessage(), e);
+                }
+            } catch (ClassNotFoundException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Ignoring file [" + fileName + "]. Class not found: " + e.getMessage(), e);
                 }
             }
         }

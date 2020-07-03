@@ -46,18 +46,18 @@ final class AdapterIntroduction implements MethodInterceptor<Object, Object> {
      */
     AdapterIntroduction(BeanContext beanContext, ExecutableMethod<?, ?> method) {
         Class<?> beanType = method.classValue(Adapter.class, ADAPTED_BEAN).orElse(null);
-        String beanMethod  = method.stringValue(Adapter.class, ADAPTED_METHOD).orElse(null);
-        String beanQualifier  = method.stringValue(Adapter.class, ADAPTED_QUALIFIER).orElse(null);
-        Class[] argumentTypes = method.classValues(Adapter.class, ADAPTED_ARGUMENT_TYPES);
 
         if (beanType == null) {
             throw new IllegalStateException("No bean type to adapt found in Adapter configuration for method: " + method);
         }
 
+        String beanMethod  = method.stringValue(Adapter.class, ADAPTED_METHOD).orElse(null);
         if (StringUtils.isEmpty(beanMethod)) {
             throw new IllegalStateException("No bean method to adapt found in Adapter configuration for method: " + method);
         }
 
+        String beanQualifier  = method.stringValue(Adapter.class, ADAPTED_QUALIFIER).orElse(null);
+        Class[] argumentTypes = method.classValues(Adapter.class, ADAPTED_ARGUMENT_TYPES);
         Class[] methodArgumentTypes = method.getArgumentTypes();
         if (StringUtils.isNotEmpty(beanQualifier)) {
             this.executionHandle = beanContext.findExecutionHandle(

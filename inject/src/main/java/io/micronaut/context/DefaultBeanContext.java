@@ -1198,7 +1198,6 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public <T> T getBean(@NonNull BeanDefinition<T> definition) {
         ArgumentUtils.requireNonNull("definition", definition);
-        Class<T> beanType = definition.getBeanType();
         Qualifier<T> declaredQualifier = definition.getDeclaredQualifier();
         if (definition.isSingleton()) {
             BeanKey<T> key = new BeanKey<>(definition, declaredQualifier);
@@ -1207,6 +1206,7 @@ public class DefaultBeanContext implements BeanContext {
                 return (T) beanRegistration.bean;
             }
         }
+        Class<T> beanType = definition.getBeanType();
         try (BeanResolutionContext context = newResolutionContext(definition, null)) {
             return getBeanForDefinition(
                     context,
@@ -1824,7 +1824,6 @@ public class DefaultBeanContext implements BeanContext {
             argumentValues = Collections.emptyMap();
         }
         Qualifier declaredQualifier = beanDefinition.getDeclaredQualifier();
-        T bean;
         Class<T> beanType = beanDefinition.getBeanType();
         if (isSingleton) {
             BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanDefinition, declaredQualifier));
@@ -1834,15 +1833,13 @@ public class DefaultBeanContext implements BeanContext {
                 }
             } else if (qualifier != null) {
                 beanRegistration = singletonObjects.get(new BeanKey(beanDefinition, null));
-                if (beanRegistration != null) {
-                    if (qualifier.reduce(beanType, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
-                        return beanRegistration.bean;
-                    }
+                if (beanRegistration != null && qualifier.reduce(beanType, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
+                    return beanRegistration.bean;
                 }
             }
         }
 
-
+        T bean;
         if (beanDefinition instanceof BeanFactory) {
             BeanFactory<T> beanFactory = (BeanFactory<T>) beanDefinition;
             try {
@@ -1934,16 +1931,14 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         if (bean != null) {
-            if (!BeanCreatedEventListener.class.isInstance(bean)) {
-                if (CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
-                    for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
-                        if (entry.getKey().isAssignableFrom(beanType)) {
-                            BeanKey beanKey = new BeanKey(beanDefinition, qualifier);
-                            for (BeanCreatedEventListener listener : entry.getValue()) {
-                                bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
-                                if (bean == null) {
-                                    throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
-                                }
+            if (!BeanCreatedEventListener.class.isInstance(bean) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
+                for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
+                    if (entry.getKey().isAssignableFrom(beanType)) {
+                        BeanKey beanKey = new BeanKey(beanDefinition, qualifier);
+                        for (BeanCreatedEventListener listener : entry.getValue()) {
+                            bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
+                            if (bean == null) {
+                                throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
                             }
                         }
                     }
@@ -2057,10 +2052,8 @@ public class DefaultBeanContext implements BeanContext {
                         // don't replace yourself
                         return false;
                     }
-                    if (replacingCandidate instanceof ProxyBeanDefinition) {
-                        if (((ProxyBeanDefinition<T>) replacingCandidate).getTargetDefinitionType() == definition.getClass()) {
-                            return false;
-                        }
+                    if (replacingCandidate instanceof ProxyBeanDefinition && ((ProxyBeanDefinition<T>) replacingCandidate).getTargetDefinitionType() == definition.getClass()) {
+                        return false;
                     }
 
                     final AnnotationValue<Replaces> replacesAnn = replacingCandidate.getAnnotation(Replaces.class);
@@ -2527,13 +2520,11 @@ public class DefaultBeanContext implements BeanContext {
                 }
             }
         }
-        if (LOG.isDebugEnabled()) {
-            if (definition != null) {
-                if (qualifier != null) {
-                    LOG.debug("Found concrete candidate [{}] for type: {} {} ", definition, qualifier, beanType.getName());
-                } else {
-                    LOG.debug("Found concrete candidate [{}] for type: {} ", definition, beanType.getName());
-                }
+        if (LOG.isDebugEnabled() && definition != null) {
+            if (qualifier != null) {
+                LOG.debug("Found concrete candidate [{}] for type: {} {} ", definition, qualifier, beanType.getName());
+            } else {
+                LOG.debug("Found concrete candidate [{}] for type: {} ", definition, beanType.getName());
             }
         }
         return Optional.ofNullable(definition);

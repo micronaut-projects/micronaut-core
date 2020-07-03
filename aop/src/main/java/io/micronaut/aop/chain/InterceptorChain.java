@@ -259,7 +259,6 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     @UsedByGeneratedCode
     public static Interceptor[] resolveIntroductionInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
-        Interceptor[] aroundInterceptors = resolveAroundInterceptors(beanContext, method, interceptors);
         Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors);
         if (introductionInterceptors.length == 0) {
             if (method.hasStereotype(Adapter.class)) {
@@ -269,6 +268,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
 
             }
         }
+        Interceptor[] aroundInterceptors = resolveAroundInterceptors(beanContext, method, interceptors);
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }
 

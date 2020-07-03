@@ -104,10 +104,8 @@ class CompletableFuturePublisher<T> implements Publisher<T> {
          */
         @Override
         public synchronized void cancel() {
-            if (completed.compareAndSet(false, true)) {
-                if (future != null) {
-                    future.cancel(false);
-                }
+            if (completed.compareAndSet(false, true) && future != null) {
+                future.cancel(false);
             }
         }
     }

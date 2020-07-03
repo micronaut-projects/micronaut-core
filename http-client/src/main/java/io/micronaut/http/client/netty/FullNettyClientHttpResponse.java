@@ -227,7 +227,6 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             return Optional.empty();
         }
 
-        Optional<MediaType> contentType = getContentType();
         if (content.refCnt() == 0 || content.readableBytes() == 0) {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Full HTTP response received an empty body");
@@ -242,6 +241,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             }
             return Optional.empty();
         }
+        Optional<MediaType> contentType = getContentType();
         boolean hasContentType = contentType.isPresent();
         if (mediaTypeCodecRegistry != null && hasContentType) {
             if (CharSequence.class.isAssignableFrom(type.getType())) {

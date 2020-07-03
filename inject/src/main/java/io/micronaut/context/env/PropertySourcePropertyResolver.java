@@ -706,15 +706,15 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      */
     @SuppressWarnings("MagicNumber")
     protected Map<String, Object> resolveEntriesForKey(String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
-        Map<String, Object> entries = null;
         if (name.length() == 0) {
             return null;
         }
         final Map<String, Object>[] catalog = getCatalog(propertyCatalog);
 
+        Map<String, Object> entries = null;
         char firstChar = name.charAt(0);
         if (Character.isLetter(firstChar)) {
-            int index = ((int) firstChar) - 65;
+            int index = firstChar - 65;
             if (index < catalog.length && index > 0) {
                 entries = catalog[index];
                 if (allowCreate && entries == null) {

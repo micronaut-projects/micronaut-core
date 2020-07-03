@@ -240,7 +240,6 @@ public class NameUtils {
      * @return True if it is a valid getter name
      */
     public static boolean isGetterName(String methodName) {
-        int len = methodName.length();
         int prefixLength = 0;
         if (methodName.startsWith(PREFIX_GET)) {
             prefixLength = PREFIX_LENTGH;
@@ -249,6 +248,7 @@ public class NameUtils {
         } else {
             return false;
         }
+        int len = methodName.length();
         if (len > prefixLength) {
             return Character.isUpperCase(methodName.charAt(prefixLength));
         }
