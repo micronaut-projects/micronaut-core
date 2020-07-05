@@ -15,4 +15,14 @@ class UriTemplateTest extends Specification {
         template.expand(["name": "John"]) == "/hello/John" // <2>
         // end::match[]
     }
+
+    void "test uri with slash before params"() {
+        // tag::match[]
+        given:
+        UriMatchTemplate template = UriMatchTemplate.of("/hello/{name}")
+
+        expect:
+        template.match("/hello/John/?param=value").isPresent() // <1>
+        // end::match[]
+    }
 }
