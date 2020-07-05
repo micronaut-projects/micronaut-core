@@ -146,6 +146,9 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         if (parameterIndex > -1) {
             uri = uri.substring(0, parameterIndex);
         }
+        if (uri.endsWith("/")) {
+            uri = uri.substring(0, uri.length() - 1);
+        }
         Matcher matcher = matchPattern.matcher(uri);
         if (matcher.matches()) {
             if (variables.isEmpty()) {
