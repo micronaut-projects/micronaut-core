@@ -157,6 +157,11 @@ ext {
                     group:'io.micronaut.cassandra',
                     name:'micronaut-cassandra'
             ],
+            'micronaut.discovery': [
+                    version:micronautDiscoveryClientVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-discovery-client'
+            ],            
             'micronaut.hibernate.validator': [
                     version:micronautHibernateValidatorVersion,
                     group:'io.micronaut.beanvalidation',

@@ -1,8 +1,0 @@
-[ {
-  "vnicId" : "ocid1.vnic.oc1.phx.abyhqljrdpeodblmzaipwmdgusajz7a5rlbd7xp6k7s4nq74h3ozrg3svvhq",
-  "privateIp" : "10.0.0.19",
-  "vlanTag" : 2337,
-  "macAddr" : "02:00:17:03:1C:BA",
-  "virtualRouterIp" : "10.0.0.1",
-  "subnetCidrBlock" : "10.0.0.0/24"
-} ]
