@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -65,7 +65,6 @@ public class TenantPropagationConfigurationProperties implements TenantPropagati
         this.serviceIdRegex = serviceIdRegex;
     }
 
-
     /**
      *
      * @return a regular expression to validate the target request uri against.
@@ -94,7 +93,6 @@ public class TenantPropagationConfigurationProperties implements TenantPropagati
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
-
 
     /**
      * Configures {@link io.micronaut.multitenancy.propagation.TenantPropagationHttpClientFilter} path. Default value {@value #DEFAULT_PATH}

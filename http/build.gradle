@@ -20,3 +20,9 @@ compileKotlin {
 
 //compileJava.options.fork = true
 //compileJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+
+spotless {
+    java {
+        targetExclude '**/io/micronaut/http/uri/QueryStringDecoder.java'
+    }
+}

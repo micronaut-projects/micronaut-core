@@ -15,9 +15,7 @@
  */
 package io.micronaut.discovery.eureka
 
-import io.micronaut.context.env.Environment
 import io.micronaut.core.naming.NameUtils
-import io.micronaut.discovery.DiscoveryClient
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.eureka.client.v2.EurekaClient
@@ -25,19 +23,17 @@ import io.micronaut.runtime.server.EmbeddedServer
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
-import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({System.getenv("TRAVIS")})
 class EurekaAutoRegistrationSpec extends Specification{
 
     @Shared
@@ -45,7 +41,11 @@ class EurekaAutoRegistrationSpec extends Specification{
     GenericContainer eurekaContainer =
             new GenericContainer("cloudready/spring-cloud-eureka-server:1.0.1")
                     .withExposedPorts(8761)
-                    .waitingFor(new LogMessageWaitStrategy().withRegEx("(?s).*Started Eureka.*"))
+                    .waitingFor(
+                            new LogMessageWaitStrategy()
+                            .withRegEx("(?s).*Started Eureka.*")
+                            .withStartupTimeout(Duration.ofMinutes(5))
+                    )
 
     @Shared String eurekaHost
     @Shared int eurekaPort

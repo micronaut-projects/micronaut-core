@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -91,13 +91,13 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         if (targetType == Object.class) {
             return Optional.of((T) object);
         }
-        Class<?> sourceType = object.getClass();
         targetType = targetType.isPrimitive() ? ReflectionUtils.getWrapperType(targetType) : targetType;
 
         if (targetType.isInstance(object) && !Iterable.class.isInstance(object) && !Map.class.isInstance(object)) {
             return Optional.of((T) object);
         }
 
+        Class<?> sourceType = object.getClass();
         final AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
         if (annotationMetadata.hasStereotype(Format.class)) {
             Optional<String> formattingAnn = annotationMetadata.getAnnotationNameByStereotype(Format.class);
@@ -809,11 +809,11 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             Argument<?> componentType = typeVariable.orElse(Argument.OBJECT_ARGUMENT);
             Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
 
-            ConversionContext newContext = context.with(componentType);
             if (targetType.isInstance(object) && targetComponentType == Object.class) {
                 return Optional.of(object);
             }
             List list = new ArrayList();
+            ConversionContext newContext = context.with(componentType);
             for (Object o : object) {
                 Optional<?> converted = convert(o, targetComponentType, newContext);
                 if (converted.isPresent()) {
@@ -934,7 +934,6 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         TypeConverter typeConverter = UNCONVERTIBLE;
         List<Class> sourceHierarchy = ClassUtils.resolveHierarchy(sourceType);
         List<Class> targetHierarchy = ClassUtils.resolveHierarchy(targetType);
-        boolean hasFormatting = formattingAnnotation != null;
         for (Class sourceSuperType : sourceHierarchy) {
             for (Class targetSuperType : targetHierarchy) {
                 ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation);
@@ -945,6 +944,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 }
             }
         }
+        boolean hasFormatting = formattingAnnotation != null;
         if (hasFormatting) {
             for (Class sourceSuperType : sourceHierarchy) {
                 for (Class targetSuperType : targetHierarchy) {

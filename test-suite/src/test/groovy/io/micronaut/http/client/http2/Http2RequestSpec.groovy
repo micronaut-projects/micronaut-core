@@ -55,6 +55,12 @@ class Http2RequestSpec extends Specification {
         then:"The response is correct"
         response.body() == Http2Controller.people
 
+        when:"posting a data again"
+        response = client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person))
+                .blockingFirst()
+
+        then:"The response is correct"
+        response.body() == Http2Controller.people
     }
 
     void "test make HTTP/2 sse stream request"() {
@@ -116,6 +122,14 @@ class Http2RequestSpec extends Specification {
 
         when:"A post request is performed"
         def response = client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
+                .blockingFirst()
+
+        then:
+        response.status() == HttpStatus.OK
+        response.body() == 'Version: HTTP_2_0 test'
+
+        when:"A post request is performed again"
+        response = client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
                 .blockingFirst()
 
         then:

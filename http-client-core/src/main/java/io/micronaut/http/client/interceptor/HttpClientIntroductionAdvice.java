@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -132,7 +132,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
 
         final AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
-        HttpClient httpClient = clientFactory.getClient(annotationMetadata);
 
         Class<?> declaringType = context.getDeclaringType();
         if (Closeable.class == declaringType || AutoCloseable.class == declaringType) {
@@ -141,6 +140,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
 
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
+        HttpClient httpClient = clientFactory.getClient(annotationMetadata);
         if (context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
             AnnotationValue<HttpMethodMapping> mapping = context.getAnnotation(HttpMethodMapping.class);
             String uri = mapping.getRequiredValue(String.class);
@@ -149,12 +149,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
-
-            HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase());
-            String httpMethodName = context.stringValue(CustomHttpMethod.class, "method").orElse(httpMethod.name());
-
-            ReturnType returnType = context.getReturnType();
-            Class<?> javaReturnType = returnType.getType();
 
             UriMatchTemplate uriTemplate = UriMatchTemplate.of("");
             if (!(uri.length() == 1 && uri.charAt(0) == '/')) {
@@ -165,7 +159,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Map<String, String> queryParams = new LinkedHashMap<>();
             List<String> uriVariables = uriTemplate.getVariableNames();
 
-            MutableHttpRequest<Object> request;
             Object body = null;
             Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
             Argument[] arguments = context.getArguments();
@@ -218,12 +211,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 MutableArgumentValue<?> value = parameters.get(argumentName);
                 Object definedValue = value.getValue();
 
-                if (paramMap.containsKey(argumentName)) {
-                    if (argumentMetadata.hasStereotype(Format.class)) {
-                        final Object v = paramMap.get(argumentName);
-                        if (v != null) {
-                            paramMap.put(argumentName, conversionService.convert(v, ConversionContext.of(String.class).with(argument.getAnnotationMetadata())));
-                        }
+                if (paramMap.containsKey(argumentName) && argumentMetadata.hasStereotype(Format.class)) {
+                    final Object v = paramMap.get(argumentName);
+                    if (v != null) {
+                        paramMap.put(argumentName, conversionService.convert(v, ConversionContext.of(String.class).with(argument.getAnnotationMetadata())));
                     }
                 }
                 if (definedValue == null) {
@@ -302,6 +293,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
+            HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase());
             if (HttpMethod.permitsRequestBody(httpMethod)) {
                 if (body == null && !bodyArguments.isEmpty()) {
                     Map<String, Object> bodyMap = new LinkedHashMap<>();
@@ -342,7 +334,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             uri = uriTemplate.expand(paramMap);
             uriVariables.forEach(queryParams::remove);
 
-            request = HttpRequest.create(httpMethod, appendQuery(uri, queryParams), httpMethodName);
+            String httpMethodName = context.stringValue(CustomHttpMethod.class, "method").orElse(httpMethod.name());
+            MutableHttpRequest<Object> request = HttpRequest.create(httpMethod, appendQuery(uri, queryParams), httpMethodName);
 
             if (body != null) {
                 request.body(body);
@@ -388,6 +381,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 request.basicAuth(basicAuth.getUsername(), basicAuth.getPassword());
             }
 
+            ReturnType returnType = context.getReturnType();
+            Class<?> javaReturnType = returnType.getType();
             boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
             final Class<?> methodDeclaringType = declaringType;
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -234,31 +234,37 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     @Override
     public void finish(VisitorContext visitorContext) {
 
-        for (AbstractIntrospection abstractIntrospection : abstractIntrospections) {
-            final Collection<? extends PropertyElement> properties = abstractIntrospection.properties.values();
-            if (CollectionUtils.isNotEmpty(properties)) {
-                processBeanProperties(
-                        abstractIntrospection.writer,
-                        properties,
-                        abstractIntrospection.includes,
-                        abstractIntrospection.excludes,
-                        abstractIntrospection.ignored,
-                        abstractIntrospection.indexedAnnotations,
-                        abstractIntrospection.metadata
-                );
-                writers.put(abstractIntrospection.writer.getBeanType().getClassName(), abstractIntrospection.writer);
+        try {
+            for (AbstractIntrospection abstractIntrospection : abstractIntrospections) {
+                final Collection<? extends PropertyElement> properties = abstractIntrospection.properties.values();
+                if (CollectionUtils.isNotEmpty(properties)) {
+                    processBeanProperties(
+                            abstractIntrospection.writer,
+                            properties,
+                            abstractIntrospection.includes,
+                            abstractIntrospection.excludes,
+                            abstractIntrospection.ignored,
+                            abstractIntrospection.indexedAnnotations,
+                            abstractIntrospection.metadata
+                    );
+                    writers.put(abstractIntrospection.writer.getBeanType().getClassName(), abstractIntrospection.writer);
+                }
+
             }
 
-        }
-
-        for (BeanIntrospectionWriter writer : writers.values()) {
-            try {
-                writer.accept(visitorContext);
-            } catch (IOException e) {
-                throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
+            if (!writers.isEmpty()) {
+                for (BeanIntrospectionWriter writer : writers.values()) {
+                    try {
+                        writer.accept(visitorContext);
+                    } catch (IOException e) {
+                        throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
+                    }
+                }
             }
+        } finally {
+            abstractIntrospections.clear();
+            writers.clear();
         }
-
     }
 
     private void processElement(

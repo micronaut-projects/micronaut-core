@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -110,13 +110,13 @@ public class ModelUtils {
      * @return An optional setter method
      */
     Optional<ExecutableElement> findGetterMethodFor(Element field) {
-        String getterName = getterNameFor(field);
         // FIXME refine this to discover one of possible overloaded methods with correct signature (i.e. single arg of field type)
         TypeElement typeElement = classElementFor(field);
         if (typeElement == null) {
             return Optional.empty();
         }
 
+        String getterName = getterNameFor(field);
         List<? extends Element> elements = typeElement.getEnclosedElements();
         List<ExecutableElement> methods = ElementFilter.methodsIn(elements);
         return methods.stream()
@@ -144,18 +144,16 @@ public class ModelUtils {
      */
     Optional<ExecutableElement> findSetterMethodFor(Element field) {
         String name = field.getSimpleName().toString();
-        if (field.asType().getKind() == TypeKind.BOOLEAN) {
-            if (name.length() > 2 && Character.isUpperCase(name.charAt(2))) {
-                name = name.replaceFirst("^(is)(.+)", "$2");
-            }
+        if (field.asType().getKind() == TypeKind.BOOLEAN && name.length() > 2 && Character.isUpperCase(name.charAt(2))) {
+            name = name.replaceFirst("^(is)(.+)", "$2");
         }
-        String setterName = setterNameFor(name);
         // FIXME refine this to discover one of possible overloaded methods with correct signature (i.e. single arg of field type)
         TypeElement typeElement = classElementFor(field);
         if (typeElement == null) {
             return Optional.empty();
         }
 
+        String setterName = setterNameFor(name);
         List<? extends Element> elements = typeElement.getEnclosedElements();
         List<ExecutableElement> methods = ElementFilter.methodsIn(elements);
         return methods.stream()
@@ -358,7 +356,7 @@ public class ModelUtils {
 
     /**
      * Finds a no argument method of the given name.
-     * 
+     *
      * @param classElement The class element
      * @param methodName The method name
      * @return The executable element
@@ -540,7 +538,7 @@ public class ModelUtils {
      *
      * @param overridden   the candidate overridden method
      * @param classElement the type element that may contain the overriding method, either directly or in a subclass
-     * @param strict       Whether to use strict checks for overriding and not include logic to handle method overloading 
+     * @param strict       Whether to use strict checks for overriding and not include logic to handle method overloading
      * @return the overriding method
      */
     Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement, boolean strict) {

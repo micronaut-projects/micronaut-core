@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -191,8 +191,6 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
             DefaultHttpClient clientBean = null;
             final String clientId = clientKey.clientId;
             final Class configurationClass = clientKey.configurationClass;
-            final String filterAnnotation = clientKey.filterAnnotation;
-            final String path = clientKey.path;
 
             if (clientId != null) {
                 clientBean = (DefaultHttpClient) this.beanContext
@@ -203,7 +201,8 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
                 throw new IllegalStateException("Referenced HTTP client configuration class must be an instance of HttpClientConfiguration for injection point: " + configurationClass);
             }
 
-
+            final String filterAnnotation = clientKey.filterAnnotation;
+            final String path = clientKey.path;
             if (clientBean != null && path == null && configurationClass == null && filterAnnotation == null) {
                 return clientBean;
             }
@@ -402,7 +401,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
 
     private ClientKey getClientKey(AnnotationMetadata metadata) {
         final HttpVersion httpVersion =
-                metadata.enumValue(Client.class, "version", HttpVersion.class).orElse(null);
+                metadata.enumValue(Client.class, "httpVersion", HttpVersion.class).orElse(null);
         String clientId = metadata.stringValue(Client.class).orElse(null);
         String path = metadata.stringValue(Client.class, "path").orElse(null);
         String filterAnnotation = metadata
