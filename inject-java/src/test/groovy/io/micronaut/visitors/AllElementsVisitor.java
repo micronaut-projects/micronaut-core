@@ -25,11 +25,13 @@ import io.micronaut.inject.visitor.VisitorContext;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class AllElementsVisitor implements TypeElementVisitor<Controller, Object> {
     public static List<String> VISITED_ELEMENTS = new ArrayList<>();
     public static List<ClassElement> VISITED_CLASS_ELEMENTS = new ArrayList<>();
     public static List<MethodElement> VISITED_METHOD_ELEMENTS = new ArrayList<>();
+    public static AtomicInteger FINISH_COUNT = new AtomicInteger();
 
     @Override
     public void start(VisitorContext visitorContext) {
@@ -57,5 +59,10 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
 
     private void visit(Element element) {
         VISITED_ELEMENTS.add(element.getName());
+    }
+
+    @Override
+    public void finish(VisitorContext visitorContext) {
+        FINISH_COUNT.incrementAndGet();
     }
 }

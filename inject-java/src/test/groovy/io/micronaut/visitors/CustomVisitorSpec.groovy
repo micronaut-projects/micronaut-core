@@ -62,6 +62,7 @@ public class TestController {
         ControllerGetVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
         AllElementsVisitor.VISITED_ELEMENTS == ["test.TestController", "privateField", "protectedField", "publicField", "packagePrivateField",  "setterMethod", "getMethod", "postMethod"]
         AllClassesVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
+        AllElementsVisitor.FINISH_COUNT.get() == 1
     }
 
     void "test non controller class is not visited by custom visitor"() {
