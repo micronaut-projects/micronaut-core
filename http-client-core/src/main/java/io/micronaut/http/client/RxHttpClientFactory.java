@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
+
 import java.net.URL;
 
 /**
@@ -31,7 +33,7 @@ public interface RxHttpClientFactory {
      * @param url The base URL
      * @return The client
      */
-    RxHttpClient createClient(URL url);
+    RxHttpClient createClient(@Nullable URL url);
 
     /**
      * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
@@ -40,5 +42,5 @@ public interface RxHttpClientFactory {
      * @param url The base URL
      * @return The client
      */
-    RxStreamingHttpClient createStreamingClient(URL url);
+    RxStreamingHttpClient createStreamingClient(@Nullable URL url);
 }
