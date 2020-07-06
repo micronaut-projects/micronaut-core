@@ -10,6 +10,13 @@ ext.startPomInfo = {
 }
 ext.extraPomInfo = {
     delegate.properties {
+        'jdk.version'('1.8')
+        'maven.compiler.source'('${jdk.version}')
+        'maven.compiler.target'('${jdk.version}')
+        'maven.compiler.release'('${jdk.version}')
+        'project.build.sourceEncoding'('UTF-8')
+        'project.reporting.outputEncoding'('UTF-8')
+
         "micronaut.version"(projectVersion)
         'micronaut-maven-plugin.version'(micronautMavenPluginVersion)
 
@@ -17,9 +24,11 @@ ext.extraPomInfo = {
         'exec-maven-plugin.version'('1.6.0')
         'function-maven-plugin.version'('0.9.3')
         'jib-maven-plugin.version'('2.4.0')
-        'maven-compiler-plugin.version'('3.8.1')
+        'maven-compiler-plugin.version'('3.8.1') // Override actual Maven compiler version (3.1) because some bugs cause annotation processors doesn't work well
+        'maven-failsafe-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
         'maven-resources-plugin.version'('3.1.0')
         'maven-shade-plugin.version'('3.1.0')
+        'maven-surefire-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
         'protoc-jar-maven-plugin.version'('3.11.4')
     }
     delegate.build {
@@ -89,6 +98,7 @@ ext.extraPomInfo = {
                     artifactId "azure-functions-maven-plugin"
                     delegate.version '${azure-functions-maven-plugin.version}'
                 }
+
                 delegate.plugin {
                     groupId "org.apache.maven.plugins"
                     artifactId "maven-resources-plugin"
@@ -113,6 +123,24 @@ ext.extraPomInfo = {
                                 compilerArgs {
                                     arg("-parameters")
                                 }
+                            }
+                        }
+                    }
+                }
+                delegate.plugin {
+                    groupId 'org.apache.maven.plugins'
+                    artifactId 'maven-surefire-plugin'
+                    delegate.version '${maven-surefire-plugin.version}'
+                }
+                delegate.plugin {
+                    groupId 'org.apache.maven.plugins'
+                    artifactId 'maven-failsafe-plugin'
+                    delegate.version '${maven-failsafe-plugin.version}'
+                    delegate.executions {
+                        execution {
+                            goals {
+                                goal 'integration-test'
+                                goal 'verify'
                             }
                         }
                     }
