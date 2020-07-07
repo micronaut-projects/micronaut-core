@@ -1601,6 +1601,36 @@ enum Test {
         thrown(InstantiationException)
     }
 
+    void "test constructor argument nested generics"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.util.List;
+import java.util.Map;
+
+@Introspected
+class Test {
+
+    public Test(Map<String, List<Action>> map) {
+    
+    }
+}
+
+class Action {
+
+}
+''')
+
+        expect:
+        introspection != null
+        introspection.constructorArguments[0].typeParameters.size() == 2
+        introspection.constructorArguments[0].typeParameters[0].typeName == 'java.lang.String'
+        introspection.constructorArguments[0].typeParameters[1].typeName == 'java.util.List<test.Action>'
+        introspection.constructorArguments[0].typeParameters[1].typeParameters.size() == 1
+        introspection.constructorArguments[0].typeParameters[1].typeParameters[0].typeName == 'test.Action'
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
