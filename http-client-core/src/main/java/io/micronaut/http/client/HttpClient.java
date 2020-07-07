@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -229,7 +230,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param url The base URL
      * @return The client
      */
-    static HttpClient create(URL url) {
+    static HttpClient create(@Nullable URL url) {
         return HttpClientConfiguration.createClient(url);
     }
 }

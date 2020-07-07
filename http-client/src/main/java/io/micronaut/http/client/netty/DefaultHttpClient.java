@@ -211,7 +211,7 @@ public class DefaultHttpClient implements
      * @param annotationMetadataResolver The annotation metadata resolver
      * @param filters                    The filters to use
      */
-    public DefaultHttpClient(LoadBalancer loadBalancer,
+    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              HttpClientConfiguration configuration,
                              @Nullable String contextPath,
                              @Nullable ThreadFactory threadFactory,
@@ -377,13 +377,13 @@ public class DefaultHttpClient implements
         this((LoadBalancer) null, new DefaultHttpClientConfiguration());
     }
 
-    /**
+    /**1
      * @param url           The URL
      * @param configuration The {@link HttpClientConfiguration} object
      */
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
         this(
-                LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+                url == null ? null : LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 

@@ -585,8 +585,7 @@ public abstract class HttpClientConfiguration {
      * @return The client
      */
     @Internal
-    static RxHttpClient createClient(@NonNull URL url) {
-        ArgumentUtils.requireNonNull("url", url);
+    static RxHttpClient createClient(@Nullable URL url) {
         RxHttpClientFactory clientFactory = HttpClientConfiguration.clientFactory;
         if (clientFactory == null) {
             synchronized (HttpClientConfiguration.class) { // double check
