@@ -493,6 +493,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      *
      * @param type list element type
      * @param <T>  list element type
+     * @since 2.0.1
      * @return The argument instance
      */
     @NonNull
@@ -519,6 +520,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      *
      * @param type set element type
      * @param <T>  set element type
+     * @since 2.0.1
      * @return The argument instance
      */
     @NonNull
@@ -549,6 +551,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      * @param valueType The value type
      * @param <K>  The map key type
      * @param <V> The map value type
+     * @since 2.0.1
      * @return The argument instance
      */
     @NonNull
