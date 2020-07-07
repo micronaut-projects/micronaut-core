@@ -473,7 +473,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 if (CollectionUtils.isNotEmpty(subArgs)) {
                     Map<String, Object> m = toTypeArguments(subArgs, visitedTypes);
                     if (CollectionUtils.isNotEmpty(m)) {
-                        map.put(entry.getKey(), m);
+                        map.put(entry.getKey(), Collections.singletonMap(getTypeForElement(ce), m));
                     } else {
                         map.put(entry.getKey(), Collections.singletonMap(entry.getKey(), className));
                     }
