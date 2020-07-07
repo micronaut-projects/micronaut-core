@@ -489,6 +489,19 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     }
 
     /**
+     * Creates a new argument representing a generic list.
+     *
+     * @param type list element type
+     * @param <T>  list element type
+     * @return The argument instance
+     */
+    @NonNull
+    static <T> Argument<List<T>> listOf(Argument<T> type) {
+        //noinspection unchecked
+        return of((Class<List<T>>) ((Class) List.class), type);
+    }
+
+    /**
      * Creates a new argument representing a generic set.
      *
      * @param type set element type
@@ -497,6 +510,19 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      */
     @NonNull
     static <T> Argument<Set<T>> setOf(Class<T> type) {
+        //noinspection unchecked
+        return of((Class<Set<T>>) ((Class) Set.class), type);
+    }
+
+    /**
+     * Creates a new argument representing a generic set.
+     *
+     * @param type set element type
+     * @param <T>  set element type
+     * @return The argument instance
+     */
+    @NonNull
+    static <T> Argument<Set<T>> setOf(Argument<T> type) {
         //noinspection unchecked
         return of((Class<Set<T>>) ((Class) Set.class), type);
     }
@@ -512,6 +538,21 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      */
     @NonNull
     static <K, V> Argument<Map<K, V>> mapOf(Class<K> keyType, Class<V> valueType) {
+        //noinspection unchecked
+        return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
+    }
+
+    /**
+     * Creates a new argument representing a generic map.
+     *
+     * @param keyType The key type
+     * @param valueType The value type
+     * @param <K>  The map key type
+     * @param <V> The map value type
+     * @return The argument instance
+     */
+    @NonNull
+    static <K, V> Argument<Map<K, V>> mapOf(Argument<K> keyType, Argument<V> valueType) {
         //noinspection unchecked
         return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
     }
