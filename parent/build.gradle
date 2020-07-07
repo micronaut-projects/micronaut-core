@@ -14,6 +14,7 @@ ext.extraPomInfo = {
         'maven.compiler.source'('${jdk.version}')
         'maven.compiler.target'('${jdk.version}')
         'maven.compiler.release'('${jdk.version}')
+        'maven.compiler.parameters'('true')
         'project.build.sourceEncoding'('UTF-8')
         'project.reporting.outputEncoding'('UTF-8')
 
@@ -108,24 +109,6 @@ ext.extraPomInfo = {
                     groupId "org.apache.maven.plugins"
                     artifactId "maven-compiler-plugin"
                     delegate.version '${maven-compiler-plugin.version}'
-                    delegate.configuration {
-                        compilerArgs {
-                            arg("-parameters")
-                        }
-                    }
-                    delegate.executions {
-                        execution {
-                            delegate.id "test-compile"
-                            goals {
-                                goal "testCompile"
-                            }
-                            delegate.configuration {
-                                compilerArgs {
-                                    arg("-parameters")
-                                }
-                            }
-                        }
-                    }
                 }
                 delegate.plugin {
                     groupId 'org.apache.maven.plugins'
