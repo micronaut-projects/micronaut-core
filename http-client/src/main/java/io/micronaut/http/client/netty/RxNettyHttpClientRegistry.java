@@ -357,12 +357,15 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
             // direct creation via createBean
             List<HttpFilterResolver.FilterEntry<HttpClientFilter>> filterEntries = clientFilterResolver
                     .resolveFilterEntries(new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA));
+            if (configuration == null) {
+                configuration = defaultHttpClientConfiguration;
+            }
             EventLoopGroup eventLoopGroup = resolveEventLoopGroup(configuration, beanContext);
             Class<? extends SocketChannel> socketChannelClass = resolveSocketChannel(configuration, beanContext);
             return new DefaultHttpClient(
                     loadBalancer,
                     null,
-                    configuration != null ? configuration : defaultHttpClientConfiguration,
+                    configuration,
                     loadBalancer.getContextPath().orElse(null),
                     clientFilterResolver,
                     filterEntries,
