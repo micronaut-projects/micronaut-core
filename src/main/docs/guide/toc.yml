@@ -4,13 +4,7 @@ introduction:
   upgrading: Upgrading to Micronaut 2.x
 quickStart:
   title: Quick Start
-  buildCLI:
-    title: Build/Install the CLI
-    installSdkman: Install with Sdkman
-    installHomebrew: Install with Homebrew
-    installMacPorts: Install with MacPorts
-    installWindows: Install through Binary on Windows
-    buildSource: Building from Source
+  buildCLI: Build/Install the CLI
   creatingServer: Creating a Server Application
   ideSetup:
     title: Setting up an IDE
