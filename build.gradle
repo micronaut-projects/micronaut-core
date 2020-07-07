@@ -1,13 +1,12 @@
 buildscript {
     repositories {
-        mavenLocal()
         maven { url "https://oss.jfrog.org/oss-snapshot-local" }
         maven { url "https://dl.bintray.com/micronaut/core-releases-local" }
         maven { url "https://repo.grails.org/grails/core" }
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:6.0.0'
-        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.4.BUILD-SNAPSHOT"
+        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.4"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
     }
