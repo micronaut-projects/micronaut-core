@@ -1,0 +1,66 @@
+To get a collection of all loggers by name with their configured and effective log levels,
+send a GET request to /logging. This will also provide a list of the available log levels.
+
+[source,bash]
+----
+$ curl http://localhost:8080/logging
+
+{
+    "levels": [
+        "ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "OFF", "NOT_SPECIFIED"
+    ],
+    "logging": {
+        "ROOT": {
+            "configuredLevel": "INFO",
+            "effectiveLevel": "INFO"
+        },
+        "io": {
+            "configuredLevel": "NOT_SPECIFIED",
+            "effectiveLevel": "INFO"
+        },
+        "io.micronaut": {
+            "configuredLevel": "NOT_SPECIFIED",
+            "effectiveLevel": "INFO"
+        },
+        // etc...
+    }
+}
+----
+
+To get the log levels of a particular logger, include the logger name in your GET request. For
+example, to access the log levels of the logger 'io.micronaut.http':
+
+[source,bash]
+----
+$ curl http://localhost:8080/logging/io.micronaut.http
+
+{
+    "configuredLevel": "NOT_SPECIFIED",
+    "effectiveLevel": "INFO"
+}
+----
+
+If the named logger does not exist, it will be created with an unspecified (i.e. `NOT_SPECIFIED`)
+configured log level. (It's effective log level will usually be that of the root logger.)
+
+To update the log level of a single logger, send a POST request to the named logger URL and include
+a body providing the log level to configure.
+
+
+[source,bash]
+----
+$ curl -i -X POST
+       -H "Content-Type: application/json" \
+       -d '{ "configuredLevel": "ERROR" }' \
+       http://localhost:8080/logging/ROOT
+
+HTTP/1.1 200 OK
+
+$ curl http://localhost:8080/logging/ROOT
+
+{
+    "configuredLevel": "ERROR",
+    "effectiveLevel": "ERROR"
+}
+
+----

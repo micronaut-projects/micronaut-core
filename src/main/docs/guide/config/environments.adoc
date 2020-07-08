@@ -16,6 +16,13 @@ $ java -Dmicronaut.environments=foo,bar -jar myapp.jar
 
 The above activates environments called `foo` and `bar`.
 
+To specify configuration via command line:
+[source,bash]
+----
+$ ./gradlew run --args="-config.property=test"
+$ ./mvnw run -Dargs="-config.property=test"
+----
+
 Finally, the Cloud environment names are also detected. See the section on <<cloudConfiguration,Cloud Configuration>> for more information.
 
 == Environment Priority
