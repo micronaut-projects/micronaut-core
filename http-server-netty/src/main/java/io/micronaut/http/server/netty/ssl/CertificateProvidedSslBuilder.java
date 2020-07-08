@@ -110,8 +110,8 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
                     ApplicationProtocolConfig.Protocol.ALPN,
                     ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
                     ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
-                    ApplicationProtocolNames.HTTP_1_1,
-                    ApplicationProtocolNames.HTTP_2
+                    ApplicationProtocolNames.HTTP_2,
+                    ApplicationProtocolNames.HTTP_1_1
             ));
         }
         try {
