@@ -26,10 +26,12 @@ import java.util.Set;
  * @since 2.0
  */
 final class BytesSentElement implements LogElement {
+
     /**
-     * The bytes sent marker (set dask when 0.)
+     * The bytes sent marker (set dask when 0).
      */
     public static final String BYTES_SENT_DASH = "b";
+
     /**
      * The bytes sent marker.
      */

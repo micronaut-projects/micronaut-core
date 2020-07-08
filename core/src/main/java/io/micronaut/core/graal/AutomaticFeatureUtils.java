@@ -136,7 +136,7 @@ public final class AutomaticFeatureUtils {
     }
 
     /**
-     * Adds resource bundles
+     * Adds resource bundles.
      * @param bundles The bundles
      */
     public static void addResourceBundles(String... bundles) {

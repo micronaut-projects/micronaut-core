@@ -70,7 +70,7 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder eagerInitAnnotated(Class<? extends Annotation>... annotations);
 
     /**
-     * Override default config locations
+     * Override default config locations.
      *
      * @param configLocations The config locations
      * @return This environment

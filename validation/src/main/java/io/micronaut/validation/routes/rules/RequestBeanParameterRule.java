@@ -29,7 +29,7 @@ import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.validation.routes.RouteValidationResult;
 
 /**
- * Validates RequestBean parameters
+ * Validates RequestBean parameters.
  *
  * @author Anze Sodja
  * @since 2.0

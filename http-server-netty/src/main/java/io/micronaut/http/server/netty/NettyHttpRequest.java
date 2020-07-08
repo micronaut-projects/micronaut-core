@@ -393,7 +393,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
     }
 
-
     /**
      * Lookup the current request from the context.
      *
