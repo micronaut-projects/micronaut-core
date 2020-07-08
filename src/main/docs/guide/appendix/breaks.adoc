@@ -306,3 +306,7 @@ interface BookClient extends BookApi {
 The AWS based function client has been made part of the https://github.com/micronaut-projects/micronaut-aws/[Micronaut AWS] project. If you need this functionality add the following dependency:
 
 dependency:io.micronaut.aws:micronaut-function-client-aws[]
+
+=== LogLevel Enum Moved to io.micronaut.logging
+
+io.micronaut.management.endpoint.loggers.LogLevel enum has moved to package io.micronaut.logging
