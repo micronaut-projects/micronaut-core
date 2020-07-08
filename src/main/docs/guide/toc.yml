@@ -215,9 +215,6 @@ languageSupport:
     title: Micronaut for GraalVM
     graalServices: Microservices as GraalVM native images
     graalFAQ: GraalVM and Micronaut FAQ
-logging:
-  title: Logging
-  logLevel: Retrieval and Setting
 management:
   title: Management & Monitoring
   buildingEndpoints:
