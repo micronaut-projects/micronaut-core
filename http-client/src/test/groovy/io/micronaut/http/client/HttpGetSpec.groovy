@@ -526,6 +526,29 @@ class HttpGetSpec extends Specification {
         then:
         body.isPresent()
         body.get() == 'success'
+
+        cleanup:
+        client.close()
+    }
+
+    void "test a nested list"() {
+        when:
+        List<List<Book>> books = myGetClient.nestedPojoList()
+
+        then:
+        books[0][0] instanceof Book
+        books[0][0].title == "The Stand"
+
+        when:
+        BlockingHttpClient client = RxHttpClient.create(embeddedServer.getURL()).toBlocking()
+        books = client.retrieve(HttpRequest.GET("/get/nestedPojoList"), Argument.listOf(Argument.listOf(Book.class)))
+
+        then:
+        books[0][0] instanceof Book
+        books[0][0].title == "The Stand"
+
+        cleanup:
+        client.close()
     }
 
     @Controller("/get")
@@ -549,6 +572,11 @@ class HttpGetSpec extends Specification {
         @Get("/pojoList")
         List<Book> pojoList() {
             return [ new Book(title: "The Stand") ]
+        }
+
+        @Get("/nestedPojoList")
+        List<List<Book>> nestedPojoList() {
+            return [[ new Book(title: "The Stand") ]]
         }
 
         @Get("/emptyList")
@@ -758,6 +786,9 @@ class HttpGetSpec extends Specification {
 
         @Get("/pojoList")
         List<Book> pojoList()
+
+        @Get("/nestedPojoList")
+        List<List<Book>> nestedPojoList()
 
         @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
         HttpResponse error()

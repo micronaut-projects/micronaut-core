@@ -46,7 +46,7 @@ public class DefaultRetryPredicate implements RetryPredicate {
     }
 
     /**
-     * Default constructor
+     * Default constructor.
      */
     public DefaultRetryPredicate() {
         this(Collections.emptyList(), Collections.emptyList());

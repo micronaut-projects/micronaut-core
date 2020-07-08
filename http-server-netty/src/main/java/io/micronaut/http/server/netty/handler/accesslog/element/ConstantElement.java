@@ -31,7 +31,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 public final class ConstantElement implements LogElement {
 
     /**
-     * The unknown value: '-'
+     * The unknown value: '-'.
      */
     public static final String UNKNOWN_VALUE = "-";
 

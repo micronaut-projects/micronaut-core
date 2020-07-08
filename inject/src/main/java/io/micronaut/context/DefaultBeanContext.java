@@ -3328,7 +3328,7 @@ public class DefaultBeanContext implements BeanContext {
     /**
      * @param <T> The bean type
      */
-    private final static class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefinitionReference<T> {
+    private static final class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefinitionReference<T> {
         private final Class<?> singletonClass;
         private final Map<Class<?>, List<Argument<?>>> typeArguments = new HashMap<>();
 

@@ -85,7 +85,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     }
 
     /**
-     * The config locations
+     * The config locations.
      *
      * @return The config locations
      */

@@ -377,7 +377,7 @@ public class DefaultHttpClient implements
         this((LoadBalancer) null, new DefaultHttpClientConfiguration());
     }
 
-    /**1
+    /**
      * @param url           The URL
      * @param configuration The {@link HttpClientConfiguration} object
      */

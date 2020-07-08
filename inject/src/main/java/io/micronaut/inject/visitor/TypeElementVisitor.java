@@ -149,7 +149,7 @@ public interface TypeElementVisitor<C, E> extends Ordered {
      */
     enum VisitorKind {
         /**
-         * A visitor that generates a file for each visited element and calls
+         * A visitor that generates a file for each visited element and calls.
          */
         ISOLATING,
         /**
