@@ -309,4 +309,4 @@ dependency:io.micronaut.aws:micronaut-function-client-aws[]
 
 === LogLevel Enum Moved to io.micronaut.logging
 
-io.micronaut.management.endpoint.loggers.LogLevel enum has moved to package io.micronaut.logging
+`io.micronaut.management.endpoint.loggers.LogLevel` enum has moved to package `io.micronaut.logging`
