@@ -52,6 +52,7 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
 import javax.inject.Scope;
+import javax.inject.Qualifier;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
@@ -122,7 +123,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     @Override
     public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         processingOver = roundEnv.processingOver();
-            
+
         annotations = annotations
                 .stream()
                 .filter(ann -> !ann.getQualifiedName().toString().equals(AnnotationUtil.KOTLIN_METADATA))
@@ -367,7 +368,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             ExecutableElement constructor = modelUtils.concreteConstructorFor(concreteClass, annotationUtils);
             this.constructorParameterInfo = populateParameterData(null, constructor, Collections.emptyMap());
             this.isExecutableType = isAopProxyType || concreteClassMetadata.hasStereotype(Executable.class);
-            this.isDeclaredBean = isExecutableType || isConfigurationPropertiesType || isFactoryType || concreteClassMetadata.hasStereotype(Scope.class) || concreteClassMetadata.hasStereotype(DefaultScope.class) || constructorParameterInfo.getAnnotationMetadata().hasStereotype(Inject.class);
+            boolean hasQualifier = concreteClassMetadata.hasStereotype(Qualifier.class) && !modelUtils.isAbstract(concreteClass);
+            this.isDeclaredBean = isExecutableType || concreteClassMetadata.hasStereotype(Scope.class) || concreteClassMetadata.hasStereotype(DefaultScope.class) || constructorParameterInfo.getAnnotationMetadata().hasStereotype(Inject.class) || hasQualifier;
         }
 
         /**
@@ -2264,7 +2266,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             element.getParameters().forEach(paramElement -> {
 
                 String argName = paramElement.getSimpleName().toString();
-                
+
                 AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(paramElement);
                 if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
                     annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, "javax.annotation.Nullable", Collections.emptyMap());
@@ -2289,7 +2291,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 TypeKind kind = typeMirror.getKind();
                 if ((kind == TypeKind.ERROR) && !processingOver) {
-                    throw new PostponeToNextRoundException();    
+                    throw new PostponeToNextRoundException();
                 }
 
                 switch (kind) {
