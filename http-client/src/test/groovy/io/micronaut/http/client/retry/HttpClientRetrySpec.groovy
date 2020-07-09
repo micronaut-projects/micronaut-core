@@ -15,6 +15,9 @@
  */
 package io.micronaut.http.client.retry
 
+import edu.umd.cs.findbugs.annotations.NonNull
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Post
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Controller
@@ -38,6 +41,7 @@ class HttpClientRetrySpec extends Specification {
 
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
 
     void "test simple blocking retry"() {
         given:
@@ -85,6 +89,15 @@ class HttpClientRetrySpec extends Specification {
 
     }
 
+    void "test retry JSON post"() {
+        given:
+        RetryableClient client = context.getBean(RetryableClient)
+        def result = client.post(new FooDTO(foo: "Good")).blockingGet()
+
+        expect:
+        result == 'Good'
+    }
+
     @Client("/retry-test")
     @Retryable(attempts = '5', delay = '5ms')
     static interface CountClient extends CountService {
@@ -119,6 +132,20 @@ class HttpClientRetrySpec extends Specification {
         }
     }
 
+    @Controller("/retry-test/json")
+    static class JsonController {
+        boolean first = true
+        @Post("/foo")
+        Single<String> post(@Body @NonNull FooDTO foo) {
+            if (first) {
+                first = false
+                return Single.error(new RuntimeException("First request failed"))
+            } else {
+                Single.just(foo.foo)
+            }
+        }
+    }
+
     static interface CountService {
 
         @Get('/count')
@@ -126,5 +153,17 @@ class HttpClientRetrySpec extends Specification {
 
         @Get('/rx-count')
         Single<Integer> getCountSingle()
+    }
+
+    @Client("/retry-test/json")
+    @Retryable(delay = "10ms", attempts = "2", maxDelay = "1s")
+    static interface RetryableClient {
+
+        @Post("/foo")
+        Single<String> post(@Body @NonNull FooDTO foo);
+    }
+
+    static class FooDTO {
+        String foo
     }
 }
