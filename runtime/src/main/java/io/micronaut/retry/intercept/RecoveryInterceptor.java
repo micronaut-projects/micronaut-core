@@ -54,9 +54,10 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
     public static final int POSITION = InterceptPhase.RETRY.getPosition() - 10;
 
     private static final Logger LOG = LoggerFactory.getLogger(RecoveryInterceptor.class);
+    private static final String FALLBACK_NOT_FOUND = "FALLBACK_NOT_FOUND";
+
     private final BeanContext beanContext;
 
-    private final static String FALLBACK_NOT_FOUND = "FALLBACK_NOT_FOUND";
 
     /**
      * @param beanContext The bean context to allow for DI of class annotated with {@link javax.inject.Inject}.
