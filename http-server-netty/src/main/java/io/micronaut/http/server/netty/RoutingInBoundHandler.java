@@ -1409,7 +1409,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         isKotlinFunctionReturnTypeUnit(((MethodBasedRouteMatch) routeMatch).getExecutableMethod());
                         final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(incomingRequest);
                         if (isKotlinCoroutineSuspended(body)) {
-                            return Single.<MutableHttpResponse<?>>create(emitter -> {
+                            return Flowable.create(emitter -> {
                                 CompletableFuture<?> f = supplier.get();
                                 f.whenComplete((o, throwable) -> {
                                     if (throwable != null) {
@@ -1425,10 +1425,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             }
                                         }
                                         response.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
-                                        emitter.onSuccess(response);
+                                        emitter.onNext(response);
+                                        emitter.onComplete();
                                     }
                                 });
-                            }).toFlowable();
+                            }, BackpressureStrategy.ERROR);
                         } else {
                             Object suspendedBody;
                             if (isKotlinFunctionReturnTypeUnit) {
