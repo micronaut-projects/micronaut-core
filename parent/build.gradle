@@ -1,7 +1,6 @@
 group projectGroupId
+version projectVersion
 
-apply plugin: 'maven-publish'
-apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
 ext.startPomInfo = {
     delegate.parent {
         groupId projectGroupId
@@ -11,7 +10,27 @@ ext.startPomInfo = {
 }
 ext.extraPomInfo = {
     delegate.properties {
+        'jdk.version'('1.8')
+        'maven.compiler.source'('${jdk.version}')
+        'maven.compiler.target'('${jdk.version}')
+        'maven.compiler.release'('${jdk.version}')
+        'maven.compiler.parameters'('true')
+        'project.build.sourceEncoding'('UTF-8')
+        'project.reporting.outputEncoding'('UTF-8')
+
         "micronaut.version"(projectVersion)
+        'micronaut-maven-plugin.version'(micronautMavenPluginVersion)
+
+        'azure-functions-maven-plugin.version'('1.5.0')
+        'exec-maven-plugin.version'('1.6.0')
+        'function-maven-plugin.version'('0.9.3')
+        'jib-maven-plugin.version'('2.4.0')
+        'maven-compiler-plugin.version'('3.8.1') // Override actual Maven compiler version (3.1) because some bugs cause annotation processors doesn't work well
+        'maven-failsafe-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
+        'maven-resources-plugin.version'('3.1.0')
+        'maven-shade-plugin.version'('3.1.0')
+        'maven-surefire-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
+        'protoc-jar-maven-plugin.version'('3.11.4')
     }
     delegate.build {
         delegate.pluginManagement {
@@ -19,12 +38,12 @@ ext.extraPomInfo = {
                 delegate.plugin {
                     groupId "io.micronaut.build"
                     artifactId "micronaut-maven-plugin"
-                    delegate.version micronautMavenPluginVersion
+                    delegate.version '${micronaut-maven-plugin.version}'
                 }
                 delegate.plugin {
                     groupId "com.github.os72"
                     artifactId "protoc-jar-maven-plugin"
-                    delegate.version "3.11.4"
+                    delegate.version '${protoc-jar-maven-plugin.version}'
                     delegate.executions {
                         execution {
                             phase('generate-sources')
@@ -53,7 +72,7 @@ ext.extraPomInfo = {
                 delegate.plugin {
                     groupId "org.codehaus.mojo"
                     artifactId "exec-maven-plugin"
-                    delegate.version "1.6.0"
+                    delegate.version '${exec-maven-plugin.version}'
                     delegate.configuration {
                         executable("java")
                         arguments {
@@ -68,42 +87,43 @@ ext.extraPomInfo = {
                 delegate.plugin {
                     groupId "com.google.cloud.functions"
                     artifactId "function-maven-plugin"
-                    delegate.version "0.9.3"
+                    delegate.version '${function-maven-plugin.version}'
                 }
                 delegate.plugin {
                     groupId "com.google.cloud.tools"
                     artifactId "jib-maven-plugin"
-                    delegate.version "2.4.0"
+                    delegate.version '${jib-maven-plugin.version}'
                 }
                 delegate.plugin {
                     groupId "com.microsoft.azure"
                     artifactId "azure-functions-maven-plugin"
-                    delegate.version "1.5.0"
+                    delegate.version '${azure-functions-maven-plugin.version}'
                 }
+
                 delegate.plugin {
                     groupId "org.apache.maven.plugins"
                     artifactId "maven-resources-plugin"
-                    delegate.version "3.1.0"
+                    delegate.version '${maven-resources-plugin.version}'
                 }
                 delegate.plugin {
                     groupId "org.apache.maven.plugins"
                     artifactId "maven-compiler-plugin"
-                    delegate.version "3.8.1"
-                    delegate.configuration {
-                        compilerArgs {
-                            arg("-parameters")
-                        }
-                    }
+                    delegate.version '${maven-compiler-plugin.version}'
+                }
+                delegate.plugin {
+                    groupId 'org.apache.maven.plugins'
+                    artifactId 'maven-surefire-plugin'
+                    delegate.version '${maven-surefire-plugin.version}'
+                }
+                delegate.plugin {
+                    groupId 'org.apache.maven.plugins'
+                    artifactId 'maven-failsafe-plugin'
+                    delegate.version '${maven-failsafe-plugin.version}'
                     delegate.executions {
                         execution {
-                            delegate.id "test-compile"
                             goals {
-                                goal "testCompile"
-                            }
-                            delegate.configuration {
-                                compilerArgs {
-                                    arg("-parameters")
-                                }
+                                goal 'integration-test'
+                                goal 'verify'
                             }
                         }
                     }
@@ -111,7 +131,7 @@ ext.extraPomInfo = {
                 delegate.plugin {
                     groupId "org.apache.maven.plugins"
                     artifactId "maven-shade-plugin"
-                    delegate.version "3.1.0"
+                    delegate.version '${maven-shade-plugin.version}'
                     delegate.executions {
                         execution {
                             delegate.phase "package"
@@ -134,3 +154,5 @@ ext.extraPomInfo = {
         }
     }
 }
+
+apply plugin: "io.micronaut.build.publishing"

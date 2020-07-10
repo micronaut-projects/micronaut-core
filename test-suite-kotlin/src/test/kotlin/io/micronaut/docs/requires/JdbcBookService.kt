@@ -20,9 +20,6 @@ import io.micronaut.context.annotation.Requires
 
 import javax.inject.Singleton
 import javax.sql.DataSource
-import java.sql.Connection
-import java.sql.PreparedStatement
-import java.sql.ResultSet
 import java.sql.SQLException
 
 // tag::requires[]

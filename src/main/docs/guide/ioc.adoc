@@ -20,7 +20,7 @@ Note that the IoC part of Micronaut can be used completely independently of Micr
 [source,groovy,subs="attributes"]
 ----
 plugins {
-  id "net.ltgt.apt" version "0.21" // <1>
+  id "com.diffplug.eclipse.apt" version "3.22.0" // <1>
 }
 
 ...
@@ -34,7 +34,7 @@ dependencies {
 
 ----
 
-<1> Apply net.ltgt.apt Gradle plugin which makes it easier/safer to use Java annotation processors
+<1> Apply `com.diffplug.eclipse.apt` Gradle plugin which modifes Eclipse projects to include gradle annotationProcessor dependencies
 <2> Include the minimal dependencies required to perform dependency injection
 <3> This is necessary to create beans in the `test` directory
 

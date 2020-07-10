@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -193,19 +193,17 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
      */
     protected void scanFile(String annotation, Path filePath, List<Class> classes) {
         String fileName = filePath.getFileName().toString();
-        if (fileName.endsWith(".class")) {
+        if (fileName.endsWith(".class") && fileName.indexOf('$') == -1) {
             // ignore generated classes
-            if (fileName.indexOf('$') == -1) {
-                try (InputStream inputStream = Files.newInputStream(filePath)) {
-                    scanInputStream(annotation, inputStream, classes);
-                } catch (IOException e) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Ignoring file [" + fileName + "] due to I/O error: " + e.getMessage(), e);
-                    }
-                } catch (ClassNotFoundException e) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Ignoring file [" + fileName + "]. Class not found: " + e.getMessage(), e);
-                    }
+            try (InputStream inputStream = Files.newInputStream(filePath)) {
+                scanInputStream(annotation, inputStream, classes);
+            } catch (IOException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Ignoring file [" + fileName + "] due to I/O error: " + e.getMessage(), e);
+                }
+            } catch (ClassNotFoundException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Ignoring file [" + fileName + "]. Class not found: " + e.getMessage(), e);
                 }
             }
         }

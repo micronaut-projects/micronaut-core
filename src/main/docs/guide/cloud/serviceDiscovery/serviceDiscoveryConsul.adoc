@@ -4,10 +4,10 @@ https://www.consul.io[Consul] is a popular Service Discovery and Distributed Con
 
 The quickest way to start using Consul is via Docker:
 
-. Starting Consul with Docker. Currently only v1.2.x is supported.
+. Starting Consul with Docker.
 [source,bash]
 ----
-docker run -p 8500:8500 consul:1.2.4
+docker run -p 8500:8500 consul
 ----
 
 Alternatively you can https://www.consul.io/docs/install/index.html[install and run a local Consul instance].

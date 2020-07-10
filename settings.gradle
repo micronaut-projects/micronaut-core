@@ -2,11 +2,10 @@ rootProject.name = 'micronaut'
 
 include "aop"
 include "bom"
-// include "bom-check"
+include "bom-check"
 include "parent"
 include "buffer-netty"
 include "core"
-include "discovery-client"
 include "function"
 include "function-client"
 include "function-web"

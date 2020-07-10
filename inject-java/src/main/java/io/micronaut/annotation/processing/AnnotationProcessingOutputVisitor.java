@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -86,16 +86,6 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         return generatedFiles.computeIfAbsent(path, s -> Optional.of(new GeneratedFileObject(path, StandardLocation.SOURCE_OUTPUT)));
     }
 
-    private FileObject openFileForReading(String path) {
-        return openedFiles.computeIfAbsent(path, s -> {
-            try {
-                return filer.getResource(StandardLocation.CLASS_OUTPUT, "", path);
-            } catch (IOException e) {
-                throw new ClassGenerationException("Unable to open file for path: " + path, e);
-            }
-        });
-    }
-
     /**
      * Class to handle generated files by the annotation processor.
      */
@@ -173,6 +163,16 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
             } catch (FileNotFoundException e) {
                 return null;
             }
+        }
+
+        private FileObject openFileForReading(String path) {
+            return openedFiles.computeIfAbsent(path, s -> {
+                try {
+                    return filer.getResource(StandardLocation.CLASS_OUTPUT, "", path);
+                } catch (IOException e) {
+                    throw new ClassGenerationException("Unable to open file for path: " + path, e);
+                }
+            });
         }
 
         private FileObject getOutputObject() throws IOException {

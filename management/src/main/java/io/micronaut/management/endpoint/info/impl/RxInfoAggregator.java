@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -51,7 +51,7 @@ public class RxInfoAggregator implements InfoAggregator<Map<String, Object>> {
             PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver();
             list.stream()
                 .sorted((e1, e2) -> Integer.compare(e2.getKey(), e1.getKey()))
-                .forEach((entry) -> resolver.addPropertySource(entry.getValue()));
+                .forEach(entry -> resolver.addPropertySource(entry.getValue()));
             return resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED);
         }).toFlowable();
     }
@@ -70,7 +70,7 @@ public class RxInfoAggregator implements InfoAggregator<Map<String, Object>> {
             Single<Map.Entry<Integer, PropertySource>> single = Flowable
                 .fromPublisher(sources[i].getSource())
                 .first(new EmptyPropertySource())
-                .map((source) -> new AbstractMap.SimpleEntry<>(index, source));
+                .map(source -> new AbstractMap.SimpleEntry<>(index, source));
             publishers.add(single.toFlowable());
         }
         return Flowable.merge(publishers);

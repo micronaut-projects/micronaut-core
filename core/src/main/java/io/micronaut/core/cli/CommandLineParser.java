@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,7 +39,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
 
     private static final String DEFAULT_PADDING = "        ";
 
-    private Map<String, Option> declaredOptions = new HashMap<String, Option>();
+    private Map<String, Option> declaredOptions = new HashMap<>();
     private int longestOptionNameLength = 0;
     private String usageMessage;
 
@@ -79,7 +79,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
      * @return commandLine
      */
     CommandLine parse(DefaultCommandLine cl, String[] args) {
-        parseInternal(cl, args, true);
+        parseInternal(cl, args);
         return cl;
     }
 
@@ -105,7 +105,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
         return sb.toString();
     }
 
-    private void parseInternal(DefaultCommandLine cl, String[] args, boolean firstArgumentIsCommand) {
+    private void parseInternal(DefaultCommandLine cl, String[] args) {
         cl.setRawArguments(args);
         String lastOptionName = null;
         for (String arg : args) {
@@ -190,7 +190,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
      * @param arg system arg
      */
     protected void processSystemArg(DefaultCommandLine cl, String arg) {
-        int i = arg.indexOf("=");
+        int i = arg.indexOf('=');
         String name = arg.substring(2, i);
         String value = arg.substring(i + 1, arg.length());
         cl.addSystemProperty(name, value);
@@ -221,7 +221,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
         final int inDoubleQuote = 2;
         int state = normal;
         final StringTokenizer tok = new StringTokenizer(toProcess, "\"\' ", true);
-        final ArrayList<String> result = new ArrayList<String>();
+        final ArrayList<String> result = new ArrayList<>();
         final StringBuilder current = new StringBuilder();
         boolean lastTokenHasBeenQuoted = false;
 

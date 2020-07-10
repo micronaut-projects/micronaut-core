@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,37 +29,37 @@ package io.micronaut.http.filter;
 public enum ServerFilterPhase {
 
     /**
-     * The first phase, invoked before all others
+     * The first phase, invoked before all others.
      */
     FIRST(-1000, -1249, -750),
 
     /**
-     * Any filters related to collecting metrics
+     * Any filters related to collecting metrics.
      */
     METRICS(9000, 8751, 9250),
 
     /**
-     * Any filters related to tracing HTTP calls
+     * Any filters related to tracing HTTP calls.
      */
     TRACING(19000, 18751, 19250),
 
     /**
-     * Any filters related to creating or reading the HTTP session
+     * Any filters related to creating or reading the HTTP session.
      */
     SESSION(29000, 28751, 29250),
 
     /**
-     * Any filters related to authentication or authorization
+     * Any filters related to authentication or authorization.
      */
     SECURITY(39000, 38751, 39250),
 
     /**
-     * Any filters related to rendering the response body
+     * Any filters related to rendering the response body.
      */
     RENDERING(49000, 48751, 49250),
 
     /**
-     * The last phase, invoked after all other phases
+     * The last phase, invoked after all other phases.
      */
     LAST(59000, 58751, 59250);
 

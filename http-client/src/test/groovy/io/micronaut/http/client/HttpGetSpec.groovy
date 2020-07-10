@@ -25,6 +25,7 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Completable
@@ -493,6 +494,63 @@ class HttpGetSpec extends Specification {
         client.close()
     }
 
+    void "test creating a client with a null URL"() {
+        given:
+        BlockingHttpClient client = HttpClient.create(null).toBlocking()
+
+        when:
+        String uri = UriBuilder.of(embeddedServer.getURI()).path("/get/simple").toString()
+        HttpResponse<String> response = client.exchange(
+                HttpRequest.GET(uri),
+                String
+        )
+        def body = response.getBody()
+
+        then:
+        body.isPresent()
+        body.get() == 'success'
+    }
+
+    void "test creating an rx client with a null URL"() {
+        given:
+        BlockingHttpClient client = RxHttpClient.create(null).toBlocking()
+
+        when:
+        String uri = UriBuilder.of(embeddedServer.getURI()).path("/get/simple").toString()
+        HttpResponse<String> response = client.exchange(
+                HttpRequest.GET(uri),
+                String
+        )
+        def body = response.getBody()
+
+        then:
+        body.isPresent()
+        body.get() == 'success'
+
+        cleanup:
+        client.close()
+    }
+
+    void "test a nested list"() {
+        when:
+        List<List<Book>> books = myGetClient.nestedPojoList()
+
+        then:
+        books[0][0] instanceof Book
+        books[0][0].title == "The Stand"
+
+        when:
+        BlockingHttpClient client = RxHttpClient.create(embeddedServer.getURL()).toBlocking()
+        books = client.retrieve(HttpRequest.GET("/get/nestedPojoList"), Argument.listOf(Argument.listOf(Book.class)))
+
+        then:
+        books[0][0] instanceof Book
+        books[0][0].title == "The Stand"
+
+        cleanup:
+        client.close()
+    }
+
     @Controller("/get")
     static class GetController {
 
@@ -514,6 +572,11 @@ class HttpGetSpec extends Specification {
         @Get("/pojoList")
         List<Book> pojoList() {
             return [ new Book(title: "The Stand") ]
+        }
+
+        @Get("/nestedPojoList")
+        List<List<Book>> nestedPojoList() {
+            return [[ new Book(title: "The Stand") ]]
         }
 
         @Get("/emptyList")
@@ -723,6 +786,9 @@ class HttpGetSpec extends Specification {
 
         @Get("/pojoList")
         List<Book> pojoList()
+
+        @Get("/nestedPojoList")
+        List<List<Book>> nestedPojoList()
 
         @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
         HttpResponse error()

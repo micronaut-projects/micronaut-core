@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -210,7 +210,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
     private DateTimeFormatter resolveFormatter(ConversionContext context) {
         Optional<String> format = context.getAnnotationMetadata().stringValue(Format.class);
         return format
-            .map((pattern) -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
+            .map(pattern -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
             .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
     }
 }

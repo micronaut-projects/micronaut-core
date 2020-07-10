@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,8 +41,8 @@ import java.io.IOException;
 
 /**
  * Converter registrar for Jackson.
- * 
- * @author graemerocher 
+ *
+ * @author graemerocher
  * @since 2.0
  */
 @Singleton
@@ -102,7 +102,7 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
         conversionService.addConverter(
                 CharSequence.class,
                 PropertyNamingStrategy.class,
-                (TypeConverter<CharSequence, PropertyNamingStrategy>) (charSequence, targetType, context) -> {
+                (charSequence, targetType, context) -> {
                     PropertyNamingStrategy propertyNamingStrategy = null;
 
                     if (charSequence != null) {
@@ -158,8 +158,7 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
             }
             ArgumentBinder binder = this.beanPropertyBinder.get();
             ArgumentBinder.BindingResult result = binder.bind(conversionContext, mapWithExtraProps);
-            Optional opt = result.getValue();
-            return opt;
+            return result.getValue();
         };
     }
 

@@ -6,6 +6,7 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":http")
     testImplementation project(":inject-java-test")
+    testImplementation dependencyModuleVersion("groovy", "groovy-json")
 
     testAnnotationProcessor project(":inject-java")
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -115,10 +115,10 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
      */
     protected <BT extends BeanType<T>> Stream<BT> reduceByAnnotation(Class<T> beanType, Stream<BT> candidates, String annotationName, String qualifiedName) {
         return candidates.filter(candidate -> {
-                String candidateName;
                 if (candidate.isPrimary() && Primary.class.getSimpleName().equals(annotationName)) {
                     return true;
                 }
+                String candidateName;
                 if (candidate instanceof NameResolver) {
                     candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
                 } else {
@@ -149,10 +149,10 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
      */
     protected <BT extends BeanType<T>> Stream<BT> reduceByName(Class<T> beanType, Stream<BT> candidates, String annotationName) {
         return candidates.filter(candidate -> {
-                    String candidateName;
                     if (candidate.isPrimary() && Primary.class.getSimpleName().equals(annotationName)) {
                         return true;
                     }
+                    String candidateName;
                     if (candidate instanceof NameResolver) {
                         candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
                     } else {

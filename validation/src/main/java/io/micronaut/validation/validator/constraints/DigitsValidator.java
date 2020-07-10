@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,12 +38,12 @@ public interface DigitsValidator<T> extends ConstraintValidator<Digits, T> {
             return true;
         }
         final int intMax = annotationMetadata.get("integer", int.class).orElse(0);
-        final int fracMax = annotationMetadata.get("fraction", int.class).orElse(0);
 
         if (intMax < 0) {
             throw new IllegalArgumentException("The length of the integer part cannot be negative.");
         }
 
+        final int fracMax = annotationMetadata.get("fraction", int.class).orElse(0);
         if (fracMax < 0) {
             throw new IllegalArgumentException("The length of the fraction part cannot be negative.");
         }

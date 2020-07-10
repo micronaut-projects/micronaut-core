@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,9 +31,14 @@ import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Named;
+import javax.inject.Provider;
 import javax.inject.Singleton;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.BiConsumer;
@@ -50,14 +55,18 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(TaskExecutors.class);
     private final BeanLocator beanLocator;
+    private final Optional<Provider<ExecutorService>> scheduledExecutorService;
+    private final Map<String, ExecutorService> scheduledExecutorServices = new ConcurrentHashMap<>();
 
     /**
      * Default constructor.
      *
      * @param beanLocator The bean constructor
+     * @param scheduledExecutorService The scheduled executor service
      */
-    AsyncInterceptor(BeanLocator beanLocator) {
+    AsyncInterceptor(BeanLocator beanLocator, @Named(TaskExecutors.SCHEDULED) Optional<Provider<ExecutorService>> scheduledExecutorService) {
         this.beanLocator = beanLocator;
+        this.scheduledExecutorService = scheduledExecutorService;
     }
 
     @Override
@@ -67,10 +76,16 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        String executorName = context.stringValue(Async.class).orElse(TaskExecutors.SCHEDULED);
-        ExecutorService executorService = beanLocator.findBean(ExecutorService.class, Qualifiers.byName(executorName)).orElseThrow(() ->
-            new TaskExecutionException("No ExecutorService named [" + executorName + "] configured in application context")
-        );
+        String executorServiceName = context.stringValue(Async.class).orElse(TaskExecutors.SCHEDULED);
+        ExecutorService executorService;
+        if (TaskExecutors.SCHEDULED.equals(executorServiceName) && scheduledExecutorService.isPresent()) {
+            executorService = scheduledExecutorService.get().get();
+        } else {
+            executorService = scheduledExecutorServices.computeIfAbsent(executorServiceName, name ->
+                    beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name))
+                            .orElseThrow(() -> new TaskExecutionException("No ExecutorService named [" + name + "] configured in application context")));
+        }
+
         ReturnType<Object> rt = context.getReturnType();
         Class<?> returnType = rt.getType();
         if (CompletionStage.class.isAssignableFrom(returnType) || Future.class.isAssignableFrom(returnType)) {
@@ -105,13 +120,8 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
         } else if (Publishers.isConvertibleToPublisher(returnType)) {
             Object result = context.proceed();
             Flowable<?> flowable = Publishers.convertPublisher(result, Flowable.class);
-            CompletableFuture<Object> newFuture = new CompletableFuture<>();
-            flowable.subscribeOn(Schedulers.from(executorService))
-                    .subscribe(
-                            newFuture::complete,
-                            newFuture::completeExceptionally
-                    );
-            return Publishers.convertPublisher(Publishers.fromCompletableFuture(newFuture), returnType);
+            flowable = flowable.subscribeOn(Schedulers.from(executorService));
+            return Publishers.convertPublisher(flowable, returnType);
         } else {
             throw new TaskExecutionException("Method [" + context.getExecutableMethod() + "] must return either void, or an instance of Publisher or CompletionStage");
         }

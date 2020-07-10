@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -62,7 +62,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * If this returns true, the {@link Cookie} cannot be accessed through client side script - But only if the
      * browser supports it.
      * <p>
-     * See <a href="http://www.owasp.org/index.php/HTTPOnly">here</a> for reference
+     * See <a href="https://www.owasp.org/index.php/HTTPOnly">here</a> for reference
      *
      * @return True if this {@link Cookie} is HTTP-only or false if it isn't
      */

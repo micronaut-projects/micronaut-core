@@ -182,9 +182,9 @@ class HealthEndpointSpec extends Specification {
             @Override
             Publisher<? extends HttpResponse<HealthResult>> apply(@NonNull Throwable throwable) throws Exception {
 
-                def response = ((HttpClientResponseException) throwable).response
-                response.getBody(HealthResult)
-                return Flowable.just(response)
+                def rsp = ((HttpClientResponseException) throwable).response
+                rsp.getBody(HealthResult)
+                return Flowable.just(rsp)
             }
         }).blockingFirst()
         HealthResult result = response.getBody(HealthResult).get()
@@ -242,9 +242,9 @@ class HealthEndpointSpec extends Specification {
             @Override
             Publisher<? extends HttpResponse<HealthResult>> apply(@NonNull Throwable throwable) throws Exception {
 
-                def response = ((HttpClientResponseException) throwable).response
-                response.getBody(Map)
-                return Flowable.just(response)
+                def rsp = ((HttpClientResponseException) throwable).response
+                rsp.getBody(Map)
+                return Flowable.just(rsp)
             }
         }).blockingFirst()
         Map result = response.getBody(Map).get()

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -76,12 +76,11 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
      * any values populated by the builder will be merged/overridden with the existing values.
      *
      * @param annotationType The annotation type
-     * @param <T> The annotation generic type
      * @return This element
      */
     @NonNull
-    default <T extends Annotation> Element annotate(@NonNull String annotationType) {
-        return annotate(annotationType, (Consumer<AnnotationValueBuilder<T>>) annotationValueBuilder -> { });
+    default Element annotate(@NonNull String annotationType) {
+        return annotate(annotationType, annotationValueBuilder -> { });
     }
 
     /**

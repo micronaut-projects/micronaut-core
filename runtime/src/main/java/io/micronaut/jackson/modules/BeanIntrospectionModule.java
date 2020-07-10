@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -647,11 +647,9 @@ public class BeanIntrospectionModule extends SimpleModule {
                     return;
                 }
             }
-            if (value == bean) {
+            if (value == bean && _handleSelfReference(bean, gen, prov, ser)) {
                 // three choices: exception; handled by call; or pass-through
-                if (_handleSelfReference(bean, gen, prov, ser)) {
-                    return;
-                }
+                return;
             }
             if (isUnwrapping()) {
                 JsonSerializer<Object> unwrappingSerializer = ser.unwrappingSerializer(null);
@@ -706,11 +704,9 @@ public class BeanIntrospectionModule extends SimpleModule {
                     return;
                 }
             }
-            if (value == bean) {
+            if (value == bean && _handleSelfReference(bean, gen, prov, ser)) {
                 // three choices: exception; handled by call; or pass-through
-                if (_handleSelfReference(bean, gen, prov, ser)) {
-                    return;
-                }
+                return;
             }
             if (_typeSerializer == null) {
                 ser.serialize(value, gen, prov);

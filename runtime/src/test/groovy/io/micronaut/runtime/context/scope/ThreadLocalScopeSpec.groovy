@@ -209,6 +209,7 @@ interface IA {
 class AImpl implements IA {
     int num
 
+    @Override
     int total() {
         return num
     }
@@ -236,6 +237,7 @@ interface IA2 {
 class A2Impl implements IA2 {
     int num
 
+    @Override
     int total() {
         return num
     }

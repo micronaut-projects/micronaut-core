@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -229,7 +230,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param url The base URL
      * @return The client
      */
-    static HttpClient create(URL url) {
+    static HttpClient create(@Nullable URL url) {
         return HttpClientConfiguration.createClient(url);
     }
 }

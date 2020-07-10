@@ -17,7 +17,6 @@ dependencies {
     compileOnly dependencyVersion("jaeger")
 
     testImplementation project(":inject-groovy")
-    testImplementation project(":discovery-client")
     testImplementation project(":inject-java")
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":http-server-netty")

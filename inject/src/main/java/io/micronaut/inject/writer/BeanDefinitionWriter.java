@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -400,7 +400,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             throw new IllegalStateException("Only a single call to visitBeanFactoryMethod(..) is permitted");
         } else {
             // now prepare the implementation of the build method. See BeanFactory interface
-            visitBuildFactoryMethodDefinition(factoryClass, methodName, argumentTypes, argumentAnnotationMetadata, methodAnnotationMetadata);
+            visitBuildFactoryMethodDefinition(factoryClass, methodName, argumentTypes, argumentAnnotationMetadata);
 
             // now implement the constructor
             buildFactoryMethodClassConstructor(
@@ -442,7 +442,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     genericTypes);
 
             // now prepare the implementation of the build method. See BeanFactory interface
-            visitBuildMethodDefinition(annotationMetadata, argumentTypes, argumentAnnotationMetadata);
+            visitBuildMethodDefinition(argumentTypes, argumentAnnotationMetadata);
 
             // now override the injectBean method
             visitInjectMethodDefinition();
@@ -460,7 +460,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             visitBeanDefinitionConstructorInternal(annotationMetadata, requiresReflection, Collections.emptyMap(), null, null);
 
             // now prepare the implementation of the build method. See BeanFactory interface
-            visitBuildMethodDefinition(annotationMetadata, Collections.emptyMap(), Collections.emptyMap());
+            visitBuildMethodDefinition(Collections.emptyMap(), Collections.emptyMap());
 
             // now override the injectBean method
             visitInjectMethodDefinition();
@@ -547,9 +547,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 String typeName = entry.getKey();
                 pushStoreStringInArray(visitor, i++, totalSize, typeName);
                 // use the property type as the value
-                pushStoreInArray(visitor, i++, totalSize, () -> {
-                    pushTypeArguments(visitor, entry.getValue());
-                });
+                pushStoreInArray(visitor, i++, totalSize, () ->
+                    pushTypeArguments(visitor, entry.getValue())
+                );
             }
             // invoke the AbstractBeanDefinition.createMap method
             visitor.invokeStatic(Type.getType(CollectionUtils.class), METHOD_MAP_OF);
@@ -883,14 +883,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         String methodProxyShortName = "$exec" + ++methodExecutorIndex;
         String methodExecutorClassName = beanDefinitionName + "$" + methodProxyShortName;
         boolean isSuspend = "kotlin.coroutines.Continuation".equals(CollectionUtils.last(argumentTypes.values()));
-      
+
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
             annotationMetadata = new AnnotationMetadataHierarchy(
                     new AnnotationMetadataReference(getBeanDefinitionReferenceClassName(), this.annotationMetadata),
                     ((AnnotationMetadataHierarchy) annotationMetadata).getDeclaredMetadata()
             );
         }
-      
+
         ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
                 beanFullClassName,
                 methodExecutorClassName,
@@ -1831,8 +1831,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Object factoryClass,
             String methodName,
             Map<String, Object> argumentTypes,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            AnnotationMetadata methodAnnotationMetadata) {
+            Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
         if (buildMethodVisitor == null) {
             boolean isParametrized = isParametrized(argumentAnnotationMetadata);
             defineBuilderMethod(isParametrized);
@@ -1882,7 +1881,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    private void visitBuildMethodDefinition(AnnotationMetadata classMetadata, Map<String, Object> argumentTypes, Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
+    private void visitBuildMethodDefinition(Map<String, Object> argumentTypes, Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
         if (buildMethodVisitor == null) {
             boolean isParametrized = isParametrized(argumentAnnotationMetadata);
             defineBuilderMethod(isParametrized);

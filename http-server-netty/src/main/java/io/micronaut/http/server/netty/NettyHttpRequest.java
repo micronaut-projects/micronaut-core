@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -342,7 +342,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 return (AbstractHttpData) httpContent;
             });
         } else {
-            receivedContent.add(httpContent);
+            receivedContent.add(httpContent.retain());
         }
     }
 
@@ -373,6 +373,24 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Override
     protected Charset initCharset(Charset characterEncoding) {
         return characterEncoding == null ? serverConfiguration.getDefaultCharset() : characterEncoding;
+    }
+
+    /**
+     * @return Return true if the request is form data.
+     */
+    @Internal
+    final boolean isFormOrMultipartData() {
+        MediaType ct = headers.contentType().orElse(null);
+        return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || ct.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
+    }
+
+    /**
+     * @return Return true if the request is form data.
+     */
+    @Internal
+    final boolean isFormData() {
+        MediaType ct = headers.contentType().orElse(null);
+        return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
     }
 
     /**
