@@ -16,6 +16,7 @@
 package io.micronaut.validation.executable;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -29,7 +30,7 @@ import io.micronaut.inject.visitor.VisitorContext;
  * @since 2.0.1
  */
 @Internal
-public class ExecutableVisitor implements TypeElementVisitor<Object, Object> {
+public class ExecutableVisitor implements TypeElementVisitor<Object, Executable> {
 
     @NonNull
     @Override
