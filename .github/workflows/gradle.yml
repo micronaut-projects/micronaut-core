@@ -7,9 +7,8 @@ name: Java CI
 on:
   push:
     branches:
-      - '*'
-#      - master
-#      - '[1-9]+.[0-9]+.x'
+      - master
+      - '[1-9]+.[0-9]+.x'
   pull_request:
     branches:
       - master
@@ -23,7 +22,7 @@ jobs:
         java: ['8', '11', '14']
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v1
+      - uses: actions/cache@v2
         with:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
@@ -47,7 +46,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           report_paths: '**/build/test-results/test/TEST-*.xml'
       - name: Publish to JFrog OSS
-        if: success() && github.event_name == 'push' && matrix.java == '8' && github.ref == 'refs/heads/master'
+        if: success() && github.event_name == 'push' && matrix.java == '8'
         env:
           BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
           BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
@@ -60,7 +59,7 @@ jobs:
           if_true: "micronaut-projects/micronaut-docs"
           if_false: ${{ github.repository }}
       - name: Publish to Github Pages
-        if: success() && github.event_name == 'push' && matrix.java == '8' && github.ref == 'refs/heads/master'
+        if: success() && github.event_name == 'push' && matrix.java == '8'
         uses: micronaut-projects/github-pages-deploy-action@master
         env:
           TARGET_REPOSITORY: ${{ steps.docs_target.outputs.value }}

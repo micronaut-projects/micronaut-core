@@ -13,4 +13,6 @@
               files="AnnotationClassReader.java|Attribute.java|Context.java|io[\\/]micronaut[\\/]core[\\/]util[\\/]clhm|AmazonInfo.java|DataCenterInfo.java|LeaseInfo.java|QueryStringDecoder.java|CronExpression.java|AntPathMatcher.java|io[\\/]micronaut[\\/]http[\\/]netty[\\/]stream[\\/]package-info.java" />
     <suppress checks="[a-zA-Z0-9]*"
               files="FlowControlHandler.java" />
+    <suppress checks="ParameterNumber"
+              files="DefaultHttpClient.java" />
 </suppressions>

@@ -377,7 +377,7 @@ public class DefaultHttpClient implements
         this((LoadBalancer) null, new DefaultHttpClientConfiguration());
     }
 
-    /**1
+    /**
      * @param url           The URL
      * @param configuration The {@link HttpClientConfiguration} object
      */
@@ -1475,7 +1475,6 @@ public class DefaultHttpClient implements
                 ByteBuf bodyContent = null;
                 if (hasBody) {
                     Object bodyValue = body.get();
-
                     if (Publishers.isConvertibleToPublisher(bodyValue)) {
                         boolean isSingle = Publishers.isSingle(bodyValue.getClass());
 
@@ -1572,7 +1571,12 @@ public class DefaultHttpClient implements
                     }
                 }
                 request.body(bodyContent);
-                nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+                try {
+                    nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+                } finally {
+                    // reset body after encoding request in case of retry
+                    request.body(body.orElse(null));
+                }
             }
         } else {
             nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);

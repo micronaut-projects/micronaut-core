@@ -11,9 +11,9 @@ ext.startPomInfo = {
 ext.extraPomInfo = {
     delegate.properties {
         'jdk.version'('1.8')
+        'release.version'('8')
         'maven.compiler.source'('${jdk.version}')
         'maven.compiler.target'('${jdk.version}')
-        'maven.compiler.release'('${jdk.version}')
         'maven.compiler.parameters'('true')
         'project.build.sourceEncoding'('UTF-8')
         'project.reporting.outputEncoding'('UTF-8')
@@ -31,6 +31,17 @@ ext.extraPomInfo = {
         'maven-shade-plugin.version'('3.1.0')
         'maven-surefire-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
         'protoc-jar-maven-plugin.version'('3.11.4')
+    }
+    delegate.profiles {
+        delegate.profile {
+            id('jdk-9-or-later')
+            delegate.activation {
+                jdk('[9,)')
+            }
+            delegate.properties {
+                'maven.compiler.release'('${release.version}')
+            }
+        }
     }
     delegate.build {
         delegate.pluginManagement {

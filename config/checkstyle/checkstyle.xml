@@ -95,9 +95,7 @@
             <property name="excludeScope" value="private"/>
         </module>
         <module name="JavadocType"/>
-        <module name="JavadocStyle">
-            <property name="checkFirstSentence" value="false"/>
-        </module>
+        <module name="JavadocStyle"/>
 
         <!-- Checks for Naming Conventions.                  -->
         <!-- See https://checkstyle.org/config_naming.html -->
@@ -122,7 +120,7 @@
         <!-- See https://checkstyle.org/config_sizes.html -->
         <!-- <module name="LineLength"/> -->
         <module name="ParameterNumber">
-            <property name="max" value="14"/>
+            <property name="max" value="12"/>
         </module>
 
         <!-- Checks for whitespace                               -->

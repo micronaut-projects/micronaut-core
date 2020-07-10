@@ -40,7 +40,7 @@ import java.util.Set;
 public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMetadataProvider> {
 
     /**
-     * Resolves the initial list of filters
+     * Resolves the initial list of filters.
      * @param context The context
      * @return The filters
      * @since 2.0

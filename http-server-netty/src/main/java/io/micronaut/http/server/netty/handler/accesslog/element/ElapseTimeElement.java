@@ -30,12 +30,14 @@ import io.netty.handler.codec.http.HttpHeaders;
  * @since 2.0
  */
 final class ElapseTimeElement implements LogElement {
+
     /**
-     * The elapse time marker (seconds.)
+     * The elapse time marker (seconds).
      */
     public static final String ELAPSE_TIME_SECONDS = "T";
+
     /**
-     * The elapse time marker (milliseconds.)
+     * The elapse time marker (milliseconds).
      */
     public static final String ELAPSE_TIME_MILLIS = "D";
 
