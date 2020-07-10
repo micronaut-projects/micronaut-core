@@ -52,6 +52,7 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
 import javax.inject.Scope;
+import javax.inject.Qualifier;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
@@ -357,7 +358,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             ExecutableElement constructor = modelUtils.concreteConstructorFor(concreteClass, annotationUtils);
             this.constructorParameterInfo = populateParameterData(null, constructor, Collections.emptyMap());
             this.isExecutableType = isAopProxyType || concreteClassMetadata.hasStereotype(Executable.class);
-            this.isDeclaredBean = isExecutableType || isConfigurationPropertiesType || isFactoryType || concreteClassMetadata.hasStereotype(Scope.class) || concreteClassMetadata.hasStereotype(DefaultScope.class) || constructorParameterInfo.getAnnotationMetadata().hasStereotype(Inject.class);
+            boolean hasQualifier = concreteClassMetadata.hasStereotype(Qualifier.class) && !modelUtils.isAbstract(concreteClass);
+            this.isDeclaredBean = isExecutableType || concreteClassMetadata.hasStereotype(Scope.class) || concreteClassMetadata.hasStereotype(DefaultScope.class) || constructorParameterInfo.getAnnotationMetadata().hasStereotype(Inject.class) || hasQualifier;
         }
 
         /**
@@ -441,12 +443,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         qualifiedName.equals(classElementQualifiedName)) {
 
                     if (qualifiedName.equals(classElementQualifiedName)) {
-                        final boolean isBean = isAopProxyType ||
-                                isConfigurationPropertiesType ||
-                                typeAnnotationMetadata.hasStereotype(ANNOTATION_STEREOTYPES) ||
-                                (constructorParameterInfo.getAnnotationMetadata().hasStereotype(Inject.class));
-
-                        if (isBean) {
+                        if (isDeclaredBean) {
                             // we know this class has supported annotations so we need a beandef writer for it
                             PackageElement packageElement = elementUtils.getPackageOf(classElement);
                             if (packageElement.isUnnamed()) {
