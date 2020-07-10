@@ -44,7 +44,7 @@ public class ExecutableVisitor implements TypeElementVisitor<Object, Executable>
 
         for (ParameterElement parameter : parameters) {
             if (parameter.getType().isPrimitive() && parameter.isNullable()) {
-                context.fail("Primitive types can not be null", parameter);
+                context.warn("@Nullable on primitive types will allow the method to be executed at runtime with null values, causing an exception", parameter);
             }
         }
     }

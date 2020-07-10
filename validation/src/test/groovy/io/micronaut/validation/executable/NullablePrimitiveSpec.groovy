@@ -2,58 +2,28 @@ package io.micronaut.validation.executable
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import spock.lang.Shared
+import spock.lang.Unroll
 
 class NullablePrimitiveSpec extends AbstractTypeElementSpec {
 
     @Shared
-    String errorMsg = "Primitive types can not be null"
+    String warning = "@Nullable on primitive types will allow the method to be executed at runtime with null values"
 
-    void 'test @Nullable is not allowed on primitive parameters'() {
-        when:
-        buildTypeElement("""
-            package test;
+    PrintStream old
+    ByteArrayOutputStream out
 
-            import io.micronaut.http.annotation.*;
-
-            @Controller("/foo")
-            class Foo {
-
-                @Get()
-                String abc(@javax.annotation.Nullable boolean boolPrimitive) {
-                    return "";
-                }
-            }
-            """.stripIndent()
-        )
-
-        then:
-        def ex = thrown(RuntimeException)
-        ex.message.contains(errorMsg)
-
-        when:
-        buildTypeElement("""
-            package test;
-
-            import io.micronaut.http.annotation.*;
-
-            @Controller("/foo")
-            class Foo {
-
-                @Get()
-                String abc(@edu.umd.cs.findbugs.annotations.Nullable boolean boolPrimitive) {
-                    return "";
-                }
-            }
-            """.stripIndent()
-        )
-
-        then:
-        ex = thrown(RuntimeException)
-        ex.message.contains(errorMsg)
+    void setup() {
+        old = System.out
+        out = new ByteArrayOutputStream()
+        System.out = new PrintStream(out)
     }
 
+    void cleanup() {
+        System.out = old
+    }
 
-    void 'test @Nullable is allowed on non-primitie parameters'() {
+    @Unroll
+    void 'test #annotation on primitive params will show a warning'() {
         when:
         buildTypeElement("""
             package test;
@@ -64,16 +34,24 @@ class NullablePrimitiveSpec extends AbstractTypeElementSpec {
             class Foo {
 
                 @Get()
-                String abc(@javax.annotation.Nullable Boolean boolType) {
+                String abc(${annotation} boolean boolPrimitive) {
                     return "";
                 }
             }
             """.stripIndent()
         )
+        String output = out.toString("UTF8")
 
         then:
         noExceptionThrown()
+        output.contains(warning)
 
+        where:
+        annotation << ['@javax.annotation.Nullable', '@edu.umd.cs.findbugs.annotations.Nullable']
+    }
+
+    @Unroll
+    void 'test #annotation is allowed on non-primitive parameters'() {
         when:
         buildTypeElement("""
             package test;
@@ -84,48 +62,43 @@ class NullablePrimitiveSpec extends AbstractTypeElementSpec {
             class Foo {
 
                 @Get()
-                String abc(@edu.umd.cs.findbugs.annotations.Nullable Boolean boolType) {
+                String abc(${annotation} Boolean boolType) {
                     return "";
                 }
             }
             """.stripIndent()
         )
+        String output = out.toString("UTF8")
 
         then:
         noExceptionThrown()
+        !output.contains(warning)
+
+        where:
+        annotation << ['@javax.annotation.Nullable', '@edu.umd.cs.findbugs.annotations.Nullable']
     }
 
-    void 'test @Nullable is allowed primitive parameters and not @Executable classes'() {
+    @Unroll
+    void 'test #annotation is allowed primitive parameters and not @Executable classes'() {
         when:
         buildTypeElement("""
             package test;
 
             @javax.inject.Singleton
             class Foo {
-                void bar(@javax.annotation.Nullable int n) {
+                void bar(${annotation} int n) {
                 }
             }
             """.stripIndent()
         )
+        String output = out.toString("UTF8")
 
         then:
         noExceptionThrown()
+        !output.contains(warning)
 
-
-        when:
-        buildTypeElement("""
-            package test;
-
-            @javax.inject.Singleton
-            class Foo {
-                void bar(@edu.umd.cs.findbugs.annotations.Nullable int n) {
-                }
-            }
-            """.stripIndent()
-        )
-
-        then:
-        noExceptionThrown()
+        where:
+        annotation << ['@javax.annotation.Nullable', '@edu.umd.cs.findbugs.annotations.Nullable']
     }
 
 }
