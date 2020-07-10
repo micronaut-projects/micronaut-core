@@ -23,7 +23,7 @@ dependencies {
     testImplementation 'org.zalando:logbook-netty:2.1.0'
     testImplementation project(":function-client")
     testImplementation project(":function-web")
-    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.817'
+    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.820'
 
 }
 
