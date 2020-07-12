@@ -33,6 +33,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
+import io.reactivex.Single
 import io.reactivex.functions.Consumer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -70,7 +71,6 @@ class HttpHeadSpec extends Specification {
 
         then:
         !body.isPresent()
-
     }
 
 
@@ -378,12 +378,30 @@ class HttpHeadSpec extends Specification {
         val == "multiple mappings"
     }
 
+    void "test head route on reactive return"() {
+        when:
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.HEAD("/head/reactive")
+        ))
+        Optional<String> body = flowable.map({res ->
+            res.getBody(String)}
+        ).blockingFirst()
+
+        then:
+        !body.isPresent()
+    }
+
     @Controller("/head")
     static class GetController {
 
         @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
         String simple() {
             return "success"
+        }
+
+        @Get(value = "/reactive", produces = MediaType.TEXT_PLAIN)
+        Single<String> reactive() {
+            return Single.just("success")
         }
 
         @Get("/pojo")
