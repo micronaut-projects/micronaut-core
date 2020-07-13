@@ -74,7 +74,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     private static final String RESOURCE_CONFIG_JSON = "resource-config.json";
     private static final String RESOURCES_DIR = "src/main/resources";
     private static final String RESOURCES = "resources";
-    private static final String BUNDLES = "bundles";
     private static final String PATTERN = "pattern";
     private static final String META_INF = "META-INF";
     private static final List<String> EXCLUDED_META_INF_DIRECTORIES = Arrays.asList("native-image", "services");
@@ -125,7 +124,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                         TypeHint.class,
                         "typeNames",
                         String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY
-                    )
+                        )
                 );
             }
         }
@@ -325,15 +324,16 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
                     final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(resourcesFile);
                     generatedFile.ifPresent(gf -> {
+                        resourceFiles.addAll(fetchAdditionalResources(visitorContext));
+
                         List<Map> resourceList = resourceFiles.stream()
-                                .map(resourceFile -> CollectionUtils.mapOf(PATTERN, "\\Q" + resourceFile + "\\E"))
+                                .map(this::mapToGraalResource)
                                 .collect(Collectors.toList());
 
                         // add any existing resource defined by the user in it's own file in src/main/graal
                         resourceList.addAll((List) json.getOrDefault(RESOURCES, Collections.EMPTY_LIST));
 
                         json.put(RESOURCES, resourceList);
-                        json.put(BUNDLES, Collections.emptyList());
 
                         try (Writer w = gf.openWriter()) {
                             visitorContext.info("Writing " + RESOURCE_CONFIG_JSON + " file to destination: " + gf.getName());
@@ -348,6 +348,25 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 visitorContext.fail("There was an error generating " + RESOURCE_CONFIG_JSON + ": " + e.getMessage(), null);
             }
         }
+    }
+
+    private List<String> fetchAdditionalResources(VisitorContext visitorContext) {
+        // If swagger (openapi) is present, add the appropriate metadata to expose the yml file an the UI
+        return visitorContext.getClassElement("io.swagger.v3.oas.annotations.info.Info")
+                .map(classElement -> Arrays.asList(
+                        ".*/swagger/.*yml",
+                        "META-INF/swagger",
+                        "META-INF/swagger/views/rapidoc/index.html",
+                        "META-INF/swagger/views/redoc/index.html",
+                        "META-INF/swagger/views/swagger-ui/index.html"
+                ))
+                .orElse(Collections.emptyList());
+    }
+
+    private Map mapToGraalResource(String resourceName) {
+        return resourceName.contains("*") ?
+                CollectionUtils.mapOf(PATTERN, resourceName) :
+                CollectionUtils.mapOf(PATTERN, "\\Q" + resourceName + "\\E");
     }
 
     private Set<String> findResourceFiles(File folder, List<String> filePath) {
