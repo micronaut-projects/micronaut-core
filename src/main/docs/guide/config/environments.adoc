@@ -16,12 +16,7 @@ $ java -Dmicronaut.environments=foo,bar -jar myapp.jar
 
 The above activates environments called `foo` and `bar`.
 
-To specify configuration via command line:
-[source,bash]
-----
-$ ./gradlew run --args="-endpoints.health.enabled=true -micronaut.environments=test"
-$ ./mvnw mn:run -Dendpoints.health.enabled=true -Dmicronaut.environments=test
-----
+include::commandLine.adoc[]
 
 Finally, the Cloud environment names are also detected. See the section on <<cloudConfiguration,Cloud Configuration>> for more information.
 
