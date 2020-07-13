@@ -131,16 +131,16 @@ class StreamSpec extends Specification {
     @Client('/stream')
     static interface StreamEchoClient {
         @Get(value = "/echo{?n,data}", consumes = MediaType.TEXT_PLAIN)
-        String echoAsString(@QueryValue @Nullable int n, @QueryValue @Nullable String data);
+        String echoAsString(@QueryValue @Nullable Integer n, @QueryValue @Nullable String data);
 
         @Get(value = "/echo{?n,data}", consumes = MediaType.TEXT_PLAIN)
-        Flowable<ByteBuffer<?>> echoAsByteBuffers(@QueryValue @Nullable int n, @QueryValue @Nullable String data);
+        Flowable<ByteBuffer<?>> echoAsByteBuffers(@QueryValue @Nullable Integer n, @QueryValue @Nullable String data);
 
         @Get(value = "/echo{?n,data}", consumes = MediaType.TEXT_PLAIN)
-        Flowable<Elephant> echoAsElephant(@QueryValue @Nullable int n, @QueryValue @Nullable String data);
+        Flowable<Elephant> echoAsElephant(@QueryValue @Nullable Integer n, @QueryValue @Nullable String data);
 
         @Get(value = "/echoWithHeaders{?n,data}", consumes = MediaType.TEXT_PLAIN)
-        HttpResponse<String> echoWithHeaders(@QueryValue @Nullable int n, @QueryValue @Nullable String data);
+        HttpResponse<String> echoWithHeaders(@QueryValue @Nullable Integer n, @QueryValue @Nullable String data);
 
         @Get(value = "/echoWithHeadersSingle{?data}", consumes = MediaType.TEXT_PLAIN)
         HttpResponse<String> echoWithHeadersSingle(@QueryValue @Nullable String data);
@@ -161,12 +161,12 @@ class StreamSpec extends Specification {
     static class StreamEchoController {
 
         @Get(value = "/echo{?n,data}", produces = MediaType.TEXT_PLAIN)
-        Flowable<byte[]> postStream(@QueryValue @Nullable int n,  @QueryValue @Nullable String data) {
+        Flowable<byte[]> postStream(@QueryValue @Nullable Integer n,  @QueryValue @Nullable String data) {
             return Flowable.just(data.getBytes(StandardCharsets.UTF_8)).repeat(n)
         }
 
         @Get(value = "/echoWithHeaders{?n,data}", produces = MediaType.TEXT_PLAIN)
-        HttpResponse<Flowable<byte[]>> echoWithHeaders(@QueryValue @Nullable int n, @QueryValue @Nullable String data) {
+        HttpResponse<Flowable<byte[]>> echoWithHeaders(@QueryValue @Nullable Integer n, @QueryValue @Nullable String data) {
             return HttpResponse.ok(Flowable.just(data.getBytes(StandardCharsets.UTF_8)).repeat(n)).header("X-MyHeader", "42")
         }
 
