@@ -15,10 +15,12 @@
  */
 package io.micronaut.scheduling.executor;
 
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.reflect.InstantiationUtils;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.concurrent.*;
 
@@ -31,14 +33,28 @@ import java.util.concurrent.*;
 @Factory
 public class ExecutorFactory {
 
+    private final BeanLocator beanLocator;
     private final ThreadFactory threadFactory;
 
     /**
      *
+     * @param beanLocator The bean beanLocator
      * @param threadFactory The factory to create new threads
      */
-    public ExecutorFactory(ThreadFactory threadFactory) {
+    public ExecutorFactory(BeanLocator beanLocator, ThreadFactory threadFactory) {
+        this.beanLocator = beanLocator;
         this.threadFactory = threadFactory;
+    }
+
+    /**
+     * Constructs an executor thread factory.
+     *
+     * @param configuration The configuration
+     * @return The thread factory
+     */
+    @EachBean(ExecutorConfiguration.class)
+    protected ThreadFactory eventLoopGroupThreadFactory(ExecutorConfiguration configuration) {
+        return configuration.getName() == null ? threadFactory : new NamedThreadFactory(configuration.getName() + "-executor");
     }
 
     /**
@@ -53,26 +69,11 @@ public class ExecutorFactory {
         ExecutorType executorType = executorConfiguration.getType();
         switch (executorType) {
             case FIXED:
-                return executorConfiguration
-                    .getThreadFactoryClass()
-                    .flatMap(InstantiationUtils::tryInstantiate)
-                    .map(factory -> Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads(), factory))
-                    .orElse(Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads(), threadFactory));
-
+                return Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads(), getThreadFactory(executorConfiguration));
             case CACHED:
-                return executorConfiguration
-                    .getThreadFactoryClass()
-                    .flatMap(InstantiationUtils::tryInstantiate)
-                    .map(Executors::newCachedThreadPool)
-                    .orElse(Executors.newCachedThreadPool(threadFactory));
-
+                return Executors.newCachedThreadPool(getThreadFactory(executorConfiguration));
             case SCHEDULED:
-                return executorConfiguration
-                    .getThreadFactoryClass()
-                    .flatMap(InstantiationUtils::tryInstantiate)
-                    .map(factory -> Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), factory))
-                    .orElse(Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), threadFactory));
-
+                return Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), getThreadFactory(executorConfiguration));
             case WORK_STEALING:
                 return Executors.newWorkStealingPool(executorConfiguration.getParallelism());
 
@@ -80,4 +81,18 @@ public class ExecutorFactory {
                 throw new IllegalStateException("Could not create Executor service for enum value: " + executorType);
         }
     }
+
+    private ThreadFactory getThreadFactory(ExecutorConfiguration executorConfiguration) {
+        return executorConfiguration
+                .getThreadFactoryClass()
+                .flatMap(InstantiationUtils::tryInstantiate)
+                .map(tf -> (ThreadFactory) tf)
+                .orElseGet(() -> {
+                    if (executorConfiguration.getName() == null) {
+                        return beanLocator.getBean(ThreadFactory.class);
+                    }
+                    return beanLocator.getBean(ThreadFactory.class, Qualifiers.byName(executorConfiguration.getName()));
+                });
+    }
+
 }

@@ -15,6 +15,8 @@
  */
 package io.micronaut.scheduling.executor;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
+
 import javax.validation.constraints.Min;
 import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
@@ -44,6 +46,14 @@ public interface ExecutorConfiguration {
      * The prefix used for Scheduled task configuration.
      */
     String PREFIX_CONSUMER = PREFIX + ".consumer";
+
+    /**
+     * @return The name of the component
+     */
+    @Nullable
+    default String getName() {
+        return null;
+    }
 
     /**
      * @return The {@link io.micronaut.scheduling.executor.ExecutorType}

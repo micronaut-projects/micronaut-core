@@ -19,23 +19,23 @@ class ThreadSelectionSpec extends Specification {
     @Unroll
     void "test thread selection strategy #strategy"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
-        ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
+            EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+            ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
         expect:
-        client.blocking().contains(blocking)
-        client.nonblocking().contains(nonBlocking)
-        client.reactive().contains(reactive)
-        client.reactiveBlocking().contains(blockingReactive)
+            client.blocking().contains(blocking)
+            client.nonblocking().contains(nonBlocking)
+            client.reactive().contains(reactive)
+            client.reactiveBlocking().contains(blockingReactive)
 
         cleanup:
-        embeddedServer.close()
+            embeddedServer.close()
 
         where:
-        strategy               | blocking            | nonBlocking         | reactive            | blockingReactive    | scheduleBlocking | scheduleReactive
-        ThreadSelection.AUTO   | 'pool-'             | 'nioEventLoopGroup' | 'nioEventLoopGroup' | 'pool-'             | "pool-"          | "pool-"
-        ThreadSelection.IO     | 'pool-'             | 'pool-'             | 'pool-'             | 'pool-'             | "pool-"          | "pool-"
-        ThreadSelection.MANUAL | 'nioEventLoopGroup' | 'nioEventLoopGroup' | 'nioEventLoopGroup' | 'nioEventLoopGroup' | "pool-"          | "pool-"
+            strategy               | blocking                    | nonBlocking                 | reactive                    | blockingReactive            | scheduleBlocking      | scheduleReactive
+            ThreadSelection.AUTO   | 'io-executor-thread-'       | 'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | 'io-executor-thread-'       | "io-executor-thread-" | "io-executor-thread-"
+            ThreadSelection.IO     | 'io-executor-thread-'       | 'io-executor-thread-'       | 'io-executor-thread-'       | 'io-executor-thread-'       | "io-executor-thread-" | "io-executor-thread-"
+            ThreadSelection.MANUAL | 'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | "io-executor-thread-" | "io-executor-thread-"
 
 
     }
