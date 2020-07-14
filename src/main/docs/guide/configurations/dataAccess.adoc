@@ -16,19 +16,19 @@ The table summarizes the configuration modules and the dependencies you should a
 |`io.micronaut.sql:micronaut-hibernate-jpa`
 |Configures Hibernate/JPA EntityManagerFactory beans
 
-|`io.micronaut.configuration:micronaut-hibernate-gorm`
+|`io.micronaut.groovy:micronaut-hibernate-gorm`
 |Configures http://gorm.grails.org/latest/hibernate/manual[GORM for Hibernate] for Groovy applications
 
 |`io.micronaut.mongodb:micronaut-mongo-reactive`
 |Configures the http://mongodb.github.io/mongo-java-driver-reactivestreams[MongoDB Reactive Driver]
 
-|`io.micronaut.configuration:micronaut-mongo-gorm`
+|`io.micronaut.groovy:micronaut-mongo-gorm`
 |Configures http://gorm.grails.org/latest/mongodb/manual[GORM for MongoDB] for Groovy applications
 
 |`io.micronaut.neo4j:micronaut-neo4j-bolt`
 |Configures the https://github.com/neo4j/neo4j-java-driver[Bolt Java Driver] for https://neo4j.com[Neo4j]
 
-|`io.micronaut.configuration:micronaut-neo4j-gorm`
+|`io.micronaut.groovy:micronaut-neo4j-gorm`
 |Configures http://gorm.grails.org/latest/neo4j/manual[GORM for Neo4j] for Groovy applications
 
 |`io.micronaut.sql:micronaut-vertx-mysql-client`
