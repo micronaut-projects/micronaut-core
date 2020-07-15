@@ -16,8 +16,6 @@ $ java -Dmicronaut.environments=foo,bar -jar myapp.jar
 
 The above activates environments called `foo` and `bar`.
 
-include::commandLine.adoc[]
-
 Finally, the Cloud environment names are also detected. See the section on <<cloudConfiguration,Cloud Configuration>> for more information.
 
 == Environment Priority
