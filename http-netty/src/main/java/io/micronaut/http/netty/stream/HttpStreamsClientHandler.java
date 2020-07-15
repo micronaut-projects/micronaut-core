@@ -17,6 +17,7 @@ package io.micronaut.http.netty.stream;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.reactive.CancelledSubscriber;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -27,6 +28,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -185,6 +187,15 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
             }
         } else {
             super.channelRead(ctx, msg);
+        }
+    }
+
+    @Override
+    public void write(final ChannelHandlerContext ctx, Object msg, final ChannelPromise promise) throws Exception {
+        if (ctx.channel().attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).get() == Boolean.TRUE) {
+            ctx.write(msg, promise);
+        } else {
+            super.write(ctx, msg, promise);
         }
     }
 }

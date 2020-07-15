@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.core.io.buffer.ByteBufferFactory
+import io.micronaut.core.io.buffer.ReferenceCounted
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
@@ -43,6 +44,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import javax.inject.Inject
 import java.nio.charset.StandardCharsets
@@ -179,7 +181,7 @@ class DataStreamSpec extends Specification {
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1286")
     void "test returning a stream and sending a multipart request"() {
-        def body = MultipartBody.builder()
+        def requestBody = MultipartBody.builder()
                 .addPart(
                         "data",
                         "randomFileName.dat",
@@ -187,15 +189,24 @@ class DataStreamSpec extends Specification {
                         new byte[4096]
                 )
 
-        def request = HttpRequest.POST("/datastream/upload", body)
+        def request = HttpRequest.POST("/datastream/upload", requestBody)
                 .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                 .accept(MediaType.TEXT_PLAIN_TYPE)
 
-        def httpResponse = client.exchangeStream(request).timeout(2, TimeUnit.SECONDS).blockingLast()
+        HttpResponse response
+        String body
+        client.exchangeStream(request)
+                .doOnNext(resp -> {
+                    response = resp
+                    body = new String(resp.body().toByteArray())
+                })
+                .subscribe()
 
         expect:
-        httpResponse.status() == HttpStatus.OK
-        httpResponse.body().toString() == "Read 4096 bytes"
+        new PollingConditions(timeout: 3).eventually {
+            assert response.status() == HttpStatus.OK
+            assert body == "Read 4096 bytes"
+        }
     }
 
     static class Book {
