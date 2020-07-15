@@ -157,7 +157,7 @@ ext {
             ],
             'micronaut.discovery': [
                     version:micronautDiscoveryClientVersion,
-                    group:'io.micronaut',
+                    group:'io.micronaut.discovery',
                     name:'micronaut-discovery-client'
             ],            
             'micronaut.hibernate.validator': [
