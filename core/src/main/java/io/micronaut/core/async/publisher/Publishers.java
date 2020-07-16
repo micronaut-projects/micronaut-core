@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -351,12 +351,12 @@ public class Publishers {
         Objects.requireNonNull(object, "Argument [object] cannot be null");
         Objects.requireNonNull(publisherType, "Argument [publisherType] cannot be null");
         if (object instanceof CompletableFuture) {
-            @SuppressWarnings("unchecked") Publisher<T> futurePublisher = (Publisher<T>) Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
+            @SuppressWarnings("unchecked") Publisher<T> futurePublisher = Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
             return ConversionService.SHARED.convert(futurePublisher, publisherType)
-                    .orElseThrow(() -> new IllegalArgumentException("Unsupported Reactive type: " + object.getClass()));
+                    .orElseThrow(() -> unconvertibleError(object, publisherType));
         } else {
             return ConversionService.SHARED.convert(object, publisherType)
-                    .orElseThrow(() -> new IllegalArgumentException("Unsupported Reactive type: " + object.getClass()));
+                    .orElseThrow(() -> unconvertibleError(object, publisherType));
         }
     }
 
@@ -388,6 +388,10 @@ public class Publishers {
             }
         }
         return false;
+    }
+
+    private static <T> IllegalArgumentException unconvertibleError(Object object, Class<T> publisherType) {
+        return new IllegalArgumentException("Cannot convert reactive type [" + object.getClass() + "] to type [" + publisherType + "]. Ensure that you have the necessary Reactive module on your classpath. For example for Reactor you should have 'micronaut-reactor'.");
     }
 
     /**

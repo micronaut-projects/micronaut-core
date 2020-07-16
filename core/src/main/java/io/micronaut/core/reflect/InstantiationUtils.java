@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,7 +40,6 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 public class InstantiationUtils {
-
 
     /**
      * Try to instantiate the given class.
@@ -143,7 +142,7 @@ public class InstantiationUtils {
                 logger.debug("Cannot instantiate type [{}] without reflection. Attempting reflective instantiation", type);
             }
             try {
-                T bean = type.newInstance();
+                T bean = type.getDeclaredConstructor().newInstance();
                 if (type.isInstance(bean)) {
                     return bean;
                 }
@@ -209,7 +208,7 @@ public class InstantiationUtils {
                     if (log.isDebugEnabled()) {
                         log.debug("Reflectively instantiating type: " + type);
                     }
-                    return type.newInstance();
+                    return type.getDeclaredConstructor().newInstance();
                 } catch (Throwable e) {
                     throw new InstantiationException("Could not instantiate type [" + type.getName() + "]: " + e.getMessage(), e);
                 }

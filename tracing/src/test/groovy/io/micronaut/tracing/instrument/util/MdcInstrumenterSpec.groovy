@@ -3,6 +3,8 @@ package io.micronaut.tracing.instrument.util
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.scheduling.instrument.InvocationInstrumenter
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -13,6 +15,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
 
 class MdcInstrumenterSpec extends Specification {
+    static final Logger LOG = LoggerFactory.getLogger(MdcInstrumenterSpec.class)
     static final String key = 'foo'
     static final String value = 'bar'
 
@@ -20,6 +23,7 @@ class MdcInstrumenterSpec extends Specification {
     MdcInstrumenter mdcInstrumenter = new MdcInstrumenter()
 
     def cleanup() {
+        LOG.info('Clearing MDC')
         MDC.clear()
     }
 
@@ -106,6 +110,36 @@ class MdcInstrumenterSpec extends Specification {
         then:
         conds.await()
         MDC.get(key) == value2
+    }
+
+    def "empty context should't clean MDC"() {
+        when:
+        MDC.put(key, value)
+        MDC.remove(key) // Make empty context
+        def mdcBeforeNew = MDC.copyOfContextMap
+        def instrumenterWithEmptyContext = mdcInstrumenter.newInvocationInstrumenter()
+        MDC.put("contextValue", "contextValue")
+        def instrumenterWithContext = mdcInstrumenter.newInvocationInstrumenter()
+        MDC.clear()
+        Runnable runnable = InvocationInstrumenter.instrument({
+            MDC.put("inside1", "inside1")
+            InvocationInstrumenter.instrument({
+                assert MDC.get("contextValue") == "contextValue"
+                assert MDC.get("inside1") == "inside1"
+
+                MDC.put("inside2", "inside2")
+            } as Runnable, instrumenterWithEmptyContext).run()
+            assert MDC.get("contextValue") == "contextValue"
+            assert MDC.get("inside1") == "inside1"
+            assert MDC.get("inside2") == null
+        } as Runnable, instrumenterWithContext)
+        runnable.run()
+
+        then:
+        mdcBeforeNew.isEmpty()
+        MDC.get(key) == null
+        MDC.get("XXX") == null
+        MDC.get("aaa") == null
     }
 
     void "test MDC instrumenter with Executor"() {

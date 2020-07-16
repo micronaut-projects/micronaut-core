@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -54,7 +54,7 @@ public interface Link {
     /**
      * @return The URI to template to
      */
-    URI getHref();
+    String getHref();
 
     /**
      * @return Whether the URI is templated
@@ -73,14 +73,14 @@ public interface Link {
     /**
      * @return The deprecation URI
      */
-    default Optional<URI> getDeprecation() {
+    default Optional<String> getDeprecation() {
         return Optional.empty();
     }
 
     /**
      * @return The profile URI
      */
-    default Optional<URI> getProfile() {
+    default Optional<String> getProfile() {
         return Optional.empty();
     }
 
@@ -112,7 +112,7 @@ public interface Link {
      * @return The link
      */
     static Link of(URI uri) {
-        return new DefaultLink(uri);
+        return new DefaultLink(uri.toString());
     }
 
     /**
@@ -122,7 +122,7 @@ public interface Link {
      * @return The link
      */
     static Link of(String uri) {
-        return new DefaultLink(URI.create(uri));
+        return new DefaultLink(uri);
     }
 
     /**
@@ -132,6 +132,16 @@ public interface Link {
      * @return The link
      */
     static Link.Builder build(URI uri) {
+        return new DefaultLink(uri.toString());
+    }
+
+    /**
+     * Create a link from the given URI.
+     *
+     * @param uri The URI
+     * @return The link
+     */
+    static Link.Builder build(String uri) {
         return new DefaultLink(uri);
     }
 
@@ -155,11 +165,26 @@ public interface Link {
         Builder profile(@Nullable URI profile);
 
         /**
+         * @param profileURI The profile URI
+         * @return The builder
+         * @see Link#getProfile()
+         */
+        Builder profile(@Nullable String profileURI);
+
+        /**
          * @param deprecation The deprecation URI
          * @return The builder
          * @see Link#getDeprecation()
          */
         Builder deprecation(@Nullable URI deprecation);
+
+
+        /**
+         * @param deprecationURI The deprecation URI
+         * @return The builder
+         * @see Link#getDeprecation()
+         */
+        Builder deprecation(@Nullable String deprecationURI);
 
         /**
          * @param title The title of the link

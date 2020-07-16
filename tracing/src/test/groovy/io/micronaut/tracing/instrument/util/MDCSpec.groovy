@@ -14,17 +14,16 @@ import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
-import org.reactivestreams.Subscription
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import spock.lang.AutoCleanup
-import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Specification
 
-import java.util.logging.Logger
-
 class MDCSpec extends Specification {
+
+    static final Logger LOG = LoggerFactory.getLogger(MDCSpec.class)
 
     @Shared @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
@@ -34,14 +33,15 @@ class MDCSpec extends Specification {
     @Shared @AutoCleanup
     RxHttpClient client = RxHttpClient.create(embeddedServer.URL)
 
-
-    @PendingFeature(reason = "Requires reworking the instrumentation APIs - again")
     void "test MDC doesn't leak"() {
+        given:
+        LOG.info ('MDC adapter: {}', MDC.getMDCAdapter())
+
         expect:
         100.times {
             String traceId = UUID.randomUUID().toString()
             HttpRequest<Object> request = HttpRequest.GET("/mdc-test").header("traceId", traceId)
-            String response = client.retrieve(request).blockingFirst()
+            String response = client.toBlocking().retrieve(request)
             assert response == traceId
         }
     }
@@ -52,9 +52,13 @@ class MDCSpec extends Specification {
 
         @Get("/mdc-test")
         HttpResponse<String> getMdc() {
-            Map<String, String> mdc = MDC.getCopyOfContextMap()
-            println ("Thread = " + Thread.currentThread().getName())
-            return HttpResponse.ok(mdc.get(RequestIdFilter.TRACE_ID_MDC_KEY))
+            Map<String, String> mdc = MDC.getCopyOfContextMap() ?: [:]
+            String traceId = mdc.get(RequestIdFilter.TRACE_ID_MDC_KEY)
+            LOG.info ('traceId: {}', traceId)
+            if (traceId == null) {
+                throw new IllegalStateException('Missing traceId')
+            }
+            HttpResponse.ok(traceId)
         }
     }
 
@@ -62,7 +66,7 @@ class MDCSpec extends Specification {
     @Requires(property = 'mdc.test.enabled')
     static class RequestIdFilter extends OncePerRequestHttpServerFilter {
 
-        private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(RequestIdFilter.class)
+        private static final Logger LOG = LoggerFactory.getLogger(RequestIdFilter.class)
 
         public static final String TRACE_ID_MDC_KEY = "traceId"
 
@@ -73,14 +77,13 @@ class MDCSpec extends Specification {
                 LOG.warn("MDC should have been empty here.")
             }
             LOG.info("Storing traceId in MDC: " + traceIdHeader)
+            MDC.put(TRACE_ID_MDC_KEY, traceIdHeader)
+            LOG.info('MDC updated')
 
             return Flowable
                     .fromPublisher(chain.proceed(request))
-                    .doOnSubscribe({ Subscription s ->
-                        MDC.put(TRACE_ID_MDC_KEY, traceIdHeader)
-                    })
                     .doFinally{->
-                        LOG.info("Removing traceId id from MDC: {}", MDC.get(TRACE_ID_MDC_KEY))
+                        LOG.info('Removing traceId id from MDC')
                         MDC.clear()
                     }
         }

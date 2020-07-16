@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.Failure;
@@ -40,10 +41,12 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
     static final Logger LOG = LoggerFactory.getLogger(Condition.class);
 
     @Override
-    public boolean isEnabled(@NonNull BeanContext context) {
+    public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
-        DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(context, this);
+        DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(
+                (DefaultBeanContext) context,
+                this, resolutionContext);
         boolean enabled = condition == null || condition.matches(conditionContext);
         if (LOG.isDebugEnabled() && !enabled) {
             if (this instanceof BeanConfiguration) {

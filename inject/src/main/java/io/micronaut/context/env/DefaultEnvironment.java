@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
 import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.CachingClassPathAnnotationScanner;
 import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
@@ -42,6 +43,7 @@ import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -71,11 +73,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String GOOGLE_APPENGINE_ENVIRONMENT = "GAE_ENV";
     private static final int DEFAULT_READ_TIMEOUT = 500;
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
+    // CHECKSTYLE:OFF
     private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
+    // CHECKSTYLE:ON
     private static final String ORACLE_CLOUD_ASSET_TAG_FILE = "/sys/devices/virtual/dmi/id/chassis_asset_tag";
     private static final String ORACLE_CLOUD_WINDOWS_ASSET_TAG_CMD = "wmic systemenclosure get smbiosassettag";
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
+    private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList("classpath:/", "file:config/");
 
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
@@ -95,6 +100,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final AtomicBoolean reading = new AtomicBoolean(false);
     private final Boolean deduceEnvironments;
     private final ApplicationContextConfiguration configuration;
+    private final Collection<String> configLocations;
 
     /**
      * Construct a new environment for the given configuration.
@@ -125,6 +131,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
         this.resourceLoader = configuration.getResourceLoader();
         this.annotationScanner = createAnnotationScanner(classLoader);
+        List<String> configLocations = configuration.getOverrideConfigLocations() == null ?
+                new ArrayList<>(DEFAULT_CONFIG_LOCATIONS) : configuration.getOverrideConfigLocations();
+        // Search config locations in reverse order
+        Collections.reverse(configLocations);
+        this.configLocations = configLocations;
     }
 
     @Override
@@ -324,13 +335,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
 
             if (StringUtils.isNotEmpty(deduceEnv)) {
-                boolean deduce = Boolean.valueOf(deduceEnv);
+                boolean deduce = Boolean.parseBoolean(deduceEnv);
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Environment deduction was set via environment variable to: " + deduce);
                 }
                 return deduce;
             } else if (StringUtils.isNotEmpty(deduceProperty)) {
-                boolean deduce = Boolean.valueOf(deduceProperty);
+                boolean deduce = Boolean.parseBoolean(deduceProperty);
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Environment deduction was set via system property to: " + deduce);
                 }
@@ -344,7 +355,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         }
     }
-
 
     /**
      * Creates the default annotation scanner.
@@ -447,18 +457,40 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     protected List<PropertySource> readPropertySourceList(String name) {
         List<PropertySource> propertySources = new ArrayList<>();
+        for (String configLocation : configLocations) {
+            ResourceLoader resourceLoader;
+            if (configLocation.equals("classpath:/")) {
+                resourceLoader = this;
+            } else if (configLocation.startsWith("classpath:")) {
+                resourceLoader = this.forBase(configLocation);
+            } else  if (configLocation.startsWith("file:")) {
+                configLocation = configLocation.substring(5);
+                Path configLocationPath = Paths.get(configLocation);
+                if (Files.exists(configLocationPath) && Files.isDirectory(configLocationPath) && Files.isReadable(configLocationPath)) {
+                    resourceLoader = new DefaultFileSystemResourceLoader(configLocationPath);
+                } else {
+                    continue; // Skip not existing config location
+                }
+            } else {
+                throw new ConfigurationException("Unsupported config location format: " + configLocation);
+            }
+            readPropertySourceList(name, resourceLoader, propertySources);
+        }
+        return propertySources;
+    }
+
+    private void readPropertySourceList(String name, ResourceLoader resourceLoader, List<PropertySource> propertySources) {
         Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
         if (propertySourceLoaders.isEmpty()) {
-            loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources);
+            loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources, resourceLoader);
         } else {
             for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
                 }
-                loadPropertySourceFromLoader(name, propertySourceLoader, propertySources);
+                loadPropertySourceFromLoader(name, propertySourceLoader, propertySources, resourceLoader);
             }
         }
-        return propertySources;
     }
 
     /**
@@ -521,13 +553,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return allLoaders;
     }
 
-    private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources) {
-        Optional<PropertySource> defaultPropertySource = propertySourceLoader.load(name, this);
+    private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources, ResourceLoader resourceLoader) {
+        Optional<PropertySource> defaultPropertySource = propertySourceLoader.load(name, resourceLoader);
         defaultPropertySource.ifPresent(propertySources::add);
         Set<String> activeNames = getActiveNames();
         int i = 0;
         for (String activeName: activeNames) {
-            Optional<PropertySource> propertySource = propertySourceLoader.loadEnv(name, this, ActiveEnvironment.of(activeName, i));
+            Optional<PropertySource> propertySource = propertySourceLoader.loadEnv(name, resourceLoader, ActiveEnvironment.of(activeName, i));
             propertySource.ifPresent(propertySources::add);
             i++;
         }
@@ -792,7 +824,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
 
         //TODO check for azure and IBM
-        //Azure - see http://blog.mszcool.com/index.php/2015/04/detecting-if-a-virtual-machine-runs-in-microsoft-azure-linux-windows-to-protect-your-software-when-distributed-via-the-azure-marketplace/
+        //Azure - see https://blog.mszcool.com/index.php/2015/04/detecting-if-a-virtual-machine-runs-in-microsoft-azure-linux-windows-to-protect-your-software-when-distributed-via-the-azure-marketplace/
         //IBM - uses cloudfoundry, will have to use that to probe
         // if all else fails not a cloud server that we can tell
         return ComputePlatform.BARE_METAL;
@@ -804,11 +836,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             final HttpURLConnection con = createConnection(GOOGLE_COMPUTE_METADATA);
             con.setRequestMethod("GET");
             con.setDoOutput(true);
-            int responseCode = con.getResponseCode();
             BufferedReader in = new BufferedReader(
                 new InputStreamReader(con.getInputStream()));
             String inputLine;
-            StringBuffer response = new StringBuffer();
+            StringBuilder response = new StringBuilder();
 
             while ((inputLine = in.readLine()) != null) {
                 response.append(inputLine);
@@ -827,10 +858,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @SuppressWarnings("MagicNumber")
     private static boolean isOracleCloudLinux() {
-        if (readFile(ORACLE_CLOUD_ASSET_TAG_FILE).toLowerCase().contains("oraclecloud")) {
-            return true;
-        }
-        return false;
+        return readFile(ORACLE_CLOUD_ASSET_TAG_FILE).toLowerCase().contains("oraclecloud");
     }
 
     private static Optional<Process> runWindowsCmd(String cmd) {
@@ -934,7 +962,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static boolean isDigitalOcean() {
         try {
             String sysVendor = new String(Files.readAllBytes(Paths.get(DO_SYS_VENDOR_FILE)));
-            return "digitalocean".equals(sysVendor.toLowerCase());
+            return "digitalocean".equalsIgnoreCase(sysVendor);
         } catch (IOException e) {
             return false;
         }

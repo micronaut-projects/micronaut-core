@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,7 +43,7 @@ final class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exec
      *
      * @param invocationInstrumenterFactories invocation instrumentation factories.
      */
-    public ExecutorServiceInstrumenter(List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
+    ExecutorServiceInstrumenter(List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
         this.invocationInstrumenterFactories = invocationInstrumenterFactories;
     }
 
@@ -58,45 +58,46 @@ final class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exec
         if (invocationInstrumenterFactories.isEmpty()) {
             return event.getBean();
         }
-        if (event.getBeanDefinition().getBeanType().getName().startsWith("io.netty")) {
-            // ignore Netty event loops
-            return event.getBean();
-        }
-        ExecutorService executorService = event.getBean();
-        if (executorService instanceof ScheduledExecutorService) {
-            return new InstrumentedScheduledExecutorService() {
-                @Override
-                public ScheduledExecutorService getTarget() {
-                    return (ScheduledExecutorService) executorService;
-                }
+        Class<ExecutorService> beanType = event.getBeanDefinition().getBeanType();
+        if (beanType == ExecutorService.class) {
+            ExecutorService executorService = event.getBean();
+            if (executorService instanceof ScheduledExecutorService) {
+                return new InstrumentedScheduledExecutorService() {
+                    @Override
+                    public ScheduledExecutorService getTarget() {
+                        return (ScheduledExecutorService) executorService;
+                    }
 
-                @Override
-                public <T> Callable<T> instrument(Callable<T> task) {
-                    return instrumentInvocation(task);
-                }
+                    @Override
+                    public <T> Callable<T> instrument(Callable<T> task) {
+                        return instrumentInvocation(task);
+                    }
 
-                @Override
-                public Runnable instrument(Runnable command) {
-                    return instrumentInvocation(command);
-                }
-            };
+                    @Override
+                    public Runnable instrument(Runnable command) {
+                        return instrumentInvocation(command);
+                    }
+                };
+            } else {
+                return new InstrumentedExecutorService() {
+                    @Override
+                    public ExecutorService getTarget() {
+                        return executorService;
+                    }
+
+                    @Override
+                    public <T> Callable<T> instrument(Callable<T> task) {
+                        return instrumentInvocation(task);
+                    }
+
+                    @Override
+                    public Runnable instrument(Runnable command) {
+                        return instrumentInvocation(command);
+                    }
+                };
+            }
         } else {
-            return new InstrumentedExecutorService() {
-                @Override
-                public ExecutorService getTarget() {
-                    return executorService;
-                }
-
-                @Override
-                public <T> Callable<T> instrument(Callable<T> task) {
-                    return instrumentInvocation(task);
-                }
-
-                @Override
-                public Runnable instrument(Runnable command) {
-                    return instrumentInvocation(command);
-                }
-            };
+            return event.getBean();
         }
     }
 

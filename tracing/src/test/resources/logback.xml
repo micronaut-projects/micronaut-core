@@ -4,7 +4,7 @@
         <!-- encoders are assigned the type
              ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%X{X-B3-TraceId:-}] %m%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p %logger{0} [%t:%X{traceId:-}] %m%n</pattern>
         </encoder>
     </appender>
 
@@ -12,5 +12,6 @@
         <appender-ref ref="STDOUT" />
     </root>
     <!--<logger name="io.micronaut.http" level="debug"/>-->
+    <logger name="io.micronaut.tracing.instrument.util.MdcInstrumenter" level="debug"/>
     <logger name="brave.internal.recorder.PendingSpans" level="trace" />
 </configuration>

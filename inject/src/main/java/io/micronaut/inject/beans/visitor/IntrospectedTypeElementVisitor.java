@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -61,7 +61,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
     private List<AbstractIntrospection> abstractIntrospections = new ArrayList<>();
-    private ClassElement lastConfigurationReader;
     private AbstractIntrospection currentAbstractIntrospection;
 
     @Override
@@ -74,15 +73,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void visitClass(ClassElement element, VisitorContext context) {
         // reset
         currentAbstractIntrospection = null;
-        lastConfigurationReader = null;
-        if (!element.isPrivate()) {
-            if (element.hasStereotype(Introspected.class)) {
-                final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
-                if (introspected != null && !writers.containsKey(element.getName())) {
-                    processIntrospected(element, context, introspected);
-                }
-            } else if (element.hasStereotype(ConfigurationReader.class)) {
-                this.lastConfigurationReader = element;
+        if (!element.isPrivate() && element.hasStereotype(Introspected.class)) {
+            final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
+            if (introspected != null && !writers.containsKey(element.getName())) {
+                processIntrospected(element, context, introspected);
             }
         }
     }
@@ -90,7 +84,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     @Override
     public void visitConstructor(ConstructorElement element, VisitorContext context) {
         final ClassElement declaringType = element.getDeclaringType();
-        if (lastConfigurationReader != null && lastConfigurationReader.getName().equals(declaringType.getName())) {
+        if (element.getDeclaringType().hasStereotype(ConfigurationReader.class)) {
             final ParameterElement[] parameters = element.getParameters();
             introspectIfValidated(context, declaringType, parameters);
         }
@@ -100,12 +94,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void visitMethod(MethodElement element, VisitorContext context) {
         final ClassElement declaringType = element.getDeclaringType();
         final String methodName = element.getName();
-        if (lastConfigurationReader != null && lastConfigurationReader.getName().equals(declaringType.getName())) {
-            if (methodName.startsWith("get")) {
-                final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
-                if (hasConstraints) {
-                    processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
-                }
+        if (declaringType.hasStereotype(ConfigurationReader.class) && methodName.startsWith("get") && !writers.containsKey(declaringType.getName())) {
+            final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
+            if (hasConstraints) {
+                processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
             }
         }
 
@@ -133,12 +125,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     @Override
     public void visitField(FieldElement element, VisitorContext context) {
         final ClassElement declaringType = element.getDeclaringType();
-        if (lastConfigurationReader != null && lastConfigurationReader.getName().equals(declaringType.getName())) {
-            if (!writers.containsKey(declaringType.getName())) {
-                final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
-                if (hasConstraints) {
-                    processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
-                }
+        if (declaringType.hasStereotype(ConfigurationReader.class) && !writers.containsKey(declaringType.getName())) {
+            final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
+            if (hasConstraints) {
+                processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
             }
         }
     }
@@ -244,31 +234,37 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     @Override
     public void finish(VisitorContext visitorContext) {
 
-        for (AbstractIntrospection abstractIntrospection : abstractIntrospections) {
-            final Collection<? extends PropertyElement> properties = abstractIntrospection.properties.values();
-            if (CollectionUtils.isNotEmpty(properties)) {
-                processBeanProperties(
-                        abstractIntrospection.writer,
-                        properties,
-                        abstractIntrospection.includes,
-                        abstractIntrospection.excludes,
-                        abstractIntrospection.ignored,
-                        abstractIntrospection.indexedAnnotations,
-                        abstractIntrospection.metadata
-                );
-                writers.put(abstractIntrospection.writer.getBeanType().getClassName(), abstractIntrospection.writer);
+        try {
+            for (AbstractIntrospection abstractIntrospection : abstractIntrospections) {
+                final Collection<? extends PropertyElement> properties = abstractIntrospection.properties.values();
+                if (CollectionUtils.isNotEmpty(properties)) {
+                    processBeanProperties(
+                            abstractIntrospection.writer,
+                            properties,
+                            abstractIntrospection.includes,
+                            abstractIntrospection.excludes,
+                            abstractIntrospection.ignored,
+                            abstractIntrospection.indexedAnnotations,
+                            abstractIntrospection.metadata
+                    );
+                    writers.put(abstractIntrospection.writer.getBeanType().getClassName(), abstractIntrospection.writer);
+                }
+
             }
 
-        }
-
-        for (BeanIntrospectionWriter writer : writers.values()) {
-            try {
-                writer.accept(visitorContext);
-            } catch (IOException e) {
-                throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
+            if (!writers.isEmpty()) {
+                for (BeanIntrospectionWriter writer : writers.values()) {
+                    try {
+                        writer.accept(visitorContext);
+                    } catch (IOException e) {
+                        throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
+                    }
+                }
             }
+        } finally {
+            abstractIntrospections.clear();
+            writers.clear();
         }
-
     }
 
     private void processElement(

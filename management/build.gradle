@@ -4,7 +4,7 @@ dependencies {
         
     api project(":router")
     api project(":runtime")
-    compileOnly dependencyVersion("micronaut.jdbc")
+    compileOnly dependencyModuleVersion("micronaut.sql", "micronaut-jdbc")
 
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")

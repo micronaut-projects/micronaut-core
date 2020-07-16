@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,12 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.EachProperty;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.Named;
@@ -29,8 +29,6 @@ import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Provider;
 import java.util.*;
 
@@ -57,9 +55,9 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     @Override
     public Qualifier<T> resolveDynamicQualifier() {
         Qualifier<T> qualifier = null;
-        String name = get(NAMED_ATTRIBUTE, ConversionContext.STRING).orElse(null);
-        if (name != null) {
-            qualifier = Qualifiers.byName(name);
+        Object o = attributes.get(NAMED_ATTRIBUTE);
+        if (o instanceof CharSequence) {
+            qualifier = Qualifiers.byName(o.toString());
         }
         return qualifier;
     }
@@ -78,12 +76,20 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     @Override
     public boolean isIterable() {
-        return classValue(EachProperty.class.getName()).isPresent() || definition.isIterable();
+        return definition.isIterable();
     }
 
     @Override
     public boolean isPrimary() {
-        return definition.isPrimary() || get(PRIMARY_ATTRIBUTE, Boolean.class).orElse(false);
+        return definition.isPrimary() || isPrimaryThroughAttribute();
+    }
+
+    private boolean isPrimaryThroughAttribute() {
+        Object o = attributes.get(PRIMARY_ATTRIBUTE);
+        if (o instanceof Boolean) {
+            return (Boolean) o;
+        }
+        return false;
     }
 
     @Override
@@ -109,7 +115,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                     Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
                     for (Argument argument : requiredArguments) {
                         Class argumentType = argument.getType();
-                        Optional result = ConversionService.SHARED.convert(named, argumentType);
+                        Optional result = ConversionService.SHARED.convert(named, argument);
                         String argumentName = argument.getName();
                         if (result.isPresent()) {
                             fulfilled.put(argumentName, result.get());
@@ -169,6 +175,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     /**
      * @return The bean definition type
      */
+    @Override
     public BeanDefinition<T> getTarget() {
         return definition;
     }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.visitors
 
+import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.http.annotation.Controller
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.ast.EnumElement
@@ -328,5 +329,152 @@ class Foo {}
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'java.util.Set'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.typeArguments.get("E").name == 'test.Foo'
+    }
+
+    // TODO: Investigate why this fails on JDK 11
+    // com.sun.tools.javac.util.PropagatedException: java.lang.IllegalStateException
+    //     at jdk.compiler/com.sun.tools.javac.api.JavacTaskImpl.prepareCompiler(JavacTaskImpl.java:187)
+    //     at jdk.compiler/com.sun.tools.javac.api.JavacTaskImpl.enter(JavacTaskImpl.java:290)
+    //     at jdk.compiler/com.sun.tools.javac.api.JavacTaskImpl.ensureEntered(JavacTaskImpl.java:481)
+    //     at jdk.compiler/com.sun.tools.javac.model.JavacElements.ensureEntered(JavacElements.java:779)
+    //     at jdk.compiler/com.sun.tools.javac.model.JavacElements.doGetTypeElement(JavacElements.java:171)
+    //     at jdk.compiler/com.sun.tools.javac.model.JavacElements.getTypeElement(JavacElements.java:160)
+    //     at jdk.compiler/com.sun.tools.javac.model.JavacElements.getTypeElement(JavacElements.java:87)
+    //     at io.micronaut.annotation.processing.GenericUtils.buildGenericTypeArgumentElementInfo(GenericUtils.java:91)
+    //     at io.micronaut.annotation.processing.visitor.JavaClassElement.getSuperType(JavaClassElement.java:127)
+    @IgnoreIf({ Jvm.current.isJava9Compatible() })
+    void "test JavaClassElement.getSuperType() with generic types"() {
+        given:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.math.MathContext;
+import static java.math.RoundingMode.HALF_UP;
+import io.micronaut.http.annotation.*;
+
+class Quantity<Q extends Quantity, U extends Unit> implements Serializable {
+    private static final long serialVersionUID = -9000608810227353935L;
+    private final BigDecimal amount;
+    private final U unit;
+
+    Quantity(BigDecimal amount, U unit) {
+        this.amount = amount;
+        this.unit = unit;
+    }
+
+    public BigDecimal getAmount() {
+        return amount;
+    }
+
+    public U getUnit() {
+        return unit;
+    }
+
+    public void setUnit(U unit) {
+        throw new UnsupportedOperationException("Quantities can't change");
+    }
+
+    public void setAmount(BigDecimal amount) {
+        throw new UnsupportedOperationException("Quantities can't change");
+    }
+}
+
+enum TimeUnit implements Unit {
+    Millisecond(BigDecimal.ONE.divide(BigDecimal.valueOf(1000), MATH_CONTEXT), "ms"),
+    Second(BigDecimal.ONE, "s"),
+    Minute(BigDecimal.valueOf(60), Second, "m"),
+    Hour(BigDecimal.valueOf(60), Minute, "h"),
+    Day(BigDecimal.valueOf(24), Hour, "d"),
+    Week(BigDecimal.valueOf(7), Day, "w");
+
+    private final BigDecimal ratio;
+    private final String suffix;
+
+    TimeUnit(BigDecimal ratio, String suffix) {
+        this.ratio = ratio;
+        this.suffix = suffix;
+    }
+
+    TimeUnit(BigDecimal factor, TimeUnit base, String suffix) {
+        this.ratio = factor.multiply(base.ratio);
+        this.suffix = suffix;
+    }
+
+    @Override public BigDecimal ratio() {
+        return ratio;
+    }
+
+    @Override public String suffix() {
+        return suffix;
+    }
+}
+
+interface Unit {
+    MathContext MATH_CONTEXT = new MathContext(16, HALF_UP);
+
+    String name();
+
+    BigDecimal ratio();
+
+    String suffix();
+}
+
+@Controller
+class Time extends Quantity<Time, TimeUnit> {
+
+    private Time(BigDecimal amount, TimeUnit unit) {
+        super(amount, unit);
+    }
+
+    public static Time of(BigDecimal amount, TimeUnit unit) {
+        return new Time(amount, unit);
+    }
+
+    @Override
+    public BigDecimal getAmount() {
+        return super.getAmount();
+    }
+
+    @Override
+    public TimeUnit getUnit() {
+        return super.getUnit();
+    }
+
+    @Override
+    public void setAmount(BigDecimal amount) {
+        super.setAmount(amount);
+    }
+
+    @Override
+    public void setUnit(TimeUnit unit) {
+        super.setUnit(unit);
+    }
+}
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+
+        expect:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0] instanceof JavaClassElement
+
+        when:
+        JavaClassElement time = (JavaClassElement) AllElementsVisitor.VISITED_CLASS_ELEMENTS[0]
+
+        then:
+        time.getSuperType()
+        time.getSuperType().isPresent()
+
+        when:
+        JavaClassElement superType = time.getSuperType().get()
+
+        then:
+        superType.getTypeArguments().size() == 2
+        superType.getTypeArguments().get('Q').getName() == 'test.Time'
+        superType.getTypeArguments().get('U').getName() == 'test.TimeUnit'
+
     }
 }

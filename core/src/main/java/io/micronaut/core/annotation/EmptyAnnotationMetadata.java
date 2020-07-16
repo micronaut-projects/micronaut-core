@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -58,28 +58,28 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @Override
     public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
         //noinspection unchecked
-        return Collections.EMPTY_LIST;
+        return Collections.emptyList();
     }
 
     @NonNull
     @Override
     public Set<String> getAnnotationNames() {
         //noinspection unchecked
-        return Collections.EMPTY_SET;
+        return Collections.emptySet();
     }
 
     @NonNull
     @Override
     public Set<String> getDeclaredAnnotationNames() {
         //noinspection unchecked
-        return Collections.EMPTY_SET;
+        return Collections.emptySet();
     }
 
     @NonNull
     @Override
     public List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
         //noinspection unchecked
-        return Collections.EMPTY_LIST;
+        return Collections.emptyList();
     }
 
     @NonNull
@@ -98,14 +98,14 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@NonNull Class<T> annotationType) {
         //noinspection unchecked
-        return Collections.EMPTY_LIST;
+        return Collections.emptyList();
     }
 
     @NonNull
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@NonNull Class<T> annotationType) {
         //noinspection unchecked
-        return Collections.EMPTY_LIST;
+        return Collections.emptyList();
     }
 
     @Override
@@ -141,7 +141,7 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @NonNull
     @Override
     public Map<String, Object> getDefaultValues(@NonNull String annotation) {
-        return Collections.EMPTY_MAP;
+        return Collections.emptyMap();
     }
 
     @Override
@@ -230,14 +230,14 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @Override
     public List<String> getAnnotationNamesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
         //noinspection unchecked
-        return Collections.EMPTY_LIST;
+        return Collections.emptyList();
     }
 
     @NonNull
     @Override
     public List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
         //noinspection unchecked
-        return Collections.EMPTY_LIST;
+        return Collections.emptyList();
     }
 
     @Override

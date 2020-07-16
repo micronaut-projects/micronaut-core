@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -24,12 +25,16 @@ import io.micronaut.inject.ast.ParameterElement;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.lang.model.element.*;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.WildcardType;
+
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 
 /**
  * A method element returning data from a {@link ExecutableElement}.
@@ -64,8 +69,13 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
     @NonNull
     @Override
     public ClassElement getGenericReturnType() {
-        Map<String, Map<String, TypeMirror>> info = declaringClass.getGenericTypeInfo();
-        return mirrorToClassElement(executableElement.getReturnType(), visitorContext, info);
+        return returnType(declaringClass.getGenericTypeInfo());
+    }
+
+    @Override
+    @NonNull
+    public ClassElement getReturnType() {
+        return returnType(Collections.emptyMap());
     }
 
     @Override
@@ -74,23 +84,21 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
     }
 
     @Override
-    @NonNull
-    public ClassElement getReturnType() {
-        TypeMirror returnType = executableElement.getReturnType();
-        return mirrorToClassElement(returnType, visitorContext, Collections.emptyMap());
-    }
-
-    @Override
     public ParameterElement[] getParameters() {
         List<? extends VariableElement> parameters = executableElement.getParameters();
-        return parameters.stream().map((Function<VariableElement, ParameterElement>) variableElement -> {
-                    AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement);
-                    if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
-                        annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, "javax.annotation.Nullable", Collections.emptyMap());
-                    }
-                    return new JavaParameterElement(declaringClass, variableElement, annotationMetadata, visitorContext);
-                }
-        ).toArray(ParameterElement[]::new);
+        List<ParameterElement> elts = new ArrayList<>(parameters.size());
+        for (Iterator<? extends VariableElement> i = parameters.iterator(); i.hasNext();) {
+            VariableElement variableElement = i.next();
+            if (! i.hasNext() && isSuspend(variableElement)) {
+                continue;
+            }
+            AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement);
+            if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
+                annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, "javax.annotation.Nullable", Collections.emptyMap());
+            }
+            elts.add(new JavaParameterElement(declaringClass, variableElement, annotationMetadata, visitorContext));
+        }
+        return elts.toArray(new ParameterElement[elts.size()]);
     }
 
     @Override
@@ -117,4 +125,34 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
     public ClassElement getOwningType() {
         return declaringClass;
     }
+
+    private ClassElement returnType(Map<String, Map<String, TypeMirror>> info) {
+        VariableElement varElement = CollectionUtils.last(executableElement.getParameters());
+        if (isSuspend(varElement)) {
+            DeclaredType dType = (DeclaredType) varElement.asType();
+            WildcardType wType = (WildcardType) dType.getTypeArguments().iterator().next();
+            TypeMirror tm = wType.getSuperBound();
+            // check Void
+            if ((tm instanceof DeclaredType) && sameType("kotlin.Unit", (DeclaredType) tm)) {
+                return new JavaVoidElement();
+            } else {
+                return mirrorToClassElement(tm, visitorContext, info);
+            }
+        }
+        return mirrorToClassElement(executableElement.getReturnType(), visitorContext, info);
+    }
+
+    private static boolean sameType(String type, DeclaredType dt) {
+        Element elt = dt.asElement();
+        return (elt instanceof TypeElement) && type.equals(((TypeElement) elt).getQualifiedName().toString());
+    }
+
+    private boolean isSuspend(VariableElement ve) {
+        if (ve != null && ve.asType() instanceof DeclaredType) {
+            DeclaredType dt = (DeclaredType) ve.asType();
+            return sameType("kotlin.coroutines.Continuation", dt);
+        }
+        return false;
+    }
+
 }

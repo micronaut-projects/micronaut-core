@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package io.micronaut.runtime.event.annotation;
 
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.scheduling.annotation.Async;
+import io.reactivex.Completable;
 
 import javax.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
@@ -25,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 public class AsyncListener {
 
     boolean invoked = false;
+    boolean completableInvoked = false;
 
     @EventListener
     @Async
@@ -36,6 +38,18 @@ public class AsyncListener {
         }
         invoked = true;
         return CompletableFuture.completedFuture(invoked);
+    }
+
+    @EventListener
+    @Async
+    Completable onCompletableStartup(StartupEvent event) {
+        try {
+            Thread.currentThread().sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        completableInvoked = true;
+        return Completable.complete();
     }
 
     public boolean isInvoked() {

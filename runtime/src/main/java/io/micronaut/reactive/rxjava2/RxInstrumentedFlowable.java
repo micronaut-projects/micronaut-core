@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableSubscriber;
@@ -32,10 +33,9 @@ import org.reactivestreams.Subscriber;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumentedComponent  {
+final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumentedComponent {
     private final Publisher<T> source;
     private final InvocationInstrumenter instrumenter;
-
 
     /**
      * Default constructor.
@@ -53,11 +53,8 @@ final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumen
         if (!(s instanceof FlowableSubscriber)) {
             throw new IllegalArgumentException("Subscriber must be an instance of FlowableSubscriber");
         }
-        try {
-            instrumenter.beforeInvocation();
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.subscribe(s);
-        } finally {
-            instrumenter.afterInvocation(false);
         }
     }
 }

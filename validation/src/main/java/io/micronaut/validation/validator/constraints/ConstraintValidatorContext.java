@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,8 @@
 package io.micronaut.validation.validator.constraints;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
+
 import javax.validation.ClockProvider;
 
 /**
@@ -38,4 +40,13 @@ public interface ConstraintValidatorContext {
      * @since 2.0
      */
     @NonNull ClockProvider getClockProvider();
+
+    /**
+     * In case of using this constraint validator with {@code javax.validation.ConstraintValidator} returns null, because JRS-303 doesn't
+     * support passing a root bean in their validation context.
+     *
+     * @return The root bean under validation.
+     */
+    @Nullable Object getRootBean();
+    
 }

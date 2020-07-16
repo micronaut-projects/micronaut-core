@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -106,13 +106,13 @@ public class ValidatingInterceptor implements MethodInterceptor {
                 final Object result = context.proceed();
                 if (context.hasStereotype(Validator.ANN_VALID) || context.hasStereotype(Validator.ANN_CONSTRAINT)) {
                     final boolean hasResult = result != null;
-                    if (supportsReactive & hasResult && Publishers.isConvertibleToPublisher(result)) {
+                    if (supportsReactive && hasResult && Publishers.isConvertibleToPublisher(result)) {
                         ReactiveValidator reactiveValidator = (ReactiveValidator) micronautValidator;
                         final Publisher newPublisher = reactiveValidator.validatePublisher(
                                 Publishers.convertPublisher(result, Publisher.class)
                         );
                         return Publishers.convertPublisher(newPublisher, executableMethod.getReturnType().getType());
-                    } else if (supportsReactive & result instanceof CompletionStage) {
+                    } else if (supportsReactive && result instanceof CompletionStage) {
                         return ((ReactiveValidator) micronautValidator).validateCompletionStage(((CompletionStage) result));
                     } else {
                         constraintViolations = this.micronautValidator.validateReturnValue(target, executableMethod, result);

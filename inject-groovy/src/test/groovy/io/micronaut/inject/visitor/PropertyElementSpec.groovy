@@ -20,9 +20,11 @@ import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.http.annotation.Get
 
 class PropertyElementSpec extends AbstractBeanDefinitionSpec {
+
     def setup() {
         System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, AllElementsVisitor.name)
     }
+
     def cleanup() {
         AllElementsVisitor.clearVisited()
     }

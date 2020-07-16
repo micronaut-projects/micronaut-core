@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +23,6 @@ import javax.inject.Singleton;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.http.netty.channel.KQueueAvailabilityCondition;
@@ -40,7 +39,6 @@ import io.netty.channel.unix.UnixChannelOption;
 @Internal
 @Singleton
 @Requires(classes = KQueue.class, condition = KQueueAvailabilityCondition.class)
-@TypeHint(value = KQueueChannelOption.class, accessType = TypeHint.AccessType.ALL_DECLARED_FIELDS)
 public class KQueueChannelOptionFactory implements ChannelOptionFactory, TypeConverterRegistrar {
 
     static {

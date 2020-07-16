@@ -20,6 +20,7 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
         response.body() == "O=Test CA,ST=Some-State,C=US"
     }
 
+    @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << [
                 'micronaut.ssl.enabled': true,

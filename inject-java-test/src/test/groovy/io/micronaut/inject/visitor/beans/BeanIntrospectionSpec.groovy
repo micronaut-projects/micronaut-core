@@ -198,6 +198,88 @@ public class ValidatedConfig {
         introspection != null
     }
 
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on getters with inner class"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+public class ValidatedConfig {
+
+    private URL url;
+
+    @NotNull
+    public URL getUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+    
+    public static class Inner {
+    
+    }
+    
+}
+''')
+        expect:
+        introspection != null
+    }
+
+    void "test generate bean introspection for inner @ConfigurationProperties"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig$Another','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+class ValidatedConfig {
+
+    private URL url;
+
+    @NotNull
+    public URL getUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+    
+    public static class Inner {
+    
+    }
+    
+    @ConfigurationProperties("another")
+    static class Another {
+    
+        private URL url;
+
+        @NotNull
+        public URL getUrl() {
+            return url;
+        }
+    
+        public void setUrl(URL url) {
+            this.url = url;
+        }
+    }
+}
+''')
+        expect:
+        introspection != null
+    }
+
     void "test generate bean introspection for @ConfigurationProperties with validation rules on fields"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
 package test;
@@ -1517,6 +1599,36 @@ enum Test {
 
         then:
         thrown(InstantiationException)
+    }
+
+    void "test constructor argument nested generics"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.util.List;
+import java.util.Map;
+
+@Introspected
+class Test {
+
+    public Test(Map<String, List<Action>> map) {
+    
+    }
+}
+
+class Action {
+
+}
+''')
+
+        expect:
+        introspection != null
+        introspection.constructorArguments[0].typeParameters.size() == 2
+        introspection.constructorArguments[0].typeParameters[0].typeName == 'java.lang.String'
+        introspection.constructorArguments[0].typeParameters[1].typeName == 'java.util.List<test.Action>'
+        introspection.constructorArguments[0].typeParameters[1].typeParameters.size() == 1
+        introspection.constructorArguments[0].typeParameters[1].typeParameters[0].typeName == 'test.Action'
     }
 
     @Override

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,13 +15,15 @@
  */
 package io.micronaut.scheduling.instrument;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Deque;
+import java.util.List;
+import java.util.ListIterator;
 
 /**
  * Implementation of {@link InvocationInstrumenter} which invoked multiple instrumenters.
@@ -34,7 +36,6 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
     private static final Logger LOG = LoggerFactory.getLogger(InvocationInstrumenter.class);
 
     private final Collection<InvocationInstrumenter> invocationInstrumenters;
-    private final Deque<InvocationInstrumenter> executedInstrumenters;
 
     /**
      * Creates new instance.
@@ -43,32 +44,28 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
      */
     MultipleInvocationInstrumenter(Collection<InvocationInstrumenter> invocationInstrumenters) {
         this.invocationInstrumenters = invocationInstrumenters;
-        this.executedInstrumenters = new ArrayDeque<>(invocationInstrumenters.size());
     }
 
-    /**
-     * Invokes beforeInvocation for multiple instrumenters.
-     */
+    @NonNull
     @Override
-    public void beforeInvocation() {
+    public Instrumentation newInstrumentation() {
+        List<Instrumentation> instrumentationList = new ArrayList<>(invocationInstrumenters.size());
         for (InvocationInstrumenter instrumenter : invocationInstrumenters) {
-            instrumenter.beforeInvocation();
-            executedInstrumenters.push(instrumenter);
-        }
-    }
-
-    /**
-     * Invokes afterInvocation for multiple instrumenters.
-     * @param cleanup Whether to cleanup
-     */
-    @Override
-    public void afterInvocation(boolean cleanup) {
-        while (!executedInstrumenters.isEmpty()) {
             try {
-                executedInstrumenters.pop().afterInvocation(cleanup);
+                instrumentationList.add(instrumenter.newInstrumentation());
             } catch (Exception e) {
-                LOG.warn("After instrumentation invocation error: {}", e.getMessage(), e);
+                LOG.warn("InvocationInstrumenter.newInstrumentation invocation error: {}", e.getMessage(), e);
             }
         }
+        return cleanup -> {
+            // invoke in reverse order
+            for (ListIterator<Instrumentation> iterator = instrumentationList.listIterator(instrumentationList.size()); iterator.hasPrevious(); ) {
+                try {
+                    iterator.previous().close(cleanup);
+                } catch (Exception e) {
+                    LOG.warn("Instrumentation.close invocation error: {}", e.getMessage(), e);
+                }
+            }
+        };
     }
 }

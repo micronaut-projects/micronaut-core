@@ -17,6 +17,7 @@ package io.micronaut.inject.executable
 
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
+import spock.lang.Ignore
 import spock.lang.Issue
 
 class ExecutableBeanSpec extends AbstractTypeElementSpec {
@@ -78,6 +79,28 @@ class Parent {
         !definition.findMethod("privateMethod").isPresent()
         !definition.findMethod("packagePrivateMethod").isPresent()
         !definition.findMethod("protectedMethod").isPresent()
+    }
+
+    void "bean definition should not be created for class with only executable methods"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+class MyBean {
+
+    @Executable
+    public int round(float num) {
+        return Math.round(num);
+    }
+}
+
+''')
+
+        expect:
+        definition == null
     }
 }
 

@@ -3,6 +3,8 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.convert.ArgumentConversionContext
+import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -10,7 +12,7 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.PathVariable
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.annotation.RequestBean
-
+import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
@@ -19,6 +21,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.annotation.Nullable
+import javax.inject.Singleton
 import javax.validation.Valid
 import javax.validation.constraints.Pattern
 
@@ -71,7 +74,12 @@ class RequestBeanSpec extends Specification {
 
     void "test HttpRequest is injected in to Bean"() {
         expect:
-            client.getPath() == "/request/bean/httpRequest"
+            client.getInjectedHttpRequest() == "/request/bean/httpRequest"
+    }
+
+    void "test Typed Value is injected in to Bean"() {
+        expect:
+            client.getInjectedTypedValue() == "Test Typed Value"
     }
 
     void "test Immutable injections works"() {
@@ -79,9 +87,9 @@ class RequestBeanSpec extends Specification {
             client.getImmutableBean("I am immutable! Muahahah") == "I am immutable! Muahahah"
     }
 
-    void "test Immutable get request path"() {
+    void "test Immutable Bean gets injected HttpRequest"() {
         expect:
-            client.getImmutableBeanGetRequestPath() == "/request/bean/immutable/request/path"
+            client.getImmutableBeanInjectedHttpRequest() == "/request/bean/immutable/request/path"
     }
 
     void "test Immutable validated parameter"() {
@@ -90,6 +98,11 @@ class RequestBeanSpec extends Specification {
         then:
             def ex = thrown(HttpClientResponseException)
             ex.message.contains("Field must have value first or second.")
+    }
+
+    void "test Immutable Bean gets injected Typed Value"() {
+        expect:
+            client.getImmutableInjectedTypedValue() == "Test Typed Value"
     }
 
     void "test Extending Bean has super values"() {
@@ -126,8 +139,13 @@ class RequestBeanSpec extends Specification {
         }
 
         @Get("/httpRequest")
-        String getPath(@RequestBean Bean bean) {
+        String getInjectedHttpRequest(@RequestBean Bean bean) {
             return bean.request.path
+        }
+
+        @Get("/typed/value")
+        String getInjectedTypedValue(@RequestBean Bean bean) {
+            return bean.principal.name
         }
 
         @Get("/immutable")
@@ -136,13 +154,18 @@ class RequestBeanSpec extends Specification {
         }
 
         @Get("/immutable/request/path")
-        String immutableBeanGetRequestPath(@RequestBean ImmutableBean bean) {
+        String immutableBeanInjectedHttpRequest(@RequestBean ImmutableBean bean) {
             return bean.request.path
         }
 
         @Get("/immutable/validated/field{?validatedValue}")
         String getImmutableBeanValidatedParameter(@Valid @RequestBean ImmutableBean bean) {
             return bean.validatedValue
+        }
+
+        @Get("/immutable/typed/value")
+        String getImmutableInjectedTypedValue(@RequestBean ImmutableBean bean) {
+            return bean.principal.name
         }
 
         @Get("/extended/values")
@@ -171,16 +194,22 @@ class RequestBeanSpec extends Specification {
         String getHeader(@Header("X-Forwarded-For") String forwardedFor)
 
         @Get("/httpRequest")
-        String getPath()
+        String getInjectedHttpRequest()
+
+        @Get("/typed/value")
+        String getInjectedTypedValue()
 
         @Get("/immutable{?queryValue}")
         String getImmutableBean(String queryValue)
 
         @Get("/immutable/request/path")
-        String getImmutableBeanGetRequestPath()
+        String getImmutableBeanInjectedHttpRequest()
 
         @Get("/immutable/validated/field{?validatedValue}")
         String getImmutableBeanValidatedValue(String validatedValue)
+
+        @Get("/immutable/typed/value")
+        String getImmutableInjectedTypedValue()
 
         @Get("/extended/values{?extendingValue,superValue}")
         String getExtendingBeanValues(String extendingValue, String superValue)
@@ -212,12 +241,18 @@ class RequestBeanSpec extends Specification {
         @Header("X-Forwarded-For")
         String forwardedFor
 
+        @Nullable
+        TestPrincipal principal
+
     }
 
     @Introspected
     static class ImmutableBean {
 
         final HttpRequest<?> request
+
+        @Nullable
+        final TestPrincipal principal
 
         @Nullable
         @QueryValue
@@ -229,8 +264,9 @@ class RequestBeanSpec extends Specification {
         @Pattern(regexp = "first|second", message = "Field must have value 'first' or 'second'.")
         final String validatedValue
 
-        ImmutableBean(HttpRequest request, String queryValue, String validatedValue) {
+        ImmutableBean(HttpRequest request, TestPrincipal principal, String queryValue, String validatedValue) {
             this.request = request
+            this.principal = principal
             this.queryValue = queryValue
             this.validatedValue = validatedValue
         }
@@ -252,6 +288,29 @@ class RequestBeanSpec extends Specification {
         @QueryValue
         String superValue
 
+    }
+
+    static class TestPrincipal {
+        String name
+    }
+
+    @Singleton
+    static class TestPrincipalBinder implements TypedRequestArgumentBinder<TestPrincipal> {
+
+        @Override
+        Argument<TestPrincipal> argumentType() {
+            return Argument.of(TestPrincipal)
+        }
+
+        @Override
+        BindingResult<TestPrincipal> bind(ArgumentConversionContext<TestPrincipal> context, HttpRequest<?> source) {
+            return new BindingResult<TestPrincipal>() {
+                @Override
+                Optional<TestPrincipal> getValue() {
+                    Optional.of(new TestPrincipal(name: "Test Typed Value"))
+                }
+            }
+        }
     }
 
 }

@@ -7,7 +7,7 @@ dependencies {
     api project(":http")
     
     compileOnly project(":http-server")
-
+    compileOnly project(":http-server-netty")
 
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
@@ -15,7 +15,7 @@ dependencies {
     testImplementation project(":http-netty")
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
-    testImplementation dependencyVersion("netty")
+    testImplementation dependencyModuleVersion("netty", "netty-codec-http")
 }
 
 

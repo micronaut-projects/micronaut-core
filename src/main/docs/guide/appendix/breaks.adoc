@@ -16,7 +16,7 @@ snippet::io.micronaut.docs.http.server.executeon.PersonController[tags="imports,
 
 NOTE: If you wish to return to the previous behaviour as defined in Micronaut 1.x you can set `micronaut.server.thread-selection` to `AUTO` in configuration.
 
-=== Micronaut Cache Moved Out Of Runtime
+=== Micronaut Cache Removed from Core
 
 The `micronaut-runtime` module in Micronaut 1.x included support for caching AOP with the `@Cache` annotation. The core caching library and a default implementation based on caffeine were included.
 
@@ -26,9 +26,26 @@ The management endpoint for caches is no longer included by default in the `micr
 
 === Support for RxJava 1.x Removed from Core
 
-RxJava 1.x support is no longer included in core by default. You can re-enable suppot by adding the following dependency:
+RxJava 1.x support is no longer included in core by default. You can re-enable support by adding the following dependency:
 
-dependency:io.micronaut.rxjava1:micronaut-rxjava1[scope="compile", version="1.0.0"]
+dependency:io.micronaut.rxjava1:micronaut-rxjava1[]
+
+=== Support for Reactor Removed from Core
+
+Reactor support is no longer included in core by default. You can re-enable support by adding the following dependency:
+
+dependency:io.micronaut.reactor:micronaut-reactor[]
+
+=== Loggers Endpoint Modifications Now Sensitive
+
+The method on the loggers endpoint to modify logging is now sensitive by default. To revert to the previous behavior, apply the following configuration:
+
+[source,yaml]
+----
+endpoints:
+    loggers:
+        write-sensitive: false
+----
 
 === Server Side Content Negotiation May Require Test Changes
 
@@ -164,6 +181,10 @@ Requesting a single instance of that bean would result in the "ford" instance be
 
 NOTE: This change does not apply to an explicit primary defined in the annotation (`@EachProperty(value = "cars", primary = "ford")`), nor requesting the instance by a qualifier (`@Named("ford") CarConfig carConfig`).
 
+=== No Longer Possible to Return Null to Disable a Bean
+
+It is no longer possible to return `null` from a ann:context.annotation.Factory[] bean method to disable the bean. You should now throw api:context.exceptions.DisabledBeanException[] instead.
+
 === Invalid Configuration File Locations
 
 Specifying a file with `micronaut.config.files`, either through the system property or environment variable, that does not exist or cannot be read will now result in the application failing to startup. In previous versions of Micronaut a warning would be logged and the file would be ignored.
@@ -238,3 +259,54 @@ NOTE: This change also applies to messages in custom constraint annotations, whi
 === Environment Order Bugfix
 
 Environments specified through the application context builder have priority over environments deduced or supplied through the MICRONAUT_ENVIRONMENTS environment variable, or the equivalent system property. A bug in the logic however did not change the order of a specified environment if it previously was found or deduced. This issue manifested itself with `@MicronautTest(environments = "test")`. The `test` environment is already deduced for tests, so it retained the order of other deduced environments, and was able to be overriden by `MICRONAUT_ENVIRONMENTS=dev`. In Micronaut 1.x configuration for `dev` would have overridden `test`. In Micronaut 2.x `test` will override `dev`.
+
+=== Introspections and Inner Classes
+
+A bug in Micronaut 1.x caused bean introspections to be generated for inner classes of classes annotated with `@Introspected`. That also applies to classes where `@Introspection` is a meta annotation, like `@Entity`. This may have an impact for GraalVM users that rely on accesses to those classes without using reflection. For example:
+
+```
+@Entity
+public class Pet {
+    ...
+    private PetType type = PetType.DOG;
+    // getters & setters
+
+    public enum PetType {
+        DOG,
+        CAT
+    }
+}
+```
+
+Previously a bean introspection would have been generated for `PetType`. That is no longer the case. If the type should be introspected, simply add the annotation.
+
+=== Executable Methods
+
+A bug in Micronaut 1.x caused bean definitions to be created for classes that only declared executable annotations on one or more methods. Classes with executable methods must now be explicitly declared as a bean with a scope annotation in order for a bean definition to be created.
+
+=== Super interfaces No Longer Searched for Fallbacks
+
+If the ann:retry.annotation.Fallback[] annotation is used to specify a fallback for a ann:http.client.annotation.Client[] interface, the super interfaces of the client will no longer be traversed to lookup the fallback to invoke.
+
+In this case it may be necessary to specify the `api` member of the ann:retry.annotation.Recoverable[] annotation to ensure the fallback can be looked up. For example:
+
+.Specifying the `api` to recover from
+[source, java]
+----
+@Client("/Books")
+@Recoverable(api = BookApi)
+interface BookClient extends BookApi {
+    @Override
+    Book get(Long id);
+}
+----
+
+=== AWS FunctionClient Moved to AWS Module
+
+The AWS based function client has been made part of the https://github.com/micronaut-projects/micronaut-aws/[Micronaut AWS] project. If you need this functionality add the following dependency:
+
+dependency:io.micronaut.aws:micronaut-function-client-aws[]
+
+=== LogLevel Enum Moved to io.micronaut.logging
+
+`io.micronaut.management.endpoint.loggers.LogLevel` enum has moved to package `io.micronaut.logging`

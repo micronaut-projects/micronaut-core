@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,6 +28,7 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.value.PropertyNotFoundException;
 
 import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * Internal introduction advice used to allow {@link io.micronaut.context.annotation.ConfigurationProperties} on interfaces. Considered internal and not for direct use.
@@ -88,27 +89,24 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
             }
             final String defaultValue = context.stringValue(Bindable.class, "defaultValue").orElse(null);
             final Argument<Object> argument = rt.asArgument();
+
+            final Optional<Object> value = environment.getProperty(
+                    property,
+                    argument
+            );
+
             if (defaultValue != null) {
-                return environment.getProperty(
-                        property,
-                        argument
-                ).orElseGet(() -> environment.convertRequired(
+                return value.orElseGet(() -> environment.convertRequired(
                         defaultValue,
                         argument
                 ));
+            } else if (rt.isOptional()) {
+                return value.orElse(Optional.empty());
+            } else if (context.isNullable()) {
+                return value.orElse(null);
             } else {
-                if (context.isNullable()) {
-                    return environment.getProperty(
-                            property,
-                            argument
-                    ).orElse(null);
-                } else {
-                    String finalProperty = property;
-                    return environment.getProperty(
-                            property,
-                            argument
-                    ).orElseThrow(() -> new PropertyNotFoundException(finalProperty, argument.getType()));
-                }
+                String finalProperty = property;
+                return value.orElseThrow(() -> new PropertyNotFoundException(finalProperty, argument.getType()));
             }
         }
     }

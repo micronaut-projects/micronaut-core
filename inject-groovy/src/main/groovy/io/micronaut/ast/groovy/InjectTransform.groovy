@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -974,7 +974,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 boolean hasInvalidModifiers = methodNode.isStatic() || methodNode.isAbstract() || methodNode.isSynthetic() || methodAnnotationMetadata.hasAnnotation(Internal) || methodNode.isPrivate()
                 boolean isPublic = methodNode.isPublic() && !hasInvalidModifiers
                 boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable) || methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) && !hasInvalidModifiers
-                if (isExecutable) {
+                if (isDeclaredBean && isExecutable) {
                     visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
                 } else if (isConfigurationProperties && isPublic) {
                     if (NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {

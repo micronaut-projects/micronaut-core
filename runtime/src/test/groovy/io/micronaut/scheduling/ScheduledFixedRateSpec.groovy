@@ -45,10 +45,10 @@ class ScheduledFixedRateSpec extends Specification {
         MyTask myTask = beanContext.getBean(MyTask)
 
         then:
+        !myTask.wasDelayedRun
         conditions.eventually {
             myTask.wasRun
             myTask.fixedDelayWasRun
-            !myTask.wasDelayedRun
             beanContext.getBean(MyJavaTask).wasRun
         }
 
@@ -114,7 +114,7 @@ class ScheduledFixedRateSpec extends Specification {
             fixedDelayWasRun = true
         }
 
-        @Scheduled(fixedRate = '10ms', initialDelay = '500ms')
+        @Scheduled(fixedRate = '10ms', initialDelay = '1s')
         void runSomethingElse() {
             wasDelayedRun = true
         }

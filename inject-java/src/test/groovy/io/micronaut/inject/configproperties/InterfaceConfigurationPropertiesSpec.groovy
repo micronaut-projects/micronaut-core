@@ -32,9 +32,10 @@ interface MyConfig {
 
 ''')
         then:
+        beanDefinition.getAnnotationMetadata().getAnnotationType(ConfigurationAdvice.class.getName()).isPresent()
         beanDefinition instanceof ValidatedBeanDefinition
         beanDefinition.getRequiredMethod("getHost")
-            .stringValue(Property, "name").get() == 'foo.bar.host'
+                .stringValue(Property, "name").get() == 'foo.bar.host'
         beanDefinition.getRequiredMethod("getServerPort")
                 .stringValue(Property, "name").get() == 'foo.bar.server-port'
 
@@ -48,6 +49,64 @@ interface MyConfig {
 
         cleanup:
         context.close()
+
+    }
+
+    void "test optional interface config props"() {
+
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig$Intercepted', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.net.URL;
+import java.util.Optional;
+
+@ConfigurationProperties("foo.bar")
+@Executable
+interface MyConfig {
+    @javax.annotation.Nullable
+    String getHost();
+
+    @javax.validation.constraints.Min(10L)
+    Optional<Integer> getServerPort();
+
+    @io.micronaut.core.bind.annotation.Bindable(defaultValue = "http://default")
+    Optional<URL> getURL();
+}
+
+''')
+        then:
+        beanDefinition.getAnnotationMetadata().getAnnotationType(ConfigurationAdvice.class.getName()).isPresent()
+        beanDefinition instanceof ValidatedBeanDefinition
+        beanDefinition.getRequiredMethod("getHost")
+                .stringValue(Property, "name").get() == 'foo.bar.host'
+        beanDefinition.getRequiredMethod("getServerPort")
+                .stringValue(Property, "name").get() == 'foo.bar.server-port'
+        beanDefinition.getRequiredMethod("getURL")
+                .stringValue(Property, "name").get() == 'foo.bar.url'
+
+        when:
+        def context = ApplicationContext.run()
+        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+
+        then:
+        config.host == null
+        config.serverPort == Optional.empty()
+        config.URL == Optional.of(new URL("http://default"))
+
+        when:
+        def context2 = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999', 'foo.bar.url': 'http://test')
+        def config2 = ((BeanFactory) beanDefinition).build(context2, beanDefinition)
+
+        then:
+        config2.host == 'test'
+        config2.serverPort == Optional.of(9999)
+        config2.URL == Optional.of(new URL("http://test"))
+
+        cleanup:
+        context.close()
+        context2.close()
 
     }
 

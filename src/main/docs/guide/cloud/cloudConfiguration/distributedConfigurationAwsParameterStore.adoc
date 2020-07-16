@@ -1,12 +1,6 @@
 Micronaut supports configuration sharing via AWS System Manager Parameter Store. You will need the following dependencies configured:
 
-.Example `build.gradle` for AWS System Manager Parameter Store
-[source,groovy]
-----
-compile "io.micronaut:micronaut-discovery-client"
-compile "io.micronaut.configuration:micronaut-aws-common"
-compile group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
-----
+dependency:io.micronaut.aws:micronaut-aws-parameter-store[]
 
 To enable distributed configuration a `src/main/resources/bootstrap.yml` configuration file must be created and configured to use Parameter Store:
 

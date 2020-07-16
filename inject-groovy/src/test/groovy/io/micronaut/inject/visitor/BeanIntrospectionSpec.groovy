@@ -52,9 +52,7 @@ interface Test extends io.micronaut.core.naming.Named {
         then:
         property.get(named) == 'test'
         setNameValue == 'test'
-
     }
-
 
     void "test multiple constructors with @JsonCreator"() {
         given:
@@ -765,5 +763,161 @@ enum Test {
         noExceptionThrown()
         introspection != null
         introspection.getProperty("name", String).get().get(new Person(name: "Sally")) == "Sally"
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on getters"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+public class ValidatedConfig {
+
+    private URL url
+    private String name
+
+    @NotNull
+    URL getUrl() {
+        url
+    }
+
+    void setUrl(URL url) {
+        this.url = url
+    }
+
+    @NotBlank
+    String getName() {
+        name
+    }
+
+    void setName(String name) {
+        this.name = name
+    }
+}
+
+
+''')
+        expect:
+        introspection != null
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on getters with inner class"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+
+import javax.validation.constraints.NotNull
+import javax.validation.constraints.NotBlank
+import java.net.URL
+
+@ConfigurationProperties("foo.bar")
+public class ValidatedConfig {
+
+    @NotNull
+    URL url
+    
+    public static class Inner {
+    
+    }
+    
+}
+''')
+        expect:
+        introspection != null
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on fields"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+
+import javax.validation.constraints.NotNull
+import javax.validation.constraints.NotBlank
+import java.net.URL
+
+@ConfigurationProperties("foo.bar")
+public class ValidatedConfig {
+
+    @NotNull
+    URL url
+
+    @NotBlank
+    String name
+
+}
+''')
+        expect:
+        introspection != null
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.MyConfig','''\
+package test
+
+import io.micronaut.context.annotation.*
+import java.time.Duration
+
+@ConfigurationProperties("foo.bar")
+class MyConfig {
+
+    private String host
+    private int serverPort
+    
+    @ConfigurationInject
+    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+        this.host = host
+        this.serverPort = serverPort
+    }
+    
+    String getHost() {
+        host
+    }
+    
+    int getServerPort() {
+        serverPort
+    }
+}
+
+''')
+        expect:
+        introspection != null
+    }
+
+    void "test generate bean introspection for inner @ConfigurationProperties"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig$Another','''\
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+
+import javax.validation.constraints.NotNull
+import javax.validation.constraints.NotBlank
+import java.net.URL
+
+@ConfigurationProperties("foo.bar")
+class ValidatedConfig {
+
+    @NotNull
+    URL url
+    
+    public static class Inner {
+    }
+    
+    @ConfigurationProperties("another")
+    static class Another {
+    
+        @NotNull
+        URL url
+    }
+}
+''')
+        expect:
+        introspection != null
     }
 }

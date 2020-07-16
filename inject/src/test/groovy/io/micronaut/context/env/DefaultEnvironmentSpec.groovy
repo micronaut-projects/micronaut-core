@@ -15,12 +15,10 @@
  */
 package io.micronaut.context.env
 
+import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
-import org.junit.Rule
-import org.junit.contrib.java.lang.system.EnvironmentVariables
-import spock.lang.Ignore
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
 
@@ -29,9 +27,6 @@ import spock.util.environment.RestoreSystemProperties
  */
 @RestoreSystemProperties
 class DefaultEnvironmentSpec extends Specification {
-
-    @Rule
-    private final EnvironmentVariables environmentVariables = new EnvironmentVariables()
 
     void "test environment system property resolve"() {
         given:
@@ -417,21 +412,26 @@ class DefaultEnvironmentSpec extends Specification {
         when:
         System.setProperty("micronaut.config.files", "classpath:config-files.yml,classpath:config-files2.yml")
         System.setProperty("config.prop", "system-property")
-        environmentVariables.set("CONFIG_PROP", "env-var")
-        Environment env = new DefaultEnvironment({["first", "second"]}).start()
+        Environment env
+        SystemLambda.withEnvironmentVariable("CONFIG_PROP", "env-var")
+        .execute(() -> {
+            env = new DefaultEnvironment({["first", "second"]}).start()
+        })
 
         then: "System properties have highest precedence"
         env.getRequiredProperty("config.prop", String.class) == "system-property"
 
         when:
         System.clearProperty("config.prop")
-        env = new DefaultEnvironment({["first", "second"]}).start()
+        SystemLambda.withEnvironmentVariable("CONFIG_PROP", "env-var")
+                .execute(() -> {
+                    env = new DefaultEnvironment({["first", "second"]}).start()
+                })
 
         then: "Environment variables have next highest precedence"
         env.getRequiredProperty("config.prop", String.class) == "env-var"
 
         when:
-        environmentVariables.clear("CONFIG_PROP")
         env = new DefaultEnvironment({["first", "second"]}).start()
 
         then: "Config files last in the list have precedence over those first in the list"
@@ -460,8 +460,24 @@ class DefaultEnvironmentSpec extends Specification {
         when:
         env = new DefaultEnvironment({[]}).start()
 
-        then: "Normal application files have the least precedence"
+        then: "Normal application files have the least precedence with config folder being last"
         env.getRequiredProperty("config.prop", String.class) == "application.yml"
+        env.getRequiredProperty("config-folder-prop", String.class) == "abc"
+    }
+
+    void "test custom config locations"() {
+        when:
+            ApplicationContext applicationContext = ApplicationContext.builder()
+                    .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
+                    .build()
+                    .start()
+
+        then: "Normal application files have the least precedence with config folder being last"
+            applicationContext.getRequiredProperty("config.prop", String.class) == "file:./custom-config/application.yml"
+            applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
+            applicationContext.getRequiredProperty("custom-config-file", String.class) == "abc"
+        cleanup:
+            applicationContext.stop()
     }
 
     void "test specified names have precedence, even if deduced"() {
@@ -472,20 +488,28 @@ class DefaultEnvironmentSpec extends Specification {
         env.activeNames == ["test"] as Set
 
         when:
-        environmentVariables.set("MICRONAUT_ENVIRONMENTS", "first,second,third")
-        env = new DefaultEnvironment({[]}).start()
+        SystemLambda.withEnvironmentVariable("MICRONAUT_ENVIRONMENTS", "first,second,third")
+        .execute(() -> {
+            env = new DefaultEnvironment({[]}).start()
+        })
 
         then: // env has priority over deduced
         env.activeNames == ["test", "first", "second", "third"] as Set
 
         when:
-        env = new DefaultEnvironment({["specified"]}).start()
+        SystemLambda.withEnvironmentVariable("MICRONAUT_ENVIRONMENTS", "first,second,third")
+                .execute(() -> {
+                    env = new DefaultEnvironment({["specified"]}).start()
+                })
 
         then: // specified has priority over env
         env.activeNames == ["test", "first", "second", "third", "specified"] as Set
 
         when:
-        env = new DefaultEnvironment({["second"]}).start()
+        SystemLambda.withEnvironmentVariable("MICRONAUT_ENVIRONMENTS", "first,second,third")
+                .execute(() -> {
+                    env = new DefaultEnvironment({["second"]}).start()
+                })
 
         then: // specified has priority over env, even if already set in env
         env.activeNames == ["test", "first", "third", "second"] as Set
@@ -493,6 +517,7 @@ class DefaultEnvironmentSpec extends Specification {
 
     private static Environment startEnv(String files) {
         new DefaultEnvironment({["test"]}) {
+            @Override
             protected String readPropertySourceListKeyFromEnvironment() {
                 files
             }

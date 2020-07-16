@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,11 +17,8 @@ package io.micronaut.management.endpoint.loggers;
 
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.type.Argument;
-import io.micronaut.management.endpoint.annotation.Endpoint;
+import io.micronaut.management.endpoint.annotation.*;
 import io.micronaut.management.endpoint.EndpointConfiguration;
-import io.micronaut.management.endpoint.annotation.Read;
-import io.micronaut.management.endpoint.annotation.Selector;
-import io.micronaut.management.endpoint.annotation.Write;
 import io.reactivex.Single;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -34,9 +31,7 @@ import java.util.Map;
  * @author Matthew Moss
  * @since 1.0
  */
-@Endpoint(id = LoggersEndpoint.NAME,
-        defaultEnabled = LoggersEndpoint.DEFAULT_ENABLED,
-        defaultSensitive = LoggersEndpoint.DEFAULT_SENSITIVE)
+@Endpoint(id = LoggersEndpoint.NAME, defaultSensitive = LoggersEndpoint.DEFAULT_SENSITIVE)
 public class LoggersEndpoint {
 
     /**
@@ -59,14 +54,15 @@ public class LoggersEndpoint {
      */
     public static final boolean DEFAULT_SENSITIVE = false;
 
-    private final LoggingSystem loggingSystem;
+    private final ManagedLoggingSystem loggingSystem;
     private final LoggersManager<Map<String, Object>> loggersManager;
+    private boolean writeSensitive = true;
 
     /**
-     * @param loggingSystem the {@link LoggingSystem}
+     * @param loggingSystem the {@link io.micronaut.logging.LoggingSystem}
      * @param loggersManager the {@link LoggersManager}
      */
-    public LoggersEndpoint(LoggingSystem loggingSystem,
+    public LoggersEndpoint(ManagedLoggingSystem loggingSystem,
                            LoggersManager<Map<String, Object>> loggersManager) {
         this.loggingSystem = loggingSystem;
         this.loggersManager = loggersManager;
@@ -94,6 +90,7 @@ public class LoggersEndpoint {
      * @param configuredLevel The {@link io.micronaut.logging.LogLevel} to set on the named logger
      */
     @Write
+    @Sensitive(property = "write-sensitive")
     public void setLogLevel(@NotBlank @Selector String name,
                             @Nullable io.micronaut.logging.LogLevel configuredLevel) {
         try {
@@ -107,4 +104,20 @@ public class LoggersEndpoint {
         }
     }
 
+    /**
+     * @return True if modifications require authentication
+     */
+    public boolean isWriteSensitive() {
+        return writeSensitive;
+    }
+
+    /**
+     * Determines whether modifications to the log level should
+     * require authentication. Default value (true).
+     *
+     * @param writeSensitive The write sensitivity option.
+     */
+    public void setWriteSensitive(boolean writeSensitive) {
+        this.writeSensitive = writeSensitive;
+    }
 }

@@ -4,15 +4,13 @@ introduction:
   upgrading: Upgrading to Micronaut 2.x
 quickStart:
   title: Quick Start
-  buildCLI:
-    title: Build/Install the CLI
-    installSdkman: Install with Sdkman
-    installHomebrew: Install with Homebrew
-    installMacPorts: Install with MacPorts
-    installWindows: Install through Binary on Windows
-    buildSource: Building from Source
+  buildCLI: Build/Install the CLI
   creatingServer: Creating a Server Application
-  ideSetup: Setting up an IDE
+  ideSetup:
+    title: Setting up an IDE
+    ideaSetup: IntelliJ IDEA
+    eclipseSetup: Eclipse
+    vsCodeSetup: Visual Studio Code
   creatingClient: Creating a Client
   deployingApp: Deploying the Application
 ioc:
@@ -110,6 +108,7 @@ httpServer:
     cors: Configuring CORS
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
+    accessLogger: Enabling Access Logger
   views:
     title: Server Side View Rendering
   openapi: OpenAPI / Swagger Support
@@ -164,20 +163,10 @@ cloud:
     jaeger: Tracing with Jaeger
 serverlessFunctions:
   title: Serverless Functions
-  writingFunctions:
-    title: Writing Functions
-    functionApplication: FunctionApplication
-    functionBean: FunctionBean
-    groovyFunctions: Groovy Functions
-  runningFunctions:
-    title: Running Functions
-    functionWeb: Functions as Web Applications
-    functionCLI: Functions as CLI Applications
-  deployingFunctions:
-    title: Deploying Functions
-    lambdaFunctions: Deploying Functions to AWS Lambda
-    openFaasFunctions: Deploying Functions to OpenFaaS
-  callingFunctions: Calling Functions with FunctionClient
+  awsLambda: AWS Lambda
+  gcpFunction: Google Cloud Function
+  gcpCloudRun: Google CLoud Run
+  azureFunction: Azure Function
 messaging:
   title: Message-Driven Microservices
   kafka: Kafka Support
@@ -232,6 +221,7 @@ management:
     title: Creating Endpoints
     endpointAnnotation: The Endpoint Annotation
     endpointMethod: Endpoint Methods
+    endpointSensitivity: Endpoint Sensitivity
     endpointConfiguration: Endpoint Configuration
   providedEndpoints:
     title: Built-In Endpoints

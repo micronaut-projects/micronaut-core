@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -53,6 +53,7 @@ public interface ChannelPipelineCustomizer {
     String HANDLER_HTTP2_PROTOCOL_NEGOTIATOR = "http2-protocol-negotiator";
     String HANDLER_WEBSOCKET_UPGRADE = "websocket-upgrade-handler";
     String HANDLER_MICRONAUT_INBOUND = "micronaut-inbound-handler";
+    String HANDLER_ACCESS_LOGGER = "http-access-logger";
 
     /**
      * @return Is this customizer the client.

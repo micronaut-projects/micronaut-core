@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -110,11 +110,9 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof IdleStateEvent) {
             IdleStateEvent idleStateEvent = (IdleStateEvent) evt;
-            if (idleStateEvent.state() == IdleState.ALL_IDLE) {
+            if (idleStateEvent.state() == IdleState.ALL_IDLE && clientSession != null && clientSession.isOpen()) {
                 // close the connection if it is idle for too long
-                if (clientSession != null && clientSession.isOpen()) {
-                    clientSession.close(CloseReason.NORMAL);
-                }
+                clientSession.close(CloseReason.NORMAL);
             }
         } else {
             super.userEventTriggered(ctx, evt);
@@ -159,7 +157,6 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 ((WebSocketSessionAware) targetBean).setWebSocketSession(clientSession);
             }
 
-            WebSocketState webSocketState = new WebSocketState(clientSession, originatingRequest);
 
             ExecutableBinder<WebSocketState> binder = new DefaultExecutableBinder<>();
             BoundExecutable<?, ?> bound = binder.tryBind(messageHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(clientSession, originatingRequest));
@@ -184,6 +181,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             if (opt.isPresent()) {
                 MethodExecutionHandle<?, ?> openMethod = opt.get();
 
+                WebSocketState webSocketState = new WebSocketState(clientSession, originatingRequest);
                 try {
                     BoundExecutable openMethodBound = binder.bind(openMethod.getExecutableMethod(), webSocketStateBinderRegistry, webSocketState);
                     Object target = openMethod.getTarget();
@@ -192,8 +190,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                     if (Publishers.isConvertibleToPublisher(result)) {
                         Flowable<?> flowable = Publishers.convertPublisher(result, Flowable.class);
                         flowable.subscribe(
-                                (o) -> { },
-                                (error) -> emitter.onError(new WebSocketSessionException("Error opening WebSocket client session: " + error.getMessage(), error)),
+                                o -> { },
+                                error -> emitter.onError(new WebSocketSessionException("Error opening WebSocket client session: " + error.getMessage(), error)),
                                 () -> {
                                     emitter.onNext(targetBean);
                                     emitter.onComplete();

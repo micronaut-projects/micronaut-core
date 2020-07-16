@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -100,6 +100,17 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             this.elementValidator = null
         }
 
+    }
+
+    @Override
+    protected AnnotatedNode getAnnotationMember(AnnotatedNode originatingElement, CharSequence member) {
+        if (originatingElement instanceof ClassNode) {
+            def methods = ((ClassNode) originatingElement).getMethods(member.toString())
+            if (methods) {
+                return methods.iterator().next()
+            }
+        }
+        return null
     }
 
     @Override
@@ -410,11 +421,22 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                     }
                 } else if (exp instanceof ClassExpression) {
                     arrayType = AnnotationClassValue
-                    converted.add(new AnnotationClassValue<>(((ClassExpression) exp).type.name))
+                    ClassExpression classExp = ((ClassExpression) exp)
+                    String typeName
+                    if (classExp.type.isArray()) {
+                        typeName = "[L" + classExp.type.componentType.name + ";"
+                    } else {
+                        typeName = classExp.type.name
+                    }
+                    converted.add(new AnnotationClassValue<>(typeName))
                 }
             }
             // for some reason this is necessary to produce correct array type in Groovy
             return ConversionService.SHARED.convert(converted, Array.newInstance(arrayType, 0).getClass()).orElse(null)
+        } else if (annotationValue != null) {
+            if (ClassUtils.isJavaLangType(annotationValue.getClass())) {
+                return annotationValue
+            }
         }
         return null
     }

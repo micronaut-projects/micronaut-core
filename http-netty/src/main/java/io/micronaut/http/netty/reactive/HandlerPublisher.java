@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -259,13 +259,13 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
     private void provideChannelContext(ChannelHandlerContext ctx) {
         switch (state) {
             case NO_SUBSCRIBER_OR_CONTEXT:
-                verifyRegisteredWithRightExecutor(ctx);
+                verifyRegisteredWithRightExecutor();
                 this.ctx = ctx;
                 // It's set, we don't have a subscriber
                 state = NO_SUBSCRIBER;
                 break;
             case NO_CONTEXT:
-                verifyRegisteredWithRightExecutor(ctx);
+                verifyRegisteredWithRightExecutor();
                 this.ctx = ctx;
                 state = IDLE;
                 subscriber.onSubscribe(new ChannelSubscription());
@@ -275,7 +275,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
         }
     }
 
-    private void verifyRegisteredWithRightExecutor(ChannelHandlerContext ctx) {
+    private void verifyRegisteredWithRightExecutor() {
         if (!executor.inEventLoop()) {
             throw new IllegalArgumentException("Channel handler MUST be registered with the same EventExecutor that it is created with.");
         }
@@ -288,88 +288,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
             requestDemand();
         }
         ctx.fireChannelActive();
-    }
-
-    private void receivedDemand(long demand) {
-        switch (state) {
-            case BUFFERING:
-            case DRAINING:
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
-                }
-
-                if (addDemand(demand)) {
-                    flushBuffer();
-                }
-                break;
-
-            case DEMANDING:
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
-                }
-
-                if (addDemand(demand)) {
-                    flushBuffer();
-                }
-                break;
-
-            case IDLE:
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
-                }
-
-                if (addDemand(demand)) {
-                    // Important to change state to demanding before doing a read, in case we get a synchronous
-                    // read back.
-                    state = DEMANDING;
-                    requestDemand();
-                }
-                break;
-            default:
-                // no-op
-        }
-    }
-
-    private boolean addDemand(long demand) {
-
-        if (demand <= 0) {
-            illegalDemand();
-            return false;
-        } else {
-            if (outstandingDemand < Long.MAX_VALUE) {
-                outstandingDemand += demand;
-                if (outstandingDemand < 0) {
-                    outstandingDemand = Long.MAX_VALUE;
-                }
-            }
-            return true;
-        }
-    }
-
-    private void illegalDemand() {
-        cleanup();
-        subscriber.onError(new IllegalArgumentException("Request for 0 or negative elements in violation of Section 3.9 of the Reactive Streams specification"));
-        ctx.close();
-        state = DONE;
-    }
-
-    private void flushBuffer() {
-        while (!buffer.isEmpty() && (outstandingDemand > 0 || outstandingDemand == Long.MAX_VALUE)) {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("HandlerPublisher (state: {}) release message from buffer to satisfy demand: {}", state, outstandingDemand);
-            }
-            publishMessage(buffer.remove());
-        }
-        if (buffer.isEmpty()) {
-            if (outstandingDemand > 0) {
-                if (state == BUFFERING) {
-                    state = DEMANDING;
-                } // otherwise we're draining
-                requestDemand();
-            } else if (state == BUFFERING) {
-                state = IDLE;
-            }
-        }
     }
 
     private void receivedCancel() {
@@ -560,5 +478,79 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
         public void cancel() {
             executor.execute(HandlerPublisher.this::receivedCancel);
         }
+
+        private void flushBuffer() {
+            while (!buffer.isEmpty() && (outstandingDemand > 0 || outstandingDemand == Long.MAX_VALUE)) {
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("HandlerPublisher (state: {}) release message from buffer to satisfy demand: {}", state, outstandingDemand);
+                }
+                publishMessage(buffer.remove());
+            }
+            if (buffer.isEmpty()) {
+                if (outstandingDemand > 0) {
+                    if (state == BUFFERING) {
+                        state = DEMANDING;
+                    } // otherwise we're draining
+                    requestDemand();
+                } else if (state == BUFFERING) {
+                    state = IDLE;
+                }
+            }
+        }
+
+        private void illegalDemand() {
+            cleanup();
+            subscriber.onError(new IllegalArgumentException("Request for 0 or negative elements in violation of Section 3.9 of the Reactive Streams specification"));
+            ctx.close();
+            state = DONE;
+        }
+
+        private boolean addDemand(long demand) {
+
+            if (demand <= 0) {
+                illegalDemand();
+                return false;
+            } else {
+                if (outstandingDemand < Long.MAX_VALUE) {
+                    outstandingDemand += demand;
+                    if (outstandingDemand < 0) {
+                        outstandingDemand = Long.MAX_VALUE;
+                    }
+                }
+                return true;
+            }
+        }
+
+        private void receivedDemand(long demand) {
+            switch (state) {
+                case BUFFERING:
+                case DRAINING:
+                case DEMANDING:
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
+                    }
+
+                    if (addDemand(demand)) {
+                        flushBuffer();
+                    }
+                    break;
+
+                case IDLE:
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
+                    }
+
+                    if (addDemand(demand)) {
+                        // Important to change state to demanding before doing a read, in case we get a synchronous
+                        // read back.
+                        state = DEMANDING;
+                        requestDemand();
+                    }
+                    break;
+                default:
+                    // no-op
+            }
+        }
+
     }
 }

@@ -15,8 +15,7 @@
  */
 package io.micronaut.docs.server.suspend
 
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldThrowExactly
+import io.kotlintest.*
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpHeaders.*
@@ -28,6 +27,8 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import org.opentest4j.AssertionFailedError
+import java.lang.IllegalArgumentException
 
 class SuspendControllerSpec: StringSpec() {
 
@@ -116,6 +117,20 @@ class SuspendControllerSpec: StringSpec() {
 
             ex.status shouldBe HttpStatus.BAD_REQUEST
             body shouldBe "illegal.argument"
+        }
+
+        "test suspend functions that throw exceptions inside withContext emit an error response to filters"() {
+            val ex = shouldThrowExactly<HttpClientResponseException> {
+                client.exchange(HttpRequest.GET<Any>("/suspend/illegalWithContext"), String::class.java).blockingFirst()
+            }
+            val body = ex.response.getBody(String::class.java).get()
+            val filter = embeddedServer.applicationContext.getBean(SuspendFilter::class.java)
+
+            ex.status shouldBe HttpStatus.BAD_REQUEST
+            body shouldBe "illegal.argument"
+            filter.response shouldBe null
+            filter.error should { t -> t is IllegalArgumentException }
+
         }
     }
 }

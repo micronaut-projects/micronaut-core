@@ -8,15 +8,17 @@ dependencies {
     api dependencyVersion("snakeyaml")
 
     compileOnly "javax.persistence:javax.persistence-api:2.2"
-    compileOnly dependencyVersion("groovy")
+    compileOnly dependencyModuleVersion("groovy", "groovy")
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
     compileOnly dependencyVersion("validation")
 
     testImplementation dependencyVersion("validation")
     testImplementation project(":inject-groovy")
-    //system-rules has a transitive on junit-dep:[4.9,), so hard setting the version instead
-    testImplementation("com.github.stefanbirkner:system-rules:$systemRulesVersion") {
-        exclude group: "junit", module: "junit-dep"
+    testImplementation "com.github.stefanbirkner:system-lambda:1.0.0"
+
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
     }
-    testImplementation "junit:junit-dep:4.11"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junit5Version"
 }

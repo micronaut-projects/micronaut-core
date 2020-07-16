@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -164,30 +164,6 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
         return new DownstreamSubscription();
     }
 
-    private void processDemand(long demand) {
-        switch (upstreamState) {
-            case BUFFERING:
-            case FLOWING:
-                if (registerDemand(demand)) {
-                    flushBuffer();
-                }
-                break;
-
-            case DEMANDING:
-                registerDemand(demand);
-                break;
-
-            case IDLE:
-                if (registerDemand(demand)) {
-                    upstreamState = BackPressureState.DEMANDING;
-                    flushBuffer();
-                }
-                break;
-            default:
-
-        }
-    }
-
     private boolean registerDemand(long demand) {
         if (demand <= 0) {
             illegalDemand();
@@ -271,6 +247,30 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
         @Override
         public synchronized void cancel() {
             upstreamSubscription.cancel();
+        }
+
+        private void processDemand(long demand) {
+            switch (upstreamState) {
+                case BUFFERING:
+                case FLOWING:
+                    if (registerDemand(demand)) {
+                        flushBuffer();
+                    }
+                    break;
+
+                case DEMANDING:
+                    registerDemand(demand);
+                    break;
+
+                case IDLE:
+                    if (registerDemand(demand)) {
+                        upstreamState = BackPressureState.DEMANDING;
+                        flushBuffer();
+                    }
+                    break;
+                default:
+
+            }
         }
     }
 }

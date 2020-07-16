@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,7 +24,6 @@ import kotlinx.coroutines.reactive.ReactiveFlowKt;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
-import java.util.function.Function;
 
 /**
  * Converts between a {@link Flow} and a {@link Publisher}.
@@ -38,7 +37,7 @@ public class FlowConverterRegistrar implements TypeConverterRegistrar {
     @Override
     public void register(ConversionService<?> conversionService) {
         // Flow
-        conversionService.addConverter(Flow.class, Flowable.class, (Function<Flow, Flowable>) flow ->
+        conversionService.addConverter(Flow.class, Flowable.class, flow ->
                 Flowable.fromPublisher(ReactiveFlowKt.asPublisher(flow))
         );
         conversionService.addConverter(Flow.class, Publisher.class, ReactiveFlowKt::asPublisher);

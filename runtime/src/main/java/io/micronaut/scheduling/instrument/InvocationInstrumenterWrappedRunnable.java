@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,7 @@ package io.micronaut.scheduling.instrument;
 import io.micronaut.core.annotation.Internal;
 
 /**
- * Wrappes {@link Runnable} and invokes {@link InvocationInstrumenter}.
+ * Wraps {@link Runnable} and invokes {@link InvocationInstrumenter}.
  *
  * @author Denis Stepanov
  * @since 1.3
@@ -43,11 +43,8 @@ final class InvocationInstrumenterWrappedRunnable implements Runnable {
      */
     @Override
     public void run() {
-        try {
-            invocationInstrumenter.beforeInvocation();
+        try (Instrumentation ignore = invocationInstrumenter.newInstrumentation().forceCleanup()) {
             runnable.run();
-        } finally {
-            invocationInstrumenter.afterInvocation(true);
         }
     }
 }

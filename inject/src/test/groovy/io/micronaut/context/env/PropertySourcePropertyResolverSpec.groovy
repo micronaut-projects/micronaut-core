@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.env
 
+import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.convert.ConversionService
@@ -22,8 +23,6 @@ import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
 import io.micronaut.core.value.MapPropertyResolver
 import io.micronaut.core.value.PropertyResolver
-import org.junit.Rule
-import org.junit.contrib.java.lang.system.EnvironmentVariables
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -32,9 +31,6 @@ import spock.lang.Unroll
  * @since 1.0
  */
 class PropertySourcePropertyResolverSpec extends Specification {
-
-    @Rule
-    private final EnvironmentVariables environmentVariables = new EnvironmentVariables()
 
     void "test resolve property entries"() {
         given:
@@ -141,15 +137,15 @@ class PropertySourcePropertyResolverSpec extends Specification {
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", [(property): value] + values)
         )
-        environmentVariables["FOO_BAR"] = "foo bar"
-        environmentVariables["FOO_BAR_1"] = "foo bar 1"
 
         expect:
-
-        resolver.getProperty(key, Object).isPresent()
-        resolver.getProperty(key, type)
-        resolver.getProperty(key, type).get() == expected
-        resolver.containsProperty(key)
+        SystemLambda.withEnvironmentVariable("FOO_BAR", "foo bar")
+                .and("FOO_BAR_1", "foo bar 1")
+                .execute(() -> {
+                    assert resolver.getProperty(key, Object).isPresent()
+                    assert resolver.getProperty(key, type).get() == expected
+                    assert resolver.containsProperty(key)
+                })
 
         where:
         property      | value                                                | key           | type    | expected

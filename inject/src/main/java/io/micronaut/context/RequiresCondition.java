@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -416,8 +416,8 @@ public class RequiresCondition implements Condition {
                             return result;
                         } catch (Exception e) {
                             // non-semantic versioning in play
-                            char majorVersion = resolveJavaMajorVersion(javaVersion);
-                            char requiredVersion = resolveJavaMajorVersion(version);
+                            int majorVersion = resolveJavaMajorVersion(javaVersion);
+                            int requiredVersion = resolveJavaMajorVersion(version);
 
                             if (majorVersion >= requiredVersion) {
                                 return true;
@@ -439,20 +439,37 @@ public class RequiresCondition implements Condition {
         return true;
     }
 
-    private char resolveJavaMajorVersion(String javaVersion) {
-        char majorVersion = 0;
+    private int resolveJavaMajorVersion(String javaVersion) {
+        int majorVersion = 0;
         if (javaVersion.indexOf('.') > -1) {
             String[] tokens = javaVersion.split("\\.");
-            majorVersion = tokens[0].charAt(0);
-            if (Character.isDigit(majorVersion)) {
-                if (majorVersion == '1' && tokens.length > 1) {
-                    majorVersion = tokens[1].charAt(0);
+            String first = tokens[0];
+            if (first.length() == 1) {
+                majorVersion = first.charAt(0);
+                if (Character.isDigit(majorVersion)) {
+                    if (majorVersion == '1' && tokens.length > 1) {
+                        majorVersion = tokens[1].charAt(0);
+                    }
+                }
+            } else {
+                try {
+                    majorVersion = Integer.parseInt(first);
+                } catch (NumberFormatException e) {
+                    // ignore
                 }
             }
         } else {
-            char ch = javaVersion.charAt(0);
-            if (Character.isDigit(ch)) {
-                majorVersion = ch;
+            if (javaVersion.length() == 1) {
+                char ch = javaVersion.charAt(0);
+                if (Character.isDigit(ch)) {
+                    majorVersion = ch;
+                }
+            } else {
+                try {
+                    majorVersion = Integer.parseInt(javaVersion);
+                } catch (NumberFormatException e) {
+                    // ignore
+                }
             }
         }
         return majorVersion;
@@ -507,7 +524,7 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesPresenceOfEntities(ConditionContext context, AnnotationValue<Requires> annotationValue) {
-        if (annotationValue.contains("entities")) {
+        if (annotationValue.contains(MEMBER_ENTITIES)) {
             Optional<AnnotationClassValue[]> classNames = annotationValue.get(MEMBER_ENTITIES, AnnotationClassValue[].class);
             if (classNames.isPresent()) {
                 BeanContext beanContext = context.getBeanContext();
@@ -561,7 +578,12 @@ public class RequiresCondition implements Condition {
 
                 for (Class<?> type : missingBeans) {
                     // remove self by passing definition as filter
-                    final Collection<? extends BeanDefinition<?>> beanDefinitions = beanContext.findBeanCandidates(type, bd, true);
+                    final Collection<? extends BeanDefinition<?>> beanDefinitions = beanContext.findBeanCandidates(
+                            context.getBeanResolutionContext(),
+                            type,
+                            bd,
+                            true
+                    );
                     for (BeanDefinition<?> beanDefinition : beanDefinitions) {
                         if (!beanDefinition.isAbstract()) {
                             context.fail("Existing bean [" + beanDefinition.getName() + "] of type [" + type + "] registered in context");

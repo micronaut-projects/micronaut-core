@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,6 @@ import io.micronaut.core.reflect.ClassUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.JarURLConnection;
@@ -30,6 +29,7 @@ import java.net.URLConnection;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -114,8 +114,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
                 String protocol = url.getProtocol();
                 if ("file".equals(protocol)) {
                     try {
-                        File file = new File(url.toURI());
-                        traverseFile(annotation, classes, file);
+                        traverseFile(annotation, classes, Paths.get(url.toURI()));
                     } catch (URISyntaxException e) {
                         if (LOG.isDebugEnabled()) {
                             LOG.debug("Ignoring file [" + url + "] due to URI error: " + e.getMessage(), e);
@@ -165,49 +164,46 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
     /**
      * @param annotation The annotation
      * @param classes    The classes
-     * @param file       The file
+     * @param filePath   The filePath
      */
-    protected void traverseFile(String annotation, List<Class> classes, File file) {
-        if (file.isDirectory()) {
-            try (DirectoryStream<Path> dirs = Files.newDirectoryStream(file.toPath())) {
+    protected void traverseFile(String annotation, List<Class> classes, Path filePath) {
+        if (Files.isDirectory(filePath)) {
+            try (DirectoryStream<Path> dirs = Files.newDirectoryStream(filePath)) {
                 dirs.forEach(path -> {
-                    File f = path.toFile();
-                    if (f.isDirectory()) {
-                        traverseFile(annotation, classes, f);
+                    if (Files.isDirectory(path)) {
+                        traverseFile(annotation, classes, path);
                     } else {
-                        scanFile(annotation, f, classes);
+                        scanFile(annotation, path, classes);
                     }
                 });
             } catch (IOException e) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Ignoring directory [" + file + "] due to I/O error: " + e.getMessage(), e);
+                    LOG.debug("Ignoring directory [" + filePath + "] due to I/O error: " + e.getMessage(), e);
                 }
             }
         } else {
-            scanFile(annotation, file, classes);
+            scanFile(annotation, filePath, classes);
         }
     }
 
     /**
      * @param annotation The annotation
-     * @param file       The file
+     * @param filePath   The file path
      * @param classes    The classes
      */
-    protected void scanFile(String annotation, File file, List<Class> classes) {
-        String fileName = file.getName();
-        if (fileName.endsWith(".class")) {
+    protected void scanFile(String annotation, Path filePath, List<Class> classes) {
+        String fileName = filePath.getFileName().toString();
+        if (fileName.endsWith(".class") && fileName.indexOf('$') == -1) {
             // ignore generated classes
-            if (fileName.indexOf('$') == -1) {
-                try (InputStream inputStream = Files.newInputStream(file.toPath())) {
-                    scanInputStream(annotation, inputStream, classes);
-                } catch (IOException e) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Ignoring file [" + file.getName() + "] due to I/O error: " + e.getMessage(), e);
-                    }
-                } catch (ClassNotFoundException e) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Ignoring file [" + file.getName() + "]. Class not found: " + e.getMessage(), e);
-                    }
+            try (InputStream inputStream = Files.newInputStream(filePath)) {
+                scanInputStream(annotation, inputStream, classes);
+            } catch (IOException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Ignoring file [" + fileName + "] due to I/O error: " + e.getMessage(), e);
+                }
+            } catch (ClassNotFoundException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Ignoring file [" + fileName + "]. Class not found: " + e.getMessage(), e);
                 }
             }
         }

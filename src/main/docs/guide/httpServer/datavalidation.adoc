@@ -3,7 +3,7 @@ It is easy to validate incoming data with Micronaut's controllers with the
 
 First, add the Hibernate Validator configuration to your application:
 
-dependency:micronaut-hibernate-validator[groupId="io.micronaut.configuration"]
+dependency:micronaut-hibernate-validator[groupId="io.micronaut.beanvalidation"]
 
 We can validate parameters using `javax.validation` annotations and the api:validation.Validated[] annotation at the class level.
 
@@ -12,9 +12,11 @@ snippet::io.micronaut.docs.datavalidation.params.EmailController[tags="imports,c
 <1> Annotate controller with api:validation.Validated[]
 <2> `subject` and `recipient` cannot be blank.
 
-The validation behaviour is shown in the following test:
+If a validation error occurs a `javax.validation.ConstraintViolationException` will be thrown. By default, the integrated `io.micronaut.validation.exception.ConstraintExceptionHandler` is used to handle the exception leading to a behaviour as shown in the following test:
 
 snippet::io.micronaut.docs.datavalidation.params.EmailControllerSpec[tags="paramsvalidated",indent=0,title="Example Test"]
+
+If you want your own `ExceptionHandler` to handle the constraint exceptions, you need to annotate it with `@Replaces(ConstraintExceptionHandler.class)`
 
 Often, you may want to use POJOs as controller method parameters.
 

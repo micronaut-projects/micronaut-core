@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,9 +19,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.*;
 import io.micronaut.context.annotation.*;
-import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -402,7 +400,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             throw new IllegalStateException("Only a single call to visitBeanFactoryMethod(..) is permitted");
         } else {
             // now prepare the implementation of the build method. See BeanFactory interface
-            visitBuildFactoryMethodDefinition(factoryClass, methodName, argumentTypes, argumentAnnotationMetadata, methodAnnotationMetadata);
+            visitBuildFactoryMethodDefinition(factoryClass, methodName, argumentTypes, argumentAnnotationMetadata);
 
             // now implement the constructor
             buildFactoryMethodClassConstructor(
@@ -444,7 +442,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     genericTypes);
 
             // now prepare the implementation of the build method. See BeanFactory interface
-            visitBuildMethodDefinition(annotationMetadata, argumentTypes, argumentAnnotationMetadata);
+            visitBuildMethodDefinition(argumentTypes, argumentAnnotationMetadata);
 
             // now override the injectBean method
             visitInjectMethodDefinition();
@@ -462,7 +460,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             visitBeanDefinitionConstructorInternal(annotationMetadata, requiresReflection, Collections.emptyMap(), null, null);
 
             // now prepare the implementation of the build method. See BeanFactory interface
-            visitBuildMethodDefinition(annotationMetadata, Collections.emptyMap(), Collections.emptyMap());
+            visitBuildMethodDefinition(Collections.emptyMap(), Collections.emptyMap());
 
             // now override the injectBean method
             visitInjectMethodDefinition();
@@ -549,9 +547,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 String typeName = entry.getKey();
                 pushStoreStringInArray(visitor, i++, totalSize, typeName);
                 // use the property type as the value
-                pushStoreInArray(visitor, i++, totalSize, () -> {
-                    pushTypeArguments(visitor, entry.getValue());
-                });
+                pushStoreInArray(visitor, i++, totalSize, () ->
+                    pushTypeArguments(visitor, entry.getValue())
+                );
             }
             // invoke the AbstractBeanDefinition.createMap method
             visitor.invokeStatic(Type.getType(CollectionUtils.class), METHOD_MAP_OF);
@@ -885,14 +883,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         String methodProxyShortName = "$exec" + ++methodExecutorIndex;
         String methodExecutorClassName = beanDefinitionName + "$" + methodProxyShortName;
         boolean isSuspend = "kotlin.coroutines.Continuation".equals(CollectionUtils.last(argumentTypes.values()));
-      
+
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
             annotationMetadata = new AnnotationMetadataHierarchy(
                     new AnnotationMetadataReference(getBeanDefinitionReferenceClassName(), this.annotationMetadata),
                     ((AnnotationMetadataHierarchy) annotationMetadata).getDeclaredMetadata()
             );
         }
-      
+
         ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
                 beanFullClassName,
                 methodExecutorClassName,
@@ -1833,8 +1831,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Object factoryClass,
             String methodName,
             Map<String, Object> argumentTypes,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            AnnotationMetadata methodAnnotationMetadata) {
+            Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
         if (buildMethodVisitor == null) {
             boolean isParametrized = isParametrized(argumentAnnotationMetadata);
             defineBuilderMethod(isParametrized);
@@ -1859,12 +1856,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // store a reference to the bean being built at index 3
             int factoryVar = pushNewBuildLocalVariable();
 
-            Map<String, Integer> variableReplacements;
-            if (isParametrized) {
-                variableReplacements = Collections.emptyMap();
-            } else {
-                variableReplacements = processEachBeanArgument(methodAnnotationMetadata, argumentTypes, argumentAnnotationMetadata, buildMethodVisitor);
-            }
             buildMethodVisitor.visitVarInsn(ALOAD, factoryVar);
             pushCastToType(buildMethodVisitor, factoryClass);
 
@@ -1874,7 +1865,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         methodName,
                         Type.getMethodDescriptor(beanType), false);
             } else {
-                pushConstructorArguments(buildMethodVisitor, argumentTypes, argumentAnnotationMetadata, variableReplacements);
+                pushConstructorArguments(buildMethodVisitor, argumentTypes, argumentAnnotationMetadata);
 
                 String methodDescriptor = getMethodDescriptor(beanFullClassName, argumentTypes.values());
                 buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
@@ -1890,7 +1881,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    private void visitBuildMethodDefinition(AnnotationMetadata classMetadata, Map<String, Object> argumentTypes, Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
+    private void visitBuildMethodDefinition(Map<String, Object> argumentTypes, Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
         if (buildMethodVisitor == null) {
             boolean isParametrized = isParametrized(argumentAnnotationMetadata);
             defineBuilderMethod(isParametrized);
@@ -1898,15 +1889,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             GeneratorAdapter buildMethodVisitor = this.buildMethodVisitor;
 
-            Map<String, Integer> variableReplacements;
-            if (isParametrized) {
-                variableReplacements = Collections.emptyMap();
-            } else {
-                variableReplacements = processEachBeanArgument(classMetadata, argumentTypes, argumentAnnotationMetadata, buildMethodVisitor);
-            }
             buildMethodVisitor.visitTypeInsn(NEW, beanType.getInternalName());
             buildMethodVisitor.visitInsn(DUP);
-            pushConstructorArguments(buildMethodVisitor, argumentTypes, argumentAnnotationMetadata, variableReplacements);
+            pushConstructorArguments(buildMethodVisitor, argumentTypes, argumentAnnotationMetadata);
             String constructorDescriptor = getConstructorDescriptor(argumentTypes.values());
             buildMethodVisitor.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
             // store a reference to the bean being built at index 3
@@ -1918,62 +1903,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    private Map<String, Integer> processEachBeanArgument(AnnotationMetadata ownerMetadata,
-                                                         Map<String, Object> argumentTypes,
-                                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                                         GeneratorAdapter buildMethodVisitor) {
-        Map<String, Integer> variableReplacements = new HashMap<>();
-
-        if (!argumentTypes.isEmpty()) {
-            Optional<String> eachBeanArgument = ownerMetadata.stringValue(EachBean.class);
-            if (eachBeanArgument.isPresent()) {
-                int size = argumentTypes.size();
-                Iterator<Map.Entry<String, Object>> iterator = argumentTypes.entrySet().iterator();
-                for (int i = 0; i < size; i++) {
-                    Map.Entry<String, Object> entry = iterator.next();
-                    if (entry.getValue().equals(eachBeanArgument.get())) {
-
-                        AnnotationMetadata argMetadata = argumentAnnotationMetadata.get(entry.getKey());
-
-                        buildMethodVisitor.visitInsn(ACONST_NULL);
-                        int eachBeanVar = pushNewBuildLocalVariable();
-
-                        Label tryStart = new Label();
-                        Label tryEnd = new Label();
-                        Label catchStart = new Label();
-                        Label catchEnd = new Label();
-                        buildMethodVisitor.visitTryCatchBlock(tryStart, tryEnd, catchStart, Type.getInternalName(BeanContextException.class));
-                        buildMethodVisitor.visitLabel(tryStart);
-
-
-                        pushConstructorArgument(buildMethodVisitor, entry.getKey(), entry.getValue(), argMetadata, i);
-                        buildMethodVisitor.visitVarInsn(ASTORE, eachBeanVar);
-
-                        buildMethodVisitor.visitLabel(tryEnd);
-                        buildMethodVisitor.visitJumpInsn(GOTO, catchEnd);
-
-                        buildMethodVisitor.visitLabel(catchStart);
-                        if (!argMetadata.hasAnnotation(AnnotationUtil.NULLABLE)) {
-                            buildMethodVisitor.visitInsn(ACONST_NULL);
-                            buildMethodVisitor.visitInsn(ARETURN);
-                        } else {
-                            buildMethodVisitor.pop();
-                        }
-                        buildMethodVisitor.visitLabel(catchEnd);
-
-                        variableReplacements.put(entry.getKey(), eachBeanVar);
-                        break;
-                    }
-                }
-            }
-        }
-        return variableReplacements;
-    }
-
     private void pushConstructorArguments(GeneratorAdapter buildMethodVisitor,
                                           Map<String, Object> argumentTypes,
-                                          Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                          Map<String, Integer> variableReplacements) {
+                                          Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
         int size = argumentTypes.size();
         if (size > 0) {
             Iterator<Map.Entry<String, Object>> iterator = argumentTypes.entrySet().iterator();
@@ -1981,12 +1913,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 Map.Entry<String, Object> entry = iterator.next();
                 AnnotationMetadata argMetadata = argumentAnnotationMetadata.get(entry.getKey());
 
-                Integer variable = variableReplacements.get(entry.getKey());
-                if (variable != null) {
-                    buildMethodVisitor.visitVarInsn(ALOAD, variable);
-                } else {
-                    pushConstructorArgument(buildMethodVisitor, entry.getKey(), entry.getValue(), argMetadata, i);
-                }
+                pushConstructorArgument(buildMethodVisitor, entry.getKey(), entry.getValue(), argMetadata, i);
             }
         }
     }

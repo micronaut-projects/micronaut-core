@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,6 +43,7 @@ import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
+import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.http.server.netty.ssl.HttpRequestCertificateHandler;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
@@ -556,19 +557,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         }
     }
 
-    private void registerMicronautChannelHandlers(Map<String, ChannelHandler> channelHandlerMap) {
-        int i = 0;
-        for (ChannelHandler outboundHandlerAdapter : outboundHandlers) {
-            String name;
-            if (outboundHandlerAdapter instanceof Named) {
-                name = ((Named) outboundHandlerAdapter).getName();
-            } else {
-                name = ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND + NettyHttpServer.OUTBOUND_KEY + ++i;
-            }
-            channelHandlerMap.put(name, outboundHandlerAdapter);
-        }
-    }
-
     private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
         options.forEach((option, value) -> biConsumer.accept(option, channelOptionFactory.convertValue(option, value, environment)));
     }
@@ -603,9 +591,10 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 serverConfiguration.isValidateHeaders(),
                 true
         );
-
         final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder()
-                .frameListener(http2ToHttpAdapter);
+                .frameListener(http2ToHttpAdapter)
+                .validateHeaders(serverConfiguration.isValidateHeaders())
+                .initialSettings(serverConfiguration.getHttp2().http2Settings());
 
         serverConfiguration.getLogLevel().ifPresent(logLevel ->
                 builder.frameLogger(new Http2FrameLogger(logLevel, NettyHttpServer.class))
@@ -630,7 +619,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     @ChannelHandler.Sharable
     private final class Http2OrHttpHandler extends ApplicationProtocolNegotiationHandler {
         private final boolean useSsl;
-        // both are Sharable
+        // all are Sharable
+        final HttpAccessLogHandler accessLogHandler = serverConfiguration.getAccessLogger() != null && serverConfiguration.getAccessLogger().isEnabled() ?
+                new HttpAccessLogHandler(serverConfiguration.getAccessLogger().getLoggerName(), serverConfiguration.getAccessLogger().getLogFormat()) : null;
         final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
         final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
 
@@ -676,6 +667,19 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             }
         }
 
+        private void registerMicronautChannelHandlers(Map<String, ChannelHandler> channelHandlerMap) {
+            int i = 0;
+            for (ChannelOutboundHandler outboundHandlerAdapter : outboundHandlers) {
+                String name;
+                if (outboundHandlerAdapter instanceof Named) {
+                    name = ((Named) outboundHandlerAdapter).getName();
+                } else {
+                    name = ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND + NettyHttpServer.OUTBOUND_KEY + ++i;
+                }
+                channelHandlerMap.put(name, outboundHandlerAdapter);
+            }
+        }
+
         @NotNull
         private Map<String, ChannelHandler> getHandlerForProtocol(@Nullable String protocol) {
             final Duration idleTime = serverConfiguration.getIdleTimeout();
@@ -688,11 +692,17 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             }
             if (protocol == null) {
                 handlers.put(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
+                if (accessLogHandler != null) {
+                    handlers.put(HANDLER_ACCESS_LOGGER, accessLogHandler);
+                }
             } else if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                 final HttpToHttp2ConnectionHandler httpToHttp2ConnectionHandler = newHttpToHttp2ConnectionHandler();
                 handlers.put(HANDLER_HTTP2_CONNECTION, httpToHttp2ConnectionHandler);
                 registerMicronautChannelHandlers(handlers);
                 handlers.put(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
+                if (accessLogHandler != null) {
+                    handlers.put(HANDLER_ACCESS_LOGGER, accessLogHandler);
+                }
             } else {
                 handlers.put(HANDLER_HTTP_SERVER_CODEC, new HttpServerCodec(
                         serverConfiguration.getMaxInitialLineLength(),
@@ -701,13 +711,15 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         serverConfiguration.isValidateHeaders(),
                         serverConfiguration.getInitialBufferSize()
                 ));
+                if (accessLogHandler != null) {
+                    handlers.put(HANDLER_ACCESS_LOGGER, accessLogHandler);
+                }
                 registerMicronautChannelHandlers(handlers);
                 handlers.put(HANDLER_FLOW_CONTROL, new FlowControlHandler());
                 handlers.put(HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
                 handlers.put(HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(httpCompressionStrategy));
                 handlers.put(HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
             }
-
             handlers.put(HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
             handlers.put(HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
             handlers.put(HttpRequestDecoder.ID, requestDecoder);
@@ -787,7 +799,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                             new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, connectionHandler);
 
                     pipeline.addLast(cleartextHttp2ServerUpgradeHandler);
-
                     pipeline.addLast(fallbackHandlerName, new SimpleChannelInboundHandler<HttpMessage>() {
                         @Override
                         protected void channelRead0(ChannelHandlerContext ctx, HttpMessage msg) {

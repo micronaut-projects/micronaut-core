@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -44,7 +44,7 @@ import java.util.*;
  */
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
-    private static final Map<String, List<AnnotationMapper>> ANNOTATION_MAPPERS = new HashMap<>(10);
+    private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
     private static final Map<String, List<AnnotationTransformer<Annotation>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
     private static final Map<MetadataKey, AnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
@@ -237,8 +237,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param element The element
      * @return The declaring type
      */
-    protected abstract @NonNull
-    String getDeclaringType(@NonNull T element);
+    protected abstract @NonNull String getDeclaringType(@NonNull T element);
 
     /**
      * Build the meta data for the given method element excluding any class metadata.
@@ -313,7 +312,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         DefaultAnnotationMetadata annotationMetadata;
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
-            annotationMetadata = (DefaultAnnotationMetadata) ((DefaultAnnotationMetadata) existing).clone();
+            annotationMetadata = ((DefaultAnnotationMetadata) existing).clone();
         } else {
             annotationMetadata = new DefaultAnnotationMetadata();
         }
@@ -598,9 +597,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         Map<? extends T, ?> elementValues = readAnnotationRawValues(annotationMirror);
         Map<CharSequence, Object> annotationValues;
         if (CollectionUtils.isEmpty(elementValues)) {
-            annotationValues = Collections.emptyMap();
+            annotationValues = new LinkedHashMap<>(3);
         } else {
-            annotationValues = new LinkedHashMap<>();
+            annotationValues = new LinkedHashMap<>(5);
             for (Map.Entry<? extends T, ?> entry : elementValues.entrySet()) {
                 T member = entry.getKey();
 
@@ -609,7 +608,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
 
                 boolean isInstantiatedMember = hasAnnotation(member, InstantiatedMember.class);
-                Optional<?> aliases = getAnnotationValues(originatingElement, member, Aliases.class).get("value");
                 Object annotationValue = entry.getValue();
                 if (isInstantiatedMember) {
                     final String memberName = getAnnotationMemberName(member);
@@ -619,49 +617,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         annotationValues.put(memberName, new AnnotationClassValue(acv.getName(), true));
                     }
                 } else {
-                    if (aliases.isPresent()) {
-                        Object value = aliases.get();
-                        if (value instanceof io.micronaut.core.annotation.AnnotationValue[]) {
-                            io.micronaut.core.annotation.AnnotationValue[] values = (io.micronaut.core.annotation.AnnotationValue[]) value;
-                            for (io.micronaut.core.annotation.AnnotationValue av : values) {
-                                OptionalValues<Object> aliasForValues = OptionalValues.of(Object.class, av.getValues());
-                                processAnnotationAlias(
-                                        originatingElement,
-                                        annotationName,
-                                        member, metadata,
-                                        isDeclared,
-                                        parentAnnotations,
-                                        annotationValues,
-                                        annotationValue,
-                                        aliasForValues
-                                );
-                            }
-                        }
-                        readAnnotationRawValues(originatingElement, annotationName, member, getAnnotationMemberName(member), annotationValue, annotationValues);
-                    } else {
-                        OptionalValues<?> aliasForValues = getAnnotationValues(
-                                originatingElement,
-                                member,
-                                AliasFor.class
-                        );
-                        processAnnotationAlias(
-                                originatingElement,
-                                annotationName,
-                                member,
-                                metadata,
-                                isDeclared,
-                                parentAnnotations,
-                                annotationValues,
-                                annotationValue,
-                                aliasForValues
-                        );
-                        readAnnotationRawValues(originatingElement, annotationName, member, getAnnotationMemberName(member), annotationValue, annotationValues);
-                    }
+                    handleAnnotationAlias(
+                            originatingElement,
+                            metadata,
+                            isDeclared,
+                            annotationName,
+                            parentAnnotations,
+                            annotationValues,
+                            member,
+                            annotationValue
+                    );
                 }
 
             }
         }
-        List<AnnotationMapper> mappers = ANNOTATION_MAPPERS.get(annotationName);
+        List<AnnotationMapper<?>> mappers = getAnnotationMappers(annotationName);
         if (mappers != null) {
             AnnotationValue<?> annotationValue = new AnnotationValue(annotationName, annotationValues);
             VisitorContext visitorContext = createVisitorContext();
@@ -691,23 +661,43 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                     );
                                 }
                             } else {
+                                Map<CharSequence, Object> values = av.getValues();
+
                                 if (isDeclared) {
                                     metadata.addDeclaredAnnotation(
                                             mappedAnnotationName,
-                                            av.getValues(),
+                                            values,
                                             retentionPolicy
                                     );
                                 } else {
                                     metadata.addAnnotation(
                                             mappedAnnotationName,
-                                            av.getValues(),
+                                            values,
                                             retentionPolicy
                                     );
                                 }
+
+
                             }
 
                             RetentionPolicy finalRetentionPolicy = retentionPolicy;
                             mappedMirror.ifPresent(annMirror -> {
+                                Map<CharSequence, Object> values = av.getValues();
+                                values.forEach((key, value) -> {
+                                    T member = getAnnotationMember(annMirror, key);
+                                    if (member != null) {
+                                        handleAnnotationAlias(
+                                                originatingElement,
+                                                metadata,
+                                                isDeclared,
+                                                mappedAnnotationName,
+                                                parentAnnotations,
+                                                annotationValues,
+                                                member,
+                                                value
+                                        );
+                                    }
+                                });
                                 final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(mappedAnnotationName, annMirror);
                                 if (finalRetentionPolicy == RetentionPolicy.RUNTIME) {
                                     processAnnotationDefaults(originatingElement, metadata, mappedAnnotationName, defaultValues);
@@ -727,6 +717,65 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         }
         return annotationValues;
+    }
+
+    private void handleAnnotationAlias(T originatingElement, DefaultAnnotationMetadata metadata, boolean isDeclared, String annotationName, List<String> parentAnnotations, Map<CharSequence, Object> annotationValues, T member, Object annotationValue) {
+        Optional<?> aliases = getAnnotationValues(originatingElement, member, Aliases.class).get("value");
+        if (aliases.isPresent()) {
+            Object value = aliases.get();
+            if (value instanceof AnnotationValue[]) {
+                AnnotationValue[] values = (AnnotationValue[]) value;
+                for (AnnotationValue av : values) {
+                    OptionalValues<Object> aliasForValues = OptionalValues.of(Object.class, av.getValues());
+                    processAnnotationAlias(
+                            originatingElement,
+                            annotationName,
+                            member, metadata,
+                            isDeclared,
+                            parentAnnotations,
+                            annotationValues,
+                            annotationValue,
+                            aliasForValues
+                    );
+                }
+            }
+            readAnnotationRawValues(originatingElement, annotationName, member, getAnnotationMemberName(member), annotationValue, annotationValues);
+        } else {
+            OptionalValues<?> aliasForValues = getAnnotationValues(
+                    originatingElement,
+                    member,
+                    AliasFor.class
+            );
+            processAnnotationAlias(
+                    originatingElement,
+                    annotationName,
+                    member,
+                    metadata,
+                    isDeclared,
+                    parentAnnotations,
+                    annotationValues,
+                    annotationValue,
+                    aliasForValues
+            );
+            readAnnotationRawValues(originatingElement, annotationName, member, getAnnotationMemberName(member), annotationValue, annotationValues);
+        }
+    }
+
+    /**
+     * Get the annotation member.
+     * @param originatingElement The originatig element
+     * @param member The member
+     * @return The annotation member
+     */
+    protected abstract @Nullable T getAnnotationMember(T originatingElement, CharSequence member);
+
+    /**
+     * Obtain the annotation mappers for the given annotation name.
+     * @param annotationName The annotation name
+     * @return The mappers
+     */
+    protected @NonNull List<AnnotationMapper<? extends Annotation>> getAnnotationMappers(@NonNull String annotationName) {
+        return ANNOTATION_MAPPERS.get(annotationName);
     }
 
     /**
@@ -894,7 +943,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         for (AnnotationRemapper annotationRemapper : annotationRemappers) {
                             List<AnnotationValue<?>> remappedRepeatable = annotationRemapper.remap(repeatableAnn, visitorContext);
                             List<AnnotationValue<?>> remappedValue = annotationRemapper.remap(av, visitorContext);
-                            if (CollectionUtils.isNotEmpty(remappedRepeatable) && CollectionUtils.isNotEmpty(remappedRepeatable)) {
+                            if (CollectionUtils.isNotEmpty(remappedRepeatable)) {
                                 for (AnnotationValue<?> repeatable : remappedRepeatable) {
                                     for (AnnotationValue<?> rmv : remappedValue) {
                                         if (isDeclared) {
@@ -922,7 +971,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                             if (isDeclared) {
                                                 annotationMetadata.addDeclaredRepeatable(annotationValue.getAnnotationName(), value);
                                             } else {
-                                                annotationMetadata.addDeclaredRepeatable(annotationValue.getAnnotationName(), value);
+                                                annotationMetadata.addRepeatable(annotationValue.getAnnotationName(), value);
                                             }
                                         }
                                     }
@@ -936,7 +985,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                     if (isDeclared) {
                                         annotationMetadata.addDeclaredRepeatable(repeatableName, value);
                                     } else {
-                                        annotationMetadata.addDeclaredRepeatable(repeatableName, value);
+                                        annotationMetadata.addRepeatable(repeatableName, value);
                                     }
                                 }
                             }
@@ -1013,15 +1062,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             List<A> topLevel = new ArrayList<>();
             for (A annotationMirror : annotationMirrors) {
 
-                final T annotationTypeMirror = getTypeForAnnotation(annotationMirror);
-
                 String annotationName = getAnnotationTypeName(annotationMirror);
-                final RetentionPolicy retentionPolicy = getRetentionPolicy(annotationTypeMirror);
                 if (annotationName.equals(getElementName(element))) {
                     continue;
                 }
 
                 if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName) && !excludes.contains(annotationName)) {
+                    final T annotationTypeMirror = getTypeForAnnotation(annotationMirror);
+                    final RetentionPolicy retentionPolicy = getRetentionPolicy(annotationTypeMirror);
+
                     topLevel.add(annotationMirror);
 
                     Map<CharSequence, Object> data = populateAnnotationData(element, annotationMirror, metadata, isDeclared, retentionPolicy);
@@ -1150,19 +1199,27 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     public <A2 extends Annotation> AnnotationMetadata annotate(
             AnnotationMetadata annotationMetadata,
             AnnotationValue<A2> annotationValue) {
+        String annotationName = annotationValue.getAnnotationName();
         if (annotationMetadata instanceof DefaultAnnotationMetadata) {
-            final Optional<T> annotationMirror = getAnnotationMirror(annotationValue.getAnnotationName());
+            final Optional<T> annotationMirror = getAnnotationMirror(annotationName);
             final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) annotationMetadata;
             defaultMetadata.addDeclaredAnnotation(
-                    annotationValue.getAnnotationName(),
+                    annotationName,
                     annotationValue.getValues()
             );
             annotationMirror.ifPresent(annotationType -> {
+                final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(annotationName, annotationType);
+                processAnnotationDefaults(
+                        annotationType,
+                        defaultMetadata,
+                        annotationName,
+                        defaultValues
+                );
                 processAnnotationStereotypes(
                         defaultMetadata,
                         true,
                         annotationType,
-                        annotationValue.getAnnotationName(),
+                        annotationName,
                         DEFAULT_ANNOTATE_EXCLUDES
                 );
             });
@@ -1173,10 +1230,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     declaredMetadata
             );
         } else if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
-            final Optional<T> annotationMirror = getAnnotationMirror(annotationValue.getAnnotationName());
+            final Optional<T> annotationMirror = getAnnotationMirror(annotationName);
             final Map<CharSequence, Object> values = annotationValue.getValues();
             final Map<String, Map<CharSequence, Object>> declared = new HashMap<>(1);
-            declared.put(annotationValue.getAnnotationName(), values);
+            declared.put(annotationName, values);
             final DefaultAnnotationMetadata newMetadata = new DefaultAnnotationMetadata(
                     declared,
                     null,
@@ -1189,7 +1246,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             newMetadata,
                             true,
                             annotationType,
-                            annotationValue.getAnnotationName(),
+                            annotationName,
                             DEFAULT_ANNOTATE_EXCLUDES
                     )
             );

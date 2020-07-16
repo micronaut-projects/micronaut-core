@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,32 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
- * Copyright 2017 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
-import io.micronaut.context.exceptions.BeanContextException;
-import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.context.exceptions.DependencyInjectionException;
-import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.context.exceptions.*;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -130,8 +111,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                                      AnnotationMetadata methodMetadata,
                                      boolean requiresReflection,
                                      Argument... arguments) {
-
-        AnnotationMetadata beanAnnotationMetadata = getAnnotationMetadata();
         this.type = producedType;
         this.isAbstract = false; // factory beans are never abstract
         this.declaringType = declaringType;
@@ -173,7 +152,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                                      boolean requiresReflection,
                                      Argument... arguments) {
 
-        AnnotationMetadata beanAnnotationMetadata = getAnnotationMetadata();
         this.type = type;
         this.isAbstract = Modifier.isAbstract(this.type.getModifiers());
         this.declaringType = type;
@@ -248,13 +226,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Override
     @SuppressWarnings({"unchecked"})
     public Stream<ExecutableMethod<T, ?>> findPossibleMethods(String name) {
-        if (executableMethodMap != null) {
-            if (executableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
-                return executableMethodMap
-                        .values()
-                        .stream()
-                        .filter((method) -> method.getMethodName().equals(name));
-            }
+        if (executableMethodMap != null && executableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
+            return executableMethodMap
+                    .values()
+                    .stream()
+                    .filter(method -> method.getMethodName().equals(name));
         }
         return Stream.empty();
     }
@@ -619,10 +595,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @SuppressWarnings({"unused"})
     @UsedByGeneratedCode
     protected Object injectAnother(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         if (bean == null) {
             throw new BeanInstantiationException(resolutionContext, "Bean factory returned null");
         }
+        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         return defaultContext.inject(resolutionContext, this, bean);
     }
 
@@ -639,7 +615,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     @UsedByGeneratedCode
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         boolean addInCreationHandling = isSingleton() && !CollectionUtils.isNotEmpty(postConstructMethods);
         DefaultBeanContext.BeanKey key = null;
         if (addInCreationHandling) {
@@ -665,6 +640,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             }
         }
 
+        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         for (int i = 0; i < methodInjectionPoints.size(); i++) {
             MethodInjectionPoint methodInjectionPoint = methodInjectionPoints.get(i);
             if (methodInjectionPoint.isPostConstructMethod() && methodInjectionPoint.requiresReflection()) {
@@ -790,7 +766,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             try {
                 String valueAnnStr = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
 
-                Class argumentType;
+                Class<?> argumentType;
                 boolean isCollection = false;
                 if (Collection.class.isAssignableFrom(argument.getType())) {
                     argumentType = argument.getFirstTypeVariable().map(Argument::getType).orElse((Class) Object.class);
@@ -799,7 +775,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     argumentType = argument.getType();
                 }
 
-                if (isInnerConfiguration(argumentType)) {
+                if (isInnerConfiguration(argumentType, context)) {
                     Qualifier qualifier = resolveQualifier(resolutionContext, argument, true);
                     if (isCollection) {
                         Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
@@ -808,9 +784,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                         return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                     }
                 } else {
-                    String argumentName = argument.getName();
                     String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valueAnnStr);
-
 
                     ApplicationContext applicationContext = (ApplicationContext) context;
                     ArgumentConversionContext conversionContext = ConversionContext.of(argument);
@@ -1031,7 +1005,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 path.pushConstructorResolve(this, argument);
                 try {
                     Object bean;
-                    Qualifier qualifier = resolveQualifier(resolutionContext, argument, isInnerConfiguration(argument.getType()));
+                    Qualifier qualifier = resolveQualifier(resolutionContext, argument, isInnerConfiguration(argument.getType(), context));
                     if (Qualifier.class.isAssignableFrom(argumentType)) {
                         bean = qualifier;
                     } else {
@@ -1040,6 +1014,19 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     }
                     path.pop();
                     return bean;
+                } catch (DisabledBeanException e) {
+                    if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                        AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argumentType.getSimpleName(), e.getMessage());
+                    }
+                    if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
+                        throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
+                    } else {
+                        if (isNullable) {
+                            path.pop();
+                            return null;
+                        }
+                        throw new DependencyInjectionException(resolutionContext, argument, e);
+                    }
                 } catch (NoSuchBeanException e) {
                     if (isNullable) {
                         path.pop();
@@ -1239,7 +1226,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 String valueAnnVal = annotationMetadata.stringValue(Value.class).orElse(null);
                 Argument<?> fieldArgument = injectionPoint.asArgument();
 
-                Class argumentType;
+                Class<?> argumentType;
                 boolean isCollection = false;
                 if (Collection.class.isAssignableFrom(injectionPoint.getType())) {
                     argumentType = fieldArgument.getFirstTypeVariable().map(Argument::getType).orElse((Class) Object.class);
@@ -1247,7 +1234,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 } else {
                     argumentType = fieldArgument.getType();
                 }
-                if (isInnerConfiguration(argumentType)) {
+                if (isInnerConfiguration(argumentType, context)) {
                     Qualifier qualifier = resolveQualifier(resolutionContext, fieldArgument, true);
                     if (isCollection) {
                         Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
@@ -1301,7 +1288,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             String... propertyPath) {
         if (context instanceof PropertyResolver) {
             PropertyResolver propertyResolver = (PropertyResolver) context;
-            Class<?> beanType = getBeanType();
             String pathString = propertyPath.length > 1 ? String.join(".", propertyPath) : propertyPath[0];
             String valString = resolvePropertyPath(resolutionContext, pathString);
 
@@ -1330,7 +1316,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             String propertyPath) {
         if (context instanceof PropertyResolver) {
             PropertyResolver propertyResolver = (PropertyResolver) context;
-            Class<?> beanType = getBeanType();
             String valString = substituteWildCards(resolutionContext, propertyPath);
 
             return propertyResolver.getProperty(valString, ConversionContext.of(propertyType));
@@ -1456,6 +1441,19 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 @SuppressWarnings("unchecked") Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, beanType, qualifier);
                 path.pop();
                 return bean;
+            } catch (DisabledBeanException e) {
+                if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                    AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
+                }
+                if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
+                    throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
+                } else {
+                    if (injectionPoint.isDeclaredNullable()) {
+                        path.pop();
+                        return null;
+                    }
+                    throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
+                }
             } catch (NoSuchBeanException e) {
                 if (injectionPoint.isDeclaredNullable()) {
                     path.pop();
@@ -1634,12 +1632,25 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                 path.pop();
                 return bean;
+            } catch (DisabledBeanException e) {
+                if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                    AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argumentType.getSimpleName(), e.getMessage());
+                }
+                if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
+                    throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
+                } else {
+                    if (argument.isDeclaredNullable()) {
+                        path.pop();
+                        return null;
+                    }
+                    throw new DependencyInjectionException(resolutionContext, argument, e);
+                }
             } catch (NoSuchBeanException e) {
                 if (argument.isDeclaredNullable()) {
                     path.pop();
                     return null;
                 }
-                throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, e);
+                throw new DependencyInjectionException(resolutionContext, argument, e);
             }
         }
     }
@@ -1731,7 +1742,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private String substituteWildCards(BeanResolutionContext resolutionContext, String valString) {
         if (valString.indexOf('*') > -1) {
-            Optional<String> namedBean = resolutionContext.get(Named.class.getName(), ArgumentConversionContext.STRING);
+            Optional<String> namedBean = resolutionContext.get(Named.class.getName(), ConversionContext.STRING);
             if (namedBean.isPresent()) {
                 valString = valString.replace("*", namedBean.get());
             }
@@ -1748,13 +1759,14 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         return null;
     }
 
-    private boolean isInnerConfiguration(Class argumentType) {
+    private boolean isInnerConfiguration(Class<?> argumentType, BeanContext beanContext) {
         return isConfigurationProperties &&
                 argumentType.getName().indexOf('$') > -1 &&
                 !argumentType.isEnum() &&
                 !argumentType.isPrimitive() &&
                 Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers()) &&
-                isInnerOfAnySuperclass(argumentType);
+                isInnerOfAnySuperclass(argumentType) &&
+                beanContext.findBeanDefinition(argumentType).map(bd -> bd.hasStereotype(ConfigurationReader.class) || bd.isIterable()).isPresent();
     }
 
     private boolean isInnerOfAnySuperclass(Class argumentType) {
@@ -1872,7 +1884,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     if ((hasMetadata && argument.isAnnotationPresent(Parameter.class)) ||
                             (innerConfiguration && isIterable) ||
                             Qualifier.class == argument.getType()) {
-                        final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, ArgumentConversionContext.STRING);
+                        final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, ConversionContext.STRING);
                         qualifier = n.map(Qualifiers::byName).orElse(null);
                     }
                 }

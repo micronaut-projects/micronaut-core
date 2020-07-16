@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -124,12 +124,12 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
     }
 
     private void applyConfiguredHeaders(MutableHttpHeaders headers) {
-        if (serverConfiguration.isDateHeader() && !headers.contains("Date")) {
+        if (serverConfiguration.isDateHeader() && !headers.contains(HttpHeaders.DATE)) {
             headers.date(LocalDateTime.now());
         }
-        serverConfiguration.getServerHeader().ifPresent((server) -> {
-            if (!headers.contains("Server")) {
-                headers.add("Server", server);
+        serverConfiguration.getServerHeader().ifPresent(server -> {
+            if (!headers.contains(HttpHeaders.SERVER)) {
+                headers.add(HttpHeaderNames.SERVER, server);
             }
         });
     }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -58,20 +58,9 @@ public class OpenTracingInvocationInstrumenter implements TracingInvocationInstr
     public InvocationInstrumenter newTracingInvocationInstrumenter() {
         final Span activeSpan = tracer.activeSpan();
         if (activeSpan != null) {
-            return new InvocationInstrumenter() {
-
-                Scope activeScope;
-
-                @Override
-                public void beforeInvocation() {
-                    activeScope = tracer.scopeManager().activate(activeSpan);
-                }
-
-                @Override
-                public void afterInvocation(boolean cleanup) {
-                    activeScope.close();
-                }
-
+            return () -> {
+                Scope activeScope = tracer.scopeManager().activate(activeSpan);
+                return cleanup -> activeScope.close();
             };
         }
         return null;

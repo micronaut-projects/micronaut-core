@@ -18,6 +18,8 @@ package io.micronaut.core.annotation
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.lang.annotation.RetentionPolicy
+
 class AnnotationValueBuilderSpec extends Specification {
 
     void "test class value"() {
@@ -31,6 +33,25 @@ class AnnotationValueBuilderSpec extends Specification {
         av.getValue(AnnotationClassValue.class).isPresent()
     }
 
+    void "test default retention policy is runtime value"() {
+        given:
+        def av = AnnotationValue.builder("Foo")
+                .value(String.class)
+                .build()
+
+        expect:
+        av.retentionPolicy == RetentionPolicy.RUNTIME
+    }
+
+    void "test custom retention policy"() {
+        given:
+        def av = AnnotationValue.builder(AnnotationValue.builder("Foo")
+                    .value(String.class)
+                    .build(), RetentionPolicy.SOURCE).build()
+
+        expect:
+        av.retentionPolicy == RetentionPolicy.SOURCE
+    }
 
     @Unroll
     void "test value for #type"() {

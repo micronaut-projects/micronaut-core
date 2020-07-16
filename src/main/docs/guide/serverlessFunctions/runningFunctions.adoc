@@ -1,1 +1,0 @@
-Typically function applications will be run in a cloud-based environment, such as AWS Lambda. However during development and testing it is often desirable to run your functions locally, either as standalone web applications or as executables from the command line. Micronaut provides support for both of these approaches.

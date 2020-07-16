@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -115,17 +115,17 @@ public class TextStreamCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException {
+    public <T> T decode(Argument<T> type, InputStream inputStream) {
         throw new UnsupportedOperationException("This codec currently only supports encoding");
     }
 
     @Override
-    public <T> T decode(Class<T> type, InputStream inputStream) throws CodecException {
+    public <T> T decode(Class<T> type, InputStream inputStream) {
         throw new UnsupportedOperationException("This codec currently only supports encoding");
     }
 
     @Override
-    public <T> void encode(T object, OutputStream outputStream) throws CodecException {
+    public <T> void encode(T object, OutputStream outputStream) {
         try {
             outputStream.write(encode(object));
         } catch (IOException e) {
@@ -134,14 +134,14 @@ public class TextStreamCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> byte[] encode(T object) throws CodecException {
+    public <T> byte[] encode(T object) {
         ByteBuffer buffer = encode(object, byteBufferFactory);
         return buffer.toByteArray();
     }
 
     @SuppressWarnings("MagicNumber")
     @Override
-    public <T, B> ByteBuffer<B> encode(T object, ByteBufferFactory<?, B> allocator) throws CodecException {
+    public <T, B> ByteBuffer<B> encode(T object, ByteBufferFactory<?, B> allocator) {
         Event<Object> event;
         if (object instanceof Event) {
             event = (Event<Object>) object;

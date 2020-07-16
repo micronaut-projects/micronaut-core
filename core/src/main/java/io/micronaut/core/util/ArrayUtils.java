@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,12 +41,12 @@ public class ArrayUtils {
      * @return The concatenated array
      */
     public static <T> T[] concat(T[] a, T... b) {
-        int aLen = a.length;
         int bLen = b.length;
 
         if (bLen == 0) {
             return a;
         }
+        int aLen = a.length;
         if (aLen == 0) {
             return b;
         }
@@ -67,12 +67,12 @@ public class ArrayUtils {
      * @return The concatenated array
      */
     public static byte[] concat(byte[] a, byte... b) {
-        int aLen = a.length;
         int bLen = b.length;
 
         if (bLen == 0) {
             return a;
         }
+        int aLen = a.length;
         if (aLen == 0) {
             return b;
         }
@@ -143,7 +143,6 @@ public class ArrayUtils {
             return Collections.emptyIterator();
         }
     }
-
 
     /**
      * Produce an iterator for the given array.

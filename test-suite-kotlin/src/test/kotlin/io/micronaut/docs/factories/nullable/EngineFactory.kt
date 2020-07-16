@@ -17,6 +17,7 @@ package io.micronaut.docs.factories.nullable
 
 import io.micronaut.context.annotation.EachBean
 import io.micronaut.context.annotation.Factory
+import io.micronaut.context.exceptions.DisabledBeanException
 
 // tag::class[]
 @Factory
@@ -31,7 +32,7 @@ class EngineFactory {
                 }
             }
         } else {
-            null
+            throw DisabledBeanException("Engine configuration disabled")
         }
     }
 }

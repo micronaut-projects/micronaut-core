@@ -23,7 +23,7 @@ class Test {
 ''')
 
         then:
-        thrown(ClassNotFoundException)
+        definition == null
     }
 
     void "test visit constructor @Inject"() {

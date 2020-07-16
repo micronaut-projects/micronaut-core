@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,7 +40,7 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
     private static final String LOGGERS = "loggers";
 
     @Override
-    public Publisher<Map<String, Object>> getLoggers(LoggingSystem loggingSystem) {
+    public Publisher<Map<String, Object>> getLoggers(ManagedLoggingSystem loggingSystem) {
         Map<String, Object> data = new LinkedHashMap<>(2);
 
         data.put(LEVELS, getLogLevels());
@@ -50,13 +50,13 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
     }
 
     @Override
-    public Publisher<Map<String, Object>> getLogger(LoggingSystem loggingSystem,
+    public Publisher<Map<String, Object>> getLogger(ManagedLoggingSystem loggingSystem,
                                                     String name) {
         return Flowable.just(getLoggerData(loggingSystem.getLogger(name)));
     }
 
     @Override
-    public void setLogLevel(LoggingSystem loggingSystem, @NotBlank String name, io.micronaut.logging.@NotNull LogLevel level) {
+    public void setLogLevel(ManagedLoggingSystem loggingSystem, @NotBlank String name, io.micronaut.logging.@NotNull LogLevel level) {
         loggingSystem.setLogLevel(name, level);
     }
 

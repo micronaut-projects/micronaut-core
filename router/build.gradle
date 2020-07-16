@@ -3,7 +3,7 @@ dependencies {
     
     api project(":inject")
     api project(":http")
-    compileOnly dependencyVersion("groovy")
+    compileOnly dependencyModuleVersion("groovy", "groovy")
     
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")

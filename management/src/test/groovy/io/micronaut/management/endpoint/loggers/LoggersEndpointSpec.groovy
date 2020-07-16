@@ -57,7 +57,11 @@ class LoggersEndpointSpec extends Specification {
     static final expectedBuiltinLoggers = ['io.micronaut', 'io.netty']
 
     void setup() {
-        server = ApplicationContext.run(EmbeddedServer)
+        server = ApplicationContext.run(EmbeddedServer, [
+                'endpoints.loggers.enabled': true,
+                'endpoints.loggers.sensitive': false,
+                'endpoints.loggers.write-sensitive': false
+        ])
         client = server.applicationContext.createBean(RxHttpClient, server.URL)
     }
 

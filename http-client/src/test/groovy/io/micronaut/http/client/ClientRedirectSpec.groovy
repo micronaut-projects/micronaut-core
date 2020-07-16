@@ -79,6 +79,7 @@ class ClientRedirectSpec extends Specification {
                 Publishers.just(ServiceInstance.of(url.getHost(), url))
             }
 
+            @Override
             Optional<String> getContextPath() {
                 Optional.of("/test")
             }
@@ -105,6 +106,7 @@ class ClientRedirectSpec extends Specification {
                 Publishers.just(ServiceInstance.of(url.getHost(), url))
             }
 
+            @Override
             Optional<String> getContextPath() {
                 Optional.of("test")
             }
@@ -130,6 +132,7 @@ class ClientRedirectSpec extends Specification {
                 Publishers.just(ServiceInstance.of(url.getHost(), url))
             }
 
+            @Override
             Optional<String> getContextPath() {
                 Optional.of("/test")
             }

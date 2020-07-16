@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,7 +38,6 @@ import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -328,7 +327,6 @@ public class MediaType implements CharSequence {
     private static final String SEMICOLON = ";";
 
     @SuppressWarnings("ConstantName")
-    private static final Logger LOG = LoggerFactory.getLogger(MediaType.class);
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
     private static Map<String, String> mediaTypeFileExtensions;
     @SuppressWarnings("ConstantName")
@@ -344,7 +342,7 @@ public class MediaType implements CharSequence {
     private BigDecimal qualityNumberField;
 
     static {
-        ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence -> {
+        ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, charSequence -> {
                     if (StringUtils.isNotEmpty(charSequence)) {
                         return new MediaType(charSequence.toString());
                     }
@@ -420,9 +418,6 @@ public class MediaType implements CharSequence {
             this.type = withoutArgs.substring(0, i);
             this.subtype = withoutArgs.substring(i + 1);
         } else {
-            if (LOG.isWarnEnabled()) {
-                LOG.warn("Failed to parse media type [{}]", name);
-            }
             throw new IllegalArgumentException("Invalid mime type: " + name);
         }
 
@@ -524,7 +519,7 @@ public class MediaType implements CharSequence {
      * @return The charset of the media type if specified
      */
     public Optional<Charset> getCharset() {
-        return getParameters().get("charset").map(Charset::forName);
+        return getParameters().get(CHARSET_PARAMETER).map(Charset::forName);
     }
 
     @Override
@@ -772,8 +767,9 @@ public class MediaType implements CharSequence {
             }
             return result;
         } catch (IOException ex) {
-            if (LOG.isWarnEnabled()) {
-                LOG.warn("Failed to load mime types for file extension detection!");
+            Logger logger = LoggerFactory.getLogger(MediaType.class);
+            if (logger.isWarnEnabled()) {
+                logger.warn("Failed to load mime types for file extension detection!");
             }
         }
 

@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.TypeHint
 
 import javax.inject.Named
 import javax.inject.Qualifier
@@ -338,4 +339,32 @@ interface TestApi {
         metadata.getValue(Named).get() == "foo"
     }
 
+    void "test annotation metadata string value array types"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test', """
+package test;
+
+import io.micronaut.core.annotation.TypeHint;
+import java.util.UUID;
+
+@TypeHint([UUID[].class, UUID.class])
+class Test {
+
+}
+""")
+
+        expect:
+        metadata.stringValues(TypeHint).size() == 2
+        metadata.stringValues(TypeHint)[0] == '[Ljava.util.UUID;'
+        metadata.stringValues(TypeHint)[1] == 'java.util.UUID'
+
+        when:
+        def className = "test"
+        metadata = writeAndLoadMetadata(className, metadata)
+
+        then:
+        metadata.stringValues(TypeHint).size() == 2
+        metadata.stringValues(TypeHint)[0] == '[Ljava.util.UUID;'
+        metadata.stringValues(TypeHint)[1] == 'java.util.UUID'
+    }
 }

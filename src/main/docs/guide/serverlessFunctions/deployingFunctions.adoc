@@ -1,1 +1,0 @@
-Micronaut functions can be deployed to either AWS lambda or any FaaS platform that can execute the function as a container. The following sections detail how to deploy your function.

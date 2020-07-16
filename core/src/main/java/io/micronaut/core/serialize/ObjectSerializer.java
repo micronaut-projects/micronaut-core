@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,8 @@ package io.micronaut.core.serialize;
 import io.micronaut.core.serialize.exceptions.SerializationException;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.type.Argument;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -59,6 +61,20 @@ public interface ObjectSerializer {
     <T> Optional<T> deserialize(@Nullable InputStream inputStream, Class<T> requiredType) throws SerializationException;
 
     /**
+     * Deserialize the given object to bytes.
+     *
+     * @param inputStream  The input stream
+     * @param requiredType The required type
+     * @param <T>          The required generic type
+     * @return An {@link Optional} of the object
+     * @throws SerializationException if there is a serialization problem
+     * @since 2.0
+     */
+    default <T> Optional<T> deserialize(@Nullable InputStream inputStream, Argument<T> requiredType) throws SerializationException {
+        return deserialize(inputStream, requiredType.getType());
+    }
+
+    /**
      * Serialize the given object to a byte[].
      *
      * @param object The object to serialize
@@ -95,6 +111,20 @@ public interface ObjectSerializer {
         } catch (IOException e) {
             throw new SerializationException("I/O error occurred during deserialization: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Deserialize the given object to bytes.
+     *
+     * @param bytes        The byte array
+     * @param requiredType The required type
+     * @param <T>          The required generic type
+     * @return An {@link Optional} of the object
+     * @throws SerializationException if there is a serialization problem
+     * @since 2.0
+     */
+    default <T> Optional<T> deserialize(@Nullable byte[] bytes, Argument<T> requiredType) throws SerializationException {
+        return deserialize(bytes, requiredType.getType());
     }
 
     /**

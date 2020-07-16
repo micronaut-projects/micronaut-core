@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -82,7 +82,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         List<String> values = nettyHeaders.getAll(name);
-        if (values.size() > 0) {
+        if (!values.isEmpty()) {
             if (values.size() == 1 || !isCollectionOrArray(conversionContext.getArgument().getType())) {
                 return conversionService.convert(values.get(0), conversionContext);
             } else {

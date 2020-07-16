@@ -11,7 +11,7 @@ $ mn create-app my-app --features mongo-reactive
 
 Micronaut includes a configuration to automatically configure the native MongoDB Java driver. To use this configuration, add the following dependency to your application:
 
-dependency:micronaut-mongo-reactive[groupId="io.micronaut.configuration"]
+dependency:micronaut-mongo-reactive[groupId="io.micronaut.mongodb"]
 
 Then configure the URI of the MongoDB server in `application.yml`:
 

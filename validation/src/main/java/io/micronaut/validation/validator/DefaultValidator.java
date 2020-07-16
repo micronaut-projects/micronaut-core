@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -476,7 +476,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         }
 
         //noinspection unchecked
-        return (Set<ConstraintViolation<T>>) overallViolations;
+        return overallViolations;
     }
 
     private <T> void validateCascadePropertyInternal(DefaultConstraintValidatorContext context,
@@ -745,7 +745,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                 context,
                                 overallViolations,
                                 argument.getName(),
-                                parameterType,
+                                unwrappedValue.getClass(),
                                 finalIndex,
                                 annotationMetadata,
                                 unwrappedValue
@@ -1056,7 +1056,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     @SuppressWarnings("unchecked")
     private <T> void validatePojoInternal(@NonNull Class<T> rootClass,
                                           @Nullable T object,
-                                          @NonNull Object[] argumentValues,
+                                          @Nullable Object[] argumentValues,
                                           @NonNull DefaultConstraintValidatorContext context,
                                           @NonNull Set overallViolations,
                                           @NonNull Class<?> parameterType,
@@ -1067,8 +1067,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 .findConstraintValidator(pojoConstraint, parameterType).orElse(null);
 
         if (constraintValidator != null) {
-            if (!constraintValidator.isValid((T) parameterValue, constraintAnnotation, context)) {
-                final String propertyValue = "";
+            if (!constraintValidator.isValid(parameterValue, constraintAnnotation, context)) {
                 BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
                 if (beanIntrospection == null) {
                     throw new ValidationException("Passed object [" + parameterValue + "] cannot be introspected. Please annotate with @Introspected");
@@ -1076,6 +1075,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 AnnotationMetadata beanAnnotationMetadata = beanIntrospection.getAnnotationMetadata();
                 AnnotationValue<? extends Annotation> annotationValue = beanAnnotationMetadata.getAnnotation(pojoConstraint);
 
+                final String propertyValue = "";
                 final String messageTemplate = buildMessageTemplate(annotationValue, beanAnnotationMetadata);
                 final Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, beanAnnotationMetadata);
                 overallViolations.add(new DefaultConstraintViolation(
@@ -1745,14 +1745,14 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
     private <T> void failOnError(@NonNull BeanResolutionContext resolutionContext, Set<ConstraintViolation<T>> errors, Class<?> beanType) {
         if (!errors.isEmpty()) {
-            StringBuilder builder = new StringBuilder();
-            builder.append("Validation failed for bean definition [");
-            builder.append(beanType.getName());
-            builder.append("]\nList of constraint violations:[\n");
+            StringBuilder builder = new StringBuilder()
+                    .append("Validation failed for bean definition [")
+                    .append(beanType.getName())
+                    .append("]\nList of constraint violations:[\n");
             for (ConstraintViolation<?> violation : errors) {
-                builder.append("\t").append(violation.getPropertyPath()).append(" - ").append(violation.getMessage()).append("\n");
+                builder.append('\t').append(violation.getPropertyPath()).append(" - ").append(violation.getMessage()).append('\n');
             }
-            builder.append("]");
+            builder.append(']');
             throw new BeanInstantiationException(resolutionContext, builder.toString());
         }
     }
@@ -1790,6 +1790,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @Override
         public ClockProvider getClockProvider() {
             return clockProvider;
+        }
+
+        @Nullable
+        @Override
+        public Object getRootBean() {
+            return validatedObjects.isEmpty() ? null : validatedObjects.iterator().next();
         }
 
         Path.Node addPropertyNode(String name, @Nullable DefaultPropertyNode container) {
@@ -2059,6 +2065,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             return kind;
         }
 
+        @Override
         public boolean isInIterable() {
             return isInIterable;
         }

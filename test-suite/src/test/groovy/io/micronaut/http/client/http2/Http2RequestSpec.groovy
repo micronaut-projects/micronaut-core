@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.docs.server.json.Person
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -54,6 +55,12 @@ class Http2RequestSpec extends Specification {
         then:"The response is correct"
         response.body() == Http2Controller.people
 
+        when:"posting a data again"
+        response = client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person))
+                .blockingFirst()
+
+        then:"The response is correct"
+        response.body() == Http2Controller.people
     }
 
     void "test make HTTP/2 sse stream request"() {
@@ -96,7 +103,6 @@ class Http2RequestSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 "micronaut.server.http-version" : "2.0",
                 "micronaut.http.client.http-version" : "2.0",
-                "micronaut.http.client.read-timeout": -1,
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
@@ -113,6 +119,22 @@ class Http2RequestSpec extends Specification {
 
         then:
         result == 'Version: HTTP_2_0'
+
+        when:"A post request is performed"
+        def response = client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
+                .blockingFirst()
+
+        then:
+        response.status() == HttpStatus.OK
+        response.body() == 'Version: HTTP_2_0 test'
+
+        when:"A post request is performed again"
+        response = client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
+                .blockingFirst()
+
+        then:
+        response.status() == HttpStatus.OK
+        response.body() == 'Version: HTTP_2_0 test'
 
         cleanup:
         server.close()
@@ -149,6 +171,11 @@ class Http2RequestSpec extends Specification {
         @Get(produces = MediaType.TEXT_HTML)
         String index(HttpRequest<?> request) {
             return "Version: ${request.httpVersion}"
+        }
+
+        @Post(processes =  MediaType.TEXT_PLAIN)
+        String post(HttpRequest<?> request, @Body String body) {
+            return "Version: ${request.httpVersion} " + body
         }
 
         @Get(value = '/stream', produces = MediaType.TEXT_PLAIN)

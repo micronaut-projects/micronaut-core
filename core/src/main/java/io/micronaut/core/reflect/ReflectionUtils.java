@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -80,19 +80,6 @@ public class ReflectionUtils {
                 put(Long.class, long.class);
                 put(Short.class, short.class);
                 put(Void.class, void.class);
-            }
-        });
-
-    private static final Map<Class<?>, Integer> PRIMITIVE_BYTE_SIZES =
-        Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Integer>() {
-            {
-                put(Byte.class, Byte.BYTES);
-                put(Character.class, Character.BYTES);
-                put(Double.class, Double.BYTES);
-                put(Float.class, Float.BYTES);
-                put(Integer.class, Integer.BYTES);
-                put(Long.class, Long.BYTES);
-                put(Short.class, Short.BYTES);
             }
         });
 
@@ -217,6 +204,7 @@ public class ReflectionUtils {
      * @param argumentTypes The argument types
      * @return An {@link Optional} contains the method or empty
      */
+    @Internal
     public static Optional<Method> findMethod(Class type, String name, Class... argumentTypes) {
         Class currentType = type;
         while (currentType != null) {
@@ -240,6 +228,7 @@ public class ReflectionUtils {
      * @return An {@link Optional} contains the method or empty
      */
     @UsedByGeneratedCode
+    @Internal
     public static Method getRequiredMethod(Class type, String name, Class... argumentTypes) {
         try {
             return type.getDeclaredMethod(name, argumentTypes);
@@ -293,6 +282,7 @@ public class ReflectionUtils {
      * @param name The name
      * @return An {@link Optional} contains the method or empty
      */
+    @Internal
     public static Field getRequiredField(Class type, String name) {
         try {
             return type.getDeclaredField(name);
@@ -309,6 +299,7 @@ public class ReflectionUtils {
      * @param name The field name
      * @return An {@link Optional} of field
      */
+    @Internal
     public static Optional<Field> findField(Class type, String name) {
         Optional<Field> declaredField = findDeclaredField(type, name);
         if (!declaredField.isPresent()) {
@@ -328,7 +319,9 @@ public class ReflectionUtils {
      * @param type  The type
      * @param name  The field name
      * @param value The value
+     * @deprecated This method uses reflection. Do not use.
      */
+    @Deprecated
     public static void setFieldIfPossible(Class type, String name, Object value) {
         Optional<Field> declaredField = findDeclaredField(type, name);
         if (declaredField.isPresent()) {

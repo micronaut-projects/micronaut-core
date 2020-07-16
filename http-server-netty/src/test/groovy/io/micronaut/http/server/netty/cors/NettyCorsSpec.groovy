@@ -252,6 +252,22 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         ex.response.header(VARY) == ORIGIN
     }
 
+    void "test control headers are applied to http error responses"() {
+        when:
+        rxClient.exchange(
+                HttpRequest.GET('/test/error-response')
+                        .header(ORIGIN, 'foo.com')
+        ).blockingFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.status == HttpStatus.BAD_REQUEST
+        ex.response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
+        ex.response.headers.getAll(ACCESS_CONTROL_ALLOW_ORIGIN).size() == 1
+        ex.response.header(VARY) == ORIGIN
+    }
+
+    @Override
     Map<String, Object> getConfiguration() {
         ['micronaut.server.cors.enabled': true,
         'micronaut.server.cors.configurations.foo.allowedOrigins': ['foo.com'],
@@ -287,6 +303,11 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         @Get("/error-checked")
         String errorChecked() {
             throw new IOException("error")
+        }
+
+        @Get("/error-response")
+        HttpResponse errorResponse() {
+            HttpResponse.badRequest()
         }
 
         @Error(exception = RuntimeException)

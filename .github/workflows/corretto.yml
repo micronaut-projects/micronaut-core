@@ -16,13 +16,13 @@ jobs:
     - name: Install tar && gzip
       run: yum install -y tar gzip
     - uses: actions/checkout@v2
-    - uses: actions/cache@v1
+    - uses: actions/cache@v2
       with:
         path: ~/.gradle/caches
         key: ${{ runner.os }}-micronaut-core-gradle-${{ hashFiles('**/*.gradle') }}
         restore-keys: |
           ${{ runner.os }}-micronaut-core-gradle-
-    - uses: actions/cache@v1
+    - uses: actions/cache@v2
       with:
         path: ~/.gradle/wrapper
         key: ${{ runner.os }}-micronaut-core-wrapper-${{ hashFiles('**/*.gradle') }}

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -25,10 +26,13 @@ import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.reactivex.Maybe;
+import io.reactivex.MaybeSource;
 import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -54,6 +58,12 @@ public class MaybeBodyBinder extends DefaultBodyAnnotationBinder<Maybe> implemen
         this.publisherBodyBinder = new PublisherBodyBinder(conversionService, httpContentProcessorResolver);
     }
 
+    @NonNull
+    @Override
+    public List<Class<?>> superTypes() {
+        return Collections.singletonList(MaybeSource.class);
+    }
+
     @Override
     public Argument<Maybe> argumentType() {
         return TYPE;
@@ -65,7 +75,7 @@ public class MaybeBodyBinder extends DefaultBodyAnnotationBinder<Maybe> implemen
         Collection<Argument<?>> typeVariables = context.getArgument().getTypeVariables().values();
 
         BindingResult<Publisher> result = publisherBodyBinder.bind(
-                ConversionContext.of(Argument.of(Publisher.class, (Argument[]) typeVariables.toArray(Argument.ZERO_ARGUMENTS))),
+                ConversionContext.of(Argument.of(Publisher.class, typeVariables.toArray(Argument.ZERO_ARGUMENTS))),
                 source
         );
         if (result.isPresentAndSatisfied()) {

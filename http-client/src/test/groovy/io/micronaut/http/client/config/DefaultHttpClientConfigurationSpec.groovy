@@ -22,6 +22,8 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.time.Duration
+//required because https://issues.apache.org/jira/browse/GROOVY-9566
+import java.net.Proxy
 
 class DefaultHttpClientConfigurationSpec extends Specification {
 

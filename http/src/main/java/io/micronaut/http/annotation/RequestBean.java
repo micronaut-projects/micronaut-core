@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,7 +22,6 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.bind.annotation.Bindable;
 
 /**
@@ -33,29 +32,7 @@ import io.micronaut.core.bind.annotation.Bindable;
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ ElementType.PARAMETER, ElementType.ANNOTATION_TYPE })
+@Target({ElementType.PARAMETER, ElementType.ANNOTATION_TYPE})
 @Bindable
 public @interface RequestBean {
-
-    /**
-     * @return The name of the parameter
-     */
-    @AliasFor(annotation = Bindable.class, member = "value")
-    @AliasFor(member = "name")
-    String value() default "";
-
-    /**
-     * @return The name of the parameter
-     */
-    @AliasFor(annotation = Bindable.class, member = "value")
-    @AliasFor(member = "value")
-    String name() default "";
-
-    /**
-     * @see Bindable#defaultValue()
-     * @return The default value
-     */
-    @AliasFor(annotation = Bindable.class, member = "defaultValue")
-    String defaultValue() default "";
-
 }

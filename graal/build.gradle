@@ -1,11 +1,12 @@
 dependencies {
     annotationProcessor project(":inject-java")
     api project(":inject")
-    api dependencyVersion("jackson.databind")
+    implementation "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
 
     testImplementation project(":inject")
     testImplementation project(":http")
     testImplementation project(":inject-java-test")
+    testImplementation dependencyModuleVersion("groovy", "groovy-json")
 
     testAnnotationProcessor project(":inject-java")
 }

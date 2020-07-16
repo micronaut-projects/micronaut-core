@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -130,7 +130,6 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         return element.toString();
     }
 
-
     /**
      * Returns a class element with aligned generic information.
      * @param typeMirror The type mirror
@@ -211,30 +210,23 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 return mirrorToClassElement(bound, visitorContext, genericsInfo);
             } else {
 
-                ClassElement classElement = mirrorToClassElement(upperBound, visitorContext, genericsInfo);
-                if (classElement != null) {
-                    return classElement;
-                } else {
-                    return mirrorToClassElement(tv.getLowerBound(), visitorContext, genericsInfo);
-                }
+                return mirrorToClassElement(upperBound, visitorContext, genericsInfo);
             }
 
         } else if (returnType instanceof ArrayType) {
             ArrayType at = (ArrayType) returnType;
             TypeMirror componentType = at.getComponentType();
             ClassElement arrayType = mirrorToClassElement(componentType, visitorContext, genericsInfo);
-            if (arrayType != null) {
-                if (arrayType instanceof JavaPrimitiveElement) {
-                    JavaPrimitiveElement jpe = (JavaPrimitiveElement) arrayType;
-                    return jpe.toArray();
-                } else {
-                    return new JavaClassElement((TypeElement) arrayType.getNativeType(), arrayType, visitorContext) {
-                        @Override
-                        public boolean isArray() {
-                            return true;
-                        }
-                    };
-                }
+            if (arrayType instanceof JavaPrimitiveElement) {
+                JavaPrimitiveElement jpe = (JavaPrimitiveElement) arrayType;
+                return jpe.toArray();
+            } else {
+                return new JavaClassElement((TypeElement) arrayType.getNativeType(), arrayType, visitorContext) {
+                    @Override
+                    public boolean isArray() {
+                        return true;
+                    }
+                };
             }
         } else if (returnType instanceof PrimitiveType) {
             PrimitiveType pt = (PrimitiveType) returnType;

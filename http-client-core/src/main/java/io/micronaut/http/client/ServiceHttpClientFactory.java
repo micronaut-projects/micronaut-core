@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package io.micronaut.http.client;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
@@ -121,7 +122,7 @@ public class ServiceHttpClientFactory {
                     }));
             };
         }
-        return null;
+        throw new DisabledBeanException("HTTP Client Health Check not enabled");
     }
 
 }

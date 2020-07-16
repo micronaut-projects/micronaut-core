@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -61,10 +61,8 @@ public class SessionWebSocketEventListener implements ApplicationEventListener<W
                 Session session = (Session) attributes;
                 if (session.isModified()) {
                     sessionStore.save(session).whenComplete((entries, throwable) -> {
-                        if (throwable != null) {
-                            if (LOG.isErrorEnabled()) {
-                                LOG.error("Error persisting session following WebSocket event: " + throwable.getMessage(), throwable);
-                            }
+                        if (throwable != null && LOG.isErrorEnabled()) {
+                            LOG.error("Error persisting session following WebSocket event: " + throwable.getMessage(), throwable);
                         }
                     });
                 }

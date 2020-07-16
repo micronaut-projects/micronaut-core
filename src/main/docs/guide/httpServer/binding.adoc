@@ -37,6 +37,10 @@ The following table summarizes the annotations, their purpose and provides an ex
 |link:{api}/io/micronaut/http/annotation/PathVariable.html[@PathVariable]
 |Binds from the path of the request
 |`@PathVariable String id`
+
+|link:{api}/io/micronaut/http/annotation/RequestBean.html[@RequestBean]
+|Binds any Bindable value to single Bean object
+|`@RequestBean MyBean bean`
 |===
 
 When a value is not specified to any binding annotation then the parameter name is used. In other words the following two methods are equivalent and both bind from a cookie called `myCookie`:
@@ -47,11 +51,30 @@ Because hyphens are not allowed in variable names it may be necessary to set the
 
 snippet::io.micronaut.docs.server.binding.BindingController[tags="header1,header2",indent=0]
 
-== Binding from Multiple values
+== Binding from Multiple Query values
 
 Instead of binding from a single section of the request, it may be desirable to bind all query values for example to a POJO. This can be achieved by using the exploded operator (`?pojo*`) in the URI template. For example:
 
 snippet::io.micronaut.docs.server.binding.BookmarkController[tags="imports,class", indent=0, title="Binding Request parameters to POJO"]
+
+== Binding from Multiple Bindable values
+
+Instead of binding just Query values, it is also possible to bind any Bindable value to POJO  (e.g. when you want to bind `HttpRequest`, `@PathVariable`, `@QueryValue` and `@Header` to single POJO).
+This can be achieved with `@RequestBean` annotation and custom Bean class that has fields with Bindable annotations or fields that can be bound by type (e.g. HttpRequest, BasicAuth, Authentication etc.).
+For example:
+
+snippet::io.micronaut.docs.server.binding.MovieTicketController[tags="class", indent=0, title="Binding Bindable values to POJO"]
+
+snippet::io.micronaut.docs.server.binding.MovieTicketBean[tags="class", indent=0, title="Bean definition"]
+
+Bean class has to be introspected with `@Introspected`. It can be one of:
+
+1. Mutable Bean class with setters and getters
+2. Immutable Bean class with getters and all argument constructor (or `@Creator` annotation on a constructor or static method).
+Arguments of constructor have to match field names so object can be constructed without reflection.
+
+WARNING: Since Java does not retain argument names in the byte code, you have to compile code with `-parameters` in case you want to use Immutable Bean class from another Jar.
+Another option is to extend Bean class in your source.
 
 == Bindable Types
 

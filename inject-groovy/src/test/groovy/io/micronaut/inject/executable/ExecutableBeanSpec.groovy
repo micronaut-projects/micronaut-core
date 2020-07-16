@@ -17,6 +17,7 @@ package io.micronaut.inject.executable
 
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
+import spock.lang.Ignore
 
 import java.util.function.Function
 
@@ -43,5 +44,27 @@ class ExecutableBean1 {
         definition != null
         definition.findMethod("round", float.class).get().returnType.type == int.class
 
+    }
+
+    void "bean definition should not be created for class with only executable methods"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+class MyBean {
+
+    @Executable
+    public int round(float num) {
+        return Math.round(num);
+    }
+}
+
+''')
+
+        expect:
+        definition == null
     }
 }

@@ -1,11 +1,10 @@
 dependencies {
     api project(":inject")
     api project(':aop')
-    api dependencyVersion("groovy")
+    api dependencyModuleVersion("groovy", "groovy")
 
-    testImplementation "junit:junit:4.13"
 //    testImplementation 'javax.validation:validation-api:1.1.0.Final'
-    testImplementation "org.hibernate:hibernate-core:5.4.15.Final"
+    testImplementation "org.hibernate:hibernate-core:5.4.18.Final"
     testImplementation 'org.hibernate:hibernate-validator:6.0.13.Final'
     testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'
     testRuntimeOnly 'org.glassfish:javax.el:3.0.1-b11'
@@ -14,6 +13,10 @@ dependencies {
     testImplementation project(":validation")
     testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
+}
+
+test {
+    exclude '**/*$_closure*'
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

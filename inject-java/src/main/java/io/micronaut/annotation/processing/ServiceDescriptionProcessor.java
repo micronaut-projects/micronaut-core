@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,8 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.util.StringUtils;
 
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
@@ -55,26 +55,23 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
             for (Element element : elements) {
                 if (element instanceof TypeElement) {
                     String name = ((TypeElement) element).getQualifiedName().toString();
-                    AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(element);
-                    String serviceName = annotationMetadata.stringValue(
-                            Generated.class,
-                            "service"
-                    ).orElse(null);
-
-                    if (serviceName != null) {
-                        serviceDescriptors.computeIfAbsent(serviceName, s1 -> new HashSet<>())
-                                .add(name);
+                    Generated generated = element.getAnnotation(Generated.class);
+                    if (generated != null) {
+                        String serviceName = generated.service();
+                        if (StringUtils.isNotEmpty(serviceName)) {
+                            serviceDescriptors.computeIfAbsent(serviceName, s1 -> new HashSet<>())
+                                    .add(name);
+                        }
                     }
+
                 }
 
             }
         }
-        if (roundEnv.processingOver()) {
-            if (!serviceDescriptors.isEmpty()) {
-                classWriterOutputVisitor.writeServiceEntries(
-                        serviceDescriptors
-                );
-            }
+        if (roundEnv.processingOver() && !serviceDescriptors.isEmpty()) {
+            classWriterOutputVisitor.writeServiceEntries(
+                    serviceDescriptors
+            );
         }
         return true;
     }

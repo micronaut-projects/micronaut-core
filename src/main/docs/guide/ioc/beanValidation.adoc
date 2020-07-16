@@ -9,7 +9,7 @@ The following features are unsupported at this time:
 * Annotations on generic argument types since only the Java language supports this feature.
 * Any interaction with the https://beanvalidation.org/2.0/spec/#constraintmetadata[constraint metadata API], since Micronaut uses already computed compilation time metadata.
 * XML-based configuration
-* Instead of using `javax.validation.ConstraintValidator` you should use api:validation.validator.constraints.ConstraintValidator[] (io.micronaut.validation.validator.constraints.ConstraintValidator) to define custom constraints, which supports validating annotations as compilation time.
+* Instead of using `javax.validation.ConstraintValidator` you should use api:validation.validator.constraints.ConstraintValidator[] (io.micronaut.validation.validator.constraints.ConstraintValidator) to define custom constraints, which supports validating annotations at compilation time.
 
 Micronaut's implementation includes the following benefits:
 
@@ -23,7 +23,7 @@ Micronaut's implementation includes the following benefits:
 
 If you require full Bean Validator 2.0 compliance you can add the `micronaut-hibernate-validator` module to your classpath, which will replace Micronaut's implementation.
 
-dependency:micronaut-hibernate-validator[groupId="io.micronaut.configuration"]
+dependency:micronaut-hibernate-validator[groupId="io.micronaut.beanvalidation"]
 
 === Validating Bean Methods
 
