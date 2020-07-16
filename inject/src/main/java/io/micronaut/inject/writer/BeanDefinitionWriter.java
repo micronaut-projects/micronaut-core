@@ -15,6 +15,8 @@
  */
 package io.micronaut.inject.writer;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.exceptions.BeanContextException;
@@ -38,9 +40,6 @@ import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
-
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 
 import javax.inject.Scope;
 import javax.inject.Singleton;
@@ -152,7 +151,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final Type beanType;
     private final Type providedType;
     private final Set<Class> interfaceTypes;
-    private final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
+    private final Map<String, GeneratorAdapter> loadTypeMethods = new LinkedHashMap<>();
     private final Map<String, ExecutableMethodWriter> methodExecutors = new LinkedHashMap<>();
     private final String providedBeanClassName;
     private final String packageName;
@@ -282,7 +281,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.beanType = getTypeReference(beanFullClassName);
         this.providedType = getTypeReference(providedBeanClassName);
         this.beanDefinitionInternalName = getInternalName(this.beanDefinitionName);
-        this.interfaceTypes = new HashSet<>();
+        this.interfaceTypes = new LinkedHashSet<>();
         this.interfaceTypes.add(BeanFactory.class);
         this.isConfigurationProperties = annotationMetadata.hasDeclaredStereotype(ConfigurationProperties.class);
     }
