@@ -279,7 +279,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.beanType = getTypeReference(beanFullClassName);
         this.providedType = getTypeReference(providedBeanClassName);
         this.beanDefinitionInternalName = getInternalName(this.beanDefinitionName);
-        this.interfaceTypes = new LinkedHashSet<>();
+        this.interfaceTypes = new TreeSet<>(Comparator.comparing(Class::getName));
         this.interfaceTypes.add(BeanFactory.class);
         this.isConfigurationProperties = annotationMetadata.hasDeclaredStereotype(ConfigurationProperties.class);
     }
