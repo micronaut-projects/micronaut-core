@@ -16,10 +16,16 @@
 package io.micronaut.http.client
 
 import io.micronaut.core.io.buffer.ByteBufferFactory
+import io.micronaut.core.io.buffer.ReferenceCounted
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.codec.CodecException
+import io.micronaut.http.multipart.PartData
+import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.reactivex.Single
@@ -35,12 +41,15 @@ import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
+import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import javax.inject.Inject
-import javax.print.attribute.standard.Media
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * @author graemerocher
@@ -170,6 +179,36 @@ class DataStreamSpec extends Specification {
         data == [188309,188310] as byte[]
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1286")
+    void "test returning a stream and sending a multipart request"() {
+        def requestBody = MultipartBody.builder()
+                .addPart(
+                        "data",
+                        "randomFileName.dat",
+                        MediaType.APPLICATION_OCTET_STREAM_TYPE,
+                        new byte[4096]
+                )
+
+        def request = HttpRequest.POST("/datastream/upload", requestBody)
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                .accept(MediaType.TEXT_PLAIN_TYPE)
+
+        HttpResponse response
+        String body
+        client.exchangeStream(request)
+                .doOnNext(resp -> {
+                    response = resp
+                    body = new String(resp.body().toByteArray())
+                })
+                .subscribe()
+
+        expect:
+        new PollingConditions(timeout: 3).eventually {
+            assert response.status() == HttpStatus.OK
+            assert body == "Read 4096 bytes"
+        }
+    }
+
     static class Book {
         String title
     }
@@ -191,6 +230,39 @@ class DataStreamSpec extends Specification {
         @Get(uri = "/data", produces = MediaType.TEXT_PLAIN)
         byte[] data() {
             [188309,188310] as byte[]
+        }
+
+        @Post(uri = "/upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+        Single<HttpResponse<String>> test(StreamingFileUpload data) {
+            AtomicInteger bytes = new AtomicInteger()
+
+            Single.<HttpResponse<String>>create { emitter ->
+                data.subscribe(new Subscriber<PartData>() {
+                    private Subscription s
+
+                    @Override
+                    void onSubscribe(Subscription s) {
+                        this.s = s
+                        s.request(1)
+                    }
+
+                    @Override
+                    void onNext(PartData partData) {
+                        bytes.addAndGet(partData.bytes.length)
+                        s.request(1)
+                    }
+
+                    @Override
+                    void onError(Throwable t) {
+                        emitter.onError(t)
+                    }
+
+                    @Override
+                    void onComplete() {
+                        emitter.onSuccess(HttpResponse.ok("Read ${bytes.get()} bytes".toString()))
+                    }
+                })
+            }
         }
     }
 }
