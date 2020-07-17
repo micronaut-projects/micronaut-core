@@ -1367,6 +1367,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     outgoingResponse = newNotFoundError(request);
                 }
             } else {
+                HttpStatus defaultHttpStatus = isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK;
                 boolean isReactive = finalRoute.isAsyncOrReactive() || Publishers.isConvertibleToPublisher(body);
                 if (isReactive) {
                     Class<?> bodyClass = body.getClass();
@@ -1389,7 +1390,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (o instanceof MutableHttpResponse) {
                                     singleResponse = (MutableHttpResponse<?>) o;
                                 } else {
-                                    singleResponse = forStatus(routeMatch.getAnnotationMetadata(), isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK)
+                                    singleResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
                                             .body(o);
                                 }
                             }
@@ -1407,49 +1408,48 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 routeMatch instanceof MethodBasedRouteMatch &&
                                         isKotlinFunctionReturnTypeUnit(((MethodBasedRouteMatch) routeMatch).getExecutableMethod());
                         final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(incomingRequest);
-                        Object suspendedBody;
                         if (isKotlinCoroutineSuspended(body)) {
-                            if (isKotlinFunctionReturnTypeUnit) {
-                                suspendedBody = Completable.create(emitter -> {
-                                    CompletableFuture<?> f = supplier.get();
-                                    f.whenComplete((BiConsumer<Object, Throwable>) (o, throwable) -> {
-                                        if (throwable != null) {
-                                            emitter.onError(throwable);
+                            return Flowable.create(emitter -> {
+                                CompletableFuture<?> f = supplier.get();
+                                f.whenComplete((o, throwable) -> {
+                                    if (throwable != null) {
+                                        emitter.onError(throwable);
+                                    } else {
+                                        MutableHttpResponse<?> response;
+                                        if (o instanceof MutableHttpResponse) {
+                                            response = (MutableHttpResponse<?>) o;
                                         } else {
-                                            emitter.onComplete();
+                                            response = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus);
+                                            if (!isKotlinFunctionReturnTypeUnit) {
+                                                response = response.body(o);
+                                            }
                                         }
-                                    });
+                                        response.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
+                                        emitter.onNext(response);
+                                        emitter.onComplete();
+                                    }
                                 });
-                            } else {
-                                suspendedBody = Single.create(emitter -> {
-                                    CompletableFuture<?> f = supplier.get();
-                                    f.whenComplete((BiConsumer<Object, Throwable>) (o, throwable) -> {
-                                        if (throwable != null) {
-                                            emitter.onError(throwable);
-                                        } else {
-                                            emitter.onSuccess(o);
-                                        }
-                                    });
-                                });
-                            }
+                            }, BackpressureStrategy.ERROR);
                         } else {
+                            Object suspendedBody;
                             if (isKotlinFunctionReturnTypeUnit) {
                                 suspendedBody = Completable.complete();
                             } else {
                                 suspendedBody = body;
                             }
+                            if (suspendedBody instanceof MutableHttpResponse) {
+                                outgoingResponse = (MutableHttpResponse<?>) suspendedBody;
+                            } else {
+                                outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
+                                        .body(suspendedBody);
+                            }
                         }
-                        if (suspendedBody instanceof MutableHttpResponse) {
-                            outgoingResponse = (MutableHttpResponse<?>) suspendedBody;
-                        } else {
-                            outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK)
-                                    .body(suspendedBody);
-                        }
+
                     } else {
                         if (body instanceof MutableHttpResponse) {
                             outgoingResponse = (MutableHttpResponse<?>) body;
                         } else {
-                            outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK)
+                            outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
                                     .body(body);
                         }
                     }

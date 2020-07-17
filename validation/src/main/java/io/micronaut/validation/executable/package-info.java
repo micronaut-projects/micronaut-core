@@ -13,17 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.qualifiers.composite;
-
-import javax.inject.Singleton;
-import javax.inject.Named;
-
-@Singleton
-@Named("thread")
-public class Runner implements Runnable {
-
-    @Override
-    public void run() {
-
-    }
-}
+/**
+ * Package to organize classes responsible for validating executable methods at compile time.
+ */
+package io.micronaut.validation.executable;
