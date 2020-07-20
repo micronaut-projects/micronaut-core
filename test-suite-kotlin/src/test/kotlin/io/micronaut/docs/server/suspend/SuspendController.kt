@@ -17,11 +17,24 @@ package io.micronaut.docs.server.suspend
 
 import io.micronaut.http.*
 import io.micronaut.http.annotation.*
+import io.micronaut.scheduling.TaskExecutors
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.atomic.AtomicInteger
+import javax.inject.Named
 
 @Controller("/suspend")
-class SuspendController {
+class SuspendController(@Named(TaskExecutors.IO) private val executor: ExecutorService) {
+
+    private val coroutineDispatcher: CoroutineDispatcher
+
+    init {
+        coroutineDispatcher = executor.asCoroutineDispatcher()
+    }
 
     // tag::suspend[]
     @Get("/simple")
@@ -69,6 +82,13 @@ class SuspendController {
     @Get("/illegal")
     suspend fun illegal(): Unit {
         throw IllegalArgumentException()
+    }
+
+    @Get("/illegalWithContext")
+    suspend fun illegalWithContext(): String {
+        return withContext(coroutineDispatcher) {
+            throw IllegalArgumentException()
+        }
     }
 
     @Status(HttpStatus.BAD_REQUEST)

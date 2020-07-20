@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,7 +40,6 @@ public final class StringUtils {
      * Constant for an empty String array.
      */
     public static final String[] EMPTY_STRING_ARRAY = new String[0];
-
 
     /**
      * Constant for an empty String.
@@ -235,10 +234,8 @@ public final class StringUtils {
         if (dottedProperty == null) {
             return dottedProperty;
         }
-        Optional<String> converted = Optional.of(dottedProperty)
-            .map(value -> value.replace('.', '_'))
-            .map(value -> uppercase ? value.toUpperCase() : value);
-        return converted.get();
+        dottedProperty = dottedProperty.replace('.', '_');
+        return uppercase ?  dottedProperty.toUpperCase() : dottedProperty;
     }
 
     /**

@@ -588,7 +588,6 @@ class AnnotationClassReader {
      */
     private int readAnnotationValue(int v, final char[] buf, final String name,
                                     final AnnotationVisitor av) {
-        int i;
         if (av == null) {
             switch (b[v] & 0xFF) {
                 case 'e': // enum_const_value
@@ -601,6 +600,7 @@ class AnnotationClassReader {
                     return v + 3;
             }
         }
+        int i;
         switch (b[v++] & 0xFF) {
             case 'I': // pointer to CONSTANT_Integer
             case 'J': // pointer to CONSTANT_Long
@@ -817,7 +817,6 @@ class AnnotationClassReader {
         }
         return new Attribute(type).read(this, off, len, null, -1, null);
     }
-
 
     /**
      * Reads a byte value in {@link #b b}. <i>This method is intended for

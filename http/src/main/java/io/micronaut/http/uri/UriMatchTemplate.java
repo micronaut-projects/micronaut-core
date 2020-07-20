@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -145,6 +145,9 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         int parameterIndex = uri.indexOf('?');
         if (parameterIndex > -1) {
             uri = uri.substring(0, parameterIndex);
+        }
+        if (uri.endsWith("/")) {
+            uri = uri.substring(0, uri.length() - 1);
         }
         Matcher matcher = matchPattern.matcher(uri);
         if (matcher.matches()) {

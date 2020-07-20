@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -669,14 +669,14 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                         case ';':
                                             encode = true;
                                             repeatPrefix = true;
-                                            prefix = String.valueOf(operator) + val + '=';
+                                            prefix = operator + val + '=';
                                             delimiter = modifier == EXPAND_MODIFIER ? prefix : ",";
                                             break;
                                         case QUERY_OPERATOR:
                                         case AND_OPERATOR:
                                             encode = true;
                                             repeatPrefix = true;
-                                            prefix = varCount < 1 ? String.valueOf(operator) + val + '=' : val + "=";
+                                            prefix = varCount < 1 ? operator + val + '=' : val + "=";
                                             delimiter = modifier == EXPAND_MODIFIER ? AND_OPERATOR + val + '=' : ",";
                                             break;
                                         default:
@@ -1069,17 +1069,14 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
 
             private String applyModifier(String modifierStr, char modifierChar, String result, int len) {
-                if (modifierChar == ':' && modifierStr.length() > 0) {
-                    if (Character.isDigit(modifierStr.charAt(0))) {
-                        try {
-                            int subResult = Integer.parseInt(modifierStr.trim(), 10);
-                            if (subResult < len) {
-                                result = result.substring(0, subResult);
-                            }
-                        } catch (NumberFormatException e) {
-                            result = ":" + modifierStr;
+                if (modifierChar == ':' && modifierStr.length() > 0 && Character.isDigit(modifierStr.charAt(0))) {
+                    try {
+                        int subResult = Integer.parseInt(modifierStr.trim(), 10);
+                        if (subResult < len) {
+                            result = result.substring(0, subResult);
                         }
-
+                    } catch (NumberFormatException e) {
+                        result = ":" + modifierStr;
                     }
                 }
                 return result;

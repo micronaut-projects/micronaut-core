@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -48,7 +48,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
 
     private static final MediaType[] DEFAULT_MEDIA_TYPES = {MediaType.APPLICATION_JSON_TYPE};
     private final Map<Class, Consumer<RouteDefinition>> httpMethodsHandlers = new LinkedHashMap<>();
-    
+
     /**
      * @param executionHandleLocator The execution handler locator
      * @param uriNamingStrategy The URI naming strategy
@@ -297,10 +297,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                     Class exceptionType = null;
                     if (method.isPresent(Error.class, AnnotationMetadata.VALUE_MEMBER)) {
                         Optional<Class> annotationValue = method.classValue(Error.class);
-                        if (annotationValue.isPresent()) {
-                            if (Throwable.class.isAssignableFrom(annotationValue.get())) {
-                                exceptionType = annotationValue.get();
-                            }
+                        if (annotationValue.isPresent() && Throwable.class.isAssignableFrom(annotationValue.get())) {
+                            exceptionType = annotationValue.get();
                         }
                     }
                     if (exceptionType == null) {

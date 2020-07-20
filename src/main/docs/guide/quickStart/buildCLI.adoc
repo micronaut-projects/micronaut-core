@@ -1,1 +1,3 @@
 The best way to install Micronaut on Unix systems is with http://sdkman.io/[SDKMAN] which greatly simplifies installing and managing multiple Micronaut versions.
+
+To see all the available installation methods, check the https://micronaut-projects.github.io/micronaut-starter/latest/guide/#installation[Micronaut Starter documentation].

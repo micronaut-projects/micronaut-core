@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -74,7 +74,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     private static final String RESOURCE_CONFIG_JSON = "resource-config.json";
     private static final String RESOURCES_DIR = "src/main/resources";
     private static final String RESOURCES = "resources";
-    private static final String BUNDLES = "bundles";
     private static final String PATTERN = "pattern";
     private static final String META_INF = "META-INF";
     private static final List<String> EXCLUDED_META_INF_DIRECTORIES = Arrays.asList("native-image", "services");
@@ -82,8 +81,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     private static final String BASE_REFLECT_JSON = "src/main/graal/reflect.json";
 
     private static final String ALL_PUBLIC_METHODS = "allPublicMethods";
-
-    private static final String ALL_PUBLIC_FIELDS = "allPublicFields";
 
     private static final String ALL_DECLARED_FIELDS = "allDeclaredFields";
 
@@ -127,7 +124,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                         TypeHint.class,
                         "typeNames",
                         String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY
-                    )
+                        )
                 );
             }
         }
@@ -166,10 +163,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     @SuppressWarnings("unchecked")
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
-        if (!isSubclass) {
-            if (element.hasDeclaredStereotype(ReflectiveAccess.class)) {
-                processMethodElement(element);
-            }
+        if (!isSubclass && element.hasDeclaredStereotype(ReflectiveAccess.class)) {
+            processMethodElement(element);
         }
     }
 
@@ -236,7 +231,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private void generateNativeImageProperties(VisitorContext visitorContext) {
         List<Map> json;
-        ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
 
         Optional<Path> projectDir = visitorContext.getProjectDir();
 
@@ -286,6 +280,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     ));
                 }
 
+                ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
                 try (Writer w = gf.openWriter()) {
                     visitorContext.info("Writing " + REFLECTION_CONFIG_JSON + " file to destination: " + gf.getName());
 
@@ -329,15 +324,16 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
                     final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(resourcesFile);
                     generatedFile.ifPresent(gf -> {
+                        resourceFiles.addAll(fetchAdditionalResources(visitorContext));
+
                         List<Map> resourceList = resourceFiles.stream()
-                                .map(resourceFile -> CollectionUtils.mapOf(PATTERN, "\\Q" + resourceFile + "\\E"))
+                                .map(this::mapToGraalResource)
                                 .collect(Collectors.toList());
 
                         // add any existing resource defined by the user in it's own file in src/main/graal
                         resourceList.addAll((List) json.getOrDefault(RESOURCES, Collections.EMPTY_LIST));
 
                         json.put(RESOURCES, resourceList);
-                        json.put(BUNDLES, Collections.emptyList());
 
                         try (Writer w = gf.openWriter()) {
                             visitorContext.info("Writing " + RESOURCE_CONFIG_JSON + " file to destination: " + gf.getName());
@@ -352,6 +348,25 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 visitorContext.fail("There was an error generating " + RESOURCE_CONFIG_JSON + ": " + e.getMessage(), null);
             }
         }
+    }
+
+    private List<String> fetchAdditionalResources(VisitorContext visitorContext) {
+        // If swagger (openapi) is present, add the appropriate metadata to expose the yml file an the UI
+        return visitorContext.getClassElement("io.swagger.v3.oas.annotations.info.Info")
+                .map(classElement -> Arrays.asList(
+                        ".*/swagger/.*yml",
+                        "META-INF/swagger",
+                        "META-INF/swagger/views/rapidoc/index.html",
+                        "META-INF/swagger/views/redoc/index.html",
+                        "META-INF/swagger/views/swagger-ui/index.html"
+                ))
+                .orElse(Collections.emptyList());
+    }
+
+    private Map mapToGraalResource(String resourceName) {
+        return resourceName.contains("*") ?
+                CollectionUtils.mapOf(PATTERN, resourceName) :
+                CollectionUtils.mapOf(PATTERN, "\\Q" + resourceName + "\\E");
     }
 
     private Set<String> findResourceFiles(File folder, List<String> filePath) {

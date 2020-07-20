@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -66,6 +66,7 @@ class CompletableFuturePublisher<T> implements Publisher<T> {
         /**
          * @param n Number of elements to request to the upstream
          */
+        @Override
         public synchronized void request(long n) {
             if (n != 0 && !completed.get()) {
                 if (n < 0) {
@@ -101,11 +102,10 @@ class CompletableFuturePublisher<T> implements Publisher<T> {
         /**
          * Request the publisher to stop sending data and clean up resources.
          */
+        @Override
         public synchronized void cancel() {
-            if (completed.compareAndSet(false, true)) {
-                if (future != null) {
-                    future.cancel(false);
-                }
+            if (completed.compareAndSet(false, true) && future != null) {
+                future.cancel(false);
             }
         }
     }

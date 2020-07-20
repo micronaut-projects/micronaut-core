@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -115,6 +115,7 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -211,7 +212,7 @@ public class DefaultHttpClient implements
      * @param annotationMetadataResolver The annotation metadata resolver
      * @param filters                    The filters to use
      */
-    public DefaultHttpClient(LoadBalancer loadBalancer,
+    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              HttpClientConfiguration configuration,
                              @Nullable String contextPath,
                              @Nullable ThreadFactory threadFactory,
@@ -383,7 +384,7 @@ public class DefaultHttpClient implements
      */
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
         this(
-                LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+                url == null ? null : LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
@@ -1479,7 +1480,6 @@ public class DefaultHttpClient implements
                 ByteBuf bodyContent = null;
                 if (hasBody) {
                     Object bodyValue = body.get();
-
                     if (Publishers.isConvertibleToPublisher(bodyValue)) {
                         boolean isSingle = Publishers.isSingle(bodyValue.getClass());
 
@@ -1576,7 +1576,12 @@ public class DefaultHttpClient implements
                     }
                 }
                 request.body(bodyContent);
-                nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+                try {
+                    nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+                } finally {
+                    // reset body after encoding request in case of retry
+                    request.body(body.orElse(null));
+                }
             }
         } else {
             nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
@@ -2992,7 +2997,8 @@ public class DefaultHttpClient implements
         private void processRequestWrite(Channel channel, ChannelPool channelPool, FlowableEmitter<?> emitter, ChannelPipeline pipeline) {
             ChannelFuture channelFuture;
             if (encoder != null && encoder.isChunked()) {
-                pipeline.replace(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
+                channel.attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).set(true);
+                pipeline.addAfter(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
                 channel.write(nettyRequest);
                 channelFuture = channel.writeAndFlush(encoder);
             } else {
@@ -3025,6 +3031,7 @@ public class DefaultHttpClient implements
                     if (encoder != null) {
                         encoder.cleanFiles();
                     }
+                    channel.attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).set(null);
                     if (closeChannelAfterWrite) {
                         closeChannelAsync(channel);
                     }

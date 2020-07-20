@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,12 +30,14 @@ import io.netty.handler.codec.http.HttpHeaders;
  * @since 2.0
  */
 final class ElapseTimeElement implements LogElement {
+
     /**
-     * The elapse time marker (seconds.)
+     * The elapse time marker (seconds).
      */
     public static final String ELAPSE_TIME_SECONDS = "T";
+
     /**
-     * The elapse time marker (milliseconds.)
+     * The elapse time marker (milliseconds).
      */
     public static final String ELAPSE_TIME_MILLIS = "D";
 

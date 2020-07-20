@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -83,6 +83,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @param path The path to the file
      * @return An optional file it was possible to create it
      */
+    @Override
     @Experimental
     Optional<GeneratedFile> visitMetaInfFile(String path);
 
@@ -92,6 +93,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @param path The path to the file
      * @return An optional file it was possible to create it
      */
+    @Override
     @Experimental
     Optional<GeneratedFile> visitGeneratedFile(String path);
 

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,8 +46,6 @@ public interface DecimalMaxValidator<T> extends ConstraintValidator<DecimalMax, 
                                 .orElseThrow(() -> new ValidationException(s + " does not represent a valid BigDecimal format.")))
                 .orElseThrow(() -> new ValidationException("null does not represent a valid BigDecimal format."));
 
-        final boolean inclusive = annotationMetadata.get("inclusive", boolean.class).orElse(true);
-
 
         int result;
         try {
@@ -55,6 +53,7 @@ public interface DecimalMaxValidator<T> extends ConstraintValidator<DecimalMax, 
         } catch (NumberFormatException nfe) {
             return false;
         }
+        final boolean inclusive = annotationMetadata.get("inclusive", boolean.class).orElse(true);
         return inclusive ? result <= 0 : result < 0;
     }
 

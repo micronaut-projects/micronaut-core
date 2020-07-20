@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,7 +35,7 @@ import io.netty.channel.socket.SocketChannel;
 /**
  * The access log format parser.
  *
- * The syntax is based on <a href="http://httpd.apache.org/docs/current/mod/mod_log_config.html">Apache httpd log format</a>.
+ * The syntax is based on <a href="https://httpd.apache.org/docs/current/mod/mod_log_config.html">Apache httpd log format</a>.
  * Here are the supported directives:
  * <ul>
  * <li><b>%a</b> - Remote IP address</li>

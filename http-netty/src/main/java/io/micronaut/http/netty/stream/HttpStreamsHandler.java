@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,6 +43,7 @@ import java.util.Queue;
 abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessage> extends ChannelDuplexHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpStreamsHandler.class);
+    public static final String HANDLER_BODY_PUBLISHER = "http-streams-codec-body-publisher";
     private final Queue<Outgoing> outgoing = new LinkedList<>();
     private final Class<In> inClass;
     private final Class<Out> outClass;
@@ -220,7 +221,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                     }
                 };
 
-                ctx.channel().pipeline().addAfter(ctx.name(), ctx.name() + "-body-publisher", publisher);
+                ctx.channel().pipeline().addAfter(ctx.name(), HANDLER_BODY_PUBLISHER, publisher);
                 ctx.fireChannelRead(createStreamedMessage(inMsg, publisher));
             }
         } else if (msg instanceof HttpContent) {
@@ -245,19 +246,23 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     private void handleReadHttpContent(ChannelHandlerContext ctx, HttpContent content) {
         if (!ignoreBodyRead) {
-            ctx.fireChannelRead(content);
-
-            if (content instanceof LastHttpContent) {
-                removeHandlerIfActive(ctx, ctx.name() + "-body-publisher");
-                currentlyStreamedMessage = null;
-                consumedInMessage(ctx);
+            ChannelHandler bodyPublisher = ctx.pipeline().get(HANDLER_BODY_PUBLISHER);
+            if (bodyPublisher != null) {
+                ctx.fireChannelRead(content);
+                if (content instanceof LastHttpContent) {
+                    removeHandlerIfActive(ctx, HANDLER_BODY_PUBLISHER);
+                    currentlyStreamedMessage = null;
+                    consumedInMessage(ctx);
+                }
+            } else {
+                ReferenceCountUtil.release(content, content.refCnt());
             }
         } else {
             ReferenceCountUtil.release(content, content.refCnt());
             if (content instanceof LastHttpContent) {
                 ignoreBodyRead = false;
                 if (currentlyStreamedMessage != null) {
-                    removeHandlerIfActive(ctx, ctx.name() + "-body-publisher");
+                    removeHandlerIfActive(ctx, HANDLER_BODY_PUBLISHER);
                 }
                 currentlyStreamedMessage = null;
             }

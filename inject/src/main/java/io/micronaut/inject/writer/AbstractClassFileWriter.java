@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -198,7 +198,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return classReference;
     }
 
-
     /**
      * Pushes type arguments onto the stack.
      *
@@ -255,7 +254,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 METHOD_CREATE_ARGUMENT_SIMPLE
         );
     }
-
 
     /**
      * Builds generic type arguments recursively.
@@ -475,7 +473,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 if (CollectionUtils.isNotEmpty(subArgs)) {
                     Map<String, Object> m = toTypeArguments(subArgs, visitedTypes);
                     if (CollectionUtils.isNotEmpty(m)) {
-                        map.put(entry.getKey(), m);
+                        map.put(entry.getKey(), Collections.singletonMap(getTypeForElement(ce), m));
                     } else {
                         map.put(entry.getKey(), Collections.singletonMap(entry.getKey(), className));
                     }
@@ -914,11 +912,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             return NAME_TO_TYPE_MAP.get(className);
         } else {
             String internalName = getInternalName(className);
-            StringBuilder start;
+            StringBuilder start = new StringBuilder(40);
             if (className.endsWith("[]")) {
-                start = new StringBuilder("[L" + internalName);
+                start.append("[L").append(internalName);
             } else {
-                start = new StringBuilder('L' + internalName);
+                start.append('L').append(internalName);
             }
             if (genericTypes != null && genericTypes.length > 0) {
                 start.append('<');
@@ -944,7 +942,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             builder.append(getTypeDescriptor(argumentType));
         }
 
-        builder.append(")");
+        builder.append(')');
 
         builder.append(getTypeDescriptor(returnType));
         return builder.toString();
@@ -963,7 +961,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             builder.append(getTypeDescriptor(argumentType));
         }
 
-        builder.append(")");
+        builder.append(')');
 
         builder.append(getTypeDescriptor(returnType));
         return builder.toString();
@@ -982,7 +980,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             builder.append(argumentType);
         }
 
-        builder.append(")");
+        builder.append(')');
 
         builder.append(returnTypeReference);
         return builder.toString();

@@ -1,6 +1,6 @@
 The Micronaut CLI is the recommended way to create new Micronaut projects. The CLI includes commands for generating specific categories of projects, allowing you to choose between build tools, test frameworks, and even pick the language you wish to use in your application. The CLI also provides commands for generating artifacts such as controllers, client interfaces, and serverless functions.
 
-TIP: We have a website that can be used to generate projects instead of the CLI. Check out https://micronaut.io/start[Micronaut Launch] to get started!
+TIP: We have a website that can be used to generate projects instead of the CLI. Check out https://micronaut.io/launch[Micronaut Launch] to get started!
 
 When <<buildCLI, Micronaut is installed on your computer>>, you can call the CLI with the `mn` command.
 

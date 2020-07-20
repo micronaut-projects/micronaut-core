@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,7 @@
  */
 package io.micronaut.jackson.codec;
 
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -39,8 +39,8 @@ public final class JacksonFeatures {
      * Empty jackson features.
      */
     public JacksonFeatures() {
-        this.serializationFeatures = new HashMap<>();
-        this.deserializationFeatures = new HashMap<>();
+        this.serializationFeatures = new EnumMap<>(SerializationFeature.class);
+        this.deserializationFeatures = new EnumMap<>(DeserializationFeature.class);
     }
 
     /**

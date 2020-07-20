@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -82,7 +82,7 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         Optional<String> optionalId = beanDefinition.stringValue(Endpoint.class);
-        optionalId.ifPresent((id) -> {
+        optionalId.ifPresent(id -> {
             boolean sensitive;
             if (method.hasDeclaredAnnotation(Sensitive.class)) {
                 String prefix = beanDefinition.stringValue(Endpoint.class, "prefix").orElse(Endpoint.DEFAULT_PREFIX);
@@ -98,7 +98,7 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
                 });
             } else {
                 EndpointConfiguration configuration = endpointConfigurations.stream()
-                        .filter((c) -> c.getId().equals(id))
+                        .filter(c -> c.getId().equals(id))
                         .findFirst()
                         .orElseGet(() -> new EndpointConfiguration(id, defaultConfiguration));
 

@@ -18,6 +18,10 @@ dependencies {
     testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.7'
     testImplementation group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.7'
 
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
@@ -26,12 +30,24 @@ dependencies {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-http'
     }
+
+    // following 3 dependencies needed for Http2PostTest
+    testImplementation 'io.vertx:vertx-core:3.9.1'
+    testImplementation 'io.vertx:vertx-web-client:3.9.1'
+    testImplementation group: 'org.eclipse.jetty', name: 'jetty-alpn-openjdk8-client', version: '9.4.30.v20200611'
+
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation dependencyModuleVersion("groovy", "groovy-templates")
     testImplementation dependencyVersion("rxjava2")
     testImplementation(dependencyModuleVersion("netty", "netty-transport-native-epoll") + ":linux-x86_64")
     testImplementation(dependencyModuleVersion("netty", "netty-transport-native-kqueue") + ":osx-x86_64")
     testImplementation "ch.qos.logback:logback-classic:1.2.3"
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+    // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
+    testImplementation("org.junit.jupiter:junit-jupiter-api:$junit5Version")
 }
 
 //tasks.withType(Test) {

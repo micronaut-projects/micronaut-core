@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,6 +26,7 @@ public class V8Engine extends GasEngine {
         publicNoArgsConstructorInjected = true;
     }
 
+    @Override
     @Inject void injectPackagePrivateMethod() {
         if (subPackagePrivateMethodInjected) {
             overriddenPackagePrivateMethodInjectedTwice = true;
@@ -36,6 +37,7 @@ public class V8Engine extends GasEngine {
     /**
      * Qualifiers are swapped from how they appear in the superclass.
      */
+    @Override
     public void injectQualifiers(Seat seatA, @Drivers Seat seatB,
             Tire tireA, @Named("spare") Tire tireB) {
         if ((seatA instanceof DriversSeat)
@@ -46,15 +48,18 @@ public class V8Engine extends GasEngine {
         }
     }
 
+    @Override
     void injectPackagePrivateMethodForOverride() {
         subPackagePrivateMethodForOverrideInjected = true;
     }
 
+    @Override
     @Inject
     public void injectTwiceOverriddenWithOmissionInMiddle() {
         overriddenTwiceWithOmissionInMiddleInjected = true;
     }
 
+    @Override
     public void injectTwiceOverriddenWithOmissionInSubclass() {
         overriddenTwiceWithOmissionInSubclassInjected = true;
     }

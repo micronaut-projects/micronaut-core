@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -259,7 +259,6 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     @UsedByGeneratedCode
     public static Interceptor[] resolveIntroductionInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
-        Interceptor[] aroundInterceptors = resolveAroundInterceptors(beanContext, method, interceptors);
         Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors);
         if (introductionInterceptors.length == 0) {
             if (method.hasStereotype(Adapter.class)) {
@@ -269,6 +268,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
 
             }
         }
+        Interceptor[] aroundInterceptors = resolveAroundInterceptors(beanContext, method, interceptors);
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }
 
@@ -297,7 +297,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         }
 
         Interceptor[] interceptorArray = Arrays.stream(interceptors)
-            .filter(i -> applicableClasses.stream().anyMatch((t) -> t.isInstance(i)))
+            .filter(i -> applicableClasses.stream().anyMatch(t -> t.isInstance(i)))
             .toArray(Interceptor[]::new);
         OrderUtil.sort(interceptorArray);
         return interceptorArray;

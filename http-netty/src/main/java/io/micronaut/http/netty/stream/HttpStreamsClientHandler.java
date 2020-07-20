@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package io.micronaut.http.netty.stream;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.reactive.CancelledSubscriber;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -27,6 +28,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -165,9 +167,11 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
                 awaiting100ContinueMessage.subscribe(new CancelledSubscriber<>());
                 awaiting100ContinueMessage = null;
                 awaiting100Continue.onSubscribe(new Subscription() {
+                    @Override
                     public void request(long n) {
                     }
 
+                    @Override
                     public void cancel() {
                     }
                 });
@@ -183,6 +187,15 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
             }
         } else {
             super.channelRead(ctx, msg);
+        }
+    }
+
+    @Override
+    public void write(final ChannelHandlerContext ctx, Object msg, final ChannelPromise promise) throws Exception {
+        if (ctx.channel().attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).get() == Boolean.TRUE) {
+            ctx.write(msg, promise);
+        } else {
+            super.write(ctx, msg, promise);
         }
     }
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -51,15 +51,11 @@ public class OutgoingHttpRequestProcessorImpl implements OutgoingHttpRequestProc
      * @return true if the request should be processed
      */
     public boolean shouldProcessRequest(OutgointRequestProcessorMatcher matcher, String serviceId, String uri) {
-        if (matcher.getServiceIdPattern() != null && serviceId != null) {
-            if (matcher.getServiceIdPattern().matcher(serviceId).matches()) {
-                return true;
-            }
+        if (matcher.getServiceIdPattern() != null && serviceId != null && matcher.getServiceIdPattern().matcher(serviceId).matches()) {
+            return true;
         }
-        if (matcher.getUriPattern() != null && uri != null) {
-            if (matcher.getUriPattern().matcher(uri).matches()) {
-                return true;
-            }
+        if (matcher.getUriPattern() != null && uri != null && matcher.getUriPattern().matcher(uri).matches()) {
+            return true;
         }
 
         return false;

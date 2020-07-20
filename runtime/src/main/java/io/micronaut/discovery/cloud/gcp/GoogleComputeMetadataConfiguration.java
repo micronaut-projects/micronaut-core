@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -48,13 +48,17 @@ public class GoogleComputeMetadataConfiguration implements Toggleable {
      * The default metadata url value.
      */
     @SuppressWarnings("WeakerAccess")
+    // CHECKSTYLE:OFF
     public static final String DEFAULT_METADATAURL = "http://metadata.google.internal/computeMetadata/v1/project/";
+    // CHECKSTYLE:ON
 
     /**
      * The default project metadata url value.
      */
     @SuppressWarnings("WeakerAccess")
+    // CHECKSTYLE:OFF
     public static final String DEFAULT_PROJECTMETADATAURL = "http://metadata.google.internal/project/v1/project/";
+    // CHECKSTYLE:ON
 
     /**
      * The default read timeout in seconds.

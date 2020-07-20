@@ -43,10 +43,12 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         tempFile
     }
 
+    @Override
     Map<String, Object> getConfiguration() {
         ['micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent]]
     }
 
+    @Override
     void cleanupSpec() {
         tempFile.delete()
     }
