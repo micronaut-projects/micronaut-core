@@ -11,7 +11,6 @@
     <root level="info">
         <appender-ref ref="STDOUT" />
     </root>
-    <!--<logger name="io.micronaut.http" level="debug"/>-->
     <logger name="io.micronaut.tracing.instrument.util.MdcInstrumenter" level="debug"/>
     <logger name="brave.internal.recorder.PendingSpans" level="trace" />
 </configuration>
