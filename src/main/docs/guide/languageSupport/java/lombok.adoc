@@ -7,8 +7,8 @@ For example in Gradle adding the following dependencies to the `dependencies` bl
 .Configuring Lombok in Gradle
 [source,groovy]
 ----
-compileOnly 'org.projectlombok:lombok:1.16.20'
-annotationProcessor "org.projectlombok:lombok:1.16.20"
+compileOnly 'org.projectlombok:lombok:1.18.12'
+annotationProcessor "org.projectlombok:lombok:1.18.12"
 ...
 // Micronaut processor define after Lombok
 annotationProcessor "io.micronaut:micronaut-inject-java"
@@ -19,11 +19,20 @@ Or when using Maven:
 .Configuring Lombok in Maven
 [source,xml]
 ----
+<dependencies>
+  <dependency>
+    <groupId>org.projectlombok</groupId>
+    <artifactId>lombok</artifactId>
+    <version>1.18.12</version>
+    <scope>provided</scope>
+  </dependency>
+</dependencies>
+...
 <annotationProcessorPaths>
   <path>
     <groupId>org.projectlombok</groupId>
     <artifactId>lombok</artifactId>
-    <version>1.18.0</version>
+    <version>1.18.12</version>
   </path>
   <path>
     <groupId>io.micronaut</groupId>
