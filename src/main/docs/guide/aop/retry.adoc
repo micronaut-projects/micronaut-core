@@ -4,7 +4,7 @@ With this in mind Micronaut comes with a api:retry.annotation.Retryable[] annota
 
 == Simple Retry
 
-The simplest form of retry is just to add the `@Retryable` annotation to any type or method. The default behaviour of `@Retryable` is to retry 3 times with an exponential delay of 1 second between each retry. (first attempt with 1s delay, second attempt with 2s delay, thrid attempt with 3s delay)
+The simplest form of retry is just to add the `@Retryable` annotation to any type or method. The default behaviour of `@Retryable` is to retry 3 times with an exponential delay of 1 second between each retry. (first attempt with 1s delay, second attempt with 2s delay, third attempt with 3s delay)
 
 For example:
 
