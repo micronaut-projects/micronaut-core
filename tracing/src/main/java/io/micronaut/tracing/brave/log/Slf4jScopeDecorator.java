@@ -15,8 +15,7 @@
  */
 package io.micronaut.tracing.brave.log;
 
-import brave.internal.HexCodec;
-import brave.internal.Nullable;
+import brave.internal.codec.HexCodec;
 import brave.propagation.CurrentTraceContext;
 import brave.propagation.TraceContext;
 import org.slf4j.Logger;
@@ -125,7 +124,7 @@ final class Slf4jScopeDecorator implements CurrentTraceContext.ScopeDecorator {
         }
     }
 
-    private static void replace(String key, @Nullable String value) {
+    private static void replace(String key, String value) {
         if (value != null) {
             MDC.put(key, value);
         } else {

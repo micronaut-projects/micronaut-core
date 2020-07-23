@@ -108,7 +108,7 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
                                 response.body(Publishers.convertPublisher(scopedPublisher, type));
                             }
                         }
-                        serverHandler.handleSend(mapResponse(request, response), null, span);
+                        serverHandler.handleSend(mapResponse(request, response), span);
                         actual.onNext(response);
                     }
                 }
@@ -120,7 +120,7 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
                         if (error instanceof HttpStatusException) {
                             statusCode = ((HttpStatusException) error).getStatus().getCode();
                         }
-                        serverHandler.handleSend(mapResponse(request, statusCode), error, span);
+                        serverHandler.handleSend(mapResponse(request, statusCode, error), span);
                         actual.onError(error);
                     }
                 }
@@ -157,8 +157,13 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
         };
     }
 
-    private HttpServerResponse mapResponse(HttpRequest<?> request, int statusCode) {
+    private HttpServerResponse mapResponse(HttpRequest<?> request, int statusCode, Throwable error) {
         return new HttpServerResponse() {
+            @Override
+            public Throwable error() {
+                return error;
+            }
+
             @Override
             public Object unwrap() {
                 return this;
