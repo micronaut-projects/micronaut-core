@@ -1,0 +1,57 @@
+== Internationalization (i18n)
+
+If your application is used in varied regions or countries of the world, you will want to internationalize it.
+Internationalization, so called i18n because there are 18 letters between the i and the n, is the process of making your
+applications readable by the user and customized to their language and regional dialect.
+
+The properties files you create with the same base name are known as bundles. Here is a trivial example:
+I have only English messages, so I will create a properties file, "messages.properties", in my resources folder.
+
+messages.properties - file will define key value pairs like this:
+
+[source,text]
+app.title=micronaut.demo
+
+To retrieve this message inside your application, you will use the ResourceBundle like this:
+
+[source,java]
+package com.example;
+import io.micronaut.runtime.Micronaut;
+public class Application {
+    public static void main(String[] args) {
+        Micronaut.run(Application.class);
+        Locale defaultLocale = new Locale();
+        ResourceBundle messages = ResourceBundle.getBundle("messages", defaultLocale);
+        String msg1 = messages.getString("app.title");
+        System.out.println( msg1 ); // this will print "micronaut.demo"
+    }
+}
+
+You will create these ResourceBundles and Micronaut provides a class called
+link:{api}/io/micronaut/context/i18n/ResourceBundleMessageSource.html[ResourceBundleMessageSource] to read the bundles
+and make sure they deliver the right translations to the users based on their language and country preferences.
+The locale specific files inherit from least specific inherited by the more specific ones.  So default properties file
+with just keys and values will be inherited by one that is defined as a specific language.  A file defined as that
+language and a specific country of origin, will inherit the keys and values of both the previous ones.  For example,
+there may be differences in Spanish translations between different countries, so you create a bundle of translations
+that will be found by the filename, then language, then country.
+
+Let's see an example:
+
+Our simple application will have English, Spanish and French for now, but the words we will use are different depending
+on the locales.
+
+[,text]
+. link:{api}\resources\locale\messages.properties[messages.properties] - This is the default file that will be retrieved
+ if nothing more specific is defined for "messages" bundle
+
+. link:{api}\resources\locale\messages_en.properties[messages_en.properties] - This is the English default that will also include all the above defined keys and values
+ and will be used for any user that has English defined as their default language, but no region specified
+. link:{api}\resources\locale\messages_en_uk.properties[messages_en_uk.properties] - This will be pulled for English UK specified users.  All keys and values defined above
+ will be included.
+. link:{api}\resources\locale\messages_en_us.properties[messages_en_us.properties] - This will be pulled for English US specified users.  All keys and values defined in
+ the first two files will be included as well.
+. link:{api}\resources\locale\messages_fr.properties[messages_fr.properties] - This is the resource bundle retrieved for the "messages" bundle if French language specified.
+. link:{api}\resources\locale\messages_sp.properties[messages_sp.properties] - This is the resource bundle retrieved for the "messages" bundle if Spanish language specified.
+
+As you can see, we can keep adding languages and countries translations as needed.

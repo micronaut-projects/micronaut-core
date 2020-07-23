@@ -52,6 +52,8 @@ config:
   # validation: Validating Configuration
   jmx:
     title: JMX Support
+  i18n:
+    title: Internationalization
 aop:
   title: Aspect Oriented Programming
   aroundAdvice: Around Advice
