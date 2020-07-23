@@ -53,7 +53,9 @@ A factory method can receive the injection point and create a client based off o
 protected DefaultHttpClient httpClient(InjectionPoint<?> injectionPoint) {
     String url = metadata.stringValue(Client.class).orElse(null);
     if (url != null) {
-        return new DefaultHttpClient(url);
+        ......
+        URL parsedUrl = new URL(url) //handle exception
+        return new DefaultHttpClient(parsedUrl);
     } else {
         return new DefaultHttpClient();
     }
