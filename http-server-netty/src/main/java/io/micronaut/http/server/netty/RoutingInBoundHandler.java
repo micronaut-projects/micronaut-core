@@ -1647,7 +1647,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (!isHttp2) {
             if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
                 boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || request.getHeaders().isKeepAlive();
-                if (!expectKeepAlive || httpStatus.getCode() > 299) {
+                if (!expectKeepAlive || httpStatus.getCode() > 499) {
                     nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
                 } else {
                     nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
