@@ -16,10 +16,40 @@ Micronaut by default contains `PropertySourceLoader` implementations that load p
 4. Java System Properties
 5. OS environment variables
 6. Configuration files loaded in order from the system property 'micronaut.config.files' or the environment variable `MICRONAUT_CONFIG_FILES`. The value can be a comma separated list of paths with the last file having precedence. The files can be referenced from the file system as a path or the classpath with a `classpath:` prefix.
-7. Enviroment-specific properties from `application-{environment}.{extension}`
+7. Environment-specific properties from `application-{environment}.{extension}`
 8. Application-specific properties from `application.{extension}`
 
 TIP: `.properties`, `.json`, `.yml` are supported out of the box. For Groovy users `.groovy` is supported as well.
+
+=== Supplying Configuration via Command Line
+
+Configuration can be supplied at the command line using Gradle or our Maven plugin. For example:
+
+[source,bash]
+.Gradle
+----
+$ ./gradlew run --args="-endpoints.health.enabled=true -config.property=test"
+----
+
+[source,bash]
+.Maven
+----
+$ ./mvnw mn:run -Dmn.appArgs="-endpoints.health.enabled=true -config.property=test"
+----
+
+In order for the configuration to be apart of the context, the args from the main method must be passed to the context builder. For example:
+
+[source,java]
+----
+import io.micronaut.runtime.Micronaut;
+
+public class Application {
+
+    public static void main(String[] args) {
+        Micronaut.run(Application.class, args); // passing args
+    }
+}
+----
 
 === Property Value Placeholders
 
