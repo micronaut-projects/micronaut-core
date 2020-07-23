@@ -21,23 +21,31 @@ Micronaut by default contains `PropertySourceLoader` implementations that load p
 
 TIP: `.properties`, `.json`, `.yml` are supported out of the box. For Groovy users `.groovy` is supported as well.
 
-To specify application arguments via command line:
+=== Supplying Configuration via Command Line
+
+Configuration can be supplied at the command line using Gradle or our Maven plugin. For example:
+
 [source,bash]
+.Gradle
 ----
 $ ./gradlew run --args="-endpoints.health.enabled=true -config.property=test"
+----
+
+[source,bash]
+.Maven
+----
 $ ./mvnw mn:run -Dmn.appArgs="-endpoints.health.enabled=true -config.property=test"
 ----
-In a typical micronaut project, the args are not passed to the running application by default, but this is easily modified.
+
+In order for the configuration to be apart of the context, the args from the main method must be passed to the context builder. For example:
+
 [source,java]
 ----
-package com.example;
-
 import io.micronaut.runtime.Micronaut;
 
 public class Application {
 
     public static void main(String[] args) {
-        // Micronaut.run(Application.class); typical
         Micronaut.run(Application.class, args); // passing args
     }
 }
