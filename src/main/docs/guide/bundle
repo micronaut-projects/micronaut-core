@@ -1,9 +1,0 @@
-Micronaut supports internationalization (i18n) by allowing it's applications to resolve text messages written in different languages and locales.  Messages are usually grouped by locale and 
-accessed through key/value pairs in properties files named for that language and locale.  These properties files are referred to as resource bundles.
-
-MessageSource is an interface for resolving messages from some defined source.  In Micronaut's context, i18n messages are retrieved from resource bundles using the class ResourceBundleMessageSource.
-
-Let's look at an example where our application should greet a person based on their locale.
-1. Create resource bundles for each language/locale i.e. English, Spanish, French, etc.
-2. Create a bean to retrieve the proper messages bundle.
-3. If a message bundle is not found, display the default messages bundle.
