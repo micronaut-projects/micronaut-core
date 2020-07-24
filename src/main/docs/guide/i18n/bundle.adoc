@@ -1,0 +1,21 @@
+A resource bundle is a Java .properties file that contains locale-specific data.
+
+Given this Resource Bundle:
+
+[source, properties]
+.src/main/resources/io/micronaut/docs/i18n/messages_en.properties
+----
+include::test-suite/src/test/resources/io/micronaut/docs/i18n/messages_en.properties[]
+----
+
+[source, properties]
+.src/main/resources/io/micronaut/docs/i18n/messages_es.properties
+----
+include::test-suite/src/test/resources/io/micronaut/docs/i18n/messages_es.properties[]
+----
+
+You can use api:context.i18n.ResourceBundleMessageSource[], an implementation of api:context.MessageSource[] which eases accessing link:{javase}/java/util/ResourceBundle.html[Resource Bundles] and provides cache functionality, to access the previous messages:
+
+snippet::io.micronaut.docs.i18n.I18nSpec[tags="test",indent=0,title="ResourceBundleMessageSource Example"]
+
+WARNING: You should not instantiate a new `ResourceBundleMessageSource` each time you retrieve a message. Instantiate it once, maybe in a `javax.inject.Singleton`, and reuse it.

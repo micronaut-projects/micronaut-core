@@ -1562,6 +1562,7 @@ public class DefaultBeanContext implements BeanContext {
                     .flatMap(beanDefinition ->
                             beanDefinition.getExecutableMethods()
                                     .parallelStream()
+                                    .filter(method -> method.hasStereotype(Executable.class))
                                     .map((Function<ExecutableMethod<?, ?>, BeanDefinitionMethodReference<?, ?>>) executableMethod ->
                                             BeanDefinitionMethodReference.of((BeanDefinition) beanDefinition, executableMethod)
                                     )
@@ -1572,17 +1573,13 @@ public class DefaultBeanContext implements BeanContext {
             Map<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> byAnnotation = new HashMap<>(processedBeans.size());
             methodStream.forEach(reference -> {
                 List<Class<? extends Annotation>> annotations = reference.getAnnotationTypesByStereotype(Executable.class);
-                if (annotations.isEmpty()) {
-                    throw new IllegalStateException("BeanDefinition.requiresMethodProcessing() returned true but method has no @Executable definition. This should never happen. Please report an issue.");
-                } else {
-                    annotations.forEach(annotation -> byAnnotation.compute(annotation, (ann, list) -> {
+                annotations.forEach(annotation -> byAnnotation.compute(annotation, (ann, list) -> {
                         if (list == null) {
                             list = new ArrayList<>(10);
                         }
                         list.add(reference);
                         return list;
                     }));
-                }
             });
 
             // Find ExecutableMethodProcessor for each annotation and process the BeanDefinitionMethodReference
