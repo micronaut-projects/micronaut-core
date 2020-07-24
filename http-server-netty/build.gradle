@@ -32,7 +32,7 @@ dependencies {
     }
 
     // following 3 dependencies needed for Http2PostTest
-    testImplementation 'io.vertx:vertx-core:3.9.1'
+    testImplementation 'io.vertx:vertx-core:3.9.2'
     testImplementation 'io.vertx:vertx-web-client:3.9.2'
     testImplementation group: 'org.eclipse.jetty', name: 'jetty-alpn-openjdk8-client', version: '9.4.30.v20200611'
 
