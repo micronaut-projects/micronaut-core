@@ -255,6 +255,9 @@ cli:
     gradleReload: Recompiling with Gradle
     ideReload: Recompiling with an IDE
   proxy: Proxy Configuration
+i18n:
+  title: Internationalization
+  bundle: Resource Bundles
 appendix:
   title: Appendices
   faq: Frequently Asked Questions (FAQ)
