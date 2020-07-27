@@ -17,7 +17,6 @@ package io.micronaut.core.io.socket;
 
 import io.micronaut.core.util.ArgumentUtils;
 
-import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -90,10 +89,8 @@ public class SocketUtils {
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress(InetAddress.getLocalHost(), currentPort), 20);
             return false;
-        } catch (ConnectException e) {
-            return true;
         } catch (Throwable e) {
-            return false;
+            return true;
         }
     }
 
