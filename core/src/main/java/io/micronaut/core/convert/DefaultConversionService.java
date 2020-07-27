@@ -655,18 +655,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Char Array
-        addConverter(CharSequence.class, char[].class, (CharSequence object, Class<char[]> targetType, ConversionContext context) -> {
-            String str = object.toString();
-            String[] strings = str.split(",");
-            Object newArray = Array.newInstance(char.class, strings.length);
-            for (int i = 0; i < strings.length; i++) {
-                String string = strings[i];
-                Optional<?> converted = convert(string, char.class);
-                if (converted.isPresent()) {
-                    Array.set(newArray, i, converted.get());
-                }
-            }
-            return Optional.of((char[]) newArray);
+        addConverter(String.class, char[].class, (String object, Class<char[]> targetType, ConversionContext context) -> {
+            return Optional.of(object.toCharArray());
         });
 
         // Object[] -> String[]
