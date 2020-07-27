@@ -28,7 +28,7 @@ dependencies {
 
     compileOnly 'org.glassfish:javax.el:3.0.1-b11'
     compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.7'
+    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.8'
     compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.3.8'
     compileOnly "ch.qos.logback:logback-classic:1.2.3"
     testImplementation "ch.qos.logback:logback-classic:1.2.3"
