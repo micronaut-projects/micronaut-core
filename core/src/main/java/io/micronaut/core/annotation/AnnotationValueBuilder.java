@@ -20,7 +20,10 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,6 +38,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     private final String annotationName;
     private final Map<CharSequence, Object> values = new HashMap<>(5);
     private final RetentionPolicy retentionPolicy;
+    private final List<AnnotationValue<? extends Annotation>> stereotypes = new ArrayList<>(2);
 
     /**
      * Default constructor.
@@ -86,8 +90,56 @@ public class AnnotationValueBuilder<T extends Annotation> {
      *
      * @return The {@link AnnotationValue}
      */
-    public @NonNull AnnotationValue<T> build() {
-        return new AnnotationValue<>(annotationName, values, retentionPolicy);
+    public @NonNull
+    AnnotationValue<T> build() {
+        if (stereotypes.size() == 0) {
+            return new AnnotationValue<>(annotationName, values, retentionPolicy);
+        } else {
+            return new SourceAnnotationValue<>(annotationName, values, stereotypes, retentionPolicy);
+        }
+    }
+
+    /**
+     * stereotype associated with the annotation.
+     *
+     * @param annotations target annotations
+     * @return this builder
+     */
+    public AnnotationValueBuilder<T> stereotype(String... annotations) {
+        if (annotations != null) {
+            for (String ann : annotations) {
+                this.stereotypes.add(new AnnotationValue<>(ann));
+            }
+        }
+        return this;
+    }
+
+    /**
+     * stereotype associated with the annotation.
+     *
+     * @param annotations target annotations
+     * @return this builder
+     */
+    public AnnotationValueBuilder<T> stereotype(Class<? extends Annotation>... annotations) {
+        if (annotations != null) {
+            for (Class<?> aClass : annotations) {
+                this.stereotypes.add(new AnnotationValue<>(aClass.getName()));
+            }
+        }
+        return this;
+    }
+
+    /**
+     * stereotype associated with the annotation.
+     *
+     * @param annotations target annotations
+     * @return this builder
+     */
+    public AnnotationValueBuilder<T> stereotype(AnnotationValue<? extends Annotation>... annotations) {
+        if (annotations != null) {
+            Collections.addAll(this.stereotypes, annotations);
+        }
+        return this;
     }
 
     /**

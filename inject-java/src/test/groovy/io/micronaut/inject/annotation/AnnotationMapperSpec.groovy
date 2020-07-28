@@ -1,15 +1,16 @@
 package io.micronaut.inject.annotation
 
-
 import edu.umd.cs.findbugs.annotations.NonNull
+import io.micronaut.aop.Around
 import io.micronaut.context.annotation.ConfigurationInject
+import io.micronaut.context.annotation.Type
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.Creator
 import io.micronaut.core.bind.annotation.Bindable
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.visitor.VisitorContext
 
 import java.lang.annotation.Annotation
@@ -19,6 +20,32 @@ import java.lang.annotation.RetentionPolicy
 import java.lang.annotation.Target
 
 class AnnotationMapperSpec extends AbstractTypeElementSpec {
+
+
+    void "test annotation mapper map stereotypes with stereotype"() {
+        def metadata = buildMethodAnnotationMetadata('''
+package test;
+
+@javax.inject.Singleton
+class Test {
+
+     @io.micronaut.inject.annotation.CustomAround
+    Test create() {
+        return new Test();
+    }
+
+}
+''', 'create')
+        expect:
+
+        metadata != null
+        List<Class<? extends Annotation>> annotations = metadata.getAnnotationTypesByStereotype(Around.class)
+        annotations.size() == 3
+        annotations.contains(Type.class)
+        annotations.contains(CustomAround.class)
+        annotations.contains(Around.class)
+
+    }
 
     void "test annotation mapper map stereotypes correctly"() {
         def metadata = buildMethodAnnotationMetadata('''
@@ -90,6 +117,11 @@ class Test {
                     new CustomQueryMapper()
             ]
         }
+        if(annotationName == CustomAround.name) {
+            return  [
+                new CustomAroundMapper()
+            ]
+        }
         return Collections.emptyList()
     }
 
@@ -113,9 +145,30 @@ class Test {
         }
     }
 
+    static class  CustomAroundMapper implements AnnotationMapper<CustomAround> {
+        @Override
+        List<AnnotationValue<?>> map(AnnotationValue<CustomAround> annotation, VisitorContext visitorContext) {
+
+            AnnotationValueBuilder<CustomAround> customAroundValueBuilder =
+                AnnotationValue.builder(CustomAround.class);
+
+            AnnotationValueBuilder<Type> typeAnnotationValueBuilder =
+                AnnotationValue.builder(Type.class);
+
+            AnnotationValueBuilder<Around> aroundAnnotationValueBuilder =
+                AnnotationValue.builder(Around.class)
+                    .stereotype(typeAnnotationValueBuilder.build(), customAroundValueBuilder.build());
+
+            return Arrays.asList(aroundAnnotationValueBuilder.build())
+        }
+    }
 
 
 }
+
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+@interface CustomAround {}
 
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
