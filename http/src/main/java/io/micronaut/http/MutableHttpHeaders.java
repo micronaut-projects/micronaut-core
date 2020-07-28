@@ -40,7 +40,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     /**
      * Add a header for the given name and value.
      *
-     * @param header The head name
+     * @param header The header name
      * @param value  The value
      * @return This headers object
      */
@@ -236,7 +236,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     /**
      * Add a header for the given name and value.
      *
-     * @param header The head name
+     * @param header The header name
      * @param value  The value
      * @return This headers object
      */
@@ -250,7 +250,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     /**
      * Add a header for the given name and value.
      *
-     * @param header The head name
+     * @param header The header name
      * @param value  The value
      * @return This headers object
      */
