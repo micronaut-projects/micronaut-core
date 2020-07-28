@@ -4,6 +4,7 @@ import edu.umd.cs.findbugs.annotations.NonNull
 import io.micronaut.aop.Around
 import io.micronaut.context.annotation.ConfigurationInject
 import io.micronaut.context.annotation.Type
+import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.Creator
@@ -40,10 +41,11 @@ class Test {
 
         metadata != null
         List<Class<? extends Annotation>> annotations = metadata.getAnnotationTypesByStereotype(Around.class)
-        annotations.size() == 3
-        annotations.contains(Type.class)
-        annotations.contains(CustomAround.class)
-        annotations.contains(Around.class)
+        annotations.size() == 1
+        Class<? extends Annotation> aroundAnn = annotations[0]
+        aroundAnn == CustomAround.class
+//        Class<? extends Annotation> tp = aroundAnn.getAnnotation(Type.class);
+//        tp != null
 
     }
 
@@ -145,25 +147,23 @@ class Test {
         }
     }
 
-    static class  CustomAroundMapper implements AnnotationMapper<CustomAround> {
+    static class CustomAroundMapper implements AnnotationMapper<CustomAround> {
         @Override
         List<AnnotationValue<?>> map(AnnotationValue<CustomAround> annotation, VisitorContext visitorContext) {
 
-            AnnotationValueBuilder<CustomAround> customAroundValueBuilder =
-                AnnotationValue.builder(CustomAround.class);
-
             AnnotationValueBuilder<Type> typeAnnotationValueBuilder =
-                AnnotationValue.builder(Type.class);
+                AnnotationValue.builder(Type.class).member("value",
+                    new AnnotationClassValue("io.micronaut.aop.TraceInterceptor"));
 
             AnnotationValueBuilder<Around> aroundAnnotationValueBuilder =
-                AnnotationValue.builder(Around.class)
-                    .stereotype(typeAnnotationValueBuilder.build(), customAroundValueBuilder.build());
+                AnnotationValue.builder(Around.class);
 
-            return Arrays.asList(aroundAnnotationValueBuilder.build())
+            AnnotationValueBuilder<CustomAround> customAroundValueBuilder =
+                AnnotationValue.builder(CustomAround.class).stereotype(typeAnnotationValueBuilder.build(), aroundAnnotationValueBuilder.build());
+
+            return Arrays.asList(customAroundValueBuilder.build())
         }
     }
-
-
 }
 
 @Target(ElementType.METHOD)

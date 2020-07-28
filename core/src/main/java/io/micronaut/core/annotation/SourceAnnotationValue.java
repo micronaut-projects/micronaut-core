@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * A runtime representation of the an stereotype annotation and its values.
+ * A compile time representation of an annotation.
  *
  * <p>This class implements the {@link AnnotationValueResolver} interface and methods such as {@link AnnotationValueResolver#get(CharSequence, Class)} can be used to retrieve the values of annotation members.</p>
  *

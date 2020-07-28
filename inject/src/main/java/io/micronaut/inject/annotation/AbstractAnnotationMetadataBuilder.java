@@ -715,40 +715,34 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             if (o instanceof SourceAnnotationValue) {
                                 SourceAnnotationValue sav = (SourceAnnotationValue) o;
                                 List<AnnotationValue> stereotypes = sav.getStereotypes();
-                                final List<String> parents = new ArrayList<String>(stereotypes.size() + 1);
-                                parents.add(mappedAnnotationName);
-                                for (AnnotationValue stereotype : stereotypes) {
-                                    String name = stereotype.getAnnotationName();
-                                    if (!parents.contains(name)) {
-                                        parents.add(name);
-                                    }
-                                }
+                                List<String> parentAnnoation = Collections.singletonList(mappedAnnotationName);
                                 for (AnnotationValue stereotype : stereotypes) {
                                     retentionPolicy = stereotype.getRetentionPolicy();
+                                    String stereotypeName = stereotype.getAnnotationName();
                                     if (repeatableName != null) {
                                         if (isDeclared) {
                                             metadata.addDeclaredRepeatableStereotype(
-                                                parents,
-                                                mappedAnnotationName,
+                                                parentAnnoation,
+                                                stereotypeName,
                                                 stereotype);
                                         } else {
                                             metadata.addRepeatableStereotype(
-                                                parents,
-                                                mappedAnnotationName,
+                                                parentAnnoation,
+                                                stereotypeName,
                                                 stereotype);
                                         }
                                     } else {
                                         Map<CharSequence, Object> values = stereotype.getValues();
                                         if (isDeclared) {
                                             metadata.addDeclaredStereotype(
-                                                parents,
-                                                mappedAnnotationName,
+                                                parentAnnoation,
+                                                stereotypeName,
                                                 values,
                                                 retentionPolicy);
                                         } else {
                                             metadata.addStereotype(
-                                                parents,
-                                                mappedAnnotationName,
+                                                parentAnnoation,
+                                                stereotypeName,
                                                 values,
                                                 retentionPolicy);
                                         }
