@@ -1631,6 +1631,37 @@ class Action {
         introspection.constructorArguments[0].typeParameters[1].typeParameters[0].typeName == 'test.Action'
     }
 
+    void "test multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test {
+
+    private int[][] failingField;
+
+    public Test() {
+    }
+
+    public int[][] getFailingField() {
+        return failingField;
+    }
+
+    public Test setFailingField(int[][] failingField) {
+        this.failingField = failingField;
+        return this;
+    }
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
