@@ -1,7 +1,7 @@
 dependencies {
     testImplementation "org.gebish:geb-spock:$gebVersion"
-    testImplementation "org.seleniumhq.selenium:htmlunit-driver:2.41.0"
-    testRuntimeOnly 'net.sourceforge.htmlunit:htmlunit:2.41.0'
+    testImplementation "org.seleniumhq.selenium:htmlunit-driver:2.42.0"
+    testRuntimeOnly 'net.sourceforge.htmlunit:htmlunit:2.42.0'
     testImplementation "org.seleniumhq.selenium:selenium-remote-driver:$seleniumVersion"
     testImplementation "org.seleniumhq.selenium:selenium-api:$seleniumVersion"
     testImplementation "org.seleniumhq.selenium:selenium-support:$seleniumVersion"
