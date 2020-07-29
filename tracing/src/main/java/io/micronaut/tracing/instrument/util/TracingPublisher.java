@@ -41,7 +41,7 @@ import static io.micronaut.tracing.interceptor.TraceInterceptor.logError;
  * @since 1.0
  */
 @SuppressWarnings("PublisherImplementation")
-public class TracingPublisher<T> implements Publisher<T> {
+public class TracingPublisher<T> implements Publishers.MicronautPublisher<T> {
 
     private final Publisher<T> publisher;
     private final Tracer tracer;

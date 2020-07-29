@@ -42,7 +42,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse<?>> {
+public class HttpServerTracingPublisher implements Publishers.MicronautPublisher<MutableHttpResponse<?>> {
 
     private final Publisher<MutableHttpResponse<?>> publisher;
     private final HttpServerHandler<HttpServerRequest, HttpServerResponse> serverHandler;

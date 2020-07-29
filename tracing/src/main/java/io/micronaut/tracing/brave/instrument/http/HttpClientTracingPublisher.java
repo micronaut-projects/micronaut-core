@@ -20,6 +20,7 @@ import brave.http.HttpClientHandler;
 import brave.http.HttpClientRequest;
 import brave.http.HttpClientResponse;
 import brave.http.HttpTracing;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
@@ -38,7 +39,7 @@ import org.reactivestreams.Subscription;
  * @since 1.0
  */
 @SuppressWarnings("PublisherImplementation")
-class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
+class HttpClientTracingPublisher implements Publishers.MicronautPublisher<HttpResponse<?>> {
 
     private final Publisher<HttpResponse<?>> publisher;
     private final HttpClientHandler<HttpClientRequest, HttpClientResponse> clientHandler;
