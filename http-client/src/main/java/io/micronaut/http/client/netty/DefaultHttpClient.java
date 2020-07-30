@@ -749,7 +749,7 @@ public class DefaultHttpClient implements
 
         WebSocketBean<T> finalWebSocketBean = webSocketBean;
         return Flowable.create(emitter -> {
-            SslContext sslContext = buildSslContext(uri);
+            SslContext sslContext = "wss".equalsIgnoreCase(uri.getScheme()) ? this.sslContext : null;
             WebSocketVersion protocolVersion = finalWebSocketBean.getBeanDefinition().enumValue(ClientWebSocket.class, "version", WebSocketVersion.class).orElse(WebSocketVersion.V13);
             int maxFramePayloadLength = finalWebSocketBean.messageMethod()
                     .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
