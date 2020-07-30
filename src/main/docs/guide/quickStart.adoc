@@ -1,5 +1,5 @@
 The following sections will walk you through a Quick start on how to use Micronaut to setup a basic "Hello World" application.
 
-Before getting started ensure you have a Java 8 or above SDK installed and it is recommended having a suitable IDE such as IntelliJ IDEA.
+Before getting started ensure you have a Java 8 or above SDK installed alongwith Maven/Gradle configured properly, and it is recommended having a suitable IDE such as IntelliJ IDEA.
 
 To follow the Quick Start it is also recommended that you have the Micronaut CLI installed.
