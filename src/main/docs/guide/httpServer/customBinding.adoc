@@ -1,0 +1,43 @@
+
+== Argument binding
+
+An argument binding allows for the binding of an argument's value from a source.
+Micronaut follows a specific search path for the resolution of api:core.bind.ArgumentBinder[ArgumentBinder]s through the
+api:http.bind.binders.ArgumentBinderRegistry[ArgumentBinderRegistry].  The selection process starts with annotation binders
+and then searches "by type" binders.  Selection of a binder can also be affected by other factors such as the request media
+type.
+
+Unlike api:core.convert.TypeConverter[TypeConverter] instances, api:core.bind.ArgumentBinder[ArgumentBinder]s can potentially
+handle complex objects and typically work in conjunction with a api:core.convert.value.ConvertibleValues[ConvertibleValues] instance
+
+An api:core.bind.ArgumentBinder[ArgumentBinder] can either be registered as a bean or by META-INF/services. In the case
+of the latter, it will be globally available at all times, whilst the former is only present when a api:context.BeanContext[BeanContext] is initialized
+
+== Example: custom argument bindings
+
+. Key interfaces/sub-interfaces are:
+
+ * api:http.bind.binders.AnnotatedArgumentBinder[AnnotatedArgumentBinder]
+
+    - An api:core.bind.ArgumentBinder[ArgumentBinder] whose lookup is driven by an annotation definition
+
+ * api:http.bind.binders.AnnotatedRequestArgumentBinder[AnnotatedRequestArgumentBinder]
+
+    - An interface for classes that bind an api:core.type.Argument[Argument] from an api:http.HttpRequest[HttpRequest] driven by an annotation.
+
+ * api:http.bind.binders.TypeArgumentBinder[TypeArgumentBinder]
+
+    - an argument binder that is based on the argument type
+
+ * api:http.bind.binders.TypedRequestArgumentBinder[TypedRequestArgumentBinder]
+
+    - A api:http.bind.binders.TypeArgumentBinder[TypeArgumentBinder] that binds from an api:http.HttpRequest[HttpRequest]
+
+. When do Binders get called?
+. What are the conditions when they get called?  attempts to bind at multiple places/times
+Binders can be called many times... may not have been completely initialized/all satisfied reqs beforehand
+. Explain satisfied and unsatisfied --- EMPTY (and any other undefined return) means satisfied...
+
+read body
+filters control - must be security filter
+authentication filter retrieves the security code...

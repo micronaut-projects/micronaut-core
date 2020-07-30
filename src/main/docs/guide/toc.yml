@@ -73,6 +73,7 @@ httpServer:
   runningSpecificPort: Running Server on a Specific Port
   routing: HTTP Routing
   binding: Simple Request Binding
+  customBinding: Custom argument binding / request binding
   hostResolution: Host Resolution
   clientIpAddress: Client IP Address
   requestResponse: The HttpRequest and HttpResponse
