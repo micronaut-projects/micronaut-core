@@ -107,7 +107,7 @@ public class DefaultBeanContext implements BeanContext {
 
     final Map<BeanKey, BeanRegistration> singletonObjects = new ConcurrentHashMap<>(100);
     final Map<BeanIdentifier, Object> singlesInCreation = new ConcurrentHashMap<>(5);
-    final Map<BeanKey, Object> scopedProxies = new ConcurrentHashMap<>(20);
+    final Map<BeanKey, Provider<Object>> scopedProxies = new ConcurrentHashMap<>(20);
 
     Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners;
 
@@ -2313,7 +2313,7 @@ public class DefaultBeanContext implements BeanContext {
             Class<?> proxiedType = resolveProxiedType(beanType, definition);
             BeanKey key = new BeanKey(proxiedType, qualifier);
             BeanDefinition<T> finalDefinition = definition;
-            return (T) scopedProxies.computeIfAbsent(key, (Function<BeanKey, T>) beanKey -> {
+            return (T) scopedProxies.computeIfAbsent(key, beanKey -> ProviderUtils.memoized(() -> {
                 Qualifier<T> q = qualifier;
                 if (q == null) {
                     q = finalDefinition.getDeclaredQualifier();
@@ -2328,7 +2328,7 @@ public class DefaultBeanContext implements BeanContext {
                     throw new NoSuchBeanException(proxyDefinition.getBeanType(), qualifier);
                 }
                 return createBean;
-            });
+            })).get();
         } else {
             Optional<BeanResolutionContext.Segment<?>> currentSegment = resolutionContext.getPath().currentSegment();
             Optional<CustomScope> registeredScope = Optional.empty();
