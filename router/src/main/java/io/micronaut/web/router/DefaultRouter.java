@@ -285,21 +285,22 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private <R> Optional<RouteMatch<R>> findErrorRouteInternal(
             @Nullable Class<?> originatingClass,
             @NonNull Throwable error, HttpRequest<?> request) {
-        Collection<MediaType> accept =
-                request.accept();
+        Collection<MediaType> accept = request.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
         if (hasAcceptHeader) {
-
+            Map<ErrorRoute, RouteMatch<R>> matchedRoutes = new LinkedHashMap<>();
             for (ErrorRoute errorRoute : errorRoutes) {
                 @SuppressWarnings("unchecked")
                 final RouteMatch<R> match = (RouteMatch<R>) errorRoute
                         .match(originatingClass, error).orElse(null);
                 if (match != null && match.doesProduce(accept)) {
-                    return Optional.of(match);
+                    matchedRoutes.put(errorRoute, match);
                 }
             }
+            return findRouteMatch(matchedRoutes, error);
         } else {
-            RouteMatch<R> firstMatch = null;
+            Map<ErrorRoute, RouteMatch<R>> producesAllMatchedRoutes = new LinkedHashMap<>();
+            Map<ErrorRoute, RouteMatch<R>> producesSpecificMatchedRoutes = new LinkedHashMap<>();
             for (ErrorRoute errorRoute : errorRoutes) {
                 @SuppressWarnings("unchecked")
                 final RouteMatch<R> match = (RouteMatch<R>) errorRoute
@@ -307,16 +308,17 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 if (match != null) {
                     final List<MediaType> produces = match.getProduces();
                     if (CollectionUtils.isEmpty(produces) || produces.contains(MediaType.ALL_TYPE)) {
-                        return Optional.of(match);
-                    } else if (firstMatch == null) {
-                        firstMatch = match;
+                        producesAllMatchedRoutes.put(errorRoute, match);
+                    } else {
+                        producesSpecificMatchedRoutes.put(errorRoute, match);
                     }
                 }
             }
-
-            return Optional.ofNullable(firstMatch);
+            if (producesAllMatchedRoutes.isEmpty()) {
+                return findRouteMatch(producesSpecificMatchedRoutes, error);
+            }
+            return findRouteMatch(producesAllMatchedRoutes, error);
         }
-        return Optional.empty();
     }
 
     @Override
