@@ -57,13 +57,22 @@ public class ClosestTypeArgumentQualifier<T> extends TypeArgumentQualifier<T> {
         return candidates
                 .filter(candidate -> beanType.isAssignableFrom(candidate.getBeanType()))
                 .map(candidate -> {
-                    List<Class> typeArguments = getTypeArguments(beanType, candidate);
+                    List<Class> hierarchy = ClassUtils.resolveHierarchy(beanType);
 
-                    int result = compare(typeArguments);
-                    if (LOG.isTraceEnabled() && result < 0) {
-                        LOG.trace("Bean type {} is not compatible with candidate generic types [{}] of candidate {}", beanType, CollectionUtils.toString(typeArguments), candidate);
+                    int candidateResult = -1;
+                    for (Class beanSuperType : hierarchy) {
+                        List<Class> typeArguments = getTypeArguments(beanSuperType, candidate);
+
+                        int result = compare(typeArguments);
+                        if (result >= 0) {
+                            if (candidateResult < 0 || result < candidateResult) {
+                                candidateResult = result;
+                            }
+                        } else if (LOG.isTraceEnabled()) {
+                            LOG.trace("Bean type {} seen as {} is not compatible with candidate generic types [{}] of candidate {}", beanType, beanSuperType, CollectionUtils.toString(typeArguments), candidate);
+                        }
                     }
-                    return new AbstractMap.SimpleEntry<>(candidate, result);
+                    return new AbstractMap.SimpleEntry<>(candidate, candidateResult);
                 })
                 .filter(entry -> entry.getValue() > -1)
                 .collect(StreamUtils.minAll(
