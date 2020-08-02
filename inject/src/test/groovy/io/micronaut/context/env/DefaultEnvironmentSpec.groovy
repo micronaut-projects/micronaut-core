@@ -94,7 +94,7 @@ class DefaultEnvironmentSpec extends Specification {
     void "test system property source loader"() {
         given: "a configuration property file is passed from system properties"
         File configPropertiesFile = File.createTempFile("default", ".properties")
-        configPropertiesFile.write("foo=bar")
+        configPropertiesFile.write("foo=bar\n[baz]=bar2")
         System.setProperty("micronaut.config.files", "${configPropertiesFile.absolutePath}")
 
         when: "load the property sources"
