@@ -3,7 +3,8 @@ Although not required to use Micronaut, the Micronaut CLI is the quickest way to
 Using the CLI you can create a new Micronaut application in either Groovy, Java or Kotlin (the default is Java).
 
 The following command creates a new "Hello World" server application in Java with a Gradle build:
-(NOTE: The applications generated via our CLI come with Gradle and Maven wrappers, so its not even necessary to have Gradle or Maven installed on your machine to begin running the applications. Simply use `mvnw` or `gradlew` commands, as explained further below.)
+
+NOTE: The applications generated via our CLI come with Gradle or Maven wrappers, so its not even necessary to have Gradle or Maven installed on your machine to begin running the applications. Simply use the `mvnw` or `gradlew` command, as explained further below.
 
 [source,bash]
 ----
