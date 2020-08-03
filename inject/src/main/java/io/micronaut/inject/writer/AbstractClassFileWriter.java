@@ -567,8 +567,8 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @return The {@link Type}
      */
     protected static Type getTypeReference(TypedElement type) {
-        String internalName = type.getName().replace('.', '/');
         if (type.isPrimitive()) {
+            String internalName = ((PrimitiveElement) type).getInternalName();
             if (type.isArray()) {
                 StringBuilder name = new StringBuilder(internalName);
                 for (int i = 0; i < type.getArrayDimensions(); i++) {
@@ -579,6 +579,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 return Type.getType(internalName);
             }
         } else {
+            String internalName = type.getName().replace('.', '/');
             if (type.isArray()) {
                 StringBuilder name = new StringBuilder(internalName);
                 name.insert(0, "L");

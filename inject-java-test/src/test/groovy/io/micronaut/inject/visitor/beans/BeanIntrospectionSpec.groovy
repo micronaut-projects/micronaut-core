@@ -1652,7 +1652,7 @@ class Test {
         return oneDimension;
     }
 
-    public void setOneDimensions(int[] oneDimension) {
+    public void setOneDimension(int[] oneDimension) {
         this.oneDimension = oneDimension;
     }
 

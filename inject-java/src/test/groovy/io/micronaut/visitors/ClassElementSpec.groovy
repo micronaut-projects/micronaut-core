@@ -181,9 +181,9 @@ public class TestController {
         expect:
         AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'I'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'int'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'J'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'long'
     }
 
     void "test generic types at type level"() {

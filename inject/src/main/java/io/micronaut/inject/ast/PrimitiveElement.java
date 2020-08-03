@@ -60,13 +60,13 @@ public class PrimitiveElement implements ClassElement {
         return arrayDimensions;
     }
 
-    public String getTypeName() {
-        return typeName;
+    public String getInternalName() {
+        return className;
     }
 
     @Override
     public String getName() {
-        return className;
+        return typeName;
     }
 
     @Override
@@ -105,7 +105,7 @@ public class PrimitiveElement implements ClassElement {
 
     public static PrimitiveElement valueOf(String name) {
         for (PrimitiveElement element: PRIMITIVES) {
-            if (element.getTypeName().equalsIgnoreCase(name)) {
+            if (element.getName().equalsIgnoreCase(name)) {
                 return element;
             }
         }
