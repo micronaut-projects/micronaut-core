@@ -30,7 +30,6 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.lang.model.element.*;
 import javax.lang.model.element.Element;
 import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.Elements;
@@ -50,9 +49,9 @@ import java.util.stream.Collectors;
 public class JavaClassElement extends AbstractJavaElement implements ClassElement {
 
     protected final TypeElement classElement;
+    protected int arrayDimensions;
     private final JavaVisitorContext visitorContext;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
-    protected int arrayDimensions;
 
     /**
      * @param classElement       The {@link TypeElement}
@@ -83,6 +82,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      * @param genericsInfo       The generic type info
+     * @param arrayDimensions    The number of array dimensions
      */
     JavaClassElement(
             TypeElement classElement,

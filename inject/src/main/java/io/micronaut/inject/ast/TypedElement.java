@@ -68,5 +68,7 @@ public interface TypedElement extends Element {
      * String[] should return 1, String[][] should return 2
      * @return The number of dimensions
      */
-    default int getArrayDimensions() { return 0; }
+    default int getArrayDimensions() {
+        return 0;
+    }
 }

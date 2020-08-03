@@ -51,8 +51,8 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached;
 public class GroovyClassElement extends AbstractGroovyElement implements ClassElement {
 
     protected final ClassNode classNode;
-    private Map<String, Map<String, ClassNode>> genericInfo;
     protected int arrayDimensions;
+    private Map<String, Map<String, ClassNode>> genericInfo;
 
     /**
      * @param sourceUnit         The source unit
@@ -70,6 +70,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
      * @param genericInfo        The generic info
+     * @param arrayDimensions    The number of array dimensions for arrays
      */
     GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata, Map<String, Map<String, ClassNode>> genericInfo, int arrayDimensions) {
         super(sourceUnit, compilationUnit, classNode, annotationMetadata);
