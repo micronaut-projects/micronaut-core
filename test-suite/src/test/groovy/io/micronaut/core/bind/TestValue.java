@@ -23,6 +23,13 @@ public @interface TestValue {
     String value() default "";
 
     /**
+     * @return The name of the parameter
+     */
+    @AliasFor(annotation = Bindable.class, member = "value")
+    @AliasFor(member = "value")
+    String name() default "";
+
+    /**
      * @see Bindable#defaultValue()
      * @return The default value
      */
