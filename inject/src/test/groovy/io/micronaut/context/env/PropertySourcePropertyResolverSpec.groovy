@@ -23,6 +23,7 @@ import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
 import io.micronaut.core.value.MapPropertyResolver
 import io.micronaut.core.value.PropertyResolver
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -429,7 +430,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
             micronaut['security']['intercept-url-map'][0]['access'][0] == '/some-path'
             micronaut['security']['intercept-url-map'][0]['access'][1] == '/some-path-x'
     }
-    
+
     void "test map and list values are collapsed"() {
         given:
         def values = new HashMap()
@@ -441,7 +442,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
         )
-        
+
         expect:
         resolver.getRequiredProperty('foo[0].bar[0]', String) == "foo0Bar0"
         resolver.getRequiredProperty('foo[0].bar[1]', String) == 'foo0Bar1'
@@ -460,4 +461,19 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getRequiredProperty('micronaut.security.intercept-url-map[0].access[1]', String) == '/some-path-x'
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/3811")
+    void "test properties start with the letter A"() {
+        given:
+        def values = [
+                'AAA': 'fonzie',
+                'aaa': 'fonzie',
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getRequiredProperty('AAA', String) == "fonzie"
+        resolver.getRequiredProperty('aaa', String) == "fonzie"
+    }
 }
