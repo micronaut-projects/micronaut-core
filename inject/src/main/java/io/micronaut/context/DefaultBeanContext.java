@@ -2256,7 +2256,7 @@ public class DefaultBeanContext implements BeanContext {
             if (concreteCandidate.isPresent()) {
                 BeanDefinition<T> definition = concreteCandidate.get();
 
-                bean = findExistingCompatibleSingleton(definition.getBeanType(), qualifier, definition);
+                bean = findExistingCompatibleSingleton(definition.getBeanType(), beanType, qualifier, definition);
                 if (bean != null) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", bean, beanType, qualifier);
@@ -2279,7 +2279,7 @@ public class DefaultBeanContext implements BeanContext {
                 }
 
             } else {
-                bean = findExistingCompatibleSingleton(beanType, qualifier, null);
+                bean = findExistingCompatibleSingleton(beanType, null, qualifier, null);
                 if (bean == null && throwNoSuchBean) {
                     throw new NoSuchBeanException(beanType, qualifier);
                 } else {
@@ -2410,7 +2410,7 @@ public class DefaultBeanContext implements BeanContext {
         return proxiedType;
     }
 
-    private <T> T findExistingCompatibleSingleton(Class<T> beanType, Qualifier<T> qualifier, BeanDefinition<T> definition) {
+    private <T> T findExistingCompatibleSingleton(Class<T> beanType, @Nullable Class<?> requestedType, Qualifier<T> qualifier, @Nullable BeanDefinition<T> definition) {
         T bean = null;
         for (Map.Entry<BeanKey, BeanRegistration> entry : singletonObjects.entrySet()) {
             BeanKey key = entry.getKey();
@@ -2433,7 +2433,10 @@ public class DefaultBeanContext implements BeanContext {
                 BeanRegistration registration = entry.getValue();
                 Object existing = registration.bean;
                 if (beanType.isInstance(existing)) {
-                    Optional<BeanDefinition> candidate = qualifier.qualify(beanType, Stream.of(registration.beanDefinition));
+                    Optional<BeanDefinition<T>> candidate = qualifier.qualify(beanType, Stream.of(registration.beanDefinition));
+                    if (!candidate.isPresent() && requestedType != null && requestedType != beanType) {
+                        candidate = qualifier.qualify((Class<T>) requestedType, Stream.of(registration.beanDefinition));
+                    }
                     if (candidate.isPresent()) {
                         synchronized (singletonObjects) {
                             bean = (T) existing;

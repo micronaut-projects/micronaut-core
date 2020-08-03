@@ -30,6 +30,6 @@ class ClosestTypeArgumentsSpec extends Specification {
         ExceptionHandler bean2 = ctx.getBean(ExceptionHandler, Qualifiers.byTypeArgumentsClosest(CustomError.class, Object.class))
 
         then:
-        bean1 == bean2
+        bean1.is(bean2)
     }
 }
