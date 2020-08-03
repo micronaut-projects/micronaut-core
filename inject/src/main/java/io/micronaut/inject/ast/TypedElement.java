@@ -62,4 +62,11 @@ public interface TypedElement extends Element {
     default boolean isArray() {
         return false;
     }
+
+    /**
+     * If the type is an array, the number of dimensions.
+     * String[] should return 1, String[][] should return 2
+     * @return The number of dimensions
+     */
+    default int getArrayDimensions() { return 0; }
 }

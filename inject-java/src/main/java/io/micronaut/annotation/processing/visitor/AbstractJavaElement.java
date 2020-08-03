@@ -25,6 +25,8 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MemberElement;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.inject.ast.PrimitiveElement;
+
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
@@ -172,33 +174,39 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             genericsInfo = Collections.emptyMap();
         }
         if (returnType instanceof NoType) {
-            return new JavaVoidElement();
+            return PrimitiveElement.VOID;
         } else if (returnType instanceof DeclaredType) {
             DeclaredType dt = (DeclaredType) returnType;
             Element e = dt.asElement();
-            List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
-            if (e instanceof TypeElement) {
-                TypeElement typeElement = (TypeElement) e;
-                Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
-                if (visitorContext.getModelUtils().resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
-                    return new JavaEnumElement(
-                            typeElement,
-                            visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
-                            visitorContext
-                    );
-                } else {
-                    genericsInfo = visitorContext.getGenericUtils().alignNewGenericsInfo(
-                        typeElement,
-                        typeArguments,
-                        boundGenerics
-                    );
-                    return new JavaClassElement(
-                            typeElement,
-                            visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
-                            visitorContext,
-                            genericsInfo
-                    );
+            //Declared types can wrap other types, like primitives
+            if (e.asType() instanceof DeclaredType) {
+                List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
+                if (e instanceof TypeElement) {
+                    TypeElement typeElement = (TypeElement) e;
+                    Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
+                    if (visitorContext.getModelUtils().resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
+                        return new JavaEnumElement(
+                                typeElement,
+                                visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
+                                visitorContext
+                        );
+                    } else {
+
+                        genericsInfo = visitorContext.getGenericUtils().alignNewGenericsInfo(
+                                typeElement,
+                                typeArguments,
+                                boundGenerics
+                        );
+                        return new JavaClassElement(
+                                typeElement,
+                                visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
+                                visitorContext,
+                                genericsInfo
+                        );
+                    }
                 }
+            } else {
+                return mirrorToClassElement(e.asType(), visitorContext, genericsInfo);
             }
         } else if (returnType instanceof TypeVariable) {
             TypeVariable tv = (TypeVariable) returnType;
@@ -217,22 +225,12 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             ArrayType at = (ArrayType) returnType;
             TypeMirror componentType = at.getComponentType();
             ClassElement arrayType = mirrorToClassElement(componentType, visitorContext, genericsInfo);
-            if (arrayType instanceof JavaPrimitiveElement) {
-                JavaPrimitiveElement jpe = (JavaPrimitiveElement) arrayType;
-                return jpe.toArray();
-            } else {
-                return new JavaClassElement((TypeElement) arrayType.getNativeType(), arrayType, visitorContext) {
-                    @Override
-                    public boolean isArray() {
-                        return true;
-                    }
-                };
-            }
+            return arrayType.toArray();
         } else if (returnType instanceof PrimitiveType) {
             PrimitiveType pt = (PrimitiveType) returnType;
-            return JavaPrimitiveElement.valueOf(pt.getKind().name());
+            return PrimitiveElement.valueOf(pt.getKind().name());
         }
-        return new JavaVoidElement();
+        return PrimitiveElement.VOID;
     }
 
     private Map<String, TypeMirror> resolveBoundGenerics(JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {
