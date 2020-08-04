@@ -1335,7 +1335,8 @@ public class DefaultHttpClient implements
      */
     protected SslContext buildSslContext(URI uriObject) {
         final SslContext sslCtx;
-        if (io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(uriObject.getScheme())) {
+        if (io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(uriObject.getScheme()) ||
+            SCHEME_WSS.equalsIgnoreCase(uriObject.getScheme())) {
             sslCtx = sslContext;
             //Allow https requests to be sent if SSL is disabled but a proxy is present
             if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
