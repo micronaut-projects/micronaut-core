@@ -30,6 +30,13 @@ import io.micronaut.http.uri.UriMatchVariable;
 
 import java.util.Collections;
 
+/**
+ * A binder for binding arguments annotated with @QueryValue
+ *
+ * @param <T> The argument type
+ * @author James Kleeh
+ * @since 2.0.2
+ */
 public class QueryValueArgumentBinder<T> extends AbstractAnnotatedArgumentBinder<QueryValue, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<QueryValue, T> {
 
     /**
