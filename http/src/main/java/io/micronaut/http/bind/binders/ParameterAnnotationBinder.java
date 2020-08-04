@@ -43,11 +43,14 @@ import java.util.Optional;
  */
 public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<QueryValue, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<QueryValue, T> {
 
+    QueryValueArgumentBinder<T> queryValueArgumentBinder;
+
     /**
      * @param conversionService The conversion service
      */
     public ParameterAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
+        this.queryValueArgumentBinder = new QueryValueArgumentBinder<>(conversionService);
     }
 
     @Override
@@ -57,48 +60,16 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
-        ConvertibleMultiValues<String> parameters = source.getParameters();
         Argument<T> argument = context.getArgument();
         HttpMethod httpMethod = source.getMethod();
         boolean permitsRequestBody = HttpMethod.permitsRequestBody(httpMethod);
 
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         boolean hasAnnotation = annotationMetadata.hasAnnotation(QueryValue.class);
-        String parameterName = annotationMetadata.stringValue(QueryValue.class).orElse(argument.getName());
-        // If we need to bind all request params to command object
-        // checks if the variable is defined with modifier char *
-        // eg. ?pojo*
-        boolean bindAll = source.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class)
-                .map(umi -> {
-                    UriMatchVariable uriMatchVariable = umi.getVariableMap().get(parameterName);
-                    return uriMatchVariable != null && uriMatchVariable.isExploded();
-                }).orElse(false);
+        String parameterName = argument.getName();
 
+        BindingResult<T> result = queryValueArgumentBinder.bind(context, source);
 
-        BindingResult<T> result;
-        // if the annotation is present or the HTTP method doesn't allow a request body
-        // attempt to bind from request parameters. This avoids allowing the request URI to
-        // be manipulated to override POST or JSON variables
-        if (hasAnnotation || !permitsRequestBody) {
-            if (bindAll) {
-                Object value;
-                // Only maps and POJOs will "bindAll", lists work like normal
-                if (Iterable.class.isAssignableFrom(argument.getType())) {
-                    value = doResolve(context, parameters, parameterName);
-                    if (value == null) {
-                        value = Collections.emptyList();
-                    }
-                } else {
-                    value = parameters.asMap();
-                }
-                result = doConvert(value, context);
-            } else {
-                result = doBind(context, parameters, parameterName);
-            }
-        } else {
-            //noinspection unchecked
-            result = BindingResult.EMPTY;
-        }
         Optional<T> val = result.getValue();
         if (!val.isPresent() && !hasAnnotation) {
             // attributes are sometimes added by filters, so this should return unsatisfied if not found

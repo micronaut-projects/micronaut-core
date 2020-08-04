@@ -150,7 +150,7 @@ Micronaut's support for GraalVM Native Image has been moved out of experimental 
 
 ==== Automatic Static Resource Detection for Native Image
 
-It is not longer necessary to configure static resources for your Native Immage builds. The `micronaut-graal` annotation processor will automatically do this for you for all resources found in `src/main/resources`.
+It is not longer necessary to configure static resources for your Native Image builds. The `micronaut-graal` annotation processor will automatically do this for you for all resources found in `src/main/resources`.
 
 ==== Improved support for JDBC / Hibernate in Native Image
 

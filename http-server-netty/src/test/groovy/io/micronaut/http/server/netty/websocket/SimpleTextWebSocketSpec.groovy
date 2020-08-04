@@ -180,28 +180,31 @@ class SimpleTextWebSocketSpec extends Specification {
         embeddedServer.close()
     }
 
-
-    @Retry
     void "test simple text websocket connection with query"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level': 'TRACE').run(EmbeddedServer)
-        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
+        PollingConditions conditions = new PollingConditions(timeout: 2, delay: 0.5)
 
         when: "a websocket connection is established"
         RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
-        ChatClientWebSocket fred = wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred?dinner=chicken").blockingFirst()
+        QueryParamClientWebSocket client = wsClient.connect(QueryParamClientWebSocket, "/charity?dinner=chicken%20dumplings").blockingFirst()
 
         then: "The connection is valid"
-        fred.session != null
-        fred.session.id != null
-        fred.request != null
-        fred.request.uri != null
-        fred.request.uri.query == "dinner=chicken"
+        client.session.id != null
+
+        when:
+        QueryParamServerWebSocket server = embeddedServer.applicationContext.getBean(QueryParamServerWebSocket)
+
+        then:
+        conditions.eventually {
+            server.dinner == "chicken dumplings"
+        }
 
         cleanup:
         wsClient.close()
         embeddedServer.close()
     }
+
 
     @Singleton
     static class MyBean {

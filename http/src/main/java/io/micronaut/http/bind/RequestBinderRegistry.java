@@ -15,8 +15,12 @@
  */
 package io.micronaut.http.bind;
 
+import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.ArgumentBinderRegistry;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+
+import java.util.Optional;
 
 /**
  * A {@link ArgumentBinderRegistry} where the source of binding is a {@link HttpRequest}.
@@ -25,4 +29,6 @@ import io.micronaut.http.HttpRequest;
  * @since 1.0
  */
 public interface RequestBinderRegistry extends ArgumentBinderRegistry<HttpRequest<?>> {
+
+
 }

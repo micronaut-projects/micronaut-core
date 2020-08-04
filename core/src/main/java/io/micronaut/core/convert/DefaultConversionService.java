@@ -654,6 +654,11 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of((int[]) newArray);
         });
 
+        // String -> Char Array
+        addConverter(String.class, char[].class, (String object, Class<char[]> targetType, ConversionContext context) -> {
+            return Optional.of(object.toCharArray());
+        });
+
         // Object[] -> String[]
         addConverter(Object[].class, String[].class, (Object[] object, Class<String[]> targetType, ConversionContext context) -> {
             String[] strings = new String[object.length];

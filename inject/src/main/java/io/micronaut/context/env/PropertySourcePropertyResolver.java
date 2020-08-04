@@ -715,7 +715,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         char firstChar = name.charAt(0);
         if (Character.isLetter(firstChar)) {
             int index = firstChar - 65;
-            if (index < catalog.length && index > 0) {
+            if (index < catalog.length && index >= 0) {
                 entries = catalog[index];
                 if (allowCreate && entries == null) {
                     entries = new LinkedHashMap<>(5);
