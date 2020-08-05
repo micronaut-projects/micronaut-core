@@ -20,42 +20,36 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 
 public final class PrimitiveElement implements ClassElement {
 
-    public static final PrimitiveElement VOID = new PrimitiveElement("void", "V");
-
-    private static final PrimitiveElement INT = new PrimitiveElement("int", "I");
-    private static final PrimitiveElement CHAR = new PrimitiveElement("char", "C");
-    private static final PrimitiveElement BOOLEAN = new PrimitiveElement("boolean", "Z");
-    private static final PrimitiveElement LONG = new PrimitiveElement("long", "J");
-    private static final PrimitiveElement FLOAT = new PrimitiveElement("float", "F");
-    private static final PrimitiveElement DOUBLE = new PrimitiveElement("double", "D");
-    private static final PrimitiveElement SHORT = new PrimitiveElement("short", "S");
-    private static final PrimitiveElement BYTE = new PrimitiveElement("byte", "B");
+    public static final PrimitiveElement VOID = new PrimitiveElement("void");
+    private static final PrimitiveElement INT = new PrimitiveElement("int");
+    private static final PrimitiveElement CHAR = new PrimitiveElement("char");
+    private static final PrimitiveElement BOOLEAN = new PrimitiveElement("boolean");
+    private static final PrimitiveElement LONG = new PrimitiveElement("long");
+    private static final PrimitiveElement FLOAT = new PrimitiveElement("float");
+    private static final PrimitiveElement DOUBLE = new PrimitiveElement("double");
+    private static final PrimitiveElement SHORT = new PrimitiveElement("short");
+    private static final PrimitiveElement BYTE = new PrimitiveElement("byte");
     private static final PrimitiveElement[] PRIMITIVES = new PrimitiveElement[] {INT, CHAR, BOOLEAN, LONG, FLOAT, DOUBLE, SHORT, BYTE, VOID};
 
     private final String typeName;
-    private final String className;
     private final int arrayDimensions;
 
     /**
      * Default constructor.
      * @param name The type name
-     * @param className The class name
      */
-    private PrimitiveElement(String name, String className) {
+    private PrimitiveElement(String name) {
         this.typeName = name;
-        this.className = className;
         this.arrayDimensions = 0;
     }
 
     /**
      * Default constructor.
      * @param name The type name
-     * @param className The class name
      * @param arrayDimensions The array dimension count
      */
-    private PrimitiveElement(String name, String className, int arrayDimensions) {
+    private PrimitiveElement(String name, int arrayDimensions) {
         this.typeName = name;
-        this.className = className;
         this.arrayDimensions = arrayDimensions;
     }
 
@@ -74,11 +68,8 @@ public final class PrimitiveElement implements ClassElement {
         return arrayDimensions;
     }
 
-    public String getInternalName() {
-        return className;
-    }
-
     @Override
+    @NonNull
     public String getName() {
         return typeName;
     }
@@ -109,7 +100,7 @@ public final class PrimitiveElement implements ClassElement {
      * @return The array rep
      */
     public ClassElement toArray() {
-        return new PrimitiveElement(typeName, className, arrayDimensions + 1);
+        return new PrimitiveElement(typeName, arrayDimensions + 1);
     }
 
     @Override

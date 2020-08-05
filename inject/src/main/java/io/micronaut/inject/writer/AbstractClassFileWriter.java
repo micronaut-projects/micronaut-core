@@ -568,7 +568,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     protected static Type getTypeReference(TypedElement type) {
         if (type.isPrimitive()) {
-            String internalName = ((PrimitiveElement) type).getInternalName();
+            String internalName = NAME_TO_TYPE_MAP.get(type.getName());
             if (type.isArray()) {
                 StringBuilder name = new StringBuilder(internalName);
                 for (int i = 0; i < type.getArrayDimensions(); i++) {
