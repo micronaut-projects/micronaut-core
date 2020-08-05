@@ -24,6 +24,7 @@ import io.reactivex.Single
 import spock.lang.Specification
 
 import javax.inject.Singleton
+import javax.persistence.OptimisticLockException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ExecutionException
@@ -153,18 +154,25 @@ class SimpleRetrySpec extends Specification {
         CounterService counterService = context.getBean(CounterService)
 
         when:
-        counterService.getCountIncludes(true)
+        counterService.updateCountIncludes(true)
 
         then: "retry didn't kick in because the exception thrown doesn't match includes"
         thrown(IllegalStateException)
         counterService.countIncludes == 1
 
         when:
-        counterService.getCountIncludes(false)
+        counterService.updateCountIncludes(false)
 
         then: "retry kicks in because the exception thrown matches includes"
         noExceptionThrown()
         counterService.countIncludes == counterService.countThreshold
+
+        when:
+        counterService.updateCountUnresolveableIncludes()
+
+        then: "retry didn't kick in because the exception thrown does not match includes that can not be resolved"
+        thrown(IllegalStateException)
+        counterService.countUnresolveableIncludes == 1
 
         cleanup:
         context.stop()
@@ -176,14 +184,14 @@ class SimpleRetrySpec extends Specification {
         CounterService counterService = context.getBean(CounterService)
 
         when:
-        counterService.getCountExcludes(false)
+        counterService.updateCountExcludes(false)
 
         then: "retry didn't kick in because the exception thrown matches excludes"
         thrown(MyCustomException)
         counterService.countExcludes == 1
 
         when:
-        counterService.getCountExcludes(true)
+        counterService.updateCountExcludes(true)
 
         then: "retry kicks in because the exception thrown doesn't match excludes"
         noExceptionThrown()
@@ -241,8 +249,8 @@ class SimpleRetrySpec extends Specification {
     static class CounterService {
         int count = 0
         int countRx = 0
-        int countReact = 0
         int countIncludes = 0
+        int countUnresolveableIncludes = 0
         int countExcludes = 0
         int countCompletion = 0
         int _countCompletionStage = 0
@@ -270,7 +278,7 @@ class SimpleRetrySpec extends Specification {
         }
 
         @Retryable(attempts = '5', delay = '5ms', includes = MyCustomException.class)
-        Integer getCountIncludes(boolean illegalState) {
+        Integer updateCountIncludes(boolean illegalState) {
             countIncludes++
             if(countIncludes < countThreshold) {
                 if (illegalState) {
@@ -282,8 +290,17 @@ class SimpleRetrySpec extends Specification {
             return countIncludes
         }
 
+        @Retryable(attempts = '5', delay = '5ms', includes = OptimisticLockException.class)
+        Integer updateCountUnresolveableIncludes() {
+            countUnresolveableIncludes++
+            if(countUnresolveableIncludes < countThreshold) {
+                throw new IllegalStateException('Bad count')
+            }
+            return countUnresolveableIncludes
+        }
+
         @Retryable(attempts = '5', delay = '5ms', excludes = MyCustomException.class)
-        Integer getCountExcludes(boolean illegalState) {
+        Integer updateCountExcludes(boolean illegalState) {
             countExcludes++
             if(countExcludes < countThreshold) {
                 if (illegalState) {

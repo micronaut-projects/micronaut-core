@@ -15,6 +15,7 @@
  */
 package io.micronaut.retry.intercept;
 
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.reflect.InstantiationUtils;
@@ -78,8 +79,14 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
 
     private static RetryPredicate createPredicate(Class<? extends RetryPredicate> predicateClass, AnnotationValue<Retryable> retry) {
         if (predicateClass.equals(DefaultRetryPredicate.class)) {
-            List<Class<? extends Throwable>> includes = resolveIncludes(retry, INCLUDES);
-            List<Class<? extends Throwable>> excludes = resolveIncludes(retry, EXCLUDES);
+            // annotationClassValues are independent from the runtime classpath
+            AnnotationClassValue<?>[] annotationClassValues = retry.annotationClassValues(INCLUDES);
+            List<Class<? extends Throwable>> includes = resolveThrowables(retry, INCLUDES);
+            if (annotationClassValues.length > 0 && includes.size() == 0) {
+                // None of the specified includes are on the classpath, retry will never be invoked
+                return throwable -> false;
+            }
+            List<Class<? extends Throwable>> excludes = resolveThrowables(retry, EXCLUDES);
             return new DefaultRetryPredicate(includes, excludes);
         } else {
             return InstantiationUtils.instantiate(predicateClass);
@@ -87,8 +94,10 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static List<Class<? extends Throwable>> resolveIncludes(AnnotationValue<Retryable> retry, String includes) {
-        Class<?>[] values = retry.classValues(includes);
+    private static List<Class<? extends Throwable>> resolveThrowables(AnnotationValue<Retryable> retry, String annotationMemberName) {
+        // Resolves the value of the specified annotation member as a list of Throwables
+        // Throwables missing on the runtime classpath are silently ignored
+        Class<?>[] values = retry.classValues(annotationMemberName);
         return (List) Collections.unmodifiableList(Arrays.asList(values));
     }
 }
