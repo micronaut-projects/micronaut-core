@@ -20,6 +20,7 @@ import groovy.transform.CompileDynamic
 import io.micronaut.aop.Adapter
 import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
+import io.micronaut.ast.groovy.visitor.AbstractGroovyElement
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
 import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
@@ -336,7 +337,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.concreteClass = targetClassNode
             def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, targetClassNode)
             this.annotationMetadata = annotationMetadata
-            this.originatingElement = new GroovyClassElement(sourceUnit, compilationUnit, concreteClass, annotationMetadata)
+            this.originatingElement = AbstractGroovyElement.toClassElement(sourceUnit, compilationUnit, concreteClass, annotationMetadata)
             this.isFactoryClass = annotationMetadata.hasStereotype(Factory)
             this.isAopProxyType = annotationMetadata.hasStereotype(AROUND_TYPE) && !targetClassNode.isAbstract()
             this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()

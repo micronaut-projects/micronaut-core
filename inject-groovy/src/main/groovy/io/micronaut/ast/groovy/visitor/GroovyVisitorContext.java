@@ -107,7 +107,7 @@ public class GroovyVisitorContext implements VisitorContext {
                 });
 
         return Optional.ofNullable(classNode)
-                .map(cn -> new GroovyClassElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)));
+                .map(cn -> AbstractGroovyElement.toClassElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)));
     }
 
     @Override
@@ -115,7 +115,7 @@ public class GroovyVisitorContext implements VisitorContext {
         final ClassNode classNode = ClassHelper.makeCached(type);
         final AnnotationMetadata annotationMetadata = AstAnnotationUtils
                 .getAnnotationMetadata(sourceUnit, compilationUnit, classNode);
-        final GroovyClassElement classElement = new GroovyClassElement(sourceUnit, compilationUnit, classNode, annotationMetadata);
+        final ClassElement classElement = AbstractGroovyElement.toClassElement(sourceUnit, compilationUnit, classNode, annotationMetadata);
         return Optional.of(
                 classElement
         );
@@ -136,7 +136,7 @@ public class GroovyVisitorContext implements VisitorContext {
         for (String s : stereotypes) {
             scanner.scan(s, aPackage).forEach(aClass -> {
                 final ClassNode classNode = ClassHelper.make(aClass);
-                classElements.add(new GroovyClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)));
+                classElements.add(AbstractGroovyElement.toClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)));
             });
         }
         return classElements.toArray(new ClassElement[0]);

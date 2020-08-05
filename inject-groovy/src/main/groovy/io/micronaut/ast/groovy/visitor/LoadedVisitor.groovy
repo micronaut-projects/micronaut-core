@@ -21,6 +21,7 @@ import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Internal
 import io.micronaut.core.order.Ordered
+import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.visitor.TypeElementVisitor
 import org.codehaus.groovy.ast.AnnotatedNode
@@ -51,7 +52,7 @@ class LoadedVisitor implements Ordered {
     private final TypeElementVisitor visitor
     private final String classAnnotation
     private final String elementAnnotation
-    private GroovyClassElement currentClassElement
+    private ClassElement currentClassElement
     private final CompilationUnit compilationUnit
 
     LoadedVisitor(SourceUnit source, CompilationUnit compilationUnit, TypeElementVisitor visitor) {
@@ -140,26 +141,21 @@ class LoadedVisitor implements Ordered {
                 visitor.visitField(e, visitorContext)
                 return e
             case ConstructorNode:
-                def e = new GroovyConstructorElement(currentClassElement, sourceUnit, compilationUnit, (ConstructorNode) annotatedNode, annotationMetadata)
+                def e = new GroovyConstructorElement((GroovyClassElement) currentClassElement, sourceUnit, compilationUnit, (ConstructorNode) annotatedNode, annotationMetadata)
                 visitor.visitConstructor(e, visitorContext)
                 return e
             case MethodNode:
                 if (currentClassElement != null) {
-                    def e = new GroovyMethodElement(currentClassElement, sourceUnit, compilationUnit, (MethodNode) annotatedNode, annotationMetadata)
+                    def e = new GroovyMethodElement((GroovyClassElement) currentClassElement, sourceUnit, compilationUnit, (MethodNode) annotatedNode, annotationMetadata)
                     visitor.visitMethod(e, visitorContext)
                     return e
                 }
+                break
             case ClassNode:
                 ClassNode cn = (ClassNode) annotatedNode
-                if (cn.isEnum()) {
-                    currentClassElement = new GroovyEnumElement(sourceUnit, compilationUnit, cn, annotationMetadata)
-                    visitor.visitClass(currentClassElement, visitorContext)
-                    return currentClassElement
-                } else {
-                    currentClassElement = new GroovyClassElement(sourceUnit, compilationUnit, cn, annotationMetadata)
-                    visitor.visitClass(currentClassElement, visitorContext)
-                    return currentClassElement
-                }
+                currentClassElement = new GroovyClassElement(sourceUnit, compilationUnit, cn, annotationMetadata)
+                visitor.visitClass(currentClassElement, visitorContext)
+                return currentClassElement
         }
 
         return null
