@@ -35,6 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -133,18 +136,31 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
      * @return The fallback method if it is present
      */
     public Optional<? extends MethodExecutionHandle<?, Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
-        Class<?> declaringType = context.classValue(Recoverable.class, "api").orElseGet(context::getDeclaringType);
-        BeanDefinition<?> beanDefinition = beanContext.findBeanDefinition(declaringType, Qualifiers.byStereotype(Fallback.class)).orElse(null);
-        if (beanDefinition != null) {
-            ExecutableMethod<?, Object> fallBackMethod =
-                    beanDefinition.findMethod(context.getMethodName(), context.getArgumentTypes()).orElse(null);
-            if (fallBackMethod != null) {
-                MethodExecutionHandle<?, Object> executionHandle = beanContext.createExecutionHandle(beanDefinition, (ExecutableMethod<Object, ?>) fallBackMethod);
-                return Optional.of(executionHandle);
+        List<Class<?>> declaredTypes = this.getDeclaredTypes(context);
+
+        for (Class<?> declaredType: declaredTypes) {
+            BeanDefinition<?> beanDefinition = beanContext.findBeanDefinition(declaredType, Qualifiers.byStereotype(Fallback.class)).orElse(null);
+            if (beanDefinition != null) {
+                ExecutableMethod<?, Object> fallBackMethod =
+                        beanDefinition.findMethod(context.getMethodName(), context.getArgumentTypes()).orElse(null);
+                if (fallBackMethod != null) {
+                    MethodExecutionHandle<?, Object> executionHandle = beanContext.createExecutionHandle(beanDefinition, (ExecutableMethod<Object, ?>) fallBackMethod);
+                    return Optional.of(executionHandle);
+                }
             }
         }
+
         context.setAttribute(FALLBACK_NOT_FOUND, Boolean.TRUE);
         return Optional.empty();
+    }
+
+    private List<Class<?>> getDeclaredTypes(MethodInvocationContext<Object, Object> context) {
+        ArrayList<Class<?>> declaredTypes = new ArrayList();
+        Class<?> declaredType = context.classValue(Recoverable.class, "api").orElseGet(context::getDeclaringType);
+        declaredTypes.add(declaredType);
+        Arrays.stream(declaredType.getAnnotatedInterfaces()).findFirst().ifPresent(annotatedType -> declaredTypes.add(annotatedType.getType().getClass()));
+
+        return declaredTypes;
     }
 
     @SuppressWarnings("unchecked")
