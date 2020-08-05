@@ -16,29 +16,9 @@
 package io.micronaut.core.bind;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.http.HttpAttributes;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMessage;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpRequestFactory;
-import io.micronaut.http.HttpVersion;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.cookie.Cookies;
-
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.security.Principal;
-import java.security.cert.Certificate;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
 
 /**
  * <p>Common interface for HTTP request implementations.</p>
