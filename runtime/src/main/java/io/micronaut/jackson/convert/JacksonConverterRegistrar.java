@@ -152,36 +152,9 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
                 conversionContext = ConversionContext.of(targetType);
             }
             ArgumentBinder binder = this.beanPropertyBinder.get();
-            ArgumentBinder.BindingResult result = binder.bind(conversionContext, correctKeys(map));
+            ArgumentBinder.BindingResult result = binder.bind(conversionContext, map);
             return result.getValue();
         };
-    }
-
-    private Map correctKeys(Map<?, ?> map) {
-        Map mapWithExtraProps = new LinkedHashMap(map.size());
-        for (Map.Entry entry : map.entrySet()) {
-            Object key = entry.getKey();
-            Object value = correctKeys(entry.getValue());
-            mapWithExtraProps.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), value);
-        }
-        return mapWithExtraProps;
-    }
-
-    private List correctKeys(List list) {
-        List newList = new ArrayList(list.size());
-        for (Object o : list) {
-            newList.add(correctKeys(o));
-        }
-        return newList;
-    }
-
-    private Object correctKeys(Object o) {
-        if (o instanceof List) {
-            return correctKeys((List) o);
-        } else if (o instanceof Map) {
-            return correctKeys((Map) o);
-        }
-        return o;
     }
 
     /**

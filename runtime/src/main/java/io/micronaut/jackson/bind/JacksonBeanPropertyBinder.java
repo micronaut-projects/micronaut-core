@@ -15,15 +15,11 @@
  */
 package io.micronaut.jackson.bind;
 
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.bind.BeanPropertyBinder;
@@ -37,6 +33,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
 
 import javax.inject.Singleton;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -67,11 +65,10 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
     @Override
     public BindingResult<Object> bind(ArgumentConversionContext<Object> context, Map<CharSequence, ? super Object> source) {
         try {
-            ObjectNode objectNode = buildSourceObjectNode(source.entrySet());
-            JsonParser jsonParser = objectMapper.treeAsTokens(objectNode);
+            Map objectNode = buildSourceMapNode(source.entrySet());
             TypeFactory typeFactory = objectMapper.getTypeFactory();
             JavaType javaType = JacksonConfiguration.constructType(context.getArgument(), typeFactory);
-            Object result = objectMapper.readValue(jsonParser, javaType);
+            Object result = objectMapper.convertValue(objectNode, javaType);
             return () -> Optional.of(result);
         } catch (Exception e) {
             context.reject(e);
@@ -97,8 +94,8 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
     @Override
     public <T2> T2 bind(Class<T2> type, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException {
         try {
-            ObjectNode objectNode = buildSourceObjectNode(source);
-            return objectMapper.treeToValue(objectNode, type);
+            Map objectNode = buildSourceMapNode(source);
+            return objectMapper.convertValue(objectNode, type);
         } catch (Exception e) {
             throw newConversionError(null, e);
         }
@@ -107,8 +104,9 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
     @Override
     public <T2> T2 bind(T2 object, ArgumentConversionContext<T2> context, Set<? extends Map.Entry<? extends CharSequence, Object>> source) {
         try {
-            ObjectNode objectNode = buildSourceObjectNode(source);
-            objectMapper.readerForUpdating(object).readValue(objectNode);
+            Map objectNode = buildSourceMapNode(source);
+            JsonNode jacksonTree = objectMapper.valueToTree(objectNode);
+            objectMapper.readerForUpdating(object).readValue(jacksonTree);
         } catch (Exception e) {
             context.reject(e);
         }
@@ -118,8 +116,9 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
     @Override
     public <T2> T2 bind(T2 object, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException {
         try {
-            ObjectNode objectNode = buildSourceObjectNode(source);
-            return objectMapper.readerForUpdating(object).readValue(objectNode);
+            Map objectNode = buildSourceMapNode(source);
+            JsonNode jacksonTree = objectMapper.valueToTree(objectNode);
+            return objectMapper.readerForUpdating(object).readValue(jacksonTree);
         } catch (Exception e) {
             throw newConversionError(object, e);
         }
@@ -172,15 +171,13 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
         }
     }
 
-    private ObjectNode buildSourceObjectNode(Set<? extends Map.Entry<? extends CharSequence, Object>> source) {
-        JsonNodeFactory nodeFactory = objectMapper.getNodeFactory();
-        ObjectNode rootNode = new ObjectNode(nodeFactory);
+    private Map buildSourceMapNode(Set<? extends Map.Entry<? extends CharSequence, Object>> source) {
+        Map rootNode = new LinkedHashMap();
         for (Map.Entry<? extends CharSequence, ? super Object> entry : source) {
-            CharSequence key = entry.getKey();
             Object value = entry.getValue();
-            String property = key.toString();
+            String property = correctKey(entry.getKey().toString());
             String[] tokens = property.split("\\.");
-            JsonNode current = rootNode;
+            Object current = rootNode;
             String index = null;
             for (int i = 0; i < tokens.length; i++) {
                 String token = tokens[i];
@@ -189,88 +186,43 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
                     index = token.substring(j + 1, token.length() - 1);
                     token = token.substring(0, j);
                 }
-
                 if (i == tokens.length - 1) {
-                    if (current instanceof ObjectNode) {
-                        ObjectNode objectNode = (ObjectNode) current;
+                    if (current instanceof Map) {
+                        Map mapNode = (Map) current;
                         if (index != null) {
-                            JsonNode existing = objectNode.get(index);
-                            if (!(existing instanceof ObjectNode)) {
-                                existing = new ObjectNode(nodeFactory);
-                                objectNode.set(index, existing);
-                            }
-                            ObjectNode node = (ObjectNode) existing;
-                            node.set(token, objectMapper.valueToTree(value));
+                            mapNode = getOrCreateMapNodeAtKey(mapNode, index);
                             index = null;
-                        } else {
-                            objectNode.set(token, objectMapper.valueToTree(value));
                         }
-                    } else if (current instanceof ArrayNode && index != null) {
-                        ArrayNode arrayNode = (ArrayNode) current;
+                        mapNode.put(token, processValue(value));
+                    } else if (current instanceof List && index != null) {
+                        List arrayNode = (List) current;
                         int arrayIndex = Integer.parseInt(index);
-                        if (arrayIndex < arraySizeThreshhold) {
-
-                            if (arrayIndex < arrayNode.size()) {
-                                JsonNode jsonNode = arrayNode.get(arrayIndex);
-                                if (jsonNode instanceof ObjectNode) {
-                                    ((ObjectNode) jsonNode).set(token, objectMapper.valueToTree(value));
-                                } else {
-
-                                    arrayNode.set(arrayIndex, new ObjectNode(nodeFactory, CollectionUtils.mapOf(token, objectMapper.valueToTree(value))));
-                                }
-                            } else {
-                                expandArrayToThreshold(arrayIndex, arrayNode);
-                                arrayNode.set(arrayIndex, new ObjectNode(nodeFactory, CollectionUtils.mapOf(token, objectMapper.valueToTree(value))));
-                            }
-                        }
+                        Map mapNode = getOrCreateMapNodeAtIndex(arrayNode, arrayIndex);
+                        mapNode.put(token, processValue(value));
                         index = null;
                     }
                 } else {
-                    if (current instanceof ObjectNode) {
-                        ObjectNode objectNode = (ObjectNode) current;
-                        JsonNode existing = objectNode.get(token);
+                    if (current instanceof Map) {
+                        Map objectNode = (Map) current;
                         if (index != null) {
-                            JsonNode jsonNode;
                             if (StringUtils.isDigits(index)) {
                                 int arrayIndex = Integer.parseInt(index);
-                                ArrayNode arrayNode;
-                                if (!(existing instanceof ArrayNode)) {
-                                    arrayNode = new ArrayNode(nodeFactory);
-                                    objectNode.set(token, arrayNode);
-                                } else {
-                                    arrayNode = (ArrayNode) existing;
-                                }
-                                expandArrayToThreshold(arrayIndex, arrayNode);
-                                jsonNode = getOrCreateNodeAtIndex(nodeFactory, arrayNode, arrayIndex);
+                                List arrayNode = getOrCreateListNodeAtKey(objectNode, token);
+                                current = getOrCreateMapNodeAtIndex(arrayNode, arrayIndex);
                             } else {
-                                if (!(existing instanceof ObjectNode)) {
-                                    existing = new ObjectNode(nodeFactory);
-                                    objectNode.set(token, existing);
-                                }
-                                jsonNode = existing.get(index);
-                                if (!(jsonNode instanceof ObjectNode)) {
-                                    jsonNode = new ObjectNode(nodeFactory);
-                                    ((ObjectNode) existing).set(index, jsonNode);
-                                }
+                                Map mapNode = getOrCreateMapNodeAtKey(objectNode, token);
+                                current = getOrCreateMapNodeAtKey(mapNode, index);
                             }
-
-                            current = jsonNode;
                             index = null;
                         } else {
-                            if (!(existing instanceof ObjectNode)) {
-                                existing = new ObjectNode(nodeFactory);
-                                objectNode.set(token, existing);
-                            }
-                            current = existing;
+                            current = getOrCreateMapNodeAtKey(objectNode, token);
                         }
-                    } else if (current instanceof ArrayNode && StringUtils.isDigits(index)) {
-                        ArrayNode arrayNode = (ArrayNode) current;
+                    } else if (current instanceof List && StringUtils.isDigits(index)) {
                         int arrayIndex = Integer.parseInt(index);
-                        expandArrayToThreshold(arrayIndex, arrayNode);
-                        JsonNode jsonNode = getOrCreateNodeAtIndex(nodeFactory, arrayNode, arrayIndex);
+                        Map jsonNode = getOrCreateMapNodeAtIndex((List) current, arrayIndex);
 
-                        current = new ObjectNode(nodeFactory);
-                        ((ObjectNode) jsonNode).set(token, current);
+                        current = new LinkedHashMap<>();
+                        jsonNode.put(token, current);
                         index = null;
                     }
                 }
@@ -279,20 +231,84 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
         return rootNode;
     }
 
-    private JsonNode getOrCreateNodeAtIndex(JsonNodeFactory nodeFactory, ArrayNode arrayNode, int arrayIndex) {
-        JsonNode jsonNode = arrayNode.get(arrayIndex);
-        if (!(jsonNode instanceof ObjectNode)) {
-            jsonNode = new ObjectNode(nodeFactory);
+    private Map getOrCreateMapNodeAtIndex(List arrayNode, int arrayIndex) {
+        if (arrayIndex >= arrayNode.size()) {
+            arrayNode = expandArrayToThreshold(arrayIndex, arrayNode);
+        }
+        Object jsonNode = arrayNode.get(arrayIndex);
+        if (!(jsonNode instanceof Map)) {
+            jsonNode = new LinkedHashMap<>();
             arrayNode.set(arrayIndex, jsonNode);
         }
-        return jsonNode;
+        return (Map) jsonNode;
     }
 
-    private void expandArrayToThreshold(int arrayIndex, ArrayNode arrayNode) {
-        if (arrayIndex < arraySizeThreshhold) {
-            while (arrayNode.size() != arrayIndex + 1) {
-                arrayNode.addNull();
-            }
+    private Map getOrCreateMapNodeAtKey(Map objectNode, Object key) {
+        Object jsonNode = objectNode.get(key);
+        if (!(jsonNode instanceof Map)) {
+            jsonNode = new LinkedHashMap<>();
+            objectNode.put(key, jsonNode);
         }
+        return (Map) jsonNode;
     }
+
+    private List getOrCreateListNodeAtKey(Map objectNode, Object key) {
+        Object jsonNode = objectNode.get(key);
+        if (!(jsonNode instanceof List)) {
+            jsonNode = new ArrayList<>();
+            objectNode.put(key, jsonNode);
+        }
+        return (List) jsonNode;
+    }
+
+    private List expandArrayToThreshold(int arrayIndex, List arrayNode) {
+        if (arrayIndex < arraySizeThreshhold) {
+            ArrayList arrayListNode;
+            if (arrayNode instanceof ArrayList) {
+                arrayListNode = (ArrayList) arrayNode;
+            } else {
+                arrayListNode = new ArrayList(arrayNode);
+            }
+            while (arrayNode.size() != arrayIndex + 1) {
+                arrayNode.add(arrayIndex, null);
+            }
+            return arrayListNode;
+        }
+        return arrayNode;
+    }
+
+    private Object processValue(Object o) {
+        if (o instanceof List) {
+            return processList((List) o);
+        } else if (o instanceof Map) {
+            return processMap((Map) o);
+        } else if (o instanceof Number || o instanceof String || o instanceof Boolean) {
+            return o;
+        }
+        // Not a JSON object (Map, List, Number, String, Boolean) -> needs to be converted to and processed
+        return processValue(objectMapper.valueToTree(o));
+    }
+
+    private Map processMap(Map<?, ?> map) {
+        Map newMap = new LinkedHashMap(map.size());
+        for (Map.Entry entry : map.entrySet()) {
+            Object key = correctKey(entry.getKey().toString());
+            Object value = processValue(entry.getValue());
+            newMap.put(key, value);
+        }
+        return newMap;
+    }
+
+    private List processList(List list) {
+        List newList = new ArrayList(list.size());
+        for (Object o : list) {
+            newList.add(processValue(o));
+        }
+        return newList;
+    }
+
+    private String correctKey(String key) {
+        return NameUtils.decapitalize(NameUtils.dehyphenate(key));
+    }
+
 }
