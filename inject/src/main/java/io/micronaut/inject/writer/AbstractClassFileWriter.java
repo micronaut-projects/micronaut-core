@@ -97,6 +97,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         NAME_TO_TYPE_MAP.put("long", "J");
         NAME_TO_TYPE_MAP.put("double", "D");
         NAME_TO_TYPE_MAP.put("float", "F");
+        NAME_TO_TYPE_MAP.put("short", "S");
     }
 
     protected final Element originatingElement;
