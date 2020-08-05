@@ -35,8 +35,8 @@ public class DefaultRetryPredicate implements RetryPredicate {
     private final boolean hasExcludes;
 
     /**
-     * @param includes Classes to include for retry
-     * @param excludes Classes to exclude for retry
+     * @param includes Classes to include for retry. An empty list 'includes' any instances of Throwable.
+     * @param excludes Classes to exclude for retry.
      */
     public DefaultRetryPredicate(List<Class<? extends Throwable>> includes, List<Class<? extends Throwable>> excludes) {
         this.includes = includes;
