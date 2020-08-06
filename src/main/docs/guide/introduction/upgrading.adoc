@@ -18,7 +18,7 @@ dependency:io.micronaut.cache:micronaut-cache-caffeine[]
 
 === Compilation Error with classes in `javax.annotation` package
 
-If you application fails to compile referencing classes in the `javax.annotation` package such as `@Nullable` and `@Nonnull` you should update your project to instead import `edu.umd.cs.findbugs.annotations` from Spot Bugs.
+If your application fails to compile referencing classes in the `javax.annotation` package such as `@Nullable` and `@Nonnull` you should update your project to instead import `edu.umd.cs.findbugs.annotations` from Spot Bugs.
 
 === New Group IDs
 
