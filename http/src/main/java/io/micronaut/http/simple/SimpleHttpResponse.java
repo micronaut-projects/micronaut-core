@@ -99,6 +99,7 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
      *
      * @return The cookies.
      */
+    @Override
     public Cookies getCookies() {
         return cookies;
     }

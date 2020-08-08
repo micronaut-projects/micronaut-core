@@ -21,13 +21,21 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
+import io.micronaut.http.simple.cookies.SimpleCookies;
+import io.micronaut.http.util.CookieUtil;
 import io.micronaut.http.util.HttpUtil;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+
+import static io.micronaut.http.HttpHeaders.SET_COOKIE;
 
 /**
  * Common interface for HTTP messages.
@@ -44,6 +52,19 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @return The {@link HttpHeaders} object
      */
     @NonNull HttpHeaders getHeaders();
+
+    /**
+     * @return the cookies of this HTTP message
+     */
+    default @NonNull Cookies getCookies() {
+        Map<CharSequence, Cookie> cookiesByName = getHeaders().getAll(SET_COOKIE).stream()
+                .map(CookieUtil::getCookieFromString)
+                .collect(Collectors.toMap(Cookie::getName, $ -> $));
+
+        SimpleCookies cookies = new SimpleCookies(ConversionService.SHARED);
+        cookies.putAll(cookiesByName);
+        return cookies;
+    }
 
     /**
      * <p>A {@link MutableConvertibleValues} of the attributes for this HTTP message.</p>
