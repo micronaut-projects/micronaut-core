@@ -228,7 +228,9 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
                     BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
                     configureDeclaringType(declaringTypeElement, beanPropertyData);
-                    beanPropertyData.type = getterReturnType;
+                    if (beanPropertyData.type == null || getterReturnType.isAssignable(beanPropertyData.type.getName())) {
+                        beanPropertyData.type = getterReturnType;
+                    }
                     beanPropertyData.getter = executableElement;
                     if (beanPropertyData.setter != null) {
                         TypeMirror typeMirror = beanPropertyData.setter.getParameters().get(0).asType();

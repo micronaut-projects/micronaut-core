@@ -35,6 +35,34 @@ import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+
+    void "test bean introspection with property of generic interface"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Foo implements GenBase<String> {
+    public String getName() {
+        return "test";
+    }
+}
+
+''', Tuple.tuple('test.GenBase', '''
+package test;
+    
+interface GenBase<T> {
+    T getName();
+}
+'''))
+        when:
+        def test = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("name", String)
+                .get(test) == 'test'
+    }
+
     void "test bean introspection with property with static creator method on interface"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
