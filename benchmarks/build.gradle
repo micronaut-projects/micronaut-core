@@ -18,7 +18,7 @@ dependencies {
     api project(":runtime")
 
     jmh 'org.openjdk.jmh:jmh-core:1.24'
-    jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.24'
+    jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.25'
 }
 jmh {
     include =['io.micronaut.http.server.StartupBenchmark']
