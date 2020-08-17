@@ -255,7 +255,7 @@ ext {
                     version: micronautGrpcVersion,
                     group  : 'io.micronaut.grpc',
                     name   : 'micronaut-grpc-runtime',
-                    modules: ['micronaut-grpc-annotation']
+                    modules: ['micronaut-grpc-annotation', 'micronaut-grpc-client-runtime', 'micronaut-grpc-server-runtime', 'micronaut-protobuff-support']
             ],
             'micronaut.xml':[
                 version:micronautXmlVersion,
