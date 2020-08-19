@@ -1,0 +1,7 @@
+The table summarizes the default metrics available for the HTTP endpoints defined on your application and exposed via Micrometer.
+
+.HTTP Server Metrics
+|===
+|Metric|Description
+|http_server_requests_seconds_count|Is the total number of requests your application received at an endpoint
+|http_server_requests_seconds_sum|Is the sum of the the duration of every request your application received at an endpoint

@@ -1,0 +1,7 @@
+The table summarizes the default metrics available for the HTTP clients defined on your application and exposed via Micrometer.
+
+.HTTP Client Metrics
+|===
+|Metric|Description
+|http_client_requests_seconds_count|Is the total number of requests per second your application made to an endpoint via HTTP Client interface
+|http_client_requests_seconds_sum|Is the sum of the duration of every request your application made to an endpoint via HTTP Client interface

@@ -113,6 +113,7 @@ httpServer:
     title: Server Side View Rendering
   openapi: OpenAPI / Swagger Support
   graphql: GraphQL Support
+  httpServerMetrics: HTTP Server Metrics
 httpClient:
   title: The HTTP Client
   lowLevelHttpClient:
@@ -137,6 +138,7 @@ httpClient:
     netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
   clientSample: HTTP Client Sample
+  httpClientMetrics: HTTP Client Metrics
 cloud:
   title: Cloud Native Features
   cloudConfiguration:
