@@ -20,7 +20,7 @@ $ unzip example.zip -d example
 
 ==== HTTP Functions with Azure Function
 
-You can deploy regular Micronaut applications that use ann:http.annotation.Controller[] etc. using Micronaut's support for Azure HTTP Functions. See the documentation on https://micronaut-projects.github.io/micronaut-azure/1.0.x/guide/index.html#azureFunction[Google Azure HTTP Functions] for more information.
+You can deploy regular Micronaut applications that use ann:http.annotation.Controller[] etc. using Micronaut's support for Azure HTTP Functions. See the documentation on https://micronaut-projects.github.io/micronaut-azure/1.0.x/guide/index.html#azureFunction[Azure HTTP Functions] for more information.
 
 [TIP]
 .Using the CLI
