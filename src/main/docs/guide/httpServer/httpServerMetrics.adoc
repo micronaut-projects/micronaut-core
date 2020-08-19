@@ -5,3 +5,4 @@ The table summarizes the default metrics available for the HTTP endpoints define
 |Metric|Description
 |http_server_requests_seconds_count|Is the total number of requests your application received at an endpoint
 |http_server_requests_seconds_sum|Is the sum of the the duration of every request your application received at an endpoint
+|http_server_requests_seconds_max|Is the maximum request duration during a time window. The value resets to 0 when a new time window starts. The default time window is 2 minutes
