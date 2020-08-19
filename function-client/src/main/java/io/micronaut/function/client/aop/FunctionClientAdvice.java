@@ -15,18 +15,15 @@
  */
 package io.micronaut.function.client.aop;
 
+import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.ReturnType;
 import io.micronaut.function.client.FunctionDefinition;
 import io.micronaut.function.client.FunctionDiscoveryClient;
 import io.micronaut.function.client.FunctionInvoker;
 import io.micronaut.function.client.FunctionInvokerChooser;
-import io.micronaut.function.client.exceptions.FunctionExecutionException;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
@@ -34,6 +31,7 @@ import io.reactivex.Maybe;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Implements advice for the {@link io.micronaut.function.client.FunctionClient} annotation.
@@ -77,24 +75,42 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
                 .orElse(NameUtils.hyphenate(context.getMethodName(), true));
 
         Flowable<FunctionDefinition> functionDefinition = Flowable.fromPublisher(discoveryClient.getFunction(functionName));
-        ReturnType<Object> returnType = context.getReturnType();
-        Class<Object> javaReturnType = returnType.getType();
-        if (Publishers.isConvertibleToPublisher(javaReturnType)) {
-            Maybe flowable = functionDefinition.firstElement().flatMap(def -> {
-                FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
-                return (Maybe) functionInvoker.invoke(
-                        def,
-                        body,
-                        Argument.of(Maybe.class, returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT))
-                );
-            });
-            flowable = flowable.switchIfEmpty(Maybe.error(new FunctionNotFoundException(functionName)));
-            return ConversionService.SHARED.convert(flowable, returnType.asArgument()).orElseThrow(() -> new FunctionExecutionException("Unsupported reactive type: " + returnType.getType()));
-        } else {
-            // blocking operation
-            FunctionDefinition def = functionDefinition.blockingFirst();
-            FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
-            return functionInvoker.invoke(def, body, returnType.asArgument());
+        InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+        try {
+            switch (interceptedMethod.resultType()) {
+                case PUBLISHER:
+                    return interceptedMethod.handleResult(invokeFn(body, functionName, functionDefinition, interceptedMethod.returnTypeValue()));
+                case COMPLETION_STAGE:
+                    return interceptedMethod.handleResult(toCompletableFuture(
+                            invokeFn(body, functionName, functionDefinition, interceptedMethod.returnTypeValue())
+                    ));
+                case SYNCHRONOUS:
+                    FunctionDefinition def = functionDefinition.blockingFirst();
+                    FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
+                    return functionInvoker.invoke(def, body, context.getReturnType().asArgument());
+                default:
+                    return interceptedMethod.unsupported();
+            }
+        } catch (Exception e) {
+            return interceptedMethod.handleException(e);
         }
     }
+
+    private Flowable<Object> invokeFn(Object body, String functionName, Flowable<FunctionDefinition> functionDefinition, Argument<?> valueType) {
+        return functionDefinition.firstElement().flatMap(def -> {
+            FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
+            return (Maybe<Object>) functionInvoker.invoke(
+                    def,
+                    body,
+                    Argument.of(Maybe.class, valueType)
+            );
+        }).switchIfEmpty(Maybe.error(() -> new FunctionNotFoundException(functionName))).toFlowable();
+    }
+
+    private CompletableFuture<Object> toCompletableFuture(Flowable<Object> flowable) {
+        CompletableFuture<Object> completableFuture = new CompletableFuture<>();
+        flowable.firstElement().subscribe(completableFuture::complete, completableFuture::completeExceptionally, () -> completableFuture.complete(null));
+        return completableFuture;
+    }
+
 }

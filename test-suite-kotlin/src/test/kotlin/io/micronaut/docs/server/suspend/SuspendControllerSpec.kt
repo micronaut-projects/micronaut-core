@@ -27,7 +27,6 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import org.opentest4j.AssertionFailedError
 import java.lang.IllegalArgumentException
 
 class SuspendControllerSpec: StringSpec() {
@@ -44,6 +43,8 @@ class SuspendControllerSpec: StringSpec() {
     val client = autoClose(
             embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL())
     )
+
+    var suspendClient = embeddedServer.applicationContext.createBean(SuspendClient::class.java, embeddedServer.getURL())
 
     init {
         "test suspend applies CORS options"() {
@@ -73,8 +74,51 @@ class SuspendControllerSpec: StringSpec() {
 
         }
 
+        "test suspend service with retries"() {
+            val response = client.exchange(HttpRequest.GET<Any>("/suspend/callSuspendServiceWithRetries"), String::class.java).blockingFirst()
+            val body = response.body.get()
+
+            body shouldBe "delayedCalculation1"
+            response.status shouldBe HttpStatus.OK
+        }
+
+        "test suspend service with retries blocked"() {
+            val response = client.exchange(HttpRequest.GET<Any>("/suspend/callSuspendServiceWithRetriesBlocked"), String::class.java).blockingFirst()
+            val body = response.body.get()
+
+            body shouldBe "delayedCalculation2"
+            response.status shouldBe HttpStatus.OK
+        }
+
         "test suspend"() {
             val response = client.exchange(HttpRequest.GET<Any>("/suspend/simple"), String::class.java).blockingFirst()
+            val body = response.body.get()
+
+            body shouldBe "Hello"
+            response.status shouldBe HttpStatus.OK
+        }
+
+        "test suspend calling client"() {
+            val body = suspendClient.simple()
+
+            body shouldBe "Hello"
+        }
+
+        "test suspend calling client ignore result"() {
+            suspendClient.simpleIgnoreResult()
+            // No exception thrown
+        }
+
+        "test suspend calling client method with response return"() {
+            val response = suspendClient.simpleResponse()
+            val body = response.body.get()
+
+            body shouldBe "Hello"
+            response.status shouldBe HttpStatus.OK
+        }
+
+        "test suspend calling client method with response return ignore result"() {
+            val response = suspendClient.simpleResponse()
             val body = response.body.get()
 
             body shouldBe "Hello"
@@ -112,6 +156,26 @@ class SuspendControllerSpec: StringSpec() {
         "test error route"() {
             val ex = shouldThrowExactly<HttpClientResponseException> {
                 client.exchange(HttpRequest.GET<Any>("/suspend/illegal"), String::class.java).blockingFirst()
+            }
+            val body = ex.response.getBody(String::class.java).get()
+
+            ex.status shouldBe HttpStatus.BAD_REQUEST
+            body shouldBe "illegal.argument"
+        }
+
+        "test error route with client response"() {
+            val ex = shouldThrowExactly<HttpClientResponseException> {
+                suspendClient.errorCallResponse()
+            }
+            val body = ex.response.getBody(String::class.java).get()
+
+            ex.status shouldBe HttpStatus.BAD_REQUEST
+            body shouldBe "illegal.argument"
+        }
+
+        "test error route with client string response"() {
+            val ex = shouldThrowExactly<HttpClientResponseException> {
+                suspendClient.errorCall()
             }
             val body = ex.response.getBody(String::class.java).get()
 
