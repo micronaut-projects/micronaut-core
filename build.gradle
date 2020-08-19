@@ -339,6 +339,7 @@ ext {
                     version: ojdbcVersion,
                     group  : 'com.oracle.database.jdbc',
                     name   : 'ojdbc8',
+                    modules: ['ucp']
             ],
             'jcache'                   : [
                     version: jcacheVersion,
