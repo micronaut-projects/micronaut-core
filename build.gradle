@@ -507,6 +507,12 @@ ext {
                 group  : 'com.oracle.database.jdbc',
                 name   : 'ojdbc8'
             ],
+            // Deprecated: Remove in the next major version
+            oldOracle                  : [
+                version: oldOracleDriverVersion,
+                group  : 'com.oracle.ojdbc',
+                name   : 'ojdbc8'
+            ],
             tomcatJdbc                 : [
                     version: tomcatJdbcVersion,
                     group  : 'org.apache.tomcat',
