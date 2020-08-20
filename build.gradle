@@ -338,8 +338,8 @@ ext {
             ojdbc                      : [
                     version: ojdbcVersion,
                     group  : 'com.oracle.database.jdbc',
-                    name   : 'ucp',
-                    modules: ['ojdbc8']
+                    name   : 'ojdbc8',
+                    modules: ['ucp']
             ],
             'jcache'                   : [
                     version: jcacheVersion,
@@ -504,7 +504,7 @@ ext {
             ],
             oracle                  : [
                 version: oracleDriverVersion,
-                group  : 'com.oracle.ojdbc',
+                group  : 'com.oracle.database.jdbc',
                 name   : 'ojdbc8'
             ],
             tomcatJdbc                 : [
