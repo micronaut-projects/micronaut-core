@@ -928,10 +928,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 .append(" -> ")
                 .append(targetMethod.getDeclaringType().getSimpleName())
                 .append('#')
-                .append(targetMethod)
+                .append(targetMethod.getName())
                 .append(" (")
                 .append(String.join(",", consumesMediaTypes))
-                .append(" )")
+                .append(")")
                 .toString();
         }
 
