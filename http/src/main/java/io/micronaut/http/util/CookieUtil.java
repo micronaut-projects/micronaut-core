@@ -71,21 +71,23 @@ public class CookieUtil {
         String[] semicolonParts = setCookieHeader.split(";");
         String[] cookieDefinition = semicolonParts[0].split("=", 2);
 
-        Map<String, String> props = Arrays.stream(semicolonParts).skip(1)
-                .map(propertyPart -> {
-                    String[] split = propertyPart.split("=", 2);
-                    //lenient parsing of empty segments caused by headers like "Set-Cookie: test=1;; Secure;"
-                    //(multiple semicolons)
-                    if (split[0].trim().equals("")) {
-                        return null;
-                    }
-                    if (split.length < 2) {
-                        return new AbstractMap.SimpleEntry<>(split[0].trim().toLowerCase(), "");
-                    }
-                    return new AbstractMap.SimpleEntry<>(split[0].trim().toLowerCase(), trimQuotes(split[1].trim()));
-                })
-                .filter(Objects::nonNull)
-                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue));
+        Map<String, String> props = new HashMap<>();
+        //omit first semicolon part - the cookie declaration
+        if (semicolonParts.length > 1) {
+            for (int i = 1; i < semicolonParts.length; i++) {
+                String[] split = semicolonParts[i].split("=", 2);
+                //lenient parsing of empty segments caused by headers like "Set-Cookie: test=1;; Secure;"
+                //(multiple semicolons)
+                if (split[0].trim().equals("")) {
+                    continue;
+                }
+                if (split.length < 2) {
+                    props.put(split[0].trim().toLowerCase(), "");
+                } else {
+                    props.put(split[0].trim().toLowerCase(), trimQuotes(split[1].trim()));
+                }
+            }
+        }
 
         String cookieName = cookieDefinition[0].substring((HttpHeaders.SET_COOKIE + ":").length()).trim();
         String cookieValue = trimQuotes(cookieDefinition[1]);
@@ -167,7 +169,7 @@ public class CookieUtil {
                 return Optional.ofNullable(Duration.ofSeconds(maxAge));
             } else if (props.get(CookieProperties.EXPIRES.toLowerCase()) != null) {
                 Optional<LocalDateTime> expiry = parseCookieDate(props.get(CookieProperties.EXPIRES.toLowerCase()));
-                return expiry.map($ -> Duration.between($, LocalDateTime.now()));
+                return expiry.map(localDateTime -> Duration.between(localDateTime, LocalDateTime.now()));
             } else {
                 return Optional.empty();
             }

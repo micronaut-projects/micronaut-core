@@ -59,7 +59,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
     default @NonNull Cookies getCookies() {
         Map<CharSequence, Cookie> cookiesByName = getHeaders().getAll(SET_COOKIE).stream()
                 .map(CookieUtil::getCookieFromString)
-                .collect(Collectors.toMap(Cookie::getName, $ -> $));
+                .collect(Collectors.toMap(Cookie::getName, cookie -> cookie));
 
         SimpleCookies cookies = new SimpleCookies(ConversionService.SHARED);
         cookies.putAll(cookiesByName);
