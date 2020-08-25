@@ -48,19 +48,50 @@ class Foo implements GenBase<String> {
     }
 }
 
-''', Tuple.tuple('test.GenBase', '''
-package test;
-    
 interface GenBase<T> {
     T getName();
 }
-'''))
+''')
         when:
         def test = introspection.instantiate()
 
         then:
         introspection.getRequiredProperty("name", String)
                 .get(test) == 'test'
+    }
+
+    void "test bean introspection with argument of generic interface"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Foo implements GenBase<Long> {
+
+    private Long value;
+
+    public Long getValue() {
+        return value;
+    }
+    
+    public void setValue(Long value) {
+        this.value = value;
+    }
+}
+
+interface GenBase<T> {
+    T getValue();
+    
+    void setValue(T t);
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        BeanProperty bp = introspection.getRequiredProperty("value", Long)
+        bp.set(test, 5L)
+
+        then:
+        bp.get(test) == 5L
     }
 
     void "test bean introspection with property with static creator method on interface"() {

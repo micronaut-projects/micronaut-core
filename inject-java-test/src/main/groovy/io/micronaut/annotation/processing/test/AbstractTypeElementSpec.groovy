@@ -109,12 +109,12 @@ abstract class AbstractTypeElementSpec extends Specification {
     *
     * @return the introspection if it is correct
     **/
-    protected BeanIntrospection buildBeanIntrospection(String className, String cls, Tuple2<String, String> ... otherClasses) {
+    protected BeanIntrospection buildBeanIntrospection(String className, String cls) {
         def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Introspection'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
-        ClassLoader classLoader = buildClassLoader(className, cls, otherClasses)
+        ClassLoader classLoader = buildClassLoader(className, cls)
         return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
     }
 
@@ -258,11 +258,8 @@ class Test {
         return (BeanConfiguration)classLoader.loadClass(packageName + '.' + BeanConfigurationWriter.CLASS_SUFFIX).newInstance()
     }
 
-    protected ClassLoader buildClassLoader(String className, String cls, Tuple2<String, String> ... otherClasses) {
-        def classes = otherClasses.collect { JavaFileObjects.forSourceString(it.v1, it.v2)}
-        classes.add(JavaFileObjects.forSourceString(className, cls))
-
-        def files = newJavaParser().generate(*classes)
+    protected ClassLoader buildClassLoader(String className, String cls) {
+        def files = newJavaParser().generate(className, cls)
         ClassLoader classLoader = new ClassLoader() {
             @Override
             protected Class<?> findClass(String name) throws ClassNotFoundException {
