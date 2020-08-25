@@ -480,6 +480,81 @@ class DefaultEnvironmentSpec extends Specification {
             applicationContext.stop()
     }
 
+    void "test custom config locations respect environment order"() {
+        when:
+            ApplicationContext applicationContext = ApplicationContext.builder()
+                    .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
+                    .environments("env1", "env2")
+                    .build()
+                    .start()
+
+        then: "Environment order establishes property value"
+            applicationContext.getRequiredProperty("config.prop", String.class) == "file:./custom-config/application-env2.yml"
+            applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
+            applicationContext.getRequiredProperty("custom-config-file", String.class) == "env2"
+        cleanup:
+            applicationContext.stop()
+    }
+
+    void "test custom config locations respect environment order - reversed"() {
+        when:
+            ApplicationContext applicationContext = ApplicationContext.builder()
+                    .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
+                    .environments("env2", "env1")
+                    .build()
+                    .start()
+
+        then: "Environment order establishes property value"
+            applicationContext.getRequiredProperty("config.prop", String.class) == "file:./custom-config/application-env1.yml"
+            applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
+            applicationContext.getRequiredProperty("custom-config-file", String.class) == "env1"
+        cleanup:
+            applicationContext.stop()
+    }
+
+    void "test custom config locations - envrionment variables take precedence"() {
+        given:
+            ApplicationContext applicationContext
+
+        when:
+            SystemLambda.withEnvironmentVariable("CONFIG_PROP", "from-env").execute(() -> {
+                applicationContext = ApplicationContext.builder()
+                    .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
+                    .environments("env1", "env2")
+                    .build()
+                    .start()
+            })
+
+        then: "values passed as environment variables take precedence"
+            applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
+            applicationContext.getRequiredProperty("custom-config-file", String.class) == "env2"
+            applicationContext.getRequiredProperty("config.prop", String.class) == "from-env"
+        cleanup:
+            applicationContext.stop()
+    }
+
+    void "test custom config locations - system properties take precedence over env"() {
+        given:
+            ApplicationContext applicationContext
+
+        when:
+            SystemLambda.withEnvironmentVariable("CONFIG_PROP", "from-env").execute(() -> {
+                applicationContext = ApplicationContext.builder()
+                    .overrideConfigLocations("file:./custom-config/", "classpath:custom-config/")
+                    .properties(["config.prop": "from-properties"])
+                    .environments("env1", "env2")
+                    .build()
+                    .start()
+            })
+
+        then: "values from properties take precedence"
+            applicationContext.getRequiredProperty("custom-config-classpath", String.class) == "xyz"
+            applicationContext.getRequiredProperty("custom-config-file", String.class) == "env2"
+            applicationContext.getRequiredProperty("config.prop", String.class) == "from-properties"
+        cleanup:
+            applicationContext.stop()
+    }
+
     void "test specified names have precedence, even if deduced"() {
         when:
         Environment env = new DefaultEnvironment({[]}).start()
