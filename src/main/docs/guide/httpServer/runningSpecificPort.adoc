@@ -18,6 +18,4 @@ micronaut:
     port: -1
 ----
 
-Your build tool (e.g. gradle) might pick up the micronaut.server.port from application.yml also _for your tests_ (via classpath scanning).
-
-In that case you'd need to specify that tests should explicitly use a random port (like above) in your src/**test**/resources/application-test.yml
+TIP: If an explicit port is set, that may cause tests to fail because multiple servers are starting simultaneously. To prevent that, set the port to be random in the test environment configuration.
