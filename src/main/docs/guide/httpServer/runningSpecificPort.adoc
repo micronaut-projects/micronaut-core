@@ -18,4 +18,4 @@ micronaut:
     port: -1
 ----
 
-TIP: If an explicit port is set, that may cause tests to fail because multiple servers are starting simultaneously. To prevent that, set the port to be random in the test environment configuration.
+TIP: If an explicit port is set, that may cause tests to fail because multiple servers are starting simultaneously on the same port. To prevent that, set the port to be random in the test environment configuration.
