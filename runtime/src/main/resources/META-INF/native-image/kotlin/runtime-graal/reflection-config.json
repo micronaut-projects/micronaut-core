@@ -1,0 +1,21 @@
+[ {
+    "name": "kotlin.internal.jdk8.JDK8PlatformImplementations",
+    "methods": [
+      { "name": "<init>", "parameterTypes": [] }
+    ]
+}, {
+  "name": "kotlin.internal.JRE8PlatformImplementations",
+  "methods": [
+    { "name": "<init>", "parameterTypes": [] }
+  ]
+}, {
+  "name": "kotlin.internal.jdk7.JDK7PlatformImplementations",
+  "methods": [
+    { "name": "<init>", "parameterTypes": [] }
+  ]
+}, {
+  "name": "kotlin.internal.JRE7PlatformImplementations",
+  "methods": [
+    { "name": "<init>", "parameterTypes": [] }
+  ]
+} ]
