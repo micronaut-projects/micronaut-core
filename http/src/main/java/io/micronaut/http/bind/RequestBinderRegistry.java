@@ -25,4 +25,6 @@ import io.micronaut.http.HttpRequest;
  * @since 1.0
  */
 public interface RequestBinderRegistry extends ArgumentBinderRegistry<HttpRequest<?>> {
+
+
 }

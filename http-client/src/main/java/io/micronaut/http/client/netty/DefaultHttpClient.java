@@ -72,6 +72,7 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.sse.Event;
+import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
@@ -792,7 +793,11 @@ public class DefaultHttpClient implements
                     final NettyWebSocketClientHandler webSocketHandler;
                     try {
                         String scheme =  (sslContext == null) ? "ws" : "wss";
-                        URI webSocketURL = URI.create(scheme + "://" + host + ":" + port + uri.getPath());
+                        URI webSocketURL = UriBuilder.of(uri)
+                                .scheme(scheme)
+                                .host(host)
+                                .port(port)
+                                .build();
 
                         MutableHttpHeaders headers = request.getHeaders();
                         HttpHeaders customHeaders = EmptyHttpHeaders.INSTANCE;
