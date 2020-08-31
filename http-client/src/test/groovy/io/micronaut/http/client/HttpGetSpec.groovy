@@ -468,10 +468,28 @@ class HttpGetSpec extends Specification {
         requestUri.endsWith("bar=abc&bar=xyz")
     }
 
+    void "test exploded query param request URI 2"() {
+        when:
+        MyGetClient client = this.myGetClient
+        String requestUri = client.queryParamExploded2(["abc", "xyz"])
+
+        then:
+        requestUri.endsWith("bar=abc&bar=xyz")
+    }
+
     void "test multiple exploded query param request URI"() {
         when:
         MyGetClient client = this.myGetClient
         String requestUri = client.multipleExplodedQueryParams(["abc", "xyz"], "random")
+
+        then:
+        requestUri.endsWith("bar=abc&bar=xyz&tag=random")
+    }
+
+    void "test multiple exploded query param request URI 2"() {
+        when:
+        MyGetClient client = this.myGetClient
+        String requestUri = client.multipleExplodedQueryParams2(["abc", "xyz"], "random")
 
         then:
         requestUri.endsWith("bar=abc&bar=xyz&tag=random")
@@ -802,8 +820,14 @@ class HttpGetSpec extends Specification {
         @Get("/queryParamExploded{?bar*}")
         String queryParamExploded(@QueryValue("bar") List<String> foo)
 
+        @Get("/queryParamExploded{?bar*}")
+        String queryParamExploded2(@QueryValue List<String> bar)
+
         @Get("/multipleExplodedQueryParams{?bar*,tag}")
         String multipleExplodedQueryParams(@QueryValue("bar") List<String> foo, @QueryValue("tag") String label)
+
+        @Get("/multipleExplodedQueryParams{?bar*,tag}")
+        String multipleExplodedQueryParams2(@QueryValue List<String> bar, @QueryValue String tag)
 
         @Get("/multipleQueryParam")
         String queryParam(@QueryValue String foo, @QueryValue String bar)
