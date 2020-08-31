@@ -312,9 +312,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 acceptTypes = DEFAULT_ACCEPT_TYPES;
             }
 
-            //binderRegistry.findReturnArgumentBinder(context.getReturnType(), httpClient, request)
-
-
             ReturnType returnType = context.getReturnType();
             Class<?> javaReturnType = returnType.getType();
             boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);

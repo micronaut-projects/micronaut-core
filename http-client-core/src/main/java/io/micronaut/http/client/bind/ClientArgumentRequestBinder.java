@@ -20,7 +20,8 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.http.MutableHttpRequest;
 
 /**
- * A binder that binds to a {@link MutableHttpRequest}.
+ * A binder that binds to a {@link MutableHttpRequest}. Argument binders
+ * are not able to modify the URI of the request.
  *
  * @param <T> A type
  * @author James Kleeh
@@ -30,7 +31,8 @@ import io.micronaut.http.MutableHttpRequest;
 public interface ClientArgumentRequestBinder<T> {
 
     /**
-     * Bind the given argument to the request.
+     * Bind the given argument to the request. Argument binders
+     * are not able to modify the URI of the request.
      *
      * @param context The {@link ArgumentConversionContext}
      * @param value   The argument value
