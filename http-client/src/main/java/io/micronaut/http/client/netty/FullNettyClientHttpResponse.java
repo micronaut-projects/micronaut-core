@@ -31,8 +31,11 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
+import io.micronaut.http.netty.cookies.NettyCookies;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
@@ -60,6 +63,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
 
     private final HttpStatus status;
     private final NettyHttpHeaders headers;
+    private final NettyCookies nettyCookies;
     private final MutableConvertibleValues<Object> attributes;
     private final FullHttpResponse nettyHttpResponse;
     private final Map<Argument, Optional> convertedBodies = new HashMap<>();
@@ -91,6 +95,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         this.nettyHttpResponse = fullHttpResponse;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.byteBufferFactory = byteBufferFactory;
+        this.nettyCookies = new NettyCookies(fullHttpResponse.headers(), ConversionService.SHARED);
         Class<?> rawBodyType = bodyType != null ? bodyType.getType() : null;
         if (rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
             if (HttpResponse.class.isAssignableFrom(bodyType.getType())) {
@@ -122,6 +127,16 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     @Override
     public HttpHeaders getHeaders() {
         return headers;
+    }
+
+    @Override
+    public Cookies getCookies() {
+        return nettyCookies;
+    }
+
+    @Override
+    public Optional<Cookie> getCookie(String name){
+        return nettyCookies.findCookie(name);
     }
 
     @Override

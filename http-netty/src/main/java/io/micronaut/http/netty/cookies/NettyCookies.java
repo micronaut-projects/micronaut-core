@@ -68,6 +68,28 @@ public class NettyCookies implements Cookies {
         }
     }
 
+    /**
+     * @param nettyHeaders      The Netty HTTP headers
+     * @param conversionService The conversion service
+     */
+    public NettyCookies(HttpHeaders nettyHeaders, ConversionService conversionService) {
+        this.conversionService = conversionService;
+        if(nettyHeaders != null) {
+            String value = nettyHeaders.get(HttpHeaderNames.SET_COOKIE);
+            if (value != null) {
+                cookies = new LinkedHashMap<>();
+                Set<io.netty.handler.codec.http.cookie.Cookie> nettyCookies = ServerCookieDecoder.LAX.decode(value);
+                for (io.netty.handler.codec.http.cookie.Cookie nettyCookie : nettyCookies) {
+                    cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
+                }
+            } else {
+                cookies = Collections.emptyMap();
+            }
+        }else{
+            cookies = Collections.emptyMap();
+        }
+    }
+
     @Override
     public Set<Cookie> getAll() {
         return new HashSet<>(cookies.values());
