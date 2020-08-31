@@ -41,6 +41,11 @@ ext {
                     name: 'micronaut-data-bom',
                     version: micronautDataVersion
             ],
+            'micronaut.oci': [
+                    group: 'io.micronaut.oci',
+                    name: 'micronaut-oci-bom',
+                    version: micronautOracleCloudVersion
+            ],
 
             //Third-party
             'netty': [
