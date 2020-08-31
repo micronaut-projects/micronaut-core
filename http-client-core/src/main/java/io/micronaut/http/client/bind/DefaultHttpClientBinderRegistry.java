@@ -57,8 +57,8 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
      * @param binders           The request argument binders
      */
     @Inject
-    public DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
-                                           List<ClientArgumentRequestBinder> binders) {
+    protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
+                                              List<ClientArgumentRequestBinder> binders) {
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, value, request) -> {
             value.forEachValue(request::header);
         });

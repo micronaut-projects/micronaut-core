@@ -35,6 +35,7 @@ public interface TypedClientArgumentRequestBinder<T> extends ClientArgumentReque
     /**
      * @return The argument type.
      */
+    @NonNull
     Argument<T> argumentType();
 
     /**

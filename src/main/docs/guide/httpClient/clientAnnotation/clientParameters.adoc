@@ -86,3 +86,21 @@ Some parameters are recognized by their type instead of their annotation. The fo
 |`BasicAuth basicAuth`
 
 |===
+
+==== Custom Binding
+
+The api:http.client.bind.ClientArgumentRequestBinder[] API is what is responsible for binding client arguments to the request. Custom binder classes registered as beans will automatically be used during the binding process. Annotation based binders are searched for first, with type based binders being searched if a binder was not found.
+
+IMPORTANT: This is an experimental feature in 2.1 and subject to change! One limitation of binding is that binders many not manipulate or set the request URI because it can be a combination of many arguments.
+
+===== Binding By Annotation
+
+To control how an argument is bound to the request based on the annotation applied to the argument, create a bean of type api:http.client.bind.AnnotatedClientArgumentRequestBinder[]. Any custom annotations must be annotated with ann:core.bind.annotation.Bindable[].
+
+===== Binding By Type
+
+To bind to the request based on the type of the argument, create a bean of type api:http.client.bind.TypedClientArgumentRequestBinder[].
+
+For example, the following binder will handle arguments passed to clients that are of the `Metadata` type:
+
+snippet::io.micronaut.docs.http.client.bind.MetadataClientArgumentBinder[tags="clazz", indent=0, title="Typed Argument Binder"]

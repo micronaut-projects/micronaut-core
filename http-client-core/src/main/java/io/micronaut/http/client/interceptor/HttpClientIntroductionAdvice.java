@@ -153,7 +153,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
-            HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase());
+            HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase(Locale.ENGLISH));
             String httpMethodName = context.stringValue(CustomHttpMethod.class, "method").orElse(httpMethod.name());
             MutableHttpRequest<?> request = HttpRequest.create(httpMethod, "", httpMethodName);
 
@@ -224,7 +224,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             for (Argument argument : arguments) {
-                Object definedValue = getValue(argument, context);
+                Object definedValue = getValue(argument, context, parameters, paramMap);
 
                 if (argument.getAnnotationMetadata().hasStereotype(Bindable.class)) {
                     argument.getAnnotationMetadata().stringValue(Bindable.class).ifPresent(name -> {
@@ -288,7 +288,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             request.uri(URI.create(appendQuery(uri, queryParams)));
 
-            if (body != null) {
+            if (body != null && !request.getContentType().isPresent()) {
                 MediaType[] contentTypes = MediaType.of(context.stringValues(Produces.class));
                 if (ArrayUtils.isEmpty(contentTypes)) {
                     contentTypes = DEFAULT_ACCEPT_TYPES;
@@ -307,9 +307,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
 
 
-            MediaType[] acceptTypes = MediaType.of(context.stringValues(Consumes.class));
+            MediaType[] acceptTypes = request.accept().toArray(MediaType.EMPTY_ARRAY);
             if (ArrayUtils.isEmpty(acceptTypes)) {
-                acceptTypes = DEFAULT_ACCEPT_TYPES;
+                acceptTypes = MediaType.of(context.stringValues(Consumes.class));
+                if (ArrayUtils.isEmpty(acceptTypes)) {
+                    acceptTypes = DEFAULT_ACCEPT_TYPES;
+                }
+                request.accept(acceptTypes);
             }
 
             ReturnType returnType = context.getReturnType();
@@ -330,8 +334,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 if (!isSingle && httpClient instanceof StreamingHttpClient) {
                     StreamingHttpClient streamingHttpClient = (StreamingHttpClient) httpClient;
 
-                    if (!Void.class.isAssignableFrom(argumentType)) {
-                        request.accept(acceptTypes);
+                    if (Void.class.isAssignableFrom(argumentType)) {
+                        request.getHeaders().remove(HttpHeaders.ACCEPT);
                     }
 
                     boolean isEventStream = Arrays.asList(acceptTypes).contains(MediaType.TEXT_EVENT_STREAM_TYPE);
@@ -378,11 +382,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 } else {
 
                     if (Void.class.isAssignableFrom(argumentType) || Completable.class.isAssignableFrom(javaReturnType)) {
+                        request.getHeaders().remove(HttpHeaders.ACCEPT);
                         publisher = httpClient.exchange(
                                 request, null, errorType
                         );
                     } else {
-                        request.accept(acceptTypes);
                         if (HttpResponse.class.isAssignableFrom(argumentType)) {
                             publisher = httpClient.exchange(
                                     request, publisherArgument, errorType
@@ -446,8 +450,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             } else {
                 BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
 
-                if (void.class != javaReturnType && httpMethod != HttpMethod.HEAD) {
-                    request.accept(acceptTypes);
+                if (void.class == javaReturnType || httpMethod == HttpMethod.HEAD) {
+                    request.getHeaders().remove(HttpHeaders.ACCEPT);
                 }
 
                 if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
@@ -469,13 +473,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return context.proceed();
     }
 
-    private Object getValue(Argument argument, MethodInvocationContext<?, ?> context) {
+    private Object getValue(Argument argument,
+                            MethodInvocationContext<?, ?> context,
+                            Map<String, MutableArgumentValue<?>> parameters,
+                            Map<String, Object> paramMap) {
         String argumentName = argument.getName();
         AnnotationMetadata argumentMetadata = argument.getAnnotationMetadata();
-        MutableArgumentValue<?> value = context.getParameters().get(argumentName);
+        MutableArgumentValue<?> value = parameters.get(argumentName);
 
         Object definedValue = value.getValue();
-        Map<String, Object> paramMap = context.getParameterValueMap();
 
         if (paramMap.containsKey(argumentName) && argumentMetadata.hasStereotype(Format.class)) {
             final Object v = paramMap.get(argumentName);

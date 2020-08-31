@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.bind;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 
@@ -36,6 +37,6 @@ public interface HttpClientBinderRegistry {
      * @param <T>      The argument type
      * @return An {@link Optional} of {@link ClientArgumentRequestBinder}
      */
-    <T> Optional<ClientArgumentRequestBinder<T>> findArgumentBinder(Argument<T> argument);
+    <T> Optional<ClientArgumentRequestBinder<T>> findArgumentBinder(@NonNull Argument<T> argument);
 
 }

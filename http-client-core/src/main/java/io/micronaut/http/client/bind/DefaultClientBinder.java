@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.bind;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -59,7 +60,7 @@ public class DefaultClientBinder implements ClientArgumentRequestBinder<Object> 
     }
 
     @Override
-    public void bind(ArgumentConversionContext<Object> context, Object value, MutableHttpRequest<?> request) {
+    public void bind(@NonNull ArgumentConversionContext<Object> context, @NonNull Object value, @NonNull MutableHttpRequest<?> request) {
         AnnotationMetadata metadata = context.getAnnotationMetadata();
         Argument argument = context.getArgument();
         String argumentName = argument.getName();

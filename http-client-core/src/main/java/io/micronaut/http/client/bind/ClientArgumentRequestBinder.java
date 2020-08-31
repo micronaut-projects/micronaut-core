@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.client.bind;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.http.MutableHttpRequest;
 
@@ -28,6 +30,7 @@ import io.micronaut.http.MutableHttpRequest;
  * @since 2.1.0
  */
 @Experimental
+@Indexed(ClientArgumentRequestBinder.class)
 public interface ClientArgumentRequestBinder<T> {
 
     /**
@@ -38,6 +41,6 @@ public interface ClientArgumentRequestBinder<T> {
      * @param value   The argument value
      * @param request The request
      */
-    void bind(ArgumentConversionContext<T> context, T value, MutableHttpRequest<?> request);
+    void bind(@NonNull ArgumentConversionContext<T> context, @NonNull T value, @NonNull MutableHttpRequest<?> request);
 
 }

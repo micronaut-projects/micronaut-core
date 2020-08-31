@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.bind;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Experimental;
 
 import java.lang.annotation.Annotation;
@@ -34,5 +35,6 @@ public interface AnnotatedClientArgumentRequestBinder<A extends Annotation, T> e
     /**
      * @return The annotation type.
      */
+    @NonNull
     Class<A> getAnnotationType();
 }
