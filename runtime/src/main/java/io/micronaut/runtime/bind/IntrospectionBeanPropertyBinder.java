@@ -26,15 +26,12 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.StringUtils;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,7 +45,7 @@ import java.util.Set;
  */
 @Singleton
 @Requires(missingBeans = BeanPropertyBinder.class)
-public class IntrospectionBeanPropertyBinder implements BeanPropertyBinder {
+public class IntrospectionBeanPropertyBinder extends AbstractBeanPropertyBinder {
 
     @Value("${micronaut.bean-property-binder.array-size-threshold:100}")
     private int arraySizeThreshold;
@@ -58,7 +55,7 @@ public class IntrospectionBeanPropertyBinder implements BeanPropertyBinder {
         Argument<T2> argument = Argument.of(type);
         try {
             ConversionContext conversionContext = ConversionContext.of(argument);
-            Map<String, Object> properties = buildSourceMapNode(source);
+            Map<String, Object> properties = buildMapObject(source);
             BeanIntrospection<T2> introspection = BeanIntrospection.getIntrospection(type);
             T2 instance = instantiate(introspection, properties, conversionContext);
             if (instance != null) {
@@ -77,7 +74,7 @@ public class IntrospectionBeanPropertyBinder implements BeanPropertyBinder {
     @Override
     public <T2> T2 bind(T2 instance, ArgumentConversionContext<T2> context, Set<? extends Map.Entry<? extends CharSequence, Object>> source) {
         try {
-            Map<String, Object> properties = buildSourceMapNode(source);
+            Map<String, Object> properties = buildMapObject(source);
             BeanIntrospection<T2> introspection = (BeanIntrospection<T2>) BeanIntrospection.getIntrospection(instance.getClass());
             setProperties(introspection, properties, instance, context);
             return instance;
@@ -91,7 +88,7 @@ public class IntrospectionBeanPropertyBinder implements BeanPropertyBinder {
     public <T2> T2 bind(T2 instance, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException {
         try {
             ConversionContext conversionContext = ConversionContext.DEFAULT;
-            Map<String, Object> properties = buildSourceMapNode(source);
+            Map<String, Object> properties = buildMapObject(source);
             BeanIntrospection<T2> introspection = (BeanIntrospection<T2>) BeanIntrospection.getIntrospection(instance.getClass());
             setProperties(introspection, properties, instance, conversionContext);
             Optional<ConversionError> lastError = conversionContext.getLastError();
@@ -107,7 +104,7 @@ public class IntrospectionBeanPropertyBinder implements BeanPropertyBinder {
     @Override
     public BindingResult<Object> bind(ArgumentConversionContext<Object> context, Map<CharSequence, ? super Object> source) {
         try {
-            Map<String, Object> properties = buildSourceMapNode(source.entrySet());
+            Map<String, Object> properties = buildMapObject(source.entrySet());
             BeanIntrospection<Object> introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
             Object instance = instantiate(introspection, properties, context);
             if (instance != null) {
@@ -214,152 +211,14 @@ public class IntrospectionBeanPropertyBinder implements BeanPropertyBinder {
         return new ConversionErrorException(Argument.of(type), conversionError);
     }
 
-    private Map<String, Object> buildSourceMapNode(Set<? extends Map.Entry<? extends CharSequence, Object>> source) {
-        Map<String, Object> rootNode = new LinkedHashMap<>();
-        for (Map.Entry<? extends CharSequence, ? super Object> entry : source) {
-            Object value = entry.getValue();
-            String property = correctKey(entry.getKey().toString());
-            String[] tokens = property.split("\\.");
-            Object current = rootNode;
-            String index = null;
-            for (int i = 0; i < tokens.length; i++) {
-                String token = tokens[i];
-                int j = token.indexOf('[');
-                if (j > -1 && token.endsWith("]")) {
-                    index = token.substring(j + 1, token.length() - 1);
-                    token = token.substring(0, j);
-                }
-                if (i == tokens.length - 1) {
-                    if (current instanceof Map) {
-                        Map mapNode = (Map) current;
-                        if (index != null) {
-                            if (StringUtils.isDigits(index)) {
-                                int arrayIndex = Integer.parseInt(index);
-                                List arrayNode = getOrCreateListNodeAtKey(mapNode, token);
-                                arrayNode.add(arrayIndex, processValue(value));
-                            } else {
-                                Map map = getOrCreateMapNodeAtKey(mapNode, token);
-                                map.put(index, processValue(value));
-                            }
-                            index = null;
-                        } else {
-                            mapNode.put(token, processValue(value));
-                        }
-                    } else if (current instanceof List && index != null) {
-                        List arrayNode = (List) current;
-                        int arrayIndex = Integer.parseInt(index);
-                        Map mapNode = getOrCreateMapNodeAtIndex(arrayNode, arrayIndex);
-                        mapNode.put(token, processValue(value));
-                        index = null;
-                    }
-                } else {
-                    if (current instanceof Map) {
-                        Map objectNode = (Map) current;
-                        if (index != null) {
-                            if (StringUtils.isDigits(index)) {
-                                int arrayIndex = Integer.parseInt(index);
-                                List arrayNode = getOrCreateListNodeAtKey(objectNode, token);
-                                current = getOrCreateMapNodeAtIndex(arrayNode, arrayIndex);
-                            } else {
-                                Map mapNode = getOrCreateMapNodeAtKey(objectNode, token);
-                                current = getOrCreateMapNodeAtKey(mapNode, index);
-                            }
-                            index = null;
-                        } else {
-                            current = getOrCreateMapNodeAtKey(objectNode, token);
-                        }
-                    } else if (current instanceof List && StringUtils.isDigits(index)) {
-                        int arrayIndex = Integer.parseInt(index);
-                        Map jsonNode = getOrCreateMapNodeAtIndex((List) current, arrayIndex);
-
-                        current = new LinkedHashMap<>();
-                        jsonNode.put(token, current);
-                        index = null;
-                    }
-                }
-            }
-        }
-        return rootNode;
-    }
-
-    private Map getOrCreateMapNodeAtIndex(List arrayNode, int arrayIndex) {
-        if (arrayIndex >= arrayNode.size()) {
-            arrayNode = expandArrayToThreshold(arrayIndex, arrayNode);
-        }
-        Object jsonNode = arrayNode.get(arrayIndex);
-        if (!(jsonNode instanceof Map)) {
-            jsonNode = new LinkedHashMap<>();
-            arrayNode.set(arrayIndex, jsonNode);
-        }
-        return (Map) jsonNode;
-    }
-
-    private Map getOrCreateMapNodeAtKey(Map objectNode, Object key) {
-        Object jsonNode = objectNode.get(key);
-        if (!(jsonNode instanceof Map)) {
-            jsonNode = new LinkedHashMap<>();
-            objectNode.put(key, jsonNode);
-        }
-        return (Map) jsonNode;
-    }
-
-    private List getOrCreateListNodeAtKey(Map objectNode, Object key) {
-        Object jsonNode = objectNode.get(key);
-        if (!(jsonNode instanceof List)) {
-            jsonNode = new ArrayList<>();
-            objectNode.put(key, jsonNode);
-        }
-        return (List) jsonNode;
-    }
-
-    private List expandArrayToThreshold(int arrayIndex, List arrayNode) {
-        if (arrayIndex < arraySizeThreshold) {
-            ArrayList arrayListNode;
-            if (arrayNode instanceof ArrayList) {
-                arrayListNode = (ArrayList) arrayNode;
-            } else {
-                arrayListNode = new ArrayList(arrayNode);
-            }
-            while (arrayNode.size() != arrayIndex + 1) {
-                arrayNode.add(arrayIndex, null);
-            }
-            return arrayListNode;
-        }
-        return arrayNode;
-    }
-
-    private Object processValue(Object o) {
-        if (o instanceof List) {
-            return processList((List) o);
-        } else if (o instanceof Map) {
-            return processMap((Map) o);
-        } else if (o instanceof Number || o instanceof String || o instanceof Boolean) {
-            return o;
-        }
-        // Not one of (Map, List, Number, String, Boolean) -> needs to be converted to and processed
+    @Override
+    protected Object convertUnknownValue(Object o) {
         return ConversionService.SHARED.convert(o, Map.class);
     }
 
-    private Map processMap(Map<?, ?> map) {
-        Map newMap = new LinkedHashMap(map.size());
-        for (Map.Entry entry : map.entrySet()) {
-            Object key = correctKey(entry.getKey().toString());
-            Object value = processValue(entry.getValue());
-            newMap.put(key, value);
-        }
-        return newMap;
-    }
-
-    private List processList(List list) {
-        List newList = new ArrayList(list.size());
-        for (Object o : list) {
-            newList.add(processValue(o));
-        }
-        return newList;
-    }
-
-    private String correctKey(String key) {
-        return NameUtils.decapitalize(NameUtils.dehyphenate(key));
+    @Override
+    protected int getArraySizeThreshold() {
+        return arraySizeThreshold;
     }
 
 }
