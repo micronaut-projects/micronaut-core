@@ -41,9 +41,9 @@ ext {
                     name: 'micronaut-data-bom',
                     version: micronautDataVersion
             ],
-            'micronaut.oci': [
-                    group: 'io.micronaut.oci',
-                    name: 'micronaut-oci-bom',
+            'micronaut.oraclecloud': [
+                    group: 'io.micronaut.oraclecloud',
+                    name: 'micronaut-oraclecloud-bom',
                     version: micronautOracleCloudVersion
             ],
 
