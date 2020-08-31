@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.jackson.bind
+package io.micronaut.bind
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -22,6 +22,7 @@ import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.ConversionService
+import io.micronaut.runtime.bind.IntrospectionBeanPropertyBinder
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -31,17 +32,14 @@ import spock.lang.Unroll
  * @author Graeme Rocher
  * @since 1.0
  */
-class JacksonBeanPropertyBinderSpec extends Specification {
+class InstrospectionBeanPropertyBinderSpec extends Specification {
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.builder()
-            .properties(['jackson.bean-property-binder.enabled': true])
-            .build()
-            .start()
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
 
     @Unroll
     void "test bind map properties to object"() {
         given:
-        JacksonBeanPropertyBinder binder = context.getBean(JacksonBeanPropertyBinder)
+            IntrospectionBeanPropertyBinder binder = context.getBean(IntrospectionBeanPropertyBinder.class)
         def result = binder.bind(type.newInstance(), map)
 
         expect:
@@ -73,6 +71,7 @@ class JacksonBeanPropertyBinderSpec extends Specification {
         optional.get().firstName == 'Todd'
     }
 
+    @Introspected
     @EqualsAndHashCode
     @ToString
     static class Book {
@@ -83,6 +82,7 @@ class JacksonBeanPropertyBinderSpec extends Specification {
         Map<String, Author> authorsByInitials = [:]
     }
 
+    @Introspected
     @EqualsAndHashCode
     @ToString
     static class Author {
@@ -92,12 +92,12 @@ class JacksonBeanPropertyBinderSpec extends Specification {
         Publisher publisher
     }
 
+    @Introspected
     @EqualsAndHashCode
     @ToString
     static class Publisher {
         String name
     }
-
 
     @Introspected
     static class ImmutablePerson {

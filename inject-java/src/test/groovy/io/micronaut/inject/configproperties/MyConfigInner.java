@@ -16,6 +16,7 @@
 package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.Introspected;
 
 import java.util.List;
 
@@ -32,6 +33,7 @@ public class MyConfigInner {
         this.innerVals = innerVals;
     }
 
+    @Introspected
     public static class InnerVal {
 
         private Integer expireUnsignedSeconds;

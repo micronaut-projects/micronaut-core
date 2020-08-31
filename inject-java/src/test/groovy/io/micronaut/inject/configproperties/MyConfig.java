@@ -16,6 +16,7 @@
 package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.convert.format.ReadableBytes;
 
 import java.net.URL;
@@ -57,6 +58,7 @@ public class MyConfig {
         return map;
     }
 
+    @Introspected
     public static class Value {
         private int property;
         private Value2 property2;
@@ -86,6 +88,7 @@ public class MyConfig {
         }
     }
 
+    @Introspected
     public static class Value2 {
         private int property;
 
@@ -246,6 +249,7 @@ public class MyConfig {
     }
 }
 
+@Introspected
 class InnerVal {
     private Integer expireUnsignedSeconds;
 

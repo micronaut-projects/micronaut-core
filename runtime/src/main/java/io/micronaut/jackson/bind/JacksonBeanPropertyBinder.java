@@ -21,7 +21,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.type.TypeFactory;
-import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -46,8 +46,8 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Requires(property = "jackson.bean-property-binder.enabled", value = "true")
 @Singleton
-@Primary
 public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
 
     private final ObjectMapper objectMapper;
@@ -171,8 +171,8 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
         }
     }
 
-    private Map buildSourceMapNode(Set<? extends Map.Entry<? extends CharSequence, Object>> source) {
-        Map rootNode = new LinkedHashMap();
+    private Map<String, Object> buildSourceMapNode(Set<? extends Map.Entry<? extends CharSequence, Object>> source) {
+        Map<String, Object> rootNode = new LinkedHashMap<>();
         for (Map.Entry<? extends CharSequence, ? super Object> entry : source) {
             Object value = entry.getValue();
             String property = correctKey(entry.getKey().toString());
@@ -190,10 +190,18 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
                     if (current instanceof Map) {
                         Map mapNode = (Map) current;
                         if (index != null) {
-                            mapNode = getOrCreateMapNodeAtKey(mapNode, index);
+                            if (StringUtils.isDigits(index)) {
+                                int arrayIndex = Integer.parseInt(index);
+                                List arrayNode = getOrCreateListNodeAtKey(mapNode, token);
+                                arrayNode.add(arrayIndex, processValue(value));
+                            } else {
+                                Map map = getOrCreateMapNodeAtKey(mapNode, token);
+                                map.put(index, processValue(value));
+                            }
                             index = null;
+                        } else {
+                            mapNode.put(token, processValue(value));
                         }
-                        mapNode.put(token, processValue(value));
                     } else if (current instanceof List && index != null) {
                         List arrayNode = (List) current;
                         int arrayIndex = Integer.parseInt(index);
