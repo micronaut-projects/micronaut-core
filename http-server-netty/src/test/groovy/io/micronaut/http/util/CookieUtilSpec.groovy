@@ -33,7 +33,7 @@ class CookieUtilSpec extends Specification {
 
     void "test parsing cookie date from header #setCookieHeader"() {
         given:
-        Cookie cookie = CookieUtil.getCookieFromString("$setCookieHeader")
+        Cookie cookie = CookieUtil.getCookieFromString(setCookieHeader)
 
         expect:
         cookie.getMaxAge() == maxAge
