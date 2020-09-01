@@ -151,12 +151,12 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
     }
 
     @Override
-    public Cookies getCookies(){
+    public Cookies getCookies() {
         return nettyCookies;
     }
 
     @Override
-    public Optional<Cookie> getCookie(String name){
+    public Optional<Cookie> getCookie(String name) {
         return nettyCookies.findCookie(name);
     }
 

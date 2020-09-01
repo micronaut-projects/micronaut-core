@@ -74,7 +74,7 @@ public class NettyCookies implements Cookies {
      */
     public NettyCookies(HttpHeaders nettyHeaders, ConversionService conversionService) {
         this.conversionService = conversionService;
-        if(nettyHeaders != null) {
+        if (nettyHeaders != null) {
             String value = nettyHeaders.get(HttpHeaderNames.SET_COOKIE);
             if (value != null) {
                 cookies = new LinkedHashMap<>();
@@ -85,7 +85,7 @@ public class NettyCookies implements Cookies {
             } else {
                 cookies = Collections.emptyMap();
             }
-        }else{
+        } else {
             cookies = Collections.emptyMap();
         }
     }

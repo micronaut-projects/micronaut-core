@@ -135,7 +135,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     }
 
     @Override
-    public Optional<Cookie> getCookie(String name){
+    public Optional<Cookie> getCookie(String name) {
         return nettyCookies.findCookie(name);
     }
 

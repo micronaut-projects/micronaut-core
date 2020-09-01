@@ -403,19 +403,19 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Helper method for retrieving all Cookies on a response
+     * Helper method for retrieving all Cookies on a response.
      * @return The cookies on the response
      */
     default Cookies getCookies() {
-        throw new UnsupportedOperationException("Operation not supported on a "+this.getClass()+" response.");
+        throw new UnsupportedOperationException("Operation not supported on a " + this.getClass() + " response.");
     }
 
     /**
-     * Helper method for retrieving a single Cookie on a response
+     * Helper method for retrieving a single Cookie on a response.
      * @param name The name of the Cookie
      * @return The Cookie
      */
     default Optional<Cookie> getCookie(String name) {
-        throw new UnsupportedOperationException("Operation not supported on a "+this.getClass()+" response.");
+        throw new UnsupportedOperationException("Operation not supported on a " + this.getClass() + " response.");
     }
 }
