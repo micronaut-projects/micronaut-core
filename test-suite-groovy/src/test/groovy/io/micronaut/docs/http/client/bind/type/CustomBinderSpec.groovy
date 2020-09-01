@@ -1,4 +1,4 @@
-package io.micronaut.docs.http.client.bind
+package io.micronaut.docs.http.client.bind.type
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
@@ -10,10 +10,12 @@ class CustomBinderSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
 
-    void "test binding to the request"() {
-        ClientBindClient client = server.getApplicationContext().getBean(ClientBindClient)
 
-        expect:
-        client.get(new Metadata(3.6, 42)) == "3.6"
+    void "test binding to the request"() {
+        when:
+        MetadataClient client = server.getApplicationContext().getBean(MetadataClient.class)
+
+        then:
+        client.get(new Metadata(3.6, 42L)) == "3.6"
     }
 }

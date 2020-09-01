@@ -1,11 +1,11 @@
-package io.micronaut.docs.http.client.bind;
+package io.micronaut.docs.http.client.bind.type;
 
 //tag::clazz[]
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
-import io.micronaut.docs.http.client.bind.Metadata;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.client.bind.TypedClientArgumentRequestBinder;
 
 import javax.inject.Singleton;
 

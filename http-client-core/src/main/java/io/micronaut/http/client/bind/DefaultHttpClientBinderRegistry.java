@@ -134,7 +134,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
      */
     public <T> void addBinder(ClientArgumentRequestBinder<T> binder) {
         if (binder instanceof AnnotatedClientArgumentRequestBinder) {
-            AnnotatedClientArgumentRequestBinder<?, ?> annotatedRequestArgumentBinder = (AnnotatedClientArgumentRequestBinder) binder;
+            AnnotatedClientArgumentRequestBinder<?> annotatedRequestArgumentBinder = (AnnotatedClientArgumentRequestBinder) binder;
             Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
             byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
         } else if (binder instanceof TypedClientArgumentRequestBinder) {
@@ -144,19 +144,6 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
             if (CollectionUtils.isNotEmpty(superTypes)) {
                 for (Class<?> superType : superTypes) {
                     byType.put(Argument.of(superType).typeHashCode(), typedRequestArgumentBinder);
-                }
-            } else if (typedRequestArgumentBinder.supportsSuperTypes()) {
-                Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(typedRequestArgumentBinder.argumentType().getType());
-                if (ClassUtils.REFLECTION_LOGGER.isWarnEnabled()) {
-                    ClassUtils.REFLECTION_LOGGER.warn(
-                            "Request argument binder [{}] triggered the use of reflection for types {}",
-                            typedRequestArgumentBinder,
-                            allInterfaces
-                    );
-                }
-
-                for (Class<?> itfce : allInterfaces) {
-                    byType.put(Argument.of(itfce).typeHashCode(), typedRequestArgumentBinder);
                 }
             }
         }

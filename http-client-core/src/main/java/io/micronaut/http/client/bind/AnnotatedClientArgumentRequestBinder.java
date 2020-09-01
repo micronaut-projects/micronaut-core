@@ -25,12 +25,11 @@ import java.lang.annotation.Annotation;
  * {@link io.micronaut.http.MutableHttpRequest} driven by an annotation.
  *
  * @param <A> An annotation
- * @param <T> A type
  * @author James Kleeh
  * @since 2.1.0
  */
 @Experimental
-public interface AnnotatedClientArgumentRequestBinder<A extends Annotation, T> extends ClientArgumentRequestBinder<T> {
+public interface AnnotatedClientArgumentRequestBinder<A extends Annotation> extends ClientArgumentRequestBinder<Object> {
 
     /**
      * @return The annotation type.

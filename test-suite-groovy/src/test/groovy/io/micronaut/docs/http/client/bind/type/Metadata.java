@@ -1,4 +1,4 @@
-package io.micronaut.docs.http.client.bind;
+package io.micronaut.docs.http.client.bind.type;
 
 public class Metadata {
 

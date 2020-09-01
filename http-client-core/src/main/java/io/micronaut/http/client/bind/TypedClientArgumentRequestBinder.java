@@ -39,16 +39,6 @@ public interface TypedClientArgumentRequestBinder<T> extends ClientArgumentReque
     Argument<T> argumentType();
 
     /**
-     * Determines whether arguments that are an interface that {@link T}
-     * implements are candidates for binding.
-     *
-     * @return True if super interfaces are binding candidates
-     */
-    default boolean supportsSuperTypes() {
-        return true;
-    }
-
-    /**
      * Returns additional super types.
      *
      * @return Additional supers types
