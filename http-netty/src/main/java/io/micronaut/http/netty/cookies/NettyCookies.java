@@ -78,7 +78,7 @@ public class NettyCookies implements Cookies {
             String value = nettyHeaders.get(HttpHeaderNames.SET_COOKIE);
             if (value != null) {
                 cookies = new LinkedHashMap<>();
-                Set<io.netty.handler.codec.http.cookie.Cookie> nettyCookies = ServerCookieDecoder.LAX.decode(value);
+                Set<io.netty.handler.codec.http.cookie.Cookie> nettyCookies = ServerCookieDecoder.STRICT.decode(value);
                 for (io.netty.handler.codec.http.cookie.Cookie nettyCookie : nettyCookies) {
                     cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
                 }
