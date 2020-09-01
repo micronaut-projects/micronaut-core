@@ -58,6 +58,7 @@ public class ObservableBodyBinder extends DefaultBodyAnnotationBinder<Observable
     }
 
     @Override
+    @Deprecated
     public boolean supportsSuperTypes() {
         return false;
     }
