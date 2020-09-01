@@ -64,6 +64,11 @@ public class MaybeBodyBinder extends DefaultBodyAnnotationBinder<Maybe> implemen
         return Collections.singletonList(MaybeSource.class);
     }
 
+    @Deprecated
+    public boolean supportsSuperTypes() {
+        return false;
+    }
+
     @Override
     public Argument<Maybe> argumentType() {
         return TYPE;

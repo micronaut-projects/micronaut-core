@@ -64,6 +64,12 @@ public class SingleBodyBinder extends DefaultBodyAnnotationBinder<Single> implem
     }
 
     @Override
+    @Deprecated
+    public boolean supportsSuperTypes() {
+        return false;
+    }
+
+    @Override
     public Argument<Single> argumentType() {
         return TYPE;
     }

@@ -19,7 +19,7 @@ import io.micronaut.core.bind.ArgumentBinder
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
-import java.util.Optional
+import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.function.Supplier
 import kotlin.coroutines.Continuation
@@ -35,6 +35,7 @@ class ContinuationArgumentBinder: TypedRequestArgumentBinder<Continuation<*>> {
 
     override fun argumentType(): Argument<Continuation<*>> = Argument.of(Continuation::class.java)
 
+    @Deprecated("Deprecated in v2.1. Will be removed in v3", replaceWith = ReplaceWith("superTypes()"))
     override fun supportsSuperTypes(): Boolean = false
 
     companion object {

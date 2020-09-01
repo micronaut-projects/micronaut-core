@@ -61,6 +61,7 @@ public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session
     }
 
     @Override
+    @Deprecated
     public boolean supportsSuperTypes() {
         return false;
     }
