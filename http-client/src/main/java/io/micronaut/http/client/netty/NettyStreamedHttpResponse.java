@@ -23,9 +23,11 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.http.*;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.cookies.NettyCookie;
+import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -47,6 +49,7 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
     private final StreamedHttpResponse nettyResponse;
     private HttpStatus status;
     private final NettyHttpHeaders headers;
+    private final NettyCookies nettyCookies;
     private B body;
     private MutableConvertibleValues<Object> attributes;
 
@@ -58,6 +61,7 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
         this.nettyResponse = response;
         this.status = httpStatus;
         this.headers = new NettyHttpHeaders(response.headers(), ConversionService.SHARED);
+        this.nettyCookies = new NettyCookies(response.headers(), ConversionService.SHARED);
     }
 
     /**
@@ -144,6 +148,16 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
             throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
         }
         return this;
+    }
+
+    @Override
+    public Cookies getCookies(){
+        return nettyCookies;
+    }
+
+    @Override
+    public Optional<Cookie> getCookie(String name){
+        return nettyCookies.findCookie(name);
     }
 
     @Override
