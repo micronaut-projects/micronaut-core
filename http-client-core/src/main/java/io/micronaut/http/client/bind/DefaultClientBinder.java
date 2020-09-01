@@ -80,14 +80,7 @@ public class DefaultClientBinder implements ClientArgumentRequestBinder<Object> 
                         .filter(StringUtils::isNotEmpty)
                         .ifPresent(param -> paramMap.put(parameterName, param));
             }
-        } else if (uriTemplate.getVariableNames().contains(context.getArgument().getName())) {
-            if (paramMap.containsKey(argumentName) && argument.getAnnotationMetadata().hasStereotype(Format.class)) {
-                final Object v = paramMap.get(argumentName);
-                if (v != null) {
-                    paramMap.put(argumentName, conversionService.convert(v, stringConversion));
-                }
-            }
-        } else {
+        } else if (!uriTemplate.getVariableNames().contains(context.getArgument().getName())) {
             bodyArguments.add(context.getArgument());
         }
     }

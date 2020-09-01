@@ -486,7 +486,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         if (paramMap.containsKey(argumentName) && argumentMetadata.hasStereotype(Format.class)) {
             final Object v = paramMap.get(argumentName);
             if (v != null) {
-                paramMap.put(argumentName, ConversionService.SHARED.convert(v, ConversionContext.of(String.class).with(argument.getAnnotationMetadata())));
+                ConversionService.SHARED.convert(v,
+                        ConversionContext.of(String.class)
+                                .with(argument.getAnnotationMetadata()))
+                        .ifPresent(str -> paramMap.put(argumentName, str));
             }
         }
         if (definedValue == null) {
