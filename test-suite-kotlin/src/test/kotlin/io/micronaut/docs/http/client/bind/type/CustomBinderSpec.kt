@@ -1,7 +1,6 @@
 package io.micronaut.docs.http.client.bind.type
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.docs.http.client.bind.Metadata
 import io.micronaut.runtime.server.EmbeddedServer
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
