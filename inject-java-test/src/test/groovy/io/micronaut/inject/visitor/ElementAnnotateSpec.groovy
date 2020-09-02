@@ -6,10 +6,10 @@ import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.aop.Introduction
 import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.Introspected
-import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -72,13 +72,17 @@ class TestListener {
 }
 
 ''')
+        def receiveMethod = definition.findMethod("receive", String).get()
+        def vArgument = receiveMethod.getArguments()[0]
 
         expect:
         definition.hasAnnotation(Ann)
         !definition.booleanValue(Ann, "aggregating").orElse(false)
         definition.booleanValue(Ann, "isolating").orElse(false)
         definition.getValue(Ann, "foo", String).get() == 'bar'
-        definition.findMethod("receive", String).get().hasAnnotation(Ann)
+        receiveMethod.hasAnnotation(Ann)
+        vArgument.getAnnotationMetadata().hasAnnotation(Ann)
+        vArgument.getAnnotationMetadata().getValue(Ann, "foo, String").get() == 'bar'
     }
 
     void "test annotation bean introspection properties"() {
@@ -160,6 +164,13 @@ class Test {
         void visitMethod(MethodElement element, VisitorContext context) {
             element.annotate(Ann) { AnnotationValueBuilder builder ->
                 builder.member("foo", "bar")
+            }
+
+            for (ParameterElement parameterElement : element.getParameters()) {
+                parameterElement.annotate(Ann) {
+                    AnnotationValueBuilder builder ->
+                        builder.member("foo", "bar")
+                }
             }
         }
     }
