@@ -25,6 +25,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MemberElement;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 
 import javax.lang.model.element.Element;
@@ -76,7 +77,20 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 .newAnnotationBuilder()
                 .annotate(annotationMetadata, av);
 
-        String declaringTypeName = this instanceof MemberElement ? ((MemberElement) this).getOwningType().getName() : getName();
+        String declaringTypeName;
+        if (this instanceof MemberElement) {
+            declaringTypeName = ((MemberElement) this).getOwningType().getName();
+        } else if (this instanceof ParameterElement) {
+            TypeElement typeElement = visitorContext.getModelUtils().classElementFor((Element) this.getNativeType());
+            if (typeElement == null) {
+                declaringTypeName = getName();
+            } else {
+                declaringTypeName = typeElement.getQualifiedName().toString();
+            }
+        } else {
+            declaringTypeName = getName();
+        }
+
         AbstractAnnotationMetadataBuilder.addMutatedMetadata(declaringTypeName, element, annotationMetadata);
         visitorContext.getAnnotationUtils().invalidateMetadata(element);
         return this;
