@@ -82,7 +82,7 @@ class TestListener {
         definition.getValue(Ann, "foo", String).get() == 'bar'
         receiveMethod.hasAnnotation(Ann)
         vArgument.getAnnotationMetadata().hasAnnotation(Ann)
-        vArgument.getAnnotationMetadata().getValue(Ann, "foo, String").get() == 'bar'
+        vArgument.getAnnotationMetadata().getValue(Ann, "foo", String).get() == 'bar'
     }
 
     void "test annotation bean introspection properties"() {
@@ -172,6 +172,7 @@ class Test {
                         builder.member("foo", "bar")
                 }
             }
+
         }
     }
 
