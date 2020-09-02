@@ -3,13 +3,7 @@ package io.micronaut.http.client.netty
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.cookie.Cookies
-import io.netty.handler.codec.http.DefaultFullHttpResponse
-import io.netty.handler.codec.http.DefaultHttpHeaders
-import io.netty.handler.codec.http.FullHttpResponse
-import io.netty.handler.codec.http.HttpHeaderNames
-import io.netty.handler.codec.http.HttpHeaders
-import io.netty.handler.codec.http.HttpResponseStatus
-import io.netty.handler.codec.http.HttpVersion
+import io.netty.handler.codec.http.*
 import spock.lang.Specification
 
 class FullNettyClientHttpResponseSpec extends Specification {
