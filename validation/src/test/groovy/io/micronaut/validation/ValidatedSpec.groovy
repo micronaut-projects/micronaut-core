@@ -307,6 +307,59 @@ class ValidatedSpec extends Specification {
         server.close()
     }
 
+    void "test validated controller empty optional query param"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName
+        ])
+        HttpClient client = server.applicationContext.createBean(HttpClient, server.getURL())
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/validated/optional"),
+                Argument.STRING,
+                Argument.of(Map, String, Object)
+        ))
+        def resp = flowable.blockingFirst()
+
+        then:
+        noExceptionThrown()
+        resp.body() == "true"
+
+        cleanup:
+        client.close()
+        server.close()
+    }
+
+    void "test validated controller empty optional query param with not null"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName
+        ])
+        HttpClient client = server.applicationContext.createBean(HttpClient, server.getURL())
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/validated/optional/notNull"),
+                Argument.STRING,
+                Argument.of(Map, String, Object)
+        ))
+        flowable.blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.BAD_REQUEST.code
+
+        when:
+        Map result = e.response.getBody(Argument.of(Map, String, Object)).get()
+
+        then:
+        result.message == 'limit: must not be null'
+
+        cleanup:
+        server.close()
+    }
+
     void "test validated response with annotation"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
