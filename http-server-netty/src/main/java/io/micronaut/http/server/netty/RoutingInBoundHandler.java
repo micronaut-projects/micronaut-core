@@ -1135,8 +1135,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         );
                                     } else {
                                         MutableHttpResponse<?> finalResponse;
-                                        if (o instanceof MutableHttpResponse) {
-                                            finalResponse = (MutableHttpResponse<?>) o;
+                                        if (o instanceof HttpResponse) {
+                                            finalResponse = toMutableResponse((HttpResponse<?>) o);
                                             o = finalResponse.body();
                                         } else {
                                             finalResponse = message;
@@ -1387,8 +1387,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     singleResponse = newNotFoundError(request);
                                 }
                             } else {
-                                if (o instanceof MutableHttpResponse) {
-                                    singleResponse = (MutableHttpResponse<?>) o;
+                                if (o instanceof HttpResponse) {
+                                    singleResponse = toMutableResponse((HttpResponse<?>) o);
                                 } else {
                                     singleResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
                                             .body(o);
@@ -1416,8 +1416,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         emitter.onError(throwable);
                                     } else {
                                         MutableHttpResponse<?> response;
-                                        if (o instanceof MutableHttpResponse) {
-                                            response = (MutableHttpResponse<?>) o;
+                                        if (o instanceof HttpResponse) {
+                                            response = toMutableResponse((HttpResponse<?>) o);
                                         } else {
                                             response = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus);
                                             if (!isKotlinFunctionReturnTypeUnit) {
@@ -1437,8 +1437,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             } else {
                                 suspendedBody = body;
                             }
-                            if (suspendedBody instanceof MutableHttpResponse) {
-                                outgoingResponse = (MutableHttpResponse<?>) suspendedBody;
+                            if (suspendedBody instanceof HttpResponse) {
+                                outgoingResponse = toMutableResponse((HttpResponse<?>) suspendedBody);
                             } else {
                                 outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
                                         .body(suspendedBody);
@@ -1446,8 +1446,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         }
 
                     } else {
-                        if (body instanceof MutableHttpResponse) {
-                            outgoingResponse = (MutableHttpResponse<?>) body;
+                        if (body instanceof HttpResponse) {
+                            outgoingResponse = toMutableResponse((HttpResponse<?>) body);
                         } else {
                             outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
                                     .body(body);
@@ -1696,6 +1696,24 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (streamId != null) {
             nettyResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
         }
+    }
+
+    private MutableHttpResponse<?> toMutableResponse(HttpResponse<?> message) {
+        MutableHttpResponse<?> mutableHttpResponse;
+        if (message instanceof MutableHttpResponse) {
+            mutableHttpResponse = (MutableHttpResponse<?>) message;
+        } else {
+            HttpStatus httpStatus = message.status();
+            mutableHttpResponse = HttpResponse.status(httpStatus, httpStatus.getReason());
+            mutableHttpResponse.body(message.body());
+            message.getHeaders().forEach((name, value) -> {
+                for (String val: value) {
+                    mutableHttpResponse.header(name, val);
+                }
+            });
+            mutableHttpResponse.getAttributes().putAll(message.getAttributes());
+        }
+        return mutableHttpResponse;
     }
 
     @NotNull
