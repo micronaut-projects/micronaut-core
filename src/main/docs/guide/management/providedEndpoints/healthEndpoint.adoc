@@ -1,6 +1,6 @@
 The health endpoint returns information about the "health" of the application. The application health is determined by any number of "health indicators".
 
-To execute the health endpoint, send a GET request to /health.
+To execute the health endpoint, send a GET request to /health. Additionally the health endpoint exposes /health/liveness and /health/readiness health indicators.
 
 == Configuration
 
@@ -69,7 +69,7 @@ The above will return api:http.HttpStatus#OK[] (200) even when the api:health.He
 
 == Customization
 
-The health endpoint consists of a health aggregator and any number of health indicators. To add a health indicator, simply create a bean class that implements link:{api}/io/micronaut/management/health/indicator/HealthIndicator.html[HealthIndicator]. A base class link:{api}/io/micronaut/management/health/indicator/AbstractHealthIndicator.html[AbstractHealthIndicator] has been provided for you to extend to make the process easier.
+The health endpoint consists of a health aggregator and any number of health indicators. To add a health indicator, simply create a bean class that implements link:{api}/io/micronaut/management/health/indicator/HealthIndicator.html[HealthIndicator]. It is recommended to also use either link:{api}/io/micronaut/health/indicator/annotation/Liveness.html[@Liveness] or link:{api}/io/micronaut/health/indicator/annotation/Readiness.html[@Readiness] qualifier. If no qualifier is used then the health incidator is part of /health and /health/readiness endpoints. A base class link:{api}/io/micronaut/management/health/indicator/AbstractHealthIndicator.html[AbstractHealthIndicator] has been provided for you to extend to make the process easier.
 
 All of the health indicator beans will be collected together with the health aggregator. To provide your own implementation of the health aggregator, create a class that implements link:{api}/io/micronaut/management/health/aggregator/HealthAggregator.html[HealthAggregator] and register it as a bean. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the link:{api}/io/micronaut/management/health/aggregator/RxJavaHealthAggregator.html[default implementation].
 
@@ -85,6 +85,8 @@ The default health aggregator returns an overall status that is calculated based
 The "worst" status will be returned as the overall status. A non operational status will be selected over an operational status. A higher severity will be selected over a lower severity.
 
 == Provided Indicators
+
+All micronaut provided health indicators are exposed on /health and /health/readiness endpoints.
 
 === Disk Space
 
