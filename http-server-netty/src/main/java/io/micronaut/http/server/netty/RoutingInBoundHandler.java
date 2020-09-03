@@ -56,6 +56,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.*;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -674,9 +675,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         // decorate the execution of the route so that it runs an async executor
         request.setMatchedRoute(route);
 
+        Optional<Argument<?>> bodyArgument = route.getBodyArgument()
+            .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
+
         // The request body is required, so at this point we must have a StreamedHttpRequest
         io.netty.handler.codec.http.HttpRequest nativeRequest = request.getNativeRequest();
-        if (!route.isExecutable() && io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) && nativeRequest instanceof StreamedHttpRequest) {
+        if (!route.isExecutable() &&
+                io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) &&
+                nativeRequest instanceof StreamedHttpRequest &&
+                (!bodyArgument.isPresent() || !route.isSatisfied(bodyArgument.get().getName()))) {
             httpContentProcessorResolver.resolve(request, route).subscribe(buildSubscriber(request, context, route));
         } else {
             if (nativeRequest instanceof StreamedHttpRequest) {
