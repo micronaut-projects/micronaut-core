@@ -34,7 +34,10 @@ import spock.lang.Unroll
  */
 class InstrospectionBeanPropertyBinderSpec extends Specification {
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.builder()
+            .properties(['jackson.bean-property-binder.enabled': false])
+            .build()
+            .start()
 
     @Unroll
     void "test bind map properties to object"() {

@@ -44,7 +44,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(property = "jackson.bean-property-binder.enabled", value = "true")
+@Requires(property = "jackson.bean-property-binder.enabled", value = "true", defaultValue = "true")
 @Singleton
 public class JacksonBeanPropertyBinder extends AbstractBeanPropertyBinder implements BeanPropertyBinder {
 
