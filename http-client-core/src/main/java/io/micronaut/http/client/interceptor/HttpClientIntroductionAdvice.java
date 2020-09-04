@@ -222,6 +222,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
+            List<Argument> bodyArguments = new ArrayList<>();
+
             for (Argument argument : arguments) {
                 Object definedValue = getValue(argument, context, parameters, paramMap);
 
@@ -235,7 +237,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 binderRegistry.findArgumentBinder((Argument<Object>) argument)
                         .orElse((ctx, uriCtx, value, req) -> {
                             if (!uriCtx.getUriTemplate().getVariableNames().contains(ctx.getArgument().getName())) {
-                                uriContext.getBodyArguments().add(ctx.getArgument());
+                                bodyArguments.add(ctx.getArgument());
                             }
                         })
                         .bind(ConversionContext.of(argument), uriContext, definedValue, request);
@@ -243,7 +245,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
 
             Object body = request.getBody().orElse(null);
-            List<Argument> bodyArguments = uriContext.getBodyArguments();
 
             if (HttpMethod.permitsRequestBody(httpMethod)) {
                 if (body == null && !bodyArguments.isEmpty()) {
