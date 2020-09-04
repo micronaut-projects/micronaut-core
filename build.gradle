@@ -247,8 +247,14 @@ ext {
             ],
             'micronaut.openapi': [
                     version:micronautOpenApiVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.openapi',
                     name:'micronaut-openapi'
+            ],
+            // TODO Deprecated: Remove in the next major version
+            'micronaut.openapi.old': [
+                    version: micronautOldOpenApiVersion,
+                    group: 'io.micronaut.configuration',
+                    name: 'micronaut-openapi'
             ],
             kafka                      : [
                     version: kafkaVersion,
