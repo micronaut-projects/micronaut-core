@@ -41,6 +41,7 @@ import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.client.*;
 import io.micronaut.http.client.annotation.Client;
+import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
 import io.micronaut.http.client.bind.HttpClientBinderRegistry;
 import io.micronaut.http.client.exceptions.HttpClientException;
@@ -223,6 +224,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             List<Argument> bodyArguments = new ArrayList<>();
+            ClientArgumentRequestBinder<Object> defaultBinder = (ctx, uriCtx, value, req) -> {
+                if (!uriCtx.getUriTemplate().getVariableNames().contains(ctx.getArgument().getName())) {
+                    bodyArguments.add(ctx.getArgument());
+                }
+            };
 
             for (Argument argument : arguments) {
                 Object definedValue = getValue(argument, context, parameters, paramMap);
@@ -235,11 +241,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
 
                 binderRegistry.findArgumentBinder((Argument<Object>) argument)
-                        .orElse((ctx, uriCtx, value, req) -> {
-                            if (!uriCtx.getUriTemplate().getVariableNames().contains(ctx.getArgument().getName())) {
-                                bodyArguments.add(ctx.getArgument());
-                            }
-                        })
+                        .orElse(defaultBinder)
                         .bind(ConversionContext.of(argument), uriContext, definedValue, request);
             }
 
