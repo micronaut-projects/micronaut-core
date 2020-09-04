@@ -47,7 +47,8 @@ public class GoogleAuthFilterSpec {
         assertTrue(
                 message.contains("metadata: nodename nor servname provided") ||
                         message.contains("metadata: Temporary failure in name resolution") ||
-                        message.contains("metadata: Name or service not known")
+                        message.contains("metadata: Name or service not known") ||
+                        message.contains("Connect Error: No such host is known (metadata)")
         );
 
     }
