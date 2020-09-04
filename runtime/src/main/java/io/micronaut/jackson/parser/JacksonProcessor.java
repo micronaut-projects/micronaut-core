@@ -133,7 +133,9 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
 
     @Override
     protected void doOnComplete() {
-        if (needMoreInput()) {
+        if (jsonStream && nodeStack.isEmpty()) {
+            super.doOnComplete();
+        } else if (needMoreInput()) {
             doOnError(new JsonEOFException(currentNonBlockingJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input"));
         } else {
             super.doOnComplete();

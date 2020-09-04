@@ -47,6 +47,7 @@ public interface ChannelPipelineCustomizer {
     String HANDLER_MICRONAUT_SSE_EVENT_STREAM = "micronaut-sse-event-stream";
     String HANDLER_MICRONAUT_SSE_CONTENT = "micronaut-sse-content";
     String HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM = "micronaut-http-response-stream";
+    String HANDLER_MICRONAUT_HTTP_RESPONSE_FULL = "micronaut-http-response-full";
     String HANDLER_HTTP2_CONNECTION = "http2-connection";
     String HANDLER_HTTP2_SETTINGS = "http2-settings";
     String HANDLER_HTTP2_UPGRADE_REQUEST = "http2-upgrade-request";

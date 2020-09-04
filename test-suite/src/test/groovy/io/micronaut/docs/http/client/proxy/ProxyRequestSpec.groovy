@@ -59,6 +59,12 @@ class ProxyRequestSpec extends Specification {
         response.header('X-My-Response-Header') == 'YYY'
         response.body() == 'Hello John XXX'
 
+        when:"A POST request with no body is proxied"
+        response = client.exchange(HttpRequest.POST("/proxy/post/nobody", "John").contentType(MediaType.TEXT_PLAIN), String).blockingFirst()
+
+        then:
+        response.status() == HttpStatus.NO_CONTENT
+
         when:"A POST request with JSON is proxied"
         response = client.exchange(HttpRequest.POST("/proxy/post/json", new Message(text: "John")).contentType(MediaType.APPLICATION_JSON), Message).blockingFirst()
 
@@ -88,6 +94,13 @@ class ProxyRequestSpec extends Specification {
         @Consumes(MediaType.TEXT_PLAIN)
         String text(HttpHeaders headers, @Body String body) {
             return "Hello " + body +  " " + headers.get("X-My-Request-Header")
+        }
+
+        @Post("/post/nobody")
+        @Produces(MediaType.TEXT_PLAIN)
+        @Consumes(MediaType.TEXT_PLAIN)
+        HttpResponse<?> noBody(HttpHeaders headers, @Body String body) {
+            return HttpResponse.noContent()
         }
 
         @Post("/post/json")

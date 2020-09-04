@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.stream
 
 import io.micronaut.core.io.buffer.ByteBuffer
+import io.micronaut.http.annotation.Produces
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
@@ -85,6 +86,17 @@ class JsonStreamSpec extends Specification {
         book.title == "The Stand"
     }
 
+    void "test an empty json stream"() {
+        given:
+        RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+
+        when:
+        def books = client.jsonStream(HttpRequest.GET("/json/stream/empty"), Book)
+
+        then:
+        books.blockingIterable().iterator().toList() == []
+    }
+
     @Controller("/json/stream")
     static class StreamController {
 
@@ -101,6 +113,11 @@ class JsonStreamSpec extends Specification {
         @Get(uri = "/single", produces = MediaType.APPLICATION_JSON_STREAM)
         HttpResponse<Single<Book>> streamSingleResponse() {
             return HttpResponse.ok(Single.just(new Book(title: "The Stand"))).header("X-MyHeader", "42")
+        }
+
+        @Get(uri = "/empty", produces = MediaType.APPLICATION_JSON_STREAM)
+        Flowable<Book> emptyStream() {
+            return Flowable.empty()
         }
 
     }
