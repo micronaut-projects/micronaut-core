@@ -41,6 +41,9 @@ public interface ClientArgumentRequestBinder<T> {
      * @param value   The argument value
      * @param request The request
      */
-    void bind(@NonNull ArgumentConversionContext<T> context, @NonNull T value, @NonNull MutableHttpRequest<?> request);
+    void bind(@NonNull ArgumentConversionContext<T> context,
+              @NonNull ClientRequestUriContext uriContext,
+              @NonNull T value,
+              @NonNull MutableHttpRequest<?> request);
 
 }
