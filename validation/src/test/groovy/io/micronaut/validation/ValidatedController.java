@@ -20,6 +20,7 @@ import io.micronaut.http.annotation.*;
 import javax.validation.Valid;
 import javax.validation.constraints.Digits;
 import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
 import java.util.Optional;
 
 /**
@@ -46,6 +47,11 @@ public class ValidatedController {
 
     @Get("/optional")
     public boolean optional(@QueryValue @Min(1) Optional<Integer> limit) {
+        return limit.map(l -> l >= 1).orElse(true);
+    }
+
+    @Get("/optional/notNull")
+    public boolean optionalNotNull(@QueryValue @NotNull Optional<Integer> limit) {
         return limit.map(l -> l >= 1).orElse(true);
     }
 }
