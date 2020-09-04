@@ -31,7 +31,7 @@ import io.micronaut.http.uri.UriMatchVariable;
 import java.util.Collections;
 
 /**
- * A binder for binding arguments annotated with @QueryValue
+ * A binder for binding arguments annotated with @QueryValue.
  *
  * @param <T> The argument type
  * @author James Kleeh
