@@ -16,9 +16,3 @@ dependencies {
     testImplementation "javax.persistence:javax.persistence-api:2.2"
     testImplementation project(":runtime")
 }
-
-if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_14)) {
-    tasks.withType(Test) { Test t ->
-        t.jvmArgs "--enable-preview"
-    }
-}
