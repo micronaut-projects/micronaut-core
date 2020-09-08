@@ -18,16 +18,14 @@ package io.micronaut.http.client.bind;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.CookieValue;
-import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.RequestAttribute;
+import io.micronaut.http.annotation.*;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 
@@ -57,19 +55,42 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
     @Inject
     protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
                                               List<ClientArgumentRequestBinder> binders) {
-        byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, value, request) -> {
+        byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> {
             value.forEachValue(request::header);
         });
-        byType.put(Argument.of(Cookies.class).typeHashCode(), (ClientArgumentRequestBinder<Cookies>) (context, value, request) -> {
+        byType.put(Argument.of(Cookies.class).typeHashCode(), (ClientArgumentRequestBinder<Cookies>) (context, uriContext, value, request) -> {
             request.cookies(value.getAll());
         });
-        byType.put(Argument.of(Cookie.class).typeHashCode(), (ClientArgumentRequestBinder<Cookie>) (context, value, request) -> {
+        byType.put(Argument.of(Cookie.class).typeHashCode(), (ClientArgumentRequestBinder<Cookie>) (context, uriContext, value, request) -> {
             request.cookie(value);
         });
-        byType.put(Argument.of(BasicAuth.class).typeHashCode(), (ClientArgumentRequestBinder<BasicAuth>) (context, value, request) -> {
+        byType.put(Argument.of(BasicAuth.class).typeHashCode(), (ClientArgumentRequestBinder<BasicAuth>) (context, uriContext, value, request) -> {
             request.basicAuth(value.getUsername(), value.getPassword());
         });
-        byAnnotation.put(CookieValue.class, (context, value, request) -> {
+        byAnnotation.put(QueryValue.class, (context, uriContext, value, request) -> {
+
+            String parameterName = context.getAnnotationMetadata().stringValue(QueryValue.class)
+                    .filter (StringUtils::isNotEmpty)
+                    .orElse(context.getArgument().getName());
+
+            conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                    .filter(StringUtils::isNotEmpty)
+                    .ifPresent(o -> {
+                        uriContext.getQueryParameters().put(parameterName, o);
+                    });
+        });
+        byAnnotation.put(PathVariable.class, (context, uriContext, value, request) -> {
+            String parameterName = context.getAnnotationMetadata().stringValue(PathVariable.class)
+                    .filter (StringUtils::isNotEmpty)
+                    .orElse(context.getArgument().getName());
+
+            if (!(value instanceof String)) {
+                conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                        .filter(StringUtils::isNotEmpty)
+                        .ifPresent(param -> uriContext.getPathParameters().put(parameterName, param));
+            }
+        });
+        byAnnotation.put(CookieValue.class, (context, uriContext, value, request) -> {
             String cookieName = context.getAnnotationMetadata().stringValue(CookieValue.class)
                     .filter(StringUtils::isNotEmpty)
                     .orElse(context.getArgument().getName());
@@ -77,7 +98,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
             conversionService.convert(value, String.class)
                     .ifPresent(o -> request.cookie(Cookie.of(cookieName, o)));
         });
-        byAnnotation.put(Header.class, (context, value, request) -> {
+        byAnnotation.put(Header.class, (context, uriContext, value, request) -> {
             AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
             String headerName = annotationMetadata
                     .stringValue(Header.class)
@@ -87,7 +108,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
             conversionService.convert(value, String.class)
                     .ifPresent(header -> request.getHeaders().set(headerName, header));
         });
-        byAnnotation.put(RequestAttribute.class, (context, value, request) -> {
+        byAnnotation.put(RequestAttribute.class, (context, uriContext, value, request) -> {
             AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
             String attributeName = annotationMetadata
                     .stringValue(RequestAttribute.class)
@@ -95,7 +116,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .orElse(NameUtils.hyphenate(context.getArgument().getName()));
             request.getAttributes().put(attributeName, value);
         });
-        byAnnotation.put(Body.class, (ClientArgumentRequestBinder<Object>) (context, value, request) -> {
+        byAnnotation.put(Body.class, (ClientArgumentRequestBinder<Object>) (context, uriContext, value, request) -> {
             request.body(value);
         });
 

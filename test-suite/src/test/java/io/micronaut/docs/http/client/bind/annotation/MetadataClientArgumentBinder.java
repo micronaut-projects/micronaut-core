@@ -1,11 +1,13 @@
 package io.micronaut.docs.http.client.bind.annotation;
 
 //tag::clazz[]
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.bind.AnnotatedClientArgumentRequestBinder;
+import io.micronaut.http.client.bind.ClientRequestUriContext;
 import org.jetbrains.annotations.NotNull;
 
 import javax.inject.Singleton;
@@ -22,7 +24,10 @@ public class MetadataClientArgumentBinder implements AnnotatedClientArgumentRequ
 
 
     @Override
-    public void bind(@NotNull ArgumentConversionContext<Object> context, @NotNull Object value, @NotNull MutableHttpRequest<?> request) {
+    public void bind(@NotNull ArgumentConversionContext<Object> context,
+                     @NonNull ClientRequestUriContext uriContext,
+                     @NotNull Object value,
+                     @NotNull MutableHttpRequest<?> request) {
         if (value instanceof Map) {
             for (Map.Entry<?, ?> entry: ((Map<?, ?>) value).entrySet()) {
                 String key = NameUtils.hyphenate(StringUtils.capitalize(entry.getKey().toString()), false);
