@@ -41,8 +41,9 @@ import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.client.*;
 import io.micronaut.http.client.annotation.Client;
+import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
+import io.micronaut.http.client.bind.ClientRequestUriContext;
 import io.micronaut.http.client.bind.HttpClientBinderRegistry;
-import io.micronaut.http.client.bind.DefaultClientBinder;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
@@ -206,10 +207,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
-            List<Argument> bodyArguments = new ArrayList<>();
             ConversionService<?> conversionService = ConversionService.SHARED;
 
-            DefaultClientBinder defaultClientBinder = new DefaultClientBinder(paramMap, queryParams, bodyArguments, uriTemplate, conversionService);
+            ClientRequestUriContext uriContext = new ClientRequestUriContext(uriTemplate, paramMap, queryParams);
 
             if (!headers.isEmpty()) {
                 for (Map.Entry<String, String> entry : headers.entrySet()) {
@@ -223,6 +223,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
+            List<Argument> bodyArguments = new ArrayList<>();
+            ClientArgumentRequestBinder<Object> defaultBinder = (ctx, uriCtx, value, req) -> {
+                if (!uriCtx.getUriTemplate().getVariableNames().contains(ctx.getArgument().getName())) {
+                    bodyArguments.add(ctx.getArgument());
+                }
+            };
+
             for (Argument argument : arguments) {
                 Object definedValue = getValue(argument, context, parameters, paramMap);
 
@@ -234,8 +241,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
 
                 binderRegistry.findArgumentBinder((Argument<Object>) argument)
-                        .orElse(defaultClientBinder)
-                        .bind(ConversionContext.of(argument), definedValue, request);
+                        .orElse(defaultBinder)
+                        .bind(ConversionContext.of(argument), uriContext, definedValue, request);
             }
 
 

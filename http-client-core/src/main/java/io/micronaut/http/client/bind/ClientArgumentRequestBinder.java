@@ -37,10 +37,14 @@ public interface ClientArgumentRequestBinder<T> {
      * Bind the given argument to the request. Argument binders
      * are not able to modify the URI of the request.
      *
-     * @param context The {@link ArgumentConversionContext}
+     * @param context The argument context
+     * @param uriContext The URI context
      * @param value   The argument value
      * @param request The request
      */
-    void bind(@NonNull ArgumentConversionContext<T> context, @NonNull T value, @NonNull MutableHttpRequest<?> request);
+    void bind(@NonNull ArgumentConversionContext<T> context,
+              @NonNull ClientRequestUriContext uriContext,
+              @NonNull T value,
+              @NonNull MutableHttpRequest<?> request);
 
 }

@@ -6,6 +6,10 @@ Micronaut {version} includes the following changes:
 
 Micronaut now ships with Kotlin 1.4 for those users using Kotlin.
 
+==== Introspections for JDK 14 Records
+
+It is now possible to define <<introspection, bean introspections>> on JDK 14+ record types (note these currently require the `––enable–preview` flag to the compiler and JVM).
+
 ==== Client Binding API
 
 A new API has been created to allow for binding declarative HTTP client method arguments to an HTTP request. See the <<clientParameters, documentation>> for more information.
@@ -17,3 +21,11 @@ Query parameters are now respected and bindable in the Micronaut websocket suppo
 ==== HttpResponse Improvements
 
 Cookies in HTTP responses from the client side are now retrievable on the HttpResponse. These are the cookies found in the `Set-Cookie` header.
+
+=== Module Upgrades
+
+TODO
+
+=== Dependency Upgrades
+
+TODO
