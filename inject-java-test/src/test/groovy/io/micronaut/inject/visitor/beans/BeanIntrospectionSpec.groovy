@@ -30,6 +30,7 @@ import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
+import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
@@ -43,14 +44,25 @@ package test;
 import io.micronaut.core.annotation.Creator;
 
 @io.micronaut.core.annotation.Introspected
-public record Foo(String name){
+public record Foo(@javax.validation.constraints.NotBlank String name){
 }
 ''')
         when:
         def test = introspection.instantiate("test")
+        def property = introspection.getRequiredProperty("name", String)
+        def argument = introspection.getConstructorArguments()[0]
 
         then:
+        argument.name == 'name'
+        argument.getAnnotationMetadata().hasAnnotation(NotBlank)
         test.name == 'test'
+        test.name() == 'test'
+        introspection.propertyNames.length == 1
+        introspection.propertyNames == ['name'] as String[]
+        property.hasAnnotation(NotBlank)
+        property.isReadOnly()
+        property.name == 'name'
+        property.get(test) == 'test'
     }
 
 

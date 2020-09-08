@@ -97,6 +97,11 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         this.arrayDimensions = arrayDimensions;
     }
 
+    @Override
+    public boolean isRecord() {
+        return JavaModelUtils.isRecord(classElement);
+    }
+
     @NonNull
     @Override
     public Map<String, ClassElement> getTypeArguments(@NonNull String type) {

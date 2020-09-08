@@ -24,7 +24,6 @@ import io.micronaut.annotation.processing.*;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
-import org.jetbrains.annotations.NotNull;
 import spock.util.environment.Jvm;
 
 import javax.annotation.processing.Processor;

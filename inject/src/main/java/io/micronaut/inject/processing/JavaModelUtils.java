@@ -18,9 +18,7 @@ package io.micronaut.inject.processing;
 import io.micronaut.core.reflect.ReflectionUtils;
 
 import javax.lang.model.element.*;
-import java.lang.reflect.Field;
 import java.util.Optional;
-import java.util.function.Function;
 
 /**
  * Utility methods for Java model handling.
