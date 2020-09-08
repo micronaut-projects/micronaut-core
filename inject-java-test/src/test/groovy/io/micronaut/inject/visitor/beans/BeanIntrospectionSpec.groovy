@@ -34,6 +34,24 @@ import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+    @IgnoreIf({ !jvm.isJava14Compatible() })
+    void "test bean introspection on a Java 14+ record"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(String name){
+}
+''')
+        when:
+        def test = introspection.instantiate("test")
+
+        then:
+        test.name == 'test'
+    }
 
 
     void "test bean introspection with property of generic interface"() {

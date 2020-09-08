@@ -23,6 +23,10 @@ import io.micronaut.annotation.processing.*;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.util.CollectionUtils;
+import org.jetbrains.annotations.NotNull;
+import spock.util.environment.Jvm;
+
 import javax.annotation.processing.Processor;
 import javax.lang.model.element.Element;
 import javax.tools.*;
@@ -79,13 +83,14 @@ public class JavaParser implements Closeable {
      * @return The elements
      */
     public Iterable<? extends Element> parse(JavaFileObject... sources) {
+        Set<String> options = getCompilerOptions();
         JavacTask task =
                 ((JavacTool) compiler)
                         .getTask(
                                 null, // explicitly use the default because old javac logs some output on stderr
                                 fileManager,
                                 diagnosticCollector,
-                                Collections.emptySet(),
+                                options,
                                 Collections.emptySet(),
                                 Arrays.asList(sources),
                                 context);
@@ -144,14 +149,14 @@ public class JavaParser implements Closeable {
      * @return The java file objects
      */
     public Iterable<? extends JavaFileObject> generate(JavaFileObject... sources) {
-
+        Set<String> options = getCompilerOptions();
         JavacTask task =
                 ((JavacTool) compiler)
                         .getTask(
                                 null, // explicitly use the default because old javac logs some output on stderr
                                 fileManager,
                                 diagnosticCollector,
-                                Collections.emptySet(),
+                                options,
                                 Collections.emptySet(),
                                 Arrays.asList(sources),
                                 context);
@@ -175,6 +180,20 @@ public class JavaParser implements Closeable {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private Set<String> getCompilerOptions() {
+        Set<String> options;
+        if (Jvm.getCurrent().isJava14Compatible()) {
+            options = CollectionUtils.setOf(
+                    "--enable-preview",
+                    "-source",
+                    "14"
+            );
+        } else {
+            options = Collections.emptySet();
+        }
+        return options;
     }
 
     /**
