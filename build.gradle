@@ -597,6 +597,12 @@ ext {
                     group  : 'io.micronaut.acme',
                     name   : 'micronaut-acme'
             ],
+            'dekorate': [
+                    version: dekorateVersion,
+                    group  : 'io.dekorate',
+                    name   : 'dekorate-project',
+                    modules: ['jaeger-annotations', 'knative-annotations', 'kubernetes-annotations',  'openshift-annotations', 'prometheus-annotations', 'servicecatalog-annotations']
+            ],
     ]
 
     dependencyVersion = { String name ->
