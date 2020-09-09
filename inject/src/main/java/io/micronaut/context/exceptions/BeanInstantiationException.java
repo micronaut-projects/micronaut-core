@@ -26,9 +26,8 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class BeanInstantiationException extends BeanContextException {
+public class BeanInstantiationException extends BeanCreationException {
 
-    private final BeanType rootBeanType;
 
     /**
      * @param message The message
@@ -36,7 +35,6 @@ public class BeanInstantiationException extends BeanContextException {
      */
     public BeanInstantiationException(String message, Throwable cause) {
         super(message, cause);
-        rootBeanType = null;
     }
 
     /**
@@ -44,7 +42,6 @@ public class BeanInstantiationException extends BeanContextException {
      */
     public BeanInstantiationException(String message) {
         super(message);
-        rootBeanType = null;
     }
 
     /**
@@ -52,8 +49,7 @@ public class BeanInstantiationException extends BeanContextException {
      * @param cause             The throwable
      */
     public BeanInstantiationException(BeanResolutionContext resolutionContext, Throwable cause) {
-        super(MessageUtils.buildMessage(resolutionContext, cause.getMessage()), cause);
-        rootBeanType = resolveRootBeanDefinition(resolutionContext);
+        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, cause.getMessage()), cause);
     }
 
     /**
@@ -61,8 +57,7 @@ public class BeanInstantiationException extends BeanContextException {
      * @param message           The message
      */
     public BeanInstantiationException(BeanResolutionContext resolutionContext, String message) {
-        super(MessageUtils.buildMessage(resolutionContext, message));
-        rootBeanType = resolveRootBeanDefinition(resolutionContext);
+        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, message));
     }
 
     /**
@@ -71,8 +66,7 @@ public class BeanInstantiationException extends BeanContextException {
      * @param <T>            The bean type
      */
     public <T> BeanInstantiationException(BeanType<T> beanDefinition, Throwable cause) {
-        super("Error instantiating bean of type [" + beanDefinition.getName() + "]: " + cause.getMessage(), cause);
-        rootBeanType = beanDefinition;
+        super(beanDefinition, "Error instantiating bean of type [" + beanDefinition.getName() + "]: " + cause.getMessage(), cause);
     }
 
     /**
@@ -81,32 +75,6 @@ public class BeanInstantiationException extends BeanContextException {
      * @param <T>            The bean type
      */
     public <T> BeanInstantiationException(BeanType<T> beanDefinition, String message) {
-        super("Error instantiating bean of type [" + beanDefinition.getName() + "]: " + message);
-        rootBeanType = beanDefinition;
-    }
-
-    /**
-     * @return The reference to the root bean.
-     */
-    public Optional<BeanType> getRootBeanType() {
-        return Optional.ofNullable(rootBeanType);
-    }
-
-    /**
-     * @param resolutionContext The resolution context
-     * @return The reference of the root bean throwing the exception
-     */
-    private BeanType resolveRootBeanDefinition(BeanResolutionContext resolutionContext) {
-        BeanType rootBeanType = null;
-        if (resolutionContext != null) {
-            BeanResolutionContext.Path path = resolutionContext.getPath();
-            if (!path.isEmpty()) {
-                BeanResolutionContext.Segment segment = path.peek();
-                rootBeanType = segment.getDeclaringType();
-            } else {
-                rootBeanType = resolutionContext.getRootDefinition();
-            }
-        }
-        return rootBeanType;
+        super(beanDefinition, "Error instantiating bean of type [" + beanDefinition.getName() + "]: " + message);
     }
 }
