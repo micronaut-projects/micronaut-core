@@ -19,11 +19,14 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.BeanInstantiationException
+import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.ValidatedBeanDefinition
 import spock.lang.Specification
 
 import javax.validation.Validation
 
-class ValidatedConfigurationSpec extends Specification {
+class ValidatedConfigurationSpec extends AbstractTypeElementSpec {
 
     void "test validated config with invalid config"() {
         given:
@@ -62,5 +65,69 @@ class ValidatedConfigurationSpec extends Specification {
 
         cleanup:
         applicationContext.close()
+    }
+
+    void "test config props with @Valid on field is a validating bean definition"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.inject.configproperties.Pojo;
+
+import javax.validation.Valid;
+import java.util.List;
+
+@ConfigurationProperties("test.valid")
+public class MyConfig {
+
+    @Valid
+    private List<Pojo> pojos;
+
+    public List<Pojo> getPojos() {
+        return pojos;
+    }
+
+    public void setPojos(List<Pojo> pojos) {
+        this.pojos = pojos;
+    }
+
+}
+''')
+
+        then:
+        beanDefinition instanceof ValidatedBeanDefinition
+    }
+
+    void "test config props with @Valid on getter is a validating bean definition"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.inject.configproperties.Pojo;
+
+import javax.validation.Valid;
+import java.util.List;
+
+@ConfigurationProperties("test.valid")
+public class MyConfig {
+  
+    private List<Pojo> pojos;
+
+    @Valid
+    public List<Pojo> getPojos() {
+        return pojos;
+    }
+
+    public void setPojos(List<Pojo> pojos) {
+        this.pojos = pojos;
+    }
+
+}
+''')
+
+        then:
+        beanDefinition instanceof ValidatedBeanDefinition
     }
 }

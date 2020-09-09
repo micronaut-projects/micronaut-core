@@ -64,7 +64,6 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                         ExecutableElement ee = (ExecutableElement) enclosedElement;
                         String qualifiedName = ee.getSimpleName().toString();
                         qualifiedName += "(" + ee.getParameters().stream().map(variableElement -> types.erasure(variableElement.asType()).toString()).collect(Collectors.joining(",")) + ")";
-                        qualifiedName = types.erasure(ee.getReturnType()).toString() + "." + qualifiedName;
                         // if the method has already been processed then it is overridden so ignore
                         if (!processed.contains(qualifiedName)) {
                             processed.add(qualifiedName);
