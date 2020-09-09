@@ -180,7 +180,7 @@ class HttpHeadSpec extends Specification {
         Optional<Book> body = response.getBody()
 
         then:
-        !response.contentType.isPresent()
+        response.contentType.isPresent()
         response.contentLength == -1
         response.status == HttpStatus.OK
         !body.isPresent()
@@ -207,7 +207,7 @@ class HttpHeadSpec extends Specification {
         Optional<List<Book>> body = response.getBody()
 
         then:
-        !response.contentType.isPresent()
+        response.contentType.isPresent()
         response.contentLength == -1
         response.status == HttpStatus.OK
         !body.isPresent()

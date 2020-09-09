@@ -24,6 +24,7 @@ import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
@@ -41,6 +42,7 @@ import org.reactivestreams.Publisher
 import spock.lang.Specification
 
 import javax.inject.Inject
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * @author Graeme Rocher
@@ -53,6 +55,9 @@ class HttpFilterSpec extends Specification {
     @Inject
     @Client("/")
     RxHttpClient rxClient
+
+    @Inject
+    ContentTypeFilter contentTypeFilter
 
     void "test interceptor execution and order - write replacement"() {
         when:
@@ -104,6 +109,17 @@ class HttpFilterSpec extends Specification {
         response.headers.contains("X-Matched-Filter")
     }
 
+    void "test content type is available in server filters"() {
+        when:
+        HttpResponse<String> response = rxClient.exchange("/simple", String.class).blockingFirst()
+
+        then:
+        response.body() == "simple"
+        response.status == HttpStatus.OK
+        response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
+        contentTypeFilter.contentTypeFound.get()
+    }
+
     @Requires(property = 'spec.name', value = "HttpFilterSpec")
     @Filter("/**")
     static class RootFilter implements HttpServerFilter {
@@ -116,6 +132,20 @@ class HttpFilterSpec extends Specification {
                             AnnotationMetadata.class).isPresent()
                 }
                 response.header("X-Root-Filter", "processed")
+            })
+        }
+    }
+
+    @Filter("/simple")
+    @Requires(property = 'spec.name', value = "HttpFilterSpec")
+    static class ContentTypeFilter implements HttpServerFilter {
+
+        AtomicBoolean contentTypeFound = new AtomicBoolean()
+
+        @Override
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            return Flowable.fromPublisher(chain.proceed(request)).doOnNext({ response ->
+               contentTypeFound.compareAndSet(false, response.contentType.isPresent())
             })
         }
     }
@@ -152,6 +182,11 @@ class HttpFilterSpec extends Specification {
         @MarkerStereotypeAnnotation
         HttpResponse matched() {
             HttpResponse.ok()
+        }
+
+        @Get("/simple")
+        String simple() {
+            "simple"
         }
 
     }
