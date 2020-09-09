@@ -60,9 +60,9 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
     @SuppressWarnings("unchecked")
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
+
         if (request.getAttribute(APPLIED, Boolean.class).isPresent()) {
-            return responsePublisher;
+            return chain.proceed(request);
         } else {
             request.setAttribute(APPLIED, true);
             SpanContext spanContext = tracer.extract(
@@ -75,6 +75,7 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
             );
 
             Tracer.SpanBuilder spanBuilder = newSpan(request, spanContext);
+            Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
             return new TracingPublisher(responsePublisher, tracer, spanBuilder) {
                 @Override
                 protected void doOnSubscribe(@NonNull Span span) {
