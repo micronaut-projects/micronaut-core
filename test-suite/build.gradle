@@ -58,13 +58,13 @@ dependencies {
     testRuntimeOnly dependencyVersion("h2")
     testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junit5Version"
     testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
-    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.852'
+    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.858'
 
     // needed for HTTP/2 tests
-    testImplementation 'io.netty:netty-tcnative:2.0.31.Final'
-    testImplementation 'io.netty:netty-tcnative-boringssl-static:2.0.31.Final'
-    testImplementation "io.netty:netty-tcnative-boringssl-static:2.0.31.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
-    testImplementation 'org.zalando:logbook-netty:2.1.0'
+    testImplementation 'io.netty:netty-tcnative:2.0.34.Final'
+    testImplementation 'io.netty:netty-tcnative-boringssl-static:2.0.34.Final'
+    testImplementation "io.netty:netty-tcnative-boringssl-static:2.0.34.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
+    testImplementation 'org.zalando:logbook-netty:2.2.0'
     testImplementation "ch.qos.logback:logback-classic:1.2.3"
 }
 
