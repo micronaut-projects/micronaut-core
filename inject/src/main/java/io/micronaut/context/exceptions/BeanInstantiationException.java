@@ -18,8 +18,6 @@ package io.micronaut.context.exceptions;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.inject.BeanType;
 
-import java.util.Optional;
-
 /**
  * Thrown when no such beans exists.
  *
@@ -27,7 +25,6 @@ import java.util.Optional;
  * @since 1.0
  */
 public class BeanInstantiationException extends BeanCreationException {
-
 
     /**
      * @param message The message
