@@ -90,9 +90,23 @@ public class TextPlainCodec implements MediaTypeCodec {
     @Override
     public <T> T decode(Argument<T> type, ByteBuffer<?> buffer) throws CodecException {
         String text = buffer.toString(defaultCharset);
+        if (CharSequence.class.isAssignableFrom(type.getType())) {
+            return (T) text;
+        }
         return ConversionService.SHARED
             .convert(text, type)
             .orElseThrow(() -> new CodecException("Cannot decode byte buffer with value [" + text + "] to type: " + type));
+    }
+
+    @Override
+    public <T> T decode(Argument<T> type, byte[] bytes) throws CodecException {
+        String text = new String(bytes, defaultCharset);
+        if (CharSequence.class.isAssignableFrom(type.getType())) {
+            return (T) text;
+        }
+        return ConversionService.SHARED
+            .convert(text, type)
+            .orElseThrow(() -> new CodecException("Cannot decode bytes with value [" + text + "] to type: " + type));
     }
 
     @Override

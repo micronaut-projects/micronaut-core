@@ -190,13 +190,32 @@ class HttpGetSpec extends Specification {
 
         HttpResponse<Book> response = flowable.blockingFirst()
         Optional<Book> body = response.getBody()
-
         then:
         response.contentType.isPresent()
         response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
         response.status == HttpStatus.OK
         body.isPresent()
         body.get().title == 'The Stand'
+        response.getBody(String.class).get() == '{"title":"The Stand"}'
+        response.getBody(byte[].class).get().length > 0
+    }
+
+    void "test simple exchange request with POJO with String response"() {
+        when:
+        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/get/pojo"), String
+        ))
+
+        HttpResponse<String> response = flowable.blockingFirst()
+        Optional<String> body = response.getBody()
+        then:
+        response.contentType.isPresent()
+        response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
+        response.status == HttpStatus.OK
+        body.isPresent()
+        response.getBody(String.class).get() == '{"title":"The Stand"}'
+        response.getBody(Book.class).get().title == 'The Stand'
+        response.getBody(byte[].class).get().length > 0
     }
 
     void "test simple retrieve request with POJO"() {
