@@ -20,7 +20,13 @@ import io.micronaut.inject.BeanType;
 
 import java.util.Optional;
 
-public class BeanCreationException extends BeanContextException {
+/**
+ * A base class for exceptions that occurred during bean creation.
+ *
+ * @author James Kleeh
+ * @since 2.0.2
+ */
+public abstract class BeanCreationException extends BeanContextException {
 
     private final BeanType rootBeanType;
 
@@ -28,7 +34,7 @@ public class BeanCreationException extends BeanContextException {
      * @param message The message
      * @param cause   The throwable
      */
-    public BeanCreationException(String message, Throwable cause) {
+    protected BeanCreationException(String message, Throwable cause) {
         super(message, cause);
         rootBeanType = null;
     }
@@ -36,7 +42,7 @@ public class BeanCreationException extends BeanContextException {
     /**
      * @param message The message
      */
-    public BeanCreationException(String message) {
+    protected BeanCreationException(String message) {
         super(message);
         rootBeanType = null;
     }
@@ -45,7 +51,7 @@ public class BeanCreationException extends BeanContextException {
      * @param resolutionContext The resolution context
      * @param message           The message
      */
-    public BeanCreationException(BeanResolutionContext resolutionContext, String message) {
+    protected BeanCreationException(BeanResolutionContext resolutionContext, String message) {
         super(message);
         rootBeanType = resolveRootBeanDefinition(resolutionContext);
     }
@@ -55,7 +61,7 @@ public class BeanCreationException extends BeanContextException {
      * @param message           The message
      * @param cause             The throwable
      */
-    public BeanCreationException(BeanResolutionContext resolutionContext, String message, Throwable cause) {
+    protected BeanCreationException(BeanResolutionContext resolutionContext, String message, Throwable cause) {
         super(message, cause);
         rootBeanType = resolveRootBeanDefinition(resolutionContext);
     }
@@ -66,7 +72,7 @@ public class BeanCreationException extends BeanContextException {
      * @param cause          The throwable
      * @param <T>            The bean type
      */
-    public <T> BeanCreationException(BeanType<T> beanDefinition, String message, Throwable cause) {
+    protected <T> BeanCreationException(BeanType<T> beanDefinition, String message, Throwable cause) {
         super(message, cause);
         rootBeanType = beanDefinition;
     }
@@ -76,7 +82,7 @@ public class BeanCreationException extends BeanContextException {
      * @param message        The message
      * @param <T>            The bean type
      */
-    public <T> BeanCreationException(BeanType<T> beanDefinition, String message) {
+    protected <T> BeanCreationException(BeanType<T> beanDefinition, String message) {
         super(message);
         rootBeanType = beanDefinition;
     }
