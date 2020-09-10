@@ -21,6 +21,7 @@ import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,6 +44,14 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      */
     default Optional<Boolean> getDeduceEnvironments() {
         return Optional.empty();
+    }
+
+    /**
+     * @return The default environments to be applied if no other environments
+     * are explicitly specified.
+     */
+    default List<String> getDefaultEnvironments() {
+        return Collections.emptyList();
     }
 
     /**
