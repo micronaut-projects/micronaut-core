@@ -3,3 +3,7 @@ This section will document breaking changes between Micronaut 2.x and Micronaut 
 === Decapitalization Strategy
 
 For many cases, one common one being introspections, getter names like `getXForwarded()` would result in the bean property being `XForwarded`. The name will now be `xForwarded`. This can affect many areas of the framework where names like `XForwarded` are used.
+
+=== Http error route priority
+
+Before 3.0 exceptions `UnsatisfiedRouteException` and `HttpStatusException` were handled by the status error route first, the new version will try to look for the exception handler route and then will look for the status error route.
