@@ -45,12 +45,18 @@ ext.extraPomInfo = {
     }
     delegate.dependencyManagement {
         delegate.dependencies {
-            delegate.dependency {
-                groupId "com.fasterxml.jackson"
-                artifactId "jackson-bom"
-                delegate.version "\${jackson.version}"
-                delegate.type "pom"
-                delegate.scope "import"
+            for(dep in bomVersions) {
+                def info = dep.value
+                // explicit for third party boms
+                if (!info.group.startsWith("io.micronaut")) {
+                    delegate.dependency {
+                        groupId info.group
+                        artifactId info.name
+                        delegate.version "\${${dep.key}.version}"
+                        delegate.type "pom"
+                        delegate.scope "import"
+                    }
+                }
             }
         }
     }
