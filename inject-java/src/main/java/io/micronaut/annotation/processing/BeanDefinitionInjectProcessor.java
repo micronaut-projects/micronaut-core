@@ -511,8 +511,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                         visitConfigurationPropertySetter(method);
                                     } else if (NameUtils.isGetterName(methodName)) {
                                         BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
-                                        if (!writer.isValidated() && annotationUtils.hasStereotype(method, ANN_CONSTRAINT)) {
-                                            writer.setValidated(true);
+                                        if (!writer.isValidated()) {
+                                            writer.setValidated(IS_CONSTRAINT.test(annotationUtils.getAnnotationMetadata(method)));
                                         }
                                     }
                                 }
@@ -862,8 +862,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     visitConfigurationPropertySetter(method);
                 } else if (NameUtils.isGetterName(methodName)) {
                     BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
-                    if (!writer.isValidated() && annotationUtils.hasStereotype(method, ANN_CONSTRAINT)) {
-                        writer.setValidated(true);
+                    if (!writer.isValidated()) {
+                        writer.setValidated(IS_CONSTRAINT.test(methodAnnotationMetadata));
                     }
                 }
             } else if (isPublic && hasConstraints) {
@@ -1801,9 +1801,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 boolean requiresReflection = isPrivate
                         || modelUtils.isInheritedAndNotPublic(this.concreteClass, declaringClass, variable);
 
-                if (!writer.isValidated()
-                        && fieldAnnotationMetadata.hasStereotype(ANN_CONSTRAINT)) {
-                    writer.setValidated(true);
+                if (!writer.isValidated()) {
+                    writer.setValidated(IS_CONSTRAINT.test(fieldAnnotationMetadata));
                 }
 
                 TypeMirror type = variable.asType();
@@ -1851,8 +1850,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (!(isMethodInjected || isValue)) {
                 // visitVariable didn't handle it
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
-                if (!writer.isValidated() && fieldAnnotationMetadata.hasStereotype("javax.validation.Constraint")) {
-                    writer.setValidated(true);
+                if (!writer.isValidated()) {
+                    writer.setValidated(IS_CONSTRAINT.test(fieldAnnotationMetadata));
                 }
                 TypeMirror fieldTypeMirror = field.asType();
                 Object fieldType = modelUtils.resolveTypeReference(fieldTypeMirror);

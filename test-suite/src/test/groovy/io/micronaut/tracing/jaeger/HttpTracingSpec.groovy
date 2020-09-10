@@ -18,6 +18,7 @@ package io.micronaut.tracing.jaeger
 import io.jaegertracing.internal.JaegerTracer
 import io.jaegertracing.internal.reporters.InMemoryReporter
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -27,8 +28,10 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.tracing.annotation.ContinueSpan
 import io.opentracing.Tracer
+import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
+import org.reactivestreams.Publisher
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -63,6 +66,36 @@ class HttpTracingSpec extends Specification {
             span != null
             span.tags.get("foo") == 'bar'
             span.tags.get('http.path') == '/traced/hello/John'
+        }
+
+        cleanup:
+        context.close()
+    }
+
+    void "test basic response rx http tracing"() {
+        given:
+        ApplicationContext context = buildContext()
+
+        when:
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+        then:
+        context.containsBean(JaegerTracer)
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/response-rx/John', String)
+        PollingConditions conditions = new PollingConditions()
+
+        then:
+        response
+        conditions.eventually {
+            reporter.spans.size() == 2
+            def span = reporter.spans.find { it.operationName == 'GET /traced/response-rx/{name}' }
+            span != null
+            span.tags.get("foo") == 'bar'
+            span.tags.get('http.path') == '/traced/response-rx/John'
         }
 
         cleanup:
@@ -374,6 +407,14 @@ class HttpTracingSpec extends Specification {
         String hello(String name) {
             spanCustomizer.activeSpan().setTag("foo", "bar")
             return name
+        }
+
+        @Get("/response-rx/{name}")
+        HttpResponse<Publisher<String>> responseRx(String name) {
+            return HttpResponse.ok(Publishers.map(Flowable.fromCallable({->
+                spanCustomizer.activeSpan().setTag("foo", "bar")
+                return name
+            }),  { String n -> n}))
         }
 
         @Get("/rxjava/{name}")

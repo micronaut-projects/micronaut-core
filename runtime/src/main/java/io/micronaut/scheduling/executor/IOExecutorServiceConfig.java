@@ -38,6 +38,6 @@ public class IOExecutorServiceConfig {
     @Singleton
     @Named(TaskExecutors.IO)
     ExecutorConfiguration configuration() {
-        return UserExecutorConfiguration.of(ExecutorType.CACHED);
+        return UserExecutorConfiguration.of(TaskExecutors.IO, ExecutorType.CACHED);
     }
 }

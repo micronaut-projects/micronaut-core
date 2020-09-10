@@ -30,10 +30,99 @@ import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
+import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+    @IgnoreIf({ !jvm.isJava14Compatible() })
+    void "test bean introspection on a Java 14+ record"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(@javax.validation.constraints.NotBlank String name){
+}
+''')
+        when:
+        def test = introspection.instantiate("test")
+        def property = introspection.getRequiredProperty("name", String)
+        def argument = introspection.getConstructorArguments()[0]
+
+        then:
+        argument.name == 'name'
+        argument.getAnnotationMetadata().hasAnnotation(NotBlank)
+        test.name == 'test'
+        test.name() == 'test'
+        introspection.propertyNames.length == 1
+        introspection.propertyNames == ['name'] as String[]
+        property.hasAnnotation(NotBlank)
+        property.isReadOnly()
+        property.name == 'name'
+        property.get(test) == 'test'
+    }
+
+
+    void "test bean introspection with property of generic interface"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Foo implements GenBase<String> {
+    public String getName() {
+        return "test";
+    }
+}
+
+interface GenBase<T> {
+    T getName();
+}
+''')
+        when:
+        def test = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("name", String)
+                .get(test) == 'test'
+    }
+
+    void "test bean introspection with argument of generic interface"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Foo implements GenBase<Long> {
+
+    private Long value;
+
+    public Long getValue() {
+        return value;
+    }
+    
+    public void setValue(Long value) {
+        this.value = value;
+    }
+}
+
+interface GenBase<T> {
+    T getValue();
+    
+    void setValue(T t);
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        BeanProperty bp = introspection.getRequiredProperty("value", Long)
+        bp.set(test, 5L)
+
+        then:
+        bp.get(test) == 5L
+    }
 
     void "test bean introspection with property with static creator method on interface"() {
         given:

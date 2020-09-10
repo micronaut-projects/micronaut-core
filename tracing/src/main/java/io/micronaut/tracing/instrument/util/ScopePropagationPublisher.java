@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.instrument.util;
 
+import io.micronaut.core.async.publisher.Publishers;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
@@ -30,7 +31,7 @@ import org.reactivestreams.Subscription;
  * @param <T> The publisher generic type
  */
 @SuppressWarnings("PublisherImplementation")
-public class ScopePropagationPublisher<T> implements Publisher<T> {
+public class ScopePropagationPublisher<T> implements Publishers.MicronautPublisher<T> {
     private final Publisher<T> publisher;
     private final Tracer tracer;
     private final Span parentSpan;
