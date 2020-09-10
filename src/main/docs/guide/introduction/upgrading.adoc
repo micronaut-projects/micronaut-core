@@ -10,6 +10,11 @@ snippet::io.micronaut.docs.http.server.executeon.PersonController[tags="imports,
 
 NOTE: If you wish to return to the previous behaviour as defined in Micronaut 1.x you can set `micronaut.server.thread-selection` to `AUTO` in configuration.
 
+=== Thread Factory instrumentation and context propagation
+
+Prior to 2.0 Micronaut had all `java.util.concurrent.ThreadFactory` intercepted to allow propagating context. That didn't work well in cases where threads are long-running causing the instrumentation to leak the context.
+It's recommended to use `@Named(TaskExecutors.IO) ExecutorService executorService` which supports context propagation.
+
 === Compilation Error with classes in `io.micronaut.cache` package
 
 If your application fails to compile due to missing classes in the `io.micronaut.cache` you need to add a dependency on a cache implementation, for example the default cache implementation was Caffeine and this can be restored with the following dependency:
