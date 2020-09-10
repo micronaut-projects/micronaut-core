@@ -597,6 +597,11 @@ ext {
                     group  : 'io.micronaut.acme',
                     name   : 'micronaut-acme'
             ],
+            'micronaut.ignite': [
+                version: micronautIgniteVersion,
+                group  : 'io.micronaut.ignite',
+                modules: ['micronaut-ignite-core', 'micronaut-ignite-cache']
+            ],
     ]
 
     dependencyVersion = { String name ->
