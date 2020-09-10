@@ -143,9 +143,9 @@ class PropertySourcePropertyResolverSpec extends Specification {
         SystemLambda.withEnvironmentVariable("FOO_BAR", "foo bar")
                 .and("FOO_BAR_1", "foo bar 1")
                 .execute(() -> {
-                    assert resolver.getProperty(key, Object).isPresent()
-                    assert resolver.getProperty(key, type).get() == expected
-                    assert resolver.containsProperty(key)
+                    resolver.getProperty(key, Object).isPresent() &&
+                    resolver.getProperty(key, type).get() == expected &&
+                    resolver.containsProperty(key)
                 })
 
         where:
