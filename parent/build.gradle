@@ -43,6 +43,17 @@ ext.extraPomInfo = {
             }
         }
     }
+    delegate.dependencyManagement {
+        delegate.dependencies {
+            delegate.dependency {
+                groupId "com.fasterxml.jackson"
+                artifactId "jackson-bom"
+                delegate.version "\${jackson.version}"
+                delegate.type "pom"
+                delegate.scope "import"
+            }
+        }
+    }
     delegate.build {
         delegate.pluginManagement {
             delegate.plugins {
