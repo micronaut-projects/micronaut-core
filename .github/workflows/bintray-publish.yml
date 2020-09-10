@@ -3,7 +3,7 @@
 # https://github.com/micronaut-projects/micronaut-project-template/tree/master/.github/workflows
 #
 # and edit them there. Note that it will be sync'ed to all the Micronaut repos
-name: Maven Central Sync
+name: Bintray Publish
 on:
   workflow_dispatch:
     inputs:
@@ -11,30 +11,21 @@ on:
         description: 'Release version (eg: 1.2.3)'
         required: true
 jobs:
-  central-sync:
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
         with:
+          token: ${{ secrets.GH_TOKEN }}
           ref: v${{ github.event.inputs.release_version }}
       - uses: gradle/wrapper-validation-action@v1
       - name: Set up JDK
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
-      - name: Publish to Sonatype OSSRH
+      - name: Publish to Bintray
         env:
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          GPG_PASSWORD: ${{ secrets.GPG_PASSWORD }}
-          GPG_FILE: ${{ secrets.GPG_FILE }}
-          PUBLISH_IN_2_STEPS: ${{ secrets.PUBLISH_IN_2_STEPS }}
-        run: |
-          echo $GPG_FILE | base64 -d > secring.gpg
-          if [ -z ${PUBLISH_IN_2_STEPS+x} ]; then
-            ./gradlew publish closeAndReleaseRepository
-          else
-            ./gradlew publish && ./gradlew closeAndReleaseRepository
-          fi
+          BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
+          BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
+        run: ./gradlew bintrayPublish
