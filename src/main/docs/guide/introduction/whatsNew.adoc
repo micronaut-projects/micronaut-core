@@ -22,6 +22,10 @@ Query parameters are now respected and bindable in the Micronaut websocket suppo
 
 Cookies in HTTP responses from the client side are now retrievable on the HttpResponse. These are the cookies found in the `Set-Cookie` header.
 
+==== Default Environment
+
+Micronaut 2.1 introduces the concept of a default environment. One or more default environments can be set and they will apply if no other environments are explicitly specified. See the <<environments, environments documentation>> for information on how to use this new feature.
+
 ==== Mandatory upgrade for Netty tcnative
 
 Due to a new https://github.com/netty/netty/pull/10407[SSL default value introduced in Netty 4.1.52], if you are using tcnative you need to update it to `2.0.33.Final`.
