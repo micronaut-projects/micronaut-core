@@ -15,6 +15,8 @@
  */
 package io.micronaut.validation.validator;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.aop.Intercepted;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.ExecutionHandleLocator;
@@ -55,8 +57,6 @@ import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.*;
@@ -745,7 +745,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                 context,
                                 overallViolations,
                                 argument.getName(),
-                                unwrappedValue.getClass(),
+                                unwrappedValue == null ? Object.class : unwrappedValue.getClass(),
                                 finalIndex,
                                 annotationMetadata,
                                 unwrappedValue
@@ -858,7 +858,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                 overallViolations.add(new DefaultConstraintViolation(
                                         object,
                                         rootClass,
-                                        null,
+                                        object,
                                         parameterValue,
                                         messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(Collections.singletonMap("type", parameterType.getName()))),
                                         messageTemplate,
@@ -1028,7 +1028,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                         overallViolations.add(new DefaultConstraintViolation(
                                 object,
                                 rootClass,
-                                null,
+                                object,
                                 parameterValue,
                                 messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
                                 messageTemplate,
@@ -1081,7 +1081,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 overallViolations.add(new DefaultConstraintViolation(
                         object,
                         rootClass,
-                        null,
+                        object,
                         parameterValue,
                         messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
                         messageTemplate,

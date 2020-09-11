@@ -17,7 +17,7 @@ vault:
             enabled: true
 ----
 
-include::{includedir}configurationProperties/io.micronaut.discovery.vault.config.VaultClientConfiguration.adoc[]
+See the https://micronaut-projects.github.io/micronaut-discovery-client/latest/guide/configurationreference.html#io.micronaut.discovery.vault.config.VaultClientConfiguration[configuration reference] for all configuration options.
 
 Micronaut will use the configured `micronaut.application.name` to lookup property sources for the application from Vault.
 

@@ -39,7 +39,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.context.exceptions.BeanCreationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
@@ -56,6 +56,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.*;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -308,9 +309,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 // handle error with a method that is global with bad request
                 errorRoute = router.findStatusRoute(statusException.getStatus(), nettyHttpRequest).orElse(null);
             }
-        } else if (cause instanceof BeanInstantiationException && declaringType != null) {
+        } else if (cause instanceof BeanCreationException && declaringType != null) {
             // If the controller could not be instantiated, don't look for a local error route
-            Optional<Class> rootBeanType = ((BeanInstantiationException) cause).getRootBeanType().map(BeanType::getBeanType);
+            Optional<Class> rootBeanType = ((BeanCreationException) cause).getRootBeanType().map(BeanType::getBeanType);
             if (rootBeanType.isPresent() && declaringType == rootBeanType.get()) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Failed to instantiate [{}]. Skipping lookup of a local error route", declaringType.getName());
@@ -674,9 +675,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         // decorate the execution of the route so that it runs an async executor
         request.setMatchedRoute(route);
 
+        Optional<Argument<?>> bodyArgument = route.getBodyArgument()
+            .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
+
         // The request body is required, so at this point we must have a StreamedHttpRequest
         io.netty.handler.codec.http.HttpRequest nativeRequest = request.getNativeRequest();
-        if (!route.isExecutable() && io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) && nativeRequest instanceof StreamedHttpRequest) {
+        if (!route.isExecutable() &&
+                io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) &&
+                nativeRequest instanceof StreamedHttpRequest &&
+                (!bodyArgument.isPresent() || !route.isSatisfied(bodyArgument.get().getName()))) {
             httpContentProcessorResolver.resolve(request, route).subscribe(buildSubscriber(request, context, route));
         } else {
             if (nativeRequest instanceof StreamedHttpRequest) {
@@ -1135,8 +1142,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         );
                                     } else {
                                         MutableHttpResponse<?> finalResponse;
-                                        if (o instanceof MutableHttpResponse) {
-                                            finalResponse = (MutableHttpResponse<?>) o;
+                                        if (o instanceof HttpResponse) {
+                                            finalResponse = toMutableResponse((HttpResponse<?>) o);
                                             o = finalResponse.body();
                                         } else {
                                             finalResponse = message;
@@ -1387,8 +1394,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     singleResponse = newNotFoundError(request);
                                 }
                             } else {
-                                if (o instanceof MutableHttpResponse) {
-                                    singleResponse = (MutableHttpResponse<?>) o;
+                                if (o instanceof HttpResponse) {
+                                    singleResponse = toMutableResponse((HttpResponse<?>) o);
                                 } else {
                                     singleResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
                                             .body(o);
@@ -1416,8 +1423,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         emitter.onError(throwable);
                                     } else {
                                         MutableHttpResponse<?> response;
-                                        if (o instanceof MutableHttpResponse) {
-                                            response = (MutableHttpResponse<?>) o;
+                                        if (o instanceof HttpResponse) {
+                                            response = toMutableResponse((HttpResponse<?>) o);
                                         } else {
                                             response = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus);
                                             if (!isKotlinFunctionReturnTypeUnit) {
@@ -1437,8 +1444,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             } else {
                                 suspendedBody = body;
                             }
-                            if (suspendedBody instanceof MutableHttpResponse) {
-                                outgoingResponse = (MutableHttpResponse<?>) suspendedBody;
+                            if (suspendedBody instanceof HttpResponse) {
+                                outgoingResponse = toMutableResponse((HttpResponse<?>) suspendedBody);
                             } else {
                                 outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
                                         .body(suspendedBody);
@@ -1446,8 +1453,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         }
 
                     } else {
-                        if (body instanceof MutableHttpResponse) {
-                            outgoingResponse = (MutableHttpResponse<?>) body;
+                        if (body instanceof HttpResponse) {
+                            outgoingResponse = toMutableResponse((HttpResponse<?>) body);
                         } else {
                             outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
                                     .body(body);
@@ -1696,6 +1703,24 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (streamId != null) {
             nettyResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
         }
+    }
+
+    private MutableHttpResponse<?> toMutableResponse(HttpResponse<?> message) {
+        MutableHttpResponse<?> mutableHttpResponse;
+        if (message instanceof MutableHttpResponse) {
+            mutableHttpResponse = (MutableHttpResponse<?>) message;
+        } else {
+            HttpStatus httpStatus = message.status();
+            mutableHttpResponse = HttpResponse.status(httpStatus, httpStatus.getReason());
+            mutableHttpResponse.body(message.body());
+            message.getHeaders().forEach((name, value) -> {
+                for (String val: value) {
+                    mutableHttpResponse.header(name, val);
+                }
+            });
+            mutableHttpResponse.getAttributes().putAll(message.getAttributes());
+        }
+        return mutableHttpResponse;
     }
 
     @NotNull
