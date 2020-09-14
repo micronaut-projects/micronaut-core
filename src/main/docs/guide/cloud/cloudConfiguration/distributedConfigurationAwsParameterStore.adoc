@@ -14,7 +14,7 @@ micronaut:
         enabled: true
 ----
 
-include::{includedir}configurationProperties/io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfiguration.adoc[]
+See the https://micronaut-projects.github.io/micronaut-discovery-client/latest/guide/configurationreference.html#io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfiguration[configuration reference] for all configuration options.
 
 You can configure shared properties by going into the AWS Console -> System Manager -> Parameter Store
 

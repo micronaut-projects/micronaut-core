@@ -5,7 +5,7 @@ buildscript {
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:6.0.0'
-        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.8"
+        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.11"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
     }
@@ -164,7 +164,7 @@ ext {
                     version:micronautDiscoveryClientVersion,
                     group:'io.micronaut',
                     name:'micronaut-discovery-client'
-            ],            
+            ],
             'micronaut.hibernate.validator': [
                     version:micronautHibernateValidatorVersion,
                     group:'io.micronaut.beanvalidation',
@@ -688,8 +688,11 @@ subprojects { Project subproject ->
     group projectGroupId
 
     apply plugin: "io.micronaut.build.common"
-    apply plugin: "io.micronaut.build.dependency-updates"
-    apply plugin: "io.micronaut.build.publishing"
+    if (!subproject.name.startsWith('test-') &&
+            !subproject.toString().contains('benchmarks')) {
+        apply plugin: "io.micronaut.build.dependency-updates"
+        apply plugin: "io.micronaut.build.publishing"
+    }
 
     micronautBuild {
         enableBom = false

@@ -15,8 +15,7 @@ Some dependencies have new Maven Group IDs so you may need to update your depend
 
 === Mandatory upgrade for Netty tcnative
 
-Due to a new https://github.com/netty/netty/pull/10407[SSL default value introduced in Netty 4.1.52], if you are using tcnative you need to update it to `2.0.33.Final`.
-
+Due to a new https://github.com/netty/netty/pull/10407[SSL default value introduced in Netty 4.1.52], if you are using tcnative you need to update it to at least `2.0.33.Final`.
 
 === Other Breaking Changes
 

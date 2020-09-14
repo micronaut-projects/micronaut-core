@@ -46,7 +46,7 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
           branch: ${{ env.githubBranch }}
       - uses: ncipollo/release-action@v1
-        if: steps.check_release_drafter.outputs.has_release_drafter == 'false'
+        if: steps.check_release_drafter.outputs.has_release_drafter == 'false' && steps.release_notes.outputs.generated_changelog == 'true'
         with:
           allowUpdates: true
           commit: ${{ env.githubBranch }}
