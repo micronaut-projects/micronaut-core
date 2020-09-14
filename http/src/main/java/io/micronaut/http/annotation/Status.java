@@ -36,7 +36,13 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface Status {
 
     /**
-     * @return The HttpStatus specified when declared on the method
+     * @return The HttpStatus specified when returned value is present or method is void
      */
-    HttpStatus value();
+    HttpStatus value() default HttpStatus.OK;
+
+    /**
+     * @return The HttpStatus specified when returned is absent: Optional.empty() or Maybe.empty() or null
+     */
+    HttpStatus absentValue() default HttpStatus.NOT_FOUND;
+
 }

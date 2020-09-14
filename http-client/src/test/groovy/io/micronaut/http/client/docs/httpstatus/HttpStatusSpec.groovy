@@ -101,4 +101,39 @@ class HttpStatusSpec extends Specification {
         e.message == "success"
         e.status == HttpStatus.NOT_FOUND
     }
+
+    @Unroll("#description")
+    void "verify default HTTP status when absent value"() {
+        when:
+        client.toBlocking().exchange(HttpRequest.GET(uri), String)
+
+        then:
+        HttpClientResponseException e = thrown()
+        e.message == "Page Not Found"
+        e.status == status
+
+        where:
+        uri                        | status                | description
+        "/status/null"             | HttpStatus.NOT_FOUND  | '404 status is returned by default for null'
+        "/status/emptyOptional"    | HttpStatus.NOT_FOUND  | '404 status is returned by default for empty Optional'
+        "/status/emptyMaybe"       | HttpStatus.NOT_FOUND  | '404 status is returned by default for empty Maybe'
+    }
+
+    @Unroll("#description")
+    void "verify @Status override when absent value"() {
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET(uri), String)
+        Optional<String> body = response.getBody()
+
+        then:
+        response.status == status
+        !body.isPresent()
+
+        where:
+        uri                        | status                | description
+        "/status/null204"          | HttpStatus.NO_CONTENT | 'It is possible to control the status for null with @Status'
+        "/status/emptyOptional204" | HttpStatus.NO_CONTENT | 'It is possible to control the status for empty Optional with @Status'
+        "/status/emptyMaybe204"    | HttpStatus.NO_CONTENT | 'It is possible to control the status for empty Maybe with @Status'
+    }
+
 }

@@ -1371,7 +1371,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         outgoingResponse.header(HttpHeaders.CONTENT_LENGTH, HttpHeaderValues.ZERO);
                     }
                 } else {
-                    outgoingResponse = newNotFoundError(request);
+                    outgoingResponse = forAbsentValue(routeMatch.getAnnotationMetadata(), request);
                 }
             } else {
                 HttpStatus defaultHttpStatus = isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK;
@@ -1391,7 +1391,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     singleResponse = forStatus(routeMatch.getAnnotationMetadata(), HttpStatus.OK)
                                             .header(HttpHeaders.CONTENT_LENGTH, HttpHeaderValues.ZERO);
                                 } else {
-                                    singleResponse = newNotFoundError(request);
+                                    singleResponse = forAbsentValue(routeMatch.getAnnotationMetadata(), request);
                                 }
                             } else {
                                 if (o instanceof HttpResponse) {
@@ -1830,6 +1830,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return HttpResponse.status(
                 annotationMetadata.enumValue(Status.class, HttpStatus.class)
                         .orElse(defaultStatus));
+    }
+
+    private MutableHttpResponse<Object> forAbsentValue(AnnotationMetadata annotationMetadata, NettyHttpRequest<?> request) {
+        HttpStatus status = annotationMetadata.enumValue(Status.class, "absentValue", HttpStatus.class)
+                .orElse(HttpStatus.NOT_FOUND);
+        if (status == HttpStatus.NOT_FOUND) {
+            return newNotFoundError(request);
+        } else {
+            MutableHttpResponse<Object> response = HttpResponse.status(status);
+            if (HttpMethod.permitsRequestBody(request.getMethod())) {
+                response.header(HttpHeaders.CONTENT_LENGTH, HttpHeaderValues.ZERO);
+            }
+            return response;
+        }
     }
 
     private Flowable<? extends MutableHttpResponse<?>> filterPublisher(

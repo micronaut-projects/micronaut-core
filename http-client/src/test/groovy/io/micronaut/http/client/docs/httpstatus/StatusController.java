@@ -23,6 +23,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Status;
 import io.reactivex.Maybe;
 
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 @Requires(property = "spec.name", value = "httpstatus")
@@ -64,4 +65,38 @@ public class StatusController {
     public String simple404() {
         return "success";
     }
+
+    @Get(value = "/null")
+    public String nullValue() {
+        return null;
+    }
+
+    @Status(absentValue = HttpStatus.NO_CONTENT)
+    @Get(value = "/null204")
+    public String nullValue204() {
+        return null;
+    }
+
+    @Get(value = "/emptyOptional")
+    public Optional<String> optionalEmpty() {
+        return Optional.empty();
+    }
+
+    @Status(absentValue = HttpStatus.NO_CONTENT)
+    @Get(value = "/emptyOptional204")
+    public Optional<String> optionalEmpty204() {
+        return Optional.empty();
+    }
+
+    @Get(value = "/emptyMaybe")
+    public Maybe<String> maybeEmpty() {
+        return Maybe.empty();
+    }
+
+    @Status(absentValue = HttpStatus.NO_CONTENT)
+    @Get(value = "/emptyMaybe204")
+    public Maybe<String> maybeEmpty204() {
+        return Maybe.empty();
+    }
+
 }
