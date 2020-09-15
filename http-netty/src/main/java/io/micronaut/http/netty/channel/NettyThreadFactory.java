@@ -66,6 +66,6 @@ public class NettyThreadFactory {
     @Named(NAME)
     @BootstrapContextCompatible
     protected ThreadFactory nettyThreadFactory() {
-        return new DefaultThreadFactory(NioEventLoopGroup.class);
+        return new DefaultThreadFactory("default-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class));
     }
 }

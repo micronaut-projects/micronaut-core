@@ -38,6 +38,7 @@ import java.util.*;
 public class DefaultApplicationContextBuilder implements ApplicationContextBuilder, ApplicationContextConfiguration {
     private List<Object> singletons = new ArrayList<>();
     private List<String> environments = new ArrayList<>();
+    private List<String> defaultEnvironments = new ArrayList<>();
     private List<String> packages = new ArrayList<>();
     private Map<String, Object> properties = new LinkedHashMap<>();
     private List<PropertySource> propertySources = new ArrayList<>();
@@ -122,6 +123,14 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public @NonNull ApplicationContextBuilder defaultEnvironments(@Nullable String... environments) {
+        if (environments != null) {
+            this.defaultEnvironments.addAll(Arrays.asList(environments));
+        }
+        return this;
+    }
+
+    @Override
     public @NonNull ApplicationContextBuilder packages(@Nullable String... packages) {
         if (packages != null) {
             this.packages.addAll(Arrays.asList(packages));
@@ -175,6 +184,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public @NonNull List<String> getEnvironments() {
         return environments;
+    }
+
+    @Override
+    public @NonNull List<String> getDefaultEnvironments() {
+        return defaultEnvironments;
     }
 
     @Override

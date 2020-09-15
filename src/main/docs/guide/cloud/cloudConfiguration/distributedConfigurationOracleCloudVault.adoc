@@ -32,7 +32,7 @@ oraclecloud:
     region: US-PHOENIX-1
 ----
 
-include::{includedir}configurationProperties/io.micronaut.discovery.oraclecloud.vault.config.OracleCloudVaultClientConfiguration.adoc[]
+See the https://micronaut-projects.github.io/micronaut-discovery-client/latest/guide/configurationreference.html#io.micronaut.discovery.oraclecloud.vault.config.OracleCloudVaultClientConfiguration[configuration reference] for all configuration options.
 
 NOTE: You can learn more about Oracle Cloud Vault Secrets by https://blogs.oracle.com/developers/protect-your-sensitive-data-with-secrets-in-the-oracle-cloud[reading this blog post].
 
