@@ -603,6 +603,17 @@ ext {
                     name   : 'dekorate-project',
                     modules: ['jaeger-annotations', 'knative-annotations', 'kubernetes-annotations',  'openshift-annotations', 'prometheus-annotations', 'servicecatalog-annotations']
             ],
+            'micronaut.ignite': [
+                version: micronautIgniteVersion,
+                group  : 'io.micronaut.ignite',
+                modules: ['micronaut-ignite-core', 'micronaut-ignite-cache']
+            ],
+            ignite: [
+                version: igniteVersion,
+                group  : 'org.apache.ignite',
+                name   : 'ignite-core',
+                modules: ['ignite-kubernetes']
+            ],
     ]
 
     dependencyVersion = { String name ->
