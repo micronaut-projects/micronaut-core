@@ -138,6 +138,7 @@ class HealthEndpointSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
+                'micronaut.application.name': 'foo',
                 'endpoints.health.sensitive': false,
                 'datasources.one.url': 'jdbc:h2:mem:oneDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE',
                 'datasources.two.url': 'jdbc:h2:mem:twoDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE'
@@ -165,6 +166,7 @@ class HealthEndpointSpec extends Specification {
         result.details.jdbc.details."jdbc:h2:mem:twoDb".status == "UP"
         result.details.jdbc.details."jdbc:h2:mem:twoDb".details.database == "H2"
         result.details.jdbc.details."jdbc:h2:mem:twoDb".details.version == "1.4.199 (2019-03-13)"
+        result.details.service.status == "UP"
 
         cleanup:
         embeddedServer.close()
@@ -293,6 +295,7 @@ class HealthEndpointSpec extends Specification {
     void "test /health/readiness endpoint"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.application.name': 'foo',
                 'spec.name': getClass().simpleName,
                 'endpoints.health.sensitive': false,
         ])
@@ -309,6 +312,7 @@ class HealthEndpointSpec extends Specification {
         result.status == "UP"
         result.details
         result.details.readiness.status == "UP"
+        result.details.service.status == "UP"
 
         cleanup:
         embeddedServer.close()
