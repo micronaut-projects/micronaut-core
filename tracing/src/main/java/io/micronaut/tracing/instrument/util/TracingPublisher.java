@@ -198,6 +198,7 @@ public class TracingPublisher<T> implements Publishers.MicronautPublisher<T> {
      * This only has effects if no spanBuilder was defined.
      *
      * @return true, if the current span should be continued by this publisher
+     * @since 2.0.3
      */
     protected boolean isContinued() {
         return false;
@@ -207,6 +208,7 @@ public class TracingPublisher<T> implements Publishers.MicronautPublisher<T> {
      * Designed for subclasses to override if the span needs to be finished upon error. True by default.
      *
      * @return true, if the active span needs to be finished on error
+     * @since 2.0.3
      */
     protected boolean isFinishOnError() {
         return true;
