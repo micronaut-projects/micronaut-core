@@ -20,7 +20,9 @@ import io.jaegertracing.internal.reporters.InMemoryReporter
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClient
@@ -138,7 +140,6 @@ class HttpTracingSpec extends Specification {
         when:
         client.toBlocking().exchange('/traced/error/John', String)
 
-
         then:
         def e = thrown(HttpClientResponseException)
         def response = e.response
@@ -151,9 +152,83 @@ class HttpTracingSpec extends Specification {
             span.tags.get('http.method') == 'GET'
             span.tags.get('error') == 'Internal Server Error: bad'
             span.operationName == 'GET /traced/error/John'
-
+            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            serverSpan.tags.get('http.path') == '/traced/error/John'
+            serverSpan.tags.get('http.status_code') == 500
+            serverSpan.tags.get('http.method') == 'GET'
+            serverSpan.tags.get('error') == 'Internal Server Error'
+            serverSpan.operationName == 'GET /traced/error/{name}'
         }
 
+        cleanup:
+        context.close()
+    }
+
+    void "test basic http trace error - rx"() {
+        given:
+        ApplicationContext context = buildContext()
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
+
+        when:
+        client.toBlocking().exchange('/traced/rxError/John', String)
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        def response = e.response
+        response
+        conditions.eventually {
+            reporter.spans.size() == 2
+            def span = reporter.spans.find { it.tags.containsKey('http.client') }
+            span.tags.get('http.path') == '/traced/rxError/John'
+            span.tags.get('http.status_code') == 500
+            span.tags.get('http.method') == 'GET'
+            span.tags.get('error') == 'Internal Server Error: bad'
+            span.operationName == 'GET /traced/rxError/John'
+            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            serverSpan.tags.get('http.path') == '/traced/rxError/John'
+            serverSpan.tags.get('http.status_code') == 500
+            serverSpan.tags.get('http.method') == 'GET'
+            serverSpan.tags.get('error') == 'Internal Server Error'
+            serverSpan.operationName == 'GET /traced/rxError/{name}'
+        }
+
+        cleanup:
+        context.close()
+    }
+
+    void "test basic http trace error - rx with error handler"() {
+        given:
+        ApplicationContext context = buildContext()
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
+
+        when:
+        client.toBlocking().exchange('/traced/quota-error', String)
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        def response = e.response
+        response
+        conditions.eventually {
+            reporter.spans.size() == 2
+            def span = reporter.spans.find { it.tags.containsKey('http.client') }
+            span.tags.get('http.path') == '/traced/quota-error'
+            span.tags.get('http.status_code') == 429
+            span.tags.get('http.method') == 'GET'
+            span.tags.get('error') == 'retry later'
+            span.operationName == 'GET /traced/quota-error'
+            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            serverSpan.tags.get('http.path') == '/traced/quota-error'
+            serverSpan.tags.get('http.status_code') == 429
+            serverSpan.tags.get('http.method') == 'GET'
+            serverSpan.tags.get('error') == 'Too Many Requests'
+            serverSpan.operationName == 'GET /traced/quota-error'
+        }
 
         cleanup:
         context.close()
@@ -318,8 +393,9 @@ class HttpTracingSpec extends Specification {
             reporter.spans.size() == 4
             reporter.spans.find {
                 it.operationName == 'GET /traced/error/{name}' &&
-                        !it.tags.containsKey("error") &&
+                        it.tags.containsKey('error') &&
                         it.tags.get('http.path') == '/traced/error/John' &&
+                        it.tags.get('http.status_code') == 500 &&
                         it.tags.get('http.server')
 
             } != null
@@ -332,15 +408,16 @@ class HttpTracingSpec extends Specification {
             } != null
             reporter.spans.find {
                 it.operationName == 'GET /traced/nestedError/{name}' &&
-                        !it.tags.containsKey("error") &&
+                        it.tags.containsKey('error') &&
                         it.tags.get('http.path') == '/traced/nestedError/John' &&
+                        it.tags.get('http.status_code') == 500 &&
                         it.tags.get('http.server')
             } != null
             reporter.spans.find {
                 it.operationName == 'GET /traced/nestedError/John' &&
                         it.tags.get('http.path') == '/traced/nestedError/John' &&
                         it.tags.get('http.status_code') == 500 &&
-                        it.tags.get('error')  &&
+                        it.tags.get('error') &&
                         it.tags.get('http.client')
             } != null
         }
@@ -430,6 +507,11 @@ class HttpTracingSpec extends Specification {
             throw new RuntimeException("bad")
         }
 
+        @Get("/rxError/{name}")
+        Single<String> rxError(String name) {
+            Single.defer { error(name) }
+        }
+
         @Get("/nested/{name}")
         String nested(String name) {
             tracedClient.hello(name)
@@ -453,7 +535,7 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/customised/name")
-        String cusomisedName() {
+        String customisedName() {
             spanCustomizer.activeSpan().setOperationName("custom name")
             "response"
         }
@@ -472,6 +554,23 @@ class HttpTracingSpec extends Specification {
         Single<Integer> nestedRx2(String name) {
             assert spanCustomizer.activeSpan().getBaggageItem("foo") == "bar"
             return Single.just(10)
+        }
+
+        @Get("/quota-error")
+        Single<String> quotaError() {
+            Single.error(new QuotaException("retry later"))
+        }
+
+        @Error(QuotaException)
+        HttpResponse<?> handleQuotaError(QuotaException ex) {
+            HttpResponse.status(HttpStatus.TOO_MANY_REQUESTS, ex.message)
+        }
+    }
+
+    static class QuotaException extends RuntimeException {
+
+        QuotaException(String message) {
+            super(message)
         }
     }
 
