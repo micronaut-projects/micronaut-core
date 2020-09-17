@@ -100,7 +100,7 @@ public class DefaultBeanContext implements BeanContext {
     private static final String PARALLEL_TYPE = Parallel.class.getName();
     private static final String INDEXES_TYPE = Indexes.class.getName();
     private static final String REPLACES_ANN = Replaces.class.getName();
-    private static final Comparator<BeanRegistration> BEAN_REGISTRATION_COMPARATOR = (o1, o2) -> {
+    private static final Comparator<BeanRegistration<?>> BEAN_REGISTRATION_COMPARATOR = (o1, o2) -> {
         int order1 = getOrder(o1);
         int order2 = getOrder(o2);
         return Integer.compare(order1, order2);
@@ -2884,15 +2884,24 @@ public class DefaultBeanContext implements BeanContext {
                 beanRegistrations = Collections.emptySet();
             }
 
+            Collection<T> beans = Collections.emptyList();
             if (beanRegistrations != Collections.EMPTY_SET) {
-                if (Ordered.class.isAssignableFrom(beanType) || hasOrderAnnotation) {
-                    beanRegistrations = beanRegistrations.stream().sorted(BEAN_REGISTRATION_COMPARATOR).collect(StreamUtils.toImmutableCollection());
+                Stream<BeanRegistration<T>> stream = beanRegistrations.stream();
+                if (Ordered.class.isAssignableFrom(beanType)) {
+                    beans = stream
+                            .map(BeanRegistration::getBean)
+                            .sorted(OrderUtil.COMPARATOR)
+                            .collect(StreamUtils.toImmutableCollection());
                 } else {
-                    beanRegistrations = Collections.unmodifiableCollection(beanRegistrations);
+                    if (hasOrderAnnotation) {
+                        stream = stream.sorted(BEAN_REGISTRATION_COMPARATOR);
+                    }
+                    beans = stream
+                            .map(BeanRegistration::getBean)
+                            .collect(StreamUtils.toImmutableCollection());
                 }
             }
 
-            Collection<T> beans = beanRegistrations.stream().map(b -> b.getBean()).collect(StreamUtils.toImmutableCollection());
             if (allCandidatesAreSingleton) {
                 initializedObjectsByType.put(key, (Collection<Object>) beans);
             }
@@ -2910,10 +2919,7 @@ public class DefaultBeanContext implements BeanContext {
 
     private static <T> int getOrder(BeanRegistration<T> registration) {
         OptionalInt order = registration.beanDefinition.intValue(Order.class);
-        if (order.isPresent()) {
-            return order.getAsInt();
-        }
-        return OrderUtil.getOrder(registration.bean);
+        return order.orElseGet(() -> OrderUtil.getOrder(registration.bean));
     }
 
     private <T> void logResolvedExisting(Class<T> beanType, Qualifier<T> qualifier, boolean hasQualifier, Collection<T> existing) {
