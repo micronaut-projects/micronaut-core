@@ -55,7 +55,7 @@ a body providing the log level to configure.
 
 [source,bash]
 ----
-$ curl -i -X POST
+$ curl -i -X POST \
        -H "Content-Type: application/json" \
        -d '{ "configuredLevel": "ERROR" }' \
        http://localhost:8080/loggers/ROOT
@@ -84,6 +84,10 @@ endpoints:
         enabled: Boolean
         sensitive: Boolean
 ----
+
+NOTE: By default the endpoint doesn't allow to change the log level by unauthorized users (even if `sensitive` is set to
+`false`). To allow it is necessary set `endpoints.loggers.write-sensitive` to `false`.
+
 
 == Customization
 

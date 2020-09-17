@@ -22,7 +22,8 @@ import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.scheduling.annotation.Scheduled;
 
 import javax.inject.Singleton;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A scheduled task that sends a periodic heartbeat whilst the server is active.
@@ -34,7 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @HeartbeatEnabled
 public class HeartbeatTask implements ApplicationEventListener<ServiceReadyEvent> {
 
-    private AtomicReference<ServiceInstance> eventReference = new AtomicReference<>();
+    private final Set<ServiceInstance> eventsReference = ConcurrentHashMap.newKeySet();
 
     private final ApplicationEventPublisher eventPublisher;
     private final CurrentHealthStatus currentHealthStatus;
@@ -55,14 +56,13 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceReadyEvent
     @Scheduled(fixedDelay = "${micronaut.heartbeat.interval:15s}",
                initialDelay = "${micronaut.heartbeat.initial-delay:5s}")
     public void pulsate() {
-        ServiceInstance instance = eventReference.get();
-        if (instance != null) {
+        for (ServiceInstance instance : eventsReference) {
             eventPublisher.publishEvent(new HeartbeatEvent(instance, currentHealthStatus.current()));
         }
     }
 
     @Override
     public void onApplicationEvent(ServiceReadyEvent event) {
-        eventReference.set(event.getSource());
+        eventsReference.add(event.getSource());
     }
 }

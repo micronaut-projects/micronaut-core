@@ -166,7 +166,7 @@ serverlessFunctions:
   title: Serverless Functions
   awsLambda: AWS Lambda
   gcpFunction: Google Cloud Function
-  gcpCloudRun: Google CLoud Run
+  gcpCloudRun: Google Cloud Run
   azureFunction: Azure Function
 messaging:
   title: Message-Driven Microservices

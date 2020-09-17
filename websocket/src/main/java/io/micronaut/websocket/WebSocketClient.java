@@ -30,6 +30,17 @@ import java.util.Map;
 public interface WebSocketClient extends AutoCloseable {
 
     /**
+     * Constant for HTTP scheme.
+     */
+    String SCHEME_WS = "ws";
+
+    /**
+     * Constant for HTTPS scheme.
+     */
+    String SCHEME_WSS = "wss";
+
+
+    /**
      * Connect the given client endpoint type to the URI over WebSocket.
      *
      * @param clientEndpointType The endpoint type. Should be a class annotated with {@link io.micronaut.websocket.annotation.ClientWebSocket}

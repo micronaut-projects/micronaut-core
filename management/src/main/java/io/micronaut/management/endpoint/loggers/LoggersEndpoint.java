@@ -31,7 +31,9 @@ import java.util.Map;
  * @author Matthew Moss
  * @since 1.0
  */
-@Endpoint(id = LoggersEndpoint.NAME, defaultSensitive = LoggersEndpoint.DEFAULT_SENSITIVE)
+@Endpoint(id = LoggersEndpoint.NAME,
+        defaultSensitive = LoggersEndpoint.DEFAULT_SENSITIVE,
+        defaultEnabled = LoggersEndpoint.DEFAULT_ENABLED)
 public class LoggersEndpoint {
 
     /**
@@ -47,7 +49,7 @@ public class LoggersEndpoint {
     /**
      * Endpoint default enabled.
      */
-    public static final boolean DEFAULT_ENABLED = true;
+    public static final boolean DEFAULT_ENABLED = false;
 
     /**
      * Endpoint default sensitivity.

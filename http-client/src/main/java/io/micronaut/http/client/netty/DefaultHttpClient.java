@@ -59,18 +59,12 @@ import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.multipart.MultipartException;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
-import io.micronaut.http.netty.NettyHttpHeaders;
-import io.micronaut.http.netty.NettyHttpRequestBuilder;
-import io.micronaut.http.netty.NettyHttpResponseBuilder;
+import io.micronaut.http.netty.*;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
-import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.micronaut.http.netty.stream.StreamedHttpResponse;
-import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
+import io.micronaut.http.netty.stream.*;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.jackson.ObjectMapperFactory;
@@ -1335,7 +1329,8 @@ public class DefaultHttpClient implements
      */
     protected SslContext buildSslContext(URI uriObject) {
         final SslContext sslCtx;
-        if (io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(uriObject.getScheme())) {
+        if (io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(uriObject.getScheme()) ||
+            SCHEME_WSS.equalsIgnoreCase(uriObject.getScheme())) {
             sslCtx = sslContext;
             //Allow https requests to be sent if SSL is disabled but a proxy is present
             if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
@@ -1793,9 +1788,46 @@ public class DefaultHttpClient implements
         );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
         ChannelPipeline pipeline = channel.pipeline();
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new SimpleChannelInboundHandler<FullHttpResponse>() {
+            final AtomicBoolean received = new AtomicBoolean(false);
+
+            @Override
+            public boolean acceptInboundMessage(Object msg) throws Exception {
+                return msg instanceof FullHttpResponse;
+            }
+
+            @Override
+            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                if (received.compareAndSet(false, true)) {
+                    emitter.onError(cause);
+                }
+            }
+
+            @Override
+            protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
+                if (received.compareAndSet(false, true)) {
+                    NettyMutableHttpResponse<Object> response = new NettyMutableHttpResponse<>(
+                            msg,
+                            ConversionService.SHARED
+                    );
+                    HttpHeaders headers = msg.headers();
+                    if (log.isTraceEnabled()) {
+                        log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), nettyRequest.method().name(), nettyRequest.uri());
+                        traceHeaders(headers);
+                    }
+                    emitter.onNext(response);
+                    emitter.onComplete();
+                }
+            }
+        });
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandler<StreamedHttpResponse>() {
 
-            AtomicBoolean received = new AtomicBoolean(false);
+            final AtomicBoolean received = new AtomicBoolean(false);
+
+            @Override
+            public boolean acceptInboundMessage(Object msg) {
+                return msg instanceof StreamedHttpResponse;
+            }
 
             @Override
             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {

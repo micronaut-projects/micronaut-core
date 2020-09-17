@@ -1,6 +1,7 @@
 
 == HTTP server and request argument binding
 
+<<<<<<< HEAD
 An argument binding allows for the binding of an argument's value from a source.
 Micronaut follows a specific search path for the resolution of api:core.bind.ArgumentBinder[ArgumentBinder]s through the
 api:http.bind.binders.ArgumentBinderRegistry[ArgumentBinderRegistry].  The selection process starts with annotation binders
@@ -9,6 +10,15 @@ type.
 
 An api:core.bind.ArgumentBinder[ArgumentBinder] can either be registered as a bean or by META-INF/services. In the case
 of the latter, it will be globally available at all times, whilst the former is only present when a api:context.BeanContext[BeanContext]
+=======
+Micronaut uses a api:http.bind.binders.ArgumentBinderRegistry[ArgumentBinderRegistry] to look up api:core.bind.ArgumentBinder[ArgumentBinder]s
+capable of binding to the arguments in controller methods.
+The default implementation will look for an annotation on the argument that is annotated with `@Bindable` and if found,
+search for an argument binder that supports that annotation.
+
+If that isn't found, a search is made for an argument binder that supports the type of the argument.
+An api:core.bind.ArgumentBinder[ArgumentBinder] can be registered as a bean. In this case it is only present when a api:context.BeanContext[BeanContext]
+>>>>>>> 3c2dd527111cc27b75929d7ae092ba7f19bee707
 is initialized.
 
 Key interfaces are:
@@ -18,8 +28,13 @@ Key interfaces are:
 
 - An interface for classes that bind an api:core.type.Argument[Argument] from an api:http.HttpRequest[HttpRequest] driven by an annotation.
 
+<<<<<<< HEAD
 Unlike api:core.convert.TypeConverter[TypeConverter] instances, api:core.bind.ArgumentBinder[ArgumentBinder]s can potentially
 handle complex objects and typically work in conjunction with a api:core.convert.value.ConvertibleValues[ConvertibleValues] instance.
+=======
+TIP: It is common to use the api:io.micronaut.core.convert.ConversionService[ConversionService] to convert the data to the
+type of the argument.
+>>>>>>> 3c2dd527111cc27b75929d7ae092ba7f19bee707
 
 === TypedRequestArgumentBinders
 
@@ -27,6 +42,7 @@ handle complex objects and typically work in conjunction with a api:core.convert
 
 - A api:http.bind.binders.TypeArgumentBinder[TypeArgumentBinder] that binds from an api:http.HttpRequest[HttpRequest] by type.
 
+<<<<<<< HEAD
 
 == Example: custom argument bindings
 . When do Binders get called?
@@ -37,3 +53,29 @@ Binders can be called many times... may not have been completely initialized/all
 read body
 filters control - must be security filter
 authentication filter retrieves the security code...
+=======
+Binders are called from the api:io.micronaut.http.annotation.Controller[Controller] once the request is sent, and the argument is resolved in the
+api:http.bind.binders.ArgumentBinderRegistry[ArgumentBinderRegistry].  api:io.micronaut.http.filter.HttpFilter[HttpFilter]s
+are called before returning results to the Controller, so your BindingResult may depend on those being initialized and
+processed before returning the BindingResult.
+A BindingResult of the class you are binding will be returned from the bind method in the implementation written.  There are two kinds of result -
+satisfied and unsatisfied.  You can return your own result or EMPTY which will mean the request is satisfied and you have
+bound the request.  If UNSATISFIED is returned, the bind will be attempted again until the request is satisfied.  There are
+many reasons why a request might not be satisfied on the first go - all beans may not be initialized, the filter may not
+have returned from it's processes, services may not have responded in time, etc.
+
+If the bindingResult contains errors... ## add some details...
+
+##NOTES##
+##== Create Code Examples: custom argument bindings
+## add Kotlin, Groovy and Java examples with tests here
+
+##. When do Binders get called?
+##. What are the conditions when they get called?  attempts to bind at multiple places/times
+##Binders can be called many times... may not have been completely initialized/all satisfied reqs beforehand
+##. Explain satisfied and unsatisfied --- EMPTY (and any other undefined return) means satisfied...
+##
+##read body
+##filters control - must be security filter
+##authentication filter retrieves the security code...
+>>>>>>> 3c2dd527111cc27b75929d7ae092ba7f19bee707

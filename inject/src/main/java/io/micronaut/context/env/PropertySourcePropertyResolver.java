@@ -466,13 +466,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             @Nullable StringConvention keyConvention,
             MapFormat.MapTransformation transformation) {
         final Argument<?> valueType = conversionContext.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT);
+        boolean valueTypeIsList = List.class.isAssignableFrom(valueType.getType());
         Map<String, Object> subMap = new LinkedHashMap<>(entries.size());
 
         String prefix = name + '.';
         for (Map.Entry<String, Object> entry : entries.entrySet()) {
             final String key = entry.getKey();
+
+            if (valueTypeIsList && key.contains("[") && key.endsWith("]")) {
+                continue;
+            }
+
             if (key.startsWith(prefix)) {
                 String subMapKey = key.substring(prefix.length());
+
                 Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
 
                 if (transformation == MapFormat.MapTransformation.FLAT) {
@@ -536,7 +543,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         }
                         if (first) {
                             Map<String, Object> normalized = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.NORMALIZED);
-                            normalized.put(propertyName, value);
+                            if (normalized != null) {
+                                normalized.put(propertyName, value);
+                            }
                             first = false;
                         }
                     } else {
