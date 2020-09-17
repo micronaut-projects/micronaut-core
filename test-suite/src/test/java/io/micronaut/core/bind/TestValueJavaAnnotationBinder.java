@@ -4,7 +4,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 
@@ -14,14 +14,14 @@ import java.util.Optional;
 /**
  * The type Test value annotation binder.
  */
-public class TestValueAnnotationBinder extends AbstractAnnotatedArgumentBinder<TestValue, ATest, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<TestValue, ATest> {
+public class TestValueJavaAnnotationBinder extends AbstractAnnotatedArgumentBinder<TestValue, ATest, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<TestValue, ATest> {
 
     /**
      * Instantiates a new Test value annotation binder.
      *
      * @param conversionService the conversion service
      */
-    public TestValueAnnotationBinder(ConversionService<?> conversionService) {
+    public TestValueJavaAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
     }
 
@@ -42,11 +42,11 @@ public class TestValueAnnotationBinder extends AbstractAnnotatedArgumentBinder<T
      */
     @Override
     public BindingResult<ATest> bind(ArgumentConversionContext<ATest> context, HttpRequest<?> source) {
-        ConvertibleValues<Object> parameters = source.getAttributes();
+        ConvertibleMultiValues values = (ConvertibleMultiValues) source.getAttributes();
         AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
         String parameterName = annotationMetadata.stringValue(TestValue.class)
                 .orElse(context.getArgument().getName());
-        return doBind(context, parameters, parameterName);
+        return doBind(context, values, parameterName);
 
     }
 }

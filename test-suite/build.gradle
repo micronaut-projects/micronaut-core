@@ -36,6 +36,9 @@ dependencies {
     }
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junit5Version")
+    // https://mvnrepository.com/artifact/org.mockito/mockito-junit-jupiter
+    testCompile group: 'org.mockito', name: 'mockito-junit-jupiter', version: '3.5.10'
+
 
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
         exclude module:'micronaut-runtime'
