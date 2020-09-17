@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -312,7 +312,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         DefaultAnnotationMetadata annotationMetadata;
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
-            annotationMetadata = (DefaultAnnotationMetadata) ((DefaultAnnotationMetadata) existing).clone();
+            annotationMetadata = ((DefaultAnnotationMetadata) existing).clone();
         } else {
             annotationMetadata = new DefaultAnnotationMetadata();
         }
@@ -943,7 +943,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         for (AnnotationRemapper annotationRemapper : annotationRemappers) {
                             List<AnnotationValue<?>> remappedRepeatable = annotationRemapper.remap(repeatableAnn, visitorContext);
                             List<AnnotationValue<?>> remappedValue = annotationRemapper.remap(av, visitorContext);
-                            if (CollectionUtils.isNotEmpty(remappedRepeatable) && CollectionUtils.isNotEmpty(remappedRepeatable)) {
+                            if (CollectionUtils.isNotEmpty(remappedRepeatable)) {
                                 for (AnnotationValue<?> repeatable : remappedRepeatable) {
                                     for (AnnotationValue<?> rmv : remappedValue) {
                                         if (isDeclared) {
@@ -971,7 +971,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                             if (isDeclared) {
                                                 annotationMetadata.addDeclaredRepeatable(annotationValue.getAnnotationName(), value);
                                             } else {
-                                                annotationMetadata.addDeclaredRepeatable(annotationValue.getAnnotationName(), value);
+                                                annotationMetadata.addRepeatable(annotationValue.getAnnotationName(), value);
                                             }
                                         }
                                     }
@@ -985,7 +985,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                     if (isDeclared) {
                                         annotationMetadata.addDeclaredRepeatable(repeatableName, value);
                                     } else {
-                                        annotationMetadata.addDeclaredRepeatable(repeatableName, value);
+                                        annotationMetadata.addRepeatable(repeatableName, value);
                                     }
                                 }
                             }

@@ -920,4 +920,143 @@ class ValidatedConfig {
         expect:
         introspection != null
     }
+
+    void "test multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    int[] oneDimension
+    int[][] twoDimensions
+    int[][][] threeDimensions
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate()
+        def property = introspection.getRequiredProperty("oneDimension", int[].class)
+        int[] level1 = [1, 2, 3] as int[]
+        property.set(instance, level1)
+
+        then:
+        property.get(instance) == level1
+
+        when:
+        property = introspection.getRequiredProperty("twoDimensions", int[][].class)
+        int[] level2 = [4, 5, 6] as int[]
+        int[][] twoDimensions = [level1, level2] as int[][]
+        property.set(instance, twoDimensions)
+
+        then:
+        property.get(instance) == twoDimensions
+
+        when:
+        property = introspection.getRequiredProperty("threeDimensions", int[][][].class)
+        int[][][] threeDimensions = [[level1], [level2]] as int[][][]
+        property.set(instance, threeDimensions)
+
+        then:
+        property.get(instance) == threeDimensions
+    }
+
+    void "test class multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    String[] oneDimension
+    String[][] twoDimensions
+    String[][][] threeDimensions
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate()
+        def property = introspection.getRequiredProperty("oneDimension", String[].class)
+        String[] level1 = ["1", "2", "3"] as String[]
+        property.set(instance, level1)
+
+        then:
+        property.get(instance) == level1
+
+        when:
+        property = introspection.getRequiredProperty("twoDimensions", String[][].class)
+        String[] level2 = ["4", "5", "6"] as String[]
+        String[][] twoDimensions = [level1, level2] as String[][]
+        property.set(instance, twoDimensions)
+
+        then:
+        property.get(instance) == twoDimensions
+
+        when:
+        property = introspection.getRequiredProperty("threeDimensions", String[][][].class)
+        String[][][] threeDimensions = [[level1], [level2]] as String[][][]
+        property.set(instance, threeDimensions)
+
+        then:
+        property.get(instance) == threeDimensions
+    }
+
+    void "test enum multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.inject.visitor.SomeEnum
+
+@Introspected
+class Test {
+    SomeEnum[] oneDimension
+    SomeEnum[][] twoDimensions
+    SomeEnum[][][] threeDimensions
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate()
+        def property = introspection.getRequiredProperty("oneDimension", SomeEnum[].class)
+        SomeEnum[] level1 = [SomeEnum.A, SomeEnum.B, SomeEnum.A] as SomeEnum[]
+        property.set(instance, level1)
+
+        then:
+        property.get(instance) == level1
+
+        when:
+        property = introspection.getRequiredProperty("twoDimensions", SomeEnum[][].class)
+        SomeEnum[] level2 = [SomeEnum.B, SomeEnum.A, SomeEnum.B] as SomeEnum[]
+        SomeEnum[][] twoDimensions = [level1, level2] as SomeEnum[][]
+        property.set(instance, twoDimensions)
+
+        then:
+        property.get(instance) == twoDimensions
+
+        when:
+        property = introspection.getRequiredProperty("threeDimensions", SomeEnum[][][].class)
+        SomeEnum[][][] threeDimensions = [[level1], [level2]] as SomeEnum[][][]
+        property.set(instance, threeDimensions)
+
+        then:
+        property.get(instance) == threeDimensions
+    }
 }

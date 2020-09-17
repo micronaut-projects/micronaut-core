@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -89,7 +89,7 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
         this.channel.attr(WEB_SOCKET_SESSION_KEY).set(this);
         this.codecRegistry = codecRegistry;
         this.messageEncoder = new WebSocketMessageEncoder(this.codecRegistry);
-        this.attributes = request.getAttribute("micronaut.SESSION", MutableConvertibleValues.class).orElseGet(() -> new MutableConvertibleValuesMap());
+        this.attributes = request.getAttribute("micronaut.SESSION", MutableConvertibleValues.class).orElseGet(MutableConvertibleValuesMap::new);
     }
 
     @Override

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,7 +31,9 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.TemporalAccessor;
+import java.time.temporal.TemporalAmount;
 import java.util.Optional;
+import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,6 +50,7 @@ import java.util.regex.Pattern;
 @TypeHint(
         value = {
                 Duration.class,
+                TemporalAmount.class,
                 Instant.class,
                 LocalDate.class,
                 LocalDateTime.class,
@@ -70,59 +73,68 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
 
     @Override
     public void register(ConversionService<?> conversionService) {
+        final BiFunction<CharSequence, ConversionContext, Optional<Duration>> durationConverter = (object, context) -> {
+            String value = object.toString().trim();
+            if (value.startsWith("P")) {
+                try {
+                    return Optional.of(Duration.parse(value));
+                } catch (DateTimeParseException e) {
+                    context.reject(value, e);
+                    return Optional.empty();
+                }
+            } else {
+                Matcher matcher = DURATION_MATCHER.matcher(value);
+                if (matcher.find()) {
+                    String amount = matcher.group(1);
+                    final String g2 = matcher.group(2);
+                    char type = g2.charAt(0);
+                    try {
+                        switch (type) {
+                            case 's':
+                                return Optional.of(Duration.ofSeconds(Integer.valueOf(amount)));
+                            case 'm':
+                                String ms = matcher.group(MILLIS);
+                                if (StringUtils.hasText(ms)) {
+                                    return Optional.of(Duration.ofMillis(Integer.valueOf(amount)));
+                                } else {
+                                    return Optional.of(Duration.ofMinutes(Integer.valueOf(amount)));
+                                }
+                            case 'h':
+                                return Optional.of(Duration.ofHours(Integer.valueOf(amount)));
+                            case 'd':
+                                return Optional.of(Duration.ofDays(Integer.valueOf(amount)));
+                            default:
+                                final String seq = g2 + matcher.group(3);
+                                switch (seq) {
+                                    case "ns":
+                                        return Optional.of(Duration.ofNanos(Integer.valueOf(amount)));
+                                    default:
+                                        context.reject(
+                                                value,
+                                                new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
+                                        return Optional.empty();
+                                }
+                        }
+                    } catch (NumberFormatException e) {
+                        context.reject(value, e);
+                    }
+                }
+            }
+            return Optional.empty();
+        };
+
         // CharSequence -> Duration
         conversionService.addConverter(
             CharSequence.class,
             Duration.class,
-            (object, targetType, context) -> {
-                String value = object.toString().trim();
-                if (value.startsWith("P")) {
-                    try {
-                        return Optional.of(Duration.parse(value));
-                    } catch (DateTimeParseException e) {
-                        context.reject(value, e);
-                        return Optional.empty();
-                    }
-                } else {
-                    Matcher matcher = DURATION_MATCHER.matcher(value);
-                    if (matcher.find()) {
-                        String amount = matcher.group(1);
-                        final String g2 = matcher.group(2);
-                        char type = g2.charAt(0);
-                        try {
-                            switch (type) {
-                                case 's':
-                                    return Optional.of(Duration.ofSeconds(Integer.valueOf(amount)));
-                                case 'm':
-                                    String ms = matcher.group(MILLIS);
-                                    if (StringUtils.hasText(ms)) {
-                                        return Optional.of(Duration.ofMillis(Integer.valueOf(amount)));
-                                    } else {
-                                        return Optional.of(Duration.ofMinutes(Integer.valueOf(amount)));
-                                    }
-                                case 'h':
-                                    return Optional.of(Duration.ofHours(Integer.valueOf(amount)));
-                                case 'd':
-                                    return Optional.of(Duration.ofDays(Integer.valueOf(amount)));
-                                default:
-                                    final String seq = g2 + matcher.group(3);
-                                    switch (seq) {
-                                        case "ns":
-                                            return Optional.of(Duration.ofNanos(Integer.valueOf(amount)));
-                                        default:
-                                            context.reject(
-                                                    value,
-                                                    new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
-                                            return Optional.empty();
-                                    }
-                            }
-                        } catch (NumberFormatException e) {
-                            context.reject(value, e);
-                        }
-                    }
-                }
-                return Optional.empty();
-            }
+            (object, targetType, context) -> durationConverter.apply(object, context)
+        );
+
+        // CharSequence -> TemporalAmount
+        conversionService.addConverter(
+            CharSequence.class,
+            TemporalAmount.class,
+            (object, targetType, context) -> durationConverter.apply(object, context).map(TemporalAmount.class::cast)
         );
 
         // CharSequence -> LocalDateTime
@@ -210,7 +222,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
     private DateTimeFormatter resolveFormatter(ConversionContext context) {
         Optional<String> format = context.getAnnotationMetadata().stringValue(Format.class);
         return format
-            .map((pattern) -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
+            .map(pattern -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
             .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
     }
 }

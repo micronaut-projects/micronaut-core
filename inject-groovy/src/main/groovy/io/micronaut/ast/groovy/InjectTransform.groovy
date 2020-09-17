@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@ import groovy.transform.CompileDynamic
 import io.micronaut.aop.Adapter
 import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
+import io.micronaut.ast.groovy.visitor.AbstractGroovyElement
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
 import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
@@ -48,6 +49,8 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Function
+import java.util.function.Predicate
+
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getGetterName
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName
@@ -137,6 +140,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     public static final String ANN_CONSTRAINT = "javax.validation.Constraint"
     public static final String ANN_CONFIGURATION_ADVICE = "io.micronaut.runtime.context.env.ConfigurationAdvice"
     public static final String ANN_VALIDATED = "io.micronaut.validation.Validated"
+    private static final Predicate<AnnotationMetadata> IS_CONSTRAINT = (Predicate<AnnotationMetadata>) { AnnotationMetadata am ->
+        am.hasStereotype(InjectTransform.ANN_CONSTRAINT) || am.hasStereotype(InjectTransform.ANN_VALID)
+    }
     CompilationUnit unit
     ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder
 
@@ -336,7 +342,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.concreteClass = targetClassNode
             def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, targetClassNode)
             this.annotationMetadata = annotationMetadata
-            this.originatingElement = new GroovyClassElement(sourceUnit, compilationUnit, concreteClass, annotationMetadata)
+            this.originatingElement = AbstractGroovyElement.toClassElement(sourceUnit, compilationUnit, concreteClass, annotationMetadata)
             this.isFactoryClass = annotationMetadata.hasStereotype(Factory)
             this.isAopProxyType = annotationMetadata.hasStereotype(AROUND_TYPE) && !targetClassNode.isAbstract()
             this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()
@@ -527,8 +533,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         boolean hasConstraint
                         for (Parameter p: methodNode.getParameters()) {
                             AnnotationMetadata parameterMetadata = AstAnnotationUtils.getAnnotationMetadata(source, unit, p)
-                            if (parameterMetadata.hasStereotype(InjectTransform.ANN_CONSTRAINT) ||
-                                    parameterMetadata.hasStereotype(InjectTransform.ANN_VALID)) {
+                            if (IS_CONSTRAINT.test(parameterMetadata)) {
                                 hasConstraint = true
                                 break
                             }
@@ -540,8 +545,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                     if (isConfigurationProperties && methodNode.isAbstract()) {
                         if (!aopProxyWriter.isValidated()) {
-                            aopProxyWriter.setValidated(annotationMetadata.hasStereotype(InjectTransform.ANN_CONSTRAINT) ||
-                                    annotationMetadata.hasStereotype(InjectTransform.ANN_VALID))
+                            aopProxyWriter.setValidated(IS_CONSTRAINT.test(annotationMetadata))
                         }
 
                         if (!NameUtils.isGetterName(methodNode.name)) {
@@ -582,7 +586,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             annotationMetadata = addAnnotation(annotationMetadata, ANN_CONFIGURATION_ADVICE)
                         }
 
-                        if (annotationMetadata.hasStereotype(ANN_CONSTRAINT) && !annotationMetadata.hasStereotype(Executable.class)) {
+                        if (IS_CONSTRAINT.test(annotationMetadata) && !annotationMetadata.hasStereotype(Executable.class)) {
                             aopProxyWriter.visitExecutableMethod(
                                     owningType,
                                     returnType,
@@ -1022,9 +1026,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                     } else if (NameUtils.isGetterName(methodNode.name)) {
                         if (!getBeanWriter().isValidated()) {
-                            if (methodAnnotationMetadata.hasStereotype("javax.validation.Constraint")) {
-                                getBeanWriter().setValidated(true)
-                            }
+                            getBeanWriter().setValidated(IS_CONSTRAINT.test(methodAnnotationMetadata))
                         }
                     }
                 } else if (isPublic) {
@@ -1033,8 +1035,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     final boolean isConstrained = isDeclaredBean &&
                             methodNode.getParameters()
                                     .any { Parameter p ->
-                                AstAnnotationUtils.hasStereotype(sourceUnit, compilationUnit, p, InjectTransform.ANN_CONSTRAINT) ||
-                                        AstAnnotationUtils.hasStereotype(sourceUnit, compilationUnit, p, InjectTransform.ANN_VALID)
+                                        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, p)
+                                        IS_CONSTRAINT.test(annotationMetadata)
                             }
                     if (isConstrained) {
                         visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
@@ -1116,7 +1118,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     getBeanWriter().setRequiresMethodProcessing(true)
                 }
                 final boolean hasConstraints = argumentAnnotationMetadata.values().stream().anyMatch({ am ->
-                    am.hasStereotype(InjectTransform.ANN_CONSTRAINT) || am.hasStereotype(InjectTransform.ANN_VALID)
+                    IS_CONSTRAINT.test(am)
                 })
 
                 if (hasConstraints) {
@@ -1300,9 +1302,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     boolean isPrivate = Modifier.isPrivate(modifiers)
                     boolean requiresReflection = isPrivate || isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, modifiers)
                     if (!getBeanWriter().isValidated()) {
-                        if (fieldAnnotationMetadata.hasStereotype(InjectTransform.ANN_CONSTRAINT)) {
-                            getBeanWriter().setValidated(true)
-                        }
+                        getBeanWriter().setValidated(IS_CONSTRAINT.test(fieldAnnotationMetadata))
                     }
                     String fieldName = fieldNode.name
                     Object fieldType = AstGenericUtils.resolveTypeReference(fieldNode.type)
@@ -1431,9 +1431,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 ClassNode declaringClass = fieldNode.declaringClass
                 if (!getBeanWriter().isValidated()) {
-                    if (fieldAnnotationMetadata.hasStereotype(InjectTransform.ANN_CONSTRAINT)) {
-                        getBeanWriter().setValidated(true)
-                    }
+                    getBeanWriter().setValidated(IS_CONSTRAINT.test(fieldAnnotationMetadata))
                 }
 
                 Object fieldTypeReference = AstGenericUtils.resolveTypeReference(fieldType)
@@ -1697,7 +1695,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 genericTypeMap
                         )
                         beanWriter.setValidated(
-                                qualifierTypes.values().any { AnnotationMetadata am -> am.hasStereotype(ANN_CONSTRAINT.toString()) || am.hasStereotype(ANN_VALID.toString()) }
+                                qualifierTypes.values().any { AnnotationMetadata am -> InjectTransform.IS_CONSTRAINT.test(am) }
                         )
                     } else {
                         addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", classNode)

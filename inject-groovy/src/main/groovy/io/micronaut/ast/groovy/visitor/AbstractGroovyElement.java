@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,7 +29,9 @@ import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
+import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.control.CompilationUnit;
@@ -183,11 +185,25 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
                     return new GroovyClassElement(sourceUnit, compilationUnit, type, annotationMetadata, Collections.singletonMap(
                             type.getName(),
                             genericsSpec
-                    ));
+                    ), 0);
                 }
             }
         }
         return rawElement;
+    }
+
+    public static ClassElement toClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
+        if (classNode.isArray()) {
+            ClassNode componentType = classNode.getComponentType();
+            ClassElement componentElement = toClassElement(sourceUnit, compilationUnit, componentType, annotationMetadata);
+            return componentElement.toArray();
+        } else if (ClassHelper.isPrimitiveType(classNode)) {
+            return PrimitiveElement.valueOf(classNode.getName());
+        } else if (classNode.isEnum()) {
+            return new GroovyEnumElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode));
+        } else {
+            return new GroovyClassElement(sourceUnit, compilationUnit, classNode, annotationMetadata);
+        }
     }
 
     private ClassElement resolveGenericType(@NonNull SourceUnit sourceUnit, Map<String, ClassNode> typeGenericInfo, ClassNode returnType) {
@@ -198,7 +214,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
                 if (classNode.isGenericsPlaceHolder()) {
                     return resolveGenericType(sourceUnit, typeGenericInfo, classNode);
                 } else {
-                    return new GroovyClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(
+                    return toClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(
                             sourceUnit,
                             compilationUnit,
                             classNode

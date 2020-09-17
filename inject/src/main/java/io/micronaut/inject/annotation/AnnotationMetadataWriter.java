@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -57,14 +57,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                     AnnotationUtil.class,
                     "internListOf",
                     Object[].class
-            )
-    );
-
-    private static final org.objectweb.asm.commons.Method METHOD_ARE_DEFAULTS_REGISTERED = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    DefaultAnnotationMetadata.class,
-                    "areAnnotationDefaultsRegistered",
-                    String.class
             )
     );
 
@@ -176,7 +168,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         this.writeAnnotationDefaults = writeAnnotationDefaults;
     }
 
-
     /**
      * Constructs a new writer for the given class name and metadata.
      *
@@ -204,6 +195,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * @param outputVisitor The {@link ClassWriterOutputVisitor}
      * @throws IOException If an error occurs
      */
+    @Override
     public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
         ClassWriter classWriter = generateClassBytes();
         if (classWriter != null) {

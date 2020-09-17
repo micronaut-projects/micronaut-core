@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 @Configuration
-@Requires(condition = TravisEnvCondition.class)
+@Requires(condition = GitHubActionsEnvCondition.class)
 package io.micronaut.inject.configurations.requiresconditionfalse
 
 import io.micronaut.context.annotation.Configuration

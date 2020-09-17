@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 package io.micronaut.http.context;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import org.reactivestreams.Publisher;
@@ -30,7 +31,7 @@ import org.reactivestreams.Subscription;
  * @since 1.0
  */
 @Internal
-public final class ServerRequestTracingPublisher implements Publisher<MutableHttpResponse<?>> {
+public final class ServerRequestTracingPublisher implements Publishers.MicronautPublisher<MutableHttpResponse<?>> {
 
     private final HttpRequest<?> request;
     private final Publisher<MutableHttpResponse<?>> actual;

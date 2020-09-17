@@ -4,15 +4,13 @@ introduction:
   upgrading: Upgrading to Micronaut 2.x
 quickStart:
   title: Quick Start
-  buildCLI:
-    title: Build/Install the CLI
-    installSdkman: Install with Sdkman
-    installHomebrew: Install with Homebrew
-    installMacPorts: Install with MacPorts
-    installWindows: Install through Binary on Windows
-    buildSource: Building from Source
+  buildCLI: Build/Install the CLI
   creatingServer: Creating a Server Application
-  ideSetup: Setting up an IDE
+  ideSetup:
+    title: Setting up an IDE
+    ideaSetup: IntelliJ IDEA
+    eclipseSetup: Eclipse
+    vsCodeSetup: Visual Studio Code
   creatingClient: Creating a Client
   deployingApp: Deploying the Application
 ioc:
@@ -167,7 +165,7 @@ serverlessFunctions:
   title: Serverless Functions
   awsLambda: AWS Lambda
   gcpFunction: Google Cloud Function
-  gcpCloudRun: Google CLoud Run
+  gcpCloudRun: Google Cloud Run
   azureFunction: Azure Function
 messaging:
   title: Message-Driven Microservices
@@ -257,6 +255,9 @@ cli:
     gradleReload: Recompiling with Gradle
     ideReload: Recompiling with an IDE
   proxy: Proxy Configuration
+i18n:
+  title: Internationalization
+  bundle: Resource Bundles
 appendix:
   title: Appendices
   faq: Frequently Asked Questions (FAQ)

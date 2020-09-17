@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -58,9 +58,8 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     final NettyHttpHeaders headers;
     private final ConversionService conversionService;
     private Object body;
-    private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
+    private final Map<Class, Optional> convertedBodies = Collections.synchronizedMap(new LinkedHashMap<>(1));
     private MutableConvertibleValues<Object> attributes;
-
     private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
 
     /**

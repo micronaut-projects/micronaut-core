@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,13 @@
  */
 package io.micronaut.validation;
 
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.*;
 
 import javax.validation.Valid;
 import javax.validation.constraints.Digits;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
+import java.util.Optional;
 
 /**
  * @author Graeme Rocher
@@ -42,5 +43,15 @@ public class ValidatedController {
     @Post("/no-introspection")
     public PojoNoIntrospection pojo(@Body @Valid PojoNoIntrospection pojo) {
         return pojo;
+    }
+
+    @Get("/optional")
+    public boolean optional(@QueryValue @Min(1) Optional<Integer> limit) {
+        return limit.map(l -> l >= 1).orElse(true);
+    }
+
+    @Get("/optional/notNull")
+    public boolean optionalNotNull(@QueryValue @NotNull Optional<Integer> limit) {
+        return limit.map(l -> l >= 1).orElse(true);
     }
 }

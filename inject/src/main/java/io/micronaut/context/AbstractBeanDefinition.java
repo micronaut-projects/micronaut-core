@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,22 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
- * Copyright 2017 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.*;
@@ -127,8 +111,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                                      AnnotationMetadata methodMetadata,
                                      boolean requiresReflection,
                                      Argument... arguments) {
-
-        AnnotationMetadata beanAnnotationMetadata = getAnnotationMetadata();
         this.type = producedType;
         this.isAbstract = false; // factory beans are never abstract
         this.declaringType = declaringType;
@@ -244,13 +226,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Override
     @SuppressWarnings({"unchecked"})
     public Stream<ExecutableMethod<T, ?>> findPossibleMethods(String name) {
-        if (executableMethodMap != null) {
-            if (executableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
-                return executableMethodMap
-                        .values()
-                        .stream()
-                        .filter((method) -> method.getMethodName().equals(name));
-            }
+        if (executableMethodMap != null && executableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
+            return executableMethodMap
+                    .values()
+                    .stream()
+                    .filter(method -> method.getMethodName().equals(name));
         }
         return Stream.empty();
     }
@@ -615,10 +595,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @SuppressWarnings({"unused"})
     @UsedByGeneratedCode
     protected Object injectAnother(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         if (bean == null) {
             throw new BeanInstantiationException(resolutionContext, "Bean factory returned null");
         }
+        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         return defaultContext.inject(resolutionContext, this, bean);
     }
 
@@ -635,7 +615,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     @UsedByGeneratedCode
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         boolean addInCreationHandling = isSingleton() && !CollectionUtils.isNotEmpty(postConstructMethods);
         DefaultBeanContext.BeanKey key = null;
         if (addInCreationHandling) {
@@ -661,6 +640,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             }
         }
 
+        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         for (int i = 0; i < methodInjectionPoints.size(); i++) {
             MethodInjectionPoint methodInjectionPoint = methodInjectionPoints.get(i);
             if (methodInjectionPoint.isPostConstructMethod() && methodInjectionPoint.requiresReflection()) {
@@ -804,9 +784,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                         return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                     }
                 } else {
-                    String argumentName = argument.getName();
                     String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valueAnnStr);
-
 
                     ApplicationContext applicationContext = (ApplicationContext) context;
                     ArgumentConversionContext conversionContext = ConversionContext.of(argument);
@@ -1310,7 +1288,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             String... propertyPath) {
         if (context instanceof PropertyResolver) {
             PropertyResolver propertyResolver = (PropertyResolver) context;
-            Class<?> beanType = getBeanType();
             String pathString = propertyPath.length > 1 ? String.join(".", propertyPath) : propertyPath[0];
             String valString = resolvePropertyPath(resolutionContext, pathString);
 
@@ -1339,7 +1316,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             String propertyPath) {
         if (context instanceof PropertyResolver) {
             PropertyResolver propertyResolver = (PropertyResolver) context;
-            Class<?> beanType = getBeanType();
             String valString = substituteWildCards(resolutionContext, propertyPath);
 
             return propertyResolver.getProperty(valString, ConversionContext.of(propertyType));
@@ -1766,7 +1742,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private String substituteWildCards(BeanResolutionContext resolutionContext, String valString) {
         if (valString.indexOf('*') > -1) {
-            Optional<String> namedBean = resolutionContext.get(Named.class.getName(), ArgumentConversionContext.STRING);
+            Optional<String> namedBean = resolutionContext.get(Named.class.getName(), ConversionContext.STRING);
             if (namedBean.isPresent()) {
                 valString = valString.replace("*", namedBean.get());
             }
@@ -1908,7 +1884,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     if ((hasMetadata && argument.isAnnotationPresent(Parameter.class)) ||
                             (innerConfiguration && isIterable) ||
                             Qualifier.class == argument.getType()) {
-                        final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, ArgumentConversionContext.STRING);
+                        final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, ConversionContext.STRING);
                         qualifier = n.map(Qualifiers::byName).orElse(null);
                     }
                 }

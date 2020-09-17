@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,7 @@ package io.micronaut.health;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.discovery.CompositeDiscoveryClient;
 
 import static java.lang.Boolean.FALSE;
@@ -38,7 +38,7 @@ public final class HeartbeatDiscoveryClientCondition implements Condition {
         if (hasDiscovery) {
             return true;
         } else {
-            final Boolean enabled = context.getProperty(HeartbeatConfiguration.ENABLED, ArgumentConversionContext.BOOLEAN).orElse(FALSE);
+            final Boolean enabled = context.getProperty(HeartbeatConfiguration.ENABLED, ConversionContext.BOOLEAN).orElse(FALSE);
             if (!enabled) {
                 context.fail("Heartbeat not enabled since no Discovery client active");
             }

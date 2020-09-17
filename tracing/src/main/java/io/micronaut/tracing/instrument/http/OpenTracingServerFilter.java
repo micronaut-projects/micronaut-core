@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,6 +30,7 @@ import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
+import org.jetbrains.annotations.NotNull;
 import org.reactivestreams.Publisher;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -47,6 +48,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 public class OpenTracingServerFilter extends AbstractOpenTracingFilter implements HttpServerFilter {
 
     private static final CharSequence APPLIED = OpenTracingServerFilter.class.getName() + "-applied";
+    private static final CharSequence CONTINUE = OpenTracingServerFilter.class.getName() + "-continue";
 
     /**
      * Creates an HTTP server instrumentation filter.
@@ -61,10 +63,14 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
-        if (request.getAttribute(APPLIED, Boolean.class).isPresent()) {
+        boolean applied = request.getAttribute(APPLIED, Boolean.class).orElse(false);
+        boolean continued = request.getAttribute(CONTINUE, Boolean.class).orElse(false);
+        if (applied && !continued) {
             return responsePublisher;
         } else {
-            request.setAttribute(APPLIED, true);
+            if (!applied) {
+                request.setAttribute(APPLIED, true);
+            }
             SpanContext spanContext = tracer.extract(
                     Format.Builtin.HTTP_HEADERS,
                     new HttpHeadersTextMap(request.getHeaders())
@@ -76,6 +82,7 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
 
             Tracer.SpanBuilder spanBuilder = newSpan(request, spanContext);
             return new TracingPublisher(responsePublisher, tracer, spanBuilder) {
+
                 @Override
                 protected void doOnSubscribe(@NonNull Span span) {
                     span.setTag(TAG_HTTP_SERVER, true);
@@ -96,8 +103,22 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
                         setResponseTags(request, response, span);
                     }
                 }
-            };
 
+                @Override
+                protected void doOnError(@NotNull Throwable throwable, @NotNull Span span) {
+                    request.setAttribute(CONTINUE, true);
+                }
+
+                @Override
+                protected boolean isContinued() {
+                    return continued;
+                }
+
+                @Override
+                protected boolean isFinishOnError() {
+                    return false;
+                }
+            };
         }
     }
 

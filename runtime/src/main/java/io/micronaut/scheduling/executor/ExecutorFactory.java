@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,14 @@
  */
 package io.micronaut.scheduling.executor;
 
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.reflect.InstantiationUtils;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
+import javax.inject.Inject;
 import java.util.concurrent.*;
 
 /**
@@ -31,14 +34,40 @@ import java.util.concurrent.*;
 @Factory
 public class ExecutorFactory {
 
+    private final BeanLocator beanLocator;
     private final ThreadFactory threadFactory;
 
     /**
-     *
      * @param threadFactory The factory to create new threads
+     * @deprecated Use {@link #ExecutorFactory(BeanLocator, ThreadFactory)} instead
      */
+    @Deprecated
     public ExecutorFactory(ThreadFactory threadFactory) {
         this.threadFactory = threadFactory;
+        this.beanLocator = null;
+    }
+
+    /**
+     *
+     * @param beanLocator The bean beanLocator
+     * @param threadFactory The factory to create new threads
+     * @since 2.0.1
+     */
+    @Inject
+    public ExecutorFactory(BeanLocator beanLocator, ThreadFactory threadFactory) {
+        this.beanLocator = beanLocator;
+        this.threadFactory = threadFactory;
+    }
+
+    /**
+     * Constructs an executor thread factory.
+     *
+     * @param configuration The configuration
+     * @return The thread factory
+     */
+    @EachBean(ExecutorConfiguration.class)
+    protected ThreadFactory eventLoopGroupThreadFactory(ExecutorConfiguration configuration) {
+        return configuration.getName() == null ? threadFactory : new NamedThreadFactory(configuration.getName() + "-executor");
     }
 
     /**
@@ -53,26 +82,11 @@ public class ExecutorFactory {
         ExecutorType executorType = executorConfiguration.getType();
         switch (executorType) {
             case FIXED:
-                return executorConfiguration
-                    .getThreadFactoryClass()
-                    .flatMap(InstantiationUtils::tryInstantiate)
-                    .map(factory -> Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads(), factory))
-                    .orElse(Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads(), threadFactory));
-
+                return Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads(), getThreadFactory(executorConfiguration));
             case CACHED:
-                return executorConfiguration
-                    .getThreadFactoryClass()
-                    .flatMap(InstantiationUtils::tryInstantiate)
-                    .map(Executors::newCachedThreadPool)
-                    .orElse(Executors.newCachedThreadPool(threadFactory));
-
+                return Executors.newCachedThreadPool(getThreadFactory(executorConfiguration));
             case SCHEDULED:
-                return executorConfiguration
-                    .getThreadFactoryClass()
-                    .flatMap(InstantiationUtils::tryInstantiate)
-                    .map(factory -> Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), factory))
-                    .orElse(Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), threadFactory));
-
+                return Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), getThreadFactory(executorConfiguration));
             case WORK_STEALING:
                 return Executors.newWorkStealingPool(executorConfiguration.getParallelism());
 
@@ -80,4 +94,22 @@ public class ExecutorFactory {
                 throw new IllegalStateException("Could not create Executor service for enum value: " + executorType);
         }
     }
+
+    private ThreadFactory getThreadFactory(ExecutorConfiguration executorConfiguration) {
+        return executorConfiguration
+                .getThreadFactoryClass()
+                .flatMap(InstantiationUtils::tryInstantiate)
+                .map(tf -> (ThreadFactory) tf)
+                .orElseGet(() -> {
+                    if (beanLocator != null) {
+                        if (executorConfiguration.getName() == null) {
+                            return beanLocator.getBean(ThreadFactory.class);
+                        }
+                        return beanLocator.getBean(ThreadFactory.class, Qualifiers.byName(executorConfiguration.getName()));
+                    } else {
+                        throw new IllegalStateException("No bean factory configured");
+                    }
+                });
+    }
+
 }

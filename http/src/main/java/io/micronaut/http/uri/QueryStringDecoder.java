@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *   https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -48,7 +48,7 @@ import static io.micronaut.core.util.StringUtils.SPACE;
  *
  * <h3>HashDOS vulnerability fix</h3>
  *
- * As a workaround to the <a href="http://netty.io/s/hashdos">HashDOS</a> vulnerability, the decoder
+ * As a workaround to the <a href="https://netty.io/s/hashdos">HashDOS</a> vulnerability, the decoder
  * limits the maximum number of decoded key-value parameter pairs, up to {@literal 1024} by
  * default, and you can configure it when you construct the decoder by passing an additional
  * integer parameter.
@@ -233,7 +233,7 @@ final class QueryStringDecoder {
         if (s.charAt(from) == '?') {
             from++;
         }
-        Map<String, List<String>> params = new LinkedHashMap<String, List<String>>();
+        Map<String, List<String>> params = new LinkedHashMap<>();
         int nameStart = from;
         int valueStart = -1;
         int i;

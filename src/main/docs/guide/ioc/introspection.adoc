@@ -89,17 +89,10 @@ snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="wrapper", indent=0]
 
 === Jackson and Bean Introspection
 
-You can enable bean introspection integration with Jackson for reflection-free JSON serialization and deserialization using the `jackson.bean-introspection-module` setting.
+Jackson is configured to use the api:core.beans.BeanIntrospection[] API to read and write property values and construct objects resulting in reflection-free serialization/deserialization which is benefitial from a performance perspective and requires less configuring to operate correctly with runtimes such as GraalVM native.
 
-NOTE: This feature is currently regarded as experimental and may be subject to changes in the future.
-
-.Enabling Jackson Bean Introspection
-[source,yaml]
-----
-jackson:
-    bean-introspection-module: true
-----
-
-With the above configuration in place Jackson will be configured to use the api:core.beans.BeanIntrospection[] API to read and write property values and construct objects resulting in reflection-free serialization/deserialization which is benefitial from a performance perspective and requires less configuring to operate correctly with runtimes such as GraalVM native.
+This feature is enabled by default, you can disable it by setting the `jackson.bean-introspection-module` configuration to `false`.
 
 NOTE: Currently only bean properties (private field with public getter/setter) are supported and usage of public fields is not supported.
+
+NOTE: This feature is currently regarded as experimental and may be subject to changes in the future.

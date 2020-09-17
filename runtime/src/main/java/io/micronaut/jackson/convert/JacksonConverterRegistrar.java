@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,8 +41,8 @@ import java.io.IOException;
 
 /**
  * Converter registrar for Jackson.
- * 
- * @author graemerocher 
+ *
+ * @author graemerocher
  * @since 2.0
  */
 @Singleton
@@ -102,7 +102,7 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
         conversionService.addConverter(
                 CharSequence.class,
                 PropertyNamingStrategy.class,
-                (TypeConverter<CharSequence, PropertyNamingStrategy>) (charSequence, targetType, context) -> {
+                (charSequence, targetType, context) -> {
                     PropertyNamingStrategy propertyNamingStrategy = null;
 
                     if (charSequence != null) {
@@ -151,16 +151,37 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
             } else {
                 conversionContext = ConversionContext.of(targetType);
             }
-            Map mapWithExtraProps = new LinkedHashMap(map.size());
-            for (Map.Entry entry : ((Map<?, ?>) map).entrySet()) {
-                Object key = entry.getKey();
-                mapWithExtraProps.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
-            }
             ArgumentBinder binder = this.beanPropertyBinder.get();
-            ArgumentBinder.BindingResult result = binder.bind(conversionContext, mapWithExtraProps);
-            Optional opt = result.getValue();
-            return opt;
+            ArgumentBinder.BindingResult result = binder.bind(conversionContext, correctKeys(map));
+            return result.getValue();
         };
+    }
+
+    private Map correctKeys(Map<?, ?> map) {
+        Map mapWithExtraProps = new LinkedHashMap(map.size());
+        for (Map.Entry entry : map.entrySet()) {
+            Object key = entry.getKey();
+            Object value = correctKeys(entry.getValue());
+            mapWithExtraProps.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), value);
+        }
+        return mapWithExtraProps;
+    }
+
+    private List correctKeys(List list) {
+        List newList = new ArrayList(list.size());
+        for (Object o : list) {
+            newList.add(correctKeys(o));
+        }
+        return newList;
+    }
+
+    private Object correctKeys(Object o) {
+        if (o instanceof List) {
+            return correctKeys((List) o);
+        } else if (o instanceof Map) {
+            return correctKeys((Map) o);
+        }
+        return o;
     }
 
     /**

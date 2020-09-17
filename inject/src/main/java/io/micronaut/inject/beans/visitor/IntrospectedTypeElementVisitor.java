@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -62,6 +62,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
     private List<AbstractIntrospection> abstractIntrospections = new ArrayList<>();
     private AbstractIntrospection currentAbstractIntrospection;
+    private BeanIntrospectionWriter currentRecordWriter;
 
     @Override
     public int getOrder() {
@@ -73,12 +74,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void visitClass(ClassElement element, VisitorContext context) {
         // reset
         currentAbstractIntrospection = null;
-        if (!element.isPrivate()) {
-            if (element.hasStereotype(Introspected.class)) {
-                final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
-                if (introspected != null && !writers.containsKey(element.getName())) {
-                    processIntrospected(element, context, introspected);
-                }
+        currentRecordWriter = null;
+        if (!element.isPrivate() && element.hasStereotype(Introspected.class)) {
+            final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
+            if (introspected != null && !writers.containsKey(element.getName())) {
+                processIntrospected(element, context, introspected);
             }
         }
     }
@@ -120,6 +120,20 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         propertyName
                 ));
                 propertyElement.writeMethod = element;
+            }
+        } else if (currentRecordWriter != null) {
+            if (element.getParameters().length == 0) {
+                Optional<ParameterElement> parameterElement = Arrays.stream(currentRecordWriter.getConstructor().getParameters())
+                        .filter(p -> p.getName().equals(methodName))
+                        .findFirst();
+                parameterElement.ifPresent(value -> currentRecordWriter.visitProperty(
+                        element.getGenericReturnType(),
+                        methodName,
+                        element,
+                        null,
+                        true,
+                        value.getAnnotationMetadata(),
+                        element.getReturnType().getTypeArguments()));
             }
         }
     }
@@ -236,31 +250,37 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     @Override
     public void finish(VisitorContext visitorContext) {
 
-        for (AbstractIntrospection abstractIntrospection : abstractIntrospections) {
-            final Collection<? extends PropertyElement> properties = abstractIntrospection.properties.values();
-            if (CollectionUtils.isNotEmpty(properties)) {
-                processBeanProperties(
-                        abstractIntrospection.writer,
-                        properties,
-                        abstractIntrospection.includes,
-                        abstractIntrospection.excludes,
-                        abstractIntrospection.ignored,
-                        abstractIntrospection.indexedAnnotations,
-                        abstractIntrospection.metadata
-                );
-                writers.put(abstractIntrospection.writer.getBeanType().getClassName(), abstractIntrospection.writer);
+        try {
+            for (AbstractIntrospection abstractIntrospection : abstractIntrospections) {
+                final Collection<? extends PropertyElement> properties = abstractIntrospection.properties.values();
+                if (CollectionUtils.isNotEmpty(properties)) {
+                    processBeanProperties(
+                            abstractIntrospection.writer,
+                            properties,
+                            abstractIntrospection.includes,
+                            abstractIntrospection.excludes,
+                            abstractIntrospection.ignored,
+                            abstractIntrospection.indexedAnnotations,
+                            abstractIntrospection.metadata
+                    );
+                    writers.put(abstractIntrospection.writer.getBeanType().getClassName(), abstractIntrospection.writer);
+                }
+
             }
 
-        }
-
-        for (BeanIntrospectionWriter writer : writers.values()) {
-            try {
-                writer.accept(visitorContext);
-            } catch (IOException e) {
-                throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
+            if (!writers.isEmpty()) {
+                for (BeanIntrospectionWriter writer : writers.values()) {
+                    try {
+                        writer.accept(visitorContext);
+                    } catch (IOException e) {
+                        throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
+                    }
+                }
             }
+        } finally {
+            abstractIntrospections.clear();
+            writers.clear();
         }
-
     }
 
     private void processElement(
@@ -321,7 +341,13 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             writer.visitDefaultConstructor(defaultConstructor);
         }
 
-        processBeanProperties(writer, beanProperties, includes, excludes, ignored, indexedAnnotations, metadata);
+        ClassElement classElement = writer.getClassElement();
+        if (classElement.isRecord()) {
+            this.currentRecordWriter = writer;
+        } else {
+            processBeanProperties(writer, beanProperties, includes, excludes, ignored, indexedAnnotations, metadata);
+        }
+
         writers.put(writer.getBeanType().getClassName(), writer);
     }
 

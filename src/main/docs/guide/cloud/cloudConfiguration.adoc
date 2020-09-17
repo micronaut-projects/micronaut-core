@@ -84,7 +84,7 @@ TIP: Any configuration property in the api:context.env.Environment[] can also be
 
 When Micronaut detects it is running on any of the cloud platforms listed above, such as Google Compute or AWS EC2, upon startup Micronaut will populate the interface api:discovery.cloud.ComputeInstanceMetadata[].
 
-TIP: Depending on the environment you are running in the backing implementation will be either api:io.micronaut.discovery.cloud.gcp.GoogleComputeInstanceMetadata[], api:io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata[],  api:io.micronaut.discovery.cloud.digitalocean.DigitalOceanInstanceMetadata[] or api:io.micronaut.discovery.cloud.oraclecloud.OracleCloudInstanceMetadata[] with metadata found from the cloud provider metadata services.
+TIP: As of Micronaut 2.1.x this logic depends on the presence of the appropriate core Cloud module for Oracle Cloud, AWS or GCP.
 
 All of this data is merged together into the `metadata` property for the running api:discovery.ServiceInstance[].
 

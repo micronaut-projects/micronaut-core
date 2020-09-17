@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -331,7 +331,6 @@ public abstract class HttpClientConfiguration {
         return Optional.ofNullable(readTimeout);
     }
 
-
     /**
      * For streaming requests and WebSockets, the {@link #getReadTimeout()} method does not apply instead a configurable
      * idle timeout is applied.
@@ -586,8 +585,7 @@ public abstract class HttpClientConfiguration {
      * @return The client
      */
     @Internal
-    static RxHttpClient createClient(@NonNull URL url) {
-        ArgumentUtils.requireNonNull("url", url);
+    static RxHttpClient createClient(@Nullable URL url) {
         RxHttpClientFactory clientFactory = HttpClientConfiguration.clientFactory;
         if (clientFactory == null) {
             synchronized (HttpClientConfiguration.class) { // double check
@@ -688,7 +686,6 @@ public abstract class HttpClientConfiguration {
         public int getMaxConnections() {
             return maxConnections;
         }
-
 
         /**
          * Sets the maximum number of connections. Defaults to no maximum.

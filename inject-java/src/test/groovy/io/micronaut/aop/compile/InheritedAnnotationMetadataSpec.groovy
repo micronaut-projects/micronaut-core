@@ -133,6 +133,11 @@ abstract class BaseService {
     public void baseServiceMethod() {}
 }
 
+@SomeAnnot
+abstract class BaseAnnotatedService {
+
+}
+
 @Singleton
 class Service extends BaseService implements ContractService {
 
@@ -144,7 +149,7 @@ class Service extends BaseService implements ContractService {
 
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.METHOD, ElementType.PARAMETER})
+@Target({ElementType.TYPE, ElementType.METHOD, ElementType.PARAMETER})
 @Around
 @Type(SomeInterceptor.class)
 @interface SomeAnnot {}
@@ -164,7 +169,19 @@ class SomeInterceptor implements MethodInterceptor<Object, Object>, Ordered {
         ctx.getBean(clazz)
 
         when:
+        ctx.classLoader.loadClass("test.\$BaseServiceDefinition")
+
+        then:
+        thrown(ClassNotFoundException)
+
+        when:
         ctx.classLoader.loadClass("test.\$BaseServiceDefinition\$Intercepted")
+
+        then:
+        thrown(ClassNotFoundException)
+
+        when:
+        ctx.classLoader.loadClass("test.\$BaseAnnotatedServiceDefinition")
 
         then:
         thrown(ClassNotFoundException)

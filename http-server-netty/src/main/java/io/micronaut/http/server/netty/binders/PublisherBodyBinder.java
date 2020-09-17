@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -61,6 +61,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
     }
 
     @Override
+    @Deprecated
     public boolean supportsSuperTypes() {
         return false;
     }
@@ -96,7 +97,6 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                         if (LOG.isTraceEnabled()) {
                             LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
                         }
-                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
                         if (message instanceof ByteBufHolder) {
                             message = ((ByteBufHolder) message).content();
                             if (message instanceof EmptyByteBuf) {
@@ -104,6 +104,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                             }
                         }
 
+                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
                         Optional<?> converted = conversionService.convert(message, conversionContext);
 
                         if (converted.isPresent()) {

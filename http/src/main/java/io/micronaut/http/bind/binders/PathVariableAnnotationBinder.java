@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +23,6 @@ import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpAttributes;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.uri.UriMatchInfo;
@@ -58,7 +57,6 @@ public class PathVariableAnnotationBinder<T> extends AbstractAnnotatedArgumentBi
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         ConvertibleMultiValues<String> parameters = source.getParameters();
         Argument<T> argument = context.getArgument();
-        HttpMethod httpMethod = source.getMethod();
 
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         boolean hasAnnotation = annotationMetadata.hasAnnotation(PathVariable.class);

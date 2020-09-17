@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,6 +30,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
@@ -108,9 +109,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             String name = mirror.getAnnotationType().toString();
             if (Repeatable.class.getName().equals(name)) {
                 Map<? extends ExecutableElement, ? extends javax.lang.model.element.AnnotationValue> elementValues = mirror.getElementValues();
-                for (ExecutableElement executableElement : elementValues.keySet()) {
-                    if (executableElement.getSimpleName().toString().equals("value")) {
-                        javax.lang.model.element.AnnotationValue av = elementValues.get(executableElement);
+                for (Map.Entry<? extends ExecutableElement, ? extends javax.lang.model.element.AnnotationValue> entry: elementValues.entrySet()) {
+                    if (entry.getKey().getSimpleName().toString().equals("value")) {
+                        javax.lang.model.element.AnnotationValue av = entry.getValue();
                         Object value = av.getValue();
                         if (value instanceof DeclaredType) {
                             Element element = ((DeclaredType) value).asElement();
@@ -278,15 +279,13 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             String memberName,
             Object annotationValue,
             Map<CharSequence, Object> annotationValues) {
-        if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue) {
-            if (!annotationValues.containsKey(memberName)) {
-                final MetadataAnnotationValueVisitor resolver = new MetadataAnnotationValueVisitor(originatingElement);
-                ((javax.lang.model.element.AnnotationValue) annotationValue).accept(resolver, this);
-                final Object resolvedValue = resolver.resolvedValue;
-                if (resolvedValue != null) {
-                    validateAnnotationValue(originatingElement, annotationName, member, memberName, resolvedValue);
-                    annotationValues.put(memberName, resolvedValue);
-                }
+        if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue && !annotationValues.containsKey(memberName)) {
+            final MetadataAnnotationValueVisitor resolver = new MetadataAnnotationValueVisitor(originatingElement);
+            ((javax.lang.model.element.AnnotationValue) annotationValue).accept(resolver, this);
+            final Object resolvedValue = resolver.resolvedValue;
+            if (resolvedValue != null) {
+                validateAnnotationValue(originatingElement, annotationName, member, memberName, resolvedValue);
+                annotationValues.put(memberName, resolvedValue);
             }
         }
     }
@@ -297,11 +296,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             final MetadataAnnotationValueVisitor visitor = new MetadataAnnotationValueVisitor(originatingElement);
             ((javax.lang.model.element.AnnotationValue) annotationValue).accept(visitor, this);
             return visitor.resolvedValue;
-        } else if (memberName != null && annotationValue != null) {
-            if (ClassUtils.isJavaLangType(annotationValue.getClass())) {
-                // only allow basic types
-                return annotationValue;
-            }
+        } else if (memberName != null && annotationValue != null && ClassUtils.isJavaLangType(annotationValue.getClass())) {
+            // only allow basic types
+            return annotationValue;
         }
         return null;
     }
@@ -611,10 +608,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             Object[] getValues() {
                 if (arrayType != null) {
                     for (Object value : values) {
-                        if (value != null) {
-                            if (!arrayType.isInstance(value)) {
-                                return ArrayUtils.EMPTY_OBJECT_ARRAY;
-                            }
+                        if (value != null && !arrayType.isInstance(value)) {
+                            return ArrayUtils.EMPTY_OBJECT_ARRAY;
                         }
                     }
                     return values.toArray((Object[]) Array.newInstance(arrayType, values.size()));
@@ -694,6 +689,15 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                     if (typeElement instanceof TypeElement) {
                         final String className = JavaModelUtils.getClassName((TypeElement) typeElement);
                         values.add(new AnnotationClassValue<>(className));
+                    }
+                } else if (t instanceof ArrayType) {
+                    TypeMirror componentType = ((ArrayType) t).getComponentType();
+                    if (componentType instanceof DeclaredType) {
+                        Element typeElement = ((DeclaredType) componentType).asElement();
+                        if (typeElement instanceof TypeElement) {
+                            final String className = JavaModelUtils.getClassArrayName((TypeElement) typeElement);
+                            values.add(new AnnotationClassValue<>(className));
+                        }
                     }
                 }
                 return null;

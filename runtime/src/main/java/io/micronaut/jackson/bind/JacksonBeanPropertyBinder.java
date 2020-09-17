@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -263,17 +263,15 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
                             }
                             current = existing;
                         }
-                    } else if (current instanceof ArrayNode) {
-                        if (StringUtils.isDigits(index)) {
-                            ArrayNode arrayNode = (ArrayNode) current;
-                            int arrayIndex = Integer.parseInt(index);
-                            expandArrayToThreshold(arrayIndex, arrayNode);
-                            JsonNode jsonNode = getOrCreateNodeAtIndex(nodeFactory, arrayNode, arrayIndex);
+                    } else if (current instanceof ArrayNode && StringUtils.isDigits(index)) {
+                        ArrayNode arrayNode = (ArrayNode) current;
+                        int arrayIndex = Integer.parseInt(index);
+                        expandArrayToThreshold(arrayIndex, arrayNode);
+                        JsonNode jsonNode = getOrCreateNodeAtIndex(nodeFactory, arrayNode, arrayIndex);
 
-                            current = new ObjectNode(nodeFactory);
-                            ((ObjectNode) jsonNode).set(token, current);
-                            index = null;
-                        }
+                        current = new ObjectNode(nodeFactory);
+                        ((ObjectNode) jsonNode).set(token, current);
+                        index = null;
                     }
                 }
             }
@@ -283,7 +281,7 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
 
     private JsonNode getOrCreateNodeAtIndex(JsonNodeFactory nodeFactory, ArrayNode arrayNode, int arrayIndex) {
         JsonNode jsonNode = arrayNode.get(arrayIndex);
-        if (jsonNode == null || !(jsonNode instanceof ObjectNode)) {
+        if (!(jsonNode instanceof ObjectNode)) {
             jsonNode = new ObjectNode(nodeFactory);
             arrayNode.set(arrayIndex, jsonNode);
         }

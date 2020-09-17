@@ -44,3 +44,27 @@ For arrays this needs to use the Java JVM internal array representation. For exa
     ...
 ]
 ----
+
+==== What if I want to set the heap's maximum size with `-Xmx`, but I get an `OutOfMemoryError`?
+
+If you set heap's maximum size in the Dockerfile that you use to build your native image, you will probably get runtime an error like this:
+
+----
+java.lang.OutOfMemoryError: Direct buffer memory
+----
+
+The problem is that Netty is trying to allocate 16MiB of memory per chunk with its default settings for `io.netty.allocator.pageSize` and `io.netty.allocator.maxOrder`:
+
+[source, java]
+----
+int defaultChunkSize = DEFAULT_PAGE_SIZE << DEFAULT_MAX_ORDER; // 8192 << 11 = 16MiB 
+----
+
+The simplest solution is to specify `io.netty.allocator.maxOrder` explicitly in your Dockerfile's entrypoint. A working example with `-Xmx64m`:
+
+[source, dockerfile]
+----
+ENTRYPOINT ["/app/application", "-Xmx64m", "-Dio.netty.allocator.maxOrder=8"]
+----
+
+If you want to go further, you can also experiment with `io.netty.allocator.numHeapArenas` or `io.netty.allocator.numDirectArenas`. You can find more information about Netty's `PooledByteBufAllocator` in the https://netty.io/4.1/api/io/netty/buffer/PooledByteBufAllocator.html[official documentation].

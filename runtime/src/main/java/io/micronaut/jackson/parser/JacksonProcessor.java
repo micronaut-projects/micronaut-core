@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,13 +23,17 @@ import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
+
+import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.IOException;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
@@ -48,6 +52,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
     private final JsonFactory jsonFactory;
     private final @Nullable DeserializationConfig deserializationConfig;
+    private final JsonNodeFactory nodeFactory;
     private String currentFieldName;
     private boolean streamArray;
     private boolean rootIsArray;
@@ -61,12 +66,13 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
      * @param deserializationConfig The jackson deserialization configuration
      */
     public JacksonProcessor(JsonFactory jsonFactory, boolean streamArray, @Nullable DeserializationConfig deserializationConfig) {
+        this.jsonFactory = jsonFactory;
+        this.deserializationConfig = deserializationConfig;
+        this.streamArray = streamArray;
+        this.jsonStream = true;
+        this.nodeFactory = deserializationConfig == null ? JsonNodeFactory.instance : deserializationConfig.getNodeFactory();
         try {
-            this.jsonFactory = jsonFactory;
-            this.deserializationConfig = deserializationConfig;
             this.currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
-            this.streamArray = streamArray;
-            this.jsonStream = true;
         } catch (IOException e) {
             throw new IllegalStateException("Failed to create non-blocking JSON parser: " + e.getMessage(), e);
         }
@@ -127,7 +133,9 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
 
     @Override
     protected void doOnComplete() {
-        if (needMoreInput()) {
+        if (jsonStream && nodeStack.isEmpty()) {
+            super.doOnComplete();
+        } else if (needMoreInput()) {
             doOnError(new JsonEOFException(currentNonBlockingJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input"));
         } else {
             super.doOnComplete();
@@ -136,77 +144,90 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
 
     @Override
     protected void onUpstreamMessage(byte[] message) {
-        try {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Received upstream bytes of length: " + message.length);
-            }
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Received upstream bytes of length: " + message.length);
+        }
 
+        try {
             if (message.length == 0) {
                 if (needMoreInput()) {
-                    if (LOG.isTraceEnabled()) {
-                        LOG.trace("More input required to parse JSON. Demanding more.");
-                    }
-                    upstreamSubscription.request(1);
-                    upstreamDemand++;
+                    requestMoreInput();
                 }
                 return;
             }
 
-            ByteArrayFeeder byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
-            boolean needMoreInput = byteFeeder.needMoreInput();
-            if (!needMoreInput) {
-                currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
-                byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
-            }
-
-            byteFeeder.feedInput(message, 0, message.length);
+            final ByteArrayFeeder byteFeeder = byteFeeder(message);
 
             JsonToken event = currentNonBlockingJsonParser.nextToken();
-            if (event == JsonToken.START_ARRAY && nodeStack.peekFirst() == null) {
-                rootIsArray = true;
-                jsonStream = false;
-            }
+            checkForStreaming(event);
 
             while (event != JsonToken.NOT_AVAILABLE) {
-                JsonNode root = asJsonNode(event);
+                final JsonNode root = asJsonNode(event);
                 if (root != null) {
 
-                    boolean isLast = nodeStack.isEmpty() && !jsonStream;
+                    final boolean isLast = nodeStack.isEmpty() && !jsonStream;
                     if (isLast) {
                         byteFeeder.endOfInput();
+                        if (streamArray && root.isArray()) {
+                            break;
+                        }
                     }
 
-                    if (isLast && streamArray && root instanceof ArrayNode) {
-                        break;
-                    } else {
-                        currentDownstreamSubscriber()
-                                .ifPresent(subscriber -> {
-                                        if (LOG.isTraceEnabled()) {
-                                            LOG.trace("Materialized new JsonNode call onNext...");
-                                        }
-                                        subscriber.onNext(root);
-                                    }
-                                );
-                    }
+                    publishNode(root);
                     if (isLast) {
                         break;
                     }
                 }
                 event = currentNonBlockingJsonParser.nextToken();
             }
-            if (jsonStream && nodeStack.isEmpty()) {
-                byteFeeder.endOfInput();
-            }
-            if (jsonStream || needMoreInput()) {
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("More input required to parse JSON. Demanding more.");
+            if (jsonStream) {
+                if (nodeStack.isEmpty()) {
+                    byteFeeder.endOfInput();
                 }
-                upstreamSubscription.request(1);
-                upstreamDemand++;
+                requestMoreInput();
+            } else if (needMoreInput()) {
+                requestMoreInput();
             }
         } catch (IOException e) {
             onError(e);
         }
+    }
+
+    private void checkForStreaming(JsonToken event) {
+        if (event == JsonToken.START_ARRAY && nodeStack.peekFirst() == null) {
+            rootIsArray = true;
+            jsonStream = false;
+        }
+    }
+
+    private void publishNode(final JsonNode root) {
+        final Optional<Subscriber<? super JsonNode>> opt = currentDownstreamSubscriber();
+        if (opt.isPresent()) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Materialized new JsonNode call onNext...");
+            }
+            opt.get().onNext(root);
+        }
+    }
+
+    private void requestMoreInput() {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("More input required to parse JSON. Demanding more.");
+        }
+        upstreamSubscription.request(1);
+        upstreamDemand++;
+    }
+
+    private ByteArrayFeeder byteFeeder(byte[] message) throws IOException {
+        ByteArrayFeeder byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
+        final boolean needMoreInput = byteFeeder.needMoreInput();
+        if (!needMoreInput) {
+            currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
+            byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
+        }
+
+        byteFeeder.feedInput(message, 0, message.length);
+        return byteFeeder;
     }
 
     /**
@@ -219,7 +240,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 break;
 
             case START_ARRAY:
-                JsonNode node = nodeStack.peekFirst();
+                final JsonNode node = nodeStack.peekFirst();
                 if (node == null) {
                     rootIsArray = true;
                 }
@@ -228,168 +249,54 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
 
             case END_OBJECT:
             case END_ARRAY:
-                if (nodeStack.isEmpty()) {
-                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected array end literal");
-                }
-                JsonNode current = nodeStack.pop();
+                checkEmptyNodeStack(event);
+                final JsonNode current = nodeStack.pop();
                 if (nodeStack.isEmpty()) {
                     return current;
-                } else {
-                    if (streamArray && nodeStack.size() == 1) {
-                        JsonNode jsonNode = nodeStack.peekFirst();
-                        if (jsonNode instanceof ArrayNode) {
-                            return current;
-                        } else {
-                            return null;
-                        }
-                    } else {
-                        return null;
-                    }
                 }
+                if (streamArray && nodeStack.size() == 1) {
+                    return nodeStack.peekFirst().isArray() ? current : null;
+                }
+                return null;
 
             case FIELD_NAME:
-                if (nodeStack.isEmpty()) {
-                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected field literal");
-                }
+                checkEmptyNodeStack(event);
                 currentFieldName = currentNonBlockingJsonParser.getCurrentName();
                 break;
 
             case VALUE_NUMBER_INT:
-                if (nodeStack.isEmpty()) {
-                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected integer literal");
-                }
-                final JsonParser.NumberType numberIntType = currentNonBlockingJsonParser.getNumberType();
-                JsonNode integerNode = nodeStack.peekFirst();
-                switch (numberIntType) {
-                    case BIG_INTEGER:
-                        if (integerNode instanceof ObjectNode) {
-                            ((ObjectNode) integerNode).put(currentFieldName, currentNonBlockingJsonParser.getBigIntegerValue());
-                        } else {
-                            ((ArrayNode) integerNode).add(currentNonBlockingJsonParser.getBigIntegerValue());
-                        }
-                        break;
-                    case LONG:
-                        if (deserializationConfig != null && deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)) {
-                            if (integerNode instanceof ObjectNode) {
-                                ((ObjectNode) integerNode).put(currentFieldName, currentNonBlockingJsonParser.getBigIntegerValue());
-                            } else {
-                                ((ArrayNode) integerNode).add(currentNonBlockingJsonParser.getBigIntegerValue());
-                            }
-                        } else if (integerNode instanceof ObjectNode) {
-                            ((ObjectNode) integerNode).put(currentFieldName, currentNonBlockingJsonParser.getLongValue());
-                        } else {
-                            ((ArrayNode) integerNode).add(currentNonBlockingJsonParser.getLongValue());
-                        }
-                        break;
-                    case INT:
-                        if (deserializationConfig != null && deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)) {
-                            if (integerNode instanceof ObjectNode) {
-                                ((ObjectNode) integerNode).put(currentFieldName, currentNonBlockingJsonParser.getBigIntegerValue());
-                            } else {
-                                ((ArrayNode) integerNode).add(currentNonBlockingJsonParser.getBigIntegerValue());
-                            }
-                        } else if (integerNode instanceof ObjectNode) {
-                            ((ObjectNode) integerNode).put(currentFieldName, currentNonBlockingJsonParser.getIntValue());
-                        } else {
-                            ((ArrayNode) integerNode).add(currentNonBlockingJsonParser.getIntValue());
-                        }
-                        break;
-                    default:
-                        throw new IllegalStateException("Unsupported number type: " + numberIntType);
-                }
+                checkEmptyNodeStack(event);
+                addIntegerNumber(nodeStack.peekFirst());
                 break;
 
             case VALUE_STRING:
-                if (nodeStack.isEmpty()) {
-                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected string literal");
-                }
-                JsonNode stringNode = nodeStack.peekFirst();
-                if (stringNode instanceof ObjectNode) {
-                    ((ObjectNode) stringNode).put(currentFieldName, currentNonBlockingJsonParser.getValueAsString());
-                } else {
-                    ((ArrayNode) stringNode).add(currentNonBlockingJsonParser.getValueAsString());
-                }
+                checkEmptyNodeStack(event);
+                addJsonNode(nodeStack.peekFirst(), nodeFactory.textNode(currentNonBlockingJsonParser.getValueAsString()));
                 break;
 
             case VALUE_NUMBER_FLOAT:
-                if (nodeStack.isEmpty()) {
-                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected float literal");
-                }
-
-                final JsonParser.NumberType numberDecimalType = currentNonBlockingJsonParser.getNumberType();
-                JsonNode decimalNode = nodeStack.peekFirst();
-                switch (numberDecimalType) {
-                    case FLOAT:
-                        if (deserializationConfig != null && deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
-                            if (decimalNode instanceof ObjectNode) {
-                                ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDecimalValue());
-                            } else {
-                                ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDecimalValue());
-                            }
-                        } else if (decimalNode instanceof ObjectNode) {
-                            ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getFloatValue());
-                        } else {
-                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getFloatValue());
-                        }
-                        break;
-                    case DOUBLE:
-                        if (deserializationConfig != null && deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
-                            if (decimalNode instanceof ObjectNode) {
-                                ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDecimalValue());
-                            } else {
-                                ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDecimalValue());
-                            }
-                        } else if (decimalNode instanceof ObjectNode) {
-                            ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDoubleValue());
-                        } else {
-                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDoubleValue());
-                        }
-                        break;
-                    case BIG_DECIMAL:
-                        if (decimalNode instanceof ObjectNode) {
-                            ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDecimalValue());
-                        } else {
-                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDecimalValue());
-                        }
-                        break;
-                    default:
-                        // shouldn't get here
-                        throw new IllegalStateException("Unsupported number type: " + numberDecimalType);
-                }
+                checkEmptyNodeStack(event);
+                addFloatNumber(nodeStack.peekFirst());
                 break;
 
             case VALUE_NULL:
-                if (nodeStack.isEmpty()) {
-                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected null literal");
-                }
-                JsonNode nullNode = nodeStack.peekFirst();
-                if (nullNode instanceof ObjectNode) {
-                    ((ObjectNode) nullNode).putNull(currentFieldName);
-                } else {
-                    ((ArrayNode) nullNode).addNull();
-                }
+                checkEmptyNodeStack(event);
+                addJsonNode(nodeStack.peekFirst(), nodeFactory.nullNode());
                 break;
 
             case VALUE_TRUE:
             case VALUE_FALSE:
-                if (nodeStack.isEmpty()) {
-                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected boolean literal");
-                }
-                JsonNode booleanNode = nodeStack.peekFirst();
-                if (booleanNode instanceof ObjectNode) {
-                    ((ObjectNode) booleanNode).put(currentFieldName, currentNonBlockingJsonParser.getBooleanValue());
-                } else {
-                    ((ArrayNode) booleanNode).add(currentNonBlockingJsonParser.getBooleanValue());
-                }
+                checkEmptyNodeStack(event);
+                addJsonNode(nodeStack.peekFirst(), nodeFactory.booleanNode(currentNonBlockingJsonParser.getBooleanValue()));
                 break;
 
             default:
                 throw new IllegalStateException("Unsupported JSON event: " + event);
         }
 
-        //its an array and the stack size is 1 which means the value is scalar
+        // it is an array and the stack size is 1 which means the value is scalar
         if (rootIsArray && streamArray && nodeStack.size() == 1) {
-            ArrayNode arrayNode = (ArrayNode) nodeStack.peekFirst();
+            final ArrayNode arrayNode = (ArrayNode) nodeStack.peekFirst();
             if (arrayNode.size() > 0) {
                 return arrayNode.remove(arrayNode.size() - 1);
             }
@@ -398,23 +305,114 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
         return null;
     }
 
-    private JsonNode array(JsonNode node) {
-        if (node instanceof ObjectNode) {
-            return ((ObjectNode) node).putArray(currentFieldName);
-        } else if (node instanceof ArrayNode) {
-            return ((ArrayNode) node).addArray();
-        } else {
-            return deserializationConfig.getNodeFactory().arrayNode();
+    private static String tokenType(JsonToken token) {
+        switch (token) {
+        case END_OBJECT:
+        case END_ARRAY:
+            return "container end";
+        case FIELD_NAME:
+            return "field";
+        case VALUE_NUMBER_INT:
+            return "integer";
+        case VALUE_STRING:
+            return "string";
+        case VALUE_NUMBER_FLOAT:
+            return "float";
+        case VALUE_NULL:
+            return "null";
+        case VALUE_TRUE:
+        case VALUE_FALSE:
+            return "boolean";
+        default:
+            return "";
         }
     }
 
-    private JsonNode node(JsonNode node) {
-        if (node instanceof ObjectNode) {
-            return ((ObjectNode) node).putObject(currentFieldName);
-        } else if (node instanceof ArrayNode && !(streamArray && nodeStack.size() == 1)) {
-            return ((ArrayNode) node).addObject();
+    private void addIntegerNumber(final JsonNode integerNode) throws IOException {
+        if (useBigIntegerForInts()) {
+            addJsonNode(integerNode, nodeFactory.numberNode(currentNonBlockingJsonParser.getBigIntegerValue()));
         } else {
-            return deserializationConfig.getNodeFactory().objectNode();
+            final JsonParser.NumberType numberIntType = currentNonBlockingJsonParser.getNumberType();
+            switch (numberIntType) {
+            case BIG_INTEGER:
+                addJsonNode(integerNode, nodeFactory.numberNode(currentNonBlockingJsonParser.getBigIntegerValue()));
+                break;
+            case LONG:
+                addJsonNode(integerNode, nodeFactory.numberNode(currentNonBlockingJsonParser.getLongValue()));
+                break;
+            case INT:
+                addJsonNode(integerNode, nodeFactory.numberNode(currentNonBlockingJsonParser.getIntValue()));
+                break;
+            default:
+                throw new IllegalStateException("Unsupported number type: " + numberIntType);
+            }
         }
+    }
+
+    private void addFloatNumber(final JsonNode decimalNode) throws IOException {
+        if (useBigDecimalForFloats()) {
+            addJsonNode(decimalNode, nodeFactory.numberNode(currentNonBlockingJsonParser.getDecimalValue()));
+        } else {
+            final JsonParser.NumberType numberDecimalType = currentNonBlockingJsonParser.getNumberType();
+            switch (numberDecimalType) {
+            case FLOAT:
+                addJsonNode(decimalNode, nodeFactory.numberNode(currentNonBlockingJsonParser.getFloatValue()));
+                break;
+            case DOUBLE:
+                addJsonNode(decimalNode, nodeFactory.numberNode(currentNonBlockingJsonParser.getDoubleValue()));
+                break;
+            case BIG_DECIMAL:
+                addJsonNode(decimalNode, nodeFactory.numberNode(currentNonBlockingJsonParser.getDecimalValue()));
+                break;
+            default:
+                // shouldn't get here
+                throw new IllegalStateException("Unsupported number type: " + numberDecimalType);
+            }
+        }
+    }
+
+    private void checkEmptyNodeStack(JsonToken token) throws JsonParseException {
+        if (nodeStack.isEmpty()) {
+            throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected " + tokenType(token) + " literal");
+        }
+    }
+
+    private boolean useBigDecimalForFloats() {
+        return deserializationConfig != null && deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+    }
+
+    private boolean useBigIntegerForInts() {
+        return deserializationConfig != null && deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS);
+    }
+
+    private void addJsonNode(JsonNode node, JsonNode value) {
+        if (node.isObject()) {
+            ((ObjectNode) node).set(currentFieldName, value);
+        } else {
+            ((ArrayNode) node).add(value);
+        }
+    }
+
+    private JsonNode array(JsonNode node) {
+        if (node == null) {
+            return nodeFactory.arrayNode();
+        }
+        if (node.isObject()) {
+            return ((ObjectNode) node).putArray(currentFieldName);
+        }
+        return ((ArrayNode) node).addArray();
+    }
+
+    private JsonNode node(JsonNode node) {
+        if (node == null) {
+            return nodeFactory.objectNode();
+        }
+        if (node.isObject()) {
+            return ((ObjectNode) node).putObject(currentFieldName);
+        }
+        if (node.isArray() && !(streamArray && nodeStack.size() == 1)) {
+            return ((ArrayNode) node).addObject();
+        }
+        return nodeFactory.objectNode();
     }
 }

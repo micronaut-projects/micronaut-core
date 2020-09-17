@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,7 +41,7 @@ import static io.micronaut.tracing.interceptor.TraceInterceptor.logError;
  * @since 1.0
  */
 @SuppressWarnings("PublisherImplementation")
-public class TracingPublisher<T> implements Publisher<T> {
+public class TracingPublisher<T> implements Publishers.MicronautPublisher<T> {
 
     private final Publisher<T> publisher;
     private final Tracer tracer;
@@ -82,7 +82,6 @@ public class TracingPublisher<T> implements Publisher<T> {
         this(publisher, tracer, spanBuilder, Publishers.isSingle(publisher.getClass()));
     }
 
-
     /**
      * Creates a new tracing publisher for the given arguments.
      *
@@ -111,7 +110,7 @@ public class TracingPublisher<T> implements Publisher<T> {
             finishOnClose = true;
         } else {
             span = parentSpan;
-            finishOnClose = false;
+            finishOnClose = isContinued();
         }
         if (span != null) {
             final ScopeManager scopeManager = tracer.scopeManager();
@@ -170,7 +169,7 @@ public class TracingPublisher<T> implements Publisher<T> {
                             actual.onError(t);
                             finished = true;
                         } finally {
-                            if (finishOnClose) {
+                            if (finishOnClose && isFinishOnError()) {
                                 span.finish();
                             }
                         }
@@ -192,6 +191,27 @@ public class TracingPublisher<T> implements Publisher<T> {
         } else {
             publisher.subscribe(actual);
         }
+    }
+
+    /**
+     * Designed for subclasses to override if the current active span is to be continued by this publisher. False by default.
+     * This only has effects if no spanBuilder was defined.
+     *
+     * @return true, if the current span should be continued by this publisher
+     * @since 2.0.3
+     */
+    protected boolean isContinued() {
+        return false;
+    }
+
+    /**
+     * Designed for subclasses to override if the span needs to be finished upon error. True by default.
+     *
+     * @return true, if the active span needs to be finished on error
+     * @since 2.0.3
+     */
+    protected boolean isFinishOnError() {
+        return true;
     }
 
     /**

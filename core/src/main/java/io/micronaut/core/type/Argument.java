@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -122,6 +122,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     /**
      * @return The name of the argument
      */
+    @Override
     @NonNull String getName();
 
     @Override
@@ -488,6 +489,20 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     }
 
     /**
+     * Creates a new argument representing a generic list.
+     *
+     * @param type list element type
+     * @param <T>  list element type
+     * @since 2.0.1
+     * @return The argument instance
+     */
+    @NonNull
+    static <T> Argument<List<T>> listOf(Argument<T> type) {
+        //noinspection unchecked
+        return of((Class<List<T>>) ((Class) List.class), type);
+    }
+
+    /**
      * Creates a new argument representing a generic set.
      *
      * @param type set element type
@@ -496,6 +511,20 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      */
     @NonNull
     static <T> Argument<Set<T>> setOf(Class<T> type) {
+        //noinspection unchecked
+        return of((Class<Set<T>>) ((Class) Set.class), type);
+    }
+
+    /**
+     * Creates a new argument representing a generic set.
+     *
+     * @param type set element type
+     * @param <T>  set element type
+     * @since 2.0.1
+     * @return The argument instance
+     */
+    @NonNull
+    static <T> Argument<Set<T>> setOf(Argument<T> type) {
         //noinspection unchecked
         return of((Class<Set<T>>) ((Class) Set.class), type);
     }
@@ -511,6 +540,22 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      */
     @NonNull
     static <K, V> Argument<Map<K, V>> mapOf(Class<K> keyType, Class<V> valueType) {
+        //noinspection unchecked
+        return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
+    }
+
+    /**
+     * Creates a new argument representing a generic map.
+     *
+     * @param keyType The key type
+     * @param valueType The value type
+     * @param <K>  The map key type
+     * @param <V> The map value type
+     * @since 2.0.1
+     * @return The argument instance
+     */
+    @NonNull
+    static <K, V> Argument<Map<K, V>> mapOf(Argument<K> keyType, Argument<V> valueType) {
         //noinspection unchecked
         return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
     }

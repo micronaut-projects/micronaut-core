@@ -363,6 +363,7 @@ class MixedUploadSpec extends AbstractMicronautSpec {
         response.body() == val
     }
 
+    @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.http.client.read-timeout': 300,
                                      'micronaut.server.multipart.mixed': true,

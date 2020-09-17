@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,7 +30,6 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.lang.model.element.*;
 import javax.lang.model.element.Element;
 import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.Elements;
@@ -49,7 +48,8 @@ import java.util.stream.Collectors;
 @Internal
 public class JavaClassElement extends AbstractJavaElement implements ClassElement {
 
-    private final TypeElement classElement;
+    protected final TypeElement classElement;
+    protected int arrayDimensions;
     private final JavaVisitorContext visitorContext;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
 
@@ -60,9 +60,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
      */
     @Internal
     public JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(classElement, annotationMetadata, visitorContext);
-        this.classElement = classElement;
-        this.visitorContext = visitorContext;
+        this(classElement, annotationMetadata, visitorContext, null, 0);
     }
 
     /**
@@ -76,10 +74,32 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
             AnnotationMetadata annotationMetadata,
             JavaVisitorContext visitorContext,
             Map<String, Map<String, TypeMirror>> genericsInfo) {
+        this(classElement, annotationMetadata, visitorContext, genericsInfo, 0);
+    }
+
+    /**
+     * @param classElement       The {@link TypeElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
+     * @param genericsInfo       The generic type info
+     * @param arrayDimensions    The number of array dimensions
+     */
+    JavaClassElement(
+            TypeElement classElement,
+            AnnotationMetadata annotationMetadata,
+            JavaVisitorContext visitorContext,
+            Map<String, Map<String, TypeMirror>> genericsInfo,
+            int arrayDimensions) {
         super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
         this.genericTypeInfo = genericsInfo;
+        this.arrayDimensions = arrayDimensions;
+    }
+
+    @Override
+    public boolean isRecord() {
+        return JavaModelUtils.isRecord(classElement);
     }
 
     @NonNull
@@ -119,6 +139,14 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
             if (element instanceof TypeElement) {
                 TypeElement superElement = (TypeElement) element;
                 if (!Object.class.getName().equals(superElement.getQualifiedName().toString())) {
+                    // if super type has type arguments, then build a parameterized ClassElement
+                    if (superclass instanceof DeclaredType && !((DeclaredType) superclass).getTypeArguments().isEmpty()) {
+                        return Optional.of(
+                                parameterizedClassElement(
+                                    superclass,
+                                    visitorContext,
+                                    visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement)));
+                    }
                     return Optional.of(
                             new JavaClassElement(
                                     superElement,
@@ -163,7 +191,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                             return false;
                         }
 
-                        if (NameUtils.isGetterName(methodName) && executableElement.getParameters().size() == 0) {
+                        if (NameUtils.isGetterName(methodName) && executableElement.getParameters().isEmpty()) {
                             return true;
                         } else {
                             return NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1;
@@ -186,7 +214,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                 String methodName = executableElement.getSimpleName().toString();
                 final TypeElement declaringTypeElement = (TypeElement) executableElement.getEnclosingElement();
 
-                if (NameUtils.isGetterName(methodName) && executableElement.getParameters().size() == 0) {
+                if (NameUtils.isGetterName(methodName) && executableElement.getParameters().isEmpty()) {
                     String propertyName = NameUtils.getPropertyNameForGetter(methodName);
                     TypeMirror returnType = executableElement.getReturnType();
                     ClassElement getterReturnType;
@@ -203,18 +231,15 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                         getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo);
                     }
 
-                    if (getterReturnType != null) {
-
-                        BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                        configureDeclaringType(declaringTypeElement, beanPropertyData);
-                        beanPropertyData.type = getterReturnType;
-                        beanPropertyData.getter = executableElement;
-                        if (beanPropertyData.setter != null) {
-                            TypeMirror typeMirror = beanPropertyData.setter.getParameters().get(0).asType();
-                            ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
-                            if (setterParameterType == null || !setterParameterType.getName().equals(getterReturnType.getName())) {
-                                beanPropertyData.setter = null; // not a compatible setter
-                            }
+                    BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+                    configureDeclaringType(declaringTypeElement, beanPropertyData);
+                    beanPropertyData.type = getterReturnType;
+                    beanPropertyData.getter = executableElement;
+                    if (beanPropertyData.setter != null) {
+                        TypeMirror typeMirror = beanPropertyData.setter.getParameters().get(0).asType();
+                        ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
+                        if (!setterParameterType.getName().equals(getterReturnType.getName())) {
+                            beanPropertyData.setter = null; // not a compatible setter
                         }
                     }
                 } else if (NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1) {
@@ -222,18 +247,15 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                     TypeMirror typeMirror = executableElement.getParameters().get(0).asType();
                     ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
 
-                    if (setterParameterType != null) {
-
-                        BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                        configureDeclaringType(declaringTypeElement, beanPropertyData);
-                        ClassElement propertyType = beanPropertyData.type;
-                        if (propertyType != null) {
-                            if (propertyType.getName().equals(setterParameterType.getName())) {
-                                beanPropertyData.setter = executableElement;
-                            }
-                        } else {
+                    BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+                    configureDeclaringType(declaringTypeElement, beanPropertyData);
+                    ClassElement propertyType = beanPropertyData.type;
+                    if (propertyType != null) {
+                        if (propertyType.getName().equals(setterParameterType.getName())) {
                             beanPropertyData.setter = executableElement;
                         }
+                    } else {
+                        beanPropertyData.setter = executableElement;
                     }
                 }
             }
@@ -337,7 +359,17 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
     @Override
     public boolean isArray() {
-        return classElement.asType().getKind() == TypeKind.ARRAY;
+        return arrayDimensions > 0;
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return arrayDimensions;
+    }
+
+    @Override
+    public ClassElement toArray() {
+        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions + 1);
     }
 
     @Override
@@ -355,11 +387,6 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
             return types.isAssignable(thisType, thatType);
         }
         return false;
-    }
-
-    @Override
-    public AnnotationMetadata getAnnotationMetadata() {
-        return super.getAnnotationMetadata();
     }
 
     @NonNull
@@ -407,9 +434,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         while (tpi.hasNext()) {
             TypeParameterElement tpe = tpi.next();
             ClassElement classElement = mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo);
-            if (classElement != null) {
-                map.put(tpe.toString(), classElement);
-            }
+            map.put(tpe.toString(), classElement);
         }
 
         return Collections.unmodifiableMap(map);

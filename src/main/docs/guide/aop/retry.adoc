@@ -4,13 +4,13 @@ With this in mind Micronaut comes with a api:retry.annotation.Retryable[] annota
 
 == Simple Retry
 
-The simplest form of retry is just to add the `@Retryable` annotation to any type or method. The default behaviour of `@Retryable` is to retry 3 times with a delay of 1 second between each retry.
+The simplest form of retry is just to add the `@Retryable` annotation to any type or method. The default behaviour of `@Retryable` is to retry 3 times with an exponential delay of 1 second between each retry. (first attempt with 1s delay, second attempt with 2s delay, third attempt with 3s delay)
 
 For example:
 
 snippet::io.micronaut.docs.aop.retry.BookService[tags="simple", indent=0, title="Simple Retry Example"]
 
-With the above example if the `listBooks()` method throws an exception it will be retried until the maximum number of attempts is reached.
+With the above example if the `listBooks()` method throws a RuntimeException it will be retried until the maximum number of attempts is reached.
 
 The `multiplier` value of the `@Retryable` annotation can be used to configure a multiplier used to calculate the delay between retries, thus allowing exponential retry support.
 

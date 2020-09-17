@@ -14,6 +14,7 @@ class BeanDefinitionDelegateSpec extends Specification {
 
     void "test type arguments are retrieved"() {
         BeanDefinition beanDefinition = new AbstractBeanDefinition(String.class, AnnotationMetadata.EMPTY_METADATA, false) {
+            @Override
             protected Map<String, Argument<?>[]> getTypeArgumentsMap() {
                 [foo: [Argument.of(String)] as Argument<?>[]]
             }

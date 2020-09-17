@@ -25,4 +25,4 @@ package my.package
 
 In the above example, all bean definitions within the annotated package will only be loaded and made available if a `javax.sql.DataSource` bean is present. This allows you to implement conditional auto-configuration of bean definitions.
 
-INFO: Java and Kotlin also support this functionality via `package-info.java`. Kotlin does not support a `package-info.kt` as of version 1.3.
+NOTE: Java and Kotlin also support this functionality via `package-info.java`. Kotlin does not support a `package-info.kt` as of version 1.3.

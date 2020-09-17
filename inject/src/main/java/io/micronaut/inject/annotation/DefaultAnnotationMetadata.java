@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,6 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -51,12 +50,12 @@ import java.util.function.Function;
 public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implements AnnotationMetadata, Cloneable, EnvironmentAnnotationMetadata {
 
     static {
-        ConversionService.SHARED.addConverter(io.micronaut.core.annotation.AnnotationValue.class, Annotation.class, (TypeConverter<io.micronaut.core.annotation.AnnotationValue, Annotation>) (object, targetType, context) -> {
+        ConversionService.SHARED.addConverter(io.micronaut.core.annotation.AnnotationValue.class, Annotation.class, (object, targetType, context) -> {
             Optional<Class> annotationClass = ClassUtils.forName(object.getAnnotationName(), targetType.getClassLoader());
             return annotationClass.map(aClass -> AnnotationMetadataSupport.buildAnnotation(aClass, object));
         });
 
-        ConversionService.SHARED.addConverter(io.micronaut.core.annotation.AnnotationValue[].class, Object[].class, (TypeConverter<io.micronaut.core.annotation.AnnotationValue[], Object[]>) (object, targetType, context) -> {
+        ConversionService.SHARED.addConverter(io.micronaut.core.annotation.AnnotationValue[].class, Object[].class, (object, targetType, context) -> {
             List result = new ArrayList();
             Class annotationClass = null;
             for (io.micronaut.core.annotation.AnnotationValue annotationValue : object) {
@@ -342,8 +341,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (repeatable != null) {
             Object v = getRawSingleValue(repeatable.value().getName(), member, valueMapper);
             if (v instanceof AnnotationValue) {
-                Optional o = ((AnnotationValue<?>) v).classValue(member, valueMapper);
-                return o;
+                return (Optional) ((AnnotationValue<?>) v).classValue(member, valueMapper);
             }
             return Optional.empty();
         } else {
@@ -378,8 +376,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         } else if (rawValue instanceof Class) {
             return Optional.of((Class) rawValue);
         } else if (rawValue != null) {
-            Optional converted = ConversionService.SHARED.convert(rawValue, Class.class);
-            return converted;
+            return ConversionService.SHARED.convert(rawValue, Class.class);
         }
         return Optional.empty();
     }
@@ -875,10 +872,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
         }
 
-        if (!resolved.isPresent()) {
-            if (hasStereotype(annotation)) {
-                return getDefaultValue(annotation, member, requiredType);
-            }
+        if (!resolved.isPresent() && hasStereotype(annotation)) {
+            return getDefaultValue(annotation, member, requiredType);
         }
 
         return resolved;
@@ -1307,7 +1302,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public static void registerAnnotationType(AnnotationClassValue<?> annotation) {
         AnnotationMetadataSupport.registerAnnotationType(annotation);
     }
-
 
     /**
      * Adds a repeatable annotation value. If a value already exists will be added

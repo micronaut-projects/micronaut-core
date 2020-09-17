@@ -138,19 +138,22 @@ class HttpTracingSpec extends Specification {
 
         then:
         response
-        reporter.spans.size() == 3
+        reporter.spans.size() == 4
         reporter.spans[0].tags().get("foo") == 'bar'
         reporter.spans[0].tags().get('http.path') == '/traced/hello/John'
         reporter.spans[0].name() == 'get /traced/hello/{name}'
         reporter.spans[0].kind() == zipkin2.Span.Kind.SERVER
-        reporter.spans[1].name() == 'get /traced/nested/{name}'
-        reporter.spans[1].kind() == zipkin2.Span.Kind.SERVER
-        reporter.spans[1].tags().get('http.method') == 'GET'
-        reporter.spans[1].tags().get('http.path') == '/traced/nested/John'
-        reporter.spans[2].tags().get("foo") == null
+        reporter.spans[1].tags().get('http.path') == '/traced/hello/John'
+        reporter.spans[1].name() == 'get /traced/hello/{name}'
+        reporter.spans[1].kind() == zipkin2.Span.Kind.CLIENT
+        reporter.spans[2].name() == 'get /traced/nested/{name}'
+        reporter.spans[2].kind() == zipkin2.Span.Kind.SERVER
+        reporter.spans[2].tags().get('http.method') == 'GET'
         reporter.spans[2].tags().get('http.path') == '/traced/nested/John'
-        reporter.spans[2].name() == 'get'
-        reporter.spans[2].kind() == zipkin2.Span.Kind.CLIENT
+        reporter.spans[3].tags().get("foo") == null
+        reporter.spans[3].tags().get('http.path') == '/traced/nested/John'
+        reporter.spans[3].name() == 'get'
+        reporter.spans[3].kind() == zipkin2.Span.Kind.CLIENT
 
         cleanup:
         client.close()
@@ -211,7 +214,7 @@ class HttpTracingSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        reporter.spans.size() == 5
+        reporter.spans.size() == 6
         assertSpan(reporter.spans[0],
                 "get /traced/error/{name}",
                 "bad",
@@ -223,16 +226,21 @@ class HttpTracingSpec extends Specification {
                 "/traced/error/John",
                 Span.Kind.SERVER)
         assertSpan(reporter.spans[2],
+                "get /traced/error/{name}",
+                "Internal Server Error: bad",
+                "/traced/error/John",
+                Span.Kind.CLIENT)
+        assertSpan(reporter.spans[3],
                 "get /traced/nestederror/{name}",
                 "Internal Server Error: bad",
                 "/traced/nestedError/John",
                 Span.Kind.SERVER)
-        assertSpan(reporter.spans[3],
+        assertSpan(reporter.spans[4],
                 "get /traced/nestederror/{name}",
                 "500",
                 "/traced/nestedError/John",
                 Span.Kind.SERVER)
-        assertSpan(reporter.spans[4],
+        assertSpan(reporter.spans[5],
                 "get",
                 "Internal Server Error: Internal Server Error: bad",
                 "/traced/nestedError/John",

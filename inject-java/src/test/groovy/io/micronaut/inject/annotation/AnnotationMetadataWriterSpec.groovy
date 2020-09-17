@@ -26,6 +26,7 @@ import io.micronaut.context.annotation.Type
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.annotation.TypeHint
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.retry.annotation.Recoverable
 
@@ -529,5 +530,37 @@ class Test {
         properties[4].get("name", String).get() == "prop3"
         properties[4].getValue(String).get() == "value3"
     }
+
+    void "test annotation metadata string value array types"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''
+package test;
+
+import io.micronaut.core.annotation.TypeHint;
+import java.util.UUID;
+
+@TypeHint({UUID[].class, UUID.class})
+class Test {
+
+}
+''')
+
+        expect:
+        metadata.stringValues(TypeHint).size() == 2
+        metadata.stringValues(TypeHint)[0] == '[Ljava.util.UUID;'
+        metadata.stringValues(TypeHint)[1] == 'java.util.UUID'
+
+        when:
+        def className = "test"
+        metadata = writeAndLoadMetadata(className, metadata)
+
+        then:
+        metadata.stringValues(TypeHint).size() == 2
+        metadata.stringValues(TypeHint)[0] == '[Ljava.util.UUID;'
+        metadata.stringValues(TypeHint)[1] == 'java.util.UUID'
+        metadata.classValues(TypeHint)[0] == UUID[].class
+        metadata.classValues(TypeHint)[1] == UUID.class
+    }
+
 
 }

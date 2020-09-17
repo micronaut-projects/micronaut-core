@@ -1,26 +1,14 @@
 buildscript {
     repositories {
+        maven { url "https://dl.bintray.com/micronaut/core-releases-local" }
         maven { url "https://repo.grails.org/grails/core" }
     }
     dependencies {
-        classpath "org.grails:grails-docs:$grailsVersion"
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.5'
-        classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
-        classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:6.0.0'
+        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.11"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
-        classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.2"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
-        classpath "io.micronaut.docs:micronaut-docs-asciidoc-extensions:$micronautDocsVersion"
-        classpath "io.micronaut.docs:micronaut-docs-gradle-plugins:$micronautDocsVersion", {
-            exclude module:'shadow'
-            exclude module:'plugin-shadow'
-        }
     }
-}
-
-plugins {
-    id 'com.github.hierynomus.license' version '0.15.0' apply false
-    id 'com.github.ben-manes.versions' version '0.27.0'
 }
 
 apply plugin: 'org.aim42.htmlSanityCheck'
@@ -30,17 +18,61 @@ repositories {
     //maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
 }
 
-version project.projectVersion
-
-ext {
-    distInstallDir = file("$buildDir/dist-tmp")
-    homeBinDir = file("bin")
-    homeLibDir = file("lib")
-    homeSrcDir = file("src")
-}
-
 ext {
     bomVersions = [
+            // Micronaut
+            'micronaut.views': [
+                    group: 'io.micronaut.views',
+                    name: 'micronaut-views-bom',
+                    version: micronautViewsVersion
+            ],
+            'micronaut.groovy': [
+                    group: 'io.micronaut.groovy',
+                    name: 'micronaut-groovy-bom',
+                    version: micronautGroovyVersion
+            ],
+            'micronaut.test': [
+                    group: 'io.micronaut.test',
+                    name: 'micronaut-test-bom',
+                    version: micronautTestVersion
+            ],
+            'micronaut.data': [
+                    group: 'io.micronaut.data',
+                    name: 'micronaut-data-bom',
+                    version: micronautDataVersion
+            ],
+            'micronaut.oraclecloud': [
+                    group: 'io.micronaut.oraclecloud',
+                    name: 'micronaut-oraclecloud-bom',
+                    version: micronautOracleCloudVersion
+            ],
+
+            //Third-party
+            'netty': [
+                    group: 'io.netty',
+                    name: 'netty-bom',
+                    version: nettyVersion
+            ],
+            'ktor': [
+                    group: 'io.ktor',
+                    name: 'ktor-bom',
+                    version: ktorVersion
+            ],
+            'groovy': [
+                    group: 'org.codehaus.groovy',
+                    name: 'groovy-bom',
+                    version: groovyVersion
+            ],
+            'micrometer': [
+                    name   : 'micrometer-bom',
+                    group  : 'io.micrometer',
+                    version: micrometerVersion
+            ],
+            'junit5': [
+                    group  : 'org.junit',
+                    name   : 'junit-bom',
+                    version: junit5Version
+            ],
             'jackson':[
                     group:'com.fasterxml.jackson',
                     name:'jackson-bom',
@@ -63,12 +95,6 @@ ext {
                     group  : 'org.apache.commons',
                     name   : 'commons-dbcp2'
             ],
-            groovy                     : [
-                    version: groovyVersion,
-                    group  : 'org.codehaus.groovy',
-                    name   : 'groovy',
-                    modules: ['groovy-test', 'groovy-test-junit5', 'groovy-ant', 'groovy-json', 'groovy-jmx', 'groovy-templates']
-            ],
             gorm                       : [
                     version: gormVersion,
                     group  : 'org.grails',
@@ -80,7 +106,7 @@ ext {
                             'grails-datastore-gorm-support',
                             'grails-datastore-gorm-test',
                             'grails-datastore-gorm-validation',
-                            'grails-datastore-gorm-web'
+                            'grails-datastore-web'
                     ]
             ],
             'gorm.hibernate'                       : [
@@ -92,12 +118,6 @@ ext {
                     version: jaegerVersion,
                     group  : 'io.jaegertracing',
                     name   : 'jaeger-thrift'
-            ],
-            ktor                     : [
-                    version: ktorVersion,
-                    group  : 'io.ktor',
-                    name   : 'ktor-server-netty',
-                    modules : ['ktor-jackson', 'ktor-server-tomcat', 'ktor-server-jetty']
             ],
             'zipkin.reporter'          : [
                     version: zipkinReporterVersion,
@@ -140,6 +160,11 @@ ext {
                     group:'io.micronaut.cassandra',
                     name:'micronaut-cassandra'
             ],
+            'micronaut.discovery': [
+                    version:micronautDiscoveryClientVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-discovery-client'
+            ],
             'micronaut.hibernate.validator': [
                     version:micronautHibernateValidatorVersion,
                     group:'io.micronaut.beanvalidation',
@@ -170,28 +195,17 @@ ext {
                     group:'io.micronaut.graphql',
                     name:'micronaut-graphql'
             ],
-            'micronaut.graphql.gorm': [
-                    version:micronautGraphQLGormVersion,
-                    group:'io.micronaut.graphql',
-                    name:'micronaut-graphql-gorm'
-            ],
-            'micronaut.groovy': [
-                    version:micronautGroovyVersion,
-                    group:'io.micronaut.groovy',
-                    name:'micronaut-runtime-groovy',
-                    modules:['micronaut-function-groovy']
-            ],
             'micronaut.gcp': [
                     version:micronautGcpVersion,
                     group:'io.micronaut.gcp',
                     name:'micronaut-gcp-common',
-                    modules:['micronaut-gcp-tracing', 'micronaut-gcp-function-http', 'micronaut-gcp-function', 'micronaut-gcp-http-client']
+                    modules:['micronaut-gcp-tracing', 'micronaut-gcp-function-http', 'micronaut-gcp-function-http-test', 'micronaut-gcp-function', 'micronaut-gcp-http-client']
             ],
             'micronaut.azure': [
                     version:micronautAzureVersion,
                     group:'io.micronaut.azure',
                     name:'micronaut-azure-function',
-                    modules:['micronaut-azure-function-http']
+                    modules:['micronaut-azure-function', 'micronaut-azure-function-http', 'micronaut-azure-function-http-test']
             ],
             'azure.function': [
                     version:'1.3.1',
@@ -212,19 +226,13 @@ ext {
                     version:micronautAwsVersion,
                     group:'io.micronaut.aws',
                     name:'micronaut-function-aws-api-proxy',
-                    modules: ['micronaut-aws-common','micronaut-function-aws','micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver']
+                    modules: ['micronaut-aws-common', 'micronaut-function-aws-api-proxy-test', 'micronaut-function-aws','micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver', 'micronaut-aws-parameter-store', 'micronaut-aws-sdk-v2', 'micronaut-function-client-aws']
             ],
             'micronaut.kotlin': [
                     version:micronautKotlinVersion,
                     group:'io.micronaut.kotlin',
                     name:'micronaut-kotlin-runtime',
                     modules: ['micronaut-ktor', 'micronaut-kotlin-extension-functions']
-            ],
-            'micronaut.gorm': [
-                    version:micronautGroovyVersion,
-                    group:'io.micronaut.groovy',
-                    name:'micronaut-gorm-common',
-                    modules:['micronaut-multitenancy-gorm', 'micronaut-neo4j-gorm', 'micronaut-mongo-gorm', 'micronaut-hibernate-gorm', 'micronaut-graphql-gorm']
             ],
             'micronaut.liquibase': [
                     version:micronautLiquibaseVersion,
@@ -239,8 +247,14 @@ ext {
             ],
             'micronaut.openapi': [
                     version:micronautOpenApiVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.openapi',
                     name:'micronaut-openapi'
+            ],
+            // TODO Deprecated: Remove in the next major version
+            'micronaut.openapi.old': [
+                    version: micronautOldOpenApiVersion,
+                    group: 'io.micronaut.configuration',
+                    name: 'micronaut-openapi'
             ],
             kafka                      : [
                     version: kafkaVersion,
@@ -252,36 +266,7 @@ ext {
                     version: micronautGrpcVersion,
                     group  : 'io.micronaut.grpc',
                     name   : 'micronaut-grpc-runtime',
-                    modules: ['micronaut-grpc-annotation']
-            ],
-            'micronaut.test'           : [
-                    version: micronautTestVersion,
-                    group  : 'io.micronaut.test',
-                    name   : 'micronaut-test-core',
-                    modules: ['micronaut-test-spock', 'micronaut-test-junit5', 'micronaut-test-kotlintest']
-            ],
-            'micronaut.data'           : [
-                                version: micronautDataVersion,
-                                group  : 'io.micronaut.data',
-                                name   : 'micronaut-data-model',
-                                modules: ['micronaut-data-hibernate-jpa', 'micronaut-data-jdbc', 'micronaut-data-processor', 'micronaut-data-runtime', 'micronaut-data-spring','micronaut-data-spring-jpa', 'micronaut-data-tx', 'micronaut-data-tx-hibernate']
-                        ],
-            'micrometer'               : [
-                    version: micrometerVersion,
-                    group  : 'io.micrometer',
-                    name   : 'micrometer-core',
-                    modules: ['micrometer-registry-atlas', 'micrometer-registry-graphite', 'micrometer-registry-prometheus', 'micrometer-registry-statsd']
-            ],
-            'junit5'               : [
-                    version: junit5Version,
-                    group  : 'org.junit.jupiter',
-                    name   : 'junit-jupiter',
-                    modules: ['junit-jupiter-api', 'junit-jupiter-engine', 'junit-jupiter-params']
-            ],
-            'junitVintage'         : [
-                    version: junit5Version,
-                    group  : 'org.junit.vintage',
-                    name   : 'junit-vintage-engine'
+                    modules: ['micronaut-grpc-annotation', 'micronaut-grpc-client-runtime', 'micronaut-grpc-server-runtime', 'micronaut-protobuff-support']
             ],
             'micronaut.xml':[
                 version:micronautXmlVersion,
@@ -364,25 +349,13 @@ ext {
             ojdbc                      : [
                     version: ojdbcVersion,
                     group  : 'com.oracle.database.jdbc',
-                    name   : 'ucp',
-                    modules: ['ojdbc8']
+                    name   : 'ojdbc8',
+                    modules: ['ucp']
             ],
             'jcache'                   : [
                     version: jcacheVersion,
                     group  : 'javax.cache',
                     name   : 'cache-api'
-            ],
-            netty                      : [
-                    version: nettyVersion,
-                    group  : 'io.netty',
-                    name   : 'netty-codec-http',
-                    modules: ['netty-all', 'netty-buffer', 'netty-codec', 'netty-codec-dns', 'netty-codec-haproxy',
-                              'netty-codec-http2', 'netty-codec-memcache', 'netty-codec-mqtt',
-                              'netty-codec-redis', 'netty-codec-smtp', 'netty-codec-socks', 'netty-codec-stomp',
-                              'netty-codec-xml', 'netty-common', 'netty-dev-tools', 'netty-handler',
-                              'netty-handler-proxy', 'netty-resolver', 'netty-resolver-dns', 'netty-transport',
-                              'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt',
-                              'netty-transport-native-epoll', 'netty-transport-native-kqueue', 'netty-codec-http2']
             ],
             opentracing                : [
                     version: opentracingVersion,
@@ -542,6 +515,12 @@ ext {
             ],
             oracle                  : [
                 version: oracleDriverVersion,
+                group  : 'com.oracle.database.jdbc',
+                name   : 'ojdbc8'
+            ],
+            // TODO Deprecated: Remove in the next major version
+            oldOracle                  : [
+                version: oldOracleDriverVersion,
                 group  : 'com.oracle.ojdbc',
                 name   : 'ojdbc8'
             ],
@@ -586,11 +565,6 @@ ext {
                     group   : 'io.micronaut.security',
                     modules : ['micronaut-security', 'micronaut-security-annotations', 'micronaut-security-jwt', 'micronaut-security-oauth2','micronaut-security-ldap', 'micronaut-security-session']
             ],
-            'micronaut.views': [
-                version: micronautViewsVersion,
-                group  : 'io.micronaut.views',
-                modules: ['micronaut-views', 'micronaut-views-core', 'micronaut-views-freemarker', 'micronaut-views-handlebars', 'micronaut-views-thymeleaf', 'micronaut-views-velocity', 'micronaut-views-soy', 'micronaut-views-rocker']
-            ],
             'micronaut.rss': [
                     version:micronautRssVersion,
                     group:'io.micronaut.rss',
@@ -618,6 +592,28 @@ ext {
                 group  : 'io.micronaut.jaxrs',
                 modules: ['micronaut-jaxrs-server', 'micronaut-jaxrs-processor']
             ],
+            'micronaut.acme': [
+                    version: micronautAcmeVersion,
+                    group  : 'io.micronaut.acme',
+                    name   : 'micronaut-acme'
+            ],
+            'dekorate': [
+                    version: dekorateVersion,
+                    group  : 'io.dekorate',
+                    name   : 'dekorate-project',
+                    modules: ['jaeger-annotations', 'knative-annotations', 'kubernetes-annotations',  'openshift-annotations', 'prometheus-annotations', 'servicecatalog-annotations']
+            ],
+            'micronaut.ignite': [
+                version: micronautIgniteVersion,
+                group  : 'io.micronaut.ignite',
+                modules: ['micronaut-ignite-core', 'micronaut-ignite-cache']
+            ],
+            ignite: [
+                version: igniteVersion,
+                group  : 'org.apache.ignite',
+                name   : 'ignite-core',
+                modules: ['ignite-kubernetes']
+            ],
     ]
 
     dependencyVersion = { String name ->
@@ -628,9 +624,9 @@ ext {
         return "$dep.group:$dep.name:$dep.version".toString()
     }
     dependencyModuleVersion = { String name, String module ->
-        def dep = dependencyVersions[name]
+        def dep = dependencyVersions[name] ?: bomVersions[name]
         if (dep == null) {
-            throw new IllegalArgumentException("No core dependency defined for name: $name")
+            throw new IllegalArgumentException("No core or BOM dependency defined for name: $name")
         }
         return "$dep.group:$module:$dep.version".toString()
     }
@@ -689,8 +685,6 @@ task testReportsAggregate {
 
 subprojects { Project subproject ->
 
-    version project.projectVersion
-
     ext {
         userOrg = "grails"
         isGrailsPlugin = false
@@ -704,70 +698,25 @@ subprojects { Project subproject ->
 
     group projectGroupId
 
-    repositories {
-        maven { url "https://oss.jfrog.org/oss-snapshot-local" }
-        maven { url "https://repo.grails.org/grails/core" }
+    apply plugin: "io.micronaut.build.common"
+    if (!subproject.name.startsWith('test-') &&
+            !subproject.toString().contains('benchmarks')) {
+        apply plugin: "io.micronaut.build.dependency-updates"
+        apply plugin: "io.micronaut.build.publishing"
     }
 
-    if (!subproject.name.contains("bom")) {
-        apply plugin: "groovy"
-        apply plugin: "java-library"
-
-        sourceCompatibility = '1.8'
-        targetCompatibility = '1.8'
-        compileJava.options.compilerArgs.add '-parameters'
-        compileTestJava.options.compilerArgs.add '-parameters'
-
-        if (
-        !subproject.name.startsWith('test-') &&
-                !subproject.toString().contains('build-projects') &&
-                        !subproject.toString().contains('benchmarks')
-        ) {
-
-            apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
-            apply plugin: 'checkstyle'
-
-            checkstyle {
-                toolVersion = 8.16
-                configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
-
-                // Per submodule
-                maxErrors = 0
-                maxWarnings = 10
-
-                showViolations = true
-            }
-
-            checkstyleTest.enabled = false
-        }
+    micronautBuild {
+        enableBom = false
+        enableProcessing = false
     }
-
-    jar {
-        manifest {
-            attributes('Automatic-Module-Name': "${subproject.group}.${subproject.name}".replaceAll('[^\\w\\.\\$_]', "_"))
-            attributes('Implementation-Version': projectVersion)
-            attributes('Implementation-Title': 'Micronaut')
-        }
-    }
-
-//    tasks.withType(GroovyCompile).configureEach {
-//        options.incremental = true
-//    }
 
     tasks.withType(Test) {
         useJUnitPlatform()
-        jvmArgs '-Duser.country=US', '-Duser.language=en', '-Xmx2048m'
-        reports.html.enabled = !System.getenv("GITHUB_ACTIONS")
-        reports.junitXml.enabled = !System.getenv("GITHUB_ACTIONS")
-        testLogging {
-            exceptionFormat = 'full'
-        }
-        afterSuite {
-            System.out.print(".")
-            System.out.flush()
-        }
-
+        jvmArgs '-Xmx2048m'
         systemProperty "micronaut.cloud.platform", "OTHER"
+        if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_14)) {
+            jvmArgs "--enable-preview"
+        }
     }
 
     tasks.withType(Checkstyle) {
@@ -779,13 +728,9 @@ subprojects { Project subproject ->
 
     configurations {
         shadowCompile
-        documentation
         all {
             resolutionStrategy.eachDependency { DependencyResolveDetails details ->
                 String group = details.requested.group
-                if (group == 'org.codehaus.groovy') {
-                    details.useVersion(groovyVersion)
-                }
                 if (group == 'org.ow2.asm') {
                     details.useVersion(asmVersion)
                 }
@@ -804,12 +749,9 @@ subprojects { Project subproject ->
     def isDocumented = subproject.name != 'inject' && subproject.name != 'core' && subproject.name != 'aop' && !subproject.name.contains('asciidoc-config-props')
 
     dependencies {
-        documentation "org.codehaus.groovy:groovy-templates:$groovyVersion"
-        documentation "org.codehaus.groovy:groovy-dateutil:$groovyVersion"
         if (subproject.name != "bom") {
             api dependencyVersion("slf4j")
         }
-
 
         if (isDocumented) {
             annotationProcessor "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion", {
@@ -818,14 +760,11 @@ subprojects { Project subproject ->
         }
         compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testImplementation "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-        testImplementation dependencyVersion("groovy")
+        testImplementation dependencyModuleVersion("groovy", "groovy")
         testImplementation(dependencyVersion("spock")) {
             exclude module: 'groovy-all'
         }
-        testImplementation "cglib:cglib-nodep:3.3.0"
-        testImplementation "org.objenesis:objenesis:3.1"
 
-        testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
         testImplementation "org.codehaus.groovy:groovy-test-junit5:$groovyVersion"
         compileOnly "org.ow2.asm:asm:$asmVersion"
         compileOnly "org.ow2.asm:asm-commons:$asmVersion"
@@ -837,22 +776,30 @@ subprojects { Project subproject ->
         testAnnotationProcessor "org.ow2.asm:asm:$asmVersion"
         testAnnotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
     }
-
-    groovydoc {
-        classpath += project.configurations.documentation
+    spotless {
+        java {
+            targetExclude '**/io/micronaut/core/io/scan/AnnotationClassReader.java'
+            targetExclude '**/io/micronaut/core/io/scan/Attribute.java'
+            targetExclude '**/io/micronaut/core/io/scan/Context.java'
+            targetExclude '**/io/micronaut/core/util/clhm/**'
+            targetExclude '**/io/micronaut/core/util/AntPathMatcher.java'
+            targetExclude '**/io/micronaut/discovery/eureka/client/v2/AmazonInfo.java'
+            targetExclude '**/io/micronaut/discovery/eureka/client/v2/DataCenterInfo.java'
+            targetExclude '**/io/micronaut/discovery/eureka/client/v2/LeaseInfo.java'
+            targetExclude '**/io/micronaut/support/InMemoryJavaFileManager.java'
+            targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
+            targetExclude '**/org/atinject/tck/auto/Tck.kt'
+            targetExclude '**/io/micronaut/http/uri/QueryStringDecoder.java'
+        }
+        format 'javaMisc', {
+            targetExclude '**/io/micronaut/core/util/clhm/**'
+            targetExclude '**/io/micronaut/http/netty/stream/package-info.java'
+        }
     }
-
-    task allDeps(type: DependencyReportTask) {}
 }
+apply plugin: "io.micronaut.build.docs"
+apply plugin: "io.micronaut.build.dependency-updates"
 
-apply from:"https://raw.githubusercontent.com/micronaut-projects/micronaut-docs/v$micronautDocsVersion/gradle/docs.gradle"
-
-// IDEA 2017.2 made a breaking change with IDE build output vs gradle build output
-// [see https://youtrack.jetbrains.com/issue/IDEA-175172]
-// the problem here is the gradle build uses <module-dir>/build/classes/main
-// while IDEA uses <module-dir>/out/production/..
-// As a result, compiling ast or java-inject module and using the IDEA test runner fails because the
-// generated bean classes for injection are in <module-dir>/build, not <module-dir>/out
 allprojects {
     apply plugin: 'idea'
 
@@ -862,13 +809,13 @@ allprojects {
             testOutputDir file('build/classes/groovy/test')
         }
     }
-    apply from: rootProject.file('gradle/license.gradle')
 }
 
 htmlSanityCheck {
     sourceDir = new File("${rootProject.buildDir}/docs/")
-    sourceDocuments = ["index.html"]
-
+    sourceDocuments = fileTree(sourceDir) {
+        include "index.html"
+    }
 }
 docs.finalizedBy(htmlSanityCheck)
 

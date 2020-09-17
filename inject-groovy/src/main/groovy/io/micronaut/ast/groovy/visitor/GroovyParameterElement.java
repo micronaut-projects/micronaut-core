@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
-import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
@@ -87,11 +86,6 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @NonNull
     @Override
     public ClassElement getType() {
-        ClassNode t = parameter.getType();
-        if (t.isEnum()) {
-            return new GroovyEnumElement(sourceUnit, compilationUnit, t, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, t));
-        } else {
-            return new GroovyClassElement(sourceUnit, compilationUnit, t, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, t));
-        }
+        return toClassElement(sourceUnit, compilationUnit, parameter.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, parameter.getType()));
     }
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -62,6 +62,7 @@ public class SpareTire extends Tire {
         subPackagePrivateMethodInjected = true;
     }
 
+    @Override
     @Inject protected void injectProtectedMethod() {
         if (subProtectedMethodInjected) {
             overriddenProtectedMethodInjectedTwice = true;
@@ -69,6 +70,7 @@ public class SpareTire extends Tire {
         subProtectedMethodInjected = true;
     }
 
+    @Override
     @Inject
     public void injectPublicMethod() {
         if (subPublicMethodInjected) {
@@ -85,18 +87,22 @@ public class SpareTire extends Tire {
         superPackagePrivateMethodForOverrideInjected = true;
     }
 
+    @Override
     protected void injectProtectedMethodForOverride() {
         protectedMethodForOverrideInjected = true;
     }
 
+    @Override
     public void injectPublicMethodForOverride() {
         publicMethodForOverrideInjected = true;
     }
 
+    @Override
     public boolean hasSpareTireBeenFieldInjected() {
         return fieldInjection != NEVER_INJECTED;
     }
 
+    @Override
     public boolean hasSpareTireBeenMethodInjected() {
         return methodInjection != NEVER_INJECTED;
     }
@@ -115,7 +121,7 @@ public class SpareTire extends Tire {
         return spareTirePackagePrivateMethod2Injected;
     }
 
-//    @Override
+    @Override
     @Inject void injectPackagePrivateMethod2() {
         spareTirePackagePrivateMethod2Injected = true;
     }
@@ -126,6 +132,7 @@ public class SpareTire extends Tire {
         return spareTirePackagePrivateMethod3Injected;
     }
 
+    @Override
     void injectPackagePrivateMethod3() {
         spareTirePackagePrivateMethod3Injected = true;
     }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -320,7 +320,6 @@ public interface AnnotationMetadata extends AnnotationSource {
         return getValue(annotation, member, Argument.of(requiredType));
     }
 
-
     /**
      * Get the value of the given annotation member.
      *
@@ -347,10 +346,8 @@ public interface AnnotationMetadata extends AnnotationSource {
 
             Optional<? extends AnnotationValue<? extends Annotation>> values = findAnnotation(annotation);
             Optional<T> value = values.flatMap(av -> av.get(member, requiredType));
-            if (!value.isPresent()) {
-                if (hasStereotype(annotation)) {
-                    return getDefaultValue(annotation, member, requiredType);
-                }
+            if (!value.isPresent() && hasStereotype(annotation)) {
+                return getDefaultValue(annotation, member, requiredType);
             }
             return value;
         }
@@ -563,10 +560,8 @@ public interface AnnotationMetadata extends AnnotationSource {
         ArgumentUtils.requireNonNull("requiredType", requiredType);
 
         Optional<T> value = findAnnotation(annotation).flatMap(av -> av.get(member, requiredType));
-        if (!value.isPresent()) {
-            if (hasStereotype(annotation)) {
-                return getDefaultValue(annotation, member, requiredType);
-            }
+        if (!value.isPresent() && hasStereotype(annotation)) {
+            return getDefaultValue(annotation, member, requiredType);
         }
         return value;
     }
@@ -656,7 +651,6 @@ public interface AnnotationMetadata extends AnnotationSource {
 
         return enumValue(annotation.getName(), member, enumType);
     }
-
 
     /**
      * The enum values for the given annotation.
@@ -794,9 +788,7 @@ public interface AnnotationMetadata extends AnnotationSource {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
-        Optional value = getValue(annotation, member, Class.class);
-        //noinspection unchecked
-        return value;
+        return getValue(annotation, member, Class.class);
     }
 
     /**
@@ -824,8 +816,6 @@ public interface AnnotationMetadata extends AnnotationSource {
 
         return classValue(annotation.getName(), member);
     }
-
-
 
     /**
      * The value as an {@link OptionalInt} for the given annotation and member.

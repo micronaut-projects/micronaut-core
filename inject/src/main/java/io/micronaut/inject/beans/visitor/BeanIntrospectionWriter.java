@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -115,6 +115,13 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     /**
+     * @return The constructor.
+     */
+    public MethodElement getConstructor() {
+        return constructor;
+    }
+
+    /**
      * @return The class element
      */
     ClassElement getClassElement() {
@@ -157,7 +164,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
 
-        final Type propertyType = getTypeForElement(type);
+        final Type propertyType = getTypeReference(type);
 
         DefaultAnnotationMetadata.contributeDefaults(
                 this.annotationMetadata,
@@ -327,7 +334,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 desc);
 
         Collection<Type> argumentTypes = Arrays.stream(constructorArguments).map(pe ->
-            getTypeForElement(pe.getType())
+            getTypeReference(pe.getType())
         ).collect(Collectors.toList());
 
         boolean isConstructor = constructor instanceof ConstructorElement;

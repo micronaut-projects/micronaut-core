@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,7 +36,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 
 /**
  * An implementation of the {@link StreamingFileUpload} interface for Netty.
@@ -114,7 +114,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
 
     @Override
     public Publisher<Boolean> transferTo(File destination) {
-        Supplier<Boolean> transferOperation = () -> {
+        BooleanSupplier transferOperation = () -> {
             try {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Transferring file {} to location {}", fileUpload.getFilename(), destination);
@@ -125,7 +125,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
             }
         };
 
-        return Single.<Boolean>create((emitter) -> {
+        return Single.<Boolean>create(emitter ->
 
             subject.subscribeOn(Schedulers.from(ioExecutor))
                 .subscribe(new Subscriber() {
@@ -150,7 +150,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
                     public void onComplete() {
                         if (fileUpload.isCompleted()) {
                             try {
-                                emitter.onSuccess(transferOperation.get());
+                                emitter.onSuccess(transferOperation.getAsBoolean());
                             } catch (Exception e) {
                                 emitter.onError(e);
                             }
@@ -158,8 +158,8 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
                             emitter.onError(new MultipartException("Transfer did not complete"));
                         }
                     }
-                });
-        }).toFlowable();
+                })
+        ).toFlowable();
 
     }
 

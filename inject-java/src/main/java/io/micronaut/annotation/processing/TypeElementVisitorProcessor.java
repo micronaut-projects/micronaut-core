@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -187,13 +187,13 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             roundEnv.getRootElements()
                     .stream()
-                    .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))
+                    .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
                     .filter(element -> element.getAnnotation(Generated.class) == null)
                     .map(modelUtils::classElementFor)
                     .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
-                    .forEach((typeElement) -> {
+                    .forEach(typeElement -> {
                         String className = typeElement.getQualifiedName().toString();
-                        List<LoadedVisitor> matchedVisitors = loadedVisitors.stream().filter((v) -> v.matches(typeElement)).collect(Collectors.toList());
+                        List<LoadedVisitor> matchedVisitors = loadedVisitors.stream().filter(v -> v.matches(typeElement)).collect(Collectors.toList());
                         typeElement.accept(new ElementVisitor(typeElement, matchedVisitors), className);
                     });
 
@@ -236,14 +236,12 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     final Requires.Sdk sdk = requires.sdk();
                     if (sdk == Requires.Sdk.MICRONAUT) {
                         final String version = requires.version();
-                        if (StringUtils.isNotEmpty(version)) {
-                            if (!VersionUtils.isAtLeastMicronautVersion(version)) {
-                                try {
-                                    warning("TypeElementVisitor [" + definition.getName() + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version);
-                                    continue;
-                                } catch (IllegalArgumentException e) {
-                                    // shouldn't happen, thrown when invalid version encountered
-                                }
+                        if (StringUtils.isNotEmpty(version) && !VersionUtils.isAtLeastMicronautVersion(version)) {
+                            try {
+                                warning("TypeElementVisitor [" + definition.getName() + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version);
+                                continue;
+                            } catch (IllegalArgumentException e) {
+                                // shouldn't happen, thrown when invalid version encountered
                             }
                         }
                     }
@@ -267,6 +265,12 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         ElementVisitor(TypeElement concreteClass, List<LoadedVisitor> visitors) {
             this.concreteClass = concreteClass;
             this.visitors = visitors;
+        }
+
+        @Override
+        public Object visitUnknown(Element e, Object o) {
+            // ignore
+            return o;
         }
 
         @Override
@@ -357,11 +361,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         private void checkMethodOverride(List<Element> enclosedElements, Element elt1) {
             boolean overrides = false;
-            for (Object elt2: enclosedElements) {
+            for (Element elt2: enclosedElements) {
                 if (elt1.equals(elt2) || ! (elt2 instanceof ExecutableElement)) {
                     continue;
                 }
-                if (elementUtils.overrides((ExecutableElement) elt2, (ExecutableElement) elt1,  modelUtils.classElementFor((ExecutableElement) elt2))) {
+                if (elementUtils.overrides((ExecutableElement) elt2, (ExecutableElement) elt1,  modelUtils.classElementFor(elt2))) {
                     overrides = true;
                     break;
                 }
@@ -384,7 +388,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                         methodAnnotationMetadata = resultingElement.getAnnotationMetadata();
                     }
                 }
-                return null;
             } else {
 
                 for (LoadedVisitor visitor : visitors) {

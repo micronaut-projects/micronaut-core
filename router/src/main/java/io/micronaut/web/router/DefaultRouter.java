@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -49,13 +49,11 @@ import java.util.stream.Stream;
 @Singleton
 public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatch<?>> {
 
-    private static final List<MediaType> ACCEPT_ALL = Collections.singletonList(MediaType.ALL_TYPE);
     private final Map<String, List<UriRoute>> routesByMethod = new HashMap<>();
     private final List<StatusRoute> statusRoutes = new ArrayList<>();
     private final Collection<FilterRoute> filterRoutes = new ArrayList<>();
     private final List<ErrorRoute> errorRoutes = new ArrayList<>();
     private final Set<Integer> exposedPorts;
-    private List<Integer> defaultPorts;
 
     /**
      * Construct a new router for the given route builders.
@@ -137,7 +135,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request) {
         boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
         return this.<T, R>find(request, request.getPath())
-                .filter((match) -> match.test(request) && (!permitsBody || match.doesConsume(request.getContentType().orElse(null))));
+                .filter(match -> match.test(request) && (!permitsBody || match.doesConsume(request.getContentType().orElse(null))));
     }
 
     @NonNull
@@ -269,9 +267,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         Map<ErrorRoute, RouteMatch<R>> matchedRoutes = new LinkedHashMap<>();
         for (ErrorRoute errorRoute : errorRoutes) {
             Optional<RouteMatch<R>> match = errorRoute.match(originatingClass, error);
-            match.ifPresent((m) -> {
-                matchedRoutes.put(errorRoute, m);
-            });
+            match.ifPresent(m ->
+                matchedRoutes.put(errorRoute, m)
+            );
         }
         return findRouteMatch(matchedRoutes, error);
     }
@@ -287,23 +285,22 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private <R> Optional<RouteMatch<R>> findErrorRouteInternal(
             @Nullable Class<?> originatingClass,
             @NonNull Throwable error, HttpRequest<?> request) {
-        Collection<MediaType> accept =
-                request.accept();
+        Collection<MediaType> accept = request.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
         if (hasAcceptHeader) {
-
+            Map<ErrorRoute, RouteMatch<R>> matchedRoutes = new LinkedHashMap<>();
             for (ErrorRoute errorRoute : errorRoutes) {
                 @SuppressWarnings("unchecked")
                 final RouteMatch<R> match = (RouteMatch<R>) errorRoute
                         .match(originatingClass, error).orElse(null);
-                if (match != null) {
-                    if (match.doesProduce(accept)) {
-                        return Optional.of(match);
-                    }
+                if (match != null && match.doesProduce(accept)) {
+                    matchedRoutes.put(errorRoute, match);
                 }
             }
+            return findRouteMatch(matchedRoutes, error);
         } else {
-            RouteMatch<R> firstMatch = null;
+            Map<ErrorRoute, RouteMatch<R>> producesAllMatchedRoutes = new LinkedHashMap<>();
+            Map<ErrorRoute, RouteMatch<R>> producesSpecificMatchedRoutes = new LinkedHashMap<>();
             for (ErrorRoute errorRoute : errorRoutes) {
                 @SuppressWarnings("unchecked")
                 final RouteMatch<R> match = (RouteMatch<R>) errorRoute
@@ -311,16 +308,17 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 if (match != null) {
                     final List<MediaType> produces = match.getProduces();
                     if (CollectionUtils.isEmpty(produces) || produces.contains(MediaType.ALL_TYPE)) {
-                        return Optional.of(match);
-                    } else if (firstMatch == null) {
-                        firstMatch = match;
+                        producesAllMatchedRoutes.put(errorRoute, match);
+                    } else {
+                        producesSpecificMatchedRoutes.put(errorRoute, match);
                     }
                 }
             }
-
-            return Optional.ofNullable(firstMatch);
+            if (producesAllMatchedRoutes.isEmpty()) {
+                return findRouteMatch(producesSpecificMatchedRoutes, error);
+            }
+            return findRouteMatch(producesAllMatchedRoutes, error);
         }
-        return Optional.empty();
     }
 
     @Override
@@ -351,10 +349,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 @SuppressWarnings("unchecked")
                 final RouteMatch<R> match = (RouteMatch<R>) statusRoute
                         .match(originatingClass, status).orElse(null);
-                if (match != null) {
-                    if (match.doesProduce(accept)) {
-                        return Optional.of(match);
-                    }
+                if (match != null && match.doesProduce(accept)) {
+                    return Optional.of(match);
                 }
             }
         } else {
@@ -385,7 +381,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         for (ErrorRoute errorRoute : errorRoutes) {
             if (errorRoute.originatingType() == null) {
                 Optional<RouteMatch<R>> match = errorRoute.match(error);
-                match.ifPresent((m) -> matchedRoutes.put(errorRoute, m));
+                match.ifPresent(m -> matchedRoutes.put(errorRoute, m));
             }
         }
 
@@ -435,7 +431,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 }
             }
         }
-        return (Stream<UriRouteMatch<T, R>>) matchedRoutes.stream();
+        return matchedRoutes.stream();
     }
 
     private <T, R> List<UriRouteMatch<T, R>> find(String httpMethodName, CharSequence uri) {
@@ -452,7 +448,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             return routeMatches;
         } else {
             //noinspection unchecked
-            return Collections.EMPTY_LIST;
+            return Collections.emptyList();
         }
     }
 
@@ -508,10 +504,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private List<HttpFilter> resolveFilters(HttpRequest<?> request, Stream<? extends FilterEntry<HttpFilter>> entryStream) {
         return entryStream
                     .filter(entry -> {
-                        if (entry.hasMethods()) {
-                            if (!entry.getFilterMethods().contains(request.getMethod())) {
-                                return false;
-                            }
+                        if (entry.hasMethods() && !entry.getFilterMethods().contains(request.getMethod())) {
+                            return false;
                         }
                         if (entry.hasPatterns()) {
                             String path = request.getPath();

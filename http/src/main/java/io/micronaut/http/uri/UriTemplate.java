@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -660,11 +660,6 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                             delimiter = ",";
                                             break;
                                         case DOT_OPERATOR:
-                                            encode = true;
-                                            repeatPrefix = varCount < 1;
-                                            prefix = String.valueOf(operator);
-                                            delimiter = modifier == EXPAND_MODIFIER ? prefix : ",";
-                                            break;
                                         case SLASH_OPERATOR:
                                             encode = true;
                                             repeatPrefix = varCount < 1;
@@ -674,14 +669,14 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                         case ';':
                                             encode = true;
                                             repeatPrefix = true;
-                                            prefix = String.valueOf(operator) + val + '=';
+                                            prefix = operator + val + '=';
                                             delimiter = modifier == EXPAND_MODIFIER ? prefix : ",";
                                             break;
                                         case QUERY_OPERATOR:
                                         case AND_OPERATOR:
                                             encode = true;
                                             repeatPrefix = true;
-                                            prefix = varCount < 1 ? String.valueOf(operator) + val + '=' : val + "=";
+                                            prefix = varCount < 1 ? operator + val + '=' : val + "=";
                                             delimiter = modifier == EXPAND_MODIFIER ? AND_OPERATOR + val + '=' : ",";
                                             break;
                                         default:
@@ -806,40 +801,6 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                           char operator,
                                           String previousDelimiter, boolean isQuerySegment) {
             segments.add(new VariablePathSegment(isQuerySegment, variable, prefix, delimiter, encode, modifierChar, operator, modifierStr, previousDelimiter, repeatPrefix));
-        }
-
-        private String escape(String v) {
-            return v.replace("%", "%25").replaceAll("\\s", "%20");
-        }
-
-        private String applyModifier(String modifierStr, char modifierChar, String result, int len) {
-            if (modifierChar == ':' && modifierStr.length() > 0) {
-                if (Character.isDigit(modifierStr.charAt(0))) {
-                    try {
-                        int subResult = Integer.parseInt(modifierStr.trim(), 10);
-                        if (subResult < len) {
-                            result = result.substring(0, subResult);
-                        }
-                    } catch (NumberFormatException e) {
-                        result = ":" + modifierStr;
-                    }
-
-                }
-            }
-            return result;
-        }
-
-        private String encode(String str, boolean query) {
-            try {
-                String encoded = URLEncoder.encode(str, "UTF-8");
-                if (query) {
-                    return encoded;
-                } else {
-                    return encoded.replace("+", "%20");
-                }
-            } catch (UnsupportedEncodingException e) {
-                throw new IllegalStateException("No available encoding", e);
-            }
         }
 
         /**
@@ -980,6 +941,10 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 return builder.toString();
             }
 
+            private String escape(String v) {
+                return v.replace("%", "%25").replaceAll("\\s", "%20");
+            }
+
             @Override
             public String expand(Map<String, Object> parameters, boolean previousHasContent, boolean anyPreviousHasOperator) {
                 Object found = parameters.get(variable);
@@ -998,11 +963,11 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         found = Arrays.asList((Object[]) found);
                     }
                     boolean isQuery = operator == QUERY_OPERATOR;
-                    
+
                     if (modifierChar == EXPAND_MODIFIER) {
                         found = expandPOJO(found); // Turn POJO into a Map
                     }
-                    
+
                     if (found instanceof Iterable) {
                         Iterable iter = ((Iterable) found);
                         if (iter instanceof Collection && ((Collection) iter).isEmpty()) {
@@ -1101,6 +1066,33 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 }
 
 
+            }
+
+            private String applyModifier(String modifierStr, char modifierChar, String result, int len) {
+                if (modifierChar == ':' && modifierStr.length() > 0 && Character.isDigit(modifierStr.charAt(0))) {
+                    try {
+                        int subResult = Integer.parseInt(modifierStr.trim(), 10);
+                        if (subResult < len) {
+                            result = result.substring(0, subResult);
+                        }
+                    } catch (NumberFormatException e) {
+                        result = ":" + modifierStr;
+                    }
+                }
+                return result;
+            }
+
+            private String encode(String str, boolean query) {
+                try {
+                    String encoded = URLEncoder.encode(str, "UTF-8");
+                    if (query) {
+                        return encoded;
+                    } else {
+                        return encoded.replace("+", "%20");
+                    }
+                } catch (UnsupportedEncodingException e) {
+                    throw new IllegalStateException("No available encoding", e);
+                }
             }
 
             private Object expandPOJO(Object found) {

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,7 +39,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.context.exceptions.BeanCreationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
@@ -56,6 +56,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.*;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -308,9 +309,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 // handle error with a method that is global with bad request
                 errorRoute = router.findStatusRoute(statusException.getStatus(), nettyHttpRequest).orElse(null);
             }
-        } else if (cause instanceof BeanInstantiationException && declaringType != null) {
+        } else if (cause instanceof BeanCreationException && declaringType != null) {
             // If the controller could not be instantiated, don't look for a local error route
-            Optional<Class> rootBeanType = ((BeanInstantiationException) cause).getRootBeanType().map(BeanType::getBeanType);
+            Optional<Class> rootBeanType = ((BeanCreationException) cause).getRootBeanType().map(BeanType::getBeanType);
             if (rootBeanType.isPresent() && declaringType == rootBeanType.get()) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Failed to instantiate [{}]. Skipping lookup of a local error route", declaringType.getName());
@@ -361,7 +362,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         return errorResultToResponse(result);
                     });
 
-                    filterPublisher(new AtomicReference<HttpRequest<?>>(nettyHttpRequest), routePublisher, ctx.executor(), nettyException)
+                    filterPublisher(new AtomicReference<>(nettyHttpRequest), routePublisher, ctx.executor(), nettyException)
                             .firstOrError()
                             .subscribe((mutableHttpResponse, throwable) -> {
                                 if (throwable != null) {
@@ -588,15 +589,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Flowable.just(finalResponse),
                 ctx.channel().eventLoop(),
                 skipOncePerRequest
-        ).singleOrError().subscribe((Consumer<MutableHttpResponse<?>>) mutableHttpResponse -> {
+        ).singleOrError().subscribe((Consumer<MutableHttpResponse<?>>) mutableHttpResponse ->
             encodeHttpResponse(
                     ctx,
                     nettyHttpRequest,
                     mutableHttpResponse,
                     mutableHttpResponse.body(),
                     defaultResponseMediaType
-            );
-        }, throwable -> exceptionCaughtInternal(ctx, throwable, nettyHttpRequest, false));
+            )
+        , throwable -> exceptionCaughtInternal(ctx, throwable, nettyHttpRequest, false));
     }
 
     private Optional<? extends FileCustomizableResponseType> matchFile(String path) {
@@ -674,9 +675,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         // decorate the execution of the route so that it runs an async executor
         request.setMatchedRoute(route);
 
+        Optional<Argument<?>> bodyArgument = route.getBodyArgument()
+            .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
+
         // The request body is required, so at this point we must have a StreamedHttpRequest
         io.netty.handler.codec.http.HttpRequest nativeRequest = request.getNativeRequest();
-        if (!route.isExecutable() && io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) && nativeRequest instanceof StreamedHttpRequest) {
+        if (!route.isExecutable() &&
+                io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) &&
+                nativeRequest instanceof StreamedHttpRequest &&
+                (!bodyArgument.isPresent() || !route.isSatisfied(bodyArgument.get().getName()))) {
             httpContentProcessorResolver.resolve(request, route).subscribe(buildSubscriber(request, context, route));
         } else {
             if (nativeRequest instanceof StreamedHttpRequest) {
@@ -700,251 +707,299 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private Subscriber<Object> buildSubscriber(NettyHttpRequest<?> request,
                                                ChannelHandlerContext context,
                                                RouteMatch<?> finalRoute) {
-        return new CompletionAwareSubscriber<Object>() {
-            Boolean alwaysAddContent = request.getContentType()
-                    .map(type -> type.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
-                    .orElse(false);
-            RouteMatch<?> routeMatch = finalRoute;
-            AtomicBoolean executed = new AtomicBoolean(false);
-            AtomicLong pressureRequested = new AtomicLong(0);
-            ConcurrentHashMap<String, UnicastProcessor> subjects = new ConcurrentHashMap<>();
-            ConcurrentHashMap<Integer, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
-            ConversionService conversionService = ConversionService.SHARED;
-            Subscription s;
-            LongConsumer onRequest = (num) -> pressureRequested.updateAndGet((p) -> {
-                long newVal = p - num;
-                if (newVal < 0) {
-                    s.request(num - p);
-                    return 0;
-                } else {
-                    return newVal;
-                }
-            });
+        boolean isFormData = request.isFormOrMultipartData();
+        if (isFormData) {
+            return new CompletionAwareSubscriber<Object>() {
+                final boolean alwaysAddContent = request.isFormData();
+                RouteMatch<?> routeMatch = finalRoute;
+                final AtomicBoolean executed = new AtomicBoolean(false);
+                final AtomicLong pressureRequested = new AtomicLong(0);
+                final ConcurrentHashMap<String, UnicastProcessor> subjects = new ConcurrentHashMap<>();
+                final ConcurrentHashMap<Integer, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
+                final ConversionService conversionService = ConversionService.SHARED;
+                Subscription s;
+                final LongConsumer onRequest = num -> pressureRequested.updateAndGet(p -> {
+                    long newVal = p - num;
+                    if (newVal < 0) {
+                        s.request(num - p);
+                        return 0;
+                    } else {
+                        return newVal;
+                    }
+                });
 
-            Flowable processFlowable(Flowable flowable, Integer dataKey, boolean controlsFlow) {
-                if (controlsFlow) {
-                    flowable = flowable.doOnRequest(onRequest);
-                }
-                return flowable
-                        .doAfterTerminate(() -> {
-                            if (controlsFlow) {
-                                HttpDataReference dataReference = dataReferences.get(dataKey);
-                                dataReference.destroy();
-                            }
-                        });
-            }
-
-            @Override
-            protected void doOnSubscribe(Subscription subscription) {
-                this.s = subscription;
-                subscription.request(1);
-            }
-
-            @Override
-            protected void doOnNext(Object message) {
-                boolean executed = this.executed.get();
-                if (message instanceof ByteBufHolder) {
-                    if (message instanceof HttpData) {
-                        HttpData data = (HttpData) message;
-
-                        if (LOG.isTraceEnabled()) {
-                            LOG.trace("Received HTTP Data for request [{}]: {}", request, message);
-                        }
-
-                        String name = data.getName();
-                        Optional<Argument<?>> requiredInput = routeMatch.getRequiredInput(name);
-
-                        if (requiredInput.isPresent()) {
-                            Argument<?> argument = requiredInput.get();
-                            Supplier<Object> value;
-                            boolean isPublisher = Publishers.isConvertibleToPublisher(argument.getType());
-                            boolean chunkedProcessing = false;
-
-                            if (isPublisher) {
-                                Integer dataKey = System.identityHashCode(data);
-                                HttpDataReference dataReference = dataReferences.computeIfAbsent(dataKey, (key) -> new HttpDataReference(data));
-                                Argument typeVariable;
-
-                                if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                                    typeVariable = ARGUMENT_PART_DATA;
-                                } else {
-                                    typeVariable = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                Flowable processFlowable(Flowable flowable, Integer dataKey, boolean controlsFlow) {
+                    if (controlsFlow) {
+                        flowable = flowable.doOnRequest(onRequest);
+                    }
+                    return flowable
+                            .doAfterTerminate(() -> {
+                                if (controlsFlow) {
+                                    HttpDataReference dataReference = dataReferences.get(dataKey);
+                                    dataReference.destroy();
                                 }
-                                Class typeVariableType = typeVariable.getType();
+                            });
+                }
 
-                                UnicastProcessor namedSubject = subjects.computeIfAbsent(name, (key) -> UnicastProcessor.create());
+                @Override
+                protected void doOnSubscribe(Subscription subscription) {
+                    this.s = subscription;
+                    subscription.request(1);
+                }
 
-                                chunkedProcessing = PartData.class.equals(typeVariableType) ||
-                                        Publishers.isConvertibleToPublisher(typeVariableType) ||
-                                        ClassUtils.isJavaLangType(typeVariableType);
+                @Override
+                protected void doOnNext(Object message) {
+                    boolean executed = this.executed.get();
+                    if (message instanceof ByteBufHolder) {
+                        if (message instanceof HttpData) {
+                            HttpData data = (HttpData) message;
 
-                                if (Publishers.isConvertibleToPublisher(typeVariableType)) {
-                                    boolean streamingFileUpload = StreamingFileUpload.class.isAssignableFrom(typeVariableType);
-                                    if (streamingFileUpload) {
+                            if (LOG.isTraceEnabled()) {
+                                LOG.trace("Received HTTP Data for request [{}]: {}", request, message);
+                            }
+
+                            String name = data.getName();
+                            Optional<Argument<?>> requiredInput = routeMatch.getRequiredInput(name);
+
+                            if (requiredInput.isPresent()) {
+                                Argument<?> argument = requiredInput.get();
+                                Supplier<Object> value;
+                                boolean isPublisher = Publishers.isConvertibleToPublisher(argument.getType());
+                                boolean chunkedProcessing = false;
+
+                                if (isPublisher) {
+                                    Integer dataKey = System.identityHashCode(data);
+                                    HttpDataReference dataReference = dataReferences.computeIfAbsent(dataKey, key -> new HttpDataReference(data));
+                                    Argument typeVariable;
+
+                                    if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
                                         typeVariable = ARGUMENT_PART_DATA;
                                     } else {
-                                        typeVariable = typeVariable.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                                        typeVariable = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                                     }
-                                    dataReference.subject.getAndUpdate(subject -> {
-                                        if (subject == null) {
-                                            UnicastProcessor childSubject = UnicastProcessor.create();
-                                            Flowable flowable = processFlowable(childSubject, dataKey, true);
-                                            if (streamingFileUpload && data instanceof FileUpload) {
-                                                namedSubject.onNext(new NettyStreamingFileUpload(
+                                    Class typeVariableType = typeVariable.getType();
+
+                                    UnicastProcessor namedSubject = subjects.computeIfAbsent(name, key -> UnicastProcessor.create());
+
+                                    chunkedProcessing = PartData.class.equals(typeVariableType) ||
+                                            Publishers.isConvertibleToPublisher(typeVariableType) ||
+                                            ClassUtils.isJavaLangType(typeVariableType);
+
+                                    if (Publishers.isConvertibleToPublisher(typeVariableType)) {
+                                        boolean streamingFileUpload = StreamingFileUpload.class.isAssignableFrom(typeVariableType);
+                                        if (streamingFileUpload) {
+                                            typeVariable = ARGUMENT_PART_DATA;
+                                        } else {
+                                            typeVariable = typeVariable.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                                        }
+                                        dataReference.subject.getAndUpdate(subject -> {
+                                            if (subject == null) {
+                                                UnicastProcessor childSubject = UnicastProcessor.create();
+                                                Flowable flowable = processFlowable(childSubject, dataKey, true);
+                                                if (streamingFileUpload && data instanceof FileUpload) {
+                                                    namedSubject.onNext(new NettyStreamingFileUpload(
+                                                            (FileUpload) data,
+                                                            serverConfiguration.getMultipart(),
+                                                            getIoExecutor(),
+                                                            flowable));
+                                                } else {
+                                                    namedSubject.onNext(flowable);
+                                                }
+
+                                                return childSubject;
+                                            }
+                                            return subject;
+                                        });
+
+                                    }
+
+
+                                    UnicastProcessor subject;
+
+                                    final UnicastProcessor ds = dataReference.subject.get();
+                                    if (ds != null) {
+                                        subject = ds;
+                                    } else {
+                                        subject = namedSubject;
+                                    }
+
+                                    Object part = data;
+
+                                    if (chunkedProcessing) {
+                                        HttpDataReference.Component component = dataReference.addComponent(e -> {
+                                            subject.onError(e);
+                                            s.cancel();
+                                        });
+                                        if (component == null) {
+                                            return;
+                                        }
+                                        part = new NettyPartData(dataReference, component);
+                                    }
+
+                                    if (data instanceof FileUpload &&
+                                            StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
+                                        dataReference.upload.getAndUpdate(upload -> {
+                                            if (upload == null) {
+                                                return new NettyStreamingFileUpload(
                                                         (FileUpload) data,
                                                         serverConfiguration.getMultipart(),
                                                         getIoExecutor(),
-                                                        flowable));
-                                            } else {
-                                                namedSubject.onNext(flowable);
+                                                        processFlowable(subject, dataKey, true));
                                             }
-
-                                            return childSubject;
-                                        }
-                                        return subject;
-                                    });
-
-                                }
-
-
-                                UnicastProcessor subject;
-
-                                final UnicastProcessor ds = dataReference.subject.get();
-                                if (ds != null) {
-                                    subject = ds;
-                                } else {
-                                    subject = namedSubject;
-                                }
-
-                                Object part = data;
-
-                                if (chunkedProcessing) {
-                                    HttpDataReference.Component component = dataReference.addComponent((e) -> {
-                                        subject.onError(e);
-                                        s.cancel();
-                                    });
-                                    if (component == null) {
-                                        return;
+                                            return upload;
+                                        });
                                     }
-                                    part = new NettyPartData(dataReference, component);
-                                }
 
-                                if (data instanceof FileUpload &&
-                                        StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                                    dataReference.upload.getAndUpdate(upload -> {
-                                        if (upload == null) {
-                                            return new NettyStreamingFileUpload(
-                                                    (FileUpload) data,
-                                                    serverConfiguration.getMultipart(),
-                                                    getIoExecutor(),
-                                                    processFlowable(subject, dataKey, true));
-                                        }
-                                        return upload;
-                                    });
-                                }
+                                    Optional<?> converted = conversionService.convert(part, typeVariable);
 
-                                Optional<?> converted = conversionService.convert(part, typeVariable);
+                                    converted.ifPresent(subject::onNext);
 
-                                converted.ifPresent(subject::onNext);
-
-                                if (data.isCompleted() && chunkedProcessing) {
-                                    subject.onComplete();
-                                }
-
-                                value = () -> {
-                                    StreamingFileUpload upload = dataReference.upload.get();
-                                    if (upload != null) {
-                                        return upload;
-                                    } else {
-                                        return processFlowable(namedSubject, dataKey, dataReference.subject.get() == null);
+                                    if (data.isCompleted() && chunkedProcessing) {
+                                        subject.onComplete();
                                     }
-                                };
 
-                            } else {
-                                if (data instanceof Attribute && !data.isCompleted()) {
-                                    request.addContent(data);
-                                    s.request(1);
-                                    return;
-                                } else {
                                     value = () -> {
-                                        if (data.refCnt() > 0) {
-                                            return data;
+                                        StreamingFileUpload upload = dataReference.upload.get();
+                                        if (upload != null) {
+                                            return upload;
                                         } else {
-                                            return null;
+                                            return processFlowable(namedSubject, dataKey, dataReference.subject.get() == null);
                                         }
                                     };
-                                }
-                            }
 
-                            if (!executed) {
-                                String argumentName = argument.getName();
-                                if (!routeMatch.isSatisfied(argumentName)) {
-                                    routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, value.get()));
+                                } else {
+                                    if (data instanceof Attribute && !data.isCompleted()) {
+                                        request.addContent(data);
+                                        s.request(1);
+                                        return;
+                                    } else {
+                                        value = () -> {
+                                            if (data.refCnt() > 0) {
+                                                return data;
+                                            } else {
+                                                return null;
+                                            }
+                                        };
+                                    }
                                 }
-                                if (isPublisher && chunkedProcessing) {
-                                    //accounting for the previous request
-                                    pressureRequested.incrementAndGet();
-                                }
-                                if (routeMatch.isExecutable() || message instanceof LastHttpContent) {
-                                    executeRoute();
-                                    executed = true;
-                                }
-                            }
 
-                            if (alwaysAddContent) {
+                                if (!executed) {
+                                    String argumentName = argument.getName();
+                                    if (!routeMatch.isSatisfied(argumentName)) {
+                                        routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, value.get()));
+                                    }
+                                    if (isPublisher && chunkedProcessing) {
+                                        //accounting for the previous request
+                                        pressureRequested.incrementAndGet();
+                                    }
+                                    if (routeMatch.isExecutable() || message instanceof LastHttpContent) {
+                                        executeRoute();
+                                        executed = true;
+                                    }
+                                }
+
+                                if (alwaysAddContent) {
+                                    request.addContent(data);
+                                }
+
+                                if (!executed || !chunkedProcessing) {
+                                    s.request(1);
+                                }
+
+                            } else {
                                 request.addContent(data);
-                            }
-
-                            if (!executed || !chunkedProcessing) {
                                 s.request(1);
                             }
-
                         } else {
-                            request.addContent(data);
+                            request.addContent((ByteBufHolder) message);
                             s.request(1);
                         }
                     } else {
-                        request.addContent((ByteBufHolder) message);
+                        ((NettyHttpRequest) request).setBody(message);
                         s.request(1);
                     }
-                } else {
-                    ((NettyHttpRequest) request).setBody(message);
-                    s.request(1);
                 }
-            }
 
-            @Override
-            protected void doOnError(Throwable t) {
-                try {
-                    s.cancel();
-                    exceptionCaught(context, t);
-                } catch (Exception e) {
-                    // should never happen
-                    writeDefaultErrorResponse(context, request, e, false);
-                }
-            }
-
-            @Override
-            protected void doOnComplete() {
-                for (UnicastProcessor subject : subjects.values()) {
-                    if (!subject.hasComplete()) {
-                        subject.onComplete();
-                    }
-                }
-                executeRoute();
-            }
-
-            private void executeRoute() {
-                if (executed.compareAndSet(false, true)) {
+                @Override
+                protected void doOnError(Throwable t) {
                     try {
-                        routeMatch = prepareRouteForExecution(routeMatch, request, false);
-                        routeMatch.execute();
+                        s.cancel();
+                        exceptionCaught(context, t);
                     } catch (Exception e) {
-                        context.pipeline().fireExceptionCaught(e);
+                        // should never happen
+                        writeDefaultErrorResponse(context, request, e, false);
                     }
                 }
-            }
-        };
+
+                @Override
+                protected void doOnComplete() {
+                    for (UnicastProcessor subject : subjects.values()) {
+                        if (!subject.hasComplete()) {
+                            subject.onComplete();
+                        }
+                    }
+                    executeRoute();
+                }
+
+                private void executeRoute() {
+                    if (executed.compareAndSet(false, true)) {
+                        try {
+                            routeMatch = prepareRouteForExecution(routeMatch, request, false);
+                            routeMatch.execute();
+                        } catch (Exception e) {
+                            context.pipeline().fireExceptionCaught(e);
+                        }
+                    }
+                }
+            };
+        } else {
+            return new CompletionAwareSubscriber<Object>() {
+                private Subscription s;
+                private RouteMatch<?> routeMatch = finalRoute;
+                private AtomicBoolean executed = new AtomicBoolean(false);
+
+                @Override
+                protected void doOnSubscribe(Subscription subscription) {
+                    this.s = subscription;
+                    subscription.request(1);
+                }
+
+                @Override
+                protected void doOnNext(Object message) {
+                    if (message instanceof ByteBufHolder) {
+                        request.addContent((ByteBufHolder) message);
+                        s.request(1);
+                    } else {
+                        ((NettyHttpRequest) request).setBody(message);
+                        s.request(1);
+                    }
+                }
+
+                @Override
+                protected void doOnError(Throwable t) {
+                    try {
+                        s.cancel();
+                        exceptionCaught(context, t);
+                    } catch (Exception e) {
+                        // should never happen
+                        writeDefaultErrorResponse(context, request, e, false);
+                    }
+                }
+
+                @Override
+                protected void doOnComplete() {
+                    if (executed.compareAndSet(false, true)) {
+                        try {
+                            routeMatch = prepareRouteForExecution(routeMatch, request, false);
+                            routeMatch.execute();
+                        } catch (Exception e) {
+                            context.pipeline().fireExceptionCaught(e);
+                        }
+                    }
+                }
+            };
+        }
+
     }
 
     private ExecutorService getIoExecutor() {
@@ -1087,8 +1142,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         );
                                     } else {
                                         MutableHttpResponse<?> finalResponse;
-                                        if (o instanceof MutableHttpResponse) {
-                                            finalResponse = (MutableHttpResponse<?>) o;
+                                        if (o instanceof HttpResponse) {
+                                            finalResponse = toMutableResponse((HttpResponse<?>) o);
                                             o = finalResponse.body();
                                         } else {
                                             finalResponse = message;
@@ -1222,10 +1277,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         });
                                     }
 
-                                    httpContentPublisher = Publishers.then(httpContentPublisher, httpContent -> {
+                                    httpContentPublisher = Publishers.then(httpContentPublisher, httpContent ->
                                         // once an http content is written, read the next item if it is available
-                                        context.read();
-                                    });
+                                        context.read()
+                                    );
 
                                     httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
                                             .doAfterTerminate(() -> cleanupRequest(context, request));
@@ -1319,6 +1374,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     outgoingResponse = newNotFoundError(request);
                 }
             } else {
+                HttpStatus defaultHttpStatus = isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK;
                 boolean isReactive = finalRoute.isAsyncOrReactive() || Publishers.isConvertibleToPublisher(body);
                 if (isReactive) {
                     Class<?> bodyClass = body.getClass();
@@ -1338,10 +1394,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     singleResponse = newNotFoundError(request);
                                 }
                             } else {
-                                if (o instanceof MutableHttpResponse) {
-                                    singleResponse = (MutableHttpResponse<?>) o;
+                                if (o instanceof HttpResponse) {
+                                    singleResponse = toMutableResponse((HttpResponse<?>) o);
                                 } else {
-                                    singleResponse = forStatus(routeMatch.getAnnotationMetadata(), isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK)
+                                    singleResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
                                             .body(o);
                                 }
                             }
@@ -1359,49 +1415,48 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 routeMatch instanceof MethodBasedRouteMatch &&
                                         isKotlinFunctionReturnTypeUnit(((MethodBasedRouteMatch) routeMatch).getExecutableMethod());
                         final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(incomingRequest);
-                        Object suspendedBody;
                         if (isKotlinCoroutineSuspended(body)) {
-                            if (isKotlinFunctionReturnTypeUnit) {
-                                suspendedBody = Completable.create(emitter -> {
-                                    CompletableFuture<?> f = supplier.get();
-                                    f.whenComplete((BiConsumer<Object, Throwable>) (o, throwable) -> {
-                                        if (throwable != null) {
-                                            emitter.onError(throwable);
+                            return Flowable.create(emitter -> {
+                                CompletableFuture<?> f = supplier.get();
+                                f.whenComplete((o, throwable) -> {
+                                    if (throwable != null) {
+                                        emitter.onError(throwable);
+                                    } else {
+                                        MutableHttpResponse<?> response;
+                                        if (o instanceof HttpResponse) {
+                                            response = toMutableResponse((HttpResponse<?>) o);
                                         } else {
-                                            emitter.onComplete();
+                                            response = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus);
+                                            if (!isKotlinFunctionReturnTypeUnit) {
+                                                response = response.body(o);
+                                            }
                                         }
-                                    });
+                                        response.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
+                                        emitter.onNext(response);
+                                        emitter.onComplete();
+                                    }
                                 });
-                            } else {
-                                suspendedBody = Single.create(emitter -> {
-                                    CompletableFuture<?> f = supplier.get();
-                                    f.whenComplete((BiConsumer<Object, Throwable>) (o, throwable) -> {
-                                        if (throwable != null) {
-                                            emitter.onError(throwable);
-                                        } else {
-                                            emitter.onSuccess(o);
-                                        }
-                                    });
-                                });
-                            }
+                            }, BackpressureStrategy.ERROR);
                         } else {
+                            Object suspendedBody;
                             if (isKotlinFunctionReturnTypeUnit) {
                                 suspendedBody = Completable.complete();
                             } else {
                                 suspendedBody = body;
                             }
+                            if (suspendedBody instanceof HttpResponse) {
+                                outgoingResponse = toMutableResponse((HttpResponse<?>) suspendedBody);
+                            } else {
+                                outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
+                                        .body(suspendedBody);
+                            }
                         }
-                        if (suspendedBody instanceof MutableHttpResponse) {
-                            outgoingResponse = (MutableHttpResponse<?>) suspendedBody;
-                        } else {
-                            outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK)
-                                    .body(suspendedBody);
-                        }
+
                     } else {
-                        if (body instanceof MutableHttpResponse) {
-                            outgoingResponse = (MutableHttpResponse<?>) body;
+                        if (body instanceof HttpResponse) {
+                            outgoingResponse = toMutableResponse((HttpResponse<?>) body);
                         } else {
-                            outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK)
+                            outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
                                     .body(body);
                         }
                     }
@@ -1599,7 +1654,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (!isHttp2) {
             if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
                 boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || request.getHeaders().isKeepAlive();
-                if (!expectKeepAlive || httpStatus.getCode() > 299) {
+                if (!expectKeepAlive || httpStatus.getCode() > 499) {
                     nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
                 } else {
                     nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
@@ -1648,6 +1703,24 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (streamId != null) {
             nettyResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
         }
+    }
+
+    private MutableHttpResponse<?> toMutableResponse(HttpResponse<?> message) {
+        MutableHttpResponse<?> mutableHttpResponse;
+        if (message instanceof MutableHttpResponse) {
+            mutableHttpResponse = (MutableHttpResponse<?>) message;
+        } else {
+            HttpStatus httpStatus = message.status();
+            mutableHttpResponse = HttpResponse.status(httpStatus, httpStatus.getReason());
+            mutableHttpResponse.body(message.body());
+            message.getHeaders().forEach((name, value) -> {
+                for (String val: value) {
+                    mutableHttpResponse.header(name, val);
+                }
+            });
+            mutableHttpResponse.getAttributes().putAll(message.getAttributes());
+        }
+        return mutableHttpResponse;
     }
 
     @NotNull
@@ -1845,10 +1918,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (serverConfiguration.isDateHeader() && !headers.contains(HttpHeaders.DATE)) {
             headers.date(LocalDateTime.now());
         }
-        if (serverHeader != null) {
-            if (!headers.contains(HttpHeaders.SERVER)) {
-                headers.add(HttpHeaders.SERVER, serverHeader);
-            }
+        if (serverHeader != null && !headers.contains(HttpHeaders.SERVER)) {
+            headers.add(HttpHeaders.SERVER, serverHeader);
         }
     }
 

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,7 @@ import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,6 +44,14 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      */
     default Optional<Boolean> getDeduceEnvironments() {
         return Optional.empty();
+    }
+
+    /**
+     * @return The default environments to be applied if no other environments
+     * are explicitly specified.
+     */
+    default List<String> getDefaultEnvironments() {
+        return Collections.emptyList();
     }
 
     /**
@@ -85,7 +94,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     }
 
     /**
-     * The config locations
+     * The config locations.
      *
      * @return The config locations
      */

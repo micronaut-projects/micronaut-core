@@ -9,10 +9,16 @@ dependencies {
     api project(":websocket")
     api project(":buffer-netty")
 
-    api dependencyVersion("netty")
+    api dependencyModuleVersion("netty", "netty-codec-http")
     api dependencyModuleVersion("netty", "netty-handler")
     api dependencyModuleVersion("netty", "netty-codec-http2")
 
     implementation dependencyVersion("rxjava2")
+}
 
+spotless {
+    format 'javaMisc', {
+        targetExclude '**/io/micronaut/http/netty/stream/package-info.java',
+                '**/io/micronaut/http/netty/reactive/package-info.java'
+    }
 }

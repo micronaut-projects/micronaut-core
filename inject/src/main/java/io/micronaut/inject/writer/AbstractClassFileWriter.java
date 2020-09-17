@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,16 +25,11 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.*;
 import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
-
-import edu.umd.cs.findbugs.annotations.NonNull;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -102,6 +97,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         NAME_TO_TYPE_MAP.put("long", "J");
         NAME_TO_TYPE_MAP.put("double", "D");
         NAME_TO_TYPE_MAP.put("float", "F");
+        NAME_TO_TYPE_MAP.put("short", "S");
     }
 
     protected final Element originatingElement;
@@ -155,7 +151,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 generatorAdapter.push(i);
                 String argumentName = entry.getKey();
                 ClassElement classElement = entry.getValue();
-                Object classReference = toClassReference(classElement);
+                Object classReference = getTypeReference(classElement);
                 Map<String, ClassElement> typeArguments = null;
 
                 if (!classElement.getName().equals(declaringElement.getName())) {
@@ -176,28 +172,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 i++;
             }
         }
-
     }
-
-    private static Object toClassReference(ClassElement classElement) {
-        String n = classElement.getName();
-        Object classReference;
-        if (classElement.isPrimitive()) {
-            if (classElement.isArray()) {
-                classReference = ClassUtils.arrayTypeForPrimitive(n).map(t -> (Object) t).orElse(n);
-            } else {
-                classReference = ClassUtils.getPrimitiveType(n).map(t -> (Object) t).orElse(n);
-            }
-        } else {
-            if (classElement.isArray()) {
-                classReference = n + "[]";
-            } else {
-                classReference = n;
-            }
-        }
-        return classReference;
-    }
-
 
     /**
      * Pushes type arguments onto the stack.
@@ -255,7 +230,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 METHOD_CREATE_ARGUMENT_SIMPLE
         );
     }
-
 
     /**
      * Builds generic type arguments recursively.
@@ -420,37 +394,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     /**
-     * Obtain the type for a given element.
-     *
-     * @param type The element type
-     * @return The type
-     */
-    protected Type getTypeForElement(@NonNull TypedElement type) {
-        Type propertyType;
-        final Optional<Class> pt;
-        final String typeName = type.getName();
-        if (type.isPrimitive()) {
-            if (type.isArray()) {
-                pt = ClassUtils.arrayTypeForPrimitive(typeName);
-            } else {
-                pt = ClassUtils.getPrimitiveType(typeName);
-            }
-        } else {
-            pt = Optional.empty();
-        }
-        if (pt.isPresent()) {
-            propertyType = getTypeReference(pt.get());
-        } else {
-            if (type.isArray()) {
-                propertyType = getTypeReference(typeName + "[]");
-            } else {
-                propertyType = getTypeReference(typeName);
-            }
-        }
-        return propertyType;
-    }
-
-    /**
      * Converts a map of class elements to type arguments.
      *
      * @param typeArguments The type arguments
@@ -475,12 +418,12 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 if (CollectionUtils.isNotEmpty(subArgs)) {
                     Map<String, Object> m = toTypeArguments(subArgs, visitedTypes);
                     if (CollectionUtils.isNotEmpty(m)) {
-                        map.put(entry.getKey(), m);
+                        map.put(entry.getKey(), Collections.singletonMap(getTypeReference(ce), m));
                     } else {
                         map.put(entry.getKey(), Collections.singletonMap(entry.getKey(), className));
                     }
                 } else {
-                    final Type typeReference = getTypeForElement(ce);
+                    final Type typeReference = getTypeReference(ce);
                     map.put(entry.getKey(), typeReference);
                 }
             }
@@ -522,7 +465,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             if (type == null) {
                 continue;
             }
-            final Type typeReference = getTypeForElement(type);
+            final Type typeReference = getTypeReference(type);
             map.put(ce.getName(), typeReference);
         }
 
@@ -615,6 +558,40 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             return Type.getObjectType(internalName);
         } else {
             throw new IllegalArgumentException("Type reference [" + type + "] should be a Class or a String representing the class name");
+        }
+    }
+
+    /**
+     * Return the type reference for a class.
+     *
+     * @param type The type
+     * @return The {@link Type}
+     */
+    protected static Type getTypeReference(TypedElement type) {
+        if (type.isPrimitive()) {
+            String internalName = NAME_TO_TYPE_MAP.get(type.getName());
+            if (type.isArray()) {
+                StringBuilder name = new StringBuilder(internalName);
+                for (int i = 0; i < type.getArrayDimensions(); i++) {
+                    name.insert(0, "[");
+                }
+                return Type.getObjectType(name.toString());
+            } else {
+                return Type.getType(internalName);
+            }
+        } else {
+            String internalName = type.getName().replace('.', '/');
+            if (type.isArray()) {
+                StringBuilder name = new StringBuilder(internalName);
+                name.insert(0, "L");
+                for (int i = 0; i < type.getArrayDimensions(); i++) {
+                    name.insert(0, "[");
+                }
+                name.append(";");
+                return Type.getObjectType(name.toString());
+            } else {
+                return Type.getObjectType(internalName);
+            }
         }
     }
 
@@ -914,11 +891,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             return NAME_TO_TYPE_MAP.get(className);
         } else {
             String internalName = getInternalName(className);
-            StringBuilder start;
+            StringBuilder start = new StringBuilder(40);
             if (className.endsWith("[]")) {
-                start = new StringBuilder("[L" + internalName);
+                start.append("[L").append(internalName);
             } else {
-                start = new StringBuilder('L' + internalName);
+                start.append('L').append(internalName);
             }
             if (genericTypes != null && genericTypes.length > 0) {
                 start.append('<');
@@ -944,7 +921,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             builder.append(getTypeDescriptor(argumentType));
         }
 
-        builder.append(")");
+        builder.append(')');
 
         builder.append(getTypeDescriptor(returnType));
         return builder.toString();
@@ -963,7 +940,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             builder.append(getTypeDescriptor(argumentType));
         }
 
-        builder.append(")");
+        builder.append(')');
 
         builder.append(getTypeDescriptor(returnType));
         return builder.toString();
@@ -982,7 +959,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             builder.append(argumentType);
         }
 
-        builder.append(")");
+        builder.append(')');
 
         builder.append(returnTypeReference);
         return builder.toString();

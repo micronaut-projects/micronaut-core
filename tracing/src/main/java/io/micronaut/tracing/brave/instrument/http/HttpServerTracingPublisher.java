@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,7 +42,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse<?>> {
+public class HttpServerTracingPublisher implements Publishers.MicronautPublisher<MutableHttpResponse<?>> {
 
     private final Publisher<MutableHttpResponse<?>> publisher;
     private final HttpServerHandler<HttpServerRequest, HttpServerResponse> serverHandler;
@@ -105,10 +105,10 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
                                         openTracer.activeSpan()
                                 );
 
-                                ((MutableHttpResponse) response).body(Publishers.convertPublisher(scopedPublisher, type));
+                                response.body(Publishers.convertPublisher(scopedPublisher, type));
                             }
                         }
-                        serverHandler.handleSend(mapResponse(request, response), null, span);
+                        serverHandler.handleSend(mapResponse(request, response), span);
                         actual.onNext(response);
                     }
                 }
@@ -120,7 +120,7 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
                         if (error instanceof HttpStatusException) {
                             statusCode = ((HttpStatusException) error).getStatus().getCode();
                         }
-                        serverHandler.handleSend(mapResponse(request, statusCode), error, span);
+                        serverHandler.handleSend(mapResponse(request, statusCode, error), span);
                         actual.onError(error);
                     }
                 }
@@ -157,8 +157,13 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
         };
     }
 
-    private HttpServerResponse mapResponse(HttpRequest<?> request, int statusCode) {
+    private HttpServerResponse mapResponse(HttpRequest<?> request, int statusCode, Throwable error) {
         return new HttpServerResponse() {
+            @Override
+            public Throwable error() {
+                return error;
+            }
+
             @Override
             public Object unwrap() {
                 return this;

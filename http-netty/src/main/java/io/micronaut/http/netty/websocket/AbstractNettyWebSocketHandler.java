@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -164,9 +164,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         if (Publishers.isConvertibleToPublisher(result)) {
                             Flowable<?> flowable = instrumentPublisher(ctx, result);
                             flowable.subscribe(
-                                    (o) -> {
+                                    o -> {
                                     },
-                                    (error) -> {
+                                    error -> {
                                         if (LOG.isErrorEnabled()) {
                                             LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + error.getMessage(), error);
                                         }
@@ -236,11 +236,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 if (Publishers.isConvertibleToPublisher(result)) {
                     Flowable<?> flowable = instrumentPublisher(ctx, result);
                     flowable.toList().subscribe((BiConsumer<List<?>, Throwable>) (objects, throwable) -> {
-                        if (throwable != null) {
-
-                            if (LOG.isErrorEnabled()) {
-                                LOG.error("Error subscribing to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + throwable.getMessage(), throwable);
-                            }
+                        if (throwable != null && LOG.isErrorEnabled()) {
+                            LOG.error("Error subscribing to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + throwable.getMessage(), throwable);
                         }
                         handleUnexpected(ctx, throwable);
                     });
@@ -321,7 +318,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
                 Argument<?> bodyArgument = this.getBodyArgument();
                 Optional<?> converted = ConversionService.SHARED.convert(msg.content(), bodyArgument);
-                NettyRxWebSocketSession currentSession = getSession();
 
                 if (!converted.isPresent()) {
                     MediaType mediaType;
@@ -345,6 +341,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 if (converted.isPresent()) {
                     Object v = converted.get();
 
+                    NettyRxWebSocketSession currentSession = getSession();
                     ExecutableBinder<WebSocketState> executableBinder = new DefaultExecutableBinder<>(
                             Collections.singletonMap(bodyArgument, v)
                     );
@@ -360,9 +357,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         if (Publishers.isConvertibleToPublisher(result)) {
                             Flowable<?> flowable = instrumentPublisher(ctx, result);
                             flowable.subscribe(
-                                    (o) -> {
+                                    o -> {
                                     },
-                                    (error) -> {
+                                    error -> {
                                         if (LOG.isErrorEnabled()) {
                                             LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + error.getMessage(), error);
                                         }
@@ -484,11 +481,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         if (Publishers.isConvertibleToPublisher(result)) {
             Flowable<?> flowable = instrumentPublisher(ctx, result);
             flowable.toList().subscribe((BiConsumer<List<?>, Throwable>) (objects, throwable) -> {
-                if (throwable != null) {
-
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error subscribing to @" + (isClose ? "OnClose" : "OnError") + " handler for WebSocket bean [" + target + "]: " + throwable.getMessage(), throwable);
-                    }
+                if (throwable != null && LOG.isErrorEnabled()) {
+                    LOG.error("Error subscribing to @" + (isClose ? "OnClose" : "OnError") + " handler for WebSocket bean [" + target + "]: " + throwable.getMessage(), throwable);
                 }
                 ctx.close();
             });

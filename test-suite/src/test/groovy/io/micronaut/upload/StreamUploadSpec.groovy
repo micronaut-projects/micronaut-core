@@ -145,9 +145,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         response.code() == HttpStatus.OK.code
         result.length() == data.length()
         result == data
-
     }
-
 
     void "test non-blocking upload with publisher receiving part datas"() {
         given:
@@ -156,7 +154,6 @@ class StreamUploadSpec extends AbstractMicronautSpec {
                 .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
                 .addPart("title", "bar")
                 .build()
-
 
         when:
         Flowable<HttpResponse<Long>> flowable = Flowable.fromPublisher(client.exchange(
@@ -445,6 +442,29 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         response.body().contains('bar')
     }
 
+    void "test whole multipart body with principal"() {
+        when: "a large document with partial data is uploaded"
+        def val = 'xxxx'
+        def data = '{"title":"Big ' + val + '"}'
+        def requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .addPart("title", "bar")
+                .build()
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-multipart-body-principal", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
+                String
+        ))
+        def response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().contains('"title":"Big xx')
+        response.body().contains('bar')
+    }
+
+    @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.http.client.read-timeout': 300]
     }

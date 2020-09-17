@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -70,7 +70,7 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder eagerInitAnnotated(Class<? extends Annotation>... annotations);
 
     /**
-     * Override default config locations
+     * Override default config locations.
      *
      * @param configLocations The config locations
      * @return This environment
@@ -101,6 +101,14 @@ public interface ApplicationContextBuilder {
      * @return This builder
      */
     @NonNull ApplicationContextBuilder environments(@Nullable String... environments);
+
+    /**
+     * The environments to use if no other environments are specified.
+     *
+     * @param environments The environments
+     * @return This builder
+     */
+    @NonNull ApplicationContextBuilder defaultEnvironments(@Nullable String... environments);
 
     /**
      * The packages to include for package scanning.
@@ -207,7 +215,6 @@ public interface ApplicationContextBuilder {
     default @NonNull ApplicationContext start() {
         return build().start();
     }
-
 
     /**
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type.

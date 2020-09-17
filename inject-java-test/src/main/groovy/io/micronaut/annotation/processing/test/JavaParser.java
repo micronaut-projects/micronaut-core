@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,9 @@ import io.micronaut.annotation.processing.*;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.util.CollectionUtils;
+import spock.util.environment.Jvm;
+
 import javax.annotation.processing.Processor;
 import javax.lang.model.element.Element;
 import javax.tools.*;
@@ -79,13 +82,14 @@ public class JavaParser implements Closeable {
      * @return The elements
      */
     public Iterable<? extends Element> parse(JavaFileObject... sources) {
+        Set<String> options = getCompilerOptions();
         JavacTask task =
                 ((JavacTool) compiler)
                         .getTask(
                                 null, // explicitly use the default because old javac logs some output on stderr
                                 fileManager,
                                 diagnosticCollector,
-                                Collections.emptySet(),
+                                options,
                                 Collections.emptySet(),
                                 Arrays.asList(sources),
                                 context);
@@ -144,14 +148,14 @@ public class JavaParser implements Closeable {
      * @return The java file objects
      */
     public Iterable<? extends JavaFileObject> generate(JavaFileObject... sources) {
-
+        Set<String> options = getCompilerOptions();
         JavacTask task =
                 ((JavacTool) compiler)
                         .getTask(
                                 null, // explicitly use the default because old javac logs some output on stderr
                                 fileManager,
                                 diagnosticCollector,
-                                Collections.emptySet(),
+                                options,
                                 Collections.emptySet(),
                                 Arrays.asList(sources),
                                 context);
@@ -175,6 +179,20 @@ public class JavaParser implements Closeable {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private Set<String> getCompilerOptions() {
+        Set<String> options;
+        if (Jvm.getCurrent().isJava14Compatible()) {
+            options = CollectionUtils.setOf(
+                    "--enable-preview",
+                    "-source",
+                    "14"
+            );
+        } else {
+            options = Collections.emptySet();
+        }
+        return options;
     }
 
     /**

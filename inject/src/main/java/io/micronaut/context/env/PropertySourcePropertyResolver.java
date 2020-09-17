@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -466,13 +466,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             @Nullable StringConvention keyConvention,
             MapFormat.MapTransformation transformation) {
         final Argument<?> valueType = conversionContext.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT);
+        boolean valueTypeIsList = List.class.isAssignableFrom(valueType.getType());
         Map<String, Object> subMap = new LinkedHashMap<>(entries.size());
 
         String prefix = name + '.';
         for (Map.Entry<String, Object> entry : entries.entrySet()) {
             final String key = entry.getKey();
+
+            if (valueTypeIsList && key.contains("[") && key.endsWith("]")) {
+                continue;
+            }
+
             if (key.startsWith(prefix)) {
                 String subMapKey = key.substring(prefix.length());
+
                 Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
 
                 if (transformation == MapFormat.MapTransformation.FLAT) {
@@ -536,7 +543,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         }
                         if (first) {
                             Map<String, Object> normalized = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.NORMALIZED);
-                            normalized.put(propertyName, value);
+                            if (normalized != null) {
+                                normalized.put(propertyName, value);
+                            }
                             first = false;
                         }
                     } else {
@@ -706,16 +715,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      */
     @SuppressWarnings("MagicNumber")
     protected Map<String, Object> resolveEntriesForKey(String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
-        Map<String, Object> entries = null;
         if (name.length() == 0) {
             return null;
         }
         final Map<String, Object>[] catalog = getCatalog(propertyCatalog);
 
+        Map<String, Object> entries = null;
         char firstChar = name.charAt(0);
         if (Character.isLetter(firstChar)) {
-            int index = ((int) firstChar) - 65;
-            if (index < catalog.length && index > 0) {
+            int index = firstChar - 65;
+            if (index < catalog.length && index >= 0) {
                 entries = catalog[index];
                 if (allowCreate && entries == null) {
                     entries = new LinkedHashMap<>(5);

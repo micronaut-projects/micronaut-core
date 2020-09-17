@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,14 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -164,7 +167,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpResponse<T> notAllowed(HttpMethod... allowed) {
         return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.METHOD_NOT_ALLOWED)
-            .headers((headers) -> headers.allow(allowed));
+            .headers(headers -> headers.allow(allowed));
     }
 
     /**
@@ -187,7 +190,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpResponse<T> notAllowedGeneric(Set<? extends CharSequence> allowed) {
         return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.METHOD_NOT_ALLOWED)
-                .headers((headers) -> headers.allowGeneric(allowed));
+                .headers(headers -> headers.allowGeneric(allowed));
     }
 
     /**
@@ -230,7 +233,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpResponse<T> accepted(URI location) {
         return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.ACCEPTED)
-                .headers((headers) ->
+                .headers(headers ->
                     headers.location(location)
                 );
     }
@@ -287,7 +290,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpResponse<T> created(URI location) {
         return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.CREATED)
-            .headers((headers) ->
+            .headers(headers ->
                 headers.location(location)
             );
     }
@@ -303,7 +306,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     static <T> MutableHttpResponse<T> created(T body, URI location) {
         return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.CREATED)
             .body(body)
-            .headers((headers) -> headers.location(location));
+            .headers(headers -> headers.location(location));
     }
 
     /**
@@ -315,7 +318,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpResponse<T> seeOther(URI location) {
         return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.SEE_OTHER)
-            .headers((headers) ->
+            .headers(headers ->
                 headers.location(location)
             );
     }
@@ -329,7 +332,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpResponse<T> temporaryRedirect(URI location) {
         return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.TEMPORARY_REDIRECT)
-            .headers((headers) ->
+            .headers(headers ->
                 headers.location(location)
             );
     }
@@ -343,7 +346,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpResponse<T> permanentRedirect(URI location) {
         return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.PERMANENT_REDIRECT)
-            .headers((headers) ->
+            .headers(headers ->
                 headers.location(location)
             );
     }
@@ -357,7 +360,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpResponse<T> redirect(URI location) {
         return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.MOVED_PERMANENTLY)
-            .headers((headers) ->
+            .headers(headers ->
                 headers.location(location)
             );
     }
@@ -397,5 +400,22 @@ public interface HttpResponse<B> extends HttpMessage<B> {
         } catch (URISyntaxException e) {
             throw new UriSyntaxException(e);
         }
+    }
+
+    /**
+     * Helper method for retrieving all Cookies on a response.
+     * @return The cookies on the response
+     */
+    default Cookies getCookies() {
+        throw new UnsupportedOperationException("Operation not supported on a " + this.getClass() + " response.");
+    }
+
+    /**
+     * Helper method for retrieving a single Cookie on a response.
+     * @param name The name of the Cookie
+     * @return The Cookie
+     */
+    default Optional<Cookie> getCookie(String name) {
+        throw new UnsupportedOperationException("Operation not supported on a " + this.getClass() + " response.");
     }
 }

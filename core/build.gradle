@@ -24,3 +24,16 @@ dependencies {
     }
 }
 
+spotless {
+    java {
+        targetExclude '**/io/micronaut/core/io/scan/AnnotationClassReader.java',
+                '**/io/micronaut/core/io/scan/Attribute.java',
+                '**/io/micronaut/core/io/scan/Context.java',
+                '**/io/micronaut/core/util/clhm/**',
+                '**/io/micronaut/core/util/AntPathMatcher.java'
+    }
+    format 'javaMisc', {
+        targetExclude '**/io/micronaut/core/util/clhm/**'
+    }
+}
+

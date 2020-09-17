@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.concurrent.DefaultThreadFactory;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -41,23 +43,29 @@ import java.util.concurrent.ThreadFactory;
 @BootstrapContextCompatible
 public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     private final EventLoopGroupFactory eventLoopGroupFactory;
-    private final ThreadFactory threadFactory;
     private final BeanLocator beanLocator;
 
     /**
      * Default constructor.
      *
      * @param eventLoopGroupFactory The event loop group factory
-     * @param threadFactory         The thread factory
      * @param beanLocator           The bean locator
      */
-    public DefaultEventLoopGroupRegistry(
-            EventLoopGroupFactory eventLoopGroupFactory,
-            @Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
-            BeanLocator beanLocator) {
+    public DefaultEventLoopGroupRegistry(EventLoopGroupFactory eventLoopGroupFactory, BeanLocator beanLocator) {
         this.eventLoopGroupFactory = eventLoopGroupFactory;
-        this.threadFactory = threadFactory;
         this.beanLocator = beanLocator;
+    }
+
+    /**
+     * Constructs an event loop group thread factory.
+     *
+     * @param configuration The configuration
+     * @return The thread factory
+     */
+    @EachBean(EventLoopGroupConfiguration.class)
+    @BootstrapContextCompatible
+    protected ThreadFactory eventLoopGroupThreadFactory(EventLoopGroupConfiguration configuration) {
+        return new DefaultThreadFactory(configuration.getName() + "-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class));
     }
 
     /**
@@ -79,6 +87,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
                                       configuration.getIoRatio().orElse(null)
                               )).orElseThrow(() -> new ConfigurationException("No executor service configured for name: " + executor));
         } else {
+            ThreadFactory threadFactory = beanLocator.getBean(ThreadFactory.class, Qualifiers.byName(configuration.getName()));
             return eventLoopGroupFactory.createEventLoopGroup(configuration, threadFactory);
         }
     }
@@ -86,6 +95,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     /**
      * Constructs an event loop group with default Configuration.
      *
+     * @param threadFactory The default Netty thread factory
      * @return The event loop group
      */
     @Singleton
@@ -93,7 +103,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     @Primary
     @Bean(preDestroy = "shutdownGracefully")
     @BootstrapContextCompatible
-    protected EventLoopGroup defaultEventLoopGroup() {
+    protected EventLoopGroup defaultEventLoopGroup(@Named(NettyThreadFactory.NAME) ThreadFactory threadFactory) {
         return eventLoopGroupFactory.createEventLoopGroup(new DefaultEventLoopGroupConfiguration(), threadFactory);
     }
 

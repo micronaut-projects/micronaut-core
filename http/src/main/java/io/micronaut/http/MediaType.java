@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,7 +38,6 @@ import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -343,7 +342,7 @@ public class MediaType implements CharSequence {
     private BigDecimal qualityNumberField;
 
     static {
-        ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence -> {
+        ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, charSequence -> {
                     if (StringUtils.isNotEmpty(charSequence)) {
                         return new MediaType(charSequence.toString());
                     }
@@ -520,7 +519,7 @@ public class MediaType implements CharSequence {
      * @return The charset of the media type if specified
      */
     public Optional<Charset> getCharset() {
-        return getParameters().get("charset").map(Charset::forName);
+        return getParameters().get(CHARSET_PARAMETER).map(Charset::forName);
     }
 
     @Override

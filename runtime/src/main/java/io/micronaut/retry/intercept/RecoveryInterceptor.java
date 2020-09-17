@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +27,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.retry.annotation.Fallback;
+import io.micronaut.retry.annotation.Recoverable;
 import io.micronaut.retry.exception.FallbackException;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
@@ -53,7 +54,10 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
     public static final int POSITION = InterceptPhase.RETRY.getPosition() - 10;
 
     private static final Logger LOG = LoggerFactory.getLogger(RecoveryInterceptor.class);
+    private static final String FALLBACK_NOT_FOUND = "FALLBACK_NOT_FOUND";
+
     private final BeanContext beanContext;
+
 
     /**
      * @param beanContext The bean context to allow for DI of class annotated with {@link javax.inject.Inject}.
@@ -69,6 +73,9 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
+        if (context.getAttribute(FALLBACK_NOT_FOUND, Boolean.class).orElse(Boolean.FALSE)) {
+            return context.proceed();
+        }
         try {
             Object result = context.proceed();
             if (result != null) {
@@ -126,7 +133,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
      * @return The fallback method if it is present
      */
     public Optional<? extends MethodExecutionHandle<?, Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
-        Class<?> declaringType = context.getDeclaringType();
+        Class<?> declaringType = context.classValue(Recoverable.class, "api").orElseGet(context::getDeclaringType);
         BeanDefinition<?> beanDefinition = beanContext.findBeanDefinition(declaringType, Qualifiers.byStereotype(Fallback.class)).orElse(null);
         if (beanDefinition != null) {
             ExecutableMethod<?, Object> fallBackMethod =
@@ -136,6 +143,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
                 return Optional.of(executionHandle);
             }
         }
+        context.setAttribute(FALLBACK_NOT_FOUND, Boolean.TRUE);
         return Optional.empty();
     }
 
