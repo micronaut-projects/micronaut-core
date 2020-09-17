@@ -71,7 +71,7 @@ ext {
             'junit5': [
                     group  : 'org.junit',
                     name   : 'junit-bom',
-                    version: junit5Version
+                    version: junitVersion
             ],
             'jackson':[
                     group:'com.fasterxml.jackson',

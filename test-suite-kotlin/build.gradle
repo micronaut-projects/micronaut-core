@@ -18,7 +18,7 @@ dependencies {
     testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-rx2:1.3.9"
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
-    testImplementation("org.junit.jupiter:junit-jupiter-api:$junit5Version")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
 
     testImplementation project(":validation")
     testImplementation project(":management")
@@ -44,7 +44,7 @@ dependencies {
     testImplementation project(':tracing')
     kaptTest project(':inject-java')
     kaptTest project(':validation')
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junit5Version"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junitVersion"
     testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.859'
 }
 
