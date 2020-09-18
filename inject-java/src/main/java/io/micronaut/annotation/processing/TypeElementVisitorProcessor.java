@@ -284,7 +284,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     concreteClass.getQualifiedName().equals(classElement.getQualifiedName());
             if (shouldVisit) {
                 if (typeAnnotationMetadata.hasStereotype(Introduction.class) || (typeAnnotationMetadata.hasStereotype(Introspected.class) && modelUtils.isAbstract(classElement))) {
-                    classElement.asType().accept(new PublicAbstractMethodVisitor<Object, Object>(classElement, modelUtils, elementUtils) {
+                    classElement.asType().accept(new PublicAbstractMethodVisitor<Object, Object>(classElement, javaVisitorContext) {
                         @Override
                         protected void accept(DeclaredType type, Element element, Object o) {
                             if (element instanceof ExecutableElement) {

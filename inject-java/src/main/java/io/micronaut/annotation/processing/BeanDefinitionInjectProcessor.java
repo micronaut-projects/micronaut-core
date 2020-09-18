@@ -593,7 +593,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         null
                 );
             }
-            classElement.asType().accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(classElement, modelUtils, elementUtils) {
+            classElement.asType().accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(classElement, javaVisitorContext) {
 
                 @Override
                 protected boolean isAcceptableMethod(ExecutableElement executableElement) {
@@ -1044,7 +1044,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     proxyWriter.visitTypeArguments(beanTypeArguments);
                 }
 
-                returnType.accept(new PublicMethodVisitor<Object, AopProxyWriter>(typeUtils) {
+                returnType.accept(new PublicMethodVisitor<Object, AopProxyWriter>(javaVisitorContext) {
                     @Override
                     protected void accept(DeclaredType type, Element element, AopProxyWriter aopProxyWriter) {
                         ExecutableElement method = (ExecutableElement) element;
@@ -1128,7 +1128,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }, proxyWriter);
             } else if (methodAnnotationMetadata.hasStereotype(Executable.class)) {
 
-                returnType.accept(new PublicMethodVisitor<Object, BeanDefinitionWriter>(typeUtils) {
+                returnType.accept(new PublicMethodVisitor<Object, BeanDefinitionWriter>(javaVisitorContext) {
                     @Override
                     protected void accept(DeclaredType type, Element element, BeanDefinitionWriter beanWriter) {
                         ExecutableElement method = (ExecutableElement) element;
@@ -1442,7 +1442,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             typeVariables.put(typeArgument.toString(), typeArgument);
                         }
 
-                        typeToImplement.accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(typeElement, modelUtils, elementUtils) {
+                        typeToImplement.accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(typeElement, javaVisitorContext) {
                             boolean first = true;
 
                             @Override
@@ -1976,7 +1976,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet());
             Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.emptySet());
 
-            PublicMethodVisitor visitor = new PublicMethodVisitor(typeUtils) {
+            PublicMethodVisitor visitor = new PublicMethodVisitor(javaVisitorContext) {
                 @Override
                 protected void accept(DeclaredType type, Element element, Object o) {
                     ExecutableElement method = (ExecutableElement) element;
