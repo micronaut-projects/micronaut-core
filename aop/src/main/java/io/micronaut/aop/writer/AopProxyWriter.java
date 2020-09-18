@@ -921,8 +921,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 isInterface ? TYPE_OBJECT.getInternalName() : getTypeReference(targetClassFullName).getInternalName(),
                 interfaces);
 
-        proxyClassWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
-
         // set $proxyMethods field
         proxyConstructorGenerator.loadThis();
         proxyConstructorGenerator.push(proxyMethodCount);
