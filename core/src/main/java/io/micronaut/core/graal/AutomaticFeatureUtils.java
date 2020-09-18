@@ -24,6 +24,7 @@ import org.graalvm.nativeimage.hosted.Feature.BeforeAnalysisAccess;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -48,7 +49,19 @@ public final class AutomaticFeatureUtils {
      * @param className the class name
      */
     public static void initializeAtBuildTime(BeforeAnalysisAccess access, String className) {
-        findClass(access, className).ifPresent(RuntimeClassInitialization::initializeAtBuildTime);
+        initializeAtBuildTime(access, new String[]{ className });
+    }
+
+    /**
+     * Marks the given class to be initialized at build time, only if it is present.
+     *
+     * @param access     The {@link BeforeAnalysisAccess} instance
+     * @param classNames The class names
+     */
+    public static void initializeAtBuildTime(BeforeAnalysisAccess access, String... classNames) {
+        for (String className : classNames) {
+            findClass(access, className).ifPresent(RuntimeClassInitialization::initializeAtBuildTime);
+        }
     }
 
     /**
@@ -58,7 +71,19 @@ public final class AutomaticFeatureUtils {
      * @param className the class name
      */
     public static void initializeAtRunTime(BeforeAnalysisAccess access, String className) {
-        findClass(access, className).ifPresent(RuntimeClassInitialization::initializeAtRunTime);
+        initializeAtRunTime(access, new String[] { className });
+    }
+
+    /**
+     * Marks the given class to be initialized at runtime, only if it is present.
+     *
+     * @param access     The {@link BeforeAnalysisAccess} instance
+     * @param classNames The class names
+     */
+    public static void initializeAtRunTime(BeforeAnalysisAccess access, String... classNames) {
+        for (String className : classNames) {
+            findClass(access, className).ifPresent(RuntimeClassInitialization::initializeAtRunTime);
+        }
     }
 
     /**
@@ -150,6 +175,85 @@ public final class AutomaticFeatureUtils {
         }
     }
 
+    /**
+     * Initializes the packages at build time.
+     *
+     * @param packages The packages
+     */
+    public static void initializePackagesAtBuildTime(String... packages) {
+        RuntimeClassInitialization.initializeAtBuildTime(packages);
+    }
+
+    /**
+     * Initializes the packages at run time.
+     *
+     * @param packages The packages
+     */
+    public static void initializePackagesAtRunTime(String... packages) {
+        RuntimeClassInitialization.initializeAtRunTime(packages);
+    }
+
+    /**
+     * Register all constructors of the given class for runtime reflection, only if the class is present.
+     *
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
+     */
+    public static void registerConstructorsForRuntimeReflection(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerConstructorsForRuntimeReflection);
+    }
+
+    /**
+     * Register the class for reflective instantiation at runtime, only if it is present.
+     *
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
+     */
+    public static void registerClassForRuntimeReflectiveInstantiation(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerForReflectiveInstantiation);
+    }
+
+    /**
+     * Register the class and allow reflective instantiation at runtime, only if it is present.
+     *
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
+     */
+    public static void registerClassForRuntimeReflectionAndReflectiveInstantiation(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerForRuntimeReflectionAndReflectiveInstantiation);
+    }
+
+    /**
+     * Register the class and allow reflective instantiation at runtime.
+     *
+     * @param clazz the class
+     */
+    public static void registerClassForRuntimeReflectionAndReflectiveInstantiation(Class<?> clazz) {
+        AutomaticFeatureUtils.registerForRuntimeReflectionAndReflectiveInstantiation(clazz);
+    }
+
+    /**
+     * Register class for runtime reflection and allows reflective instantiation. Also register all fields, methods and
+     * constructors for runtime reflection; only if the class is present.
+     *
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
+     */
+    public static void registerAllForRuntimeReflectionAndReflectiveInstantiation(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerAllForRuntimeReflectionAndReflectiveInstantiation);
+    }
+
+    /**
+     * Register class for runtime reflection and allows reflective instantiation. Also register all fields and methods
+     * for runtime reflection; only if the class is present.
+     *
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
+     */
+    public static void registerFieldsAndMethodsWithReflectiveAccess(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerFieldsAndMethodsWithReflectiveAccess);
+    }
+
     private static void registerAllAccess(Class<?> clazz) {
         registerClassForRuntimeReflection(clazz);
         registerFieldsForRuntimeReflection(clazz);
@@ -175,6 +279,46 @@ public final class AutomaticFeatureUtils {
 
     private static Optional<Class<?>> findClass(BeforeAnalysisAccess access, String className) {
         return Optional.ofNullable(access.findClassByName(className));
+    }
+
+    private static void registerAllForRuntimeReflectionAndReflectiveInstantiation(Class<?> clazz) {
+        registerForRuntimeReflection(clazz);
+        registerForReflectiveInstantiation(clazz);
+        registerFieldsForRuntimeReflection(clazz);
+        registerMethodsForRuntimeReflection(clazz);
+        registerConstructorsForRuntimeReflection(clazz);
+    }
+
+    private static void registerAllForRuntimeReflection(Class<?> clazz) {
+        registerForRuntimeReflection(clazz);
+        registerFieldsForRuntimeReflection(clazz);
+        registerMethodsForRuntimeReflection(clazz);
+        registerConstructorsForRuntimeReflection(clazz);
+    }
+
+    private static void registerFieldsAndMethodsWithReflectiveAccess(Class<?> clazz) {
+        registerForRuntimeReflectionAndReflectiveInstantiation(clazz);
+        registerMethodsForRuntimeReflection(clazz);
+        registerFieldsForRuntimeReflection(clazz);
+    }
+
+    private static void registerForRuntimeReflection(Class<?> clazz) {
+        RuntimeReflection.register(clazz);
+    }
+
+    private static void registerForReflectiveInstantiation(Class<?> clazz) {
+        RuntimeReflection.registerForReflectiveInstantiation(clazz);
+    }
+
+    private static void registerForRuntimeReflectionAndReflectiveInstantiation(Class<?> clazz) {
+        RuntimeReflection.register(clazz);
+        RuntimeReflection.registerForReflectiveInstantiation(clazz);
+    }
+
+    private static void registerConstructorsForRuntimeReflection(Class<?> clazz) {
+        for (Constructor<?> constructor : clazz.getConstructors()) {
+            RuntimeReflection.register(constructor);
+        }
     }
 
 }
