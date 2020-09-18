@@ -20,6 +20,7 @@ class EndpointsPortSpec extends Specification {
         def port = SocketUtils.findAvailableTcpPort()
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
+                'micronaut.application.name': 'foo',
                 'endpoints.all.port': port,
                 'endpoints.all.enabled': true
         ])
