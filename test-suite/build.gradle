@@ -35,7 +35,7 @@ dependencies {
         exclude module:'micronaut-inject'
     }
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
-    testImplementation("org.junit.jupiter:junit-jupiter-api:$junit5Version")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
 
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
         exclude module:'micronaut-runtime'
@@ -56,7 +56,7 @@ dependencies {
 
     testRuntimeOnly dependencyVersion("tomcatJdbc")
     testRuntimeOnly dependencyVersion("h2")
-    testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junit5Version"
+    testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junitVersion"
     testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
     testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.859'
 

@@ -20,5 +20,5 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junit5Version"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junitVersion"
 }

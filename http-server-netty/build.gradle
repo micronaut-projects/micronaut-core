@@ -47,7 +47,7 @@ dependencies {
         exclude module:'micronaut-inject'
     }
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
-    testImplementation("org.junit.jupiter:junit-jupiter-api:$junit5Version")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
 }
 
 //tasks.withType(Test) {
