@@ -101,8 +101,8 @@ public class DefaultBeanContext implements BeanContext {
     private static final String INDEXES_TYPE = Indexes.class.getName();
     private static final String REPLACES_ANN = Replaces.class.getName();
     private static final Comparator<BeanRegistration<?>> BEAN_REGISTRATION_COMPARATOR = (o1, o2) -> {
-        int order1 = getOrder(o1);
-        int order2 = getOrder(o2);
+        int order1 = OrderUtil.getOrder(o1.getBeanDefinition(), o1.getBean());
+        int order2 = OrderUtil.getOrder(o2.getBeanDefinition(), o2.getBean());
         return Integer.compare(order1, order2);
     };
 
@@ -2929,11 +2929,6 @@ public class DefaultBeanContext implements BeanContext {
 
             return beans;
         }
-    }
-
-    private static <T> int getOrder(BeanRegistration<T> registration) {
-        OptionalInt order = registration.beanDefinition.intValue(Order.class);
-        return order.orElseGet(() -> OrderUtil.getOrder(registration.bean));
     }
 
     private <T> void logResolvedExisting(Class<T> beanType, Qualifier<T> qualifier, boolean hasQualifier, Collection<T> existing) {

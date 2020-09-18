@@ -15,6 +15,9 @@
  */
 package io.micronaut.core.order;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Order;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -110,6 +113,21 @@ public class OrderUtil {
             return getOrder((Ordered) o);
         }
         return Ordered.LOWEST_PRECEDENCE;
+    }
+
+    /**
+     * Get the order of the given object. Objects implementing {@link Ordered} have precedence
+     * over annotation metadata with {@link Order}.
+     *
+     * @param annotationMetadata The annotation metadata
+     * @param o The object
+     * @return The order of the object. If no order is found, {@link Ordered#LOWEST_PRECEDENCE} is returned.
+     */
+    public static int getOrder(AnnotationMetadata annotationMetadata, Object o) {
+        if (o instanceof Ordered) {
+            return getOrder((Ordered) o);
+        }
+        return annotationMetadata.intValue(Order.class).orElse(Ordered.LOWEST_PRECEDENCE);
     }
 
     /**

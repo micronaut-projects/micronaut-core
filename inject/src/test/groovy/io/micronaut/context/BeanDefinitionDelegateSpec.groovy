@@ -36,13 +36,32 @@ class BeanDefinitionDelegateSpec extends Specification {
         Collection<OrderedBean> beans = ctx.getBeansOfType(OrderedBean)
 
         then:
+        beans.size() == 4
         beans[0].class == One
         beans[1].class == Ten
         beans[2].class == Fifty
         beans[3].class == Hundred
     }
 
+    void "test the @Order annotation is ignored if the bean type implements Ordered"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(["spec.name": getClass().simpleName])
+
+        when:
+        Collection<ImplementsOrdered> beans = ctx.getBeansOfType(ImplementsOrdered)
+
+        then:
+        beans.size() == 3
+        beans[0].class == Negative100
+        beans[1].class == Negative50
+        beans[2].class == Negative10
+    }
+
     static interface OrderedBean {
+    }
+
+    static interface ImplementsOrdered extends Ordered {
+
     }
 
     @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
@@ -59,11 +78,9 @@ class BeanDefinitionDelegateSpec extends Specification {
 
     @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
     @Singleton
+    @Order(200) // The order annotation should be ignored because Ordered is implemented
     private static class Fifty implements OrderedBean, Ordered {
-        @Override
-        int getOrder() {
-            return 50
-        }
+        int order = 50
     }
 
     @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
@@ -71,5 +88,25 @@ class BeanDefinitionDelegateSpec extends Specification {
     @Order(value = 100)
     private static class Hundred implements OrderedBean {
     }
+
+    @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
+    @Singleton
+    private static class Negative100 implements ImplementsOrdered {
+        int order = -100
+    }
+
+    @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
+    @Singleton
+    private static class Negative50 implements ImplementsOrdered {
+        int order = -50
+    }
+
+    @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
+    @Singleton
+    @Order(-1000) // the order annotation is ignored
+    private static class Negative10 implements ImplementsOrdered {
+        int order = -10
+    }
+
 
 }
