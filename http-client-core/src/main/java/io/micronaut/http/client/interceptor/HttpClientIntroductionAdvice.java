@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.interceptor;
 
+import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
@@ -44,7 +45,6 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
 import io.micronaut.http.client.bind.HttpClientBinderRegistry;
-import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
 import io.micronaut.http.client.sse.SseClient;
@@ -53,8 +53,6 @@ import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
-import io.reactivex.Completable;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -67,7 +65,6 @@ import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -314,170 +311,167 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
 
 
-            MediaType[] acceptTypes = request.accept().toArray(MediaType.EMPTY_ARRAY);
-            if (ArrayUtils.isEmpty(acceptTypes)) {
-                acceptTypes = MediaType.of(context.stringValues(Consumes.class));
-                if (ArrayUtils.isEmpty(acceptTypes)) {
+            final MediaType[] acceptTypes;
+            Collection<MediaType> accept = request.accept();
+            if (accept.isEmpty()) {
+                String[] consumesMediaType = context.stringValues(Consumes.class);
+                if (ArrayUtils.isEmpty(consumesMediaType)) {
                     acceptTypes = DEFAULT_ACCEPT_TYPES;
+                } else {
+                    acceptTypes = MediaType.of(consumesMediaType);
                 }
                 request.accept(acceptTypes);
+            } else {
+                acceptTypes = accept.toArray(MediaType.EMPTY_ARRAY);
             }
 
-            ReturnType returnType = context.getReturnType();
-            Class<?> javaReturnType = returnType.getType();
-            boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
-            final Class<?> methodDeclaringType = declaringType;
-            if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
-                Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-                Class<?> argumentType = publisherArgument.getType();
+            ReturnType<?> returnType = context.getReturnType();
 
-                boolean isSingle = returnType.isSingleResult() ||
-                                   returnType.isCompletable() ||
-                                   HttpResponse.class.isAssignableFrom(argumentType) ||
-                                   HttpStatus.class.isAssignableFrom(argumentType);
+            InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+            try {
+                Argument<?> valueType = interceptedMethod.returnTypeValue();
+                Class<?> reactiveValueType = valueType.getType();
+                switch (interceptedMethod.resultType()) {
+                    case PUBLISHER:
+                        boolean isSingle = returnType.isSingleResult() ||
+                                returnType.isCompletable() ||
+                                HttpResponse.class.isAssignableFrom(reactiveValueType) ||
+                                HttpStatus.class == reactiveValueType;
 
-                Publisher<?> publisher;
-
-                if (!isSingle && httpClient instanceof StreamingHttpClient) {
-                    StreamingHttpClient streamingHttpClient = (StreamingHttpClient) httpClient;
-
-                    if (Void.class.isAssignableFrom(argumentType)) {
-                        request.getHeaders().remove(HttpHeaders.ACCEPT);
-                    }
-
-                    boolean isEventStream = Arrays.asList(acceptTypes).contains(MediaType.TEXT_EVENT_STREAM_TYPE);
-
-                    if (isEventStream && streamingHttpClient instanceof SseClient) {
-                        SseClient sseClient = (SseClient) streamingHttpClient;
-                        if (publisherArgument.getType() == Event.class) {
-                            publisher = sseClient.eventStream(
-                                    request, publisherArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
-                            );
+                        Publisher<?> publisher;
+                        if (!isSingle && httpClient instanceof StreamingHttpClient) {
+                            publisher = httpClientResponseStreamingPublisher((StreamingHttpClient) httpClient, acceptTypes, request, valueType);
                         } else {
-                            publisher = Flowable.fromPublisher(sseClient.eventStream(
-                                    request, publisherArgument
-                            )).map(Event::getData);
+                            publisher = httpClientResponsePublisher(httpClient, request, returnType, errorType, valueType);
                         }
-                    } else {
-                        boolean isJson = isJsonParsedMediaType(acceptTypes);
-                        if (isJson) {
-                            publisher = streamingHttpClient.jsonStream(
-                                    request, publisherArgument
-                            );
-                        } else {
-                            Publisher<ByteBuffer<?>> byteBufferPublisher = streamingHttpClient.dataStream(
-                                    request
-                            );
-                            if (argumentType == ByteBuffer.class) {
-                                publisher = byteBufferPublisher;
-                            } else {
-                                if (conversionService.canConvert(ByteBuffer.class, argumentType)) {
-                                    // It would be nice if we could capture the TypeConverter here
-                                    publisher = Flowable.fromPublisher(byteBufferPublisher)
-                                            .map(value -> conversionService.convert(value, argumentType).get());
-                                } else {
-                                    throw new ConfigurationException("Cannot create the generated HTTP client's " +
-                                            "required return type, since no TypeConverter from ByteBuffer to " +
-                                            argumentType + " is registered");
+                        Object finalPublisher = interceptedMethod.handleResult(publisher);
+                        for (ReactiveClientResultTransformer transformer : transformers) {
+                            finalPublisher = transformer.transform(finalPublisher);
+                        }
+                        return finalPublisher;
+                    case COMPLETION_STAGE:
+                        Publisher<?> csPublisher = httpClientResponsePublisher(httpClient, request, returnType, errorType, valueType);
+                        CompletableFuture<Object> future = new CompletableFuture<>();
+                        csPublisher.subscribe(new CompletionAwareSubscriber<Object>() {
+                            AtomicReference<Object> reference = new AtomicReference<>();
+
+                            @Override
+                            protected void doOnSubscribe(Subscription subscription) {
+                                subscription.request(1);
+                            }
+
+                            @Override
+                            protected void doOnNext(Object message) {
+                                if (Void.class != reactiveValueType) {
+                                    reference.set(message);
                                 }
                             }
 
-                        }
-                    }
-
-
-                } else {
-
-                    if (Void.class.isAssignableFrom(argumentType) || Completable.class.isAssignableFrom(javaReturnType)) {
-                        request.getHeaders().remove(HttpHeaders.ACCEPT);
-                        publisher = httpClient.exchange(
-                                request, null, errorType
-                        );
-                    } else {
-                        if (HttpResponse.class.isAssignableFrom(argumentType)) {
-                            publisher = httpClient.exchange(
-                                    request, publisherArgument, errorType
-                            );
-                        } else {
-                            publisher = httpClient.retrieve(
-                                    request, publisherArgument, errorType
-                            );
-                        }
-                    }
-                }
-
-                if (isFuture) {
-                    CompletableFuture<Object> future = new CompletableFuture<>();
-                    publisher.subscribe(new CompletionAwareSubscriber<Object>() {
-                        AtomicReference<Object> reference = new AtomicReference<>();
-
-                        @Override
-                        protected void doOnSubscribe(Subscription subscription) {
-                            subscription.request(1);
-                        }
-
-                        @Override
-                        protected void doOnNext(Object message) {
-                            if (!Void.class.isAssignableFrom(argumentType)) {
-                                reference.set(message);
-                            }
-                        }
-
-                        @Override
-                        protected void doOnError(Throwable t) {
-                            if (t instanceof HttpClientResponseException) {
-                                HttpClientResponseException e = (HttpClientResponseException) t;
-                                if (e.getStatus() == HttpStatus.NOT_FOUND) {
-                                    future.complete(null);
-                                    return;
+                            @Override
+                            protected void doOnError(Throwable t) {
+                                if (t instanceof HttpClientResponseException) {
+                                    HttpClientResponseException e = (HttpClientResponseException) t;
+                                    if (e.getStatus() == HttpStatus.NOT_FOUND) {
+                                        future.complete(null);
+                                        return;
+                                    }
                                 }
-                            }
-                            if (LOG.isErrorEnabled()) {
-                                LOG.error("Client [" + methodDeclaringType.getName() + "] received HTTP error response: " + t.getMessage(), t);
+                                if (LOG.isErrorEnabled()) {
+                                    LOG.error("Client [" + declaringType.getName() + "] received HTTP error response: " + t.getMessage(), t);
+                                }
+                                future.completeExceptionally(t);
                             }
 
-                            future.completeExceptionally(t);
+                            @Override
+                            protected void doOnComplete() {
+                                future.complete(reference.get());
+                            }
+                        });
+                        return interceptedMethod.handleResult(future);
+                    case SYNCHRONOUS:
+                        Class<?> javaReturnType = returnType.getType();
+                        BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
+
+                        if (void.class == javaReturnType || httpMethod == HttpMethod.HEAD) {
+                            request.getHeaders().remove(HttpHeaders.ACCEPT);
                         }
 
-                        @Override
-                        protected void doOnComplete() {
-                            future.complete(reference.get());
+                        if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
+                            return handleBlockingCall(javaReturnType, () ->
+                                    blockingHttpClient.exchange(request,
+                                            returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT),
+                                            errorType
+                                    ));
+                        } else if (void.class == javaReturnType) {
+                            return handleBlockingCall(javaReturnType, () ->
+                                    blockingHttpClient.exchange(request, null, errorType));
+                        } else {
+                            return handleBlockingCall(javaReturnType, () ->
+                                    blockingHttpClient.retrieve(request, returnType.asArgument(), errorType));
                         }
-                    });
-                    return future;
-                } else {
-                    Object finalPublisher = conversionService.convert(publisher, javaReturnType).orElseThrow(() ->
-                            new HttpClientException("Cannot convert response publisher to Reactive type (Unsupported Reactive type): " + javaReturnType)
-                    );
-                    for (ReactiveClientResultTransformer transformer : transformers) {
-                        finalPublisher = transformer.transform(finalPublisher);
-                    }
-                    return finalPublisher;
+                    default:
+                        return interceptedMethod.unsupported();
                 }
-            } else {
-                BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
-
-                if (void.class == javaReturnType || httpMethod == HttpMethod.HEAD) {
-                    request.getHeaders().remove(HttpHeaders.ACCEPT);
-                }
-
-                if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
-                    return handleBlockingCall(javaReturnType, () ->
-                            blockingHttpClient.exchange(request,
-                                    returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT),
-                                    errorType
-                            ));
-                } else if (void.class == javaReturnType) {
-                    return handleBlockingCall(javaReturnType, () ->
-                            blockingHttpClient.exchange(request, null, errorType));
-                } else {
-                    return handleBlockingCall(javaReturnType, () ->
-                            blockingHttpClient.retrieve(request, returnType.asArgument(), errorType));
-                }
+            } catch (Exception e) {
+                return interceptedMethod.handleException(e);
             }
         }
         // try other introduction advice
         return context.proceed();
+    }
+
+    private Publisher httpClientResponsePublisher(HttpClient httpClient, MutableHttpRequest<?> request,
+                                                  ReturnType<?> returnType,
+                                                  Argument<?> errorType,
+                                                  Argument<?> reactiveValueArgument) {
+        Class<?> argumentType = reactiveValueArgument.getType();
+        if (Void.class == argumentType || returnType.isVoid()) {
+            request.getHeaders().remove(HttpHeaders.ACCEPT);
+            return httpClient.exchange(request, null, errorType);
+        } else {
+            if (HttpResponse.class.isAssignableFrom(argumentType)) {
+                return httpClient.exchange(request, reactiveValueArgument, errorType);
+            }
+            return httpClient.retrieve(request, reactiveValueArgument, errorType);
+        }
+    }
+
+    private Publisher httpClientResponseStreamingPublisher(StreamingHttpClient streamingHttpClient,
+                                                           MediaType[] acceptTypes,
+                                                           MutableHttpRequest<?> request,
+                                                           Argument<?> reactiveValueArgument) {
+        Class<?> reactiveValueType = reactiveValueArgument.getType();
+        if (Void.class == reactiveValueType) {
+            request.getHeaders().remove(HttpHeaders.ACCEPT);
+        }
+
+        if (streamingHttpClient instanceof SseClient && Arrays.asList(acceptTypes).contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
+            SseClient sseClient = (SseClient) streamingHttpClient;
+            if (reactiveValueArgument.getType() == Event.class) {
+                return sseClient.eventStream(
+                        request, reactiveValueArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
+                );
+            }
+            return Publishers.map(sseClient.eventStream(request, reactiveValueArgument), Event::getData);
+        } else {
+            if (isJsonParsedMediaType(acceptTypes)) {
+                return streamingHttpClient.jsonStream(request, reactiveValueArgument);
+            } else {
+                Publisher<ByteBuffer<?>> byteBufferPublisher = streamingHttpClient.dataStream(request);
+                if (reactiveValueType == ByteBuffer.class) {
+                    return byteBufferPublisher;
+                } else {
+                    if (ConversionService.SHARED.canConvert(ByteBuffer.class, reactiveValueType)) {
+                        // It would be nice if we could capture the TypeConverter here
+                        return Publishers.map(byteBufferPublisher, value -> ConversionService.SHARED.convert(value, reactiveValueType).get());
+                    } else {
+                        throw new ConfigurationException("Cannot create the generated HTTP client's " +
+                                "required return type, since no TypeConverter from ByteBuffer to " +
+                                reactiveValueType + " is registered");
+                    }
+                }
+            }
+        }
     }
 
     private Object getValue(Argument argument,
