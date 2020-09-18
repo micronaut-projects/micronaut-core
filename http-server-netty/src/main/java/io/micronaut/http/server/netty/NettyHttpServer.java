@@ -287,7 +287,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     @Override
     public boolean isRunning() {
-        return running.get() && !SocketUtils.isTcpPortAvailable(serverPort);
+        return running.get();
     }
 
     @Override
