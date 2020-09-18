@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.inject.processing.JavaModelUtils;
-import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
