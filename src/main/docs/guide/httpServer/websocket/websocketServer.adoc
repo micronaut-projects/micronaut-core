@@ -13,6 +13,7 @@ TIP: A working example of WebSockets in action can be found in the https://githu
 In terms of binding the method arguments to each WebSocket method can be:
 
 * A variable from the URI template (in the above example `topic` and `username` are variables in the URI template)
+* An instance of api:http.HttpRequest[]
 * An instance of api:websocket.WebSocketSession[]
 
 === The @OnClose Method
