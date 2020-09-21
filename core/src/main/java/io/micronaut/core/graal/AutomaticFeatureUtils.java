@@ -39,7 +39,6 @@ import java.util.Optional;
  * @author graemerocher
  * @since 2.0.0
  */
-@Internal
 public final class AutomaticFeatureUtils {
 
     /**
