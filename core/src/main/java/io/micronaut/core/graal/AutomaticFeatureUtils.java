@@ -17,7 +17,6 @@ package io.micronaut.core.graal;
 
 import com.oracle.svm.core.configure.ResourcesRegistry;
 import com.oracle.svm.core.jdk.proxy.DynamicProxyRegistry;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
 import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.hosted.Feature.BeforeAnalysisAccess;
@@ -30,7 +29,6 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-
 
 /**
  * Utility methods for implementing Graal's {@link com.oracle.svm.core.annotate.AutomaticFeature}.
