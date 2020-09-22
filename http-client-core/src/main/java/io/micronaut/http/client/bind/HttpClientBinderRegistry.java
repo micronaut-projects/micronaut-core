@@ -16,6 +16,7 @@
 package io.micronaut.http.client.bind;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 
@@ -28,6 +29,7 @@ import java.util.Optional;
  * @since 2.1.0
  */
 @Experimental
+@BootstrapContextCompatible
 public interface HttpClientBinderRegistry {
 
     /**
