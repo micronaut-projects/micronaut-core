@@ -100,6 +100,11 @@ public class DefaultBeanContext implements BeanContext {
     private static final String PARALLEL_TYPE = Parallel.class.getName();
     private static final String INDEXES_TYPE = Indexes.class.getName();
     private static final String REPLACES_ANN = Replaces.class.getName();
+    private static final Comparator<BeanRegistration<?>> BEAN_REGISTRATION_COMPARATOR = (o1, o2) -> {
+        int order1 = OrderUtil.getOrder(o1.getBeanDefinition(), o1.getBean());
+        int order2 = OrderUtil.getOrder(o2.getBeanDefinition(), o2.getBean());
+        return Integer.compare(order1, order2);
+    };
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
@@ -2828,9 +2833,10 @@ public class DefaultBeanContext implements BeanContext {
                 return existing;
             }
 
-            HashSet<T> beansOfTypeList;
+            HashSet<BeanRegistration<T>> beansOfTypeList;
             boolean allCandidatesAreSingleton = false;
-            Collection<T> beans;
+            boolean hasOrderAnnotation = false;
+            Collection<BeanRegistration<T>> beanRegistrations;
             Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(resolutionContext, beanType);
             filterProxiedTypes(candidates, true, false);
             boolean hasCandidates = !candidates.isEmpty();
@@ -2849,16 +2855,19 @@ public class DefaultBeanContext implements BeanContext {
                         if (definition.isSingleton()) {
                             allCandidatesAreSingleton = true;
                         }
+                        if (definition.hasAnnotation(Order.class)) {
+                            hasOrderAnnotation = true;
+                        }
                         addCandidateToList(resolutionContext, beanType, definition, beansOfTypeList, qualifier, reduced.size() == 1);
                     }
-                    beans = beansOfTypeList;
+                    beanRegistrations = beansOfTypeList;
                 } else {
 
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Found no matching beans of type [{}] for qualifier: {} ", beanType.getName(), qualifier);
                     }
                     allCandidatesAreSingleton = true;
-                    beans = Collections.emptySet();
+                    beanRegistrations = Collections.emptySet();
                 }
             } else if (hasCandidates) {
                 boolean hasNonSingletonCandidate = false;
@@ -2872,25 +2881,38 @@ public class DefaultBeanContext implements BeanContext {
                     if (!hasNonSingletonCandidate && !candidate.isSingleton()) {
                         hasNonSingletonCandidate = true;
                     }
+                    if (candidate.hasAnnotation(Order.class)) {
+                        hasOrderAnnotation = true;
+                    }
                     addCandidateToList(resolutionContext, beanType, candidate, beansOfTypeList, qualifier, candidateCount == 1);
                 }
                 if (!hasNonSingletonCandidate) {
                     allCandidatesAreSingleton = true;
                 }
-                beans = beansOfTypeList;
+                beanRegistrations = beansOfTypeList;
             } else {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Found no possible candidate beans of type [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
                 allCandidatesAreSingleton = true;
-                beans = Collections.emptySet();
+                beanRegistrations = Collections.emptySet();
             }
 
-            if (beans != Collections.EMPTY_SET) {
+            Collection<T> beans = Collections.emptyList();
+            if (beanRegistrations != Collections.EMPTY_SET) {
+                Stream<BeanRegistration<T>> stream = beanRegistrations.stream();
                 if (Ordered.class.isAssignableFrom(beanType)) {
-                    beans = beans.stream().sorted(OrderUtil.COMPARATOR).collect(StreamUtils.toImmutableCollection());
+                    beans = stream
+                            .map(BeanRegistration::getBean)
+                            .sorted(OrderUtil.COMPARATOR)
+                            .collect(StreamUtils.toImmutableCollection());
                 } else {
-                    beans = Collections.unmodifiableCollection(beans);
+                    if (hasOrderAnnotation) {
+                        stream = stream.sorted(BEAN_REGISTRATION_COMPARATOR);
+                    }
+                    beans = stream
+                            .map(BeanRegistration::getBean)
+                            .collect(StreamUtils.toImmutableCollection());
                 }
             }
 
@@ -2899,9 +2921,9 @@ public class DefaultBeanContext implements BeanContext {
             }
             if (LOG.isDebugEnabled() && !beans.isEmpty()) {
                 if (hasQualifier) {
-                    LOG.debug("Found {} beans for type [{} {}]: {} ", beans.size(), qualifier, beanType.getName(), beans);
+                    LOG.debug("Found {} beans for type [{} {}]: {} ", beanRegistrations.size(), qualifier, beanType.getName(), beanRegistrations);
                 } else {
-                    LOG.debug("Found {} beans for type [{}]: {} ", beans.size(), beanType.getName(), beans);
+                    LOG.debug("Found {} beans for type [{}]: {} ", beanRegistrations.size(), beanType.getName(), beanRegistrations);
                 }
             }
 
@@ -2943,7 +2965,7 @@ public class DefaultBeanContext implements BeanContext {
             @Nullable BeanResolutionContext resolutionContext,
             Class<T> beanType,
             BeanDefinition<T> candidate,
-            Collection<T> beansOfTypeList,
+            Collection<BeanRegistration<T>> beansOfTypeList,
             Qualifier<T> qualifier,
             boolean singleCandidate) {
         T bean = null;
@@ -2978,7 +3000,7 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         if (bean != null) {
-            beansOfTypeList.add(bean);
+            beansOfTypeList.add(new BeanRegistration(null, candidate, bean));
         }
     }
 
