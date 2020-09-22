@@ -179,6 +179,22 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
         }
     }
 
+    @Override
+    public <T> T decode(Argument<T> type, byte[] bytes) throws CodecException {
+        try {
+            if (CharSequence.class.isAssignableFrom(type.getType())) {
+                return (T) new String(bytes, applicationConfiguration.getDefaultCharset());
+            } else if (type.hasTypeVariables()) {
+                JavaType javaType = constructJavaType(type);
+                return getObjectMapper().readValue(bytes, javaType);
+            } else {
+                return getObjectMapper().readValue(bytes, type.getType());
+            }
+        } catch (IOException e) {
+            throw new CodecException("Error decoding stream for type [" + type.getType() + "]: " + e.getMessage(), e);
+        }
+    }
+
     @SuppressWarnings("Duplicates")
     @Override
     public <T> T decode(Argument<T> type, String data) throws CodecException {
