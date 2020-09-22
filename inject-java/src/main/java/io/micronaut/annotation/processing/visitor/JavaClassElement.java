@@ -175,7 +175,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         Map<String, BeanPropertyData> props = new LinkedHashMap<>();
         Map<String, VariableElement> fields = new LinkedHashMap<>();
 
-        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext.getTypes()) {
+        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext) {
 
             @Override
             protected boolean isAcceptable(javax.lang.model.element.Element element) {
@@ -339,7 +339,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     @Override
     public List<FieldElement> getFields(@NonNull Predicate<Set<ElementModifier>> modifierFilter) {
         List<FieldElement> fields = new ArrayList<>();
-        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext.getTypes()) {
+        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext) {
             @Override
             protected boolean isAcceptable(javax.lang.model.element.Element element) {
                 final Set<ElementModifier> mods = element.getModifiers().stream().map(m -> ElementModifier.valueOf(m.name())).collect(Collectors.toSet());

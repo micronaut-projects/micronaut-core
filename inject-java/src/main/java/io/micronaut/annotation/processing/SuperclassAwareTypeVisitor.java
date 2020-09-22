@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
@@ -25,6 +26,7 @@ import javax.lang.model.util.AbstractTypeVisitor8;
 import javax.lang.model.util.Types;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -38,14 +40,16 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
     private final Set<String> processed = new HashSet<>();
 
     private final Types types;
+    private final GenericUtils genericUtils;
 
     /**
      * Default constructor.
      *
-     * @param types The types instance
+     * @param visitorContext The visitor context
      */
-    protected SuperclassAwareTypeVisitor(Types types) {
-        this.types = types;
+    protected SuperclassAwareTypeVisitor(JavaVisitorContext visitorContext) {
+        this.types = visitorContext.getTypes();
+        this.genericUtils = visitorContext.getGenericUtils();
     }
 
     @Override
@@ -64,6 +68,20 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                         ExecutableElement ee = (ExecutableElement) enclosedElement;
                         String qualifiedName = ee.getSimpleName().toString();
                         qualifiedName += "(" + ee.getParameters().stream().map(variableElement -> types.erasure(variableElement.asType()).toString()).collect(Collectors.joining(",")) + ")";
+
+
+                        TypeMirror returnTypeMirror = ee.getReturnType();
+                        String returnType = types.erasure(returnTypeMirror).toString();
+                        if (returnTypeMirror.getKind() == TypeKind.TYPEVAR) {
+                            Map<String, Object> generics = genericUtils.buildGenericTypeArgumentInfo(type)
+                                    .get(typeElement.getQualifiedName().toString());
+                            if (generics != null && generics.containsKey(returnTypeMirror.toString())) {
+                                returnType = generics.get(returnTypeMirror.toString()).toString();
+                            }
+                        }
+
+                        qualifiedName = returnType + "." + qualifiedName;
+
                         // if the method has already been processed then it is overridden so ignore
                         if (!processed.contains(qualifiedName)) {
                             processed.add(qualifiedName);
