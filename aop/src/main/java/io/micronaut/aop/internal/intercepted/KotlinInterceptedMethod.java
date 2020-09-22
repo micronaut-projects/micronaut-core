@@ -37,7 +37,7 @@ import java.util.function.Consumer;
  */
 @Internal
 @Experimental
-class KotlinInterceptedMethod implements InterceptedMethod {
+final class KotlinInterceptedMethod implements InterceptedMethod {
 
     private final MethodInvocationContext<?, ?> context;
     private final Continuation continuation;

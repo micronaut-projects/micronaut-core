@@ -101,7 +101,6 @@ public final class AutomaticFeatureUtils {
         RuntimeClassInitialization.initializeAtRunTime(packages);
     }
 
-
     /**
      * Register all constructors of the given class for runtime reflection, only if the class is present.
      *
