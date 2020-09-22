@@ -16,15 +16,14 @@
 package io.micronaut.tracing.interceptor;
 
 import io.micronaut.aop.InterceptPhase;
+import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.tracing.annotation.ContinueSpan;
 import io.micronaut.tracing.annotation.NewSpan;
@@ -34,9 +33,10 @@ import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
 import io.opentracing.log.Fields;
-import org.reactivestreams.Publisher;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import org.reactivestreams.Publisher;
+
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Optional;
@@ -89,41 +89,40 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
             return context.proceed();
         }
         Span currentSpan = tracer.activeSpan();
-        ReturnType<Object> returnType = context.getReturnType();
-        Class<Object> javaReturnType = returnType.getType();
-
         if (isContinue) {
             if (currentSpan == null) {
                 return context.proceed();
             }
-
-            if (Publishers.isConvertibleToPublisher(javaReturnType)) {
-                Object returnObject = context.proceed();
-                if (returnObject == null || (returnObject instanceof TracingPublisher)) {
-                    return returnObject;
-                } else {
-                    Publisher<?> resultFlowable = conversionService.convert(returnObject, Publisher.class)
-                            .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
-
-                    resultFlowable = new TracingPublisher(resultFlowable, tracer) {
-                        @Override
-                        protected void doOnSubscribe(@NonNull Span span) {
-                            tagArguments(span, context);
+            InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+            try {
+                switch (interceptedMethod.resultType()) {
+                    case PUBLISHER:
+                        Publisher<?> publisher = interceptedMethod.interceptResultAsPublisher();
+                        if (publisher instanceof TracingPublisher) {
+                            return publisher;
                         }
-                    };
-                    return conversionService.convert(
-                            resultFlowable,
-                            javaReturnType
-                    ).orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
+                        return interceptedMethod.handleResult(
+                                new TracingPublisher(publisher, tracer) {
+                                    @Override
+                                    protected void doOnSubscribe(@NonNull Span span) {
+                                        tagArguments(span, context);
+                                    }
+                                }
+                        );
+                    case COMPLETION_STAGE:
+                    case SYNCHRONOUS:
+                        tagArguments(currentSpan, context);
+                        try {
+                            return context.proceed();
+                        } catch (RuntimeException e) {
+                            logError(currentSpan, e);
+                            throw e;
+                        }
+                    default:
+                        return interceptedMethod.unsupported();
                 }
-            } else {
-                tagArguments(currentSpan, context);
-                try {
-                    return context.proceed();
-                } catch (RuntimeException e) {
-                    logError(currentSpan, e);
-                    throw e;
-                }
+            } catch (Exception e) {
+                return interceptedMethod.handleException(e);
             }
         } else {
             // must be new
@@ -138,66 +137,61 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
                 builder.asChildOf(currentSpan);
             }
 
-            if (Publishers.isConvertibleToPublisher(javaReturnType)) {
-                Object returnedObject = context.proceed();
-                if (returnedObject == null || (returnedObject instanceof TracingPublisher)) {
-                    return returnedObject;
-                } else {
-                    Publisher<?> resultPublisher = conversionService.convert(returnedObject, Publisher.class)
-                            .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
-
-                    resultPublisher = new TracingPublisher(resultPublisher, tracer, builder) {
-                        @Override
-                        protected void doOnSubscribe(@NonNull Span span) {
-                            populateTags(context, hystrixCommand, span);
+            InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+            try {
+                switch (interceptedMethod.resultType()) {
+                    case PUBLISHER:
+                        Publisher<?> publisher = interceptedMethod.interceptResultAsPublisher();
+                        if (publisher instanceof TracingPublisher) {
+                            return publisher;
                         }
-                    };
-
-                    return conversionService.convert(
-                            resultPublisher,
-                            javaReturnType
-                    ).orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
-                }
-            } else {
-                if (CompletionStage.class.isAssignableFrom(javaReturnType)) {
-                    Span span = builder.start();
-                    try (Scope ignored = tracer.scopeManager().activate(span)) {
-                        populateTags(context, hystrixCommand, span);
-                        try {
-                            CompletionStage<?> completionStage = (CompletionStage) context.proceed();
-                            if (completionStage != null) {
-
-                                return completionStage.whenComplete((o, throwable) -> {
-                                    if (throwable != null) {
-                                        logError(span, throwable);
+                        return interceptedMethod.handleResult(
+                                new TracingPublisher(publisher, tracer, builder) {
+                                    @Override
+                                    protected void doOnSubscribe(@NonNull Span span) {
+                                        populateTags(context, hystrixCommand, span);
                                     }
-                                    span.finish();
-                                });
+                                }
+                        );
+                    case COMPLETION_STAGE:
+                        Span span = builder.start();
+                        try (Scope ignored = tracer.scopeManager().activate(span)) {
+                            populateTags(context, hystrixCommand, span);
+                            try {
+                                CompletionStage<?> completionStage = interceptedMethod.interceptResultAsCompletionStage();
+                                if (completionStage != null) {
+                                    completionStage = completionStage.whenComplete((o, throwable) -> {
+                                        if (throwable != null) {
+                                            logError(span, throwable);
+                                        }
+                                        span.finish();
+                                    });
+                                }
+                                return interceptedMethod.handleResult(completionStage);
+                            } catch (RuntimeException e) {
+                                logError(span, e);
+                                throw e;
                             }
-                            return null;
-                        } catch (RuntimeException e) {
-                            logError(span, e);
-                            throw e;
                         }
-
-                    }
-                } else {
-
-                    Span span = builder.start();
-                    try (Scope scope = tracer.scopeManager().activate(span)) {
-                        populateTags(context, hystrixCommand, span);
-                        try {
-                            return context.proceed();
-                        } catch (RuntimeException e) {
-                            logError(span, e);
-                            throw e;
-                        } finally {
-                            span.finish();
+                    case SYNCHRONOUS:
+                        Span syncSpan = builder.start();
+                        try (Scope scope = tracer.scopeManager().activate(syncSpan)) {
+                            populateTags(context, hystrixCommand, syncSpan);
+                            try {
+                                return context.proceed();
+                            } catch (RuntimeException e) {
+                                logError(syncSpan, e);
+                                throw e;
+                            } finally {
+                                syncSpan.finish();
+                            }
                         }
-                    }
+                    default:
+                        return interceptedMethod.unsupported();
                 }
+            } catch (Exception e) {
+                return interceptedMethod.handleException(e);
             }
-
         }
     }
 

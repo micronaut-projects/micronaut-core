@@ -103,7 +103,7 @@ class StreamSpec extends Specification {
         given:
         StreamEchoClient myClient = context.getBean(StreamEchoClient)
         when:
-        Flowable<Elephant> _ = myClient.echoAsElephant(42, "Hello, big grey animal!")
+        Flowable<Elephant> _ = myClient.echoAsElephant(42, "Hello, big grey animal!").blockingFirst()
         then:
         def ex = thrown(ConfigurationException)
         ex.message == 'Cannot create the generated HTTP client\'s required return type, since no TypeConverter from ' +

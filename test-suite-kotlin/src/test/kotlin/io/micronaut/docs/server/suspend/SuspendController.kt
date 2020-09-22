@@ -21,14 +21,14 @@ import io.micronaut.scheduling.TaskExecutors
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Named
 
 @Controller("/suspend")
-class SuspendController(@Named(TaskExecutors.IO) private val executor: ExecutorService) {
+class SuspendController(@Named(TaskExecutors.IO) private val executor: ExecutorService, private val suspendService: SuspendService) {
 
     private val coroutineDispatcher: CoroutineDispatcher
 
@@ -37,14 +37,14 @@ class SuspendController(@Named(TaskExecutors.IO) private val executor: ExecutorS
     }
 
     // tag::suspend[]
-    @Get("/simple")
+    @Get("/simple", produces = [MediaType.TEXT_PLAIN])
     suspend fun simple(): String { // <1>
         return "Hello"
     }
     // end::suspend[]
 
     // tag::suspendDelayed[]
-    @Get("/delayed")
+    @Get("/delayed", produces = [MediaType.TEXT_PLAIN])
     suspend fun delayed(): String { // <1>
         delay(1) // <2>
         return "Delayed"
@@ -96,5 +96,18 @@ class SuspendController(@Named(TaskExecutors.IO) private val executor: ExecutorS
     @Produces(MediaType.TEXT_PLAIN)
     suspend fun onIllegalArgument(e: IllegalArgumentException): String {
         return "illegal.argument"
+    }
+
+    @Get("/callSuspendServiceWithRetries")
+    suspend fun callSuspendServiceWithRetries(): String {
+        return suspendService.delayedCalculation1()
+    }
+
+    @Get("/callSuspendServiceWithRetriesBlocked")
+    fun callSuspendServiceWithRetriesBlocked(): String {
+        // Bypass ContinuationArgumentBinder
+        return runBlocking {
+            suspendService.delayedCalculation2()
+        }
     }
 }

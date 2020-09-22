@@ -64,5 +64,4 @@ class Foo {}
         deleteMethod.arguments[0].firstTypeVariable.get().type.name == 'test.Foo'
 
     }
-
 }

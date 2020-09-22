@@ -71,7 +71,7 @@ ext {
             'junit5': [
                     group  : 'org.junit',
                     name   : 'junit-bom',
-                    version: junit5Version
+                    version: junitVersion
             ],
             'jackson':[
                     group:'com.fasterxml.jackson',
@@ -199,7 +199,7 @@ ext {
                     version:micronautGcpVersion,
                     group:'io.micronaut.gcp',
                     name:'micronaut-gcp-common',
-                    modules:['micronaut-gcp-tracing', 'micronaut-gcp-function-http', 'micronaut-gcp-function-http-test', 'micronaut-gcp-function', 'micronaut-gcp-http-client']
+                    modules:['micronaut-gcp-tracing', 'micronaut-gcp-function-http', 'micronaut-gcp-function-http-test', 'micronaut-gcp-function', 'micronaut-gcp-http-client', 'micronaut-gcp-logging', 'micronaut-gcp-pubsub']
             ],
             'micronaut.azure': [
                     version:micronautAzureVersion,
