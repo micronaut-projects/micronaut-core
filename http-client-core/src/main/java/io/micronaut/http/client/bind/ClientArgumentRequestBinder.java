@@ -16,6 +16,7 @@
 package io.micronaut.http.client.bind;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -30,6 +31,7 @@ import io.micronaut.http.MutableHttpRequest;
  * @since 2.1.0
  */
 @Experimental
+@BootstrapContextCompatible
 @Indexed(ClientArgumentRequestBinder.class)
 public interface ClientArgumentRequestBinder<T> {
 
