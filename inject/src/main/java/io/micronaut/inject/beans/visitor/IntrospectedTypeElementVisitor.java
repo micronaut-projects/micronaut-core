@@ -93,6 +93,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
     }
 
+    private boolean isIntrospected(VisitorContext context, ClassElement c) {
+        return writers.containsKey(c.getName()) || context.getClassElement(c.getPackageName() + ".$" + c.getSimpleName() + "$Introspection").isPresent();
+    }
+
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         final ClassElement declaringType = element.getDeclaringType();
@@ -194,7 +198,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             for (AnnotationClassValue aClass : classes) {
                 final Optional<ClassElement> classElement = context.getClassElement(aClass.getName());
                 classElement.ifPresent(ce -> {
-                    if (ce.isPublic() && !ce.hasStereotype(Introspected.class)) {
+                    if (ce.isPublic() && !isIntrospected(context, ce)) {
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                                 element.getName(),
                                 index.getAndIncrement(),
@@ -216,7 +220,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     ClassElement[] elements = context.getClassElements(aPackage, includedAnnotations.toArray(new String[0]));
                     int j = 0;
                     for (ClassElement classElement : elements) {
-                        if (classElement.isAbstract() || !classElement.isPublic() || classElement.hasStereotype(Introspected.class)) {
+                        if (classElement.isAbstract() || !classElement.isPublic() || isIntrospected(context, classElement)) {
                             continue;
                         }
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(

@@ -14,6 +14,8 @@ dependencies {
     testImplementation project(":validation")
     testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
+    testImplementation "com.blazebit:blaze-persistence-core-impl:1.5.0-Alpha1"
+
 }
 
 test {
