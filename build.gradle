@@ -160,9 +160,15 @@ ext {
                     group:'io.micronaut.cassandra',
                     name:'micronaut-cassandra'
             ],
+            // TODO Deprecated: Remove in the next major version
+            'micronaut.discovery.old': [
+                    version:micronautOldDiscoveryClientVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-discovery-client'
+            ],
             'micronaut.discovery': [
                     version:micronautDiscoveryClientVersion,
-                    group:'io.micronaut',
+                    group:'io.micronaut.discovery',
                     name:'micronaut-discovery-client'
             ],
             'micronaut.hibernate.validator': [
