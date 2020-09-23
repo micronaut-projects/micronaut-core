@@ -114,22 +114,24 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
 
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
         try {
+            retryState.open();
+            // Retry method call before we have actual Publisher/CompletionStage result
+            Object result = retrySync(context, retryState, interceptedMethod);
             switch (interceptedMethod.resultType()) {
                 case PUBLISHER:
-                    retryState.open();
-                    Flowable<Object> flowable = Flowable.fromPublisher(interceptedMethod.interceptResultAsPublisher());
+                    Flowable<Object> flowable = Flowable.fromPublisher((Publisher<?>) result);
                     return interceptedMethod.handleResult(
                             flowable.onErrorResumeNext(retryFlowable(context, retryState, flowable))
                                     .doOnNext(o -> retryState.close(null))
                     );
                 case COMPLETION_STAGE:
-                    retryState.open();
                     CompletableFuture<Object> newFuture = new CompletableFuture<>();
                     Supplier<CompletionStage<?>> retrySupplier = () -> interceptedMethod.interceptResultAsCompletionStage(this);
-                    interceptedMethod.interceptResultAsCompletionStage().whenComplete(retryCompletable(context, retryState, newFuture, retrySupplier));
+                    ((CompletionStage<?>) result).whenComplete(retryCompletable(context, retryState, newFuture, retrySupplier));
                     return interceptedMethod.handleResult(newFuture);
                 case SYNCHRONOUS:
-                    return retrySync(context, retryState);
+                    retryState.close(null);
+                    return result;
                 default:
                     return interceptedMethod.unsupported();
             }
@@ -172,7 +174,6 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 newFuture.completeExceptionally(exception);
             }
         };
-
     }
 
     @SuppressWarnings("unchecked")
@@ -202,13 +203,15 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         };
     }
 
-    private Object retrySync(MethodInvocationContext<Object, Object> context, MutableRetryState retryState) {
-        retryState.open();
+    private Object retrySync(MethodInvocationContext<Object, Object> context, MutableRetryState retryState, InterceptedMethod interceptedMethod) {
+        boolean firstCall = true;
         while (true) {
             try {
-                Object result = context.proceed(this);
-                retryState.close(null);
-                return result;
+                if (firstCall) {
+                    firstCall = false;
+                    return interceptedMethod.interceptResult();
+                }
+                return interceptedMethod.interceptResult(this);
             } catch (RuntimeException e) {
                 if (!retryState.canRetry(e)) {
                     if (LOG.isDebugEnabled()) {
