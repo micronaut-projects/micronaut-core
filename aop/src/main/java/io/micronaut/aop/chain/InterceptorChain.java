@@ -285,9 +285,9 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         Set<Class> applicableClasses = new HashSet<>();
 
         for (Class<? extends Annotation> aClass: annotations) {
-            if (annotationType == Around.class && aClass.getAnnotation(Introduction.class) != null) {
+            if (annotationType == Around.class && aClass.getAnnotation(Around.class) == null && aClass.getAnnotation(Introduction.class) != null) {
                 continue;
-            } else if (annotationType == Introduction.class && aClass.getAnnotation(Around.class) != null) {
+            } else if (annotationType == Introduction.class && aClass.getAnnotation(Introduction.class) == null && aClass.getAnnotation(Around.class) != null) {
                 continue;
             }
             Type typeAnn = aClass.getAnnotation(Type.class);
