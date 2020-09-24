@@ -26,7 +26,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Introduction(interfaces = CustomProxy.class)
-@Type(ProxyAdviceInterceptor.class)
+@Type(ProxyIntroductionInterceptor.class)
 @Documented
 @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 public @interface ProxyIntroduction {

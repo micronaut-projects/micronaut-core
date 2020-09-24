@@ -15,20 +15,20 @@
  */
 package io.micronaut.aop.introduction.with_around;
 
-import io.micronaut.aop.Around;
-import io.micronaut.context.annotation.Type;
+import io.micronaut.aop.MethodInterceptor;
+import io.micronaut.aop.MethodInvocationContext;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
+import javax.inject.Singleton;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+@Singleton
+public class ProxyAroundInterceptor implements MethodInterceptor<Object, Object> {
 
-@Around
-@Type(ProxyAroundInterceptor.class)
-@Documented
-@Retention(RUNTIME)
-@Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
-public @interface ProxyAround {
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        // Intercept everything other when CustomProxy
+        if (context.getMethodName().equalsIgnoreCase("getId")) {
+            return 1L;
+        }
+        return context.proceed();
+    }
 }
