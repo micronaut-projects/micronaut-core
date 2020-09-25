@@ -117,6 +117,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
     );
 
+    private static final Constructor CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN_NO_PARAMS = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class).orElseThrow(() ->
+            new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
+    );
+
     private static final String FIELD_INTERCEPTORS = "$interceptors";
     private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
     private static final String FIELD_BEAN_QUALIFIER = "$beanQualifier";
@@ -672,22 +676,28 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         // third argument: the executable method
         overriddenMethodGenerator.loadLocal(methodProxyVar);
 
-        // fourth argument: array of the argument values
-        overriddenMethodGenerator.push(argumentCount);
-        overriddenMethodGenerator.newArray(Type.getType(Object.class));
+        if (argumentCount > 0) {
+            // fourth argument: array of the argument values
+            overriddenMethodGenerator.push(argumentCount);
+            overriddenMethodGenerator.newArray(Type.getType(Object.class));
 
-        // now pass the remaining arguments from the original method
-        for (int i = 0; i < argumentCount; i++) {
-            overriddenMethodGenerator.dup();
-            Object argType = argumentTypeList.get(i);
-            overriddenMethodGenerator.push(i);
-            overriddenMethodGenerator.loadArg(i);
-            pushBoxPrimitiveIfNecessary(argType, overriddenMethodGenerator);
-            overriddenMethodGenerator.visitInsn(AASTORE);
+            // now pass the remaining arguments from the original method
+            for (int i = 0; i < argumentCount; i++) {
+                overriddenMethodGenerator.dup();
+                Object argType = argumentTypeList.get(i);
+                overriddenMethodGenerator.push(i);
+                overriddenMethodGenerator.loadArg(i);
+                pushBoxPrimitiveIfNecessary(argType, overriddenMethodGenerator);
+                overriddenMethodGenerator.visitInsn(AASTORE);
+            }
+
+            // invoke MethodInterceptorChain constructor with parameters
+            overriddenMethodGenerator.invokeConstructor(TYPE_METHOD_INTERCEPTOR_CHAIN, Method.getMethod(CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN));
+        } else {
+            // invoke MethodInterceptorChain constructor without parameters
+            overriddenMethodGenerator.invokeConstructor(TYPE_METHOD_INTERCEPTOR_CHAIN, Method.getMethod(CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN_NO_PARAMS));
         }
 
-        // invoke MethodInterceptorChain constructor
-        overriddenMethodGenerator.invokeConstructor(TYPE_METHOD_INTERCEPTOR_CHAIN, Method.getMethod(CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN));
         int chainVar = overriddenMethodGenerator.newLocal(TYPE_METHOD_INTERCEPTOR_CHAIN);
         overriddenMethodGenerator.storeLocal(chainVar);
         overriddenMethodGenerator.loadLocal(chainVar);
