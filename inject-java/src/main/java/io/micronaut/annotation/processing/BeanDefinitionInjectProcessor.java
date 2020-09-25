@@ -597,7 +597,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 @Override
                 protected boolean isAcceptableMethod(ExecutableElement executableElement) {
-                    return super.isAcceptableMethod(executableElement) || annotationUtils.getAnnotationMetadata(executableElement).hasDeclaredStereotype(AROUND_TYPE);
+                    return super.isAcceptableMethod(executableElement)
+                            || annotationUtils.getAnnotationMetadata(executableElement).hasDeclaredStereotype(AROUND_TYPE)
+                            || annotationUtils.getAnnotationMetadata(classElement).hasDeclaredStereotype(AROUND_TYPE);
                 }
 
                 @Override
