@@ -420,7 +420,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             GeneratorAdapter invokeMethodVisitor) {
         Type returnTypeObject = getTypeReference(returnType);
         invokeMethodVisitor.visitVarInsn(ALOAD, 1);
-        pushCastToType(invokeMethodVisitor, beanFullClassName);
+        pushCastToType(invokeMethodVisitor,  declaringTypeObject.getClassName());
         boolean hasArgs = !argumentTypes.isEmpty();
         String methodDescriptor;
         if (hasArgs) {

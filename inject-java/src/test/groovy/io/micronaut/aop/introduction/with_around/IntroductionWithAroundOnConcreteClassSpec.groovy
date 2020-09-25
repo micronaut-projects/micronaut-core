@@ -36,7 +36,7 @@ class IntroductionWithAroundOnConcreteClassSpec extends Specification {
             bean.getName() == null
 
         where:
-            clazz << [MyBean1, MyBean2, MyBean3, MyBean4]
+            clazz << [MyBean1, MyBean2, MyBean3, MyBean4, MyBean5, MyBean6]
     }
 
     void "test introspected preset"(Class clazz) {
@@ -46,6 +46,6 @@ class IntroductionWithAroundOnConcreteClassSpec extends Specification {
             introspection
 
         where:
-            clazz << [MyBean4, MyBean5]
+            clazz << [MyBean4, MyBean5, MyBean6]
     }
 }
