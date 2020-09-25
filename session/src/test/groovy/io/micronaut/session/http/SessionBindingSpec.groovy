@@ -16,6 +16,7 @@
 package io.micronaut.session.http
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -186,6 +187,7 @@ class SessionBindingSpec extends Specification {
         embeddedServer.stop()
     }
 
+    @Requires(property = "spec.name", value = "SessionBindingSpec")
     @Controller('/sessiontest')
     static class SessionController {
 
