@@ -39,10 +39,7 @@ import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessedTypes;
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
-import io.micronaut.inject.writer.BeanDefinitionVisitor;
-import io.micronaut.inject.writer.BeanDefinitionWriter;
-import io.micronaut.inject.writer.ExecutableMethodWriter;
+import io.micronaut.inject.writer.*;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -201,6 +198,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         if (processingOver) {
             try {
                 writeConfigurationMetadata();
+                writeBeanDefinitionsToMetaInf();
             } finally {
                 AnnotationUtils.invalidateCache();
                 AbstractAnnotationMetadataBuilder.clearMutated();
@@ -208,6 +206,18 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         return false;
+    }
+
+    /**
+     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io.micronaut.inject.BeanDefinitionReference.
+     */
+    private void writeBeanDefinitionsToMetaInf() {
+        try {
+            classWriterOutputVisitor.finish();
+        } catch (Exception e) {
+            String message = e.getMessage();
+            error("Error occurred writing META-INF files: %s", message != null ? message : e);
+        }
     }
 
     private void writeConfigurationMetadata() {

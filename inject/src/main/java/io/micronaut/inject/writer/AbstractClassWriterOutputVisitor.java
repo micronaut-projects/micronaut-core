@@ -38,6 +38,22 @@ import java.util.Set;
 @Internal
 public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOutputVisitor {
     private final Map<String, Set<String>> serviceDescriptors = new HashMap<>();
+    private final boolean isEclipseCompiler;
+
+    /**
+     * Default constructor.
+     * @param isEclipseCompiler Is this the eclipse compiler
+     */
+    protected AbstractClassWriterOutputVisitor(boolean isEclipseCompiler) {
+        this.isEclipseCompiler = isEclipseCompiler;
+    }
+
+    /**
+     * Compatibility constructor.
+     */
+    public AbstractClassWriterOutputVisitor() {
+        this.isEclipseCompiler = false;
+    }
 
     @Override
     public final Map<String, Set<String>> getServiceEntries() {
@@ -53,9 +69,16 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
 
     @Override
     public final void finish() {
-        Map<String, Set<String>> serviceEntries = getServiceEntries();
+        // we only write out service entries for the Eclipse compiler because
+        // for javac we support incremental compilation via ServiceDescriptionProcessor
+        // this approach doesn't work in Eclipse.
+        // see https://bugs.eclipse.org/bugs/show_bug.cgi?id=567116
+        // If the above issue is fixed then this workaround can be removed
+        if (isEclipseCompiler) {
+            Map<String, Set<String>> serviceEntries = getServiceEntries();
 
-        writeServiceEntries(serviceEntries);
+            writeServiceEntries(serviceEntries);
+        }
     }
 
     /**
@@ -108,8 +131,10 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
     }
 
     private boolean isNotEclipseNotFound(Throwable e) {
+        if (isEclipseCompiler) {
+            return false;
+        }
         String message = e.getMessage();
-        return !message.contains("does not exist") || !e.getClass().getName().equals("org.eclipse.core.internal.resources.ResourceException");
+        return !message.contains("does not exist") || !e.getClass().getName().startsWith("org.eclipse");
     }
-
 }
