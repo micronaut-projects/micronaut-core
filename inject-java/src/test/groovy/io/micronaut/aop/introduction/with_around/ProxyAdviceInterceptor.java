@@ -35,7 +35,11 @@ public class ProxyAdviceInterceptor implements MethodInterceptor<Object, Object>
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         if (context.getMethodName().equalsIgnoreCase("getId")) {
             // Test invocation delegation
-            if (context.getTarget() instanceof MyBean6) {
+            if (context.getTarget() instanceof MyBean5) {
+                MyBean5 delegate = new MyBean5();
+                delegate.setId(1L);
+                return context.getExecutableMethod().invoke(delegate, context.getParameterValues());
+            } else if (context.getTarget() instanceof MyBean6) {
                 try {
                     ExecutableMethod<MyBean6, Object> proxyTargetMethod = beanContext.getProxyTargetMethod(MyBean6.class, context.getMethodName(), context.getArgumentTypes());
                     MyBean6 delegate = new MyBean6();

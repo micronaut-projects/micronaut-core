@@ -571,11 +571,22 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         invokeMethodVisitor.visitMaxs(AbstractClassFileWriter.DEFAULT_MAX_STACK, 1);
                         invokeMethodVisitor.visitEnd();
                     } else {
+                        Label invokeTargetBlock = new Label();
+
                         // load this
                         invokeMethodVisitor.loadThis();
                         // first argument to static bridge is reference to parent
                         invokeMethodVisitor.getField(methodType, FIELD_PARENT, proxyType);
-                        // now remaining arguments
+                        // duplicate value
+                        invokeMethodVisitor.dup();
+                        // load target
+                        invokeMethodVisitor.loadArg(0);
+                        // compare parent == target
+                        invokeMethodVisitor.ifCmp(Type.getType(Object.class), GeneratorAdapter.NE, invokeTargetBlock);
+
+                        // Invoke method on the static parent field
+
+                        // load arguments
                         for (int i = 0; i < argumentTypeList.size(); i++) {
                             invokeMethodVisitor.loadArg(1);
                             invokeMethodVisitor.push(i);
@@ -589,8 +600,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                             AopProxyWriter.pushBoxPrimitiveIfNecessary(returnType, invokeMethodVisitor);
                         }
                         invokeMethodVisitor.visitInsn(ARETURN);
-                        invokeMethodVisitor.visitMaxs(AbstractClassFileWriter.DEFAULT_MAX_STACK, 1);
-                        invokeMethodVisitor.visitEnd();
+
+                        invokeMethodVisitor.visitLabel(invokeTargetBlock);
+
+                        // remove parent
+                        invokeMethodVisitor.pop();
+
+                        // Invoke method on the target
+                        super.buildInvokeMethod(declaringTypeObject, methodName, returnType, argumentTypes, invokeMethodVisitor);
                     }
                 }
 
