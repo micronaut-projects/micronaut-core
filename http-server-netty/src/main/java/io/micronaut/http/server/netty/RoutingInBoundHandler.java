@@ -1038,6 +1038,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return route;
     }
 
+    private boolean isSingle(RouteMatch<?> finalRoute, Class<?> bodyClass) {
+        return finalRoute.isSpecifiedSingle() || (finalRoute.isSingleResult() &&
+                (finalRoute.isAsync() || finalRoute.isSuspended() || Publishers.isSingle(bodyClass)));
+    }
+
     private RouteMatch<?> buildExecutableRoute(
             RouteMatch<?> route,
             NettyHttpRequest<?> request,
@@ -1099,8 +1104,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         boolean isReactive = finalRoute.isAsyncOrReactive() || Publishers.isConvertibleToPublisher(body);
                         if (isReactive && Publishers.isConvertibleToPublisher(body)) {
                             Class<?> bodyClass = body.getClass();
-                            boolean isSingle = finalRoute.isSpecifiedSingle() || (finalRoute.isSingleResult() &&
-                                    (finalRoute.isAsync() || finalRoute.isSuspended() || Publishers.isSingle(bodyClass)));
+                            boolean isSingle = isSingle(finalRoute, bodyClass);
                             boolean isCompletable = !isSingle && finalRoute.isVoid() && Publishers.isCompletable(bodyClass);
                             if (isSingle || isCompletable) {
                                 // full response case
@@ -1378,7 +1382,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 boolean isReactive = finalRoute.isAsyncOrReactive() || Publishers.isConvertibleToPublisher(body);
                 if (isReactive) {
                     Class<?> bodyClass = body.getClass();
-                    boolean isSingle = finalRoute.isSingleResult() && (finalRoute.isAsync() || Publishers.isSingle(bodyClass));
+                    boolean isSingle = isSingle(finalRoute, bodyClass);
                     boolean isCompletable = !isSingle && finalRoute.isVoid() && Publishers.isCompletable(bodyClass);
                     if (isSingle || isCompletable) {
                         // full response case
