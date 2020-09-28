@@ -19,7 +19,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import io.micronaut.core.annotation.*;
+import io.micronaut.core.annotation.Creator;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
+import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -324,6 +327,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
                     final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(resourcesFile);
                     generatedFile.ifPresent(gf -> {
+                        resourceFiles.addAll(visitorContext.getGeneratedResources());
                         resourceFiles.addAll(fetchAdditionalResources(visitorContext));
 
                         List<Map> resourceList = resourceFiles.stream()
@@ -350,6 +354,12 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         }
     }
 
+    /** This should be removed eventually. Future versions of the openapi type element visitors can
+     * add generated resources to the {@link VisitorContext}.
+     *
+     * @see VisitorContext#addGeneratedResource(String)
+     * @see VisitorContext#getGeneratedResources()
+     */
     private List<String> fetchAdditionalResources(VisitorContext visitorContext) {
         // If swagger (openapi) is present, add the appropriate metadata to expose the yml file an the UI
         return visitorContext.getClassElement("io.swagger.v3.oas.annotations.info.Info")

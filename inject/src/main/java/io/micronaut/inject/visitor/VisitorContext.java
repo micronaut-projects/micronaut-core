@@ -15,6 +15,8 @@
  */
 package io.micronaut.inject.visitor;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ast.ClassElement;
@@ -22,12 +24,11 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
@@ -183,5 +184,27 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     default Map<String, String> getOptions() {
         return Collections.emptyMap();
+    }
+
+    /**
+     * Provide a collection of generated classpath resources that other TypeElement visitors might want to consume.
+     * The generated resources are intended to be strings paths relative to the classpath root.
+     *
+     * @return a possibly empty collection of resource paths
+     */
+    @Experimental
+    default Collection<String> getGeneratedResources() {
+        info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
+        return Collections.emptyList();
+    }
+    /**
+     * Some TypeElementVisitors generate classpath resources that other visitors might be interested in.
+     * The gerenerated resources are intended to be strings paths relative to the classpath root
+     *
+     * @param resource the relative path to add
+     */
+    @Experimental
+    default void addGeneratedResource(String resource) {
+        info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
     }
 }
