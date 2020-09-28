@@ -1795,21 +1795,30 @@ public class DefaultHttpClient implements
         ChannelPipeline pipeline = channel.pipeline();
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new SimpleChannelInboundHandler<FullHttpResponse>() {
             final AtomicBoolean received = new AtomicBoolean(false);
+            final AtomicBoolean emitted = new AtomicBoolean(false);
 
             @Override
-            public boolean acceptInboundMessage(Object msg) throws Exception {
+            public boolean acceptInboundMessage(Object msg) {
                 return msg instanceof FullHttpResponse;
             }
 
             @Override
-            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
                 if (received.compareAndSet(false, true)) {
                     emitter.onError(cause);
                 }
             }
 
             @Override
-            protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
+            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                if (evt instanceof IdleStateEvent && received.compareAndSet(false, true)) {
+                    // closed to idle ste
+                    emitter.onError(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                }
+            }
+
+            @Override
+            protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) {
                 if (received.compareAndSet(false, true)) {
                     NettyMutableHttpResponse<Object> response = new NettyMutableHttpResponse<>(
                             msg,
@@ -2701,7 +2710,7 @@ public class DefaultHttpClient implements
                 if (poolMap == null) {
                     // read timeout settings are not applied to streamed requests.
                     // instead idle timeout settings are applied.
-                    if (stream && readTimeoutMillis == null) {
+                    if (stream) {
                         Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
                         if (readIdleTime.isPresent()) {
                             Duration duration = readIdleTime.get();
@@ -2800,9 +2809,8 @@ public class DefaultHttpClient implements
                     if (evt instanceof IdleStateEvent) {
                         // close the connection if it is idle for too long
                         ctx.close();
-                    } else {
-                        super.userEventTriggered(ctx, evt);
                     }
+                    super.userEventTriggered(ctx, evt);
                 }
             });
         }
