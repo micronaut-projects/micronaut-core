@@ -40,6 +40,7 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
      * @param targetDir The target directory
      */
     public DirectoryClassWriterOutputVisitor(File targetDir) {
+        super(true);
         this.targetDir = targetDir;
     }
 

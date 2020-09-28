@@ -53,7 +53,12 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
      * @param filer The {@link Filer} for creating new files
      */
     public AnnotationProcessingOutputVisitor(Filer filer) {
+        super(isEclipseFiler(filer));
         this.filer = filer;
+    }
+
+    private static boolean isEclipseFiler(Filer filer) {
+        return filer.getClass().getTypeName().startsWith("org.eclipse.jdt");
     }
 
     @Override
