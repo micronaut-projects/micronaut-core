@@ -675,6 +675,7 @@ subprojects { Project subproject ->
             !subproject.toString().contains('benchmarks')) {
         apply plugin: "io.micronaut.build.dependency-updates"
         apply plugin: "io.micronaut.build.publishing"
+        bintray.pkg.version.gpg.sign = false
     }
 
     micronautBuild {
