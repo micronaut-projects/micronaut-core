@@ -714,7 +714,7 @@ subprojects { Project subproject ->
         useJUnitPlatform()
         jvmArgs '-Xmx2048m'
         systemProperty "micronaut.cloud.platform", "OTHER"
-        if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_14)) {
+        if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
             jvmArgs "--enable-preview"
         }
     }
