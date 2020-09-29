@@ -15,6 +15,8 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import groovy.lang.GroovyClassLoader;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
@@ -44,8 +46,6 @@ import org.codehaus.groovy.control.messages.SimpleMessage;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -66,6 +66,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final CompilationUnit compilationUnit;
     private final SourceUnit sourceUnit;
     private final MutableConvertibleValues<Object> attributes;
+    private final List<String> generatedResources = new ArrayList<>();
 
     /**
      * @param sourceUnit      The source unit
@@ -309,4 +310,14 @@ public class GroovyVisitorContext implements VisitorContext {
         return attributes.get(name, conversionContext);
     }
 
+    @Override
+    public Collection<String> getGeneratedResources() {
+        return Collections.unmodifiableCollection(generatedResources);
+    }
+
+    @Override
+    public void addGeneratedResource(@NonNull String resource) {
+        info("Adding generated resource: " + resource, null);
+        generatedResources.add(resource);
+    }
 }
