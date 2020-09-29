@@ -2,13 +2,64 @@ Micronaut {version} includes the following changes:
 
 === Core Features
 
+==== Introspections for JDK 14 Records
+
+It is now possible to define <<introspection, bean introspections>> on JDK 14+ record types (note these currently require the `––enable–preview` flag to the compiler and JVM).
+
+==== Default Environment
+
+Micronaut 2.1 introduces the concept of a default environment. One or more default environments can be set and they will apply if no other environments are explicitly specified. See the <<environments, environments documentation>> for information on how to use this new feature.
+
+==== @Order Annotation
+
+The ann:core.annotation.Order[] annotation has been added to support supplying bean order for factory methods or for those who prefer the use of annotations over the api:core.order.Ordered[] interface.
+
 ==== Kotlin 1.4
 
 Micronaut now ships with Kotlin 1.4 for those users using Kotlin.
 
-==== Introspections for JDK 14 Records
+=== Build Features
 
-It is now possible to define <<introspection, bean introspections>> on JDK 14+ record types (note these currently require the `––enable–preview` flag to the compiler and JVM).
+==== New Gradle Plugin
+
+A new Gradle plugin is available that provides a more expressive way to define a Micronaut application and includes awesome new features for GraalVM Native Image and Docker. The minimum required build to build a Micronaut application is now:
+
+.Micronaut Minimal Gradle Build
+[source,groovy]
+----
+plugins {
+     id 'io.micronaut.application' version '{version}'
+}
+repositories {
+    jcenter()
+    mavenCentral()
+}
+
+micronaut {
+    version = "2.1.0" // The Micronaut Version
+    runtime "netty" // Using the Netty runtime
+}
+mainClassName = "example.Application" // Your main class
+----
+
+Building a Native Image is then as simple as:
+
+[source,bash]
+----
+$ ./gradlew nativeImage
+----
+
+Whilst building a docker image using GraalVM Native Image can be done with:
+
+[source,bash]
+----
+$ ./gradlew dockerBuildNative
+
+# Or to push a native image to a Docker registry
+$ ./gradlew dockerPushNative
+----
+
+=== Web Features
 
 ==== Client Binding API
 
@@ -22,17 +73,28 @@ Query parameters are now respected and bindable in the Micronaut websocket suppo
 
 Cookies in HTTP responses from the client side are now retrievable on the HttpResponse. These are the cookies found in the `Set-Cookie` header.
 
-==== Default Environment
+=== Cloud Features
 
-Micronaut 2.1 introduces the concept of a default environment. One or more default environments can be set and they will apply if no other environments are explicitly specified. See the <<environments, environments documentation>> for information on how to use this new feature.
+==== Support for Oracle Cloud SDK
 
-==== Liveness/Readiness Health Endpoint Resources
+A new GraalVM Native Image compatible https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/[module for Oracle Cloud SDK] has been added allowing you to use any part of the Oracle Cloud SDK with Native Image and also enhancing the SDK with RxJava 2 support.
 
-A new health endpoint resources `/health/liveness` and `/health/readiness` to distinguish health indicators purpose.
+==== Support for Oracle Function
 
-==== @Order Annotation
+Support has been added for building https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/#functions[Oracle Functions] deployable to Oracle Cloud including the ability to compute the functions in native images using GraalVM.
 
-The ann:core.annotation.Order[] annotation has been added to support supplying bean order for factory methods or for those who prefer the use of annotations over the api:core.order.Ordered[] interface.
+==== Support for Google Pub/Sub
+
+Thanks to https://github.com/viniciusccarvalho[Vinicius Carvalho] at Google, Micronaut now features dedicated support for https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#pubsub[Google Pub/Sub] for seamless messaging in Google Cloud.
+
+==== Support for Google Cloud Log Format
+
+Thanks to https://github.com/viniciusccarvalho[Vinicius Carvalho] at Google, Micronaut can now https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#logging[output logs in the official JSON format] supported by Stackdriver on Google Cloud
+
+==== Liveness/Readiness Probes
+
+Micronaut's `/health` endpoint now allows you to distinguish liveness and readiness probes at the URIs `/health/liveness` and `/health/readiness`. Micronaut Launch's Kubernetes support has been updated to generate a Kubenetes descriptor that is configured to with these probe endpoints by default.
+
 
 === Module Upgrades
 
