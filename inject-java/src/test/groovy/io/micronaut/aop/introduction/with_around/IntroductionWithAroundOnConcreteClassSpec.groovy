@@ -17,8 +17,9 @@ class IntroductionWithAroundOnConcreteClassSpec extends Specification {
     @Unroll
     void "test introduction with around for #clazz"(Class clazz) {
         when:
-            def beanDefinition = applicationContext.findProxyTargetBeanDefinition(clazz, null).get()
-            def bean = applicationContext.getBean(beanDefinition)
+            def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
+            def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
+            def bean = applicationContext.getBean(proxyTargetBeanDefinition)
 
         then:
             bean instanceof CustomProxy
@@ -35,6 +36,10 @@ class IntroductionWithAroundOnConcreteClassSpec extends Specification {
             bean.getId() == 1
             bean.getName() == null
 
+        and:
+            beanDefinition.getExecutableMethods().size() == 5
+            proxyTargetBeanDefinition.getExecutableMethods().size() == 5
+
         where:
             clazz << [MyBean1, MyBean2, MyBean3, MyBean4, MyBean5, MyBean6]
     }
@@ -47,5 +52,25 @@ class IntroductionWithAroundOnConcreteClassSpec extends Specification {
 
         where:
             clazz << [MyBean4, MyBean5, MyBean6]
+    }
+
+    void "test executable methods count for introduction with executable"() {
+        when:
+            def clazz = MyBean7.class
+            def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
+            def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
+        then:
+            proxyTargetBeanDefinition.getExecutableMethods().size() == 5
+            beanDefinition.getExecutableMethods().size() == 5
+    }
+
+    void "test executable methods count for around with executable"() {
+        when:
+            def clazz = MyBean8.class
+            def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
+            def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
+        then:
+            proxyTargetBeanDefinition.getExecutableMethods().size() == 4
+            beanDefinition.getExecutableMethods().size() == 4
     }
 }

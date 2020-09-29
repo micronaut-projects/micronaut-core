@@ -27,7 +27,14 @@ public class ProxyIntroductionInterceptor implements MethodInterceptor<Object, O
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         // Only intercept CustomProxy
         if (context.getMethodName().equalsIgnoreCase("isProxy")) {
-            return true;
+            // test introduced interface delegation
+            CustomProxy customProxy = new CustomProxy() {
+                @Override
+                public boolean isProxy() {
+                    return true;
+                }
+            };
+            return context.getExecutableMethod().invoke(customProxy, context.getParameterValues());
         }
         return context.proceed();
     }
