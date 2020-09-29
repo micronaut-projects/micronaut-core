@@ -15,23 +15,41 @@
  */
 package io.micronaut.core.version;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
+
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.net.URL;
-import java.util.jar.Attributes;
-import java.util.jar.Manifest;
+import java.nio.charset.StandardCharsets;
+import java.util.Properties;
 
 /**
  * Utility methods for versioning.
  *
  * @author graemerocher
+ * @author Iván Lopez
  * @since 1.0
  */
 public class VersionUtils {
 
+    private static final Properties VERSIONS = new Properties();
+
     /**
      * The current version of Micronaut.
      */
-    public static final String MICRONAUT_VERSION = computeMicronautVersion();
+    public static final String MICRONAUT_VERSION = getMicronautVersion();
+
+    static {
+        URL resource = VersionUtils.class.getResource("/micronaut-version.properties");
+        if (resource != null) {
+            try (Reader reader = new InputStreamReader(resource.openStream(), StandardCharsets.UTF_8)) {
+                VERSIONS.load(reader);
+            } catch (IOException e) {
+                // ignore
+            }
+        }
+    }
 
     /**
      * Return whether the current version of Micronaut is at least the given version using semantic rules.
@@ -43,28 +61,12 @@ public class VersionUtils {
         return MICRONAUT_VERSION == null || SemanticVersion.isAtLeast(MICRONAUT_VERSION, requiredVersion);
     }
 
-    private static String computeMicronautVersion() {
-        String micronautVersion = VersionUtils.class.getPackage().getImplementationVersion();
-        if (micronautVersion == null) {
-            String className = VersionUtils.class.getSimpleName() + ".class";
-            final URL res = VersionUtils.class.getResource(className);
-            if (res != null) {
-                String classPath = res.toString();
-
-                if (classPath.startsWith("jar")) {
-                    String manifestPath = classPath.substring(0, classPath.lastIndexOf('!') + 1) +
-                            "/META-INF/MANIFEST.MF";
-                    Manifest manifest;
-                    try {
-                        manifest = new Manifest(new URL(manifestPath).openStream());
-                        Attributes attr = manifest.getMainAttributes();
-                        micronautVersion = attr.getValue("Implementation-Version");
-                    } catch (IOException e) {
-                        // ignore
-                    }
-                }
-            }
+    @Nullable
+    public static String getMicronautVersion() {
+        Object micronautVersion = VERSIONS.get("micronaut.version");
+        if (micronautVersion != null) {
+            return micronautVersion.toString();
         }
-        return micronautVersion;
+        return null;
     }
 }
