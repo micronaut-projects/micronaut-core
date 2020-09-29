@@ -372,7 +372,6 @@ public class JavaVisitorContext implements VisitorContext {
 
     @Override
     public void addGeneratedResource(@NonNull String resource) {
-        info("Adding generated resource: " + resource, null);
         generatedResources.add(resource);
     }
 }
