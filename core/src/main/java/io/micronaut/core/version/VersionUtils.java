@@ -35,11 +35,7 @@ public class VersionUtils {
 
     private static final Properties VERSIONS = new Properties();
 
-    /**
-     * The current version of Micronaut.
-     */
-    public static final String MICRONAUT_VERSION = getMicronautVersion();
-
+    // This block needs to be here so it is executed before MICRONAUT_VERSION
     static {
         URL resource = VersionUtils.class.getResource("/micronaut-version.properties");
         if (resource != null) {
@@ -50,6 +46,12 @@ public class VersionUtils {
             }
         }
     }
+
+    /**
+     * The current version of Micronaut.
+     */
+    @SuppressWarnings("DeclarationOrder")
+    public static final String MICRONAUT_VERSION = getMicronautVersion();
 
     /**
      * Return whether the current version of Micronaut is at least the given version using semantic rules.
