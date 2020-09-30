@@ -108,6 +108,7 @@ Micronaut's `/health` endpoint now allows you to distinguish liveness and readin
 - Micronaut GCP `3.2.0`
 - Micronaut GraphQL `2.1.0`
 - Micronaut Groovy `2.1.0`
+- Micronaut gRPC `2.0.5`
 - Micronaut Ignite `1.0.0.RC1`
 - Micronaut Kafka `3.0.0`
 - Micronaut Kotline `2.1.0`
@@ -119,28 +120,29 @@ Micronaut's `/health` endpoint now allows you to distinguish liveness and readin
 - Micronaut Oracle `Cloud 1.0.0`
 - Micronaut Picocli `3.0.0`
 - Micronaut RabbitMQ `2.1.0`
+- Micronaut Redis `3.0.0`
 - Micronaut Security `2.1.0`
 - Micronaut Servlet `2.0.0`
 - Micronaut Test `2.1.0`
 - Micronaut Xml `2.0.0`
-- Micronaut gRPC `2.0.5`
 
 === Dependency Upgrades
 
 - Dekorate `1.0.3`
 - Flyway `6.5.4`
+- gRPC `1.32.1`
 - Ignite `2.8.1`
 - JUnit `5.7.0`
 - Kotlin `1.4.10`
 - Ktor `1.4.0`
 - Liquibase `3.10.2`
-- MSSQL `Driver 8.4.1.jre8`
-- MariaDB `Driver 2.6.2`
+- MSSQL Driver `8.4.1.jre8`
+- MariaDB Driver `2.6.2`
 - Micrometer `1.5.4`
-- Mongo `Driver 4.1.0`
-- Mongo `Reactive Driver 4.1.0`
-- Neo4j `Driver 4.1.1`
+- Mongo Driver `4.1.0`
+- Mongo Reactive Driver `4.1.0`
+- Neo4j Driver `4.1.1`
 - Netty `4.1.52.Final`
 - Picocli `4.5.1`
-- Postgres `Driver 42.2.16`
-- gRPC `1.32.1`
+- Postgres Driver `42.2.16`
+- Redis Lettuce `5.3.4.RELEASE`
