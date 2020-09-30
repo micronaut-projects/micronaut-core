@@ -372,7 +372,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                 if (t instanceof HttpClientResponseException) {
                                     HttpClientResponseException e = (HttpClientResponseException) t;
                                     if (e.getStatus() == HttpStatus.NOT_FOUND) {
-                                        future.complete(null);
+                                        if (reactiveValueType == Optional.class) {
+                                            future.complete(Optional.empty());
+                                        } else {
+                                            future.complete(null);
+                                        }
                                         return;
                                     }
                                 }

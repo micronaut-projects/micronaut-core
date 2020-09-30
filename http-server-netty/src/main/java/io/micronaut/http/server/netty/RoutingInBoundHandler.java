@@ -1386,6 +1386,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 .switchIfEmpty(NOT_FOUND_SINGLE);
                         return single.map(o -> {
                             MutableHttpResponse<?> singleResponse;
+                            if (o instanceof Optional) {
+                                o = ((Optional) o).orElse(NOT_FOUND);
+                            }
                             if (o == NOT_FOUND) {
                                 if (isCompletable || finalRoute.isVoid()) {
                                     singleResponse = forStatus(routeMatch.getAnnotationMetadata(), HttpStatus.OK)
