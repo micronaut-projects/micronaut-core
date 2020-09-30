@@ -59,7 +59,7 @@ class SessionCreationSpec extends Specification {
             session.get("specName").get()
         }
 
-        @Get(single = true)
+        @Get
         Publisher<MutableHttpResponse<?>> createSession(HttpRequest<?> request) {
             return Flowable.create({ emitter ->
                 Session session = SessionForRequest.find(request).orElseGet(() -> SessionForRequest.create(sessionStore, request));
