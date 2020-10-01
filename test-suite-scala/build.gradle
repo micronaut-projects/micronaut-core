@@ -1,0 +1,41 @@
+plugins {
+    id 'scala'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    annotationProcessor project(":inject-java")
+
+    scalaCompilerPlugins project(':inject-scala-plugin')
+
+    implementation project(":core")
+    implementation project(":inject")
+    implementation project(":inject-java")
+    implementation project(":inject-groovy")
+    implementation project(":runtime")
+
+    implementation 'org.scala-lang:scala-library:2.12.12'
+
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+}
+
+if (hasProperty("debugJava")) {
+    compileJava.options.fork = true
+    compileJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+}
+if (hasProperty("debugGroovy")) {
+    compileGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+}
+
+if (hasProperty("debugScala")) {
+    compileScala.scalaCompileOptions.forkOptions.jvmArgs = ['-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005']
+}
+
+
+

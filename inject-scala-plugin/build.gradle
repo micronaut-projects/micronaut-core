@@ -1,0 +1,27 @@
+plugins {
+    id 'scala'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.scala-lang:scala-library:2.12.12'
+    implementation 'org.scala-lang:scala-compiler:2.12.12'
+
+    compile project(":core")
+    compile project(":inject")
+    compile project(":inject-java")
+
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+}
+
+jar {
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
