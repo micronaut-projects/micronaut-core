@@ -117,7 +117,7 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                     String[] parts = object.toString().split(":");
                     if (parts.length == 2) {
                         int port = Integer.parseInt(parts[1]);
-                        return Optional.of(new InetSocketAddress(parts[0], port));
+                        return Optional.of(InetSocketAddress.createUnresolved(parts[0], port));
                     } else {
                         return Optional.empty();
                     }
