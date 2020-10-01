@@ -57,6 +57,33 @@ class ClientProxySpec extends Specification {
         downloadFailsWithException() instanceof HttpClientException
     }
 
+    void "test downloading via http proxy using default proxy-selector"() {
+        given:
+        def oldProxyHost = System.setProperty('https.proxyHost', proxyHost)
+        def oldProxyPort = System.setProperty('https.proxyPort', proxyPort.toString())
+        startServer([
+                'micronaut.http.client.exception-on-error-status': false,
+                'micronaut.http.client.proxy-selector'           : 'default'
+        ])
+
+        when: 'download page via proxy'
+        def response = downloadPage()
+
+        then: 'page is downloaded'
+        response.status == HttpStatus.OK
+        response.body().contains(HTML_FRAGMENT)
+
+        when: 'proxy container is stopped'
+        proxyContainer.stop()
+
+        then: 'page download fails'
+        downloadFailsWithException() instanceof HttpClientException
+
+        cleanup:
+        resetSystemProperty('https.proxyHost', oldProxyHost)
+        resetSystemProperty('https.proxyPort', oldProxyPort)
+    }
+
     private String getProxyHost() {
         proxyContainer.containerIpAddress
     }
@@ -83,6 +110,14 @@ class ClientProxySpec extends Specification {
             return null
         } catch (Throwable ex) {
             return ex
+        }
+    }
+
+    private static void resetSystemProperty(String property, String value) {
+        if (value == null) {
+            System.clearProperty(property)
+        } else {
+            System.setProperty(property, value)
         }
     }
 }
