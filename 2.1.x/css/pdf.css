@@ -1,0 +1,160 @@
+@import "custom-pdf.css";
+
+/* page layout and page numbering */
+@page {
+   size: a4;
+   font-family:Arial;
+}
+
+@page :left {
+    @bottom-left {
+        content: counter(page);
+        vertical-align: middle;
+        margin: 0.8em 0;
+        font-size: 12pt;
+    }
+}
+
+@page :right {
+    @bottom-right {
+        content: counter(page);
+        vertical-align: middle;
+        margin: 0.8em 0;
+        font-size: 12pt;
+    }
+}
+
+.body {
+    margin: 0;
+    padding: 0;
+    font-size: 12pt;
+	background-color: white;
+}
+
+#navigation {
+    display:none;
+}
+
+#main {
+    margin: 0;
+	border: none;
+}
+
+#header {
+    margin:0;
+    padding:0;
+    background:url(../img/bg.png) no-repeat;
+}
+
+#header .images .rsalogo{
+    display:none;
+}
+
+.body #header .message{
+    color:#FFFFFF;
+    font-size:16px;
+    margin-left:60px;
+    margin-top:730px;
+    border-bottom:none;
+    text-align:left;
+}
+
+/* style overrides */
+
+.paragraph {
+    text-align:center;
+    margin: 0.2em 0;
+    padding: 0.2em 0;
+}
+
+div.project > h1 {
+    page-break-before: avoid;
+}
+
+h1 {
+    font-family: helvetica,arial,sans-serif;
+    font-size: 1.5em;
+    string-set: header content();
+    page-break-before: always
+}
+
+h1>a {
+    font-size: 1em;
+    string-set: header content();
+    page-break-before: always
+}
+
+h2 {
+    font-family: helvetica,arial,sans-serif;
+    font-size: 1.3em;
+}
+
+h3 {
+    font-family: helvetica,arial,sans-serif;
+    font-size: 1.2em;
+}
+
+h4 {
+    font-family: helvetica,arial,sans-serif;
+    font-size: 1.1em;
+}
+
+h1, h2, h3, h1>a, h2>a, h3>a {
+    color:#000000;
+}
+
+#toc div.tocItem {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+#toc div.tocItem a::after {
+    content: leader('.') target-counter(attr(href), page);
+    font-style: normal;
+}
+
+#col1 {
+    width: 100%;
+}
+
+#col2 {
+    width: 0;
+}
+
+#col2 .local {
+    display: none;
+}
+
+div.title {
+    font-size: 20px;
+}
+
+.code pre {
+    text-align: left;
+    padding-left:5px;
+    font-size: 0.85em;
+    line-height: 100%;
+    white-space: pre-wrap;
+    page-break-inside: avoid;
+}
+
+.bq {
+    white-space: pre-wrap;
+    page-break-inside: avoid;
+}
+
+.code, .bq {
+    text-align: left;
+    margin-bottom: 1em;
+}
+
+.warning, .note{
+    background-position:10px 10px;
+}
+
+.warning, .note, table {
+    margin-top: 1em;
+    margin-bottom: 1em;
+    page-break-inside: avoid;
+}
