@@ -104,14 +104,15 @@ Micronaut's `/health` endpoint now allows you to distinguish liveness and readin
 - Micronaut Cache `2.1.0`
 - Micronaut Cassandra `3.0.0`
 - Micronaut Data `2.0.0`
+- Micronaut Elasticsearch `2.0.1`
 - Micronaut Flyway `2.1.1`
-- Micronaut GCP `3.2.0`
+- Micronaut GCP `3.2.1`
 - Micronaut GraphQL `2.1.0`
 - Micronaut Groovy `2.1.0`
 - Micronaut gRPC `2.0.5`
 - Micronaut Ignite `1.0.0.RC1`
 - Micronaut Kafka `3.0.0`
-- Micronaut Kotline `2.1.0`
+- Micronaut Kotlin `2.1.1`
 - Micronaut Liquibase `2.1.0`
 - Micronaut Micrometer `3.0.1`
 - Micronaut Mongo `DB 3.0.0`
@@ -131,6 +132,7 @@ Micronaut's `/health` endpoint now allows you to distinguish liveness and readin
 
 - Commons Dbcp `2.8.0`
 - Dekorate `1.0.3`
+- Elasticsearch `7.8.1`
 - Flyway `6.5.4`
 - gRPC `1.32.1`
 - Hibernate `5.4.21.Final`
