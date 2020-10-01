@@ -1363,6 +1363,13 @@ public class DefaultHttpClient implements
         String username = configuration.getProxyUsername().orElse(null);
         String password = configuration.getProxyPassword().orElse(null);
 
+        if (proxyAddress instanceof InetSocketAddress) {
+            InetSocketAddress isa = (InetSocketAddress) proxyAddress;
+            if (isa.isUnresolved()) {
+                proxyAddress = new InetSocketAddress(isa.getHostString(), isa.getPort());
+            }
+        }
+
         if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
             switch (proxyType) {
                 case HTTP:
