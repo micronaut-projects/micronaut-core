@@ -143,6 +143,34 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
+     * Provide the URI to the annotation processing classes output directory, i.e. the parent of META-INF.
+     *
+     * <p>This might, for example, be used as a convenience for {@link TypeElementVisitor} classes to provide
+     * relative path strings to {@link VisitorContext#addGeneratedResource(String)}</p>
+     * <pre>
+     * Path resource = ... // absolute path to the resource
+     * Optional<URI> classesOutputURI = visitorContext.getClassesOutputUri();
+     * if (classesOutputURI.isPresent()) {
+     *     // path to resource, relative to classes output
+     *     Path relativePath = classesOutputURI.get().relativize(resource)
+     *     visitorContext.addGeneratedResource(relativePath.toString());
+     * }
+     * </pre>
+     *
+     * @return URI pointing to the classes output directory
+     */
+    @Experimental
+    default Optional<Path> getClassesOutputPath() {
+        Optional<GeneratedFile> dummy = visitMetaInfFile("dummy");
+        if (dummy.isPresent()) {
+            // we want the parent directory of META-INF/dummy
+            Path classesOutputDir = Paths.get(dummy.get().toURI()).getParent().getParent();
+            return Optional.of(classesOutputDir);
+        }
+        return Optional.empty();
+    }
+
+    /**
      * This method will lookup another class element by name. If it cannot be found an empty optional will be returned.
      *
      * @param name The name
@@ -199,7 +227,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
     /**
      * Some TypeElementVisitors generate classpath resources that other visitors might be interested in.
-     * The gerenerated resources are intended to be strings paths relative to the classpath root
+     * The generated resources are intended to be strings paths relative to the classpath root
      *
      * @param resource the relative path to add
      */
