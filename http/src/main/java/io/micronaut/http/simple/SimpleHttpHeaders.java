@@ -17,9 +17,11 @@ package io.micronaut.http.simple;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MutableHttpHeaders;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Simple {@link MutableHttpHeaders} implementation.
@@ -87,7 +89,16 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public MutableHttpHeaders add(CharSequence header, CharSequence value) {
-        headers.put(header.toString(), value == null ? null : value.toString());
+        if (value == null) {
+            headers.put(header.toString(), null);
+        } else {
+            String delimiter = ",";
+            Set<String> currentValues = Arrays.stream(
+                    headers.getOrDefault(header.toString(), StringUtils.EMPTY_STRING).split(delimiter)
+            ).filter(StringUtils::isNotEmpty).collect(Collectors.toSet());
+            currentValues.add(value.toString());
+            headers.put(header.toString(), String.join(delimiter, currentValues));
+        }
         return this;
     }
 
