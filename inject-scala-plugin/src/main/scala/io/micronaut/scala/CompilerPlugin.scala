@@ -123,7 +123,7 @@ class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComp
         if (classDef.symbol.annotations.nonEmpty) {
           if (!classDef.symbol.isAbstractType) {
             val visitorContext = new ScalaVisitorContext(global, unit.source)
-            val concreteClassMetadata = Globals.metadataBuilder.build(classDef.symbol)
+            val concreteClassMetadata = Globals.metadataBuilder.getOrCreate(ScalaSymbolElement(classDef.symbol))
 
             val constructor = concreteConstructorFor(classDef)
 

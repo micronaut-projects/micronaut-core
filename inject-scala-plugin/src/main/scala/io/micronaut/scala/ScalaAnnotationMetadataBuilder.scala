@@ -1,34 +1,39 @@
 package io.micronaut.scala
 
-import java.lang.annotation.{Repeatable, RetentionPolicy}
+import java.lang.annotation.RetentionPolicy
 import java.util
-import java.util.{ArrayList, Collections, HashMap, List, Map, Optional}
+import java.util.{Collections, Optional}
 
-import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
-import io.micronaut.inject.processing.JavaModelUtils
 import io.micronaut.inject.visitor.VisitorContext
-import javax.lang.model.`type`.{DeclaredType, TypeMirror}
-import javax.lang.model.element.{AnnotationValue, Element, ElementKind, ExecutableElement, TypeElement, VariableElement}
 
-import scala.reflect.runtime.universe._
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.tools.nsc.Global
 
 object ScalaAnnotationMetadataBuilder {
-  val ANNOTATION_DEFAULTS = new util.HashMap[String, util.Map[Global#Symbol, AnnotationValue]]
+  val ANNOTATION_DEFAULTS = new util.HashMap[String, util.Map[ScalaElement, Any]]
+  val CACHE = new mutable.HashMap[ScalaElement, AnnotationMetadata]()
 }
 
-class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[Global#Symbol, Global#AnnotationInfo] {
+class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[ScalaElement, Global#AnnotationInfo] {
+
+  def getOrCreate(element: ScalaElement): AnnotationMetadata =
+    ScalaAnnotationMetadataBuilder.CACHE.getOrElseUpdate(element, build(element))
+
   /**
    * Whether the element is a field, method, class or constructor.
    *
    * @param element The element
    * @return True if it is
    */
-  override protected def isMethodOrClassElement(element: Global#Symbol): Boolean = element match {
-    case _:Global#ClassSymbol | _:Global#MethodSymbol => true
+  override protected def isMethodOrClassElement(element: ScalaElement): Boolean = element match {
+    case ScalaSymbolElement(symbol) => symbol match {
+      case _: Global#ClassSymbol | _: Global#MethodSymbol => true
+      case _ => false
+    }
     case _ => false
   }
 
@@ -38,10 +43,11 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param element The element
    * @return The declaring type
    */
-  override protected def getDeclaringType(element: Global#Symbol): String = element match {
-    case classSymbol:Global#ClassSymbol => classSymbol.name.toString
-    case _ => element.owner.toString
-  }
+  override protected def getDeclaringType(element: ScalaElement): String =
+    element match {
+      case ScalaSymbolElement(symbol) => symbol.owner.nameString
+      case ScalaNameElement(name) => name.toString
+    }
 
   /**
    * Get the type of the given annotation.
@@ -49,8 +55,8 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param annotationMirror The annotation
    * @return The type
    */
-  override protected def getTypeForAnnotation(annotationMirror: Global#AnnotationInfo): Global#Symbol =
-    annotationMirror.atp.typeSymbol
+  override protected def getTypeForAnnotation(annotationMirror: Global#AnnotationInfo): ScalaElement =
+    ScalaSymbolElement(annotationMirror.atp.typeSymbol)
 
   /**
    * Checks whether an annotation is present.
@@ -59,8 +65,11 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param annotation The annotation type
    * @return True if the annotation is present
    */
-  override protected def hasAnnotation(element: Global#Symbol, annotation: Class[_ <: java.lang.annotation.Annotation]): Boolean =
-    element.annotations.exists{ anno => anno.tree.tpe.toString.equals(annotation.getCanonicalName) }
+  override protected def hasAnnotation(element: ScalaElement, annotation: Class[_ <: java.lang.annotation.Annotation]): Boolean =
+    element match {
+      case ScalaSymbolElement(symbol) => symbol.annotations.exists{ anno => anno.tree.tpe.toString.equals(annotation.getCanonicalName) }
+      case ScalaNameElement(name) => false
+    }
 
   /**
    * Get the given type of the annotation.
@@ -76,7 +85,10 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param element The element
    * @return The name
    */
-  override protected def getElementName(element: Global#Symbol): String = element.name.toString
+  override protected def getElementName(element: ScalaElement): String = element match {
+    case ScalaSymbolElement(symbol) => symbol.nameString
+    case ScalaNameElement(name) => name.toString()
+  }
 
   /**
    * Obtain the annotations for the given type.
@@ -84,8 +96,11 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param element The type element
    * @return The annotations
    */
-  override protected def getAnnotationsForType(element: Global#Symbol): util.List[Global#AnnotationInfo] =
-    element.annotations.asJava
+  override protected def getAnnotationsForType(element: ScalaElement): util.List[Global#AnnotationInfo] =
+    element match {
+      case ScalaSymbolElement(symbol) => symbol.annotations.asJava
+      case ScalaNameElement(_) => Collections.emptyList()
+    }
 
   /**
    * Build the type hierarchy for the given element.
@@ -95,110 +110,123 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param declaredOnly           Whether to only include declared annotations
    * @return The type hierarchy
    */
-  override protected def buildHierarchy(element: Global#Symbol, inheritTypeAnnotations: Boolean, declaredOnly: Boolean): util.List[Global#Symbol] = {
-    if (declaredOnly) return Collections.singletonList(element)
-
+  override protected def buildHierarchy(element: ScalaElement, inheritTypeAnnotations: Boolean, declaredOnly: Boolean): util.List[ScalaElement] = {
     element match {
-      case tipe:Global#TypeSymbol => {
-        val hierarchy = new util.ArrayList[Global#Symbol]
-        hierarchy.add(element)
-        populateTypeHierarchy(element, hierarchy)
-        Collections.reverse(hierarchy)
-        hierarchy
-      }
-      case deff:Global#MethodSymbol => { // we have a method
-        // for methods we merge the data from any overridden interface or abstract methods
-        // with type level data
-        val executableElement = element.asInstanceOf[Global#Symbol]
-        // the starting hierarchy is the type and super types of this method
-         val hierarchy = if (inheritTypeAnnotations)
-               buildHierarchy(executableElement.owner, false, declaredOnly)
-          else new util.ArrayList[Global#Symbol]
-        if (hasAnnotation(executableElement, classOf[Override])) hierarchy.addAll(findOverriddenMethods(executableElement))
-        hierarchy.add(element)
-        hierarchy
-      }
-    case varSym:Global#TermSymbol => {
-      val hierarchy = new util.ArrayList[Global#Symbol]
-      val enclosingElement = varSym.owner
-      enclosingElement match {
-        case executableElement: Global#MethodSymbol =>
-          if (hasAnnotation(executableElement, classOf[Override])) {
-//            val variableIdx = executableElement.getParameters.indexOf(variable)
-//            for (overridden <- findOverriddenMethods(executableElement)) {
-//              hierarchy.add(overridden.getParameters.get(variableIdx))
-//            }
+      case ScalaSymbolElement(symbol) => {
+        if (declaredOnly) Collections.singletonList(ScalaSymbolElement(symbol))
+        else {
+          symbol match {
+            case tpe: Global#TypeSymbol => {
+              val hierarchy = new util.ArrayList[ScalaElement]
+              hierarchy.add(ScalaSymbolElement(symbol))
+              populateTypeHierarchy(ScalaSymbolElement(tpe), hierarchy)
+              Collections.reverse(hierarchy)
+              hierarchy
+            }
+            case deff: Global#MethodSymbol => { // we have a method
+              // for methods we merge the data from any overridden interface or abstract methods
+              // with type level data
+              // the starting hierarchy is the type and super types of this method
+              val hierarchy = if (inheritTypeAnnotations)
+                buildHierarchy(ScalaSymbolElement(deff.owner), false, declaredOnly)
+              else new util.ArrayList[ScalaElement]
+              if (hasAnnotation(ScalaSymbolElement(deff), classOf[Override])) hierarchy.addAll(findOverriddenMethods(ScalaSymbolElement(deff)))
+              hierarchy.add(ScalaSymbolElement(symbol))
+              hierarchy
+            }
+            case varSym: Global#TermSymbol => {
+              val hierarchy = new util.ArrayList[ScalaElement]
+              val enclosingElement = varSym.owner
+              enclosingElement match {
+                case executableElement: Global#MethodSymbol =>
+                  if (hasAnnotation(ScalaSymbolElement(executableElement), classOf[Override])) {
+                    //            val variableIdx = executableElement.getParameters.indexOf(variable)
+                    //            for (overridden <- findOverriddenMethods(executableElement)) {
+                    //              hierarchy.add(overridden.getParameters.get(variableIdx))
+                    //            }
+                  }
+                case _ =>
+              }
+              hierarchy.add(ScalaSymbolElement(varSym))
+              hierarchy
+            }
+            case _ => {
+              val single = new util.ArrayList[ScalaElement]
+              single.add(ScalaSymbolElement(symbol))
+              single
+            }
           }
-        case _ =>
+        }
       }
-      hierarchy.add(varSym)
-      hierarchy
+      case ScalaNameElement(_) => new util.ArrayList[ScalaElement]
     }
-    case _ => {
-      val single = new util.ArrayList[Global#Symbol]
-      single.add(element)
-      single
-    }
-  }
   }
 
-  private def populateTypeHierarchy(element: Global#Symbol, hierarchy: util.List[Global#Symbol]): Unit = {
-    val isInterface = element.isInterface
-    if (isInterface) {
-      val typeElement = element.asInstanceOf[Global#Symbol]
-//      val interfaces = typeElement.getInterfaces
-//      for (anInterface <- interfaces) {
-//        if (anInterface.isInstanceOf[DeclaredType]) {
-//          val interfaceElement = anInterface.asInstanceOf[DeclaredType].asElement
-//          hierarchy.add(interfaceElement)
-//          populateTypeHierarchy(interfaceElement, hierarchy)
-//        }
-//      }
+  private def populateTypeHierarchy(element:ScalaElement, hierarchy: util.List[ScalaElement]): Unit = {
+    element match {
+      case ScalaSymbolElement(element) => {
+        val isInterface = element.isInterface
+        if (isInterface) {
+          val typeElement = element.asInstanceOf[Global#Symbol]
+          //      val interfaces = typeElement.getInterfaces
+          //      for (anInterface <- interfaces) {
+          //        if (anInterface.isInstanceOf[DeclaredType]) {
+          //          val interfaceElement = anInterface.asInstanceOf[DeclaredType].asElement
+          //          hierarchy.add(interfaceElement)
+          //          populateTypeHierarchy(interfaceElement, hierarchy)
+          //        }
+          //      }
+        }
+        //    else while ( {
+        //      JavaModelUtils.resolveKind(element, ElementKind.CLASS).isPresent
+        //    }) {
+        //      val typeElement = element.asInstanceOf[TypeElement]
+        //      val interfaces = typeElement.getInterfaces
+        //      import scala.collection.JavaConversions._
+        //      for (anInterface <- interfaces) {
+        //        if (anInterface.isInstanceOf[DeclaredType]) {
+        //          val interfaceElement = anInterface.asInstanceOf[DeclaredType].asElement
+        //          hierarchy.add(interfaceElement)
+        //          populateTypeHierarchy(interfaceElement, hierarchy)
+        //        }
+        //      }
+        //      val superMirror = typeElement.getSuperclass
+        //      if (superMirror.isInstanceOf[DeclaredType]) {
+        //        val `type` = superMirror.asInstanceOf[DeclaredType]
+        //        if (`type`.toString == classOf[Any].getName) break //todo: break is not supported
+        //        else {
+        //          element = `type`.asElement
+        //          hierarchy.add(element)
+        //        }
+        //      }
+        //      else break //todo: break is not supported
+        //    }
+      }
+      case ScalaNameElement(_) => ()
     }
-//    else while ( {
-//      JavaModelUtils.resolveKind(element, ElementKind.CLASS).isPresent
-//    }) {
-//      val typeElement = element.asInstanceOf[TypeElement]
-//      val interfaces = typeElement.getInterfaces
-//      import scala.collection.JavaConversions._
-//      for (anInterface <- interfaces) {
-//        if (anInterface.isInstanceOf[DeclaredType]) {
-//          val interfaceElement = anInterface.asInstanceOf[DeclaredType].asElement
-//          hierarchy.add(interfaceElement)
-//          populateTypeHierarchy(interfaceElement, hierarchy)
-//        }
-//      }
-//      val superMirror = typeElement.getSuperclass
-//      if (superMirror.isInstanceOf[DeclaredType]) {
-//        val `type` = superMirror.asInstanceOf[DeclaredType]
-//        if (`type`.toString == classOf[Any].getName) break //todo: break is not supported
-//        else {
-//          element = `type`.asElement
-//          hierarchy.add(element)
-//        }
-//      }
-//      else break //todo: break is not supported
-//    }
   }
 
-  private def findOverriddenMethods(executableElement: Global#Symbol) = {
-    val overridden = new util.ArrayList[Global#Symbol]
-    val enclosingElement = executableElement.owner
-    if (enclosingElement.isInstanceOf[Global#TypeSymbol]) {
-//      var supertype = enclosingElement.asInstanceOf[TypeElement]
-//      while ( {
-//        supertype != null && !(supertype.toString == classOf[Any].getName)
-//      }) {
-//        val result = findOverridden(executableElement, supertype)
-//        if (result.isPresent) {
-//          val overriddenMethod = result.get
-//          overridden.add(overriddenMethod)
-//        }
-//        findOverriddenInterfaceMethod(executableElement, overridden, supertype)
-//        val superclass = supertype.getSuperclass
-//        if (superclass.isInstanceOf[DeclaredType]) supertype = superclass.asInstanceOf[DeclaredType].asElement.asInstanceOf[TypeElement]
-//        else break //todo: break is not supported
-//      }
+  private def findOverriddenMethods(executableElement: ScalaElement) = {
+    val overridden = new util.ArrayList[ScalaElement]
+    executableElement match {
+      case ScalaSymbolElement(symbol) => symbol.owner match {
+        case supertype:Global#TypeSymbol =>
+        //      var supertype = enclosingElement.asInstanceOf[TypeElement]
+        //      while ( {
+        //        supertype != null && !(supertype.toString == classOf[Any].getName)
+        //      }) {
+        //        val result = findOverridden(executableElement, supertype)
+        //        if (result.isPresent) {
+        //          val overriddenMethod = result.get
+        //          overridden.add(overriddenMethod)
+        //        }
+        //        findOverriddenInterfaceMethod(executableElement, overridden, supertype)
+        //        val superclass = supertype.getSuperclass
+        //        if (superclass.isInstanceOf[DeclaredType]) supertype = superclass.asInstanceOf[DeclaredType].asElement.asInstanceOf[TypeElement]
+        //        else break //todo: break is not supported
+        //      }
+      }
+      case _ => ()
     }
     overridden
   }
@@ -213,7 +241,17 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param annotationValue    The value
    * @param annotationValues   The values to populate
    */
-  override protected def readAnnotationRawValues(originatingElement: Global#Symbol, annotationName: String, member: Global#Symbol, memberName: String, annotationValue: Any, annotationValues: util.Map[CharSequence, AnyRef]): Unit = ???
+  override protected def readAnnotationRawValues(originatingElement: ScalaElement, annotationName: String, member: ScalaElement, memberName: String, annotationValue: Any, annotationValues: util.Map[CharSequence, AnyRef]): Unit = {
+//    if (memberName != null && annotationValue.isInstanceOf[AnnotationValue] && !annotationValues.containsKey(memberName)) {
+//      val resolver = new JavaAnnotationMetadataBuilder#MetadataAnnotationValueVisitor(originatingElement)
+//      annotationValue.asInstanceOf[AnnotationValue].accept(resolver, this)
+      val resolvedValue = annotationValue.toString
+      if (resolvedValue != null) {
+        validateAnnotationValue(originatingElement, annotationName, member, memberName, resolvedValue)
+        annotationValues.put(memberName, resolvedValue)
+      }
+//    }
+  }
 
   /**
    * Adds an error.
@@ -221,7 +259,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param originatingElement The originating element
    * @param error              The error
    */
-  override protected def addError(originatingElement: Global#Symbol, error: String): Unit = ???
+  override protected def addError(originatingElement: ScalaElement, error: String): Unit = ???
 
   /**
    * Read the given member and value, applying conversions if necessary, and place the data in the given map.
@@ -232,7 +270,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param annotationValue    The value
    * @return The object
    */
-  override protected def readAnnotationValue(originatingElement: Global#Symbol, member: Global#Symbol, memberName: String, annotationValue: Any): AnyRef = ???
+  override protected def readAnnotationValue(originatingElement: ScalaElement, member: ScalaElement, memberName: String, annotationValue: Any): AnyRef = ???
 
   /**
    * Read the raw default annotation values from the given annotation.
@@ -240,12 +278,11 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param annotationMirror The annotation
    * @return The values
    */
-  override protected def readAnnotationDefaultValues(annotationMirror: Global#AnnotationInfo): util.Map[_ <: Global#Symbol, _] = {
+  override protected def readAnnotationDefaultValues(annotationMirror: Global#AnnotationInfo): util.Map[_ <: ScalaElement, _] = {
     val annotationTypeName = getAnnotationTypeName(annotationMirror)
-    val element = annotationMirror.symbol
+    val element = ScalaSymbolElement(annotationMirror.symbol)
     readAnnotationDefaultValues(annotationTypeName, element)
   }
-
 
   /**
    * Read the raw default annotation values from the given annotation.
@@ -254,26 +291,30 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param element the type
    * @return The values
    */
-  override protected def readAnnotationDefaultValues(annotationName: String, element: Global#Symbol): util.Map[_ <: Global#Symbol, _] = {
+  override protected def readAnnotationDefaultValues(annotationName: String, element: ScalaElement): util.Map[_ <: ScalaElement, _] = {
     val defaults = ScalaAnnotationMetadataBuilder.ANNOTATION_DEFAULTS
-    if (element.isInstanceOf[Global#TypeSymbol]) {
-      val annotationElement = element.asInstanceOf[Global#TypeSymbol]
-      val annotationName = annotationElement.fullName
-      if (!defaults.containsKey(annotationName)) {
-        val defaultValues = new util.HashMap[Global#Symbol, AnnotationValue]
-//        val allMembers = elementUtils.getAllMembers(annotationElement)
-//        allMembers.stream.filter((member: Element) => member.getEnclosingElement == annotationElement).filter(classOf[ExecutableElement].isInstance).map(classOf[ExecutableElement].cast).filter(this.isValidDefaultValue).forEach((executableElement: ExecutableElement) => {
-//          def foo(executableElement: ExecutableElement) = {
-//            val defaultValue = executableElement.getDefaultValue
-//            defaultValues.put(executableElement, defaultValue)
-//          }
-//
-//          foo(executableElement)
-//        })
-        defaults.put(annotationName, defaultValues)
+    element match {
+      case ScalaSymbolElement(symbol) => symbol match {
+        case annotationElement: Global#TypeSymbol =>
+          val annotationName = annotationElement.fullName
+          if (!defaults.containsKey(annotationName)) {
+            val defaultValues = new util.HashMap[ScalaElement, Any]
+            //        val allMembers = elementUtils.getAllMembers(annotationElement)
+            //        allMembers.stream.filter((member: Element) => member.getEnclosingElement == annotationElement).filter(classOf[ExecutableElement].isInstance).map(classOf[ExecutableElement].cast).filter(this.isValidDefaultValue).forEach((executableElement: ExecutableElement) => {
+            //          def foo(executableElement: ExecutableElement) = {
+            //            val defaultValue = executableElement.getDefaultValue
+            //            defaultValues.put(executableElement, defaultValue)
+            //          }
+            //
+            //          foo(executableElement)
+            //        })
+            defaults.put(annotationName, defaultValues)
+          }
+          ScalaAnnotationMetadataBuilder.ANNOTATION_DEFAULTS.get(element)
       }
+      case ScalaNameElement(_) =>  Collections.emptyMap()
     }
-    return ScalaAnnotationMetadataBuilder.ANNOTATION_DEFAULTS.get(element)
+    Collections.emptyMap()
   }
 
   /**
@@ -282,9 +323,16 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param annotationMirror The annotation
    * @return The values
    */
-  override protected def readAnnotationRawValues(annotationMirror: Global#AnnotationInfo): util.Map[_ <: Global#Symbol, _] = {
-    // annotationMirror.tree.
-    new util.HashMap[Global#Symbol, Any]()
+  override protected def readAnnotationRawValues(annotationMirror: Global#AnnotationInfo): util.Map[_ <: ScalaElement, _] = {
+    val result = new util.HashMap[ScalaElement, Any]()
+    annotationMirror.tree.foreach {
+      case arg: Global#AssignOrNamedArg => (arg.lhs, arg.rhs) match {
+        case (ident:Global#Ident, literal:Global#Literal) => result.put(ScalaNameElement(ident.name), literal.value.value.toString)
+        case _ => ()
+      }
+      case _ => ()
+    }
+    result
   }
 
   /**
@@ -295,7 +343,9 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param annotationType     The type
    * @return The values
    */
-  override protected def getAnnotationValues(originatingElement: Global#Symbol, member: Global#Symbol, annotationType: Class[_]): OptionalValues[_] = ???
+  override protected def getAnnotationValues(originatingElement: ScalaElement, member: ScalaElement, annotationType: Class[_]): OptionalValues[_] = {
+    OptionalValues.empty[Any]
+  }
 
   /**
    * Read the name of an annotation member.
@@ -303,7 +353,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param member The member
    * @return The name
    */
-  override protected def getAnnotationMemberName(member: Global#Symbol): String = ???
+  override protected def getAnnotationMemberName(member: ScalaElement): String = getElementName(member)
 
   /**
    * Obtain the name of the repeatable annotation if the annotation is is one.
@@ -313,7 +363,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    */
   override protected def getRepeatableName(annotationMirror: Global#AnnotationInfo): String = {
     val typeElement = annotationMirror.symbol
-    getRepeatableNameForType(typeElement)
+    getRepeatableNameForType(ScalaSymbolElement(typeElement))
   }
 
 /**
@@ -322,26 +372,30 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param annotationType The annotation mirror
    * @return Return the name or null
    */
-  override protected def getRepeatableNameForType(annotationType: Global#Symbol): String = {
-    val mirrors = annotationType.annotations
-    for (mirror <- mirrors) {
-      val name = mirror.symbol.nameString
-//      if (classOf[Repeatable].getName == name) {
-//        val elementValues = mirror.getElementValues
-//        import scala.collection.JavaConversions._
-//        for (entry <- elementValues.entrySet) {
-//          if (entry.getKey.getSimpleName.toString == "value") {
-//            val av = entry.getValue
-//            val value = av.getValue
-//            if (value.isInstanceOf[DeclaredType]) {
-//              val element = value.asInstanceOf[DeclaredType].asElement
-//              return JavaModelUtils.getClassName(element.asInstanceOf[TypeElement])
-//            }
-//          }
-//        }
-//      }
+  override protected def getRepeatableNameForType(annotationType: ScalaElement): String = {
+    annotationType match {
+      case ScalaSymbolElement(symbol) =>
+        val mirrors = symbol.annotations
+        for (mirror <- mirrors) {
+          val name = mirror.symbol.nameString
+          //      if (classOf[Repeatable].getName == name) {
+          //        val elementValues = mirror.getElementValues
+          //        import scala.collection.JavaConversions._
+          //        for (entry <- elementValues.entrySet) {
+          //          if (entry.getKey.getSimpleName.toString == "value") {
+          //            val av = entry.getValue
+          //            val value = av.getValue
+          //            if (value.isInstanceOf[DeclaredType]) {
+          //              val element = value.asInstanceOf[DeclaredType].asElement
+          //              return JavaModelUtils.getClassName(element.asInstanceOf[TypeElement])
+          //            }
+          //          }
+          //        }
+          //      }
+        }
+        null // TODO
+      case ScalaNameElement(name) => null
     }
-    null
   }
 
   /**
@@ -350,7 +404,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param annotationName The annotation name
    * @return An optional mirror
    */
-  override protected def getAnnotationMirror(annotationName: String): Optional[Global#Symbol] = ???
+  override protected def getAnnotationMirror(annotationName: String): Optional[ScalaElement] = ???
 
   /**
    * Get the annotation member.
@@ -359,7 +413,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param member             The member
    * @return The annotation member
    */
-  override protected def getAnnotationMember(originatingElement: Global#Symbol, member: CharSequence): Global#Symbol = ???
+  override protected def getAnnotationMember(originatingElement:ScalaElement, member: CharSequence): ScalaElement = ???
 
   /**
    * Creates the visitor context for this implementation.
@@ -374,7 +428,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
    * @param annotation The annotation
    * @return The retention policy
    */
-  override protected def getRetentionPolicy(annotation: Global#Symbol): RetentionPolicy = {
+  override protected def getRetentionPolicy(annotation: ScalaElement): RetentionPolicy = {
 //    List<AnnotationNode> annotations = annotation.getAnnotations()
 //    for(ann in annotations) {
 //      if (ann.classNode.name == Retention.name) {
@@ -395,5 +449,5 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[G
 //    }
     RetentionPolicy.RUNTIME
   }
-  
+
 }

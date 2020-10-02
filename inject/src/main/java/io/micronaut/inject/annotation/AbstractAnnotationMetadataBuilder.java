@@ -909,7 +909,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             if (annotationHierarchy.isEmpty()) {
                 continue;
             }
-            boolean isDeclared = currentElement == element;
+            boolean isDeclared = currentElement.equals(element);
 
             for (A annotationMirror : annotationHierarchy) {
                 String annotationName = getAnnotationTypeName(annotationMirror);

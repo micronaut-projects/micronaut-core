@@ -19,7 +19,7 @@ class LoadedVisitor(classSymbol:Global#ClassDef, visitor: TypeElementVisitor[_, 
     if (classSymbol.name.toString() == "java.lang.Object") {
       true
     } else {
-      val annotationMetadata = Globals.metadataBuilder.build(classSymbol.symbol)
+      val annotationMetadata = Globals.metadataBuilder.getOrCreate(ScalaSymbolElement(classSymbol.symbol))
       annotationMetadata.hasStereotype(classAnnotation)
     }
   }
