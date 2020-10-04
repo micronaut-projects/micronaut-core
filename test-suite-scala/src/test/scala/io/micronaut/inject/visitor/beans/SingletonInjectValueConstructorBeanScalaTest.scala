@@ -26,7 +26,7 @@ class SingletonInjectValueConstructorBeanScalaTest {
   @Test def testApplicationContextScalaBean(): Unit = {
     val applicationContext = new DefaultApplicationContext
     applicationContext.start
-    val singletonBean = applicationContext.getBean(classOf[test.scala.TestSingletonInjectValueConstructorBean])
+    val singletonBean = applicationContext.getBean(classOf[test.scala.TestSingletonInjectValueConstructorScalaBean])
 
     assertNotNull(singletonBean)
     assertEquals("injected String", singletonBean.injectedString)

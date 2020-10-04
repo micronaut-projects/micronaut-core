@@ -12,7 +12,7 @@ public class ContextBeanTest {
         ApplicationContext applicationContext = new DefaultApplicationContext();
         applicationContext.start();
 
-        test.scala.TestContextBean singletonBean = applicationContext.getBean(test.scala.TestContextBean.class);
+        test.scala.TestContextScalaBean singletonBean = applicationContext.getBean(test.scala.TestContextScalaBean.class);
 
         assertNotNull(singletonBean);
     }

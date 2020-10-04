@@ -17,6 +17,8 @@ public class InjectConstructorSingletonBeanTest {
 
         assertNotNull(singletonBean);
         assertEquals("not injected", singletonBean.singletonBean.getNotInjected());
+       // assertEquals("not injected", singletonBean.singletonScalaBean.getNotInjected());
+        assertEquals(2, singletonBean.engines.length);
     }
 
     @Test
@@ -24,9 +26,10 @@ public class InjectConstructorSingletonBeanTest {
         ApplicationContext applicationContext = new DefaultApplicationContext();
         applicationContext.start();
 
-        test.scala.TestInjectConstructorSingletonBean singletonBean = applicationContext.getBean(test.scala.TestInjectConstructorSingletonBean.class);
+        test.scala.TestInjectConstructorSingletonScalaBean singletonBean = applicationContext.getBean(test.scala.TestInjectConstructorSingletonScalaBean.class);
 
         assertNotNull(singletonBean);
         assertEquals("not injected", singletonBean.singletonBean().getNotInjected());
+        assertEquals("not injected - scala", singletonBean.singletonScalaBean().getNotInjected());
     }
 }

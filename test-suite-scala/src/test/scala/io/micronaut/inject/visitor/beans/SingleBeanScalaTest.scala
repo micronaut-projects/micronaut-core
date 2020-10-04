@@ -11,10 +11,10 @@ class SingleBeanScalaTest {
     val applicationContext = new DefaultApplicationContext()
     applicationContext.start();
 
-    val singletonBean = applicationContext.getBean(classOf[test.scala.TestSingletonBean])
+    val singletonBean = applicationContext.getBean(classOf[test.scala.TestSingletonScalaBean])
 
     assertNotNull(singletonBean)
-    assertEquals("not injected", singletonBean.getNotInjected())
+    assertEquals("not injected - scala", singletonBean.getNotInjected())
   }
 
   @Test

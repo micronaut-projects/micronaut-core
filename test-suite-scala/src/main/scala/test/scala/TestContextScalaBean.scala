@@ -3,6 +3,6 @@ package test.scala
 import io.micronaut.context.annotation.Context
 
 @Context
-class TestContextBean {
+class TestContextScalaBean {
     def getNotInjected() = "not injected"
 }

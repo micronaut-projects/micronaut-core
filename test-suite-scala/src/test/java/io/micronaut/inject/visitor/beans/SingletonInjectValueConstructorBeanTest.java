@@ -34,7 +34,7 @@ public class SingletonInjectValueConstructorBeanTest {
         ApplicationContext applicationContext = new DefaultApplicationContext();
         applicationContext.start();
 
-        test.scala.TestSingletonInjectValueConstructorBean singletonBean = applicationContext.getBean(test.scala.TestSingletonInjectValueConstructorBean.class);
+        test.scala.TestSingletonInjectValueConstructorScalaBean singletonBean = applicationContext.getBean(test.scala.TestSingletonInjectValueConstructorScalaBean.class);
 
         assertNotNull(singletonBean);
         assertEquals("injected String", singletonBean.injectedString());

@@ -23,6 +23,11 @@ object Globals {
     case "scala.Short" => classOfPrimitiveFor("short")
     case "scala.Char" => classOfPrimitiveFor("char")
     case "scala.Predef.String" => "java.lang.String"
-    case _: Any => valDef.tpt.toString
+    case other: String => if (other.startsWith("scala.Array[")) {
+      valDef.tpt.asInstanceOf[Global#TypeTree].original
+        .asInstanceOf[Global#AppliedTypeTree].args(0).toString + "[]"
+    } else {
+      valDef.tpt.toString
+    }
   }
 }
