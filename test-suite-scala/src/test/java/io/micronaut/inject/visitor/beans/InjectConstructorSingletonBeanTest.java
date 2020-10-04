@@ -7,26 +7,26 @@ import org.junit.jupiter.api.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
-public class SingletonBeanTest {
-    @Test
-    public void testApplicationContextScalaBean() {
-        ApplicationContext applicationContext = new DefaultApplicationContext();
-        applicationContext.start();
-
-        test.scala.TestSingletonBean singletonBean = applicationContext.getBean(test.scala.TestSingletonBean.class);
-
-        assertNotNull(singletonBean);
-        assertEquals("not injected", singletonBean.getNotInjected());
-    }
-
+public class InjectConstructorSingletonBeanTest {
     @Test
     public void testApplicationContextJavaBean() {
         ApplicationContext applicationContext = new DefaultApplicationContext();
         applicationContext.start();
 
-        test.java.TestSingletonBean singletonBean = applicationContext.getBean(test.java.TestSingletonBean.class);
+        test.java.TestInjectConstructorSingletonBean singletonBean = applicationContext.getBean(test.java.TestInjectConstructorSingletonBean.class);
 
         assertNotNull(singletonBean);
-        assertEquals("not injected", singletonBean.getNotInjected());
+        assertEquals("not injected", singletonBean.singletonBean.getNotInjected());
+    }
+
+    @Test
+    public void testApplicationContextScalaBean() {
+        ApplicationContext applicationContext = new DefaultApplicationContext();
+        applicationContext.start();
+
+        test.scala.TestInjectConstructorSingletonBean singletonBean = applicationContext.getBean(test.scala.TestInjectConstructorSingletonBean.class);
+
+        assertNotNull(singletonBean);
+        assertEquals("not injected", singletonBean.singletonBean().getNotInjected());
     }
 }

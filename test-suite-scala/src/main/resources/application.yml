@@ -1,2 +1,2 @@
-server:
-  host: application.yml
+lookup:
+  integer: 45

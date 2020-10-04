@@ -1,7 +1,7 @@
 package io.micronaut.inject.visitor.beans
 
 import io.micronaut.context.DefaultApplicationContext
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.{assertEquals, assertNotNull}
 import org.junit.jupiter.api.Test
 
 class SingleBeanScalaTest {
@@ -14,6 +14,7 @@ class SingleBeanScalaTest {
     val singletonBean = applicationContext.getBean(classOf[test.scala.TestSingletonBean])
 
     assertNotNull(singletonBean)
+    assertEquals("not injected", singletonBean.getNotInjected())
   }
 
   @Test
@@ -24,5 +25,6 @@ class SingleBeanScalaTest {
     val singletonBean = applicationContext.getBean(classOf[test.java.TestSingletonBean])
 
     assertNotNull(singletonBean)
+    assertEquals("not injected", singletonBean.getNotInjected)
   }
 }

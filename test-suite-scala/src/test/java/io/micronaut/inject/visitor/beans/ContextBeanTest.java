@@ -4,19 +4,17 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.DefaultApplicationContext;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
-public class SingletonBeanTest {
+public class ContextBeanTest {
     @Test
     public void testApplicationContextScalaBean() {
         ApplicationContext applicationContext = new DefaultApplicationContext();
         applicationContext.start();
 
-        test.scala.TestSingletonBean singletonBean = applicationContext.getBean(test.scala.TestSingletonBean.class);
+        test.scala.TestContextBean singletonBean = applicationContext.getBean(test.scala.TestContextBean.class);
 
         assertNotNull(singletonBean);
-        assertEquals("not injected", singletonBean.getNotInjected());
     }
 
     @Test
@@ -24,9 +22,8 @@ public class SingletonBeanTest {
         ApplicationContext applicationContext = new DefaultApplicationContext();
         applicationContext.start();
 
-        test.java.TestSingletonBean singletonBean = applicationContext.getBean(test.java.TestSingletonBean.class);
+        test.java.TestContextBean singletonBean = applicationContext.getBean(test.java.TestContextBean.class);
 
         assertNotNull(singletonBean);
-        assertEquals("not injected", singletonBean.getNotInjected());
     }
 }

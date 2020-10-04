@@ -1,9 +1,9 @@
 package test.java;
 
-import javax.inject.Singleton;
+import io.micronaut.context.annotation.Context;
 
-@Singleton
-public class TestSingletonBean {
+@Context
+public class TestContextBean {
     public String getNotInjected() {
         return "not injected";
     }

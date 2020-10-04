@@ -1,9 +1,8 @@
 package io.micronaut.scala
 
 import java.util
+import java.util.Collections
 
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
@@ -11,7 +10,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.writer.{BeanDefinitionReferenceWriter, BeanDefinitionWriter}
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.tools.nsc.plugins._
 import scala.tools.nsc.transform._
 import scala.tools.nsc.{Global, Phase}
@@ -26,14 +24,6 @@ class CompilerPlugin(override val global: Global)
          new BeanDefinitionInjectPluginComponent(global),
          new FinalizePluginComponent(global)
     )
-}
-
-object Globals {
-  val metadataBuilder = new ScalaAnnotationMetadataBuilder()
-  val loadedVisitors: mutable.Map[String, LoadedVisitor] = new mutable.LinkedHashMap[String, LoadedVisitor]
-  val visitorAttributes = new MutableConvertibleValuesMap[AnyRef]
-  val beanDefinitionWriters = new mutable.HashMap[String, BeanDefinitionWriter] {}
-  val beanDefinitionReferenceWriters = new mutable.HashMap[String, BeanDefinitionReferenceWriter] {}
 }
 
 class InitPluginComponent(val global: Global) extends PluginComponent with TypingTransformers {
@@ -151,13 +141,26 @@ class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComp
               constructorParameterInfo.annotationMetadata,
               constructorParameterInfo.genericTypes
             )
+
+            classDef.impl.body.foreach {
+                case valDef: global.ValDef if valDef.mods.isMutable => {
+                  beanDefinitionWriter.visitFieldValue(
+                    classDef.symbol.fullName,
+                    Globals.argTypeForValDef(valDef),
+                    valDef.name.toString.trim,
+                    valDef.mods.isPrivate,
+                    Globals.metadataBuilder.getOrCreate(ScalaSymbolElement(valDef.symbol)),
+                    //genericUtils.resolveGenericTypes(`type`, Collections.emptyMap), TODO
+                    Collections.emptyMap(),
+                    false)
+                }
+                case _ => ()
+            }
+
             beanDefinitionWriter.visitBeanDefinitionEnd()
             beanDefinitionWriter.accept(visitorContext)
 
             beanDefinitionReferenceWriter.accept(visitorContext)
-
-            Globals.beanDefinitionWriters += classDef.symbol.fullName -> beanDefinitionWriter
-            Globals.beanDefinitionReferenceWriters += classDef.symbol.fullName -> beanDefinitionReferenceWriter
           }
         }
         super.transform(tree)
@@ -190,21 +193,9 @@ class FinalizePluginComponent(val global: Global) extends PluginComponent with T
         for (loadedVisitor <- asScalaIterator(values.iterator())) {
           loadedVisitor.finish()
         }
-        unit.body = new TypeElementEndTransformer(unit).transform(unit.body)
       }
     }
   }
-
-  class TypeElementEndTransformer(unit: CompilationUnit) extends TypingTransformer(unit) {
-    override def transform(tree: Tree) = tree match {
-      case classDef:ClassDef => {
-        super.transform(tree)
-      }
-      case _ => super.transform(tree)
-    }
-  }
-
-  def newTransformer(unit: CompilationUnit) = new TypeElementEndTransformer(unit)
 }
 
 

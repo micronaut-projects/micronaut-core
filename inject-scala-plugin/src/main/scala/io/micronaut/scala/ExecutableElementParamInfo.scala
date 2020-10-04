@@ -16,9 +16,9 @@ class ExecutableElementParamInfo(requiresReflection: Boolean, val metadata: Anno
     this(requiresReflection, metadata.getOrElse(AnnotationMetadata.EMPTY_METADATA))
   }
 
-  def addParameter(name: Global#TermName, argType: Any, genericType: Any): Unit = {
-    parameters.put(name.toString(), argType.toString)
-    genericParameters.put(name.toString(), genericType.toString)
+  def addParameter(name: Global#TermName, argType: AnyRef, genericType: AnyRef): Unit = {
+    parameters.put(name.toString(), argType)
+    genericParameters.put(name.toString(), genericType)
   }
 
   def addAnnotationMetadata(name: Global#TermName, valDefMetadata: AnnotationMetadata): Unit = {
@@ -28,6 +28,7 @@ class ExecutableElementParamInfo(requiresReflection: Boolean, val metadata: Anno
 }
 
 object ExecutableElementParamInfo {
+
   def populateParameterData(element: Option[Global#DefDef]): ExecutableElementParamInfo = {
     element.map { defDef =>
       val elementMetadata = Globals.metadataBuilder.getOrCreate(ScalaSymbolElement(defDef.symbol))
@@ -39,18 +40,7 @@ object ExecutableElementParamInfo {
 
           params.addAnnotationMetadata(valDef.name, valDefMetadata)
 
-          val argType = valDef.tpt.asInstanceOf[Global#TypeTree].original match {
-            case select: Global#Select => (select.qualifier.toString(), select.name.toString()) match {
-              case ("scala", "Boolean") => "java.lang.Boolean"
-              case ("scala", "Int") => "java.lang.Integer"
-              case ("scala", "Float") => "java.lang.Float"
-              case ("scala", "Double") => "java.lang.Double"
-              case ("scala", "Long") => "java.lang.Long"
-              case ("scala.Predef", "String") => "java.lang.String"
-              case whatevs: Any => whatevs._1 + "." + whatevs._2
-            }
-            case whatevs: Any => whatevs.toString
-          }
+          val argType = Globals.argTypeForValDef(valDef)
 
 //          if (/*isConstructBinding &&*/ Stream.of(classOf[Property], classOf[Value], classOf[Parameter]).noneMatch(annotationMetadata.hasAnnotation)) {
 //            val parameterElement = typeUtils.asElement(typeMirror)
