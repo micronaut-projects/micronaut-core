@@ -17,11 +17,10 @@ package io.micronaut.http.simple;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.convert.value.MutableConvertibleMultiValuesMap;
 import io.micronaut.http.MutableHttpHeaders;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Simple {@link MutableHttpHeaders} implementation.
@@ -31,21 +30,23 @@ import java.util.stream.Collectors;
  */
 public class SimpleHttpHeaders implements MutableHttpHeaders {
 
-    private final Map<String, String> headers;
+    private final MutableConvertibleMultiValuesMap<String> headers = new MutableConvertibleMultiValuesMap<>();
     private final ConversionService conversionService;
 
     /**
      * Map-based implementation of {@link MutableHttpHeaders}.
-     * @param headers The headers
+     *
+     * @param headers           The headers
      * @param conversionService The conversion service
      */
     public SimpleHttpHeaders(Map<String, String> headers, ConversionService conversionService) {
-        this.headers = headers;
+        headers.forEach(this.headers::add);
         this.conversionService = conversionService;
     }
 
     /**
      * Map-based implementation of {@link MutableHttpHeaders}.
+     *
      * @param conversionService The conversion service
      */
     public SimpleHttpHeaders(ConversionService conversionService) {
@@ -55,8 +56,8 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
     @Override
     @SuppressWarnings("unchecked")
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
-        String value = headers.get(name.toString());
-        if (value != null) {
+        Optional<String> value = headers.getFirst(name.toString());
+        if (value.isPresent()) {
             return conversionService.convert(value, conversionContext);
         }
         return Optional.empty();
@@ -64,22 +65,17 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public List<String> getAll(CharSequence name) {
-        return Collections.singletonList(headers.get(name.toString()));
+        return headers.getAll(name.toString());
     }
 
     @Override
     public Set<String> names() {
-        return headers.keySet();
+        return headers.names();
     }
 
     @Override
     public Collection<List<String>> values() {
-        Set<String> names = names();
-        List<List<String>> values = new ArrayList<>();
-        for (String name : names) {
-            values.add(getAll(name));
-        }
-        return Collections.unmodifiableList(values);
+        return headers.values();
     }
 
     @Override
@@ -89,15 +85,8 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public MutableHttpHeaders add(CharSequence header, CharSequence value) {
-        if (value == null) {
-            headers.put(header.toString(), null);
-        } else {
-            String delimiter = ",";
-            Set<String> currentValues = Arrays.stream(
-                    headers.getOrDefault(header.toString(), StringUtils.EMPTY_STRING).split(delimiter)
-            ).filter(StringUtils::isNotEmpty).collect(Collectors.toSet());
-            currentValues.add(value.toString());
-            headers.put(header.toString(), String.join(delimiter, currentValues));
+        if (value != null) {
+            headers.add(header.toString(), value.toString());
         }
         return this;
     }
