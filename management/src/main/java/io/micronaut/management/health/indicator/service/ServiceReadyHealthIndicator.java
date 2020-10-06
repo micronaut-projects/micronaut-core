@@ -16,6 +16,7 @@
 package io.micronaut.management.health.indicator.service;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.health.HealthStatus;
@@ -23,7 +24,9 @@ import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.management.health.indicator.annotation.Readiness;
+import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.event.annotation.EventListener;
+import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
@@ -42,12 +45,17 @@ import javax.inject.Singleton;
 public class ServiceReadyHealthIndicator implements HealthIndicator {
 
     private static final String NAME = "service";
+    private final boolean isService;
 
     private boolean serviceReady = false;
 
-    @EventListener
-    void onServiceStarted(ServiceReadyEvent event) {
-        serviceReady = true;
+    /**
+     * Default constructor.
+     * @param applicationConfiguration The application configuration.
+     */
+    @Internal
+    protected ServiceReadyHealthIndicator(ApplicationConfiguration applicationConfiguration) {
+        this.isService = applicationConfiguration.getName().isPresent();
     }
 
     @Override
@@ -64,5 +72,25 @@ public class ServiceReadyHealthIndicator implements HealthIndicator {
             builder.status(HealthStatus.DOWN);
         }
         return Flowable.just(builder.build());
+    }
+
+    /**
+     * Event listener triggered when a service is ready.
+     * @param event The event
+     */
+    @EventListener
+    void onServiceStarted(ServiceReadyEvent event) {
+        serviceReady = true;
+    }
+
+    /**
+     * Event listener triggered when the server starts up.
+     * @param event The event
+     */
+    @EventListener
+    void onServerStarted(ServerStartupEvent event) {
+        if (!isService) {
+            serviceReady = true;
+        }
     }
 }
