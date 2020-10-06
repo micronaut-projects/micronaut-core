@@ -13,21 +13,28 @@ object Globals {
 
   private def classOfPrimitiveFor(primitiveType: String) = ClassUtils.getPrimitiveType(primitiveType).orElseThrow(() => new IllegalArgumentException("Unknown primitive type: " + primitiveType))
 
-  def argTypeForValDef(valDef:Global#ValDef):AnyRef = valDef.tpt.asInstanceOf[Global#TypeTree].original.toString match {
-    case "scala.Boolean" => classOfPrimitiveFor("boolean")
-    case "scala.Int" => classOfPrimitiveFor("int")
-    case "scala.Float" => classOfPrimitiveFor("float")
-    case "scala.Double" => classOfPrimitiveFor("double")
-    case "scala.Long" => classOfPrimitiveFor("long")
-    case "scala.Byte" => classOfPrimitiveFor("byte")
-    case "scala.Short" => classOfPrimitiveFor("short")
-    case "scala.Char" => classOfPrimitiveFor("char")
-    case "scala.Predef.String" => "java.lang.String"
-    case other: String => if (other.startsWith("scala.Array[")) {
-      valDef.tpt.asInstanceOf[Global#TypeTree].original
-        .asInstanceOf[Global#AppliedTypeTree].args(0).toString + "[]"
-    } else {
-      valDef.tpt.toString
+  def argTypeForTree(tree:Global#TypeTree): AnyRef = {
+    val valAsString = if (tree.original == null) tree.toString else tree.original.toString
+    valAsString match { // TODO this can be less klunky
+      case "scala.Boolean" | "Boolean" => classOfPrimitiveFor("boolean")
+      case "scala.Int" | "Int" => classOfPrimitiveFor("int")
+      case "scala.Float" | "Float" => classOfPrimitiveFor("float")
+      case "scala.Double" | "Double" => classOfPrimitiveFor("double")
+      case "scala.Long" | "Long" => classOfPrimitiveFor("long")
+      case "scala.Byte" | "Byte" => classOfPrimitiveFor("byte")
+      case "scala.Short" | "Short" => classOfPrimitiveFor("short")
+      case "scala.Char" | "Char" => classOfPrimitiveFor("char")
+      case "scala.Unit" | "Unit" => classOfPrimitiveFor("void")
+      case "scala.Predef.String" => "java.lang.String"
+      case other: String => if (other.startsWith("scala.Array[")) {
+        tree.asInstanceOf[Global#TypeTree].original
+          .asInstanceOf[Global#AppliedTypeTree].args(0).toString + "[]"
+      } else {
+        tree.toString
+      }
     }
   }
+
+  def argTypeForValDef(valDef:Global#ValDef):AnyRef =
+    argTypeForTree(valDef.tpt.asInstanceOf[Global#TypeTree])
 }

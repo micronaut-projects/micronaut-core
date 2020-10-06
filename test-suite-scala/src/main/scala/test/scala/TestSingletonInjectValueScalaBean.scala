@@ -3,7 +3,7 @@ package test.scala
 import io.micronaut.context.annotation.Value
 
 @javax.inject.Singleton
-class TestSingletonInjectValueConstructorScalaBean(
+class TestSingletonInjectValueScalaBean(
    @Value("injected String") val injectedString: String,
    @Value("41") val injectedByte: Byte,
    @Value("42") val injectedShort: Short,

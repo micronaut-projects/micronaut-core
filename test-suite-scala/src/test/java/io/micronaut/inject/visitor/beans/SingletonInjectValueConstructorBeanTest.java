@@ -3,6 +3,7 @@ package io.micronaut.inject.visitor.beans;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.DefaultApplicationContext;
 import org.junit.jupiter.api.Test;
+import test.java.TestSingletonInjectValueBean;
 
 import static org.junit.Assert.*;
 
@@ -13,7 +14,7 @@ public class SingletonInjectValueConstructorBeanTest {
         ApplicationContext applicationContext = new DefaultApplicationContext();
         applicationContext.start();
 
-        test.java.TestSingletonInjectValueConstructorBean singletonBean = applicationContext.getBean(test.java.TestSingletonInjectValueConstructorBean.class);
+        TestSingletonInjectValueBean singletonBean = applicationContext.getBean(TestSingletonInjectValueBean.class);
 
         assertNotNull(singletonBean);
         assertEquals("injected String", singletonBean.injectedString);
@@ -34,7 +35,7 @@ public class SingletonInjectValueConstructorBeanTest {
         ApplicationContext applicationContext = new DefaultApplicationContext();
         applicationContext.start();
 
-        test.scala.TestSingletonInjectValueConstructorScalaBean singletonBean = applicationContext.getBean(test.scala.TestSingletonInjectValueConstructorScalaBean.class);
+        test.scala.TestSingletonInjectValueScalaBean singletonBean = applicationContext.getBean(test.scala.TestSingletonInjectValueScalaBean.class);
 
         assertNotNull(singletonBean);
         assertEquals("injected String", singletonBean.injectedString());

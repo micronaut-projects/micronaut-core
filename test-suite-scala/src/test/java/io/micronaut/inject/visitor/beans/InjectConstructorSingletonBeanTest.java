@@ -3,9 +3,9 @@ package io.micronaut.inject.visitor.beans;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.DefaultApplicationContext;
 import org.junit.jupiter.api.Test;
+import test.java.TestInjectSingletonBean;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.*;
 
 public class InjectConstructorSingletonBeanTest {
     @Test
@@ -13,12 +13,16 @@ public class InjectConstructorSingletonBeanTest {
         ApplicationContext applicationContext = new DefaultApplicationContext();
         applicationContext.start();
 
-        test.java.TestInjectConstructorSingletonBean singletonBean = applicationContext.getBean(test.java.TestInjectConstructorSingletonBean.class);
+        TestInjectSingletonBean singletonBean = applicationContext.getBean(TestInjectSingletonBean.class);
 
         assertNotNull(singletonBean);
         assertEquals("not injected", singletonBean.singletonBean.getNotInjected());
        // assertEquals("not injected", singletonBean.singletonScalaBean.getNotInjected());
         assertEquals(2, singletonBean.engines.length);
+
+//TODO        assertTrue(singletonBean.existingOptionalEngine.isPresent());
+        assertFalse(singletonBean.nonExistingOptionalEngine.isPresent());
+
     }
 
     @Test
@@ -26,7 +30,7 @@ public class InjectConstructorSingletonBeanTest {
         ApplicationContext applicationContext = new DefaultApplicationContext();
         applicationContext.start();
 
-        test.scala.TestInjectConstructorSingletonScalaBean singletonBean = applicationContext.getBean(test.scala.TestInjectConstructorSingletonScalaBean.class);
+        test.scala.TestInjectSingletonScalaBean singletonBean = applicationContext.getBean(test.scala.TestInjectSingletonScalaBean.class);
 
         assertNotNull(singletonBean);
         assertEquals("not injected", singletonBean.singletonBean().getNotInjected());

@@ -21,7 +21,7 @@ object ScalaAnnotationMetadataBuilder {
 class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[ScalaElement, Global#AnnotationInfo] {
 
   def getOrCreate(element: ScalaElement): AnnotationMetadata =
-    ScalaAnnotationMetadataBuilder.CACHE.getOrElseUpdate(element, build(element))
+    ScalaAnnotationMetadataBuilder.CACHE.getOrElseUpdate(element, buildOverridden(element))
 
   /**
    * Whether the element is a field, method, class or constructor.

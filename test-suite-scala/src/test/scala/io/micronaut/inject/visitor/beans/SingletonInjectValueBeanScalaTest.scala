@@ -3,12 +3,13 @@ package io.micronaut.inject.visitor.beans
 import io.micronaut.context.DefaultApplicationContext
 import org.junit.Assert.{assertEquals, assertNotNull, assertTrue}
 import org.junit.jupiter.api.Test
+import test.java.TestSingletonInjectValueBean
 
-class SingletonInjectValueConstructorBeanScalaTest {
+class SingletonInjectValueBeanScalaTest {
   @Test def testApplicationContextJavaBean(): Unit = {
     val applicationContext = new DefaultApplicationContext
     applicationContext.start
-    val singletonBean = applicationContext.getBean(classOf[test.java.TestSingletonInjectValueConstructorBean])
+    val singletonBean = applicationContext.getBean(classOf[TestSingletonInjectValueBean])
 
     assertEquals("injected String", singletonBean.injectedString)
     assertEquals(41, singletonBean.injectedByte)
@@ -26,7 +27,7 @@ class SingletonInjectValueConstructorBeanScalaTest {
   @Test def testApplicationContextScalaBean(): Unit = {
     val applicationContext = new DefaultApplicationContext
     applicationContext.start
-    val singletonBean = applicationContext.getBean(classOf[test.scala.TestSingletonInjectValueConstructorScalaBean])
+    val singletonBean = applicationContext.getBean(classOf[test.scala.TestSingletonInjectValueScalaBean])
 
     assertNotNull(singletonBean)
     assertEquals("injected String", singletonBean.injectedString)

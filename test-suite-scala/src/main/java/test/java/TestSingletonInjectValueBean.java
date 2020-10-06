@@ -5,7 +5,7 @@ import io.micronaut.context.annotation.Value;
 import javax.inject.Singleton;
 
 @Singleton
-public class TestSingletonInjectValueConstructorBean {
+public class TestSingletonInjectValueBean {
     public final String injectedString;
     public final byte injectedByte;
     public final short injectedShort;
@@ -18,7 +18,7 @@ public class TestSingletonInjectValueConstructorBean {
     public final int lookUpInteger;
     @Value("46") public int injectIntField;
 
-    public TestSingletonInjectValueConstructorBean(
+    public TestSingletonInjectValueBean(
             @Value("injected String") String injectedString,
             @Value("41") byte injectedByte,
             @Value("42") short injectedShort,

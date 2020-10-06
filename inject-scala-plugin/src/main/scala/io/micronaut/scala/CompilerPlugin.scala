@@ -3,15 +3,16 @@ package io.micronaut.scala
 import java.util
 import java.util.Collections
 
+import io.micronaut.context.annotation.{Property, Value}
 import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.writer.{BeanDefinitionReferenceWriter, BeanDefinitionWriter}
+import javax.inject.Inject
 
 import scala.collection.JavaConverters._
 import scala.tools.nsc.plugins._
-import scala.tools.nsc.transform._
 import scala.tools.nsc.{Global, Phase}
 
 class CompilerPlugin(override val global: Global)
@@ -20,25 +21,25 @@ class CompilerPlugin(override val global: Global)
   override val description = "Compiler plugin"
   override val components =
     List(new InitPluginComponent(global),
-         new TypeElementVisitorPluginComponent(global),
-         new BeanDefinitionInjectPluginComponent(global),
-         new FinalizePluginComponent(global)
+      new TypeElementVisitorPluginComponent(global),
+      new BeanDefinitionInjectPluginComponent(global),
+      new FinalizePluginComponent(global)
     )
 }
 
-class InitPluginComponent(val global: Global) extends PluginComponent with TypingTransformers {
+class InitPluginComponent(val global: Global) extends PluginComponent {
   import global._
   override val phaseName = "compiler-plugin-type-element-init"
   override val runsAfter = List("jvm")
   override def newPhase(prev: Phase) =
     new StdPhase(prev) {
       override def apply(unit: CompilationUnit) {
-        unit.body = new InitTransformer(unit).transform(unit.body)
+        new InitTraverser(unit).traverse(unit.body)
       }
     }
 
-  class InitTransformer(unit: CompilationUnit) extends TypingTransformer(unit) {
-    override def transform(tree: Tree) = tree match {
+  class InitTraverser(unit: CompilationUnit) extends Traverser {
+    override def traverse(tree: Tree) = tree match {
       // Annotation are available in symbols at this point
       case classDef: ClassDef => {
         val serviceLoader = SoftServiceLoader.load(classOf[TypeElementVisitor[_, _]])
@@ -56,133 +57,67 @@ class InitPluginComponent(val global: Global) extends PluginComponent with Typin
             }
           }
         }
-        super.transform(tree)
+        super.traverse(tree)
       }
-      case _ => super.transform(tree)
+      case _ => super.traverse(tree)
     }
   }
-
-  def newTransformer(unit: CompilationUnit) =
-    new InitTransformer(unit)
 }
 
-class TypeElementVisitorPluginComponent(val global: Global) extends PluginComponent with TypingTransformers {
+class TypeElementVisitorPluginComponent(val global: Global) extends PluginComponent {
   import global._
-  override val phaseName = "compiler-plugin-bean-definition"
+  override val phaseName = "compiler-plugin-type-element-visitor"
   override val runsAfter = List("compiler-plugin-type-element-init")
   override def newPhase(prev: Phase) =
     new StdPhase(prev) {
       override def apply(unit: CompilationUnit) {
-        unit.body = new TypeElementVisitorTransformer(unit).transform(unit.body)
+        new TypeElementVisitorTraverser().traverse(unit.body)
       }
     }
 
-  class TypeElementVisitorTransformer(unit: CompilationUnit) extends TypingTransformer(unit) {
+  class TypeElementVisitorTraverser extends Traverser {
 
-    override def transform(tree: Tree) = tree match {
+    override def traverse(tree: Tree) = tree match {
       case classDef: ClassDef => {
         Globals.loadedVisitors.values./*filter(v.matches)*/foreach{ loadedVisitor =>
           new ScalaElementVisitor(classDef.symbol, List(loadedVisitor)).visitType(classDef.symbol.asInstanceOf[Global#ClassSymbol], null)
         }
-        super.transform(tree)
+        super.traverse(tree)
       }
-      case _ => super.transform(tree)
+      case _ => super.traverse(tree)
     }
   }
-
-  def newTransformer(unit: CompilationUnit) =
-    new TypeElementVisitorTransformer(unit)
 }
 
-class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComponent with TypingTransformers {
+class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComponent {
   import global._
 
-  override val phaseName = "compiler-plugin-inject-transform"
-  override val runsAfter = List("compiler-plugin-bean-definition")
+  override val phaseName = "compiler-plugin-bean-definition-inject"
+  override val runsAfter = List("compiler-plugin-type-element-visitor")
 
   override def newPhase(prev: Phase) =
     new StdPhase(prev) {
       override def apply(unit: CompilationUnit) {
-        unit.body = new BeanDefinitionInjectTransformer(unit).transform(unit.body)
+        new BeanDefinitionInjectTraverser(unit).traverse(unit.body)
       }
     }
 
-  class BeanDefinitionInjectTransformer(unit: CompilationUnit) extends TypingTransformer(unit) {
-    override def transform(tree: Tree) = tree match {
+  class BeanDefinitionInjectTraverser(unit:CompilationUnit) extends Traverser {
+    override def traverse(tree: Tree) = tree match {
       case classDef:ClassDef => {
-        if (classDef.symbol.annotations.nonEmpty) {
-          if (!classDef.symbol.isAbstractType) {
-            val visitorContext = new ScalaVisitorContext(global, unit.source)
-            val concreteClassMetadata = Globals.metadataBuilder.getOrCreate(ScalaSymbolElement(classDef.symbol))
-
-            val constructor = concreteConstructorFor(classDef)
-
-            val constructorParameterInfo = ExecutableElementParamInfo.populateParameterData(constructor)
-
-            val annotationMetadata = new AnnotationMetadataHierarchy(concreteClassMetadata)
-
-            val beanDefinitionWriter = new BeanDefinitionWriter(
-              classDef.symbol.enclosingPackageClass.fullName,
-              classDef.name.toString,
-              new ScalaClassElement(classDef.symbol, annotationMetadata, visitorContext),
-              annotationMetadata
-            )
-            val beanDefinitionReferenceWriter = new BeanDefinitionReferenceWriter(
-              beanDefinitionWriter.getBeanTypeName,
-              beanDefinitionWriter.getBeanDefinitionName,
-              beanDefinitionWriter.getOriginatingElement,
-              beanDefinitionWriter.getAnnotationMetadata
-            )
-
-            beanDefinitionWriter.visitBeanDefinitionConstructor(
-              beanDefinitionWriter.getAnnotationMetadata,
-              false,
-              constructorParameterInfo.parameters,
-              constructorParameterInfo.annotationMetadata,
-              constructorParameterInfo.genericTypes
-            )
-
-            classDef.impl.body.foreach {
-                case valDef: global.ValDef if valDef.mods.isMutable => {
-                  beanDefinitionWriter.visitFieldValue(
-                    classDef.symbol.fullName,
-                    Globals.argTypeForValDef(valDef),
-                    valDef.name.toString.trim,
-                    valDef.mods.isPrivate,
-                    Globals.metadataBuilder.getOrCreate(ScalaSymbolElement(valDef.symbol)),
-                    //genericUtils.resolveGenericTypes(`type`, Collections.emptyMap), TODO
-                    Collections.emptyMap(),
-                    false)
-                }
-                case _ => ()
-            }
-
-            beanDefinitionWriter.visitBeanDefinitionEnd()
-            beanDefinitionWriter.accept(visitorContext)
-
-            beanDefinitionReferenceWriter.accept(visitorContext)
-          }
-        }
-        super.transform(tree)
-        }
-      case _ => super.transform(tree)
+        new AnnBeanElementVisitor(classDef, new ScalaVisitorContext(global, unit.source)).visit()
+        super.traverse(tree)
+      }
+      case _ => super.traverse(tree)
     }
-  }
-
-  def newTransformer(unit: CompilationUnit) = new BeanDefinitionInjectTransformer(unit)
-
-  def concreteConstructorFor(classDef:ClassDef): Option[DefDef] = {
-    val constructors = classDef.impl.body.filter(_.symbol.isConstructor)
-
-    constructors.headOption.map(_.asInstanceOf[DefDef])
   }
 }
 
-class FinalizePluginComponent(val global: Global) extends PluginComponent with TypingTransformers {
+class FinalizePluginComponent(val global: Global) extends PluginComponent {
   import global._
 
   override val phaseName = "compiler-plugin-type-element-end"
-  override val runsAfter = List("compiler-plugin-inject-transform")
+  override val runsAfter = List("compiler-plugin-bean-definition-inject")
 
   override def newPhase(prev: Phase) = {
     new StdPhase(prev) {
