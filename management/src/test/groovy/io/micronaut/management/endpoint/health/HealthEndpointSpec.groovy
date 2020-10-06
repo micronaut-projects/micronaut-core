@@ -318,6 +318,31 @@ class HealthEndpointSpec extends Specification {
         embeddedServer.close()
     }
 
+    void "test /health/readiness endpoint - no app name"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'endpoints.health.sensitive': false,
+        ])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+        embeddedServer.applicationContext.createBean(TestReadinessHealthIndicator.class)
+
+        when:
+        def response = rxClient.exchange("/health/readiness", Map).blockingFirst()
+        Map result = response.body()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result.status == "UP"
+        result.details
+        result.details.readiness.status == "UP"
+        result.details.service.status == "UP"
+
+        cleanup:
+        embeddedServer.close()
+    }
+
     @Singleton
     @Requires(property = 'spec.name', value = 'HealthEndpointSpec')
     static class TestPrincipalBinder implements TypedRequestArgumentBinder<Principal> {
