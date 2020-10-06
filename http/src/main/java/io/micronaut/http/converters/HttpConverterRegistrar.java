@@ -27,6 +27,7 @@ import io.micronaut.http.MediaType;
 
 import javax.inject.Singleton;
 import java.net.InetSocketAddress;
+import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URL;
 import java.util.Optional;
@@ -116,7 +117,18 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                     String[] parts = object.toString().split(":");
                     if (parts.length == 2) {
                         int port = Integer.parseInt(parts[1]);
-                        return Optional.of(new InetSocketAddress(parts[0], port));
+                        return Optional.of(InetSocketAddress.createUnresolved(parts[0], port));
+                    } else {
+                        return Optional.empty();
+                    }
+                }
+        );
+        conversionService.addConverter(
+                CharSequence.class,
+                ProxySelector.class,
+                (object, targetType, context) -> {
+                    if (object.toString().equals("default")) {
+                        return Optional.of(ProxySelector.getDefault());
                     } else {
                         return Optional.empty();
                     }
