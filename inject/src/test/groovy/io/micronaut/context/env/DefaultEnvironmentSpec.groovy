@@ -625,7 +625,7 @@ class DefaultEnvironmentSpec extends Specification {
                     env = new DefaultEnvironment(new ApplicationContextConfiguration() {
                         @Override
                         List<String> getEnvironments() {
-                            return []
+                            return Arrays.asList()
                         }
 
                         @Override

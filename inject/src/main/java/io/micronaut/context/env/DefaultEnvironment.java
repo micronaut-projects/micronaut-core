@@ -112,7 +112,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         super(configuration.getConversionService());
         this.configuration = configuration;
         Set<String> environments = new LinkedHashSet<>(3);
-        List<String> specifiedNames = configuration.getEnvironments();
+        List<String> specifiedNames = new ArrayList<>(configuration.getEnvironments());
 
         specifiedNames.addAll(0, Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
                 System.getenv(ENVIRONMENTS_ENV))
