@@ -1,5 +1,5 @@
 plugins {
-    id "org.jetbrains.kotlin.jvm" version "1.3.72"
+    id "org.jetbrains.kotlin.jvm"
 }
 
 ext {
@@ -8,7 +8,7 @@ ext {
 dependencies {
     api project(':inject')
     api project(':core')
-    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.8"
+    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion"
 }
 
 compileKotlin {
