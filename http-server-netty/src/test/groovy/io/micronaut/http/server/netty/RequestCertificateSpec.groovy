@@ -27,7 +27,7 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
                 // Cannot be true!
                 'micronaut.ssl.buildSelfSigned': false,
                 'micronaut.ssl.clientAuthentication': "need",
-                'micronaut.ssl.key-store.path': 'classpath:KeyStore.p12',
+                'micronaut.ssl.key-store.path': 'classpath:KeyStore.pkcs12',
                 'micronaut.ssl.key-store.type': 'PKCS12',
                 'micronaut.ssl.key-store.password': '',
                 'micronaut.ssl.trust-store.path': 'classpath:TrustStore.jks',
