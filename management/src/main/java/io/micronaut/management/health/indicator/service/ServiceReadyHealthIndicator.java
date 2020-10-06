@@ -74,11 +74,19 @@ public class ServiceReadyHealthIndicator implements HealthIndicator {
         return Flowable.just(builder.build());
     }
 
+    /**
+     * Event listener triggered when a service is ready.
+     * @param event The event
+     */
     @EventListener
     void onServiceStarted(ServiceReadyEvent event) {
         serviceReady = true;
     }
 
+    /**
+     * Event listener triggered when the server starts up.
+     * @param event The event
+     */
     @EventListener
     void onServerStarted(ServerStartupEvent event) {
         if (!isService) {
