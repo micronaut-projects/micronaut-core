@@ -591,7 +591,7 @@ class DefaultEnvironmentSpec extends Specification {
         Environment env = new DefaultEnvironment(new ApplicationContextConfiguration() {
             @Override
             List<String> getEnvironments() {
-                return []
+                return Arrays.asList()
             }
 
             @Override
@@ -643,7 +643,7 @@ class DefaultEnvironmentSpec extends Specification {
         env = new DefaultEnvironment(new ApplicationContextConfiguration() {
             @Override
             List<String> getEnvironments() {
-                return []
+                return Arrays.asList()
             }
 
             @Override
