@@ -245,9 +245,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionWriter.visitBeanDefinitionEnd();
             beanDefinitionWriter.accept(classWriterOutputVisitor);
 
-            String beanDefinitionName = beanDefinitionWriter.getBeanDefinitionName();
             String beanTypeName = beanDefinitionWriter.getBeanTypeName();
-
             List<? extends TypeMirror> interfaces = beanClassElement.getInterfaces();
             for (TypeMirror anInterface : interfaces) {
 
@@ -267,14 +265,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
             }
 
-            AnnotationMetadata annotationMetadata = beanDefinitionWriter.getAnnotationMetadata();
             BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                    new BeanDefinitionReferenceWriter(
-                            beanTypeName,
-                            beanDefinitionName,
-                            beanDefinitionWriter,
-                            annotationMetadata
-                    );
+                    new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter);
             beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
 
             String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();

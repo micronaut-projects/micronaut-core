@@ -228,6 +228,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private Map<String, Map<String, Object>> typeArguments;
     private List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
     private List<MethodVisitData> preDestroyMethodVisits = new ArrayList<>(2);
+    private String interceptedType;
 
     private List<Runnable> deferredInjectionPoints = new ArrayList<>();
 
@@ -474,6 +475,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
+    public void setInterceptedType(String typeName) {
+        if (typeName != null) {
+            this.interfaceTypes.add(AdvisedBeanType.class);
+        }
+        this.interceptedType = typeName;
+    }
+
+    @Override
+    public Optional<Type> getInterceptedType() {
+        return Optional.ofNullable(interceptedType)
+                       .map(BeanDefinitionWriter::getTypeReferenceForName);
+    }
+
+    @Override
     public boolean isValidated() {
         return this.interfaceTypes.contains(ValidatedBeanDefinition.class);
     }
@@ -644,6 +659,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             preDestroyMethodVisitor.visitInsn(ARETURN);
             preDestroyMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, preDestroyMethodLocalCount);
         }
+
+        getInterceptedType().ifPresent(t -> implementInterceptedTypeMethod(t, this.classWriter));
 
         for (GeneratorAdapter method : loadTypeMethods.values()) {
             method.visitMaxs(3, 1);
