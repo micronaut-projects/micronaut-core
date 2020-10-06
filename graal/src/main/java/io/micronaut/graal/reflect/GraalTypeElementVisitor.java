@@ -109,7 +109,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 packages.add(element.getPackageName());
                 final String beanName = element.getName();
                 addBean(beanName);
-                resolveClassData(beanName+"[]");
+                resolveClassData(beanName + "[]");
                 final String[] introspectedClasses = element.getValue(Introspected.class, "classes", String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
                 for (String introspectedClass : introspectedClasses) {
                     addBean(introspectedClass);
