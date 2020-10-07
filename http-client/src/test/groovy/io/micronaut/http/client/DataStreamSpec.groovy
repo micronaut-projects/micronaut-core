@@ -42,6 +42,7 @@ import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
 import spock.lang.Issue
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -131,6 +132,7 @@ class DataStreamSpec extends Specification {
         new String(arrays[1]) == 'The Shining'
     }
 
+    @Retry
     void "test that stream response is free of race conditions"() {
         when:
         List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(
