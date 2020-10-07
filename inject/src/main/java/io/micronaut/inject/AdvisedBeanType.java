@@ -19,7 +19,7 @@ package io.micronaut.inject;
  * A marker interface for all {@link BeanDefinitionReference} and {@link BeanDefinition}
  * instances to implement that provides access to the target bean type for an AOP advice bean.
  *
- * @since 2.1.1
+ * @since 2.2.0
  * @author graemerocher
  * @param <T> The bean type of the aspect
  */
