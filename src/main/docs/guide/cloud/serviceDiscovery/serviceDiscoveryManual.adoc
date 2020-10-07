@@ -14,6 +14,9 @@ micronaut:
                     - http://foo2
 
 ----
+WARNING: All `micronaut.http.services` should be kebab-cased and not camelCased. For example, name your service `foo-v1` and not `fooV1`.
+
+image::https-warning.jpg[]
 
 You can then inject a client with `@Client("foo")` and it will use the above configuration to load balance between the two configured servers.
 
