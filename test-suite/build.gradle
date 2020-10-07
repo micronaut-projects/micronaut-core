@@ -58,7 +58,7 @@ dependencies {
     testRuntimeOnly dependencyVersion("h2")
     testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junitVersion"
     testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
-    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.862'
+    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.877'
 
     // needed for HTTP/2 tests
     testImplementation 'io.netty:netty-tcnative:2.0.34.Final'
