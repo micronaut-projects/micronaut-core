@@ -1471,7 +1471,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 int paramLen = targetParameters.size();
                                 if (paramLen == sourceParameters.size()) {
 
-                                    Map<String, Object> genericTypes = new HashMap<>();
+                                    Map<String, Object> genericTypes = new LinkedHashMap<>();
                                     for (int i = 0; i < paramLen; i++) {
 
                                         VariableElement targetElement = targetParameters.get(i);
