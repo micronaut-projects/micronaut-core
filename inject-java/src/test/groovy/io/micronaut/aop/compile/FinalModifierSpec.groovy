@@ -15,11 +15,43 @@
  */
 package io.micronaut.aop.compile
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import io.micronaut.aop.Intercepted
 import io.micronaut.aop.simple.Mutating
 import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 
 class FinalModifierSpec extends AbstractTypeElementSpec {
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2530')
+    void 'test final modifier on external class produced by factory'() {
+        when:
+        def context = buildContext('test.MyBeanFactory', '''
+package test;
+
+import io.micronaut.aop.simple.*;
+import io.micronaut.context.annotation.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+@Factory
+class MyBeanFactory {
+    @Mutating("someVal")
+    @javax.inject.Singleton
+    @javax.inject.Named("myMapper")
+    ObjectMapper myMapper() {
+        return new ObjectMapper();
+    }
+
+}
+
+''')
+        then:
+        context.getBean(ObjectMapper, Qualifiers.byName("myMapper")) instanceof Intercepted
+
+        cleanup:
+        context.close()
+    }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2479')
     void "test final modifier on inherited public method"() {

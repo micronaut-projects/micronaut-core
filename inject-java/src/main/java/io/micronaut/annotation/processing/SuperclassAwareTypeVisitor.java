@@ -20,6 +20,7 @@ import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
@@ -65,22 +66,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                 boolean isAcceptable = isAcceptable(enclosedElement);
                 if (isAcceptable) {
                     if (enclosedElement instanceof ExecutableElement) {
-                        ExecutableElement ee = (ExecutableElement) enclosedElement;
-                        String qualifiedName = ee.getSimpleName().toString();
-                        qualifiedName += "(" + ee.getParameters().stream().map(variableElement -> types.erasure(variableElement.asType()).toString()).collect(Collectors.joining(",")) + ")";
-
-
-                        TypeMirror returnTypeMirror = ee.getReturnType();
-                        String returnType = types.erasure(returnTypeMirror).toString();
-                        if (returnTypeMirror.getKind() == TypeKind.TYPEVAR) {
-                            Map<String, Object> generics = genericUtils.buildGenericTypeArgumentInfo(type)
-                                    .get(typeElement.getQualifiedName().toString());
-                            if (generics != null && generics.containsKey(returnTypeMirror.toString())) {
-                                returnType = generics.get(returnTypeMirror.toString()).toString();
-                            }
-                        }
-
-                        qualifiedName = returnType + "." + qualifiedName;
+                        String qualifiedName = buildQualifiedName(type, typeElement, (ExecutableElement) enclosedElement);
 
                         // if the method has already been processed then it is overridden so ignore
                         if (!processed.contains(qualifiedName)) {
@@ -94,6 +80,15 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                             processed.add(qualifiedName);
                             accept(type, enclosedElement, p);
                         }
+                    }
+                } else if (enclosedElement instanceof ExecutableElement) {
+                    ExecutableElement ee = (ExecutableElement) enclosedElement;
+                    Set<Modifier> modifiers = ee.getModifiers();
+                    if (!modifiers.contains(Modifier.PRIVATE) && !modifiers.contains(Modifier.STATIC)) {
+                        String qualifiedName = buildQualifiedName(type, typeElement, ee);
+                        // add to processed so that if a super method is visited that this method
+                        // overrides it is not processed again
+                        processed.add(qualifiedName);
                     }
                 }
             }
@@ -177,5 +172,25 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
     @Override
     public R visitUnion(UnionType t, P p) {
         return null;
+    }
+
+    private String buildQualifiedName(DeclaredType type, TypeElement typeElement, ExecutableElement enclosedElement) {
+        ExecutableElement ee = enclosedElement;
+        String qualifiedName = ee.getSimpleName().toString();
+        qualifiedName += "(" + ee.getParameters().stream().map(variableElement -> types.erasure(variableElement.asType()).toString()).collect(Collectors.joining(",")) + ")";
+
+        TypeMirror returnTypeMirror = ee.getReturnType();
+        String returnType = types.erasure(returnTypeMirror).toString();
+
+        if (returnTypeMirror.getKind() == TypeKind.TYPEVAR) {
+            Map<String, Object> generics = genericUtils.buildGenericTypeArgumentInfo(type)
+                    .get(typeElement.getQualifiedName().toString());
+            if (generics != null && generics.containsKey(returnTypeMirror.toString())) {
+                returnType = generics.get(returnTypeMirror.toString()).toString();
+            }
+        }
+
+        qualifiedName = returnType + "." + qualifiedName;
+        return qualifiedName;
     }
 }
