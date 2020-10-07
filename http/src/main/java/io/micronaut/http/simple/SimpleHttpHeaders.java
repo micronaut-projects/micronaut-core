@@ -57,10 +57,7 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
     @SuppressWarnings("unchecked")
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         Optional<String> value = headers.getFirst(name.toString());
-        if (value.isPresent()) {
-            return conversionService.convert(value, conversionContext);
-        }
-        return Optional.empty();
+        return value.flatMap(it -> conversionService.convert(it, conversionContext));
     }
 
     @Override
