@@ -294,7 +294,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 this,
                 annotationMetadata
         );
-        proxyBeanDefinitionWriter.setInterceptedType(targetClassFullName);
+        if (isInterface) {
+            if (implementInterface) {
+                proxyBeanDefinitionWriter.setInterceptedType(targetClassFullName);
+            }
+        } else {
+            proxyBeanDefinitionWriter.setInterceptedType(targetClassFullName);
+        }
         startClass(classWriter, proxyInternalName, getTypeReference(targetClassFullName));
     }
 
