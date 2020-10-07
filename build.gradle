@@ -8,6 +8,7 @@ buildscript {
         classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.11"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
     }
 }
 
