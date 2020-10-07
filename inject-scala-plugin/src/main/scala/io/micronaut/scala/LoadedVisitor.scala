@@ -54,7 +54,7 @@ class LoadedVisitor(classSymbol:Global#ClassDef, visitor: TypeElementVisitor[_, 
         null
       }
     }
-    case typeElement: Global#TypeSymbol => {
+    case typeElement: Global#ClassSymbol => {
       val isEnum = typeElement.isJavaEnum
       if (isEnum) {
         this.rootClassElement = new ScalaEnumElement(typeElement, annotationMetadata, visitorContext)

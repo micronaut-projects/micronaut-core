@@ -7,7 +7,7 @@ import io.micronaut.inject.visitor.VisitorContext
 import scala.tools.nsc.Global
 
 class ScalaClassElement(
-  symbol: Global#Symbol,
+  symbol: Global#ClassSymbol,
   annotationMetadata: AnnotationMetadata,
   visitorContext: VisitorContext
 ) extends io.micronaut.inject.ast.ClassElement {

@@ -3,7 +3,7 @@ package test.scala
 import io.micronaut.context.annotation.Prototype
 import javax.inject.Named
 
-abstract class TestEngine(val numCylinders:Int)
+sealed abstract class TestEngine(val numCylinders:Int)
 
 @Prototype
 @Named("v6")

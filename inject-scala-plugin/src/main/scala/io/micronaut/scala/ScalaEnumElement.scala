@@ -9,7 +9,7 @@ import io.micronaut.inject.visitor.VisitorContext
 import scala.tools.nsc.Global
 
 class ScalaEnumElement (
-  typeElement: Global#TypeSymbol,
+  typeElement: Global#ClassSymbol,
   annotationMetadata: AnnotationMetadata,
   visitorContext: VisitorContext
  ) extends ScalaClassElement(typeElement, annotationMetadata, visitorContext) with EnumElement {

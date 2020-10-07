@@ -67,6 +67,7 @@ class ScalaElementVisitor(concreteClass:Global#Symbol, visitors:List[LoadedVisit
         elt1 match {
           case _:Global#MethodSymbol => checkMethodOverride(enclosedElements, elt1)
           case _:Global#TermSymbol => checkFieldHide(enclosedElements, elt1)
+          case _ => ()
         }
       }
       superClass = superClass.superClass

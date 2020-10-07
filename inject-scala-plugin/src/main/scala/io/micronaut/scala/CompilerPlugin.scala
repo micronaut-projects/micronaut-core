@@ -1,17 +1,18 @@
 package io.micronaut.scala
 
+import java.io.IOException
 import java.util
-import java.util.Collections
 
-import io.micronaut.context.annotation.{Property, Value}
+import io.micronaut.context.annotation.Context
 import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.order.OrderUtil
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
-import io.micronaut.inject.visitor.TypeElementVisitor
-import io.micronaut.inject.writer.{BeanDefinitionReferenceWriter, BeanDefinitionWriter}
-import javax.inject.Inject
+import io.micronaut.inject.visitor.{TypeElementVisitor, VisitorContext}
+import io.micronaut.inject.writer.{BeanDefinitionReferenceWriter, BeanDefinitionVisitor}
+import javax.lang.model.`type`.DeclaredType
+import javax.lang.model.element.TypeElement
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.tools.nsc.plugins._
 import scala.tools.nsc.{Global, Phase}
 
@@ -103,10 +104,48 @@ class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComp
     }
 
   class BeanDefinitionInjectTraverser(unit:CompilationUnit) extends Traverser {
+    val processed = new mutable.HashSet[ScalaElement]
+
+    private def processBeanDefinitions(beanClassElement: Global#ClassDef, beanDefinitionWriter: BeanDefinitionVisitor, visitorContext: VisitorContext): Unit = {
+        beanDefinitionWriter.visitBeanDefinitionEnd()
+        beanDefinitionWriter.accept(visitorContext)
+        val beanDefinitionName = beanDefinitionWriter.getBeanDefinitionName
+        var beanTypeName = beanDefinitionWriter.getBeanTypeName
+//        val interfaces = beanClassElement.impl.ingetInterfaces
+//        for (anInterface <- interfaces) {
+//          if (anInterface.isInstanceOf[DeclaredType]) {
+//            val declaredType = anInterface.asInstanceOf[DeclaredType]
+//            val element = declaredType.asElement
+//            if (element.isInstanceOf[TypeElement]) {
+//              val te = element.asInstanceOf[TypeElement]
+//              val name = te.getQualifiedName.toString
+//              if (classOf[Provider[_]].getName == name) {
+//                val typeArguments = declaredType.getTypeArguments
+//                if (!typeArguments.isEmpty) beanTypeName = genericUtils.resolveTypeReference(typeArguments.get(0)).toString
+//              }
+//            }
+//          }
+//        }
+          val annotationMetadata = beanDefinitionWriter.getAnnotationMetadata
+        val beanDefinitionReferenceWriter = new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionName, beanDefinitionWriter.getOriginatingElement, annotationMetadata)
+        beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing)
+        val className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName
+//        beanDefinitionReferenceWriter.setContextScope(annotationUtils.hasStereotype(beanClassElement, classOf[Context]))
+        beanDefinitionReferenceWriter.accept(visitorContext)
+    }
+
     override def traverse(tree: Tree) = tree match {
       case classDef:ClassDef => {
-        new AnnBeanElementVisitor(classDef, new ScalaVisitorContext(global, unit.source)).visit()
-        super.traverse(tree)
+        val visitorContext = new ScalaVisitorContext(global, unit.source)
+        val visitor = new AnnBeanElementVisitor(classDef, visitorContext)
+          visitor.visit()
+          visitor.beanDefinitionWriters.iterator.foreach{tuple =>
+            if (!processed.contains(tuple._1)) {
+              processed.add(tuple._1)
+              processBeanDefinitions(classDef, tuple._2, visitorContext)
+            }
+          }
+          super.traverse(tree)
       }
       case _ => super.traverse(tree)
     }
