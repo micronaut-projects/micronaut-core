@@ -587,7 +587,7 @@ class DefaultEnvironmentSpec extends Specification {
     }
 
     void "test the default environment is applied"() {
-        when:
+        when: 'environment deduction is on'
         Environment env = new DefaultEnvironment(new ApplicationContextConfiguration() {
             @Override
             List<String> getEnvironments() {
@@ -600,8 +600,29 @@ class DefaultEnvironmentSpec extends Specification {
             }
         }).start()
 
-        then:
-        env.activeNames == ['test', 'default'] as Set
+        then: 'an environment is deduced so the default is not applied'
+        env.activeNames == ['test'] as Set
+
+        when: 'environment deduction is off'
+        env = new DefaultEnvironment(new ApplicationContextConfiguration() {
+            @Override
+            List<String> getEnvironments() {
+                return []
+            }
+
+            @Override
+            List<String> getDefaultEnvironments() {
+                return ['default']
+            }
+
+            @Override
+            Optional<Boolean> getDeduceEnvironments() {
+                return Optional.of(false)
+            }
+        }).start()
+
+        then: 'the default is applied'
+        env.activeNames == ['default'] as Set
 
         when: 'an environment is specified'
         env = new DefaultEnvironment(new ApplicationContextConfiguration() {

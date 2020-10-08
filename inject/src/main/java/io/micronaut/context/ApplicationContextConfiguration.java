@@ -48,7 +48,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
 
     /**
      * @return The default environments to be applied if no other environments
-     * are explicitly specified.
+     * are explicitly specified or deduced.
      */
     default List<String> getDefaultEnvironments() {
         return Collections.emptyList();
