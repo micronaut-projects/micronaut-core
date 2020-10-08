@@ -158,4 +158,45 @@ abstract class MyBean implements MyInterface {
         StaticOriginatingElements.INSTANCE.originatingElements[1].name == 'test.MyInterface'
 
     }
+
+    @RestoreSystemProperties
+    void "test originating elements from abstract extended introduction advise interface inheritance"() {
+        given:
+        System.setProperty("micronaut.static.originating.elements", "true")
+
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package test;
+
+import io.micronaut.aop.introduction.*;
+import io.micronaut.context.annotation.*;
+import java.net.*;
+import javax.validation.constraints.*;
+
+interface MyInterface {
+    @Executable
+    void save(@NotBlank String name, @Min(1L) int age);
+    @Executable
+    void saveTwo(@Min(1L) String name);
+}
+
+
+@Stub
+@javax.inject.Singleton
+abstract class MyBean extends MyParentBean {
+}
+
+abstract class MyParentBean implements MyInterface {
+}
+
+''')
+        then:
+        !beanDefinition.isAbstract()
+
+        and:"MyParentBean is not included because it has no bean related annotations"
+        StaticOriginatingElements.INSTANCE.originatingElements.size() == 2
+        StaticOriginatingElements.INSTANCE.originatingElements[0].name == 'test.MyBean'
+        StaticOriginatingElements.INSTANCE.originatingElements[1].name == 'test.MyInterface'
+
+    }
 }
