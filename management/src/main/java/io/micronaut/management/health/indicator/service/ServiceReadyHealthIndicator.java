@@ -45,6 +45,7 @@ public class ServiceReadyHealthIndicator implements HealthIndicator {
 
     private boolean serviceReady = false;
 
+    @SuppressWarnings("checkstyle:DesignForExtension")
     @EventListener
     void onServiceStarted(ServiceReadyEvent event) {
         serviceReady = true;
