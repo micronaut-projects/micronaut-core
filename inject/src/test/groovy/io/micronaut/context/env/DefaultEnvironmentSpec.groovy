@@ -635,10 +635,15 @@ class DefaultEnvironmentSpec extends Specification {
             List<String> getDefaultEnvironments() {
                 return ['default']
             }
+
+            @Override
+            Optional<Boolean> getDeduceEnvironments() {
+                return Optional.of(false)
+            }
         }).start()
 
         then: 'the default environment is not applied'
-        env.activeNames == ['test', 'foo'] as Set
+        env.activeNames == ['foo'] as Set
 
         when: 'an environment is specified through env var'
         SystemLambda.withEnvironmentVariable("MICRONAUT_ENVIRONMENTS", "bar")
@@ -653,11 +658,16 @@ class DefaultEnvironmentSpec extends Specification {
                         List<String> getDefaultEnvironments() {
                             return ['default']
                         }
+
+                        @Override
+                        Optional<Boolean> getDeduceEnvironments() {
+                            return Optional.of(false)
+                        }
                     }).start()
                 })
 
         then: 'the default environment is not applied'
-        env.activeNames == ['test', 'bar'] as Set
+        env.activeNames == ['bar'] as Set
 
         when: 'an environment is specified through a system prop'
         System.setProperty('micronaut.environments', 'xyz')
@@ -671,10 +681,15 @@ class DefaultEnvironmentSpec extends Specification {
             List<String> getDefaultEnvironments() {
                 return ['default']
             }
+
+            @Override
+            Optional<Boolean> getDeduceEnvironments() {
+                return Optional.of(false)
+            }
         }).start()
 
         then: 'the default environment is not applied'
-        env.activeNames == ['test', 'xyz'] as Set
+        env.activeNames == ['xyz'] as Set
     }
 
     private static Environment startEnv(String files) {
