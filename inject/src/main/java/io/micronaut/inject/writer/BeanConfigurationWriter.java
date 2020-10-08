@@ -63,7 +63,7 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName, getOriginatingElement())) {
+        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName, getOriginatingElements())) {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
         }

@@ -147,7 +147,9 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * @param originatingElement      The originating element
      * @param annotationMetadata      The annotation metadata
      * @param writeAnnotationDefaults Whether annotations defaults should be written
+     * @deprecated No longer needs to be instantiated directly, just use the static methods
      */
+    @Deprecated
     public AnnotationMetadataWriter(
             String className,
             ClassElement originatingElement,
@@ -174,7 +176,9 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * @param className          The class name for which the metadata relates
      * @param originatingElement The originating element
      * @param annotationMetadata The annotation metadata
+     * @deprecated No longer needs to be instantiated directly, just use the static methods
      */
+    @Deprecated
     public AnnotationMetadataWriter(
             String className,
             ClassElement originatingElement,
@@ -200,7 +204,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         ClassWriter classWriter = generateClassBytes();
         if (classWriter != null) {
 
-            try (OutputStream outputStream = outputVisitor.visitClass(className, getOriginatingElement())) {
+            try (OutputStream outputStream = outputVisitor.visitClass(className, getOriginatingElements())) {
                 outputStream.write(classWriter.toByteArray());
             }
         }

@@ -225,6 +225,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
         info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
         return Collections.emptyList();
     }
+
     /**
      * Some TypeElementVisitors generate classpath resources that other visitors might be interested in.
      * The generated resources are intended to be strings paths relative to the classpath root

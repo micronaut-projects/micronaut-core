@@ -41,12 +41,7 @@ import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
-import io.micronaut.inject.writer.AbstractClassFileWriter;
-import io.micronaut.inject.writer.BeanDefinitionVisitor;
-import io.micronaut.inject.writer.BeanDefinitionWriter;
-import io.micronaut.inject.writer.ClassWriterOutputVisitor;
-import io.micronaut.inject.writer.ExecutableMethodWriter;
-import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
+import io.micronaut.inject.writer.*;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -189,7 +184,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public AopProxyWriter(BeanDefinitionWriter parent,
                           OptionalValues<Boolean> settings,
                           Object... interceptorTypes) {
-        super(parent.getOriginatingElement());
+        super(parent.getOriginatingElements());
         this.isIntroduction = false;
         this.implementInterface = true;
         this.parentWriter = parent;
@@ -212,8 +207,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
                 isInterface,
-                parent.getOriginatingElement(),
-                parent.getAnnotationMetadata());
+                parent,
+                parent.getAnnotationMetadata()
+        );
         startClass(classWriter, getInternalName(proxyFullName), getTypeReference(targetClassFullName));
         processAlreadyVisitedMethods(parent);
     }
@@ -246,7 +242,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param className          The class name
      * @param isInterface        Is the target of the advise an interface
      * @param implementInterface Whether the interface should be implemented. If false the {@code interfaceTypes} argument should contain at least one entry
-     * @param originatingElement The originating element
+     * @param originatingElement The originating elements
      * @param annotationMetadata The annotation metadata
      * @param interfaceTypes     The additional interfaces to implement
      * @param interceptorTypes   The interceptor types
@@ -259,7 +255,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                           AnnotationMetadata annotationMetadata,
                           Object[] interfaceTypes,
                           Object... interceptorTypes) {
-        super(originatingElement);
+        super(OriginatingElements.of(originatingElement));
         this.isIntroduction = true;
         this.implementInterface = implementInterface;
 
@@ -285,7 +281,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
                 isInterface,
-                originatingElement,
+                this,
                 annotationMetadata
         );
         startClass(classWriter, proxyInternalName, getTypeReference(targetClassFullName));
@@ -316,6 +312,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
+    @Deprecated
     public Element getOriginatingElement() {
         return proxyBeanDefinitionWriter.getOriginatingElement();
     }
@@ -548,7 +545,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     isAbstract,
                     isDefault,
                     isSuspend,
-                    getOriginatingElement(),
+                    this,
                     annotationMetadata) {
 
                 @Override
@@ -1070,7 +1067,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
         proxyBeanDefinitionWriter.accept(visitor);
-        try (OutputStream out = visitor.visitClass(proxyFullName, getOriginatingElement())) {
+        try (OutputStream out = visitor.visitClass(proxyFullName, getOriginatingElements())) {
             out.write(classWriter.toByteArray());
             for (ExecutableMethodWriter method : proxiedMethods) {
                 method.accept(visitor);
