@@ -14,11 +14,12 @@ micronaut:
                     - http://foo2
 
 ----
-WARNING: All `micronaut.http.services` should be kebab-cased and not camelCased. For example, name your service `foo-v1` and not `fooV1`.
-
-image::https-warning.jpg[]
 
 You can then inject a client with `@Client("foo")` and it will use the above configuration to load balance between the two configured servers.
+
+WARNING: All clients injected with `@Client` must use an id that is kebab-cased and not camelCased. For example, `@Client("foo-v1")` instead of `@Client("fooV1")`
+
+image::https-warning.jpg[]
 
 TIP: You can override this configuration in production by specifying an environment variable such as `MICRONAUT_HTTP_SERVICES_FOO_URLS=http://prod1,http://prod2`
 
