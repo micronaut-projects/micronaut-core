@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ClassGenerationException;
 import io.micronaut.inject.writer.GeneratedFile;
@@ -32,9 +33,7 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.net.URI;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * An implementation of {@link io.micronaut.inject.writer.ClassWriterOutputVisitor} for annotation processing.
@@ -63,19 +62,27 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
     @Override
     public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
-        JavaFileObject javaFileObject;
-        if (originatingElement != null) {
-            Object nativeType = originatingElement.getNativeType();
-            if (nativeType instanceof Element) {
-                javaFileObject = filer.createClassFile(classname, (Element) nativeType);
-            } else {
-                javaFileObject = filer.createClassFile(classname);
-            }
-        } else {
-            javaFileObject = filer.createClassFile(classname);
-        }
-        return javaFileObject.openOutputStream();
+        return visitClass(classname, new io.micronaut.inject.ast.Element[]{ originatingElement });
+    }
 
+    @Override
+    public OutputStream visitClass(String classname, io.micronaut.inject.ast.Element... originatingElements) throws IOException {
+        JavaFileObject javaFileObject;
+        Element[] nativeOriginatingElements;
+        if (ArrayUtils.isNotEmpty(originatingElements)) {
+            List<Element> list = new ArrayList<>(originatingElements.length);
+            for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
+                Object nativeType = originatingElement.getNativeType();
+                if (nativeType instanceof Element) {
+                    list.add((Element) nativeType);
+                }
+            }
+            nativeOriginatingElements = list.toArray(new Element[0]);
+        } else {
+            nativeOriginatingElements = new Element[0];
+        }
+        javaFileObject = filer.createClassFile(classname, nativeOriginatingElements);
+        return javaFileObject.openOutputStream();
     }
 
     @Override

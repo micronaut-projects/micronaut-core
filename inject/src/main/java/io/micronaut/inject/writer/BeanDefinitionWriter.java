@@ -231,6 +231,57 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     /**
      * Creates a bean definition writer.
      *
+     * @param packageName         The package name of the bean
+     * @param className           The class name, without the package, of the bean
+     * @param isInterface         Whether the writer is for an interface.
+     * @param originatingElements The originating elements
+     * @param annotationMetadata  The annotation metadata
+     * @since 2.1.1
+     */
+    public BeanDefinitionWriter(String packageName,
+                                String className,
+                                boolean isInterface,
+                                OriginatingElements originatingElements,
+                                AnnotationMetadata annotationMetadata) {
+        this(packageName,
+                className,
+                packageName + '.' + className,
+                isInterface,
+                originatingElements,
+                annotationMetadata
+        );
+    }
+
+    /**
+     * Creates a bean definition writer.
+     *
+     * @param packageName         The package name of the bean
+     * @param className           The class name, without the package, of the bean
+     * @param providedClassName   The type this bean definition provides, in this case where the bean implements {@link javax.inject.Provider}
+     * @param isInterface         Is the type an interface
+     * @param originatingElements The originating elements
+     * @param annotationMetadata  The annotation metadata
+     */
+    public BeanDefinitionWriter(String packageName,
+                                String className,
+                                String providedClassName,
+                                boolean isInterface,
+                                OriginatingElements originatingElements,
+                                AnnotationMetadata annotationMetadata) {
+        this(
+                packageName,
+                className,
+                packageName + ".$" + className + "Definition",
+                providedClassName,
+                isInterface,
+                originatingElements,
+                annotationMetadata
+        );
+    }
+
+    /**
+     * Creates a bean definition writer.
+     *
      * @param packageName        The package name of the bean
      * @param className          The class name, without the package, of the bean
      * @param providedClassName  The type this bean definition provides, in this case where the bean implements {@link javax.inject.Provider}
@@ -244,7 +295,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 boolean isInterface,
                                 Element originatingElement,
                                 AnnotationMetadata annotationMetadata) {
-        this(packageName, className, packageName + ".$" + className + "Definition", providedClassName, isInterface, originatingElement, annotationMetadata);
+        this(
+                packageName,
+                className,
+                packageName + ".$" + className + "Definition",
+                providedClassName,
+                isInterface,
+                OriginatingElements.of(originatingElement),
+                annotationMetadata
+        );
     }
 
     /**
@@ -265,8 +324,28 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 boolean isInterface,
                                 Element originatingElement,
                                 AnnotationMetadata annotationMetadata) {
-        super(originatingElement);
+        this(packageName, className, beanDefinitionName, providedClassName, isInterface, OriginatingElements.of(originatingElement), annotationMetadata);
+    }
 
+    /**
+     * Creates a bean definition writer.
+     *
+     * @param packageName         The package name of the bean
+     * @param className           The class name, without the package, of the bean
+     * @param beanDefinitionName  The name of the bean definition
+     * @param providedClassName   The type this bean definition provides, which differs from the class name in the case of factory beans
+     * @param isInterface         Whether the provided type is an interface
+     * @param originatingElements The originating elements
+     * @param annotationMetadata  The annotation metadata
+     */
+    public BeanDefinitionWriter(String packageName,
+                                String className,
+                                String beanDefinitionName,
+                                String providedClassName,
+                                boolean isInterface,
+                                OriginatingElements originatingElements,
+                                AnnotationMetadata annotationMetadata) {
+        super(originatingElements);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.packageName = packageName;
         this.isInterface = isInterface;
@@ -548,7 +627,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 pushStoreStringInArray(visitor, i++, totalSize, typeName);
                 // use the property type as the value
                 pushStoreInArray(visitor, i++, totalSize, () ->
-                    pushTypeArguments(visitor, entry.getValue())
+                        pushTypeArguments(visitor, entry.getValue())
                 );
             }
             // invoke the AbstractBeanDefinition.createMap method
@@ -629,7 +708,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
-        try (OutputStream out = visitor.visitClass(getBeanDefinitionName(), getOriginatingElement())) {
+        try (OutputStream out = visitor.visitClass(getBeanDefinitionName(), getOriginatingElements())) {
             try {
                 for (ExecutableMethodWriter methodWriter : methodExecutors.values()) {
                     methodWriter.accept(visitor);
@@ -898,7 +977,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 this.isInterface || isInterface,
                 isDefault,
                 isSuspend,
-                getOriginatingElement(),
+                this,
                 annotationMetadata
         );
 //        executableMethodWriter.makeStaticInner(beanDefinitionInternalName, (ClassWriter) classWriter);
@@ -2219,14 +2298,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         /**
          * Default constructor.
-         * @param declaringType The declaring type
-         * @param requiresReflection Whether reflection is required
-         * @param returnType The return type
-         * @param methodName The method name
-         * @param argumentTypes The argument types
+         *
+         * @param declaringType              The declaring type
+         * @param requiresReflection         Whether reflection is required
+         * @param returnType                 The return type
+         * @param methodName                 The method name
+         * @param argumentTypes              The argument types
          * @param argumentAnnotationMetadata The argument metadata
-         * @param genericTypes The generic type metadata
-         * @param annotationMetadata The method annotation metadata
+         * @param genericTypes               The generic type metadata
+         * @param annotationMetadata         The method annotation metadata
          */
         MethodVisitData(
                 Object declaringType,

@@ -43,6 +43,7 @@ import io.micronaut.inject.configuration.PropertyMetadata
 import io.micronaut.inject.processing.JavaModelUtils
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 import io.micronaut.inject.writer.GeneratedFile
+import io.micronaut.inject.writer.OriginatingElements
 
 import javax.inject.Named
 import java.time.Duration
@@ -220,7 +221,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(
                         beanTypeName,
                         beanDefinitionName,
-                        beanDefWriter.getOriginatingElement(),
+                        beanDefWriter,
                         beanDefWriter.annotationMetadata
                 )
 
@@ -237,6 +238,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     ClassWriterOutputVisitor visitor = new ClassWriterOutputVisitor() {
                         @Override
                         OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
+                            ByteArrayOutputStream stream = new ByteArrayOutputStream()
+                            classStreams.put(classname, stream)
+                            return stream
+                        }
+
+                        @Override
+                        OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
                             ByteArrayOutputStream stream = new ByteArrayOutputStream()
                             classStreams.put(classname, stream)
                             return stream

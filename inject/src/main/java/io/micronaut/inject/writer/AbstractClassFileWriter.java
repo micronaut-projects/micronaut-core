@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
@@ -46,7 +47,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractClassFileWriter implements Opcodes {
+public abstract class AbstractClassFileWriter implements Opcodes, OriginatingElements {
 
     protected static final Type TYPE_ARGUMENT = Type.getType(Argument.class);
     protected static final Type TYPE_ARGUMENT_ARRAY = Type.getType(Argument[].class);
@@ -100,13 +101,40 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         NAME_TO_TYPE_MAP.put("short", "S");
     }
 
-    protected final Element originatingElement;
+    private final OriginatingElements originatingElements;
 
     /**
      * @param originatingElement The originating element
+     * @deprecated Use {@link #AbstractClassFileWriter(Element...)} instead
      */
+    @Deprecated
     protected AbstractClassFileWriter(Element originatingElement) {
-        this.originatingElement = originatingElement;
+        this(OriginatingElements.of(originatingElement));
+    }
+
+    /**
+     * @param originatingElements The originating elements
+     */
+    protected AbstractClassFileWriter(Element... originatingElements) {
+        this(OriginatingElements.of(originatingElements));
+    }
+
+    /**
+     * @param originatingElements The originating elements
+     */
+    protected AbstractClassFileWriter(OriginatingElements originatingElements) {
+        this.originatingElements = Objects.requireNonNull(originatingElements, "The originating elements cannot be null");
+    }
+
+    @NotNull
+    @Override
+    public Element[] getOriginatingElements() {
+        return originatingElements.getOriginatingElements();
+    }
+
+    @Override
+    public void addOriginatingElement(@NotNull Element element) {
+        originatingElements.addOriginatingElement(element);
     }
 
     /**
@@ -495,9 +523,14 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     /**
      * @return The originating element
      */
-    public @Nullable
-    Element getOriginatingElement() {
-        return this.originatingElement;
+    @Deprecated
+    public @Nullable Element getOriginatingElement() {
+        Element[] originatingElements = getOriginatingElements();
+        if (ArrayUtils.isNotEmpty(originatingElements)) {
+            return originatingElements[0];
+        } else {
+            return null;
+        }
     }
 
     /**

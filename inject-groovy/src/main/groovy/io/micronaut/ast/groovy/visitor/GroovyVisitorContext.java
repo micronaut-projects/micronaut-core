@@ -184,12 +184,17 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
+        return visitClass(classname, new Element[]{ originatingElement });
+    }
+
+    @Override
+    public OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
         File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                     classesDir
             );
-            return outputVisitor.visitClass(classname, originatingElement);
+            return outputVisitor.visitClass(classname, originatingElements);
         } else {
             // should only arrive here in testing scenarios
             if (compilationUnit.getClassLoader() instanceof InMemoryByteCodeGroovyClassLoader) {

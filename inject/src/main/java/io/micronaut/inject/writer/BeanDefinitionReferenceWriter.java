@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.ast.Element;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -54,17 +53,17 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     private boolean requiresMethodProcessing;
 
     /**
-     * @param beanTypeName       The bean type name
-     * @param beanDefinitionName The bean definition name
-     * @param originatingElement The originating element
-     * @param annotationMetadata The annotation metadata
+     * @param beanTypeName        The bean type name
+     * @param beanDefinitionName  The bean definition name
+     * @param originatingElements The originating element
+     * @param annotationMetadata  The annotation metadata
      */
     public BeanDefinitionReferenceWriter(
             String beanTypeName,
             String beanDefinitionName,
-            Element originatingElement,
+            OriginatingElements originatingElements,
             AnnotationMetadata annotationMetadata) {
-        super(beanDefinitionName + REF_SUFFIX, originatingElement, annotationMetadata, true);
+        super(beanDefinitionName + REF_SUFFIX, originatingElements, annotationMetadata, true);
         this.beanTypeName = beanTypeName;
         this.beanDefinitionName = beanDefinitionName;
         this.beanDefinitionReferenceClassName = beanDefinitionName + REF_SUFFIX;
@@ -79,13 +78,13 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
      */
     @Override
     public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
-        try (OutputStream outputStream = outputVisitor.visitClass(getBeanDefinitionQualifiedClassName(), getOriginatingElement())) {
+        try (OutputStream outputStream = outputVisitor.visitClass(getBeanDefinitionQualifiedClassName(), getOriginatingElements())) {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
         }
         outputVisitor.visitServiceDescriptor(
-            BeanDefinitionReference.class,
-            beanDefinitionReferenceClassName
+                BeanDefinitionReference.class,
+                beanDefinitionReferenceClassName
         );
     }
 
