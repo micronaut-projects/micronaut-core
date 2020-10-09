@@ -17,9 +17,7 @@ micronaut:
 
 You can then inject a client with `@Client("foo")` and it will use the above configuration to load balance between the two configured servers.
 
-WARNING: All clients injected with `@Client` must use an id that is kebab-cased and not camelCased. For example, `@Client("foo-v1")` instead of `@Client("fooV1")`
-
-image::https-warning.jpg[]
+IMPORTANT: When using an `@Client` with service discovery, the service id must be specified in the annotation in kebab-case. The configuration in the example above however can be in camel case.
 
 TIP: You can override this configuration in production by specifying an environment variable such as `MICRONAUT_HTTP_SERVICES_FOO_URLS=http://prod1,http://prod2`
 
