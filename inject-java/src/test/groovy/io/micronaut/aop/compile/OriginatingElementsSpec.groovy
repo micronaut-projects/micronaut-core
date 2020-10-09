@@ -45,6 +45,113 @@ abstract class MyBase {
     }
 
     @RestoreSystemProperties
+    void "test base class not included if no injection points"() {
+        given:
+        System.setProperty("micronaut.static.originating.elements", "true")
+
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' , '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.annotation.*;
+import javax.inject.*;
+
+@Singleton
+class MyBean extends MyBase {
+
+}
+
+abstract class MyBase {
+    io.micronaut.core.convert.ConversionService conversionService;
+}
+''')
+        then:
+        !beanDefinition.isAbstract()
+        beanDefinition != null
+        beanDefinition.injectedFields.size() == 0
+
+        and:"the originating elements include the super class"
+        StaticOriginatingElements.INSTANCE.originatingElements.size() == 1
+        StaticOriginatingElements.INSTANCE.originatingElements[0].name == 'test.MyBean'
+    }
+
+    @RestoreSystemProperties
+    void "test executable method inherited through abstract base"() {
+        given:
+        System.setProperty("micronaut.static.originating.elements", "true")
+
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' , '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.annotation.*;
+import javax.inject.*;
+
+@Singleton
+class MyBean extends MyBase {
+
+}
+
+abstract class MyBase {
+    @Executable
+    void myMethod() {
+        // no-op
+    }
+}
+''')
+        then:
+        !beanDefinition.isAbstract()
+        beanDefinition != null
+        beanDefinition.injectedFields.size() == 0
+        beanDefinition.executableMethods.size() == 1
+
+        and:"the originating elements include the super class"
+        StaticOriginatingElements.INSTANCE.originatingElements.size() == 2
+        StaticOriginatingElements.INSTANCE.originatingElements[0].name == 'test.MyBean'
+        StaticOriginatingElements.INSTANCE.originatingElements[1].name == 'test.MyBase'
+    }
+
+    @RestoreSystemProperties
+    void "test AOP method inherited through abstract base"() {
+        given:
+        System.setProperty("micronaut.static.originating.elements", "true")
+
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' , '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.annotation.*;
+import io.micronaut.aop.simple.*;
+import javax.inject.*;
+
+@Singleton
+class MyBean extends MyBase {
+
+}
+
+abstract class MyBase {
+    @Mutating("name")
+    void myMethod(String name) {
+        // no-op
+    }
+}
+''')
+        then:
+        !beanDefinition.isAbstract()
+        beanDefinition != null
+        beanDefinition.injectedFields.size() == 0
+        beanDefinition.executableMethods.size() == 1
+
+        and:"the originating elements include the super class"
+        StaticOriginatingElements.INSTANCE.originatingElements.size() == 2
+        StaticOriginatingElements.INSTANCE.originatingElements[0].name == 'test.MyBean'
+        StaticOriginatingElements.INSTANCE.originatingElements[1].name == 'test.MyBase'
+    }
+
+    @RestoreSystemProperties
     void "test inject annotation on method inherited through abstract base"() {
         given:
         System.setProperty("micronaut.static.originating.elements", "true")

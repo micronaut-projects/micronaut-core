@@ -1295,6 +1295,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             final AopProxyWriter proxyWriter = resolveAopWriter(beanWriter);
             ExecutableMethodWriter executableMethodWriter = null;
             if (proxyWriter == null || proxyWriter.isProxyTarget()) {
+                addOriginatingElementIfNecessary(beanWriter, declaringClass);
                 executableMethodWriter = beanWriter.visitExecutableMethod(
                         typeRef,
                         resolvedReturnType,
