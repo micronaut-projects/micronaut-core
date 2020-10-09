@@ -121,12 +121,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 .map(String::trim)
                 .collect(Collectors.toList()));
 
-        if (specifiedNames.isEmpty()) {
-            specifiedNames = configuration.getDefaultEnvironments();
-        }
-
         this.deduceEnvironments = configuration.getDeduceEnvironments().orElse(null);
         EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
+        if (environmentsAndPackage.enviroments.isEmpty() && specifiedNames.isEmpty()) {
+            specifiedNames = configuration.getDefaultEnvironments();
+        }
         environments.addAll(environmentsAndPackage.enviroments);
         String aPackage = environmentsAndPackage.aPackage;
         if (aPackage != null) {

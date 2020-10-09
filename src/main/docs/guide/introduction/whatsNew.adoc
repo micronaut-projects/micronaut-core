@@ -8,7 +8,7 @@ It is now possible to define <<introspection, bean introspections>> on JDK 14+ r
 
 ==== Default Environment
 
-Micronaut 2.1 introduces the concept of a default environment. One or more default environments can be set and they will apply if no other environments are explicitly specified. See the <<environments, environments documentation>> for information on how to use this new feature.
+Micronaut 2.1 introduces the concept of a default environment. One or more default environments can be set and they will apply if no other environments are explicitly specified or deduced. See the <<environments, environments documentation>> for information on how to use this new feature.
 
 ==== @Order Annotation
 
