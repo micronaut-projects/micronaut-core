@@ -9,7 +9,7 @@ import scala.tools.nsc.Global
 class ExecutableElementParamInfo(requiresReflection: Boolean, val metadata: AnnotationMetadata) {
   val parameters = new util.LinkedHashMap[String, AnyRef]
   val genericParameters = new util.LinkedHashMap[String, AnyRef]
-  val annotationMetadata = new util.LinkedHashMap[String, AnnotationMetadata]
+  val parameterMetadata = new util.LinkedHashMap[String, AnnotationMetadata]
   val genericTypes = new util.LinkedHashMap[String, util.Map[String, AnyRef]]
 
   def this(requiresReflection: Boolean, metadata: Option[AnnotationMetadata]) = {
@@ -22,7 +22,7 @@ class ExecutableElementParamInfo(requiresReflection: Boolean, val metadata: Anno
   }
 
   def addAnnotationMetadata(name: Global#TermName, valDefMetadata: AnnotationMetadata): Unit = {
-    annotationMetadata.put(name.toString(), valDefMetadata)
+    parameterMetadata.put(name.toString(), valDefMetadata)
   }
 
 }

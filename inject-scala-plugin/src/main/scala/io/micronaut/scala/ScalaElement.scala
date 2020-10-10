@@ -10,5 +10,5 @@ abstract sealed class ScalaElement(val obj:Any) {
 }
 
 case class ScalaSymbolElement(symbol:Global#Symbol) extends ScalaElement(symbol)
-case class ScalaNameElement(name:Global#Name) extends ScalaElement(name)
+case class ScalaNameElement(annOwner: Global#Symbol, name:Global#Name) extends ScalaElement(name)
 
