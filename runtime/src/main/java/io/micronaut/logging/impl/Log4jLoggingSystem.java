@@ -15,7 +15,6 @@
  */
 package io.micronaut.logging.impl;
 
-import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.logging.LogLevel;
