@@ -25,6 +25,7 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
 import javax.lang.model.util.Types;
+import java.lang.reflect.AnnotatedType;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
 
     private final Types types;
     private final GenericUtils genericUtils;
+    private final ModelUtils modelUtils;
 
     /**
      * Default constructor.
@@ -51,13 +53,14 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
     protected SuperclassAwareTypeVisitor(JavaVisitorContext visitorContext) {
         this.types = visitorContext.getTypes();
         this.genericUtils = visitorContext.getGenericUtils();
+        this.modelUtils = visitorContext.getModelUtils();
     }
 
     @Override
     public R visitDeclared(DeclaredType type, P p) {
-        Element element = type.asElement();
+       final Element element = type.asElement();
 
-        while ((JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element)) &&
+        if ((JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element)) &&
                 !element.toString().equals(Object.class.getName()) &&
                 !element.toString().equals(Enum.class.getName())) {
             TypeElement typeElement = (TypeElement) element;
@@ -65,21 +68,16 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
             for (Element enclosedElement : enclosedElements) {
                 boolean isAcceptable = isAcceptable(enclosedElement);
                 if (isAcceptable) {
+                    String qualifiedName;
                     if (enclosedElement instanceof ExecutableElement) {
-                        String qualifiedName = buildQualifiedName(type, typeElement, (ExecutableElement) enclosedElement);
-
-                        // if the method has already been processed then it is overridden so ignore
-                        if (!processed.contains(qualifiedName)) {
-                            processed.add(qualifiedName);
-                            accept(type, enclosedElement, p);
-                        }
+                        qualifiedName = buildQualifiedName(type, typeElement, (ExecutableElement) enclosedElement);
                     } else {
-                        String qualifiedName = types.erasure(enclosedElement.asType()).toString() + "." + enclosedElement.getSimpleName().toString();
-                        // if the method has already been processed then it is overridden so ignore
-                        if (!processed.contains(qualifiedName)) {
-                            processed.add(qualifiedName);
-                            accept(type, enclosedElement, p);
-                        }
+                        qualifiedName = types.erasure(enclosedElement.asType()).toString() + "." + enclosedElement.getSimpleName().toString();
+                    }
+                    // if the method has already been processed then it is overridden so ignore
+                    if (!processed.contains(qualifiedName)) {
+                        processed.add(qualifiedName);
+                        accept(type, enclosedElement, p);
                     }
                 } else if (enclosedElement instanceof ExecutableElement) {
                     ExecutableElement ee = (ExecutableElement) enclosedElement;
@@ -92,6 +90,11 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                     }
                 }
             }
+
+            TypeMirror superMirror = typeElement.getSuperclass();
+            if (superMirror instanceof DeclaredType) {
+                visitDeclared((DeclaredType) superMirror, p);
+            }
             List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
             for (TypeMirror anInterface : interfaces) {
                 if (anInterface instanceof DeclaredType) {
@@ -99,12 +102,6 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                     DeclaredType interfaceType = (DeclaredType) anInterface;
                     visitDeclared(interfaceType, p);
                 }
-            }
-            TypeMirror superMirror = typeElement.getSuperclass();
-            if (superMirror instanceof DeclaredType) {
-                element = ((DeclaredType) superMirror).asElement();
-            } else {
-                break;
             }
         }
 
@@ -180,7 +177,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
         qualifiedName += "(" + ee.getParameters().stream().map(variableElement -> types.erasure(variableElement.asType()).toString()).collect(Collectors.joining(",")) + ")";
 
         TypeMirror returnTypeMirror = ee.getReturnType();
-        String returnType = types.erasure(returnTypeMirror).toString();
+        String returnType = null;
 
         if (returnTypeMirror.getKind() == TypeKind.TYPEVAR) {
             Map<String, Object> generics = genericUtils.buildGenericTypeArgumentInfo(type)
@@ -188,6 +185,10 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
             if (generics != null && generics.containsKey(returnTypeMirror.toString())) {
                 returnType = generics.get(returnTypeMirror.toString()).toString();
             }
+        }
+
+        if (returnType == null) {
+            returnType = modelUtils.resolveTypeName(returnTypeMirror);
         }
 
         qualifiedName = returnType + "." + qualifiedName;
