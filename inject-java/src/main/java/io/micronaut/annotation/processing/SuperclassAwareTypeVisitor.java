@@ -43,6 +43,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
 
     private final Types types;
     private final GenericUtils genericUtils;
+    private final ModelUtils modelUtils;
 
     /**
      * Default constructor.
@@ -52,6 +53,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
     protected SuperclassAwareTypeVisitor(JavaVisitorContext visitorContext) {
         this.types = visitorContext.getTypes();
         this.genericUtils = visitorContext.getGenericUtils();
+        this.modelUtils = visitorContext.getModelUtils();
     }
 
     @Override
@@ -175,7 +177,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
         qualifiedName += "(" + ee.getParameters().stream().map(variableElement -> types.erasure(variableElement.asType()).toString()).collect(Collectors.joining(",")) + ")";
 
         TypeMirror returnTypeMirror = ee.getReturnType();
-        String returnType = types.erasure(returnTypeMirror).toString();
+        String returnType = null;
 
         if (returnTypeMirror.getKind() == TypeKind.TYPEVAR) {
             Map<String, Object> generics = genericUtils.buildGenericTypeArgumentInfo(type)
@@ -184,15 +186,11 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                 returnType = generics.get(returnTypeMirror.toString()).toString();
             }
         }
-        if (!returnTypeMirror.getAnnotationMirrors().isEmpty()) {
-            //This relies on knowledge of the internal Type.AnnotatedType api so its
-            //less than ideal, however there is no public API to get the underlying
-            //type when the return type is annotated
-            int annotatedIndex = returnType.lastIndexOf("::");
-            if (annotatedIndex > -1) {
-                returnType = returnType.substring(annotatedIndex + 3, returnType.length() - 1);
-            }
+
+        if (returnType == null) {
+            returnType = modelUtils.resolveTypeName(returnTypeMirror);
         }
+
         qualifiedName = returnType + "." + qualifiedName;
         return qualifiedName;
     }
