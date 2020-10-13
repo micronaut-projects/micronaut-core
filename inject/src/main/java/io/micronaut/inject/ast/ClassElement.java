@@ -39,6 +39,14 @@ public interface ClassElement extends TypedElement {
     boolean isAssignable(String type);
 
     /**
+     * @return Whether this element is a record
+     * @since 2.1.0
+     */
+    default boolean isRecord() {
+        return false;
+    }
+
+    /**
      * Whether this element is an enum.
      * @return True if it is an enum
      */
@@ -129,27 +137,9 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * @return Whether the class element is abstract
-     */
-    @Override
-    default boolean isAbstract() {
-        return false;
-    }
-
-    /**
      * @return Whether the class element is an interface
      */
     default boolean isInterface() {
-        return false;
-    }
-
-    /**
-     * Returns whether the class element is an array.
-     *
-     * @return True if this class element is an array
-     */
-    @Override
-    default boolean isArray() {
         return false;
     }
 
@@ -206,4 +196,11 @@ public interface ClassElement extends TypedElement {
         return isAssignable(type.getName());
     }
 
+    /**
+     * Convert the class element to an element for the same type, but representing an array.
+     * Do not mutate the existing instance. Create a new instance instead.
+     *
+     * @return A new class element
+     */
+    ClassElement toArray();
 }

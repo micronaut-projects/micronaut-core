@@ -15,6 +15,8 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.GenericUtils;
@@ -32,8 +34,6 @@ import io.micronaut.inject.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -71,6 +71,7 @@ public class JavaVisitorContext implements VisitorContext {
     private final MutableConvertibleValues<Object> visitorAttributes;
     private final GenericUtils genericUtils;
     private final ProcessingEnvironment processingEnv;
+    private final List<String> generatedResources = new ArrayList<>();
     private @Nullable
     JavaFileManager standardFileManager;
 
@@ -189,7 +190,12 @@ public class JavaVisitorContext implements VisitorContext {
 
     @Override
     public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
-        return outputVisitor.visitClass(classname, originatingElement);
+        return outputVisitor.visitClass(classname, new io.micronaut.inject.ast.Element[]{ originatingElement });
+    }
+
+    @Override
+    public OutputStream visitClass(String classname, io.micronaut.inject.ast.Element... originatingElements) throws IOException {
+        return outputVisitor.visitClass(classname, originatingElements);
     }
 
     @Override
@@ -362,5 +368,15 @@ public class JavaVisitorContext implements VisitorContext {
             }
         }
         return Optional.ofNullable(this.standardFileManager);
+    }
+
+    @Override
+    public Collection<String> getGeneratedResources() {
+        return Collections.unmodifiableCollection(generatedResources);
+    }
+
+    @Override
+    public void addGeneratedResource(@NonNull String resource) {
+        generatedResources.add(resource);
     }
 }

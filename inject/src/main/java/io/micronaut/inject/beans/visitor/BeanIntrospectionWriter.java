@@ -115,6 +115,13 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     /**
+     * @return The constructor.
+     */
+    public MethodElement getConstructor() {
+        return constructor;
+    }
+
+    /**
      * @return The class element
      */
     ClassElement getClassElement() {
@@ -157,7 +164,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
 
-        final Type propertyType = getTypeForElement(type);
+        final Type propertyType = getTypeReference(type);
 
         DefaultAnnotationMetadata.contributeDefaults(
                 this.annotationMetadata,
@@ -207,7 +214,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private void writeIntrospectionClass(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         final Type superType = Type.getType(AbstractBeanIntrospection.class);
 
-        try (OutputStream introspectionStream = classWriterOutputVisitor.visitClass(introspectionName, getOriginatingElement())) {
+        try (OutputStream introspectionStream = classWriterOutputVisitor.visitClass(introspectionName, getOriginatingElements())) {
 
             startFinalClass(introspectionWriter, introspectionType.getInternalName(), superType);
             final GeneratorAdapter constructorWriter = startConstructor(introspectionWriter);
@@ -327,7 +334,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 desc);
 
         Collection<Type> argumentTypes = Arrays.stream(constructorArguments).map(pe ->
-            getTypeForElement(pe.getType())
+            getTypeReference(pe.getType())
         ).collect(Collectors.toList());
 
         boolean isConstructor = constructor instanceof ConstructorElement;
@@ -409,7 +416,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         final String referenceName = targetClassType.getClassName();
         classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, referenceName);
 
-        try (OutputStream referenceStream = classWriterOutputVisitor.visitClass(referenceName, getOriginatingElement())) {
+        try (OutputStream referenceStream = classWriterOutputVisitor.visitClass(referenceName, getOriginatingElements())) {
             startService(referenceWriter, BeanIntrospectionReference.class, targetClassType.getInternalName(), superType);
             final ClassWriter classWriter = generateClassBytes(referenceWriter);
             for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {

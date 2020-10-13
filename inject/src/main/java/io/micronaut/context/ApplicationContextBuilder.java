@@ -103,6 +103,14 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder environments(@Nullable String... environments);
 
     /**
+     * The environments to use if no other environments are specified.
+     *
+     * @param environments The environments
+     * @return This builder
+     */
+    @NonNull ApplicationContextBuilder defaultEnvironments(@Nullable String... environments);
+
+    /**
      * The packages to include for package scanning.
      *
      * @param packages The packages

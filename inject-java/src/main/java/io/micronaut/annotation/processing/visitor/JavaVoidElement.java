@@ -15,18 +15,22 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 
 /**
  * Represents the void type.
  *
  * @author graemerocher
  * @since 1.0
+ * @deprecated Use {@link PrimitiveElement#VOID} instead.
  */
 @Internal
+@Deprecated
 final class JavaVoidElement implements ClassElement, AnnotationMetadataDelegate {
 
     @Override
@@ -37,6 +41,11 @@ final class JavaVoidElement implements ClassElement, AnnotationMetadataDelegate 
     @Override
     public boolean isAssignable(String type) {
         return "void".equals(type);
+    }
+
+    @Override
+    public ClassElement toArray() {
+        return PrimitiveElement.VOID.toArray();
     }
 
     @Override
@@ -55,11 +64,13 @@ final class JavaVoidElement implements ClassElement, AnnotationMetadataDelegate 
     }
 
     @Override
+    @NonNull
     public Object getNativeType() {
         return void.class;
     }
 
     @Override
+    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return AnnotationMetadata.EMPTY_METADATA;
     }

@@ -50,7 +50,8 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached;
 @Internal
 public class GroovyClassElement extends AbstractGroovyElement implements ClassElement {
 
-    private final ClassNode classNode;
+    protected final ClassNode classNode;
+    protected int arrayDimensions;
     private Map<String, Map<String, ClassNode>> genericInfo;
 
     /**
@@ -59,8 +60,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
      */
-    public GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
-        this(sourceUnit, compilationUnit, classNode, annotationMetadata, null);
+    GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
+        this(sourceUnit, compilationUnit, classNode, annotationMetadata, null, 0);
     }
 
     /**
@@ -69,11 +70,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
      * @param genericInfo        The generic info
+     * @param arrayDimensions    The number of array dimensions for arrays
      */
-    GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata, Map<String, Map<String, ClassNode>> genericInfo) {
+    GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata, Map<String, Map<String, ClassNode>> genericInfo, int arrayDimensions) {
         super(sourceUnit, compilationUnit, classNode, annotationMetadata);
         this.classNode = classNode;
         this.genericInfo = genericInfo;
+        this.arrayDimensions = arrayDimensions;
     }
 
     @Override
@@ -83,7 +86,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     @Override
     public boolean isPrimitive() {
-        return ClassHelper.isPrimitiveType(classNode) || (classNode.isArray() && ClassHelper.isPrimitiveType(classNode.getComponentType()));
+        return false;
     }
 
     @Override
@@ -91,7 +94,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         final ClassNode superClass = classNode.getSuperClass();
         if (superClass != null && !superClass.equals(ClassHelper.OBJECT_TYPE)) {
             return Optional.of(
-                    new GroovyClassElement(
+                    toClassElement(
                             sourceUnit,
                             compilationUnit,
                             superClass,
@@ -159,7 +162,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
             for (Map.Entry<String, ClassNode> entry : forType.entrySet()) {
                 ClassNode classNode = entry.getValue();
 
-                ClassElement rawElement = new GroovyClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(
+                ClassElement rawElement = toClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(
                         sourceUnit,
                         compilationUnit,
                         classNode
@@ -193,7 +196,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                     }
 
                     if (cn != null) {
-                        typeArgumentMap.put(name, new GroovyClassElement(
+                        typeArgumentMap.put(name, toClassElement(
                                 sourceUnit,
                                 compilationUnit,
                                 cn,
@@ -211,12 +214,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
             Map<String, ClassElement> map = new LinkedHashMap<>(spec.size());
             for (Map.Entry<String, ClassNode> entry : spec.entrySet()) {
                 ClassNode cn = entry.getValue();
-                GroovyClassElement classElement;
-                if (cn.isEnum()) {
-                    classElement = new GroovyEnumElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn));
-                } else {
-                    classElement = new GroovyClassElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn));
-                }
+                ClassElement classElement = toClassElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn));
                 map.put(entry.getKey(), classElement);
             }
             return Collections.unmodifiableMap(map);
@@ -247,7 +245,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                     @Override
                     public ClassElement getType() {
                         ClassNode type = propertyNode.getType();
-                        return new GroovyClassElement(sourceUnit, compilationUnit, type,
+                        return toClassElement(sourceUnit, compilationUnit, type,
                                 AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, type));
                     }
                 };
@@ -289,17 +287,16 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                                     return;
                                 }
                                 ClassNode returnTypeNode = node.getReturnType();
-                                ClassElement getterReturnType;
+                                ClassElement getterReturnType = null;
                                 if (returnTypeNode.isGenericsPlaceHolder()) {
                                     final String placeHolderName = returnTypeNode.getUnresolvedName();
                                     final ClassElement classElement = getTypeArguments().get(placeHolderName);
                                     if (classElement != null) {
                                         getterReturnType = classElement;
-                                    } else {
-                                        getterReturnType = new GroovyClassElement(sourceUnit, compilationUnit, returnTypeNode, AnnotationMetadata.EMPTY_METADATA);
                                     }
-                                } else {
-                                    getterReturnType = new GroovyClassElement(sourceUnit, compilationUnit, returnTypeNode, AnnotationMetadata.EMPTY_METADATA);
+                                }
+                                if (getterReturnType == null) {
+                                    getterReturnType = toClassElement(sourceUnit, compilationUnit, returnTypeNode, AnnotationMetadata.EMPTY_METADATA);
                                 }
 
                                 GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
@@ -308,7 +305,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                                 getterAndSetter.getter = node;
                                 if (getterAndSetter.setter != null) {
                                     ClassNode typeMirror = getterAndSetter.setter.getParameters()[0].getType();
-                                    ClassElement setterParameterType = new GroovyClassElement(sourceUnit, compilationUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
+                                    ClassElement setterParameterType = toClassElement(sourceUnit, compilationUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
                                     if (!setterParameterType.getName().equals(getterReturnType.getName())) {
                                         getterAndSetter.setter = null; // not a compatible setter
                                     }
@@ -319,7 +316,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                                     return;
                                 }
                                 ClassNode typeMirror = node.getParameters()[0].getType();
-                                ClassElement setterParameterType = new GroovyClassElement(sourceUnit, compilationUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
+                                ClassElement setterParameterType = toClassElement(sourceUnit, compilationUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
 
                                 GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
                                 configureDeclaringType(declaringTypeElement, getterAndSetter);
@@ -405,7 +402,17 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     @Override
     public boolean isArray() {
-        return classNode.isArray();
+        return arrayDimensions > 0;
+    }
+
+    @Override
+    public ClassElement toArray() {
+        return new GroovyClassElement(sourceUnit, compilationUnit, classNode, getAnnotationMetadata(), getGenericTypeInfo(), arrayDimensions + 1);
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return arrayDimensions;
     }
 
     @Override
@@ -415,11 +422,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     @Override
     public String getName() {
-        if (isArray()) {
-            return classNode.getComponentType().getName();
-        } else {
-            return classNode.getName();
-        }
+        return classNode.getName();
     }
 
     @Override

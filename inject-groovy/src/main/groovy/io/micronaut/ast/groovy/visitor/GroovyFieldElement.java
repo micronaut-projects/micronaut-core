@@ -97,7 +97,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @NonNull
     @Override
     public ClassElement getType() {
-        return new GroovyClassElement(sourceUnit, compilationUnit, variable.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, variable.getType()));
+        return toClassElement(sourceUnit, compilationUnit, variable.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, variable.getType()));
     }
 
     @Override
@@ -115,7 +115,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
             throw new IllegalStateException("Declaring class could not be established");
         }
 
-        return new GroovyClassElement(
+        return toClassElement(
                 sourceUnit,
                 compilationUnit,
                 declaringClass,

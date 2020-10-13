@@ -1,5 +1,6 @@
 package io.micronaut.docs.http.client.proxy
 
+import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
@@ -12,19 +13,48 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
+import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.client.exceptions.ReadTimeoutException
+import io.micronaut.http.client.netty.DefaultHttpClient
+import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.test.annotation.MicronautTest
 import spock.lang.Specification
 
 import javax.inject.Inject
+import java.time.Duration
 
 @MicronautTest
+@Property(name = "micronaut.http.client.read-idle-timeout", value = "10s")
+@Property(name = "micronaut.http.client.log-level", value = "TRACE")
 class ProxyRequestSpec extends Specification {
     @Inject
     @Client("/")
     RxHttpClient client
+
+    @Inject
+    EmbeddedServer embeddedServer
+
+    void "test proxy request with read timeout"() {
+        given:"A client with no read timeout"
+        def configuration = new DefaultHttpClientConfiguration()
+        configuration.setReadTimeout(Duration.ofSeconds(-1))
+        def client = new DefaultHttpClient(embeddedServer.URL, configuration)
+
+        when:"A GET request is proxied"
+        client.exchange("/proxy/timeout", String).blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message.contains("Read Timeout")
+
+        cleanup:
+        client.close()
+    }
 
     void "test proxy GET request from filter"() {
         when:"A GET request is proxied"
@@ -59,6 +89,12 @@ class ProxyRequestSpec extends Specification {
         response.header('X-My-Response-Header') == 'YYY'
         response.body() == 'Hello John XXX'
 
+        when:"A POST request with no body is proxied"
+        response = client.exchange(HttpRequest.POST("/proxy/post/nobody", "John").contentType(MediaType.TEXT_PLAIN), String).blockingFirst()
+
+        then:
+        response.status() == HttpStatus.NO_CONTENT
+
         when:"A POST request with JSON is proxied"
         response = client.exchange(HttpRequest.POST("/proxy/post/json", new Message(text: "John")).contentType(MediaType.APPLICATION_JSON), Message).blockingFirst()
 
@@ -83,11 +119,26 @@ class ProxyRequestSpec extends Specification {
             return "good " + headers.get("X-My-Request-Header")
         }
 
+        @Get("/timeout")
+        @Produces(MediaType.TEXT_PLAIN)
+        @ExecuteOn(TaskExecutors.IO)
+        String timeout() {
+            sleep(15000)
+            return "done"
+        }
+
         @Post("/post/text")
         @Produces(MediaType.TEXT_PLAIN)
         @Consumes(MediaType.TEXT_PLAIN)
         String text(HttpHeaders headers, @Body String body) {
             return "Hello " + body +  " " + headers.get("X-My-Request-Header")
+        }
+
+        @Post("/post/nobody")
+        @Produces(MediaType.TEXT_PLAIN)
+        @Consumes(MediaType.TEXT_PLAIN)
+        HttpResponse<?> noBody(HttpHeaders headers, @Body String body) {
+            return HttpResponse.noContent()
         }
 
         @Post("/post/json")

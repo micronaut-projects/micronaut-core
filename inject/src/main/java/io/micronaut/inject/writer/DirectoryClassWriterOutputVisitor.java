@@ -40,11 +40,17 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
      * @param targetDir The target directory
      */
     public DirectoryClassWriterOutputVisitor(File targetDir) {
+        super(true);
         this.targetDir = targetDir;
     }
 
     @Override
     public OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
+        return visitClass(classname, new Element[]{ originatingElement });
+    }
+
+    @Override
+    public OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
         File targetFile = new File(targetDir, getClassFileName(classname)).getCanonicalFile();
         File parentDir = targetFile.getParentFile();
         if (!parentDir.exists() && !parentDir.mkdirs()) {

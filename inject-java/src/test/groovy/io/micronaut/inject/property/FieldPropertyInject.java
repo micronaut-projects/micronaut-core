@@ -15,11 +15,12 @@
  */
 package io.micronaut.inject.property;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.core.convert.format.MapFormat;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Singleton;
+import java.util.List;
 import java.util.Map;
 
 @Singleton
@@ -32,6 +33,9 @@ public class FieldPropertyInject {
 
     @Property(name = "my.map")
     Map<String, String> defaultInject;
+
+    @Property(name = "my.multi-value-map")
+    Map<String, List<String>> multiMap;
 
     @Property(name = "my.string")
     String str;

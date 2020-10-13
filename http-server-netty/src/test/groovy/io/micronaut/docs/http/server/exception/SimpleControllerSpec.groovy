@@ -45,6 +45,7 @@ class SimpleControllerSpec extends Specification {
         then:
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.BAD_REQUEST
+        e.response.reason() == "Fix it!"
     }
 
     @Requires(property = 'spec.name', value = 'SimpleControllerSpec')
@@ -87,9 +88,23 @@ class SimpleControllerSpec extends Specification {
         }
 
         @Error
-        HttpResponse exceptionHandler(HttpRequest request, Throwable throwable) {
+        HttpResponse throwableExceptionHandler(HttpRequest request, Throwable throwable) {
+            JsonError error = new JsonError("Invalid: " + throwable.getMessage())
+            return HttpResponse.<JsonError>status(HttpStatus.BAD_REQUEST, "throwableExceptionHandler")
+                    .body(error)
+        }
+
+        @Error
+        HttpResponse exceptionHandler(HttpRequest request, RuntimeException throwable) {
             JsonError error = new JsonError("Invalid: " + throwable.getMessage())
             return HttpResponse.<JsonError>status(HttpStatus.BAD_REQUEST, "Fix it!")
+                    .body(error)
+        }
+
+        @Error
+        HttpResponse exceptionExceptionHandler(HttpRequest request, Exception throwable) {
+            JsonError error = new JsonError("Invalid: " + throwable.getMessage())
+            return HttpResponse.<JsonError>status(HttpStatus.BAD_REQUEST, "exceptionExceptionHandler")
                     .body(error)
         }
     }

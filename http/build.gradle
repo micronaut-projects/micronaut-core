@@ -1,12 +1,12 @@
 plugins {
-    id "org.jetbrains.kotlin.jvm" version "1.3.72"
+    id "org.jetbrains.kotlin.jvm"
 }
 
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
-    api project(":inject")    
-    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.8"
+    api project(":inject")
+    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.9-native-mt"
 
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")

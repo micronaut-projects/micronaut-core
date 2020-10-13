@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing.test
 
+import com.google.testing.compile.JavaFileObjects
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context

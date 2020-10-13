@@ -123,3 +123,4 @@ dependencies {
 }
 
 apply plugin: "io.micronaut.build.publishing"
+bintray.pkg.version.gpg.sign = false

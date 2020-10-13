@@ -16,11 +16,11 @@
 package io.micronaut.scheduling.async;
 
 import io.micronaut.aop.InterceptPhase;
+import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskExecutors;
@@ -37,11 +37,9 @@ import javax.inject.Singleton;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 /**
  * Interceptor implementation for the {@link Async} annotation.
@@ -61,7 +59,7 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
     /**
      * Default constructor.
      *
-     * @param beanLocator The bean constructor
+     * @param beanLocator              The bean constructor
      * @param scheduledExecutorService The scheduled executor service
      */
     AsyncInterceptor(BeanLocator beanLocator, @Named(TaskExecutors.SCHEDULED) Optional<Provider<ExecutorService>> scheduledExecutorService) {
@@ -85,45 +83,38 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
                     beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name))
                             .orElseThrow(() -> new TaskExecutionException("No ExecutorService named [" + name + "] configured in application context")));
         }
-
-        ReturnType<Object> rt = context.getReturnType();
-        Class<?> returnType = rt.getType();
-        if (CompletionStage.class.isAssignableFrom(returnType) || Future.class.isAssignableFrom(returnType)) {
-            CompletableFuture newFuture = new CompletableFuture();
-
-            executorService.submit(() -> {
-                CompletionStage<?> completionStage = (CompletionStage) context.proceed();
-                if (completionStage == null) {
-                    newFuture.complete(null);
-                } else {
-                    completionStage.whenComplete((BiConsumer<Object, Throwable>) (o, throwable) -> {
-                        if (throwable != null) {
-                            newFuture.completeExceptionally(throwable);
-                        } else {
-                            newFuture.complete(o);
-                        }
-                    });
-                }
-            });
-            return newFuture;
-        } else if (void.class == returnType) {
-            executorService.submit(() -> {
-                try {
-                    context.proceed();
-                } catch (Throwable e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error occurred executing @Async method [" + context.getExecutableMethod() + "]: " + e.getMessage(), e);
+        InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+        try {
+            switch (interceptedMethod.resultType()) {
+                case PUBLISHER:
+                    return interceptedMethod.handleResult(
+                            Flowable.fromPublisher(interceptedMethod.interceptResultAsPublisher()).subscribeOn(Schedulers.from(executorService))
+                    );
+                case COMPLETION_STAGE:
+                    return interceptedMethod.handleResult(
+                            CompletableFuture.supplyAsync(() -> interceptedMethod.interceptResultAsCompletionStage(), executorService).thenCompose(Function.identity())
+                    );
+                case SYNCHRONOUS:
+                    ReturnType<Object> rt = context.getReturnType();
+                    Class<?> returnType = rt.getType();
+                    if (void.class == returnType) {
+                        executorService.submit(() -> {
+                            try {
+                                context.proceed();
+                            } catch (Throwable e) {
+                                if (LOG.isErrorEnabled()) {
+                                    LOG.error("Error occurred executing @Async method [" + context.getExecutableMethod() + "]: " + e.getMessage(), e);
+                                }
+                            }
+                        });
+                        return null;
                     }
-                }
-            });
-            return null;
-        } else if (Publishers.isConvertibleToPublisher(returnType)) {
-            Object result = context.proceed();
-            Flowable<?> flowable = Publishers.convertPublisher(result, Flowable.class);
-            flowable = flowable.subscribeOn(Schedulers.from(executorService));
-            return Publishers.convertPublisher(flowable, returnType);
-        } else {
-            throw new TaskExecutionException("Method [" + context.getExecutableMethod() + "] must return either void, or an instance of Publisher or CompletionStage");
+                    throw new TaskExecutionException("Method [" + context.getExecutableMethod() + "] must return either void, or an instance of Publisher or CompletionStage");
+                default:
+                    return interceptedMethod.unsupported();
+            }
+        } catch (Exception e) {
+            return interceptedMethod.handleException(e);
         }
     }
 }

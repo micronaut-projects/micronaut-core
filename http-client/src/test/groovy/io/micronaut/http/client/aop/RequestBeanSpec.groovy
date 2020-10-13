@@ -311,6 +311,12 @@ class RequestBeanSpec extends Specification {
                 }
             }
         }
+
+        @Override
+        @Deprecated
+        boolean supportsSuperTypes() {
+            return false
+        }
     }
 
 }

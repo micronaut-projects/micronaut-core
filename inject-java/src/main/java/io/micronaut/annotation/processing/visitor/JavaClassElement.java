@@ -30,7 +30,6 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.lang.model.element.*;
 import javax.lang.model.element.Element;
 import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.Elements;
@@ -49,7 +48,8 @@ import java.util.stream.Collectors;
 @Internal
 public class JavaClassElement extends AbstractJavaElement implements ClassElement {
 
-    private final TypeElement classElement;
+    protected final TypeElement classElement;
+    protected int arrayDimensions;
     private final JavaVisitorContext visitorContext;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
 
@@ -60,9 +60,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
      */
     @Internal
     public JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(classElement, annotationMetadata, visitorContext);
-        this.classElement = classElement;
-        this.visitorContext = visitorContext;
+        this(classElement, annotationMetadata, visitorContext, null, 0);
     }
 
     /**
@@ -76,10 +74,32 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
             AnnotationMetadata annotationMetadata,
             JavaVisitorContext visitorContext,
             Map<String, Map<String, TypeMirror>> genericsInfo) {
+        this(classElement, annotationMetadata, visitorContext, genericsInfo, 0);
+    }
+
+    /**
+     * @param classElement       The {@link TypeElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
+     * @param genericsInfo       The generic type info
+     * @param arrayDimensions    The number of array dimensions
+     */
+    JavaClassElement(
+            TypeElement classElement,
+            AnnotationMetadata annotationMetadata,
+            JavaVisitorContext visitorContext,
+            Map<String, Map<String, TypeMirror>> genericsInfo,
+            int arrayDimensions) {
         super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
         this.genericTypeInfo = genericsInfo;
+        this.arrayDimensions = arrayDimensions;
+    }
+
+    @Override
+    public boolean isRecord() {
+        return JavaModelUtils.isRecord(classElement);
     }
 
     @NonNull
@@ -155,7 +175,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         Map<String, BeanPropertyData> props = new LinkedHashMap<>();
         Map<String, VariableElement> fields = new LinkedHashMap<>();
 
-        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext.getTypes()) {
+        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext) {
 
             @Override
             protected boolean isAcceptable(javax.lang.model.element.Element element) {
@@ -319,7 +339,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     @Override
     public List<FieldElement> getFields(@NonNull Predicate<Set<ElementModifier>> modifierFilter) {
         List<FieldElement> fields = new ArrayList<>();
-        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext.getTypes()) {
+        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext) {
             @Override
             protected boolean isAcceptable(javax.lang.model.element.Element element) {
                 final Set<ElementModifier> mods = element.getModifiers().stream().map(m -> ElementModifier.valueOf(m.name())).collect(Collectors.toSet());
@@ -339,7 +359,17 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
     @Override
     public boolean isArray() {
-        return classElement.asType().getKind() == TypeKind.ARRAY;
+        return arrayDimensions > 0;
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return arrayDimensions;
+    }
+
+    @Override
+    public ClassElement toArray() {
+        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions + 1);
     }
 
     @Override

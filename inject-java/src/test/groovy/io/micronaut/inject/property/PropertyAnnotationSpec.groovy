@@ -26,7 +26,14 @@ class PropertyAnnotationSpec extends Specification {
                 'my.string':'foo',
                 'my.int':10,
                 'my.map.one':'one',
-                'my.map.one.two':'two'
+                'my.map.one.two':'two',
+
+                'my.multi-value-map.one[0]':'one',
+                'my.multi-value-map.one[1]':'two',
+                'my.multi-value-map.one[2]':'three',
+                'my.multi-value-map.one': ['one', 'two', 'three'],
+                'my.multi-value-map.two[0]':'two',
+                'my.multi-value-map.two': ['two'],
         )
 
         ConstructorPropertyInject constructorInjectedBean = ctx.getBean(ConstructorPropertyInject)
@@ -46,6 +53,7 @@ class PropertyAnnotationSpec extends Specification {
         fieldInjectedBean.integer == 10
         fieldInjectedBean.str == 'foo'
         fieldInjectedBean.values == ['one':'one', 'one.two':'two']
+        fieldInjectedBean.multiMap == ['one':['one', 'two', 'three'], 'two':['two']]
         fieldInjectedBean.defaultInject == ['one':'one']
     }
 

@@ -53,6 +53,12 @@ public class OptionalSessionValueArgumentBinder implements TypedRequestArgumentB
     }
 
     @Override
+    @Deprecated
+    public boolean supportsSuperTypes() {
+        return false;
+    }
+
+    @Override
     public ArgumentBinder.BindingResult<Optional> bind(ArgumentConversionContext<Optional> context, HttpRequest<?> source) {
         MutableConvertibleValues<Object> attrs = source.getAttributes();
         if (!attrs.contains(OncePerRequestHttpServerFilter.getKey(HttpSessionFilter.class))) {

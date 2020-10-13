@@ -43,8 +43,7 @@ Names of caches under `micronaut.caches` should be defined in kebab case (lowerc
 
 To configure a weigher to be used with the `maximumWeight` configuration, create a bean that implements `io.micronaut.caffeine.cache.Weigher`. To associate a given weigher with only a specific cache, annotate the bean with `@Named(<cache name>)`. Weighers without a named qualifier will apply to all caches that don't have a named weigher. If no beans are found, a default implementation will be used.
 
-
-include::{includedir}configurationProperties/io.micronaut.cache.DefaultCacheConfiguration.adoc[]
+See the https://micronaut-projects.github.io/micronaut-cache/latest/guide/configurationreference.html#io.micronaut.cache.caffeine.DefaultCacheConfiguration[configuration reference] for all available configuration options.
 
 == Dynamic Cache Creation
 

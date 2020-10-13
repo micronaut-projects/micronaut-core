@@ -58,7 +58,7 @@ The following table summarizes the parameter annotations, their purpose, and pro
 
 |ann:http.annotation.Header[]
 |Allows specifying parameters that should be sent as HTTP headers
-|`@Header String contentType`
+|`@Header String requestId`
 
 |ann:http.annotation.QueryValue[]
 |Allows customizing the name of the URI parameter to bind from
@@ -74,6 +74,8 @@ The following table summarizes the parameter annotations, their purpose, and pro
 
 |===
 
+IMPORTANT: Always use ann:http.annotation.Produces[] or ann:http.annotation.Consumes[] instead of supplying a header for `Content-Type` or `Accept`.
+
 ==== Type Based Binding Parameters
 
 Some parameters are recognized by their type instead of their annotation. The following table summarizes the parameter types, their purpose, and provides an example:
@@ -86,3 +88,41 @@ Some parameters are recognized by their type instead of their annotation. The fo
 |`BasicAuth basicAuth`
 
 |===
+
+==== Custom Binding
+
+The api:http.client.bind.ClientArgumentRequestBinder[] API is what is responsible for binding client arguments to the request. Custom binder classes registered as beans will automatically be used during the binding process. Annotation based binders are searched for first, with type based binders being searched if a binder was not found.
+
+IMPORTANT: This is an experimental feature in 2.1 and subject to change! One limitation of binding is that binders many not manipulate or set the request URI because it can be a combination of many arguments.
+
+===== Binding By Annotation
+
+To control how an argument is bound to the request based on the annotation applied to the argument, create a bean of type api:http.client.bind.AnnotatedClientArgumentRequestBinder[]. Any custom annotations must be annotated with ann:core.bind.annotation.Bindable[].
+
+In this example, see the following client:
+
+snippet::io.micronaut.docs.http.client.bind.annotation.MetadataClient[tags="clazz", indent=0, title="Client With @Metadata Argument"]
+
+The argument is annotated with the following annotation:
+
+snippet::io.micronaut.docs.http.client.bind.annotation.Metadata[tags="clazz", indent=0, title="@Metadata Annotation"]
+
+Without any additional code, the client will attempt to convert the metadata to a string and append it as a query parameter. In this case that isn't the desired effect so a custom binder must be created.
+
+The following binder will handle arguments passed to clients that are annotated with the `@Metadata` annotation and then mutate the request to contain the desired headers. The implementation could be modified to accept more types of data other than `Map`.
+
+snippet::io.micronaut.docs.http.client.bind.annotation.MetadataClientArgumentBinder[tags="clazz", indent=0, title="Annotation Argument Binder"]
+
+===== Binding By Type
+
+To bind to the request based on the type of the argument, create a bean of type api:http.client.bind.TypedClientArgumentRequestBinder[].
+
+In this example, see the following client:
+
+snippet::io.micronaut.docs.http.client.bind.type.MetadataClient[tags="clazz", indent=0, title="Client With Metadata Argument"]
+
+Without any additional code, the client will attempt to convert the metadata to a string and append it as a query parameter. In this case that isn't the desired effect so a custom binder must be created.
+
+The following binder will handle arguments passed to clients that are of the `Metadata` type and then mutate the request to contain the desired headers.
+
+snippet::io.micronaut.docs.http.client.bind.type.MetadataClientArgumentBinder[tags="clazz", indent=0, title="Typed Argument Binder"]

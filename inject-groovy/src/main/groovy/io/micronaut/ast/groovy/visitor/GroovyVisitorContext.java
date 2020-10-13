@@ -15,6 +15,8 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import groovy.lang.GroovyClassLoader;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
@@ -44,8 +46,6 @@ import org.codehaus.groovy.control.messages.SimpleMessage;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -66,6 +66,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final CompilationUnit compilationUnit;
     private final SourceUnit sourceUnit;
     private final MutableConvertibleValues<Object> attributes;
+    private final List<String> generatedResources = new ArrayList<>();
 
     /**
      * @param sourceUnit      The source unit
@@ -107,7 +108,7 @@ public class GroovyVisitorContext implements VisitorContext {
                 });
 
         return Optional.ofNullable(classNode)
-                .map(cn -> new GroovyClassElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)));
+                .map(cn -> AbstractGroovyElement.toClassElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)));
     }
 
     @Override
@@ -115,7 +116,7 @@ public class GroovyVisitorContext implements VisitorContext {
         final ClassNode classNode = ClassHelper.makeCached(type);
         final AnnotationMetadata annotationMetadata = AstAnnotationUtils
                 .getAnnotationMetadata(sourceUnit, compilationUnit, classNode);
-        final GroovyClassElement classElement = new GroovyClassElement(sourceUnit, compilationUnit, classNode, annotationMetadata);
+        final ClassElement classElement = AbstractGroovyElement.toClassElement(sourceUnit, compilationUnit, classNode, annotationMetadata);
         return Optional.of(
                 classElement
         );
@@ -136,7 +137,7 @@ public class GroovyVisitorContext implements VisitorContext {
         for (String s : stereotypes) {
             scanner.scan(s, aPackage).forEach(aClass -> {
                 final ClassNode classNode = ClassHelper.make(aClass);
-                classElements.add(new GroovyClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)));
+                classElements.add(AbstractGroovyElement.toClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)));
             });
         }
         return classElements.toArray(new ClassElement[0]);
@@ -183,12 +184,17 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
+        return visitClass(classname, new Element[]{ originatingElement });
+    }
+
+    @Override
+    public OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
         File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                     classesDir
             );
-            return outputVisitor.visitClass(classname, originatingElement);
+            return outputVisitor.visitClass(classname, originatingElements);
         } else {
             // should only arrive here in testing scenarios
             if (compilationUnit.getClassLoader() instanceof InMemoryByteCodeGroovyClassLoader) {
@@ -309,4 +315,13 @@ public class GroovyVisitorContext implements VisitorContext {
         return attributes.get(name, conversionContext);
     }
 
+    @Override
+    public Collection<String> getGeneratedResources() {
+        return Collections.unmodifiableCollection(generatedResources);
+    }
+
+    @Override
+    public void addGeneratedResource(@NonNull String resource) {
+        generatedResources.add(resource);
+    }
 }

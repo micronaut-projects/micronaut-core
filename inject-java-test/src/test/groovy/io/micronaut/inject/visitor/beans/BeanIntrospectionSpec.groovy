@@ -30,10 +30,100 @@ import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
+import javax.validation.Constraint
+import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+    @IgnoreIf({ !jvm.isJava14Compatible() })
+    void "test bean introspection on a Java 14+ record"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(@javax.validation.constraints.NotBlank String name){
+}
+''')
+        when:
+        def test = introspection.instantiate("test")
+        def property = introspection.getRequiredProperty("name", String)
+        def argument = introspection.getConstructorArguments()[0]
+
+        then:
+        argument.name == 'name'
+        argument.getAnnotationMetadata().hasAnnotation(NotBlank)
+        test.name == 'test'
+        test.name() == 'test'
+        introspection.propertyNames.length == 1
+        introspection.propertyNames == ['name'] as String[]
+        property.hasAnnotation(NotBlank)
+        property.isReadOnly()
+        property.name == 'name'
+        property.get(test) == 'test'
+    }
+
+
+    void "test bean introspection with property of generic interface"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Foo implements GenBase<String> {
+    public String getName() {
+        return "test";
+    }
+}
+
+interface GenBase<T> {
+    T getName();
+}
+''')
+        when:
+        def test = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("name", String)
+                .get(test) == 'test'
+    }
+
+    void "test bean introspection with argument of generic interface"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Foo implements GenBase<Long> {
+
+    private Long value;
+
+    public Long getValue() {
+        return value;
+    }
+    
+    public void setValue(Long value) {
+        this.value = value;
+    }
+}
+
+interface GenBase<T> {
+    T getValue();
+    
+    void setValue(T t);
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        BeanProperty bp = introspection.getRequiredProperty("value", Long)
+        bp.set(test, 5L)
+
+        then:
+        bp.get(test) == 5L
+    }
 
     void "test bean introspection with property with static creator method on interface"() {
         given:
@@ -1630,6 +1720,261 @@ class Action {
         introspection.constructorArguments[0].typeParameters[1].typeParameters.size() == 1
         introspection.constructorArguments[0].typeParameters[1].typeParameters[0].typeName == 'test.Action'
     }
+
+    void "test primitive multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test {
+
+    private int[] oneDimension;
+    private int[][] twoDimensions;
+    private int[][][] threeDimensions;
+
+    public Test() {
+    }
+    
+    public int[] getOneDimension() {
+        return oneDimension;
+    }
+
+    public void setOneDimension(int[] oneDimension) {
+        this.oneDimension = oneDimension;
+    }
+
+    public int[][] getTwoDimensions() {
+        return twoDimensions;
+    }
+
+    public void setTwoDimensions(int[][] twoDimensions) {
+        this.twoDimensions = twoDimensions;
+    }
+    
+    public int[][][] getThreeDimensions() {
+        return threeDimensions;
+    }
+
+    public void setThreeDimensions(int[][][] threeDimensions) {
+        this.threeDimensions = threeDimensions;
+    }
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate()
+        def property = introspection.getRequiredProperty("oneDimension", int[].class)
+        int[] level1 = [1, 2, 3] as int[]
+        property.set(instance, level1)
+
+        then:
+        property.get(instance) == level1
+
+        when:
+        property = introspection.getRequiredProperty("twoDimensions", int[][].class)
+        int[] level2 = [4, 5, 6] as int[]
+        int[][] twoDimensions = [level1, level2] as int[][]
+        property.set(instance, twoDimensions)
+
+        then:
+        property.get(instance) == twoDimensions
+
+        when:
+        property = introspection.getRequiredProperty("threeDimensions", int[][][].class)
+        int[][][] threeDimensions = [[level1], [level2]] as int[][][]
+        property.set(instance, threeDimensions)
+
+        then:
+        property.get(instance) == threeDimensions
+    }
+
+    void "test class multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test {
+
+    private String[] oneDimension;
+    private String[][] twoDimensions;
+    private String[][][] threeDimensions;
+
+    public Test() {
+    }
+    
+    public String[] getOneDimension() {
+        return oneDimension;
+    }
+
+    public void setOneDimension(String[] oneDimension) {
+        this.oneDimension = oneDimension;     
+    }
+
+    public String[][] getTwoDimensions() {
+        return twoDimensions;
+    }
+
+    public void setTwoDimensions(String[][] twoDimensions) {
+        this.twoDimensions = twoDimensions;
+    }
+    
+    public String[][][] getThreeDimensions() {
+        return threeDimensions;
+    }
+
+    public void setThreeDimensions(String[][][] threeDimensions) {
+        this.threeDimensions = threeDimensions;
+    }
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate()
+        def property = introspection.getRequiredProperty("oneDimension", String[].class)
+        String[] level1 = ["1", "2", "3"] as String[]
+        property.set(instance, level1)
+
+        then:
+        property.get(instance) == level1
+
+        when:
+        property = introspection.getRequiredProperty("twoDimensions", String[][].class)
+        String[] level2 = ["4", "5", "6"] as String[]
+        String[][] twoDimensions = [level1, level2] as String[][]
+        property.set(instance, twoDimensions)
+
+        then:
+        property.get(instance) == twoDimensions
+
+        when:
+        property = introspection.getRequiredProperty("threeDimensions", String[][][].class)
+        String[][][] threeDimensions = [[level1], [level2]] as String[][][]
+        property.set(instance, threeDimensions)
+
+        then:
+        property.get(instance) == threeDimensions
+    }
+
+    void "test enum multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.inject.visitor.beans.SomeEnum;
+
+@Introspected
+class Test {
+
+    private SomeEnum[] oneDimension;
+    private SomeEnum[][] twoDimensions;
+    private SomeEnum[][][] threeDimensions;
+
+    public Test() {
+    }
+    
+    public SomeEnum[] getOneDimension() {
+        return oneDimension;
+    }
+
+    public void setOneDimension(SomeEnum[] oneDimension) {
+        this.oneDimension = oneDimension;     
+    }
+
+    public SomeEnum[][] getTwoDimensions() {
+        return twoDimensions;
+    }
+
+    public void setTwoDimensions(SomeEnum[][] twoDimensions) {
+        this.twoDimensions = twoDimensions;
+    }
+    
+    public SomeEnum[][][] getThreeDimensions() {
+        return threeDimensions;
+    }
+
+    public void setThreeDimensions(SomeEnum[][][] threeDimensions) {
+        this.threeDimensions = threeDimensions;
+    }
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate()
+        def property = introspection.getRequiredProperty("oneDimension", SomeEnum[].class)
+        SomeEnum[] level1 = [SomeEnum.A, SomeEnum.B, SomeEnum.A] as SomeEnum[]
+        property.set(instance, level1)
+
+        then:
+        property.get(instance) == level1
+
+        when:
+        property = introspection.getRequiredProperty("twoDimensions", SomeEnum[][].class)
+        SomeEnum[] level2 = [SomeEnum.B, SomeEnum.A, SomeEnum.B] as SomeEnum[]
+        SomeEnum[][] twoDimensions = [level1, level2] as SomeEnum[][]
+        property.set(instance, twoDimensions)
+
+        then:
+        property.get(instance) == twoDimensions
+
+        when:
+        property = introspection.getRequiredProperty("threeDimensions", SomeEnum[][][].class)
+        SomeEnum[][][] threeDimensions = [[level1], [level2]] as SomeEnum[][][]
+        property.set(instance, threeDimensions)
+
+        then:
+        property.get(instance) == threeDimensions
+    }
+
+    void "test superclass methods are read before interface methods"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import javax.validation.constraints.NotNull;
+
+interface IEmail {
+String getEmail();
+}
+@Introspected
+class SuperClass implements IEmail {
+    @NotNull
+    public String getEmail() {
+        return null;
+    }
+}
+@Introspected
+class SubClass extends SuperClass {
+}
+@Introspected
+class Test extends SuperClass implements IEmail {
+}
+
+''')
+        expect:
+        introspection != null
+        introspection.getProperty("email").isPresent()
+        introspection.getIndexedProperties(Constraint).size() == 1
+    }
+
 
     @Override
     protected JavaParser newJavaParser() {

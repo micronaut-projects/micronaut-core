@@ -21,6 +21,9 @@ import io.micronaut.context.event.StartupEvent
 import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
+import org.atinject.tck.auto.events.EventHandlerMultipleArguments
+import org.atinject.tck.auto.events.Metadata
+import org.atinject.tck.auto.events.SomeEvent
 
 class MethodAdapterSpec extends AbstractTypeElementSpec {
 
@@ -162,6 +165,30 @@ class Test {
         then:"Then a bean is produced that is valid"
         def e = thrown(RuntimeException)
         e.message.contains("Cannot adapt method [onStartup(io.micronaut.context.event.StartupEvent,boolean)] to target method [onApplicationEvent(E)]. Argument lengths don't match.")
+
+    }
+
+    void  "test method adapter argument order"() {
+        when:"An adapter method is parsed"
+        BeanDefinition definition = buildBeanDefinition('org.atinject.tck.auto.events.EventListener$EventHandlerMultipleArguments$onEvent1$Intercepted','''\
+package org.atinject.tck.auto.events;
+
+@javax.inject.Singleton
+class EventListener {
+
+    @EventHandler
+    public void onEvent(Metadata metadata, SomeEvent event) {
+    }
+
+}
+
+''')
+        then:"Then a bean is produced that is valid"
+        definition != null
+        EventHandlerMultipleArguments.isAssignableFrom(definition.getBeanType())
+        definition.getTypeArguments(EventHandlerMultipleArguments).size() == 2
+        definition.getTypeArguments(EventHandlerMultipleArguments).get(0).type == Metadata
+        definition.getTypeArguments(EventHandlerMultipleArguments).get(1).type == SomeEvent
 
     }
 

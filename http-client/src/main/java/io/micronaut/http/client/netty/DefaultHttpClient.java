@@ -59,19 +59,14 @@ import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.multipart.MultipartException;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
-import io.micronaut.http.netty.NettyHttpHeaders;
-import io.micronaut.http.netty.NettyHttpRequestBuilder;
-import io.micronaut.http.netty.NettyHttpResponseBuilder;
+import io.micronaut.http.netty.*;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
-import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.micronaut.http.netty.stream.StreamedHttpResponse;
-import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
+import io.micronaut.http.netty.stream.*;
 import io.micronaut.http.sse.Event;
+import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
@@ -792,7 +787,11 @@ public class DefaultHttpClient implements
                     final NettyWebSocketClientHandler webSocketHandler;
                     try {
                         String scheme =  (sslContext == null) ? "ws" : "wss";
-                        URI webSocketURL = URI.create(scheme + "://" + host + ":" + port + uri.getPath());
+                        URI webSocketURL = UriBuilder.of(uri)
+                                .scheme(scheme)
+                                .host(host)
+                                .port(port)
+                                .build();
 
                         MutableHttpHeaders headers = request.getHeaders();
                         HttpHeaders customHeaders = EmptyHttpHeaders.INSTANCE;
@@ -1335,7 +1334,8 @@ public class DefaultHttpClient implements
      */
     protected SslContext buildSslContext(URI uriObject) {
         final SslContext sslCtx;
-        if (io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(uriObject.getScheme())) {
+        if (io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(uriObject.getScheme()) ||
+            SCHEME_WSS.equalsIgnoreCase(uriObject.getScheme())) {
             sslCtx = sslContext;
             //Allow https requests to be sent if SSL is disabled but a proxy is present
             if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
@@ -1367,6 +1367,13 @@ public class DefaultHttpClient implements
     protected void configureProxy(ChannelPipeline pipeline, Type proxyType, SocketAddress proxyAddress) {
         String username = configuration.getProxyUsername().orElse(null);
         String password = configuration.getProxyPassword().orElse(null);
+
+        if (proxyAddress instanceof InetSocketAddress) {
+            InetSocketAddress isa = (InetSocketAddress) proxyAddress;
+            if (isa.isUnresolved()) {
+                proxyAddress = new InetSocketAddress(isa.getHostString(), isa.getPort());
+            }
+        }
 
         if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
             switch (proxyType) {
@@ -1793,9 +1800,55 @@ public class DefaultHttpClient implements
         );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
         ChannelPipeline pipeline = channel.pipeline();
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new SimpleChannelInboundHandler<FullHttpResponse>() {
+            final AtomicBoolean received = new AtomicBoolean(false);
+            final AtomicBoolean emitted = new AtomicBoolean(false);
+
+            @Override
+            public boolean acceptInboundMessage(Object msg) {
+                return msg instanceof FullHttpResponse;
+            }
+
+            @Override
+            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                if (received.compareAndSet(false, true)) {
+                    emitter.onError(cause);
+                }
+            }
+
+            @Override
+            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                if (evt instanceof IdleStateEvent && received.compareAndSet(false, true)) {
+                    // closed to idle ste
+                    emitter.onError(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                }
+            }
+
+            @Override
+            protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) {
+                if (received.compareAndSet(false, true)) {
+                    NettyMutableHttpResponse<Object> response = new NettyMutableHttpResponse<>(
+                            msg,
+                            ConversionService.SHARED
+                    );
+                    HttpHeaders headers = msg.headers();
+                    if (log.isTraceEnabled()) {
+                        log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), nettyRequest.method().name(), nettyRequest.uri());
+                        traceHeaders(headers);
+                    }
+                    emitter.onNext(response);
+                    emitter.onComplete();
+                }
+            }
+        });
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandler<StreamedHttpResponse>() {
 
-            AtomicBoolean received = new AtomicBoolean(false);
+            final AtomicBoolean received = new AtomicBoolean(false);
+
+            @Override
+            public boolean acceptInboundMessage(Object msg) {
+                return msg instanceof StreamedHttpResponse;
+            }
 
             @Override
             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
@@ -2664,7 +2717,7 @@ public class DefaultHttpClient implements
                 if (poolMap == null) {
                     // read timeout settings are not applied to streamed requests.
                     // instead idle timeout settings are applied.
-                    if (stream && readTimeoutMillis == null) {
+                    if (stream) {
                         Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
                         if (readIdleTime.isPresent()) {
                             Duration duration = readIdleTime.get();
@@ -2763,9 +2816,8 @@ public class DefaultHttpClient implements
                     if (evt instanceof IdleStateEvent) {
                         // close the connection if it is idle for too long
                         ctx.close();
-                    } else {
-                        super.userEventTriggered(ctx, evt);
                     }
+                    super.userEventTriggered(ctx, evt);
                 }
             });
         }

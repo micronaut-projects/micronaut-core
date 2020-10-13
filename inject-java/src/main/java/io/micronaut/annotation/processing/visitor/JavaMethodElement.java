@@ -24,6 +24,8 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.inject.ast.PrimitiveElement;
+
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
@@ -43,7 +45,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-class JavaMethodElement extends AbstractJavaElement implements MethodElement {
+public class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
     private final ExecutableElement executableElement;
     private final JavaVisitorContext visitorContext;
@@ -55,7 +57,7 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
      * @param annotationMetadata The annotation metadata
      * @param visitorContext The visitor context
      */
-    JavaMethodElement(
+    public JavaMethodElement(
             JavaClassElement declaringClass,
             ExecutableElement executableElement,
             AnnotationMetadata annotationMetadata,
@@ -134,7 +136,7 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
             TypeMirror tm = wType.getSuperBound();
             // check Void
             if ((tm instanceof DeclaredType) && sameType("kotlin.Unit", (DeclaredType) tm)) {
-                return new JavaVoidElement();
+                return PrimitiveElement.VOID;
             } else {
                 return mirrorToClassElement(tm, visitorContext, info);
             }

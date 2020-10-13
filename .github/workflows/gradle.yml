@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['8', '11', '14']
+        java: ['8', '11', '15']
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2

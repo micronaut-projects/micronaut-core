@@ -33,7 +33,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanDefinitionVisitor {
+public interface BeanDefinitionVisitor extends OriginatingElements {
 
     /**
      * The suffix use for generated AOP intercepted types.
@@ -42,7 +42,9 @@ public interface BeanDefinitionVisitor {
 
     /**
      * @return The element where the bean definition originated from.
+     * @deprecated Use {@link #getOriginatingElements()} instead
      */
+    @Deprecated
     @Nullable Element getOriginatingElement();
 
     /**

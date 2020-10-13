@@ -94,7 +94,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             int index,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
-        super(introspectionWriter.getOriginatingElement());
+        super(introspectionWriter.getOriginatingElements());
         Type introspectionType = introspectionWriter.getIntrospectionType();
         this.declaringElement = introspectionWriter.getClassElement();
         this.typeElement = typeElement;
@@ -138,7 +138,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        try (OutputStream classOutput = classWriterOutputVisitor.visitClass(getName(), getOriginatingElement())) {
+        try (OutputStream classOutput = classWriterOutputVisitor.visitClass(getName(), getOriginatingElements())) {
             startFinalClass(classWriter, type.getInternalName(), TYPE_BEAN_PROPERTY);
 
             writeConstructor();
@@ -189,7 +189,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         pushCastToType(writeMethod, propertyType);
         final boolean hasWriteMethod = this.writeMethod != null;
         final String methodName = hasWriteMethod ? this.writeMethod.getName() : NameUtils.setterNameFor(propertyName);
-        final Object returnType = hasWriteMethod ? getTypeForElement(this.writeMethod.getReturnType()) : void.class;
+        final Object returnType = hasWriteMethod ? getTypeReference(this.writeMethod.getReturnType()) : void.class;
         if (declaringElement.isInterface()) {
             writeMethod.invokeInterface(
                     beanType,

@@ -46,6 +46,8 @@ class CustomErrorTypeSpec extends Specification {
         then:
         def e = thrown(HttpClientResponseException)
         e.response.getBody(MyError).get().reason == 'bad things'
+        e.response.getBody(String).get() == '{"reason":"bad things"}'
+        e.response.getBody(MyError2).get().reason == 'bad things'
     }
 
     void "test custom error type with generic"() {
@@ -80,6 +82,10 @@ class CustomErrorTypeSpec extends Specification {
     }
 
     static class MyError {
+        String reason
+    }
+
+    static class MyError2 {
         String reason
     }
 

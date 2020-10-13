@@ -158,4 +158,45 @@ interface MyBean  {
         listenerAdviceInterceptor.recievedMessages.size() == 1
 
     }
+
+    void "test an interface with non overriding but subclass return type method"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package test;
+
+import io.micronaut.aop.introduction.*;
+import io.micronaut.context.annotation.*;
+
+@Stub
+@javax.inject.Singleton
+interface MyBean extends GenericInterface, SpecificInterface {
+
+}
+
+class Generic {
+}
+class Specific extends Generic {
+}
+interface GenericInterface {   
+    Generic getObject();
+}
+interface SpecificInterface {    
+    Specific getObject();
+}
+''')
+
+        then:
+        noExceptionThrown()
+        beanDefinition != null
+
+        when:
+        def context = new DefaultBeanContext()
+        context.start()
+        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+
+        then:
+        //I ended up going this route because actually calling the methods here would be relying on
+        //having the target interface in the bytecode of the test
+        instance.$proxyMethods.length == 2
+    }
 }
