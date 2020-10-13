@@ -1,15 +1,11 @@
 package io.micronaut.scala
 
-import java.io.IOException
 import java.util
 
-import io.micronaut.context.annotation.Context
 import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.inject.visitor.{TypeElementVisitor, VisitorContext}
 import io.micronaut.inject.writer.{BeanDefinitionReferenceWriter, BeanDefinitionVisitor}
-import javax.lang.model.`type`.DeclaredType
-import javax.lang.model.element.TypeElement
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -104,7 +100,7 @@ class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComp
     }
 
   class BeanDefinitionInjectTraverser(unit:CompilationUnit) extends Traverser {
-    val processed = new mutable.HashSet[ScalaElement]
+    val processed = new mutable.HashSet[ElementFacade]
 
     private def processBeanDefinitions(beanClassElement: Global#ClassDef, beanDefinitionWriter: BeanDefinitionVisitor, visitorContext: VisitorContext): Unit = {
         beanDefinitionWriter.visitBeanDefinitionEnd()

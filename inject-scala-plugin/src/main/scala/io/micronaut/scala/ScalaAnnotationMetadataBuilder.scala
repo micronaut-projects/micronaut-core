@@ -15,13 +15,13 @@ import scala.collection.mutable
 import scala.tools.nsc.Global
 
 object ScalaAnnotationMetadataBuilder {
-  val ANNOTATION_DEFAULTS = new util.HashMap[String, util.Map[ScalaElement, Any]]
-  val CACHE = new mutable.HashMap[ScalaElement, AnnotationMetadata]()
+  val ANNOTATION_DEFAULTS = new util.HashMap[String, util.Map[ElementFacade, Any]]
+  val CACHE = new mutable.HashMap[ElementFacade, AnnotationMetadata]()
 }
 
-class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[ScalaElement, Global#AnnotationInfo] {
+class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[ElementFacade, AnnotationFacade] {
 
-  def getOrCreate(element: ScalaElement): AnnotationMetadata =
+  def getOrCreate(element: ElementFacade): AnnotationMetadata =
     ScalaAnnotationMetadataBuilder.CACHE.getOrElseUpdate(element, buildOverridden(element))
 
   /**
@@ -30,8 +30,8 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param element The element
    * @return True if it is
    */
-  override protected def isMethodOrClassElement(element: ScalaElement): Boolean = element match {
-    case ScalaSymbolElement(symbol) => symbol match {
+  override protected def isMethodOrClassElement(element: ElementFacade): Boolean = element match {
+    case SymbolFacade(symbol) => symbol match {
       case _: Global#ClassSymbol | _: Global#MethodSymbol => true
       case _ => false
     }
@@ -44,10 +44,10 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param element The element
    * @return The declaring type
    */
-  override protected def getDeclaringType(element: ScalaElement): String =
+  override protected def getDeclaringType(element: ElementFacade): String =
     element match {
-      case ScalaSymbolElement(symbol) => symbol.owner.nameString
-      case ScalaNameElement(_, name) => name.toString
+      case SymbolFacade(symbol) => symbol.owner.nameString
+      case NameFacade(cls, _) => cls.getCanonicalName
     }
 
   /**
@@ -56,8 +56,12 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param annotationMirror The annotation
    * @return The type
    */
-  override protected def getTypeForAnnotation(annotationMirror: Global#AnnotationInfo): ScalaElement =
-    ScalaSymbolElement(annotationMirror.atp.typeSymbol)
+  override protected def getTypeForAnnotation(annotationMirror: AnnotationFacade): ElementFacade = {
+    annotationMirror match {
+      case ScalaAnnotationFacade(annotationInfo) => SymbolFacade(annotationInfo.atp.typeSymbol)
+      case JavaAnnotationFacade(cls, _) => NameFacade(cls, "")
+    }
+  }
 
   /**
    * Checks whether an annotation is present.
@@ -66,10 +70,10 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param annotation The annotation type
    * @return True if the annotation is present
    */
-  override protected def hasAnnotation(element: ScalaElement, annotation: Class[_ <: java.lang.annotation.Annotation]): Boolean =
+  override protected def hasAnnotation(element: ElementFacade, annotation: Class[_ <: java.lang.annotation.Annotation]): Boolean =
     element match {
-      case ScalaSymbolElement(symbol) => symbol.annotations.exists{ anno => anno.tree.tpe.toString.equals(annotation.getCanonicalName) }
-      case ScalaNameElement(_, name) => false
+      case SymbolFacade(symbol) => symbol.annotations.exists{ anno => anno.tree.tpe.toString.equals(annotation.getCanonicalName) }
+      case NameFacade(cls, _) => annotation == cls
     }
 
   /**
@@ -78,7 +82,10 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param annotationMirror The annotation
    * @return The type
    */
-  override protected def getAnnotationTypeName(annotationMirror: Global#AnnotationInfo): String = annotationMirror.atp.toString
+  override protected def getAnnotationTypeName(annotationMirror: AnnotationFacade): String = annotationMirror match {
+    case ScalaAnnotationFacade(annotationInfo) => annotationInfo.atp.toString
+    case JavaAnnotationFacade(cls, _) => cls.getCanonicalName
+  }
 
   /**
    * Get the name for the given element.
@@ -86,9 +93,9 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param element The element
    * @return The name
    */
-  override protected def getElementName(element: ScalaElement): String = element match {
-    case ScalaSymbolElement(symbol) => symbol.nameString
-    case ScalaNameElement(_, name) => name.toString()
+  override protected def getElementName(element: ElementFacade): String = element match {
+    case SymbolFacade(symbol) => symbol.nameString
+    case NameFacade(_, name) => name
   }
 
   /**
@@ -97,10 +104,12 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param element The type element
    * @return The annotations
    */
-  override protected def getAnnotationsForType(element: ScalaElement): util.List[Global#AnnotationInfo] =
+  override protected def getAnnotationsForType(element: ElementFacade): util.List[_ <: AnnotationFacade] =
     element match {
-      case ScalaSymbolElement(symbol) => symbol.annotations.asJava
-      case ScalaNameElement(_, _) => Collections.emptyList()
+      case SymbolFacade(symbol) => symbol.annotations.map { ScalaAnnotationFacade(_) }.asJava
+      case NameFacade(cls, _) => cls.getAnnotations.map { anno =>
+        JavaAnnotationFacade(anno.annotationType, Map())
+      }.toList.asJava
     }
 
   /**
@@ -111,15 +120,15 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param declaredOnly           Whether to only include declared annotations
    * @return The type hierarchy
    */
-  override protected def buildHierarchy(element: ScalaElement, inheritTypeAnnotations: Boolean, declaredOnly: Boolean): util.List[ScalaElement] = {
+  override protected def buildHierarchy(element: ElementFacade, inheritTypeAnnotations: Boolean, declaredOnly: Boolean): util.List[ElementFacade] = {
     element match {
-      case ScalaSymbolElement(symbol) => {
-        if (declaredOnly) Collections.singletonList(ScalaSymbolElement(symbol))
+      case SymbolFacade(symbol) => {
+        if (declaredOnly) Collections.singletonList(SymbolFacade(symbol))
         else {
           symbol match {
             case tpe: Global#TypeSymbol => {
-              val hierarchy = new util.ArrayList[ScalaElement]
-              populateTypeHierarchy(ScalaSymbolElement(tpe), hierarchy)
+              val hierarchy = new util.ArrayList[ElementFacade]
+              populateTypeHierarchy(SymbolFacade(tpe), hierarchy)
               Collections.reverse(hierarchy)
               hierarchy
             }
@@ -128,18 +137,18 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
               // with type level data
               // the starting hierarchy is the type and super types of this method
               val hierarchy = if (inheritTypeAnnotations)
-                buildHierarchy(ScalaSymbolElement(deff.owner), false, declaredOnly)
-              else new util.ArrayList[ScalaElement]
-              if (hasAnnotation(ScalaSymbolElement(deff), classOf[Override])) hierarchy.addAll(findOverriddenMethods(ScalaSymbolElement(deff)))
-              hierarchy.add(ScalaSymbolElement(symbol))
+                buildHierarchy(SymbolFacade(deff.owner), false, declaredOnly)
+              else new util.ArrayList[ElementFacade]
+              if (hasAnnotation(SymbolFacade(deff), classOf[Override])) hierarchy.addAll(findOverriddenMethods(SymbolFacade(deff)))
+              hierarchy.add(SymbolFacade(symbol))
               hierarchy
             }
             case varSym: Global#TermSymbol => {
-              val hierarchy = new util.ArrayList[ScalaElement]
+              val hierarchy = new util.ArrayList[ElementFacade]
               val enclosingElement = varSym.owner
               enclosingElement match {
                 case executableElement: Global#MethodSymbol =>
-                  if (hasAnnotation(ScalaSymbolElement(executableElement), classOf[Override])) {
+                  if (hasAnnotation(SymbolFacade(executableElement), classOf[Override])) {
                     //            val variableIdx = executableElement.getParameters.indexOf(variable)
                     //            for (overridden <- findOverriddenMethods(executableElement)) {
                     //              hierarchy.add(overridden.getParameters.get(variableIdx))
@@ -147,38 +156,38 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
                   }
                 case _ =>
               }
-              hierarchy.add(ScalaSymbolElement(varSym))
+              hierarchy.add(SymbolFacade(varSym))
               hierarchy
             }
             case _ => {
-              val single = new util.ArrayList[ScalaElement]
-              single.add(ScalaSymbolElement(symbol))
+              val single = new util.ArrayList[ElementFacade]
+              single.add(SymbolFacade(symbol))
               single
             }
           }
         }
       }
-      case ScalaNameElement(_,_) => new util.ArrayList[ScalaElement]
+      case NameFacade(_,_) => new util.ArrayList[ElementFacade]
     }
   }
 
-  private def populateTypeHierarchy(element:ScalaElement, hierarchy: util.List[ScalaElement]): Unit = {
+  private def populateTypeHierarchy(element:ElementFacade, hierarchy: util.List[ElementFacade]): Unit = {
     element match {
-      case ScalaSymbolElement(element) => {
+      case SymbolFacade(element) => {
           val baseClasses = element.baseClasses
           for (anInterface <- baseClasses) {
-            val interfaceElement = ScalaSymbolElement(anInterface)
+            val interfaceElement = SymbolFacade(anInterface)
             hierarchy.add(interfaceElement)
           }
         }
-      case ScalaNameElement(_,_) => ()
+      case NameFacade(_,_) => ()
     }
   }
 
-  private def findOverriddenMethods(executableElement: ScalaElement) = {
-    val overridden = new util.ArrayList[ScalaElement]
+  private def findOverriddenMethods(executableElement: ElementFacade) = {
+    val overridden = new util.ArrayList[ElementFacade]
     executableElement match {
-      case ScalaSymbolElement(symbol) => symbol.owner match {
+      case SymbolFacade(symbol) => symbol.owner match {
         case supertype:Global#TypeSymbol =>
         //      var supertype = enclosingElement.asInstanceOf[TypeElement]
         //      while ( {
@@ -210,7 +219,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param annotationValue    The value
    * @param annotationValues   The values to populate
    */
-  override protected def readAnnotationRawValues(originatingElement: ScalaElement, annotationName: String, member: ScalaElement, memberName: String, annotationValue: Any, annotationValues: util.Map[CharSequence, AnyRef]): Unit = {
+  override protected def readAnnotationRawValues(originatingElement: ElementFacade, annotationName: String, member: ElementFacade, memberName: String, annotationValue: Any, annotationValues: util.Map[CharSequence, AnyRef]): Unit = {
 //    if (memberName != null && annotationValue.isInstanceOf[AnnotationValue] && !annotationValues.containsKey(memberName)) {
 //      val resolver = new JavaAnnotationMetadataBuilder#MetadataAnnotationValueVisitor(originatingElement)
 //      annotationValue.asInstanceOf[AnnotationValue].accept(resolver, this)
@@ -228,7 +237,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param originatingElement The originating element
    * @param error              The error
    */
-  override protected def addError(originatingElement: ScalaElement, error: String): Unit = ???
+  override protected def addError(originatingElement: ElementFacade, error: String): Unit = ???
 
   /**
    * Read the given member and value, applying conversions if necessary, and place the data in the given map.
@@ -239,7 +248,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param annotationValue    The value
    * @return The object
    */
-  override protected def readAnnotationValue(originatingElement: ScalaElement, member: ScalaElement, memberName: String, annotationValue: AnyRef): AnyRef = {
+  override protected def readAnnotationValue(originatingElement: ElementFacade, member: ElementFacade, memberName: String, annotationValue: AnyRef): AnyRef = {
 //    if (memberName != null && annotationValue.isInstanceOf[AnnotationValue]) {
 //      val visitor = new JavaAnnotationMetadataBuilder#MetadataAnnotationValueVisitor(originatingElement)
 //      annotationValue.asInstanceOf[AnnotationValue].accept(visitor, this)
@@ -259,10 +268,12 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param annotationMirror The annotation
    * @return The values
    */
-  override protected def readAnnotationDefaultValues(annotationMirror: Global#AnnotationInfo): util.Map[_ <: ScalaElement, _] = {
+  override protected def readAnnotationDefaultValues(annotationMirror: AnnotationFacade): util.Map[_ <: ElementFacade, _] = {
     val annotationTypeName = getAnnotationTypeName(annotationMirror)
-    val element = ScalaSymbolElement(annotationMirror.symbol)
-    readAnnotationDefaultValues(annotationTypeName, element)
+    annotationMirror match {
+      case ScalaAnnotationFacade(annotationInfo) => readAnnotationDefaultValues(annotationTypeName, SymbolFacade(annotationInfo.symbol))
+      case JavaAnnotationFacade(cls, values) => readAnnotationDefaultValues(annotationTypeName, NameFacade(cls, ""))  // TODO need something with values
+    }
   }
 
   /**
@@ -272,14 +283,14 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param element the type
    * @return The values
    */
-  override protected def readAnnotationDefaultValues(annotationName: String, element: ScalaElement): util.Map[_ <: ScalaElement, _] = {
+  override protected def readAnnotationDefaultValues(annotationName: String, element: ElementFacade): util.Map[_ <: ElementFacade, _] = {
     val defaults = ScalaAnnotationMetadataBuilder.ANNOTATION_DEFAULTS
     element match {
-      case ScalaSymbolElement(symbol) => symbol match {
+      case SymbolFacade(symbol) => symbol match {
         case annotationElement: Global#TypeSymbol =>
           val annotationName = annotationElement.fullName
           if (!defaults.containsKey(annotationName)) {
-            val defaultValues = new util.HashMap[ScalaElement, Any]
+            val defaultValues = new util.HashMap[ElementFacade, Any]
             val allMembers = annotationElement.children
             //allMembers.filter((member: Global#Symbol) => member.getEnclosingElement == annotationElement).filter(classOf[ExecutableElement].isInstance).map(classOf[ExecutableElement].cast).filter(this.isValidDefaultValue).forEach((executableElement: ExecutableElement) => {
             //          def foo(executableElement: ExecutableElement) = {
@@ -293,7 +304,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
           }
           ScalaAnnotationMetadataBuilder.ANNOTATION_DEFAULTS.get(element)
       }
-      case ScalaNameElement(_,_) =>  Collections.emptyMap()
+      case NameFacade(_,_) =>  Collections.emptyMap()
     }
     Collections.emptyMap()
   }
@@ -304,17 +315,29 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param annotationMirror The annotation
    * @return The values
    */
-  override protected def readAnnotationRawValues(annotationMirror: Global#AnnotationInfo): util.Map[_ <: ScalaNameElement, _] = {
-    val result = new util.HashMap[ScalaNameElement, Any]()
-    annotationMirror.tree.foreach {
-      case arg: Global#AssignOrNamedArg => (arg.lhs, arg.rhs) match {
-        case (ident:Global#Ident, literal:Global#Literal) => result.put(ScalaNameElement(annotationMirror.symbol, ident.name), literal.value.value.toString)
-        case _ => ()
+  override protected def readAnnotationRawValues(annotationMirror: AnnotationFacade): util.Map[_ <: NameFacade, _] = {
+    val result = new util.HashMap[NameFacade, Any]()
+    annotationMirror match {
+      case ScalaAnnotationFacade(annotationInfo) => {
+        annotationInfo.assocs.foreach {
+          // Scala 2.12 annotationInfo.tree.foreach {
+          //      case arg: Global#AssignOrNamedArg => (arg.lhs, arg.rhs) match {
+          //        case (ident:Global#Ident, literal:Global#Literal) => result.put(ScalaNameElement(annotationMirror.symbol, ident.name), literal.value.value.toString)
+          //        case _ => ()
+          //      }
+          case (name, arg) if (arg.isInstanceOf[Global#LiteralAnnotArg]) => {
+            result.put(NameFacade(Class.forName(annotationInfo.symbol.fullName), name.toString), arg.asInstanceOf[Global#LiteralAnnotArg].const.value)
+          }
+        }
       }
-      case _ => ()
+      case JavaAnnotationFacade(els, values) => {
+
+      }
     }
     result
   }
+
+
 
   /**
    * Resolve the annotations values from the given member for the given type.
@@ -324,28 +347,27 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param annotationType     The type
    * @return The values
    */
-  override protected def getAnnotationValues(originatingElement: ScalaElement, member: ScalaElement, annotationType: Class[_]): OptionalValues[_] = {
-    val annotationMirrors = member match {
-      case ScalaSymbolElement(symbol) => symbol.annotations
-      case _ => List()
-    }
-    val annotationName = annotationType.getName
+  override protected def getAnnotationValues(originatingElement: ElementFacade, member: ElementFacade, annotationType: Class[_]): OptionalValues[_] = {
     val converted = new util.LinkedHashMap[CharSequence, AnyRef]
-    for (annotationMirror <- annotationMirrors) {
-      if (annotationMirror.symbol.fullName.endsWith(annotationName)) {
-        val values = readAnnotationRawValues(annotationMirror)
-        values.entrySet.forEach { entry =>
-          val key = entry.getKey
-          val value = entry.getValue
-          readAnnotationRawValues(originatingElement, annotationName, member, key.toString, value, converted)
+
+    member match {
+      case SymbolFacade(symbol) => {
+        val annotationName = annotationType.getName
+        for (annotationMirror <-  symbol.annotations) {
+          if (annotationMirror.symbol.fullName.endsWith(annotationName)) {
+            val values = readAnnotationRawValues(ScalaAnnotationFacade(annotationMirror))
+            values.entrySet.forEach { entry =>
+              val key = entry.getKey
+              val value = entry.getValue
+              readAnnotationRawValues(originatingElement, annotationName, member, key.toString, value, converted)
+            }
+          }
         }
       }
-    }
-    (originatingElement, member) match {
-      case (_, ScalaNameElement(annOwner, name)) => {
-        if (annOwner.isJavaAnnotation) {
-          Optional.ofNullable(Class.forName(annOwner.fullName)
-            .getMethod(name.toString())
+      case NameFacade(annOwner, name) => {
+        if (annOwner.isAnnotation) {
+          Optional.ofNullable(annOwner
+            .getMethod(name)
             .getAnnotation(annotationType.asInstanceOf[Class[Annotation]]))
             .ifPresent { it =>
               // HACK
@@ -355,12 +377,10 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
                   converted.put(method.getName, wrapAnnotationAttribute(method.invoke(it)))
                 }
               }
-             }
+            }
         }
       }
-      case _ => ()
     }
-
     OptionalValues.of(classOf[Any], converted)
   }
 
@@ -375,7 +395,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param member The member
    * @return The name
    */
-  override protected def getAnnotationMemberName(member: ScalaElement): String = getElementName(member)
+  override protected def getAnnotationMemberName(member: ElementFacade): String = getElementName(member)
 
   /**
    * Obtain the name of the repeatable annotation if the annotation is is one.
@@ -383,9 +403,11 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param annotationMirror The annotation mirror
    * @return Return the name or null
    */
-  override protected def getRepeatableName(annotationMirror: Global#AnnotationInfo): String = {
-    val typeElement = annotationMirror.symbol
-    getRepeatableNameForType(ScalaSymbolElement(typeElement))
+  override protected def getRepeatableName(annotationMirror: AnnotationFacade): String = {
+    annotationMirror match {
+      case ScalaAnnotationFacade(annotationInfo) => getRepeatableNameForType(SymbolFacade(annotationInfo.symbol))
+      case JavaAnnotationFacade(els, values) => null
+    }
   }
 
 /**
@@ -394,22 +416,23 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param annotationType The annotation mirror
    * @return Return the name or null
    */
-  override protected def getRepeatableNameForType(annotationType: ScalaElement): String = {
+  override protected def getRepeatableNameForType(annotationType: ElementFacade): String = {
     annotationType match {
-      case ScalaSymbolElement(symbol) =>
+      case SymbolFacade(symbol) =>
         val mirrors = symbol.annotations
         for (mirror <- mirrors) {
           val name = mirror.symbol.fullName
           if (classOf[Repeatable].getName == name) {
             mirror.assocs.foreach { entry =>
               if ("value" == entry._1.toString && entry._2.isInstanceOf[Global#LiteralAnnotArg]) {
-                return entry._2.asInstanceOf[Global#LiteralAnnotArg].value.value.toString
+//Scala 2.12                return entry._2.asInstanceOf[Global#LiteralAnnotArg].value.value.toString
+                return entry._2.asInstanceOf[Global#LiteralAnnotArg].const.value.toString
               }
             }
           }
         }
         null // TODO
-      case ScalaNameElement(_,_) => null
+      case NameFacade(_,_) => null
     }
   }
 
@@ -419,12 +442,13 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param annotationName The annotation name
    * @return An optional mirror
    */
-  override protected def getAnnotationMirror(annotationName: String): Optional[ScalaElement] = {
+  override protected def getAnnotationMirror(annotationName: String): Optional[ElementFacade] = {
     val clazz = Class.forName(annotationName)
     if (clazz.isAnnotation) {
-
+      Optional.of(NameFacade(clazz, ""))
+    } else {
+      Optional.empty()
     }
-    Optional.empty() // TODO implement this
   }
 
   /**
@@ -434,7 +458,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param member             The member
    * @return The annotation member
    */
-  override protected def getAnnotationMember(originatingElement:ScalaElement, member: CharSequence): ScalaElement = ???
+  override protected def getAnnotationMember(originatingElement:ElementFacade, member: CharSequence): ElementFacade = ???
 
   /**
    * Creates the visitor context for this implementation.
@@ -449,7 +473,7 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[S
    * @param annotation The annotation
    * @return The retention policy
    */
-  override protected def getRetentionPolicy(annotation: ScalaElement): RetentionPolicy = {
+  override protected def getRetentionPolicy(annotation: ElementFacade): RetentionPolicy = {
 //    List<AnnotationNode> annotations = annotation.getAnnotations()
 //    for(ann in annotations) {
 //      if (ann.classNode.name == Retention.name) {

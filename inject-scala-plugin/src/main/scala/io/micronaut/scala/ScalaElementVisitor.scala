@@ -18,7 +18,7 @@ class ScalaElementVisitor(concreteClass:Global#Symbol, visitors:List[LoadedVisit
   }
 
   def visitType (classElement: Global#ClassSymbol, o: Any): Any = {
-    var typeAnnotationMetadata = Globals.metadataBuilder.getOrCreate(ScalaSymbolElement(classElement))
+    var typeAnnotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(classElement))
     for (visitor <- visitors) {
       val resultingElement = visitor.visit(classElement, typeAnnotationMetadata)
       if (resultingElement != null) typeAnnotationMetadata = resultingElement.getAnnotationMetadata
@@ -76,7 +76,7 @@ class ScalaElementVisitor(concreteClass:Global#Symbol, visitors:List[LoadedVisit
   }
 
    def visitExecutable(executableElement: Global#MethodSymbol, o: Any): Any = {
-    var methodAnnotationMetadata: AnnotationMetadata = new AnnotationMetadataHierarchy(Globals.metadataBuilder.getOrCreate(ScalaSymbolElement(executableElement.owner)), Globals.metadataBuilder.build(ScalaSymbolElement(executableElement)))
+    var methodAnnotationMetadata: AnnotationMetadata = new AnnotationMetadataHierarchy(Globals.metadataBuilder.getOrCreate(SymbolFacade(executableElement.owner)), Globals.metadataBuilder.build(SymbolFacade(executableElement)))
     if (executableElement.nameString == "<init>") {
       for (visitor <- visitors) {
         val resultingElement = visitor.visit(executableElement, methodAnnotationMetadata)

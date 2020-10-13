@@ -31,12 +31,12 @@ object ExecutableElementParamInfo {
 
   def populateParameterData(element: Option[Global#DefDef]): ExecutableElementParamInfo = {
     element.map { defDef =>
-      val elementMetadata = Globals.metadataBuilder.getOrCreate(ScalaSymbolElement(defDef.symbol))
+      val elementMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(defDef.symbol))
       val params = new ExecutableElementParamInfo(false, elementMetadata)
 
       defDef.vparamss.foreach { valDefs =>
         valDefs.foreach { valDef =>
-          val valDefMetadata = Globals.metadataBuilder.getOrCreate(ScalaSymbolElement(valDef.symbol))
+          val valDefMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(valDef.symbol))
 
           params.addAnnotationMetadata(valDef.name, valDefMetadata)
 
