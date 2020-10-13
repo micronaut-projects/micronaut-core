@@ -74,11 +74,9 @@ class HttpTracingSpec extends Specification {
             span != null
             span.tags.get("foo") == 'bar'
             span.tags.get('http.path') == '/traced/hello/John'
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
         }
-
-        and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "test basic response rx http tracing"() {
@@ -103,11 +101,9 @@ class HttpTracingSpec extends Specification {
             span != null
             span.tags.get("foo") == 'bar'
             span.tags.get('http.path') == '/traced/response-rx/John'
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
         }
-
-        and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "test rxjava http tracing"() {
@@ -128,11 +124,9 @@ class HttpTracingSpec extends Specification {
             span != null
             span.tags.get("foo") == 'bar'
             span.tags.get('http.path') == '/traced/rxjava/John'
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
         }
-
-        and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "test basic http trace error"() {
@@ -163,11 +157,9 @@ class HttpTracingSpec extends Specification {
             serverSpan.tags.get('http.method') == 'GET'
             serverSpan.tags.get('error') == 'Internal Server Error'
             serverSpan.operationName == 'GET /traced/error/{name}'
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
         }
-
-        and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "test basic http trace error - rx"() {
@@ -198,11 +190,9 @@ class HttpTracingSpec extends Specification {
             serverSpan.tags.get('http.method') == 'GET'
             serverSpan.tags.get('error') == 'Internal Server Error'
             serverSpan.operationName == 'GET /traced/rxError/{name}'
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
         }
-
-        and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "test basic http trace error - rx with error handler"() {
@@ -233,11 +223,9 @@ class HttpTracingSpec extends Specification {
             serverSpan.tags.get('http.method') == 'GET'
             serverSpan.tags.get('error') == 'Too Many Requests'
             serverSpan.operationName == 'GET /traced/quota-error'
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
         }
-
-        and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "test delayed http trace error"() {
@@ -269,11 +257,9 @@ class HttpTracingSpec extends Specification {
             serverSpan.tags.get('error') == 'Internal Server Error'
             serverSpan.duration > TimeUnit.SECONDS.toMicros(2L)
             serverSpan.operationName == 'GET /traced/delayed-error/{duration}'
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
         }
-
-        and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "tested continue http tracing"() {
@@ -314,11 +300,9 @@ class HttpTracingSpec extends Specification {
                         it.tags.get('http.path') == '/traced/continued/John' &&
                         it.tags.get('http.client')
             } != null
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
         }
-
-        and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
 
         cleanup:
         client.close()
@@ -362,11 +346,9 @@ class HttpTracingSpec extends Specification {
                         it.tags.get('http.path') == '/traced/continueRx/John' &&
                         it.tags.get('http.client')
             } != null
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
         }
-
-        and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
 
         cleanup:
         client.close()
@@ -410,11 +392,9 @@ class HttpTracingSpec extends Specification {
                         it.tags.get('http.path') == '/traced/nested/John' &&
                         it.tags.get('http.client')
             } != null
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
         }
-
-        and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
 
         cleanup:
         client.close()
@@ -464,17 +444,16 @@ class HttpTracingSpec extends Specification {
                         it.tags.get('error') &&
                         it.tags.get('http.client')
             } != null
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
         }
-
-        and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "tested continue nested http tracing - rx"() {
         given:
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/traced/nestedRx/John', String)
@@ -483,8 +462,10 @@ class HttpTracingSpec extends Specification {
         response.body() == "10"
 
         and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
+        conditions.eventually {
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
+        }
 
         cleanup:
         client.close()
@@ -503,11 +484,9 @@ class HttpTracingSpec extends Specification {
         then:
         conditions.eventually {
             reporter.spans.any { it.operationName == "custom name" }
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
         }
-
-        and: 'all spans are finished'
-        nrOfStartedSpans > 0
-        nrOfFinishedSpans == nrOfStartedSpans
 
         cleanup:
         client.close()
