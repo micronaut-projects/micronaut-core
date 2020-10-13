@@ -1851,7 +1851,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
         if (!filters.isEmpty()) {
             // make the action executor the last filter in the chain
-            filters.add((HttpServerFilter) (req, chain) -> routePublisher);
+            filters.add((HttpServerFilter) (req, chain) -> {
+                if (executor != null) {
+                    if (routePublisher instanceof Flowable) {
+                        return ((Flowable<MutableHttpResponse<?>>) routePublisher)
+                                .subscribeOn(Schedulers.from(executor));
+                    } else {
+                        return Flowable.fromPublisher(routePublisher)
+                                .subscribeOn(Schedulers.from(executor));
+                    }
+                } else {
+                    return routePublisher;
+                }
+            });
 
             AtomicInteger integer = new AtomicInteger();
             int len = filters.size();
@@ -1874,21 +1886,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             finalPublisher = routePublisher;
         }
 
-        if (executor != null) {
-            // Handle the scheduler to subscribe on
-            if (finalPublisher instanceof Flowable) {
-                return ((Flowable<MutableHttpResponse<?>>) finalPublisher)
-                        .subscribeOn(Schedulers.from(executor));
-            } else {
-                return Flowable.fromPublisher(finalPublisher)
-                        .subscribeOn(Schedulers.from(executor));
-            }
+        if (finalPublisher instanceof Flowable) {
+            return (Flowable<? extends MutableHttpResponse<?>>) finalPublisher;
         } else {
-            if (finalPublisher instanceof Flowable) {
-                return (Flowable<? extends MutableHttpResponse<?>>) finalPublisher;
-            } else {
-                return Flowable.fromPublisher(finalPublisher);
-            }
+            return Flowable.fromPublisher(finalPublisher);
         }
     }
 
