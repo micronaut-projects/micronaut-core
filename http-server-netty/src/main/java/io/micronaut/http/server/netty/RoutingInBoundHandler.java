@@ -1470,7 +1470,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
 
                 // for head request we never emit the body
-                if (incomingRequest.getMethod().equals(HttpMethod.HEAD)) {
+                if (incomingRequest != null && incomingRequest.getMethod().equals(HttpMethod.HEAD)) {
                     final Object o = outgoingResponse.getBody().orElse(null);
                     if (o instanceof ReferenceCounted) {
                         ((ReferenceCounted) o).release();
