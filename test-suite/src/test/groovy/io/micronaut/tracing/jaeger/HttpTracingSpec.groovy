@@ -16,6 +16,7 @@
 package io.micronaut.tracing.jaeger
 
 import io.jaegertracing.internal.JaegerTracer
+import io.jaegertracing.internal.metrics.InMemoryMetricsFactory
 import io.jaegertracing.internal.reporters.InMemoryReporter
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.async.publisher.Publishers
@@ -24,8 +25,8 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.tracing.annotation.ContinueSpan
@@ -34,19 +35,24 @@ import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 import org.reactivestreams.Publisher
+import spock.lang.AutoCleanup
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import javax.inject.Inject
+import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 /**
  * @author graemerocher
  * @since 1.0
  */
 class HttpTracingSpec extends Specification {
+
+    @AutoCleanup
+    ApplicationContext context = buildContext()
+
     void "test basic http tracing"() {
-        given:
-        ApplicationContext context = buildContext()
 
         when:
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
@@ -70,13 +76,12 @@ class HttpTracingSpec extends Specification {
             span.tags.get('http.path') == '/traced/hello/John'
         }
 
-        cleanup:
-        context.close()
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "test basic response rx http tracing"() {
-        given:
-        ApplicationContext context = buildContext()
 
         when:
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
@@ -100,13 +105,13 @@ class HttpTracingSpec extends Specification {
             span.tags.get('http.path') == '/traced/response-rx/John'
         }
 
-        cleanup:
-        context.close()
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "test rxjava http tracing"() {
         given:
-        ApplicationContext context = buildContext()
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -125,13 +130,13 @@ class HttpTracingSpec extends Specification {
             span.tags.get('http.path') == '/traced/rxjava/John'
         }
 
-        cleanup:
-        context.close()
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "test basic http trace error"() {
         given:
-        ApplicationContext context = buildContext()
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -160,13 +165,13 @@ class HttpTracingSpec extends Specification {
             serverSpan.operationName == 'GET /traced/error/{name}'
         }
 
-        cleanup:
-        context.close()
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "test basic http trace error - rx"() {
         given:
-        ApplicationContext context = buildContext()
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -195,13 +200,13 @@ class HttpTracingSpec extends Specification {
             serverSpan.operationName == 'GET /traced/rxError/{name}'
         }
 
-        cleanup:
-        context.close()
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "test basic http trace error - rx with error handler"() {
         given:
-        ApplicationContext context = buildContext()
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -230,13 +235,49 @@ class HttpTracingSpec extends Specification {
             serverSpan.operationName == 'GET /traced/quota-error'
         }
 
-        cleanup:
-        context.close()
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
+    }
+
+    void "test delayed http trace error"() {
+        given:
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
+
+        when:
+        client.toBlocking().exchange('/traced/delayed-error/2s', String)
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        def response = e.response
+        response
+        conditions.eventually {
+            reporter.spans.size() == 2
+            def span = reporter.spans.find { it.tags.containsKey('http.client') }
+            span.tags.get('http.path') == '/traced/delayed-error/2s'
+            span.tags.get('http.status_code') == 500
+            span.tags.get('http.method') == 'GET'
+            span.tags.get('error') == 'Internal Server Error: delayed error'
+            span.operationName == 'GET /traced/delayed-error/2s'
+            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            serverSpan.tags.get('http.path') == '/traced/delayed-error/2s'
+            serverSpan.tags.get('http.status_code') == 500
+            serverSpan.tags.get('http.method') == 'GET'
+            serverSpan.tags.get('error') == 'Internal Server Error'
+            serverSpan.duration > TimeUnit.SECONDS.toMicros(2L)
+            serverSpan.operationName == 'GET /traced/delayed-error/{duration}'
+        }
+
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "tested continue http tracing"() {
         given:
-        ApplicationContext context = buildContext()
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -275,16 +316,16 @@ class HttpTracingSpec extends Specification {
             } != null
         }
 
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
+
         cleanup:
         client.close()
-        context.close(
-
-        )
     }
 
     void "tested continue http tracing - rx"() {
         given:
-        ApplicationContext context = buildContext()
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -323,16 +364,16 @@ class HttpTracingSpec extends Specification {
             } != null
         }
 
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
+
         cleanup:
         client.close()
-        context.close(
-
-        )
     }
 
     void "tested nested http tracing"() {
         given:
-        ApplicationContext context = buildContext()
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -347,15 +388,15 @@ class HttpTracingSpec extends Specification {
             reporter.spans.size() == 4
             reporter.spans.find {
                 it.operationName == 'GET /traced/hello/{name}' &&
-                it.tags.get('foo') == 'bar' &&
-                it.tags.get('http.path') == '/traced/hello/John' &&
-                it.tags.get('http.server')
+                        it.tags.get('foo') == 'bar' &&
+                        it.tags.get('http.path') == '/traced/hello/John' &&
+                        it.tags.get('http.server')
             } != null
             reporter.spans.find {
                 it.operationName == 'GET /traced/hello/{name}' &&
-                !it.tags.get('foo') &&
-                it.tags.get('http.path') == '/traced/hello/John' &&
-                it.tags.get('http.client')
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/hello/John' &&
+                        it.tags.get('http.client')
             } != null
             reporter.spans.find {
                 it.operationName == 'GET /traced/nested/{name}' &&
@@ -371,14 +412,16 @@ class HttpTracingSpec extends Specification {
             } != null
         }
 
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
+
         cleanup:
         client.close()
-        context.close()
     }
 
     void "tested nested http error tracing"() {
         given:
-        ApplicationContext context = buildContext()
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -388,7 +431,8 @@ class HttpTracingSpec extends Specification {
         client.toBlocking().exchange('/traced/nestedError/John', String)
 
         then:
-        def e = thrown(HttpClientResponseException)
+        def ex = thrown(HttpClientResponseException)
+        ex != null
         conditions.eventually {
             reporter.spans.size() == 4
             reporter.spans.find {
@@ -422,13 +466,13 @@ class HttpTracingSpec extends Specification {
             } != null
         }
 
-        cleanup:
-        context.close()
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
     }
 
     void "tested continue nested http tracing - rx"() {
         given:
-        ApplicationContext context = buildContext()
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
@@ -438,15 +482,16 @@ class HttpTracingSpec extends Specification {
         then:
         response.body() == "10"
 
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
 
         cleanup:
         client.close()
-        context.close()
     }
 
     void "tested customising span name"() {
         given:
-        ApplicationContext context = buildContext()
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -460,25 +505,42 @@ class HttpTracingSpec extends Specification {
             reporter.spans.any { it.operationName == "custom name" }
         }
 
+        and: 'all spans are finished'
+        nrOfStartedSpans > 0
+        nrOfFinishedSpans == nrOfStartedSpans
+
         cleanup:
         client.close()
-        context.close()
     }
-
 
     ApplicationContext buildContext() {
         def reporter = new InMemoryReporter()
+        def metricsFactory = new InMemoryMetricsFactory()
         ApplicationContext.builder(
-            'tracing.jaeger.enabled':true,
-            'tracing.jaeger.sampler.probability':1
-        ).singletons(reporter)
-         .start()
+                'tracing.jaeger.enabled': true,
+                'tracing.jaeger.sampler.probability': 1
+        ).singletons(reporter, metricsFactory)
+                .start()
+    }
+
+    long getJaegerMetric(String name, Map tags = [:]) {
+        context.getBean(InMemoryMetricsFactory).getCounter("jaeger_tracer_${name}", tags)
+    }
+
+    long getNrOfFinishedSpans() {
+        getJaegerMetric('finished_spans')
+    }
+
+    long getNrOfStartedSpans() {
+        getJaegerMetric('started_spans', ['sampled': 'y'])
     }
 
     @Controller('/traced')
     static class TracedController {
-        @Inject Tracer spanCustomizer
-        @Inject TracedClient tracedClient
+        @Inject
+        Tracer spanCustomizer
+        @Inject
+        TracedClient tracedClient
 
         @Get("/hello/{name}")
         String hello(String name) {
@@ -488,15 +550,15 @@ class HttpTracingSpec extends Specification {
 
         @Get("/response-rx/{name}")
         HttpResponse<Publisher<String>> responseRx(String name) {
-            return HttpResponse.ok(Publishers.map(Flowable.fromCallable({->
+            return HttpResponse.ok(Publishers.map(Flowable.fromCallable({ ->
                 spanCustomizer.activeSpan().setTag("foo", "bar")
                 return name
-            }),  { String n -> n}))
+            }), { String n -> n }))
         }
 
         @Get("/rxjava/{name}")
         Single<String> rxjava(String name) {
-            Single.fromCallable({->
+            Single.fromCallable({ ->
                 spanCustomizer.activeSpan().setTag("foo", "bar")
                 return name
             }).subscribeOn(Schedulers.io())
@@ -509,7 +571,7 @@ class HttpTracingSpec extends Specification {
 
         @Get("/rxError/{name}")
         Single<String> rxError(String name) {
-            Single.defer { error(name) }
+            Single.defer { Single.just(error(name)) }
         }
 
         @Get("/nested/{name}")
@@ -544,10 +606,10 @@ class HttpTracingSpec extends Specification {
         Single<String> nestedRx(String name) {
             spanCustomizer.activeSpan().setBaggageItem("foo", "bar")
             tracedClient.continuedRx(name)
-                .flatMap({ String res ->
-                    assert spanCustomizer.activeSpan().getBaggageItem("foo") == "bar"
-                    return tracedClient.nestedRx2(res)
-                })
+                    .flatMap({ String res ->
+                        assert spanCustomizer.activeSpan().getBaggageItem("foo") == "bar"
+                        return tracedClient.nestedRx2(res)
+                    })
         }
 
         @Get("/nestedRx2/{name}")
@@ -559,6 +621,11 @@ class HttpTracingSpec extends Specification {
         @Get("/quota-error")
         Single<String> quotaError() {
             Single.error(new QuotaException("retry later"))
+        }
+
+        @Get("/delayed-error/{duration}")
+        Single<Object> delayedError(Duration duration) {
+            Single.error(new RuntimeException("delayed error")).delay(duration.toMillis(), TimeUnit.MILLISECONDS, true)
         }
 
         @Error(QuotaException)
