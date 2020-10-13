@@ -58,7 +58,7 @@ The following table summarizes the parameter annotations, their purpose, and pro
 
 |ann:http.annotation.Header[]
 |Allows specifying parameters that should be sent as HTTP headers
-|`@Header String contentType`
+|`@Header String requestId`
 
 |ann:http.annotation.QueryValue[]
 |Allows customizing the name of the URI parameter to bind from
@@ -73,6 +73,8 @@ The following table summarizes the parameter annotations, their purpose, and pro
 |`@RequestAttribute Integer locationId`
 
 |===
+
+IMPORTANT: Always use ann:http.annotation.Produces[] or ann:http.annotation.Consumes[] instead of supplying a header for `Content-Type` or `Accept`.
 
 ==== Type Based Binding Parameters
 

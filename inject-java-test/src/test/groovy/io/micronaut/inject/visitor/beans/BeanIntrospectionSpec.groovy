@@ -30,6 +30,7 @@ import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
+import javax.validation.Constraint
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
 import java.lang.reflect.Field
@@ -1941,6 +1942,37 @@ class Test {
 
         then:
         property.get(instance) == threeDimensions
+    }
+
+    void "test superclass methods are read before interface methods"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import javax.validation.constraints.NotNull;
+
+interface IEmail {
+String getEmail();
+}
+@Introspected
+class SuperClass implements IEmail {
+    @NotNull
+    public String getEmail() {
+        return null;
+    }
+}
+@Introspected
+class SubClass extends SuperClass {
+}
+@Introspected
+class Test extends SuperClass implements IEmail {
+}
+
+''')
+        expect:
+        introspection != null
+        introspection.getProperty("email").isPresent()
+        introspection.getIndexedProperties(Constraint).size() == 1
     }
 
 
