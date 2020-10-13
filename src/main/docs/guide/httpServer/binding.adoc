@@ -20,7 +20,7 @@ The following table summarizes the annotations, their purpose and provides an ex
 
 |link:{api}/io/micronaut/http/annotation/Header.html[@Header]
 |Binds a parameter from an HTTP header
-|`@Header String contentType`
+|`@Header String requestId`
 
 |link:{api}/io/micronaut/http/annotation/QueryValue.html[@QueryValue]
 |Binds from a request query parameter
