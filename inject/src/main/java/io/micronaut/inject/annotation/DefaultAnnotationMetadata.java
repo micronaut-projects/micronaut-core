@@ -1837,6 +1837,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                             additionalDefaults
                     );
                 }
+            } else {
+                final Map<String, Map<CharSequence, Object>> additionalDefaults = ((DefaultAnnotationMetadata) source).annotationDefaultValues;
+                if (additionalDefaults != null) {
+                    additionalDefaults.forEach(((DefaultAnnotationMetadata) target)::addDefaultAnnotationValues);
+                }
             }
         }
     }
