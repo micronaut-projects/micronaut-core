@@ -23,6 +23,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
+import spock.lang.Retry
 
 /**
  * Any changes or additions to this test should also be done
@@ -147,6 +148,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         result == data
     }
 
+    @Retry
     void "test non-blocking upload with publisher receiving part datas"() {
         given:
         def data = 'some data ' * 500

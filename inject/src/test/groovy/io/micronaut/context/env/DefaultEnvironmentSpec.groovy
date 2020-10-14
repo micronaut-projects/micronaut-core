@@ -587,8 +587,24 @@ class DefaultEnvironmentSpec extends Specification {
     }
 
     void "test the default environment is applied"() {
-        when:
+        when: 'environment deduction is on'
         Environment env = new DefaultEnvironment(new ApplicationContextConfiguration() {
+            @Override
+            List<String> getEnvironments() {
+                return Arrays.asList()
+            }
+
+            @Override
+            List<String> getDefaultEnvironments() {
+                return ['default']
+            }
+        }).start()
+
+        then: 'an environment is deduced so the default is not applied'
+        env.activeNames == ['test'] as Set
+
+        when: 'environment deduction is off'
+        env = new DefaultEnvironment(new ApplicationContextConfiguration() {
             @Override
             List<String> getEnvironments() {
                 return []
@@ -598,10 +614,15 @@ class DefaultEnvironmentSpec extends Specification {
             List<String> getDefaultEnvironments() {
                 return ['default']
             }
+
+            @Override
+            Optional<Boolean> getDeduceEnvironments() {
+                return Optional.of(false)
+            }
         }).start()
 
-        then:
-        env.activeNames == ['test', 'default'] as Set
+        then: 'the default is applied'
+        env.activeNames == ['default'] as Set
 
         when: 'an environment is specified'
         env = new DefaultEnvironment(new ApplicationContextConfiguration() {
@@ -614,10 +635,15 @@ class DefaultEnvironmentSpec extends Specification {
             List<String> getDefaultEnvironments() {
                 return ['default']
             }
+
+            @Override
+            Optional<Boolean> getDeduceEnvironments() {
+                return Optional.of(false)
+            }
         }).start()
 
         then: 'the default environment is not applied'
-        env.activeNames == ['test', 'foo'] as Set
+        env.activeNames == ['foo'] as Set
 
         when: 'an environment is specified through env var'
         SystemLambda.withEnvironmentVariable("MICRONAUT_ENVIRONMENTS", "bar")
@@ -625,35 +651,45 @@ class DefaultEnvironmentSpec extends Specification {
                     env = new DefaultEnvironment(new ApplicationContextConfiguration() {
                         @Override
                         List<String> getEnvironments() {
-                            return []
+                            return Arrays.asList()
                         }
 
                         @Override
                         List<String> getDefaultEnvironments() {
                             return ['default']
                         }
+
+                        @Override
+                        Optional<Boolean> getDeduceEnvironments() {
+                            return Optional.of(false)
+                        }
                     }).start()
                 })
 
         then: 'the default environment is not applied'
-        env.activeNames == ['test', 'bar'] as Set
+        env.activeNames == ['bar'] as Set
 
         when: 'an environment is specified through a system prop'
         System.setProperty('micronaut.environments', 'xyz')
         env = new DefaultEnvironment(new ApplicationContextConfiguration() {
             @Override
             List<String> getEnvironments() {
-                return []
+                return Arrays.asList()
             }
 
             @Override
             List<String> getDefaultEnvironments() {
                 return ['default']
             }
+
+            @Override
+            Optional<Boolean> getDeduceEnvironments() {
+                return Optional.of(false)
+            }
         }).start()
 
         then: 'the default environment is not applied'
-        env.activeNames == ['test', 'xyz'] as Set
+        env.activeNames == ['xyz'] as Set
     }
 
     private static Environment startEnv(String files) {

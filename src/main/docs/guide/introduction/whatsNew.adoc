@@ -6,9 +6,13 @@ Micronaut {version} includes the following changes:
 
 It is now possible to define <<introspection, bean introspections>> on JDK 14+ record types (note these currently require the `––enable–preview` flag to the compiler and JVM).
 
+==== @Client + Kotlin
+
+@Client interfaces now support suspend methods!
+
 ==== Default Environment
 
-Micronaut 2.1 introduces the concept of a default environment. One or more default environments can be set and they will apply if no other environments are explicitly specified. See the <<environments, environments documentation>> for information on how to use this new feature.
+Micronaut 2.1 introduces the concept of a default environment. One or more default environments can be set and they will apply if no other environments are explicitly specified or deduced. See the <<environments, environments documentation>> for information on how to use this new feature.
 
 ==== @Order Annotation
 

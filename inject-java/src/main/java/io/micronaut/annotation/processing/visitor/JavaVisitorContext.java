@@ -190,7 +190,12 @@ public class JavaVisitorContext implements VisitorContext {
 
     @Override
     public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
-        return outputVisitor.visitClass(classname, originatingElement);
+        return outputVisitor.visitClass(classname, new io.micronaut.inject.ast.Element[]{ originatingElement });
+    }
+
+    @Override
+    public OutputStream visitClass(String classname, io.micronaut.inject.ast.Element... originatingElements) throws IOException {
+        return outputVisitor.visitClass(classname, originatingElements);
     }
 
     @Override

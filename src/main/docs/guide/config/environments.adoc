@@ -49,7 +49,7 @@ snippet::io.micronaut.docs.context.env.DefaultEnvironmentSpec[tags="disableEnvDe
 
 == Default Environment
 
-Micronaut supports the concept of one or many default environments. A default environment is one that is only applied if no other environments are explicitly specified. Environments can be explicitly specified either through the application context builder `Micronaut.build().environments(...)`, through the `micronaut.environments` system property, or the `MICRONAUT_ENVIRONMENTS` environment variable. If an environment is configured through any of the above means, the default environment will *not* be applied.
+Micronaut supports the concept of one or many default environments. A default environment is one that is only applied if no other environments are explicitly specified or deduced. Environments can be explicitly specified either through the application context builder `Micronaut.build().environments(...)`, through the `micronaut.environments` system property, or the `MICRONAUT_ENVIRONMENTS` environment variable. Environments can be deduced to automatically apply the environment appropriate for cloud deployments. If an environment is found through any of the above means, the default environment will *not* be applied.
 
 To set the default environments, modify your application main method:
 

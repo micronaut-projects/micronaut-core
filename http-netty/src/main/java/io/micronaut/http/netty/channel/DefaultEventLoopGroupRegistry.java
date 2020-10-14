@@ -57,18 +57,6 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     }
 
     /**
-     * Constructs an event loop group thread factory.
-     *
-     * @param configuration The configuration
-     * @return The thread factory
-     */
-    @EachBean(EventLoopGroupConfiguration.class)
-    @BootstrapContextCompatible
-    protected ThreadFactory eventLoopGroupThreadFactory(EventLoopGroupConfiguration configuration) {
-        return new DefaultThreadFactory(configuration.getName() + "-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class));
-    }
-
-    /**
      * Constructs an event loop group for each configuration.
      *
      * @param configuration The configuration
@@ -87,7 +75,8 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
                                       configuration.getIoRatio().orElse(null)
                               )).orElseThrow(() -> new ConfigurationException("No executor service configured for name: " + executor));
         } else {
-            ThreadFactory threadFactory = beanLocator.getBean(ThreadFactory.class, Qualifiers.byName(configuration.getName()));
+            ThreadFactory threadFactory = beanLocator.findBean(ThreadFactory.class, Qualifiers.byName(configuration.getName()))
+                    .orElseGet(() ->  new DefaultThreadFactory(configuration.getName() + "-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class)));
             return eventLoopGroupFactory.createEventLoopGroup(configuration, threadFactory);
         }
     }

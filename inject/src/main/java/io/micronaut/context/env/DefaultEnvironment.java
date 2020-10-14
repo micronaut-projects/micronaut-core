@@ -112,7 +112,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         super(configuration.getConversionService());
         this.configuration = configuration;
         Set<String> environments = new LinkedHashSet<>(3);
-        List<String> specifiedNames = configuration.getEnvironments();
+        List<String> specifiedNames = new ArrayList<>(configuration.getEnvironments());
 
         specifiedNames.addAll(0, Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
                 System.getenv(ENVIRONMENTS_ENV))
@@ -121,12 +121,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 .map(String::trim)
                 .collect(Collectors.toList()));
 
-        if (specifiedNames.isEmpty()) {
-            specifiedNames = configuration.getDefaultEnvironments();
-        }
-
         this.deduceEnvironments = configuration.getDeduceEnvironments().orElse(null);
         EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
+        if (environmentsAndPackage.enviroments.isEmpty() && specifiedNames.isEmpty()) {
+            specifiedNames = configuration.getDefaultEnvironments();
+        }
         environments.addAll(environmentsAndPackage.enviroments);
         String aPackage = environmentsAndPackage.aPackage;
         if (aPackage != null) {

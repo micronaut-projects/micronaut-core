@@ -388,7 +388,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
         } else if (msg instanceof PingWebSocketFrame) {
             // respond with pong
-            PingWebSocketFrame frame = (PingWebSocketFrame) msg;
+            PingWebSocketFrame frame = (PingWebSocketFrame) msg.retain();
             ctx.writeAndFlush(new PongWebSocketFrame(frame.content()));
 
         } else if (msg instanceof PongWebSocketFrame) {

@@ -21,15 +21,10 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Delegates to {@link Cookie}.
@@ -75,11 +70,11 @@ public class NettyCookies implements Cookies {
     public NettyCookies(HttpHeaders nettyHeaders, ConversionService conversionService) {
         this.conversionService = conversionService;
         if (nettyHeaders != null) {
-            String value = nettyHeaders.get(HttpHeaderNames.SET_COOKIE);
-            if (value != null) {
+            List<String> values = nettyHeaders.getAll(HttpHeaderNames.SET_COOKIE);
+            if (values != null && !values.isEmpty()) {
                 cookies = new LinkedHashMap<>();
-                Set<io.netty.handler.codec.http.cookie.Cookie> nettyCookies = ServerCookieDecoder.STRICT.decode(value);
-                for (io.netty.handler.codec.http.cookie.Cookie nettyCookie : nettyCookies) {
+                for (String value: values) {
+                    io.netty.handler.codec.http.cookie.Cookie nettyCookie = ClientCookieDecoder.STRICT.decode(value);
                     cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
                 }
             } else {

@@ -28,6 +28,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -52,7 +53,24 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
 
     /**
      * @param className               The class name
-     * @param originatingElement      The originating element
+     * @param originatingElements     The originating elements
+     * @param annotationMetadata      The annotation metadata
+     * @param writeAnnotationDefaults Whether to write annotation defaults
+     */
+    protected AbstractAnnotationMetadataWriter(
+            String className,
+            OriginatingElements originatingElements,
+            AnnotationMetadata annotationMetadata,
+            boolean writeAnnotationDefaults) {
+        super(originatingElements);
+        this.targetClassType = getTypeReference(className);
+        this.annotationMetadata = annotationMetadata;
+        this.writeAnnotationDefault = writeAnnotationDefaults;
+    }
+
+    /**
+     * @param className               The class name
+     * @param originatingElement     The originating element
      * @param annotationMetadata      The annotation metadata
      * @param writeAnnotationDefaults Whether to write annotation defaults
      */
@@ -61,7 +79,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             Element originatingElement,
             AnnotationMetadata annotationMetadata,
             boolean writeAnnotationDefaults) {
-        super(originatingElement);
+        super(new Element[]{ originatingElement });
         this.targetClassType = getTypeReference(className);
         this.annotationMetadata = annotationMetadata;
         this.writeAnnotationDefault = writeAnnotationDefaults;
