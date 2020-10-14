@@ -1330,7 +1330,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             Object propertyValue,
             @Nullable DefaultPropertyNode container) {
 
-        final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(propertyValue);
+        BeanIntrospection<Object> beanIntrospection = null;
+        if (propertyValue != null && !ClassUtils.isJavaLangType(propertyValue.getClass())) {
+            beanIntrospection = getBeanIntrospection(propertyValue);
+            if (beanIntrospection == null) {
+                throw new ValidationException("Passed object [" + propertyValue + "] cannot be introspected. Please annotate with @Introspected");
+            }
+        }
 
         if (beanIntrospection != null) {
             if (container != null) {

@@ -10,8 +10,10 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Singleton
+import javax.validation.ConstraintViolation
 import javax.validation.ElementKind
 import javax.validation.Valid
+import javax.validation.ValidationException
 import javax.validation.ValidatorFactory
 import javax.validation.constraints.*
 import javax.validation.metadata.BeanDescriptor
@@ -377,6 +379,61 @@ class ValidatorSpec extends Specification {
         !beanDescriptor.isBeanConstrained()
         beanDescriptor.getConstrainedProperties().size() == 0
     }
+
+    void "test people not empty"() {
+        when:
+            def constraints = validator.validate(new People2())
+
+        then:
+            constraints.size() == 1
+            constraints.first().message == "must not be empty"
+            constraints.first().propertyPath.toString() == "people"
+    }
+
+    void "test missing introspected"() {
+        when:
+            validator.validate(new People1(people: [new Person()]))
+
+        then:
+            def e = thrown(ValidationException)
+            e.getMessage().contains "io.micronaut.validation.validator.Person"
+            e.getMessage().contains "Please annotate with @Introspected"
+    }
+
+    void "test introspected not needed for null check"() {
+        when:
+            def violations1 = validator.validate(new JustANullCheck(person: new Person()))
+        then:
+            violations1.isEmpty()
+        when:
+            def violations2 = validator.validate(new JustANullCheck())
+        then:
+            violations2.size() == 1
+    }
+}
+
+@Introspected
+class JustANullCheck {
+    @NotNull
+    Person person
+}
+
+@Introspected
+class People1 {
+    @Valid
+    List<Person> people;
+}
+
+@Introspected
+class People2 {
+    @NotEmpty
+    @Valid
+    List<Person> people;
+}
+
+class Person {
+    @NotBlank
+    String name
 }
 
 @Introspected
