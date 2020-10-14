@@ -48,7 +48,7 @@ import java.util.concurrent.TimeUnit;
 @Internal
 @BootstrapContextCompatible
 public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
-    private static final Logger logger = LoggerFactory.getLogger(DefaultEventLoopGroupRegistry.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultEventLoopGroupRegistry.class);
 
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final BeanLocator beanLocator;
@@ -66,6 +66,9 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
         this.beanLocator = beanLocator;
     }
 
+    /**
+     * Shut down event loop groups according to configuration.
+     */
     @PreDestroy
     void shutdown() {
         eventLoopGroups.forEach((eventLoopGroup, configuration) -> {
@@ -74,7 +77,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
                 long timeout = configuration.getShutdownTimeout().toMillis();
                 eventLoopGroup.shutdownGracefully(quietPeriod, timeout, TimeUnit.MILLISECONDS);
             } catch (Throwable t) {
-                logger.warn("Error shutting down EventLoopGroup: {}", t.getMessage(), t);
+                LOGGER.warn("Error shutting down EventLoopGroup: {}", t.getMessage(), t);
             }
         });
         eventLoopGroups.clear();
