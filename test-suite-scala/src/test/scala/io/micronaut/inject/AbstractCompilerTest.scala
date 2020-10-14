@@ -2,7 +2,6 @@
 import java.io.FileInputStream
 
 import io.micronaut.core.naming.NameUtils
-import io.micronaut.inject.BeanDefinition
 
 import scala.reflect.internal.util.BatchSourceFile
 import scala.tools.nsc.io.AbstractFile
@@ -10,6 +9,8 @@ import scala.tools.nsc.reporters.ConsoleReporter
 import scala.tools.nsc.{Global, Settings}
 
 package io.micronaut.inject {
+
+  import scala.reflect.io.VirtualDirectory
 
   abstract class AbstractCompilerTest {
 
@@ -36,6 +37,8 @@ package io.micronaut.inject {
       settings.usejavacp.value = true
 
       val outputDir = AbstractFile.getDirectory("build/generated")
+      // TODO - would be nice to make this work, but BeanDefinitionWriter seem to have problems writing to it
+      //  val outputDir = new VirtualDirectory("(memory)", None)
       settings.outputDirs.setSingleOutput(outputDir)
 
       val compiler = new Global(settings, new ConsoleReporter(settings)) {

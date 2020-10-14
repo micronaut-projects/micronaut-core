@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test
 
 class AliasForQualifierSpec extends AbstractCompilerTest {
   @Test
-  def testOther(): Unit = {
+  def `test that when an alias is created for a named qualifier the stereotypes are correct`(): Unit = {
     val code =
       """
         |package test

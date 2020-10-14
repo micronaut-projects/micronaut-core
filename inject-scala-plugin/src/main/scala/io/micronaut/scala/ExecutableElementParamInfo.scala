@@ -1,6 +1,7 @@
 package io.micronaut.scala
 
 import java.util
+import java.util.Map
 
 import io.micronaut.core.annotation.AnnotationMetadata
 
@@ -23,6 +24,10 @@ class ExecutableElementParamInfo(requiresReflection: Boolean, val metadata: Anno
 
   def addAnnotationMetadata(name: Global#TermName, valDefMetadata: AnnotationMetadata): Unit = {
     parameterMetadata.put(name.toString(), valDefMetadata)
+  }
+
+  def addGenericTypes(paramName: Global#TermName, generics: util.Map[String, AnyRef]): Unit = {
+    genericTypes.put(paramName.toString(), generics)
   }
 
 }
@@ -49,7 +54,27 @@ object ExecutableElementParamInfo {
 //            if (!parameterTypeMetadata.hasStereotype(classOf[Scope])) annotationMetadata = addPropertyMetadata(annotationMetadata, paramElement, argName)
 //          }
 
-          params.addParameter(valDef.name, argType, argType)
+          valDef.tpt match {
+            case typeTree:Global#TypeTree if typeTree.symbol.isClass || typeTree.symbol.isInterface => {
+              params.addParameter(valDef.name, argType, argType)
+              typeTree.original match {
+                case appliedTree:Global#AppliedTypeTree if "scala.Array" != appliedTree.tpt.toString => {
+                  val genericTypeMap = new java.util.HashMap[String, AnyRef]()
+                  val paramNames = Class.forName(argType.toString).getTypeParameters
+                  var idx = 0
+                  for (arg <- appliedTree.args) {
+                    genericTypeMap.put(paramNames(idx).getName, arg.toString)
+                    idx = idx + 1
+                  }
+
+                  params.addGenericTypes(valDef.name, genericTypeMap)
+                }
+                case _ => params.addParameter(valDef.name, argType, argType)
+              }
+            }
+            case _ => params.addParameter(valDef.name, argType, argType)
+          }
+
 
 //         valDef.symbol match {
 //           case kind:_ => {
