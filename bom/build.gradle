@@ -10,15 +10,6 @@ apply plugin: 'maven-publish'
 
 boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
 
-def excludedProjects = [
-        "benchmarks",
-        "test-suite",
-        "test-suite-groovy",
-        "test-suite-helper",
-        "test-suite-kotlin",
-        "test-utils"
-]
-
 publishing {
     afterEvaluate {
         publications {
@@ -95,7 +86,7 @@ dependencies {
     constraints {
         for (Project p : rootProject.subprojects) {
             if (!p.subprojects.empty) continue
-            if (p.name.contains("bom")) continue
+            if (p.name.contains("bom") || p.name.contains("dependencies")) continue
             if (excludedProjects.contains(p.name)) continue
 
             api "$p.group:micronaut-$p.name:$p.version"

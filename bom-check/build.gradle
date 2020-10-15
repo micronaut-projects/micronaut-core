@@ -43,7 +43,7 @@ dependencies {
     //Include core projects
     for (Project p : rootProject.subprojects) {
         if (!p.subprojects.empty) continue
-        if (p.name.contains("bom") || p.name.contains("parent")) continue
+        if (p.name.contains("bom") || p.name.contains("parent") || p.name.contains("dependencies")) continue
         if (excludedProjects.contains(p.name)) continue
 
         implementation p

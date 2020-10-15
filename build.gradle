@@ -88,6 +88,11 @@ ext {
                     group:'com.google.protobuf',
                     name:'protobuf-bom',
                     version:protobufJavaVersion
+            ],
+            'testcontainers':[
+                    group:'org.testcontainers',
+                    name:'testcontainers-bom',
+                    version:testContainersVersion
             ]
     ]
     dependencyVersions = [
@@ -697,9 +702,17 @@ subprojects { Project subproject ->
         isGrailsPlugin = false
         isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
         shadowJarEnabled = false
+        excludedProjects = [
+            "benchmarks",
+            "test-suite",
+            "test-suite-groovy",
+            "test-suite-helper",
+            "test-suite-kotlin",
+            "test-utils"
+]
     }
 
-    if (subproject.name.contains("bom") || subproject.name.contains("parent")) {
+    if (subproject.name.contains("bom") || subproject.name.contains("parent") || subproject.name.contains("dependencies")) {
         return
     }
 
@@ -757,7 +770,7 @@ subprojects { Project subproject ->
     def isDocumented = subproject.name != 'inject' && subproject.name != 'core' && subproject.name != 'aop' && !subproject.name.contains('asciidoc-config-props')
 
     dependencies {
-        if (subproject.name != "bom") {
+        if (subproject.name != "bom" && subproject.name != "dependencies") {
             api dependencyVersion("slf4j")
         }
 

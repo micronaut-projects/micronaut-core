@@ -1,0 +1,40 @@
+plugins {
+    id 'java-platform'
+}
+
+group projectGroupId
+version projectVersion
+
+apply plugin: 'maven-publish'
+
+publishing {
+    afterEvaluate {
+        publications {
+            maven(MavenPublication) {
+                artifactId("micronaut-dependencies")
+                from components.javaPlatform
+
+                pom.withXml {
+                    def xml = asNode()
+
+                    xml.children().find {
+                        it.name().localPart == 'packaging'
+                    } + pomInfo
+                }
+            }
+        }
+    }
+}
+
+dependencies {
+    constraints {
+        for (Project p : rootProject.subprojects) {
+            if (!p.subprojects.empty) continue
+            if (p.name.contains("bom") || p.name.contains("dependencies") ) continue
+            if (excludedProjects.contains(p.name)) continue
+            api "$p.group:micronaut-$p.name:$p.version"
+        }
+    }
+}
+
+apply plugin: "io.micronaut.build.publishing"
