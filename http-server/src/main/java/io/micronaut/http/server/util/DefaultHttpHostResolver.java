@@ -38,6 +38,7 @@ import java.net.URI;
 @Experimental
 public class DefaultHttpHostResolver implements HttpHostResolver {
 
+    private static final String DEFAULT_HOST = "http://localhost";
     private final Provider<EmbeddedServer> embeddedServer;
     private final HttpServerConfiguration serverConfiguration;
 
@@ -46,7 +47,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
      * @param embeddedServer The embedded server provider
      */
     public DefaultHttpHostResolver(HttpServerConfiguration serverConfiguration,
-                                   Provider<EmbeddedServer> embeddedServer) {
+                                   @Nullable Provider<EmbeddedServer> embeddedServer) {
         this.serverConfiguration = serverConfiguration;
         this.embeddedServer = embeddedServer;
     }
@@ -70,12 +71,11 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
      * @return The host resolved from the embedded server
      */
     protected String getEmbeddedHost() {
-        EmbeddedServer server = embeddedServer.get();
-        int port = server.getPort();
-        if (port > -1 && port != 80 && port != 443) {
-            return server.getScheme() + "://" + server.getHost() + ":" + port;
+        if (embeddedServer != null) {
+            EmbeddedServer server = embeddedServer.get();
+            return createHost(server.getScheme(), server.getHost(), server.getPort());
         } else {
-            return server.getScheme() + "://" + server.getHost();
+            return DEFAULT_HOST;
         }
     }
 
@@ -128,7 +128,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         if (scheme == null) {
             scheme = request.getUri().getScheme();
         }
-        if (scheme == null) {
+        if (scheme == null && embeddedServer != null) {
             scheme = embeddedServer.get().getScheme();
         }
 
@@ -139,7 +139,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         if (host == null) {
             host = request.getUri().getHost();
         }
-        if (host == null) {
+        if (host == null && embeddedServer != null) {
             host = embeddedServer.get().getHost();
         }
 
@@ -160,7 +160,9 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         return createHost(scheme, host, port);
     }
 
-    private String createHost(String scheme, String host, @Nullable Integer port) {
+    private String createHost(@Nullable String scheme, @Nullable String host, @Nullable Integer port) {
+        scheme = scheme == null ? "http" : scheme;
+        host = host == null ? "localhost" : host;
         if (port != null && port != 80 && port != 443) {
             return scheme + "://" + host + ":" + port;
         } else {
