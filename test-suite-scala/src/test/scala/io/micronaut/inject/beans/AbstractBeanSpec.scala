@@ -24,5 +24,4 @@ class AbstractBeanSpec extends AbstractCompilerTest {
       assertThat(definition.isAbstract).isTrue
       assertThat(definition.getInjectedFields.size).isEqualTo(1)
   }
-
 }

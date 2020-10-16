@@ -57,19 +57,9 @@ object ExecutableElementParamInfo {
           valDef.tpt match {
             case typeTree:Global#TypeTree if typeTree.symbol.isClass || typeTree.symbol.isInterface => {
               params.addParameter(valDef.name, argType, argType)
-              typeTree.original match {
-                case appliedTree:Global#AppliedTypeTree if "scala.Array" != appliedTree.tpt.toString => {
-                  val genericTypeMap = new java.util.HashMap[String, AnyRef]()
-                  val paramNames = Class.forName(argType.toString).getTypeParameters
-                  var idx = 0
-                  for (arg <- appliedTree.args) {
-                    genericTypeMap.put(paramNames(idx).getName, arg.toString)
-                    idx = idx + 1
-                  }
-
-                  params.addGenericTypes(valDef.name, genericTypeMap)
-                }
-                case _ => params.addParameter(valDef.name, argType, argType)
+              val genericTypeMap = Globals.genericTypesForTypeTree(argType.toString, typeTree)
+              if (!genericTypeMap.isEmpty) {
+                params.addGenericTypes(valDef.name, genericTypeMap)
               }
             }
             case _ => params.addParameter(valDef.name, argType, argType)

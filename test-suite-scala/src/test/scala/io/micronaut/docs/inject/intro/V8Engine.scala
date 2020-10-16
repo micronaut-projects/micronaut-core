@@ -8,7 +8,7 @@ import javax.inject.Singleton
 
   override def getCylinders: Int = cylinders
 
-  def setCylinders (cylinders: Int) {
+  def setCylinders (cylinders: Int):Unit = {
     this.cylinders = cylinders
   }
 

@@ -1,13 +1,10 @@
 package io.micronaut.scala
 
-import java.util
-
-import io.micronaut.core.io.service.SoftServiceLoader
-import io.micronaut.core.order.OrderUtil
-import io.micronaut.inject.visitor.{TypeElementVisitor, VisitorContext}
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.{BeanDefinitionReferenceWriter, BeanDefinitionVisitor}
 
-import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.tools.nsc.plugins._
 import scala.tools.nsc.{Global, Phase}
@@ -30,33 +27,63 @@ class InitPluginComponent(val global: Global) extends PluginComponent {
   override val runsAfter = List("jvm")
   override def newPhase(prev: Phase) =
     new StdPhase(prev) {
-      override def apply(unit: CompilationUnit) {
+      override def apply(unit: CompilationUnit):Unit = {
         new InitTraverser(unit).traverse(unit.body)
       }
     }
 
   class InitTraverser(unit: CompilationUnit) extends Traverser {
-    override def traverse(tree: Tree) = tree match {
-      // Annotation are available in symbols at this point
-      case classDef: ClassDef => {
-        val serviceLoader = SoftServiceLoader.load(classOf[TypeElementVisitor[_, _]])
-        for (definition <- asScalaIterator(serviceLoader.iterator())) {
-          if (definition.isPresent) {
-            val visitor = definition.load()
-            Globals.loadedVisitors +=
-              definition.getName -> new LoadedVisitor(classDef, visitor, new ScalaVisitorContext(global, unit.source))
-
-            val values = new java.util.ArrayList[LoadedVisitor]()
-            values.addAll(Globals.loadedVisitors.values.asJavaCollection)
-            OrderUtil.reverseSort(values)
-            for(loadedVisitor <- asScalaIterator(values.iterator())) {
-              loadedVisitor.start()
-            }
-          }
-        }
-        super.traverse(tree)
+    override def traverse(tree: Tree) = {
+      tree match {
+        // Annotation are available in symbols at this point
+        //      case classDef: ClassDef => {
+        //        val serviceLoader = SoftServiceLoader.load(classOf[TypeElementVisitor[_, _]])
+        //        for (definition <- asScalaIterator(serviceLoader.iterator())) {
+        //          if (definition.isPresent) {
+        //            val visitor = definition.load()
+        //            Globals.loadedVisitors +=
+        //              definition.getName -> new LoadedVisitor(classDef, visitor, new ScalaVisitorContext(global, unit.source))
+        //
+        //            val values = new java.util.ArrayList[LoadedVisitor]()
+        //            values.addAll(Globals.loadedVisitors.values.asJavaCollection)
+        //            OrderUtil.reverseSort(values)
+        //            for(loadedVisitor <- asScalaIterator(values.iterator())) {
+        //              loadedVisitor.start()
+        //            }
+        //          }
+        //        }
+        //        super.traverse(tree)
+        //      }
+        case classDef:ClassDef => processSymbolAnnotations(classDef.symbol, classDef.symbol)
+        case defDef:DefDef => processSymbolAnnotations(defDef.symbol, defDef.symbol.enclClass)
+        case valDef:ValDef => processSymbolAnnotations(valDef.symbol, valDef.symbol.enclClass)
+        case _ => ()
       }
-      case _ => super.traverse(tree)
+      super.traverse(tree)
+    }
+  }
+
+  def processSymbolAnnotations(symbol:Global#Symbol, owner:Global#Symbol) = {
+    if (symbol.annotations.exists(annotationInfo => {
+      val annotationName = annotationInfo.symbol.thisType.toString
+        hasStereotype(annotationInfo.symbol, Globals.ANNOTATION_STEREOTYPES) ||
+        AbstractAnnotationMetadataBuilder.isAnnotationMapped(annotationName)
+    })) {
+        Globals.beanableSymbols += owner
+    }
+  }
+
+  protected def hasStereotype(element: Global#Symbol, stereotypes: Array[String]): Boolean = {
+    if (stereotypes.contains(element.thisType.toString)) {
+      true
+    } else {
+      try {
+        val annotationMetadata: AnnotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(element))
+        stereotypes.exists(annotationMetadata.hasStereotype)
+      } catch {
+        case _:ClassNotFoundException => false
+        case other:Exception => throw other
+      }
     }
   }
 }
@@ -67,7 +94,7 @@ class TypeElementVisitorPluginComponent(val global: Global) extends PluginCompon
   override val runsAfter = List("compiler-plugin-type-element-init")
   override def newPhase(prev: Phase) =
     new StdPhase(prev) {
-      override def apply(unit: CompilationUnit) {
+      override def apply(unit: CompilationUnit):Unit = {
         new TypeElementVisitorTraverser().traverse(unit.body)
       }
     }
@@ -76,9 +103,9 @@ class TypeElementVisitorPluginComponent(val global: Global) extends PluginCompon
 
     override def traverse(tree: Tree) = tree match {
       case classDef: ClassDef => {
-        Globals.loadedVisitors.values./*filter(v.matches)*/foreach{ loadedVisitor =>
-          new ScalaElementVisitor(classDef.symbol, List(loadedVisitor)).visitType(classDef.symbol.asInstanceOf[Global#ClassSymbol], null)
-        }
+//        Globals.loadedVisitors.values./*filter(v.matches)*/foreach{ loadedVisitor =>
+//          new ScalaElementVisitor(classDef.symbol, List(loadedVisitor)).visitType(classDef.symbol.asInstanceOf[Global#ClassSymbol], null)
+//        }
         super.traverse(tree)
       }
       case _ => super.traverse(tree)
@@ -94,7 +121,7 @@ class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComp
 
   override def newPhase(prev: Phase) =
     new StdPhase(prev) {
-      override def apply(unit: CompilationUnit) {
+      override def apply(unit: CompilationUnit):Unit = {
         new BeanDefinitionInjectTraverser(unit).traverse(unit.body)
       }
     }
@@ -132,16 +159,18 @@ class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComp
 
     override def traverse(tree: Tree) = tree match {
       case classDef:ClassDef => {
-        val visitorContext = new ScalaVisitorContext(global, unit.source)
-        val visitor = new AnnBeanElementVisitor(classDef, visitorContext)
+        if (Globals.beanableSymbols.contains(classDef.symbol)) {
+          val visitorContext = new ScalaVisitorContext(global, unit.source)
+          val visitor = new AnnBeanElementVisitor(classDef, visitorContext)
           visitor.visit()
-          visitor.beanDefinitionWriters.iterator.foreach{tuple =>
+          visitor.beanDefinitionWriters.iterator.foreach { tuple =>
             if (!processed.contains(tuple._1)) {
               processed.add(tuple._1)
               processBeanDefinitions(classDef, tuple._2, visitorContext)
             }
           }
-          super.traverse(tree)
+        }
+        super.traverse(tree)
       }
       case _ => super.traverse(tree)
     }
@@ -156,13 +185,13 @@ class FinalizePluginComponent(val global: Global) extends PluginComponent {
 
   override def newPhase(prev: Phase) = {
     new StdPhase(prev) {
-      override def apply(unit: CompilationUnit) {
-        val values = new util.ArrayList[LoadedVisitor]()
-        values.addAll(Globals.loadedVisitors.values.asJavaCollection)
-        OrderUtil.reverseSort(values)
-        for (loadedVisitor <- asScalaIterator(values.iterator())) {
-          loadedVisitor.finish()
-        }
+      override def apply(unit: CompilationUnit):Unit = {
+//        val values = new util.ArrayList[LoadedVisitor]()
+//        values.addAll(Globals.loadedVisitors.values.asJavaCollection)
+//        OrderUtil.reverseSort(values)
+//        for (loadedVisitor <- asScalaIterator(values.iterator())) {
+//          loadedVisitor.finish()
+//        }
       }
     }
   }

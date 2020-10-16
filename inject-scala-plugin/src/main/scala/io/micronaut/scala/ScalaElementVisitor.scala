@@ -6,7 +6,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import java.util.{List => JavaList}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.tools.nsc.Global
 
 class ScalaElementVisitor(concreteClass:Global#Symbol, visitors:List[LoadedVisitor]) {
