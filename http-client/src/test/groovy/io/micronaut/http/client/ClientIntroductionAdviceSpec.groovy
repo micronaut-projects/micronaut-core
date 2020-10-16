@@ -138,6 +138,34 @@ class ClientIntroductionAdviceSpec extends Specification {
         context.close()
     }
 
+    void "test execution of a default method 2"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        context.getBean(EmbeddedServer).start()
+        DefaultMethodClient2 myService = context.getBean(DefaultMethodClient2)
+        expect:
+        myService.index("ZZZ") == 'success ZZZ XYZ from default method'
+        myService.defaultMethod() == 'success from default method mutated'
+        myService.defaultMethod2("ABC") == 'success ABC XYZ from default method 2 mutated'
+
+        cleanup:
+        context.close()
+    }
+
+    void "test execution of a default method 3"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        context.getBean(EmbeddedServer).start()
+        DefaultMethodClient3 myService = context.getBean(DefaultMethodClient3)
+        expect:
+        myService.index("ZZZ") == 'success ZZZ XYZ from default method'
+        myService.defaultMethod() == 'success from default method mutated'
+        myService.defaultMethod2("ABC") == 'success ABC XYZ from default method 2 mutated'
+
+        cleanup:
+        context.close()
+    }
+
     @Controller('/aop')
     static class AopController implements MyApi {
         @Override
