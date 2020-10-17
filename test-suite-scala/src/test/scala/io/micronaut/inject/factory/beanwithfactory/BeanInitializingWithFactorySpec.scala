@@ -12,11 +12,11 @@ class BeanInitializingWithFactorySpec {
 
       val b = context.getBean(classOf[B])
 
-    // FIXME      assertThat(b.name).isEqualTo("CHANGED")
+      assertThat(b.name).isEqualTo("CHANGED")
 
       val listener = context.getBean(classOf[DualListener])
 
-    // FIXME       assertThat(listener.initialized).isTrue
-    // FIXME     assertThat(listener.created).isTrue
+      assertThat(listener.initialized).isTrue
+      assertThat(listener.created).isTrue
   }
 }

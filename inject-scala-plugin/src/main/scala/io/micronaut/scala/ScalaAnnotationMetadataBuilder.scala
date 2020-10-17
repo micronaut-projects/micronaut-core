@@ -225,8 +225,9 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[E
 //      annotationValue.asInstanceOf[AnnotationValue].accept(resolver, this)
       val resolvedValue = annotationValue.toString
       if (resolvedValue != null) {
-        validateAnnotationValue(originatingElement, annotationName, member, memberName, resolvedValue)
-        annotationValues.put(memberName, resolvedValue)
+        val resolvedAnnotationValue = new AnnotationClassValue(resolvedValue)
+        validateAnnotationValue(originatingElement, annotationName, member, memberName, resolvedAnnotationValue)
+        annotationValues.put(memberName, resolvedAnnotationValue)
       }
 //    }
   }

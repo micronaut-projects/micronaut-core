@@ -709,7 +709,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
   }
 
   def visit(): Unit = {
-    if (concreteClass.symbol.annotations.nonEmpty && !concreteClass.symbol.isAbstractType) {
+    if (!concreteClass.symbol.isAbstractType) {
       val concreteClassMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(concreteClass.symbol))
 
       val beanDefinitionWriter = new BeanDefinitionWriter(
@@ -736,7 +736,11 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
         constructorParameterInfo.genericTypes
       )
 
+
+
       visitType(concreteClass, Globals.metadataBuilder.getOrCreate(SymbolFacade(concreteClass.symbol)))
+
+      visitTypeArguments(concreteClass, beanDefinitionWriter)
 
       concreteClass.impl.body.foreach {
         case defDef: Global#DefDef if !defDef.symbol.isConstructor => {
@@ -752,6 +756,19 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       beanDefinitionWriter.accept(visitorContext)
 
       beanDefinitionReferenceWriter.accept(visitorContext)
+    }
+  }
+
+  def visitTypeArguments(typeElement:Global#ClassDef, beanDefinitionWriter:BeanDefinitionWriter) {
+    val typeArguments = new util.HashMap[String, util.Map[String, AnyRef]]()
+    typeElement.impl.parents.foreach( cls => {
+      val map = Globals.genericTypesForTree(cls.toString, cls)
+      if (!map.isEmpty) {
+        typeArguments.put(Globals.argTypeForTree(cls).toString, map)
+       }
+    })
+    if (!typeArguments.isEmpty) {
+      beanDefinitionWriter.visitTypeArguments(typeArguments);
     }
   }
 }

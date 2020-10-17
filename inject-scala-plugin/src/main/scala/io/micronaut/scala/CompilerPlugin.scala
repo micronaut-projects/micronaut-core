@@ -24,7 +24,7 @@ class CompilerPlugin(override val global: Global)
 class InitPluginComponent(val global: Global) extends PluginComponent {
   import global._
   override val phaseName = "compiler-plugin-type-element-init"
-  override val runsAfter = List("jvm")
+  override val runsAfter = List("explicitouter")
   override def newPhase(prev: Phase) =
     new StdPhase(prev) {
       override def apply(unit: CompilationUnit):Unit = {

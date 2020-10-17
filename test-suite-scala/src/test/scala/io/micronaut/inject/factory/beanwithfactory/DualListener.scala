@@ -4,7 +4,7 @@ import io.micronaut.context.event.{BeanCreatedEvent, BeanCreatedEventListener, B
 import javax.inject.Singleton
 
 @Singleton
-class DualListener extends BeanCreatedEventListener[BFactory] with BeanInitializedEventListener [BFactory ]{
+class DualListener extends BeanCreatedEventListener[BFactory] with BeanInitializedEventListener[BFactory]{
   var initialized = false
   var created = false
 

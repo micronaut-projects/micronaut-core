@@ -41,7 +41,7 @@ class SecondarySpec {
   def `test the @Secondary annotation influences bean selection`(): Unit = {
     val context = BeanContext.run()
 
-    val b = context.getBean(classOf[B])
+     val b = context.getBean(classOf[B])
 
     assertThat(b.getAll.size).isEqualTo(2)
     assertThat(b.getAll.stream().anyMatch( _.isInstanceOf[A1])).isTrue

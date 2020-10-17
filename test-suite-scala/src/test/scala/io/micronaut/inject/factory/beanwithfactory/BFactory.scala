@@ -10,9 +10,9 @@ class BFactory {
   private[beanwithfactory] var postConstructCalled = false
   private[beanwithfactory] var getCalled = false
 
-  @Inject private val fieldA:A = null
+  @Inject private var fieldA:A = null
   @Inject protected var anotherField: A = null
-  @Inject private[beanwithfactory] val a:A = null
+  @Inject private[beanwithfactory] var a:A = null
 
   private var methodInjected:A = null
 
