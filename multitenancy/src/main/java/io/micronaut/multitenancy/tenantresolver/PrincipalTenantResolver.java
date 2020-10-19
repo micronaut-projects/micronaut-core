@@ -53,6 +53,7 @@ public class PrincipalTenantResolver implements TenantResolver, HttpRequestTenan
      * @deprecated Use {@link PrincipalTenantResolver#resolveTenantIdentifier(HttpRequest)} instead;
      */
     @Deprecated
+    @NonNull
     protected Serializable resolveTenantIdentifierAtRequest(HttpRequest<Object> request) throws TenantNotFoundException {
         return resolveTenantIdentifier(request);
     }

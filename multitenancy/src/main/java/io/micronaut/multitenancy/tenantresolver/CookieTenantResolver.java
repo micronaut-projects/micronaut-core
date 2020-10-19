@@ -66,6 +66,7 @@ public class CookieTenantResolver implements TenantResolver, HttpRequestTenantRe
     }
 
     @Override
+    @NonNull
     public Serializable resolveTenantIdentifier(@NonNull @NotNull HttpRequest<?> request) throws TenantNotFoundException {
         if (request.getCookies() != null) {
             Optional<Cookie> optionalTenantId = request.getCookies().findCookie(cookiename);

@@ -73,6 +73,7 @@ public class SessionTenantResolver implements TenantResolver, HttpRequestTenantR
     }
 
     @Override
+    @NonNull
     public Serializable resolveTenantIdentifier(@NonNull @NotNull HttpRequest<?> request) throws TenantNotFoundException {
         if (this.attribute == null) {
             throw new TenantNotFoundException("Tenant could not be resolved from HTTP Session, because session attribute name is not set");

@@ -35,5 +35,6 @@ public interface HttpRequestTenantResolver {
      * @return The tenant identifier
      * @throws TenantNotFoundException if tenant not found
      */
+    @NonNull
     Serializable resolveTenantIdentifier(@NonNull @NotNull HttpRequest<?> request) throws TenantNotFoundException;
 }

@@ -39,6 +39,7 @@ import java.util.Optional;
 public class SubdomainTenantResolver implements TenantResolver, HttpRequestTenantResolver {
 
     @Override
+    @NonNull
     public Serializable resolveTenantIdentifier() {
         Optional<HttpRequest<Object>> current = ServerRequestContext.currentRequest();
         return current.map(this::resolveTenantIdentifierAtRequest).orElseThrow(() -> new TenantNotFoundException("Tenant could not be resolved outside a web request"));
@@ -57,6 +58,7 @@ public class SubdomainTenantResolver implements TenantResolver, HttpRequestTenan
     }
 
     @Override
+    @NonNull
     public Serializable resolveTenantIdentifier(@NonNull @NotNull HttpRequest<?> request) throws TenantNotFoundException {
         if (request.getHeaders() != null) {
             String host = request.getHeaders().get(HttpHeaders.HOST);

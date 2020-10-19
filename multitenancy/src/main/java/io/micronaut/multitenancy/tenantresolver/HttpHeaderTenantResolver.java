@@ -65,6 +65,7 @@ public class HttpHeaderTenantResolver implements TenantResolver, HttpRequestTena
     }
 
     @Override
+    @NonNull
     public Serializable resolveTenantIdentifier(@NonNull @NotNull HttpRequest<?> request) throws TenantNotFoundException {
         String tenantId = request.getHeaders().get(headerName);
         if (tenantId == null) {
