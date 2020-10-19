@@ -26,6 +26,7 @@ import java.io.Serializable;
  * @author Sergio del Amo
  * @since 1.0
  */
+@FunctionalInterface
 public interface TenantResolver {
 
     String PREFIX = MultitenancyConfiguration.PREFIX + ".tenantresolver";
