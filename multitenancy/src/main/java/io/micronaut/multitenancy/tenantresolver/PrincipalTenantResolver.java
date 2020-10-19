@@ -15,6 +15,7 @@
  */
 package io.micronaut.multitenancy.tenantresolver;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
@@ -23,6 +24,7 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.multitenancy.exceptions.TenantNotFoundException;
 
 import javax.inject.Singleton;
+import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.security.Principal;
 import java.util.Optional;
@@ -35,7 +37,7 @@ import java.util.Optional;
  */
 @Singleton
 @Requires(property = PrincipalTenantResolverConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
-public class PrincipalTenantResolver implements TenantResolver {
+public class PrincipalTenantResolver implements TenantResolver, HttpRequestTenantResolver {
 
     @Override
     public Serializable resolveTenantIdentifier() {
@@ -48,11 +50,18 @@ public class PrincipalTenantResolver implements TenantResolver {
      * @param request The HTTP request
      * @return the tenant ID if resolved.
      * @throws TenantNotFoundException if tenant not found
+     * @deprecated Use {@link PrincipalTenantResolver#resolveTenantIdentifier(HttpRequest)} instead;
      */
+    @Deprecated
     protected Serializable resolveTenantIdentifierAtRequest(HttpRequest<Object> request) throws TenantNotFoundException {
+        return resolveTenantIdentifier(request);
+    }
+
+    @Override
+    public Serializable resolveTenantIdentifier(@NonNull @NotNull HttpRequest<?> request) throws TenantNotFoundException {
         return request.getUserPrincipal().map(Principal::getName)
-                      .orElseThrow(() ->
-                              new TenantNotFoundException("Tenant could not be resolved because " + HttpAttributes.PRINCIPAL + " attribute was not found")
-                      );
+                .orElseThrow(() ->
+                        new TenantNotFoundException("Tenant could not be resolved because " + HttpAttributes.PRINCIPAL + " attribute was not found")
+                );
     }
 }

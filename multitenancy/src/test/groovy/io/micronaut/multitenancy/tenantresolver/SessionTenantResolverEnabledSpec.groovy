@@ -36,5 +36,9 @@ class SessionTenantResolverEnabledSpec extends Specification {
 
         then:
         noExceptionThrown()
+
+        and:
+        context.containsBean(HttpRequestTenantResolver)
+        context.getBean(HttpRequestTenantResolver) instanceof SessionTenantResolver
     }
 }

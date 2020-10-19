@@ -15,6 +15,7 @@
  */
 package io.micronaut.multitenancy.tenantresolver;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
@@ -22,6 +23,7 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.multitenancy.exceptions.TenantNotFoundException;
 
 import javax.inject.Singleton;
+import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.util.Optional;
 
@@ -34,7 +36,7 @@ import java.util.Optional;
 @Singleton
 @Requires(beans = HttpHeaderTenantResolverConfiguration.class)
 @Requires(property = HttpHeaderTenantResolverConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
-public class HttpHeaderTenantResolver implements TenantResolver {
+public class HttpHeaderTenantResolver implements TenantResolver, HttpRequestTenantResolver {
 
     /**
      * The name of the header.
@@ -62,20 +64,24 @@ public class HttpHeaderTenantResolver implements TenantResolver {
         return current.map(this::resolveTenantIdentifierAtRequest).orElseThrow(() -> new TenantNotFoundException("Tenant could not be resolved outside a web request"));
     }
 
+    @Override
+    public Serializable resolveTenantIdentifier(@NonNull @NotNull HttpRequest<?> request) throws TenantNotFoundException {
+        String tenantId = request.getHeaders().get(headerName);
+        if (tenantId == null) {
+            throw new TenantNotFoundException("Tenant could not be resolved. Header " + headerName + " value is null");
+        }
+        return tenantId;
+    }
+
     /**
      *
      * @param request The HTTP request
      * @return the tenant ID if resolved.
      * @throws TenantNotFoundException A exception thrown if the tenant could not be resolved.
+     * @deprecated Use {@link HttpHeaderTenantResolver#resolveTenantIdentifier(HttpRequest)} instead.
      */
+    @Deprecated
     protected Serializable resolveTenantIdentifierAtRequest(HttpRequest<Object> request) throws TenantNotFoundException {
-        if (request.getHeaders() != null) {
-            String tenantId = request.getHeaders().get(headerName);
-            if (tenantId == null) {
-                throw new TenantNotFoundException("Tenant could not be resolved. Header " + headerName + " value is null");
-            }
-            return tenantId;
-        }
-        throw new TenantNotFoundException("Tenant could not be resolved from HTTP Header: " + headerName);
+        return resolveTenantIdentifier(request);
     }
 }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.multitenancy.tenantresolver;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
@@ -23,6 +24,7 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.multitenancy.exceptions.TenantNotFoundException;
 
 import javax.inject.Singleton;
+import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.util.Optional;
 
@@ -35,7 +37,7 @@ import java.util.Optional;
 @Singleton
 @Requires(beans = CookieTenantResolverConfiguration.class)
 @Requires(property = CookieTenantResolverConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
-public class CookieTenantResolver implements TenantResolver {
+public class CookieTenantResolver implements TenantResolver, HttpRequestTenantResolver {
 
     /**
      * The name of the header.
@@ -63,13 +65,8 @@ public class CookieTenantResolver implements TenantResolver {
         return current.map(this::resolveTenantIdentifierAtRequest).orElseThrow(() -> new TenantNotFoundException("Tenant could not be resolved outside a web request"));
     }
 
-    /**
-     *
-     * @param request The HTTP request
-     * @return the tenant ID if resolved.
-     * @throws TenantNotFoundException A exception thrown if the tenant could not be resolved.
-     */
-    protected Serializable resolveTenantIdentifierAtRequest(HttpRequest<Object> request) throws TenantNotFoundException {
+    @Override
+    public Serializable resolveTenantIdentifier(@NonNull @NotNull HttpRequest<?> request) throws TenantNotFoundException {
         if (request.getCookies() != null) {
             Optional<Cookie> optionalTenantId = request.getCookies().findCookie(cookiename);
             if (optionalTenantId.isPresent()) {
@@ -77,5 +74,17 @@ public class CookieTenantResolver implements TenantResolver {
             }
         }
         throw new TenantNotFoundException("Tenant could not be resolved from the Cookie: " + cookiename);
+    }
+
+    /**
+     *
+     * @param request The HTTP request
+     * @return the tenant ID if resolved.
+     * @throws TenantNotFoundException A exception thrown if the tenant could not be resolved.
+     * @deprecated Use {@link CookieTenantResolver#resolveTenantIdentifier(HttpRequest)} instead.
+     */
+    @Deprecated
+    protected Serializable resolveTenantIdentifierAtRequest(HttpRequest<Object> request) throws TenantNotFoundException {
+        return resolveTenantIdentifier(request);
     }
 }
