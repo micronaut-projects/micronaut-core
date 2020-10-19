@@ -31,6 +31,8 @@ import io.micronaut.inject.writer.ClassGenerationException;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
+
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -351,9 +353,16 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         writers.put(writer.getBeanType().getClassName(), writer);
     }
 
-    private void processBeanProperties(BeanIntrospectionWriter writer, Collection<? extends PropertyElement> beanProperties, Set<String> includes, Set<String> excludes, Set<String> ignored, Set<AnnotationValue> indexedAnnotations, boolean metadata) {
+    private void processBeanProperties(
+            BeanIntrospectionWriter writer,
+            Collection<? extends PropertyElement> beanProperties,
+            Set<String> includes,
+            Set<String> excludes,
+            Set<String> ignored,
+            Set<AnnotationValue> indexedAnnotations,
+            boolean metadata) {
         for (PropertyElement beanProperty : beanProperties) {
-            final ClassElement type = beanProperty.getType();
+            final ClassElement type = beanProperty.getGenericType();
 
             final String name = beanProperty.getName();
             if (!includes.isEmpty() && !includes.contains(name)) {

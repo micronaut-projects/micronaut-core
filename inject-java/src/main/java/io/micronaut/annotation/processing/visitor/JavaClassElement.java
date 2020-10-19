@@ -296,6 +296,14 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                             value.type,
                             value.setter == null,
                             visitorContext) {
+
+                        @Override
+                        public ClassElement getGenericType() {
+                            TypeMirror returnType = value.getter.getReturnType();
+                            Map<String, Map<String, TypeMirror>> declaredGenericInfo = getGenericTypeInfo();
+                            return parameterizedClassElement(returnType, visitorContext, declaredGenericInfo);
+                        }
+
                         @Override
                         public Optional<String> getDocumentation() {
                             Elements elements = visitorContext.getElements();
