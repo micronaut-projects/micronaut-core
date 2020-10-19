@@ -147,6 +147,34 @@ interface Foo {
         def test = introspection.instantiate("test")
 
         then:
+        introspection.constructorArguments.length == 1
+        introspection.getRequiredProperty("name", String)
+                .get(test) == 'test'
+    }
+
+    void "test bean introspection with property with static creator method on interface with generic type arguments"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+
+@io.micronaut.core.annotation.Introspected
+interface Foo<T> {
+    String getName();
+    
+    @Creator
+    static <T1> Foo<T1> create(String name) {
+        return () -> name;
+    }
+}
+
+''')
+        when:
+        def test = introspection.instantiate("test")
+
+        then:
+        introspection.constructorArguments.length == 1
         introspection.getRequiredProperty("name", String)
                 .get(test) == 'test'
     }

@@ -38,7 +38,7 @@ import java.lang.reflect.Method;
 @Internal
 public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> implements MethodInvocationContext<T, R> {
 
-    private final static Object[] EMPTY_ARRAY = new Object[0];
+    private static final Object[] EMPTY_ARRAY = new Object[0];
 
     /**
      * Constructor for empty parameters.
