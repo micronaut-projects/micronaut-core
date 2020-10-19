@@ -28,6 +28,7 @@ import java.io.Serializable;
  * @author Sergio del Amo
  * @since 2.1.2
  */
+@FunctionalInterface
 public interface HttpRequestTenantResolver {
     /**
      * Resolves the current tenant identifier.
