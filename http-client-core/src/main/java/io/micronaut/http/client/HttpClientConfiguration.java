@@ -17,7 +17,6 @@ package io.micronaut.http.client;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.ArgumentUtils;
@@ -28,7 +27,6 @@ import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import javax.inject.Inject;
 import java.net.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -40,8 +38,8 @@ import java.util.concurrent.ThreadFactory;
 /**
  * Configuration for the {@link HttpClient}. This configuration only takes affect for {@link HttpClient}
  * instances created outside the application context using {@link HttpClient#create(URL, HttpClientConfiguration)}.
- * For clients created within the context using, e.g. {@link Inject} or
- * {@link ApplicationContext#createBean(Class)}, use event loop group configuration.
+ * For clients created within the context using, e.g. {@link javax.inject.Inject} or
+ * {@link io.micronaut.context.ApplicationContext#createBean(Class)}, use event loop group configuration.
  *
  * @author Graeme Rocher
  * @since 1.0
