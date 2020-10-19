@@ -60,6 +60,7 @@ public class CookieTenantResolver implements TenantResolver, HttpRequestTenantRe
      * @throws TenantNotFoundException if tenant not found
      */
     @Override
+    @NonNull
     public Serializable resolveTenantIdentifier() throws TenantNotFoundException {
         Optional<HttpRequest<Object>> current = ServerRequestContext.currentRequest();
         return current.map(this::resolveTenantIdentifierAtRequest).orElseThrow(() -> new TenantNotFoundException("Tenant could not be resolved outside a web request"));

@@ -39,6 +39,7 @@ import java.util.Optional;
 @Requires(property = PrincipalTenantResolverConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class PrincipalTenantResolver implements TenantResolver, HttpRequestTenantResolver {
 
+    @NonNull
     @Override
     public Serializable resolveTenantIdentifier() {
         Optional<HttpRequest<Object>> current = ServerRequestContext.currentRequest();
@@ -59,6 +60,7 @@ public class PrincipalTenantResolver implements TenantResolver, HttpRequestTenan
     }
 
     @Override
+    @NonNull
     public Serializable resolveTenantIdentifier(@NonNull @NotNull HttpRequest<?> request) throws TenantNotFoundException {
         return request.getUserPrincipal().map(Principal::getName)
                 .orElseThrow(() ->
