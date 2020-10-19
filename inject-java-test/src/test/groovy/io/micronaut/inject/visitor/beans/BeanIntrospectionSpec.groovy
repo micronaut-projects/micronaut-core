@@ -87,6 +87,38 @@ interface GenBase<T> {
         def test = introspection.instantiate()
 
         then:
+        introspection.beanProperties.first().type == String
+        introspection.getRequiredProperty("name", String)
+                .get(test) == 'test'
+    }
+
+    void "test bean introspection with property of generic superclass"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Foo extends GenBase<String> {
+    public String getName() {
+        return "test";
+    }
+}
+
+abstract class GenBase<T> {
+    abstract T getName();
+    
+    public T getOther() {
+        return (T) "other";
+    }
+}
+''')
+        when:
+        def test = introspection.instantiate()
+
+        def beanProperties = introspection.beanProperties.toList()
+        then:
+        beanProperties[0].type == String
+        beanProperties[1].type == String
         introspection.getRequiredProperty("name", String)
                 .get(test) == 'test'
     }
