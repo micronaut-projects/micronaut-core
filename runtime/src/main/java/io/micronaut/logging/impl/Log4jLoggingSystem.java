@@ -28,6 +28,7 @@ import javax.inject.Singleton;
  * An implementation of {@link LoggingSystem} that works with Log4j.
  *
  * @author Matteo Vaccari
+ * @since 2.2.0
  */
 @Singleton
 @Requires(classes = Configurator.class)

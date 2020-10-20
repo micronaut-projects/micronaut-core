@@ -37,6 +37,7 @@ import static java.util.stream.Collectors.toList;
  * An implementation of {@link ManagedLoggingSystem} that works with logback.
  *
  * @author Matteo Vaccari, Matthew Moss
+ * @since 2.2.0
  */
 @Singleton
 @Requires(beans = LoggersEndpoint.class)
