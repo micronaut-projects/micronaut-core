@@ -22,6 +22,7 @@ import javax.lang.model.`type`.{TypeKind, TypeMirror}
 import javax.lang.model.element.ElementKind.FIELD
 import javax.lang.model.element.{ExecutableElement, Name, PackageElement, TypeElement, VariableElement}
 
+import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 import scala.collection.mutable
 import scala.tools.nsc.Global
 
@@ -759,14 +760,48 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
     }
   }
 
-  def visitTypeArguments(typeElement:Global#ClassDef, beanDefinitionWriter:BeanDefinitionWriter) {
+  def visitTypeArguments(typeElement:Global#ClassDef, beanDefinitionWriter:BeanDefinitionWriter):Unit = {
     val typeArguments = new util.HashMap[String, util.Map[String, AnyRef]]()
-    typeElement.impl.parents.foreach( cls => {
-      val map = Globals.genericTypesForTree(cls.toString, cls)
-      if (!map.isEmpty) {
-        typeArguments.put(Globals.argTypeForTree(cls).toString, map)
-       }
-    })
+    typeElement.symbol.baseClasses.filter(!_.isRoot).foreach {
+        case classSymbol:Global#ClassSymbol => {
+          if (classSymbol.isJava) {
+            val map = Globals.genericTypesForSymbol(classSymbol)
+            if (!map.isEmpty) {
+              typeArguments.put(Globals.argTypeForTypeSymbol(classSymbol, List()).toString, map)
+            }
+          } else {
+            val typeCtor = classSymbol.originalInfo.typeConstructor
+
+            typeCtor.parents.foreach{ parent =>
+              val args = parent.typeArgs
+              val params = parent.typeSymbol.originalInfo.typeParams
+
+              (args, params).zipped.foreach{ (arg, param) =>
+                arg match {
+                  case absTypeRef:Global#AbstractTypeRef => {
+                    val asStr = absTypeRef.toString()
+                    val valueList = typeArguments.values().toList
+                    valueList.foreach{ otherMap =>
+                      if (otherMap.containsKey(asStr)) {
+                        val map = typeArguments.computeIfAbsent(parent.typeSymbol.fullName, key => new util.HashMap[String, AnyRef]() )
+                        map.put(param.nameString, otherMap.get(asStr))
+                      }
+                    }
+                  }
+                  case typeRef:Global#ArgsTypeRef => {
+                    val map = typeArguments.computeIfAbsent(parent.typeSymbol.fullName, key => new util.HashMap[String, AnyRef]() )
+                    map.put(param.nameString, Globals.argTypeForTypeSymbol(typeRef.typeSymbol, typeRef.args))
+                  }
+                  case _ => {
+                    val map = typeArguments.computeIfAbsent(parent.typeSymbol.fullName, key => new util.HashMap[String, AnyRef]() )
+                    map.put(param.nameString, Globals.argTypeForTypeSymbol(arg.typeSymbol, List()))
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
     if (!typeArguments.isEmpty) {
       beanDefinitionWriter.visitTypeArguments(typeArguments);
     }
