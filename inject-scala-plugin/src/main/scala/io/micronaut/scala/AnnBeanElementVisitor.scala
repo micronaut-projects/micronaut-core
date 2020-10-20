@@ -5,22 +5,18 @@ import java.util
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicInteger
 
-import io.micronaut.annotation.processing.ExecutableElementParamInfo
 import io.micronaut.aop.writer.AopProxyWriter
 import io.micronaut.context.annotation._
 import io.micronaut.core.annotation.{AnnotationMetadata, AnnotationValue, Internal}
 import io.micronaut.core.naming.NameUtils
-import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.{AnnotationMetadataHierarchy, DefaultAnnotationMetadata}
 import io.micronaut.inject.configuration.PropertyMetadata
 import io.micronaut.inject.processing.ProcessedTypes
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.{BeanDefinitionReferenceWriter, BeanDefinitionVisitor, BeanDefinitionWriter, ExecutableMethodWriter}
 import io.micronaut.scala.AnnBeanElementVisitor._
+import io.micronaut.scala.TypeFunctions._
 import javax.inject.{Inject, Qualifier, Scope}
-import javax.lang.model.`type`.{TypeKind, TypeMirror}
-import javax.lang.model.element.ElementKind.FIELD
-import javax.lang.model.element.{ExecutableElement, Name, PackageElement, TypeElement, VariableElement}
 
 import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 import scala.collection.mutable
@@ -117,7 +113,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       beanDefinitionWriter.visitPostConstructMethod(
         concreteClass.symbol.fullName,
         requiresReflection,
-        Globals.argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]),
+        argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]),
         method.symbol.nameString,
         params.parameters,
         params.parameterMetadata,
@@ -130,7 +126,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       beanDefinitionWriter.visitPreDestroyMethod(
             concreteClass.symbol.fullName,
             requiresReflection,
-            Globals.argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]),
+            argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]),
             method.symbol.nameString,
             params.parameters,
             params.parameterMetadata,
@@ -141,7 +137,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
        beanDefinitionWriter.visitMethodInjectionPoint(
         concreteClass.symbol.fullName,
         requiresReflection,
-        Globals.argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]),
+        argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]),
         method.symbol.nameString,
         params.parameters,
         params.parameterMetadata,
@@ -441,7 +437,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
 
   private def visitConfigurationPropertySetter(method: Global#DefDef, methodAnnotationMetadata:AnnotationMetadata, beanDefinitionVisitor: BeanDefinitionVisitor): Unit = {
     val parameter = method.vparamss.head.head
-    val fieldType = Globals.argTypeForValDef(parameter)
+    val fieldType = argTypeForValDef(parameter)
 //    val fieldType: Any = Globals.argTypeForTree(valueType.)
     var genericTypes: util.Map[String, AnyRef] = Collections.emptyMap()
 //    val typeKind: TypeKind = valueType.getKind
@@ -476,7 +472,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
           }
         beanDefinitionVisitor.visitSetterValue(
           declaringClass,
-          Globals.argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]),
+          argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]),
           annotationMetadata,
           requiresReflection,
           fieldType,
@@ -522,7 +518,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       packageName,
       shortClassName,
       factoryMethodBeanDefinitionName,
-      Globals.argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]).toString, //modelUtils.resolveTypeReference(producedElement).toString,
+      argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]).toString, //modelUtils.resolveTypeReference(producedElement).toString,
       isInterface,
       originatingElement,
       annotationMetadata)
@@ -552,7 +548,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       val methodAnnotationMetadata: AnnotationMetadata = Globals.metadataBuilder.buildForParent(SymbolFacade(producedElement.typeSymbol), new SymbolFacade(beanMethod.symbol))
       beanMethodWriter.visitBeanFactoryMethod(
         beanMethodDeclaringType,
-        Globals.argTypeForTypeTree(beanMethod.tpt.asInstanceOf[Global#TypeTree]),
+        argTypeForTypeTree(beanMethod.tpt.asInstanceOf[Global#TypeTree]),
         beanMethodName,
         methodAnnotationMetadata,
         beanMethodParameters,
@@ -662,15 +658,15 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       val isPrivate = valDef.mods.isPrivate
       val requiresReflection = isPrivate // TODO || modelUtils.isInheritedAndNotPublic(this.concreteClass, declaringClass, variable)
 
-      val genericTypeMap = Globals.genericTypesForTree(
-        Globals.argTypeForTree(valDef.tpt).toString,
+      val genericTypeMap = genericTypesForTree(
+        argTypeForTree(valDef.tpt).toString,
         valDef.tpt
       )
 
       if (isValue) {
         beanDefinitionWriter.visitFieldValue(
           concreteClass.symbol.fullName,
-          Globals.argTypeForValDef(valDef),
+          argTypeForValDef(valDef),
           valDef.name.toString.trim,
           requiresReflection,
           fieldAnnotationMetadata,
@@ -679,7 +675,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       } else {
         beanDefinitionWriter.visitFieldInjectionPoint(
           concreteClass.symbol.fullName,
-          Globals.argTypeForValDef(valDef),
+          argTypeForValDef(valDef),
           valDef.name.toString.trim,
           requiresReflection,
           fieldAnnotationMetadata,
@@ -763,44 +759,37 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
   def visitTypeArguments(typeElement:Global#ClassDef, beanDefinitionWriter:BeanDefinitionWriter):Unit = {
     val typeArguments = new util.HashMap[String, util.Map[String, AnyRef]]()
     typeElement.symbol.baseClasses.filter(!_.isRoot).foreach {
-        case classSymbol:Global#ClassSymbol => {
-          if (classSymbol.isJava) {
-            val map = Globals.genericTypesForSymbol(classSymbol)
-            if (!map.isEmpty) {
-              typeArguments.put(Globals.argTypeForTypeSymbol(classSymbol, List()).toString, map)
-            }
-          } else {
-            val typeCtor = classSymbol.originalInfo.typeConstructor
+      case classSymbol:Global#ClassSymbol => {
+        val typeCtor = classSymbol.originalInfo.typeConstructor
 
-            typeCtor.parents.foreach{ parent =>
-              val args = parent.typeArgs
-              val params = parent.typeSymbol.originalInfo.typeParams
+        typeCtor.parents.foreach{ parent =>
+          val args = parent.typeArgs
+          val params = parent.typeSymbol.originalInfo.typeParams
 
-              (args, params).zipped.foreach{ (arg, param) =>
-                arg match {
-                  case absTypeRef:Global#AbstractTypeRef => {
-                    val asStr = absTypeRef.toString()
-                    val valueList = typeArguments.values().toList
-                    valueList.foreach{ otherMap =>
-                      if (otherMap.containsKey(asStr)) {
-                        val map = typeArguments.computeIfAbsent(parent.typeSymbol.fullName, key => new util.HashMap[String, AnyRef]() )
-                        map.put(param.nameString, otherMap.get(asStr))
-                      }
-                    }
-                  }
-                  case typeRef:Global#ArgsTypeRef => {
-                    val map = typeArguments.computeIfAbsent(parent.typeSymbol.fullName, key => new util.HashMap[String, AnyRef]() )
-                    map.put(param.nameString, Globals.argTypeForTypeSymbol(typeRef.typeSymbol, typeRef.args))
-                  }
-                  case _ => {
-                    val map = typeArguments.computeIfAbsent(parent.typeSymbol.fullName, key => new util.HashMap[String, AnyRef]() )
-                    map.put(param.nameString, Globals.argTypeForTypeSymbol(arg.typeSymbol, List()))
+          (args, params).zipped.foreach{ (arg, param) =>
+            arg match {
+              case absTypeRef:Global#AbstractTypeRef => {
+                val asStr = absTypeRef.toString()
+                val valueList = typeArguments.values().toList
+                valueList.foreach{ otherMap =>
+                  if (otherMap.containsKey(asStr)) {
+                    typeArguments.computeIfAbsent(parent.typeSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]() )
+                      .put(param.nameString, otherMap.get(asStr))
                   }
                 }
+              }
+              case typeRef:Global#ArgsTypeRef => {
+                typeArguments.computeIfAbsent(parent.typeSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]() )
+                  .put(param.nameString, argTypeForTypeSymbol(typeRef.sym, typeRef.args))
+              }
+              case _ => {
+                typeArguments.computeIfAbsent(parent.typeSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]() )
+                  .put(param.nameString, argTypeForTypeSymbol(arg.typeSymbol, List()))
               }
             }
           }
         }
+      }
     }
     if (!typeArguments.isEmpty) {
       beanDefinitionWriter.visitTypeArguments(typeArguments);

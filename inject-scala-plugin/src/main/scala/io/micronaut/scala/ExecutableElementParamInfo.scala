@@ -1,7 +1,6 @@
 package io.micronaut.scala
 
 import java.util
-import java.util.Map
 
 import io.micronaut.core.annotation.AnnotationMetadata
 
@@ -45,7 +44,7 @@ object ExecutableElementParamInfo {
 
           params.addAnnotationMetadata(valDef.name, valDefMetadata)
 
-          val argType = Globals.argTypeForValDef(valDef)
+          val argType = TypeFunctions.argTypeForValDef(valDef)
 
 //          if (/*isConstructBinding &&*/ Stream.of(classOf[Property], classOf[Value], classOf[Parameter]).noneMatch(annotationMetadata.hasAnnotation)) {
 //            val parameterElement = typeUtils.asElement(typeMirror)
@@ -57,7 +56,7 @@ object ExecutableElementParamInfo {
           valDef.tpt match {
             case typeTree:Global#TypeTree if typeTree.symbol.isClass || typeTree.symbol.isInterface => {
               params.addParameter(valDef.name, argType, argType)
-              val genericTypeMap = Globals.genericTypesForTypeTree(argType.toString, typeTree)
+              val genericTypeMap = TypeFunctions.genericTypesForTypeTree(argType.toString, typeTree)
               if (!genericTypeMap.isEmpty) {
                 params.addGenericTypes(valDef.name, genericTypeMap)
               }
