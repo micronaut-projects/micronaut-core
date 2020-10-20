@@ -135,6 +135,10 @@ public class JavaVisitorContext implements VisitorContext {
     @Override
     public Optional<ClassElement> getClassElement(String name) {
         TypeElement typeElement = elements.getTypeElement(name);
+        if (typeElement == null) {
+            // maybe inner class?
+            typeElement = elements.getTypeElement(name.replace('$', '.'));
+        }
         return Optional.ofNullable(typeElement).map(typeElement1 ->
                 new JavaClassElement(typeElement1, annotationUtils.getAnnotationMetadata(typeElement1), this, Collections.emptyMap())
         );

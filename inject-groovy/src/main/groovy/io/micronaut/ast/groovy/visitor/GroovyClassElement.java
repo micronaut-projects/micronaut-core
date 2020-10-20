@@ -80,6 +80,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     }
 
     @Override
+    public boolean isInner() {
+        return classNode instanceof InnerClassNode;
+    }
+
+    @Override
     public boolean isInterface() {
         return classNode.isInterface();
     }

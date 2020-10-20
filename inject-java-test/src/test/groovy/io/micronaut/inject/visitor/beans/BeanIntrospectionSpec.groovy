@@ -66,6 +66,85 @@ public record Foo(@javax.validation.constraints.NotBlank String name){
         property.get(test) == 'test'
     }
 
+    void "test create bean introspection for external inner class"() {
+        given:
+        ApplicationContext applicationContext = buildContext('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+import io.micronaut.inject.visitor.beans.*;
+
+@Introspected(classes=OuterBean.InnerBean.class)
+class Test {}
+''')
+
+        when:"the reference is loaded"
+        def clazz = applicationContext.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getBeanType() == OuterBean.InnerBean.class
+
+        when:
+        BeanIntrospection i = reference.load()
+
+        then:
+        i.propertyNames.length == 1
+        i.propertyNames[0] == 'name'
+
+        when:
+        def o = i.instantiate()
+
+        then:
+        def e = thrown(InstantiationException)
+        e.message == 'No default constructor exists'
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test create bean introspection for external inner interface"() {
+        given:
+        ApplicationContext applicationContext = buildContext('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+import io.micronaut.inject.visitor.beans.*;
+
+@Introspected(classes=OuterBean.InnerInterface.class)
+class Test {}
+''')
+
+        when:"the reference is loaded"
+        def clazz = applicationContext.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getBeanType() == OuterBean.InnerInterface.class
+
+        when:
+        BeanIntrospection i = reference.load()
+
+        then:
+        i.propertyNames.length == 1
+        i.propertyNames[0] == 'name'
+
+        when:
+        def o = i.instantiate()
+
+        then:
+        def e = thrown(InstantiationException)
+        e.message == 'No default constructor exists'
+
+        cleanup:
+        applicationContext.close()
+    }
 
     void "test bean introspection with property of generic interface"() {
         given:
