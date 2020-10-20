@@ -13,4 +13,8 @@ public class OuterBean {
             this.name = name;
         }
     }
+
+    public interface InnerInterface {
+        String getName();
+    }
 }

@@ -195,7 +195,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             for (AnnotationClassValue aClass : classes) {
                 final Optional<ClassElement> classElement = context.getClassElement(aClass.getName());
                 classElement.ifPresent(ce -> {
-                    if (!ce.isAbstract() && ce.isPublic() && !ce.hasStereotype(Introspected.class)) {
+                    if (ce.isPublic() && !ce.hasStereotype(Introspected.class)) {
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                                 element.getName(),
                                 index.getAndIncrement(),
@@ -294,7 +294,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             ClassElement ce,
             BeanIntrospectionWriter writer) {
         Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
-        if (ce.isAbstract() && !constructorElement.isPresent()) {
+        if (ce.isAbstract() && !constructorElement.isPresent() && ce.hasStereotype(Introspected.class)) {
             currentAbstractIntrospection = new AbstractIntrospection(
                     writer,
                     includes,

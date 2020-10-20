@@ -409,8 +409,8 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         final ModelUtils modelUtils = visitorContext.getModelUtils();
         ExecutableElement method = modelUtils.staticCreatorFor(classElement, annotationUtils);
         if (method == null) {
-            if (isInner() && !isPublic() || !isStatic()) {
-                // only public, non static inner classes can be constructed
+            if (isInner() && !isStatic()) {
+                // only static inner classes can be constructed
                 return Optional.empty();
             }
             method = modelUtils.concreteConstructorFor(classElement, annotationUtils);
@@ -425,8 +425,8 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         final ModelUtils modelUtils = visitorContext.getModelUtils();
         ExecutableElement method = modelUtils.defaultStaticCreatorFor(classElement, annotationUtils);
         if (method == null) {
-            if (isInner() && !isPublic() || !isStatic()) {
-                // only public, non static inner classes can be constructed
+            if (isInner() && !isStatic()) {
+                // only static inner classes can be constructed
                 return Optional.empty();
             }
             method = modelUtils.defaultConstructorFor(classElement);
