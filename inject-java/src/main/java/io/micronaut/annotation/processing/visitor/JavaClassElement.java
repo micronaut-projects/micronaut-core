@@ -98,6 +98,11 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     }
 
     @Override
+    public boolean isInner() {
+        return classElement.getNestingKind().isNested();
+    }
+
+    @Override
     public boolean isRecord() {
         return JavaModelUtils.isRecord(classElement);
     }
@@ -404,6 +409,10 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         final ModelUtils modelUtils = visitorContext.getModelUtils();
         ExecutableElement method = modelUtils.staticCreatorFor(classElement, annotationUtils);
         if (method == null) {
+            if (isInner() && !isPublic() || !isStatic()) {
+                // only public, non static inner classes can be constructed
+                return Optional.empty();
+            }
             method = modelUtils.concreteConstructorFor(classElement, annotationUtils);
         }
 
@@ -416,6 +425,10 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         final ModelUtils modelUtils = visitorContext.getModelUtils();
         ExecutableElement method = modelUtils.defaultStaticCreatorFor(classElement, annotationUtils);
         if (method == null) {
+            if (isInner() && !isPublic() || !isStatic()) {
+                // only public, non static inner classes can be constructed
+                return Optional.empty();
+            }
             method = modelUtils.defaultConstructorFor(classElement);
         }
         return createMethodElement(annotationUtils, method);

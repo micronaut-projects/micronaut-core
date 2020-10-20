@@ -47,6 +47,15 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Is this type an inner class.
+     * @return True if it is an inner class
+     * @since 2.1.2
+     */
+    default boolean isInner() {
+        return false;
+    }
+
+    /**
      * Whether this element is an enum.
      * @return True if it is an enum
      */
