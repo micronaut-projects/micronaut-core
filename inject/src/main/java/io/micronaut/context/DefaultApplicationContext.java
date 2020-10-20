@@ -189,7 +189,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @NonNull
     @Override
     public Collection<String> getPropertyEntries(@NonNull String name) {
-        return environment.getPropertyEntries(name);
+        return getEnvironment().getPropertyEntries(name);
     }
 
     @NonNull
