@@ -54,10 +54,10 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
 
   val beanDefinitionWriters = new mutable.HashMap[ElementFacade, BeanDefinitionVisitor]
 
-  private def concreteConstructorFor(classDef: Global#ClassDef): Option[Global#DefDef] = {
+  private def concreteConstructorFor(classDef: Global#ClassDef): Option[Global#Symbol] = {
     val constructors = classDef.impl.body.filter(_.symbol.isConstructor)
 
-    constructors.headOption.map(_.asInstanceOf[Global#DefDef])
+    constructors.headOption.map(_.symbol)
   }
 
   private def isExecutableThroughType(
@@ -68,9 +68,10 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
               annotationMetadataHierarchy.hasDeclaredStereotype(classOf[Executable]) ||
               declaredMetadata.hasStereotype(classOf[Executable])
 
-  private def visitAnnotatedMethod(method: Global#DefDef,
+  private def visitAnnotatedMethod(methodSymbol: Global#Symbol,
                                    annotationMetadata: AnnotationMetadata,
                                    beanDefinitionWriter: BeanDefinitionWriter): Unit = {
+
 //    val params = populateParameterData(null, method, Collections.emptyMap)
 //    val returnType = method.getReturnType
 //    val declaringClass = modelUtils.classElementFor(method)
@@ -103,9 +104,9 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
 //    }
 //    if (!requiresReflection && modelUtils.isInheritedAndNotPublic(this.concreteClass, declaringClass, method)) requiresReflection = true
 //
-    val requiresReflection = method.symbol.isPrivate // || isPackagePrivateAndPackagesDiffer
+    val requiresReflection = methodSymbol.isPrivate // || isPackagePrivateAndPackagesDiffer
 
-    val params = ExecutableElementParamInfo.populateParameterData(Some(method))
+    val params = ExecutableElementParamInfo.populateParameterData(Some(methodSymbol))
 
     if (annotationMetadata.hasDeclaredStereotype(ProcessedTypes.POST_CONSTRUCT)) {
       //      final AopProxyWriter aopWriter = resolveAopWriter(writer);
@@ -113,8 +114,12 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       beanDefinitionWriter.visitPostConstructMethod(
         concreteClass.symbol.fullName,
         requiresReflection,
-        argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]),
-        method.symbol.nameString,
+        argTypeForTypeSymbol(
+          methodSymbol.originalInfo.resultType.typeSymbol,
+          methodSymbol.originalInfo.resultType.typeArgs,
+          false
+        ),
+        methodSymbol.nameString,
         params.parameters,
         params.parameterMetadata,
         params.genericTypes,
@@ -126,8 +131,12 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       beanDefinitionWriter.visitPreDestroyMethod(
             concreteClass.symbol.fullName,
             requiresReflection,
-            argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]),
-            method.symbol.nameString,
+            argTypeForTypeSymbol(
+              methodSymbol.originalInfo.resultType.typeSymbol,
+              methodSymbol.originalInfo.resultType.typeArgs,
+          false
+            ),
+            methodSymbol.nameString,
             params.parameters,
             params.parameterMetadata,
             params.genericTypes,
@@ -137,8 +146,12 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
        beanDefinitionWriter.visitMethodInjectionPoint(
         concreteClass.symbol.fullName,
         requiresReflection,
-        argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]),
-        method.symbol.nameString,
+         argTypeForTypeSymbol(
+           methodSymbol.originalInfo.resultType.typeSymbol,
+           methodSymbol.originalInfo.resultType.typeArgs,
+           false
+         ),
+         methodSymbol.nameString,
         params.parameters,
         params.parameterMetadata,
         params.genericTypes,
@@ -244,10 +257,10 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
     }
   }
 
-  private def visitExecutableMethod(method: Global#DefDef, methodAnnotationMetadata: AnnotationMetadata, beanDefinitionWriter: BeanDefinitionWriter):Unit = {
-    val returnType = method.symbol.thisType
+  private def visitExecutableMethod(methodSymbol: Global#Symbol, methodAnnotationMetadata: AnnotationMetadata, beanDefinitionWriter: BeanDefinitionWriter):Unit = {
+    val returnType = methodSymbol.thisType
 
-    val declaringClass = method.symbol.owner
+    val declaringClass = methodSymbol.owner
     if (declaringClass == null || declaringClass.isRoot) {
       return
     }
@@ -267,14 +280,14 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
 
     val resolvedReturnType: Any = returnType //modelUtils.resolveTypeReference(returnType)
 
-    val enclosingElement = method.symbol.enclClass
+    val enclosingElement = methodSymbol.enclClass
 
 //    var boundTypes: Map[String, AnyRef] = genericUtils.buildGenericTypeArgumentInfo(concreteClass).get(enclosingElement.getQualifiedName.toString)
 //    if (boundTypes == null) {
 //     var boundTypes: Map[String, AnyRef]  = Collections.emptyMap()
 //    }
 
-    val params = ExecutableElementParamInfo.populateParameterData(Some(method)) //, boundTypes)
+    val params = ExecutableElementParamInfo.populateParameterData(Some(methodSymbol)) //, boundTypes)
 
     // This method requires pre-processing. See Executable#processOnStartup()
     val preprocess: Boolean = methodAnnotationMetadata.isTrue(classOf[Executable], "processOnStartup")
@@ -295,7 +308,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
         resolvedReturnType,
         resolvedReturnType,
         returnTypeGenerics,
-        method.name.toString,
+        methodSymbol.nameString,
         params.parameters,
         params.genericParameters,
         params.parameterMetadata,
@@ -314,7 +327,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
     // shouldn't visit around advice on an introduction advice instance
     if (!((beanDefinitionWriter.isInstanceOf[AopProxyWriter]))) {
       val isConcrete: Boolean = concreteClass.symbol.isConcreteClass
-      val isPublic: Boolean = method.symbol.isPublic || method.symbol.hasPackageFlag
+      val isPublic: Boolean = methodSymbol.isPublic || methodSymbol.hasPackageFlag
 //      if ((isAopProxyType && isPublic) || (!(isAopProxyType) && methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) || (methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE) && isConcrete)) {
 //        val interceptorTypes: Array[AnyRef] = methodAnnotationMetadata.getAnnotationNamesByStereotype(AROUND_TYPE).toArray
 //        val settings: OptionalValues[Boolean] = methodAnnotationMetadata.getValues(AROUND_TYPE, classOf[Boolean])
@@ -373,7 +386,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
             resolvedReturnType,
             resolvedReturnType,
             returnTypeGenerics,
-            method.name.toString,
+            methodSymbol.nameString,
             params.parameters,
             params.genericParameters,
             params.parameterMetadata,
@@ -385,30 +398,30 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       }
    }
 
-  private def  visitExecutable(method: Global#DefDef,
+  private def  visitExecutable(methodSymbol: Global#Symbol,
                                    beanDefinitionWriter: BeanDefinitionWriter):Unit = {
-    val annotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(method.symbol))
+    val annotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(methodSymbol))
 
     val methodAnnotationMetadata = if (annotationMetadata.isInstanceOf[AnnotationMetadataHierarchy]) annotationMetadata
     else new AnnotationMetadataHierarchy(concreteClassMetadata, annotationMetadata)
 
     if (isFactoryType && methodAnnotationMetadata.hasDeclaredStereotype(classOf[Bean], classOf[Scope]) /* && (returnKind eq TypeKind.DECLARED) */) {
-      visitBeanFactoryMethod(method, methodAnnotationMetadata)
+      visitBeanFactoryMethod(methodSymbol, methodAnnotationMetadata)
     } else {
       val injected = annotationMetadata.hasDeclaredStereotype(classOf[Inject])
       val postConstruct = annotationMetadata.hasDeclaredStereotype(ProcessedTypes.POST_CONSTRUCT)
       val preDestroy = annotationMetadata.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY)
       if (injected || postConstruct || preDestroy || annotationMetadata.hasDeclaredStereotype(classOf[ConfigurationInject])) {
         if (isDeclaredBean) {
-          visitAnnotatedMethod(method, annotationMetadata, beanDefinitionWriter)
+          visitAnnotatedMethod(methodSymbol, annotationMetadata, beanDefinitionWriter)
         } else if (injected) { // DEPRECATE: This behaviour should be deprecated in 2.0
-          visitAnnotatedMethod(method, annotationMetadata, beanDefinitionWriter)
+          visitAnnotatedMethod(methodSymbol, annotationMetadata, beanDefinitionWriter)
         }
       }
 
-      val hasInvalidModifiers = method.symbol.isAbstract || method.symbol.isStatic || method.symbol.isPrivate || methodAnnotationMetadata.hasAnnotation(classOf[Internal])
-      val isPublic = method.symbol.isPublic && !hasInvalidModifiers
-      val isExecutable = !hasInvalidModifiers && (isExecutableThroughType(method.symbol.owner.asInstanceOf[Global#ClassSymbol], methodAnnotationMetadata, annotationMetadata, isPublic) || annotationMetadata.hasStereotype(AROUND_TYPE))
+      val hasInvalidModifiers = methodSymbol.isAbstract || methodSymbol.isStatic || methodSymbol.isPrivate || methodAnnotationMetadata.hasAnnotation(classOf[Internal])
+      val isPublic = methodSymbol.isPublic && !hasInvalidModifiers
+      val isExecutable = !hasInvalidModifiers && (isExecutableThroughType(methodSymbol.owner.asInstanceOf[Global#ClassSymbol], methodAnnotationMetadata, annotationMetadata, isPublic) || annotationMetadata.hasStereotype(AROUND_TYPE))
 
       var hasConstraints = false
 //      if (isDeclaredBean && !methodAnnotationMetadata.hasStereotype(ANN_VALID) && method.getParameters.stream.anyMatch((p: VariableElement) => annotationUtils.hasStereotype(p, ANN_CONSTRAINT) || annotationUtils.hasStereotype(p, ANN_VALID))) {
@@ -417,11 +430,11 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
 //      }
 
       if (isDeclaredBean && isExecutable) {
-        visitExecutableMethod(method, methodAnnotationMetadata, beanDefinitionWriter)
-      } else if (isConfigurationPropertiesType && !method.symbol.isPrivate && !method.symbol.isStatic) {
-        val methodName = method.symbol.nameString
-        if (NameUtils.isSetterName(methodName) && method.symbol.paramss.size == 1) {
-          visitConfigurationPropertySetter(method, methodAnnotationMetadata, beanDefinitionWriter)
+        visitExecutableMethod(methodSymbol, methodAnnotationMetadata, beanDefinitionWriter)
+      } else if (isConfigurationPropertiesType && !methodSymbol.isPrivate && !methodSymbol.isStatic) {
+        val methodName = methodSymbol.nameString
+        if (NameUtils.isSetterName(methodName) && methodSymbol.paramss.size == 1) {
+          visitConfigurationPropertySetter(methodSymbol, methodAnnotationMetadata, beanDefinitionWriter)
         } else if (NameUtils.isGetterName(methodName)) {
             if (!beanDefinitionWriter.isValidated) {
               beanDefinitionWriter.setValidated(
@@ -430,23 +443,27 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
             }
         }
       } else if (isPublic && hasConstraints) {
-        visitExecutableMethod(method, methodAnnotationMetadata, beanDefinitionWriter)
+        visitExecutableMethod(methodSymbol, methodAnnotationMetadata, beanDefinitionWriter)
       }
     }
   }
 
-  private def visitConfigurationPropertySetter(method: Global#DefDef, methodAnnotationMetadata:AnnotationMetadata, beanDefinitionVisitor: BeanDefinitionVisitor): Unit = {
-    val parameter = method.vparamss.head.head
-    val fieldType = argTypeForValDef(parameter)
+  private def visitConfigurationPropertySetter(methodSymbol: Global#Symbol, methodAnnotationMetadata:AnnotationMetadata, beanDefinitionVisitor: BeanDefinitionVisitor): Unit = {
+    val parameterSymbol = methodSymbol.paramss.head.head
+    val fieldType = TypeFunctions.argTypeForTypeSymbol(
+      parameterSymbol.originalInfo.typeSymbol,
+      parameterSymbol.originalInfo.typeArgs,
+      false
+    )
 //    val fieldType: Any = Globals.argTypeForTree(valueType.)
     var genericTypes: util.Map[String, AnyRef] = Collections.emptyMap()
 //    val typeKind: TypeKind = valueType.getKind
 
 //    if (!(typeKind.isPrimitive || (typeKind eq ARRAY))) genericTypes = genericUtils.resolveGenericTypes(valueType, Collections.emptyMap)
-    val declaringClass = method.symbol.owner.fullName
+    val declaringClass = methodSymbol.owner.fullName
     if (declaringClass != null) {
-      val propertyName = NameUtils.getPropertyNameForSetter(method.symbol.nameString)
-      val isInterface = parameter.symbol.isInterface
+      val propertyName = NameUtils.getPropertyNameForSetter(methodSymbol.nameString)
+      val isInterface = parameterSymbol.isInterface
       if (methodAnnotationMetadata.hasStereotype(classOf[ConfigurationBuilder])) {
           beanDefinitionVisitor.visitConfigBuilderMethod(fieldType, NameUtils.getterNameFor(propertyName), methodAnnotationMetadata, metadataBuilder, isInterface)
          // try visitConfigurationBuilder(declaringClass, method, valueType, beanDefinitionVisitor)
@@ -454,17 +471,17 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       } else {
 //        if (shouldExclude(configurationMetadata, propertyName)) return
         val docComment: String = "" //elementUtils.getDocComment(method)
-        val setterName: String = method.symbol.nameString
+        val setterName: String = methodSymbol.nameString
         val propertyMetadata = metadataBuilder.visitProperty(
           concreteClass.symbol,
-          method.symbol.owner,
-          getPropertyMetadataTypeReference(parameter.symbol).toString,
+          methodSymbol.owner,
+          getPropertyMetadataTypeReference(parameterSymbol).toString,
           propertyName, docComment, null)
         val annotationMetadata: AnnotationMetadata = addPropertyMetadata(AnnotationMetadata.EMPTY_METADATA, propertyMetadata)
-        val requiresReflection = if (method.symbol.isPublic) {
+        val requiresReflection = if (methodSymbol.isPublic) {
             false
-          } else if (method.symbol.hasPackageFlag || method.symbol.isProtected) {
-            val declaringPackage = method.symbol.owner.packageObject
+          } else if (methodSymbol.hasPackageFlag || methodSymbol.isProtected) {
+            val declaringPackage = methodSymbol.owner.packageObject
             val concretePackage = concreteClass.symbol.packageObject
             !(declaringPackage.fullName == concretePackage.fullName)
           } else {
@@ -472,13 +489,17 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
           }
         beanDefinitionVisitor.visitSetterValue(
           declaringClass,
-          argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]),
+          argTypeForTypeSymbol(
+            methodSymbol.originalInfo.resultType.typeSymbol,
+            methodSymbol.originalInfo.resultType.typeArgs,
+            false
+          ),
           annotationMetadata,
           requiresReflection,
           fieldType,
           setterName,
           genericTypes,
-          Globals.metadataBuilder.getOrCreate(SymbolFacade(parameter.symbol)),
+          Globals.metadataBuilder.getOrCreate(SymbolFacade(parameterSymbol)),
           true)
       }
     }
@@ -502,53 +523,59 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
     )
 
 
-  private def createFactoryBeanMethodWriterFor(method: Global#DefDef, producedElement: Global#Type) = {
+  private def createFactoryBeanMethodWriterFor(methodSymbol: Global#Symbol, producedElement: Global#Type) = {
     val annotationMetadata = Globals.metadataBuilder.buildForParent(
       SymbolFacade(producedElement.typeSymbol),
-      SymbolFacade(method.symbol), true)
-    val producedPackageElement = producedElement.typeSymbol.enclosingPackage.fullName
-    val definingPackageElement = method.symbol.owner.enclosingPackage.fullName
+      SymbolFacade(methodSymbol), true)
     val isInterface = producedElement.typeSymbol.isInterface
-    val packageName = producedPackageElement.toString
-    val beanDefinitionPackage = definingPackageElement.toString
+    val packageName = producedElement.typeSymbol.enclosingPackage.fullName
+    val beanDefinitionPackage = methodSymbol.owner.enclosingPackage.fullName.toString
     val shortClassName = producedElement.typeSymbol.nameString
-    val upperCaseMethodName = NameUtils.capitalize(method.symbol.name.toString())
+    val upperCaseMethodName = NameUtils.capitalize(methodSymbol.name.toString())
     val factoryMethodBeanDefinitionName = beanDefinitionPackage + ".$" + concreteClass.symbol.nameString + "$" + upperCaseMethodName + factoryMethodIndex.getAndIncrement + "Definition"
+
     new BeanDefinitionWriter(
       packageName,
       shortClassName,
       factoryMethodBeanDefinitionName,
-      argTypeForTypeTree(method.tpt.asInstanceOf[Global#TypeTree]).toString, //modelUtils.resolveTypeReference(producedElement).toString,
+      argTypeForTypeSymbol(
+        methodSymbol.originalInfo.resultType.typeSymbol,
+        methodSymbol.originalInfo.resultType.typeArgs,
+        false
+      ).toString,
       isInterface,
       originatingElement,
       annotationMetadata)
   }
 
-  private def visitBeanFactoryMethod(beanMethod: Global#DefDef, methodAnnotationMetadata:AnnotationMetadata): Unit = {
+  private def visitBeanFactoryMethod(methodSymbol: Global#Symbol, methodAnnotationMetadata:AnnotationMetadata): Unit = {
 //    if (isFactoryType && methodAnnotationMetadata.hasStereotype(beanMethod.symbol.owner, AROUND_TYPE)) {
 //      visitExecutableMethod(beanMethod, annotationUtils.getAnnotationMetadata(beanMethod))
 //    }
-    val producedElement = beanMethod.symbol.asInstanceOf[Global#MethodSymbol].returnType
+    val producedElement = methodSymbol.asInstanceOf[Global#MethodSymbol].returnType
 //    val producedElement: TypeElement = modelUtils.classElementFor(typeUtils.asElement(returnType))
     if (producedElement != null) {
-      val producedTypeName = producedElement.toLongString
-      val beanMethodParams = ExecutableElementParamInfo.populateParameterData(Some(beanMethod)) //, Collections.emptyMap)
-      val beanMethodWriter = createFactoryBeanMethodWriterFor(beanMethod, producedElement)
+      val beanMethodParams = ExecutableElementParamInfo.populateParameterData(Some(methodSymbol)) //, Collections.emptyMap)
+      val beanMethodWriter = createFactoryBeanMethodWriterFor(methodSymbol, producedElement)
       var beanTypeArguments: java.util.Map[String, java.util.Map[String, AnyRef]] = null
       //    if (returnType.isInstanceOf[DeclaredType]) {
       //      val dt: DeclaredType = returnType.asInstanceOf[DeclaredType]
       //      beanTypeArguments = genericUtils.buildGenericTypeArgumentInfo(dt)
       //      beanMethodWriter.visitTypeArguments(beanTypeArguments)
       //    }
-      val beanMethodName = beanMethod.symbol.nameString
+      val beanMethodName = methodSymbol.nameString
       val beanMethodParameters = beanMethodParams.parameters
       //val methodKey: StringBuilder = new StringBuilder(beanMethodName).append("(").append(beanMethodParameters.values.stream.map(_.toString).collect(Collectors.joining(","))).append(")")
-      beanDefinitionWriters += new SymbolFacade(beanMethod.symbol) -> beanMethodWriter
-      val beanMethodDeclaringType: Any = beanMethod.symbol.owner.fullName
-      val methodAnnotationMetadata: AnnotationMetadata = Globals.metadataBuilder.buildForParent(SymbolFacade(producedElement.typeSymbol), new SymbolFacade(beanMethod.symbol))
+      beanDefinitionWriters += SymbolFacade(methodSymbol) -> beanMethodWriter
+      val beanMethodDeclaringType: Any = methodSymbol.owner.fullName
+      val methodAnnotationMetadata: AnnotationMetadata = Globals.metadataBuilder.buildForParent(SymbolFacade(producedElement.typeSymbol), SymbolFacade(methodSymbol))
       beanMethodWriter.visitBeanFactoryMethod(
         beanMethodDeclaringType,
-        argTypeForTypeTree(beanMethod.tpt.asInstanceOf[Global#TypeTree]),
+        argTypeForTypeSymbol(
+          methodSymbol.originalInfo.resultType.typeSymbol,
+          methodSymbol.originalInfo.resultType.typeArgs,
+          false
+        ),
         beanMethodName,
         methodAnnotationMetadata,
         beanMethodParameters,
@@ -648,26 +675,29 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
     }
   }
 
-  def visitVariable(valDef: Global#ValDef, beanDefinitionWriter:BeanDefinitionWriter):Unit = { // assuming just fields, visitExecutable should be handling params for method calls
-    val fieldAnnotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(valDef.symbol))
+  def visitVariable(valSymbol: Global#Symbol, beanDefinitionWriter:BeanDefinitionWriter):Unit = { // assuming just fields, visitExecutable should be handling params for method calls
+    val fieldAnnotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(valSymbol))
 
     val isInjected = fieldAnnotationMetadata.hasStereotype(classOf[Inject])
     val isValue = !isInjected && (fieldAnnotationMetadata.hasStereotype(classOf[Value]) || fieldAnnotationMetadata.hasStereotype(classOf[Property]))
     if (isInjected || isValue) {
 
-      val isPrivate = valDef.mods.isPrivate
-      val requiresReflection = isPrivate // TODO || modelUtils.isInheritedAndNotPublic(this.concreteClass, declaringClass, variable)
+      val isPrivate = valSymbol.isPrivate
+      val requiresReflection = isPrivate
 
-      val genericTypeMap = genericTypesForTree(
-        argTypeForTree(valDef.tpt).toString,
-        valDef.tpt
+      val genericTypeMap = TypeFunctions.genericTypesForSymbol(
+        valSymbol
       )
 
       if (isValue) {
         beanDefinitionWriter.visitFieldValue(
           concreteClass.symbol.fullName,
-          argTypeForValDef(valDef),
-          valDef.name.toString.trim,
+          TypeFunctions.argTypeForTypeSymbol(
+            valSymbol.originalInfo.typeSymbol,
+            valSymbol.originalInfo.typeArgs,
+            false
+          ),
+          valSymbol.nameString,
           requiresReflection,
           fieldAnnotationMetadata,
           genericTypeMap,
@@ -675,8 +705,12 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       } else {
         beanDefinitionWriter.visitFieldInjectionPoint(
           concreteClass.symbol.fullName,
-          argTypeForValDef(valDef),
-          valDef.name.toString.trim,
+          TypeFunctions.argTypeForTypeSymbol(
+            valSymbol.originalInfo.typeSymbol,
+            valSymbol.originalInfo.typeArgs,
+            false
+          ),
+          valSymbol.nameString,
           requiresReflection,
           fieldAnnotationMetadata,
           genericTypeMap
@@ -733,20 +767,23 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
         constructorParameterInfo.genericTypes
       )
 
-
-
       visitType(concreteClass, Globals.metadataBuilder.getOrCreate(SymbolFacade(concreteClass.symbol)))
 
       visitTypeArguments(concreteClass, beanDefinitionWriter)
 
-      concreteClass.impl.body.foreach {
-        case defDef: Global#DefDef if !defDef.symbol.isConstructor => {
-          visitExecutable(defDef, beanDefinitionWriter)
+      concreteClass.symbol.baseClasses.foreach { classSymbol =>
+        classSymbol.originalInfo.decls.foreach { child:Global#Symbol =>
+          child match {
+            case methodSymbol: Global#MethodSymbol if methodSymbol.isMethod &&
+              !(methodSymbol.isConstructor || methodSymbol.isVariable) => {
+              visitExecutable(methodSymbol, beanDefinitionWriter)
+            }
+            case termSymbol: Global#TermSymbol if termSymbol.isMutable => {
+              visitVariable(termSymbol, beanDefinitionWriter)
+            }
+            case _ => ()
+          }
         }
-        case valDef: Global#ValDef if valDef.mods.isMutable => {
-          visitVariable(valDef, beanDefinitionWriter)
-        }
-        case _ => ()
       }
 
       beanDefinitionWriter.visitBeanDefinitionEnd()
@@ -780,11 +817,11 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
               }
               case typeRef:Global#ArgsTypeRef => {
                 typeArguments.computeIfAbsent(parent.typeSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]() )
-                  .put(param.nameString, argTypeForTypeSymbol(typeRef.sym, typeRef.args))
+                  .put(param.nameString, argTypeForTypeSymbol(typeRef.sym, typeRef.args, true))
               }
               case _ => {
                 typeArguments.computeIfAbsent(parent.typeSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]() )
-                  .put(param.nameString, argTypeForTypeSymbol(arg.typeSymbol, List()))
+                  .put(param.nameString, argTypeForTypeSymbol(arg.typeSymbol, List(), true))
               }
             }
           }

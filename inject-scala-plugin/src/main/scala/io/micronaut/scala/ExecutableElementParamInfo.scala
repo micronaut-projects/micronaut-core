@@ -16,35 +16,38 @@ class ExecutableElementParamInfo(requiresReflection: Boolean, val metadata: Anno
     this(requiresReflection, metadata.getOrElse(AnnotationMetadata.EMPTY_METADATA))
   }
 
-  def addParameter(name: Global#TermName, argType: AnyRef, genericType: AnyRef): Unit = {
-    parameters.put(name.toString(), argType)
-    genericParameters.put(name.toString(), genericType)
+  def addParameter(name: String, argType: AnyRef, genericType: AnyRef): Unit = {
+    parameters.put(name, argType)
+    genericParameters.put(name, genericType)
   }
 
-  def addAnnotationMetadata(name: Global#TermName, valDefMetadata: AnnotationMetadata): Unit = {
-    parameterMetadata.put(name.toString(), valDefMetadata)
+  def addAnnotationMetadata(name: String, valDefMetadata: AnnotationMetadata): Unit = {
+    parameterMetadata.put(name, valDefMetadata)
   }
 
-  def addGenericTypes(paramName: Global#TermName, generics: util.Map[String, AnyRef]): Unit = {
-    genericTypes.put(paramName.toString(), generics)
+  def addGenericTypes(paramName: String, generics: util.Map[String, AnyRef]): Unit = {
+    genericTypes.put(paramName, generics)
   }
 
 }
 
 object ExecutableElementParamInfo {
 
-  def populateParameterData(element: Option[Global#DefDef]): ExecutableElementParamInfo = {
-    element.map { defDef =>
-      val elementMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(defDef.symbol))
+  def populateParameterData(element: Option[Global#Symbol]): ExecutableElementParamInfo = {
+    element.map { defSymbol =>
+      val elementMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(defSymbol))
       val params = new ExecutableElementParamInfo(false, elementMetadata)
 
-      defDef.vparamss.foreach { valDefs =>
-        valDefs.foreach { valDef =>
-          val valDefMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(valDef.symbol))
+      defSymbol.originalInfo.params.foreach { valSymbol =>
+          val valDefMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(valSymbol))
 
-          params.addAnnotationMetadata(valDef.name, valDefMetadata)
+          params.addAnnotationMetadata(valSymbol.nameString, valDefMetadata)
 
-          val argType = TypeFunctions.argTypeForValDef(valDef)
+          val argType = TypeFunctions.argTypeForTypeSymbol(
+            valSymbol.originalInfo.typeSymbol,
+            valSymbol.originalInfo.typeArgs,
+            false
+          )
 
 //          if (/*isConstructBinding &&*/ Stream.of(classOf[Property], classOf[Value], classOf[Parameter]).noneMatch(annotationMetadata.hasAnnotation)) {
 //            val parameterElement = typeUtils.asElement(typeMirror)
@@ -53,17 +56,13 @@ object ExecutableElementParamInfo {
 //            if (!parameterTypeMetadata.hasStereotype(classOf[Scope])) annotationMetadata = addPropertyMetadata(annotationMetadata, paramElement, argName)
 //          }
 
-          valDef.tpt match {
-            case typeTree:Global#TypeTree if typeTree.symbol.isClass || typeTree.symbol.isInterface => {
-              params.addParameter(valDef.name, argType, argType)
-              val genericTypeMap = TypeFunctions.genericTypesForTypeTree(argType.toString, typeTree)
+            params.addParameter(valSymbol.nameString, argType, argType)
+              val genericTypeMap = TypeFunctions.genericTypesForSymbol(
+                valSymbol
+              )
               if (!genericTypeMap.isEmpty) {
-                params.addGenericTypes(valDef.name, genericTypeMap)
+                params.addGenericTypes(valSymbol.nameString, genericTypeMap)
               }
-            }
-            case _ => params.addParameter(valDef.name, argType, argType)
-          }
-
 
 //         valDef.symbol match {
 //           case kind:_ => {
@@ -111,8 +110,6 @@ object ExecutableElementParamInfo {
           //            else error(element, "Unprocessable element type [%s] for param [%s] of element %s", kind, paramElement, element)
           //        }
           //      }
-
-        }
       }
 
 

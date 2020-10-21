@@ -15,7 +15,7 @@ class ScalaConfigurationMetadataBuilder extends ConfigurationMetadataBuilder[Glo
    * <p>
    * <p>For {@link io.micronaut.context.annotation.ConfigurationProperties} that path is a property is
    * established by looking at the value of the {@link io.micronaut.context.annotation.ConfigurationProperties} and
-   * then calculating the path based on the inheritance tree.</p>
+   * then calculating the path based on the io.micronaut.inject.inheritance tree.</p>
    * <p>
    * <p>For example consider the following classes:</p>
    * <p>
