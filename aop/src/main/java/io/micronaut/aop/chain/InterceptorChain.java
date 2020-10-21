@@ -244,9 +244,6 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     @Internal
     @UsedByGeneratedCode
     public static void supplyTarget(@Nullable Qualifier<Object> qualifier, Object target, Interceptor<?, ?>... interceptors) {
-        if (target instanceof InterceptedProxy) {
-            target = ((InterceptedProxy<?>) target).interceptedTarget();
-        }
         for (Interceptor<?, ?> interceptor : interceptors) {
             if (interceptor instanceof TargetAwareMethodInterceptor) {
                 @SuppressWarnings("unchecked") TargetAwareMethodInterceptor<Object, Object> tami =
@@ -257,10 +254,18 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
                     if (ArrayUtils.isNotEmpty(args)) {
                         Class<?> arg1 = args[0];
                         if (arg1.isInstance(target)) {
-                            tami.newTarget(qualifier, target);
+                            Object finalTarget = target;
+                            if (target instanceof InterceptedProxy) {
+                                finalTarget = ((InterceptedProxy<?>) target).interceptedTarget();
+                            }
+                            tami.newTarget(qualifier, finalTarget);
                         }
                     } else {
-                        tami.newTarget(qualifier, target);
+                        Object finalTarget = target;
+                        if (target instanceof InterceptedProxy) {
+                            finalTarget = ((InterceptedProxy<?>) target).interceptedTarget();
+                        }
+                        tami.newTarget(qualifier, finalTarget);
                     }
                 } catch (Exception e) {
                     throw new InstantiationException("Error supplying AOP target bean to interceptor [" + interceptor.getClass() + "]: " + e.getMessage(), e);
