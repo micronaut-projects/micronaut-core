@@ -106,6 +106,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", BeanContext.class, ExecutableMethod.class, Interceptor[].class);
 
+    private static final java.lang.reflect.Method SUPPLY_TARGET_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "supplyTarget", Qualifier.class, Object.class, Interceptor[].class);
+
     private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", BeanContext.class, ExecutableMethod.class, Interceptor[].class);
 
     private static final Constructor CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
@@ -1027,6 +1029,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         for (Runnable fieldInjectionPoint : deferredInjectionPoints) {
             fieldInjectionPoint.run();
         }
+
+        proxyConstructorGenerator.loadThis();
+        // 1st argument is the qualifier
+        proxyConstructorGenerator.loadArg(qualifierIndex);
+        // 2nd argument the bean being created
+        proxyConstructorGenerator.loadThis();
+        // 3rd arguments the interceptors
+        proxyConstructorGenerator.loadArg(interceptorArgumentIndex);
+        // invoke InterceptorChain.supplyTarget(..)
+        proxyConstructorGenerator.invokeStatic(TYPE_INTERCEPTOR_CHAIN, Method.getMethod(SUPPLY_TARGET_METHOD));
 
         constructorWriter.visitInsn(RETURN);
         constructorWriter.visitMaxs(DEFAULT_MAX_STACK, 1);

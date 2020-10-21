@@ -15,17 +15,21 @@
  */
 package io.micronaut.aop.chain;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.aop.*;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.EnvironmentConfigurable;
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.reflect.GenericTypeUtils;
+import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.util.ArrayUtils;
@@ -228,6 +232,41 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
             }
         }
         throw new IllegalArgumentException("Argument [" + from + "] is not within the interceptor chain");
+    }
+
+    /**
+     * Supplies the AOP target to interested interceptors when the target is instantiated.
+     * @param qualifier The qualifier
+     * @param target The target
+     * @param interceptors The interceptors
+     * @since 2.2.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public static void supplyTarget(@Nullable Qualifier<Object> qualifier, Object target, Interceptor<?, ?>... interceptors) {
+        if (target instanceof InterceptedProxy) {
+            target = ((InterceptedProxy<?>) target).interceptedTarget();
+        }
+        for (Interceptor<?, ?> interceptor : interceptors) {
+            if (interceptor instanceof TargetAwareMethodInterceptor) {
+                @SuppressWarnings("unchecked") TargetAwareMethodInterceptor<Object, Object> tami =
+                        (TargetAwareMethodInterceptor<Object, Object>) interceptor;
+                Class<?>[] args = GenericTypeUtils
+                        .resolveInterfaceTypeArguments(interceptor.getClass(), TargetAwareMethodInterceptor.class);
+                try {
+                    if (ArrayUtils.isNotEmpty(args)) {
+                        Class<?> arg1 = args[0];
+                        if (arg1.isInstance(target)) {
+                            tami.newTarget(qualifier, target);
+                        }
+                    } else {
+                        tami.newTarget(qualifier, target);
+                    }
+                } catch (Exception e) {
+                    throw new InstantiationException("Error supplying AOP target bean to interceptor [" + interceptor.getClass() + "]: " + e.getMessage(), e);
+                }
+            }
+        }
     }
 
     /**
