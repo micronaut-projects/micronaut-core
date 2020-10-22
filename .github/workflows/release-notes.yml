@@ -5,6 +5,8 @@
 # and edit them there. Note that it will be sync'ed to all the Micronaut repos
 name: Changelog
 on:
+  issues:
+    types: [closed,reopened]
   push:
     branches:
       - master
