@@ -1,6 +1,7 @@
 package io.micronaut.scala
 
 import java.util
+import java.util.{Collections, Map}
 
 import io.micronaut.core.annotation.AnnotationMetadata
 
@@ -33,19 +34,31 @@ class ExecutableElementParamInfo(requiresReflection: Boolean, val metadata: Anno
 
 object ExecutableElementParamInfo {
 
-  def populateParameterData(element: Option[Global#Symbol]): ExecutableElementParamInfo = {
+  def populateParameterData(element:Global#Symbol):ExecutableElementParamInfo = populateParameterData(Option.empty, Some(element), Collections.emptyMap())
+
+  def populateParameterData(
+      declaringTypeName: Option[String],
+      element: Option[Global#Symbol],
+      boundTypes: java.util.Map[String, AnyRef]
+  ): ExecutableElementParamInfo = {
     element.map { defSymbol =>
-      val elementMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(defSymbol))
+      val elementMetadata = if (declaringTypeName.isDefined) {
+        new ScalaAnnotationMetadataBuilder().build(declaringTypeName.get, SymbolFacade(defSymbol))
+      } else {
+        Globals.metadataBuilder.getOrCreate(SymbolFacade(defSymbol))
+      }
       val params = new ExecutableElementParamInfo(false, elementMetadata)
 
-      defSymbol.originalInfo.params.foreach { valSymbol =>
-          val valDefMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(valSymbol))
+      defSymbol.originalInfo.params.foreach { paramSymbol =>
+          val valDefMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(paramSymbol))
 
-          params.addAnnotationMetadata(valSymbol.nameString, valDefMetadata)
+          val argName = paramSymbol.nameString
+
+          params.addAnnotationMetadata(argName, valDefMetadata)
 
           val argType = TypeFunctions.argTypeForTypeSymbol(
-            valSymbol.originalInfo.typeSymbol,
-            valSymbol.originalInfo.typeArgs,
+            paramSymbol.originalInfo.typeSymbol,
+            paramSymbol.originalInfo.typeArgs,
             false
           )
 
@@ -56,16 +69,39 @@ object ExecutableElementParamInfo {
 //            if (!parameterTypeMetadata.hasStereotype(classOf[Scope])) annotationMetadata = addPropertyMetadata(annotationMetadata, paramElement, argName)
 //          }
 
-            params.addParameter(valSymbol.nameString, argType, argType)
-              val genericTypeMap = TypeFunctions.genericTypesForSymbol(
-                valSymbol
-              )
-              if (!genericTypeMap.isEmpty) {
-                params.addGenericTypes(valSymbol.nameString, genericTypeMap)
-              }
 
-//         valDef.symbol match {
-//           case kind:_ => {
+
+            val kind = paramSymbol.originalInfo.typeSymbol
+
+            if (kind.isClass || kind.isInterface) {
+              params.addParameter(paramSymbol.nameString, argType, argType)
+              val genericTypeMap = TypeFunctions.genericTypesForSymbol(
+                paramSymbol
+              )
+              // TODO still work to be done here. This is probably not correct, but passes tests
+              genericTypeMap.putAll(boundTypes)
+              if (!genericTypeMap.isEmpty) {
+                params.addGenericTypes(paramSymbol.nameString, genericTypeMap)
+              }
+            } else if (kind.isTypeParameter) {
+              val parameterType = paramSymbol.typeOfThis
+              if (parameterType != null) {
+                params.addParameter(
+                  argName,
+                  paramSymbol.typeOfThis.typeSymbol.fullName,
+                  boundTypes.get(kind.nameString))
+
+                params.addGenericTypes(
+                  argName,
+                  Collections.singletonMap(
+                    kind.nameString,
+                    boundTypes.get(kind.nameString))
+                )
+              }
+            } else {
+
+            }
+
 //             if (kind.isPrimitive) {
 //               var typeName = null
 //               if (typeMirror.isInstanceOf[DeclaredType]) {
@@ -76,8 +112,7 @@ object ExecutableElementParamInfo {
 //               val argType = modelUtils.classOfPrimitiveFor(typeName)
 //               params.addParameter(argName, argType, argType)
 //             }
-//           }
-//         }
+
 
           // if ((kind eq TypeKind.ERROR) && !processingOver) throw new BeanDefinitionInjectProcessor.PostponeToNextRoundException
           //        kind match {

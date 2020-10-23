@@ -32,6 +32,9 @@ abstract class AbstractB { // inject via field
 @Singleton
 class B extends AbstractB
 
+@Singleton
+class BFromJava extends AbstractBJava
+
 class AbstractInheritanceSpec {
 
   @Test
@@ -39,6 +42,19 @@ class AbstractInheritanceSpec {
     val context = new DefaultBeanContext().start()
 
     val b = context.getBean(classOf[B])
+
+    assertThat(b.getA).isNotNull
+    assertThat(b.getAnother).isNotNull
+    assertThat(b.getA).isSameAs(b.getAnother)
+    assertThat(b.getPackagePrivate).isNotNull
+    assertThat(b.getPackagePrivate).isSameAs(b.getAnother)
+  }
+
+  @Test
+  def `test values are injected for abstract java parent class`():Unit = {
+    val context = new DefaultBeanContext().start()
+
+    val b = context.getBean(classOf[BFromJava])
 
     assertThat(b.getA).isNotNull
     assertThat(b.getAnother).isNotNull

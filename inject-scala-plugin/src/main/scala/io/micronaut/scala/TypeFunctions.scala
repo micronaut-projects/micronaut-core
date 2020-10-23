@@ -65,13 +65,17 @@ object TypeFunctions {
     }
   }
 
-  def genericTypesForSymbol(symbol:Global#Symbol):java.util.Map[String, AnyRef] = {
-    val genericTypeMap = new java.util.HashMap[String, AnyRef]()
-    val params = symbol.originalInfo.typeSymbol.originalInfo.typeParams
-    val args = symbol.originalInfo.typeArgs
-    (args, params).zipped.foreach{ (arg, param) =>
-       genericTypeMap.put(param.nameString, argTypeForTypeSymbol(arg.typeSymbol, arg.typeArgs, false))
+  def typeGenericsForParamsAndArgs(params:List[Global#Symbol], args:List[Global#Type]): java.util.Map[String, AnyRef] = {
+    val genericTypeMap = new java.util.LinkedHashMap[String, AnyRef]()
+    (args, params).zipped.foreach { (arg, param) =>
+      genericTypeMap.put(param.nameString, argTypeForTypeSymbol(arg.typeSymbol, arg.typeArgs, false))
     }
     genericTypeMap
   }
+
+  def genericTypesForSymbol(symbol:Global#Symbol):java.util.Map[String, AnyRef] =
+    typeGenericsForParamsAndArgs(
+      symbol.originalInfo.typeSymbol.originalInfo.typeParams,
+      symbol.originalInfo.typeArgs
+    )
 }
