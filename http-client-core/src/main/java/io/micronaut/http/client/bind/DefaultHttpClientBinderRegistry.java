@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.bind;
 
-import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -27,13 +26,17 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
+import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import kotlin.coroutines.Continuation;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.*;
+
+import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
 /**
  * Default implementation of {@link HttpClientBinderRegistry} that searches by
@@ -120,6 +123,11 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         byAnnotation.put(Body.class, (ClientArgumentRequestBinder<Object>) (context, uriContext, value, request) -> {
             request.body(value);
         });
+
+        if (KOTLIN_COROUTINES_SUPPORTED) {
+            //Clients should do nothing with the continuation
+            byType.put(Argument.of(Continuation.class).typeHashCode(),  (context, uriContext, value, request) -> {});
+        }
 
         if (CollectionUtils.isNotEmpty(binders)) {
             for (ClientArgumentRequestBinder binder : binders) {
