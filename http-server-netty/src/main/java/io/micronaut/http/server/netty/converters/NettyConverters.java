@@ -25,7 +25,9 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
+import io.micronaut.http.server.netty.multipart.NettyCompletedAttribute;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.netty.buffer.*;
@@ -118,6 +120,12 @@ public class NettyConverters implements TypeConverterRegistrar {
                 FileUpload.class,
                 CompletedFileUpload.class,
                 fileUploadToCompletedFileUploadConverter()
+        );
+
+        conversionService.addConverter(
+                Attribute.class,
+                CompletedPart.class,
+                attributeToCompletedPartConverter()
         );
 
         conversionService.addConverter(
@@ -279,6 +287,24 @@ public class NettyConverters implements TypeConverterRegistrar {
                 }
 
                 return Optional.of(new NettyCompletedFileUpload(object));
+            } catch (Exception e) {
+                context.reject(e);
+                return Optional.empty();
+            }
+        };
+    }
+
+    /**
+     * @return An Attribute to CompletedPart converter
+     */
+    protected TypeConverter<Attribute, CompletedPart> attributeToCompletedPartConverter() {
+        return (object, targetType, context) -> {
+            try {
+                if (!object.isCompleted()) {
+                    return Optional.empty();
+                }
+
+                return Optional.of(new NettyCompletedAttribute(object));
             } catch (Exception e) {
                 context.reject(e);
                 return Optional.empty();
