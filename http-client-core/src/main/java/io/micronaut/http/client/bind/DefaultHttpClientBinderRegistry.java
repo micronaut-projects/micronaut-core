@@ -125,7 +125,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
 
         if (KOTLIN_COROUTINES_SUPPORTED) {
             //Clients should do nothing with the continuation
-            byType.put(Argument.of(Continuation.class).typeHashCode(),  (context, uriContext, value, request) -> {});
+            byType.put(Argument.of(Continuation.class).typeHashCode(),  (context, uriContext, value, request) -> { });
         }
 
         if (CollectionUtils.isNotEmpty(binders)) {
