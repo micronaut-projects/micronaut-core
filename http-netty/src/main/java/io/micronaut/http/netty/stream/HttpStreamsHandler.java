@@ -42,8 +42,9 @@ import java.util.Queue;
 @Internal
 abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessage> extends ChannelDuplexHandler {
 
-    private static final Logger LOG = LoggerFactory.getLogger(HttpStreamsHandler.class);
     public static final String HANDLER_BODY_PUBLISHER = "http-streams-codec-body-publisher";
+    private static final Logger LOG = LoggerFactory.getLogger(HttpStreamsHandler.class);
+
     private final Queue<Outgoing> outgoing = new LinkedList<>();
     private final Class<In> inClass;
     private final Class<Out> outClass;
