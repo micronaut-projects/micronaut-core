@@ -466,6 +466,25 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         response.body().contains('bar')
     }
 
+    void "test binding to multiple attributes with the same name"() {
+        when:
+        def requestBody = MultipartBody.builder()
+                .addPart("recipients", "john@google.com")
+                .addPart("recipients", "sally@google.com")
+                .build()
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/publisher-completedpart", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
+                String
+        ))
+        def response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == 'john@google.com|sally@google.com'
+    }
+
     @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.http.client.read-timeout': 300]
