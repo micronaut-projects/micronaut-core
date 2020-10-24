@@ -31,8 +31,7 @@ import java.util.Optional;
  * <p>Unlike {@link io.micronaut.core.convert.TypeConverter} instances binders can potentially handle complex
  * objects and typically work on conjunction with a {@link io.micronaut.core.convert.value.ConvertibleValues} instance</p>
  * <p>
- * <p>An {@link ArgumentBinder} can either be registered as a bean or by META-INF/services. In the case of the latter
- * it will be globally available at all times, whilst the former is only present when a {@code io.micronaut.context.BeanContext} is initialized</p>
+ * <p>An {@link ArgumentBinder} can be registered as a bean. In this case it will be globally available at all times.
  *
  * @param <T> The argument type
  * @param <S> The source type
