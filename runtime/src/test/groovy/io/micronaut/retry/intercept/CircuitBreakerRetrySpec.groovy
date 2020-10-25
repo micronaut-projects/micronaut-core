@@ -69,6 +69,11 @@ class CircuitBreakerRetrySpec extends Specification {
         then:
         retry.currentState() == CircuitState.OPEN
 
+        when: "calling close with null tests a previous execution that succeeded closing an already open circuit"
+        retry.close(null)
+
+        then:
+        retry.currentState() == CircuitState.OPEN
 
         when:
         PollingConditions conditions = new PollingConditions(timeout: 3)
