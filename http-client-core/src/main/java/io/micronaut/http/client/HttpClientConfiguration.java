@@ -631,6 +631,7 @@ public abstract class HttpClientConfiguration {
      * @param url The base URL
      * @param configuration the client configuration
      * @return The client
+     * @since 2.2.0
      */
     @Internal
     static RxHttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration) {
@@ -660,6 +661,7 @@ public abstract class HttpClientConfiguration {
      * @param url The base URL
      * @param configuration The client configuration
      * @return The client
+     * @since 2.2.0
      */
     @Internal
     static RxStreamingHttpClient createStreamingClient(@NonNull URL url, HttpClientConfiguration configuration) {

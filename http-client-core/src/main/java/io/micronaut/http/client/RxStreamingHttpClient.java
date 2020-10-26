@@ -67,6 +67,7 @@ public interface RxStreamingHttpClient extends StreamingHttpClient, RxHttpClient
      * @param url The base URL
      * @param configuration The client configuration
      * @return The client
+     * @since 2.2.0
      */
     static RxStreamingHttpClient create(URL url, HttpClientConfiguration configuration) {
         return HttpClientConfiguration.createStreamingClient(url, configuration);

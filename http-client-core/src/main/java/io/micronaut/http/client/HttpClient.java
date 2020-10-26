@@ -241,6 +241,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param url The base URL
      * @param configuration the client configuration
      * @return The client
+     * @since 2.2.0
      */
     static HttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
         return HttpClientConfiguration.createClient(url, configuration);

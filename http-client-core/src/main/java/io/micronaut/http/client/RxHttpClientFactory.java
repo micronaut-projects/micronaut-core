@@ -42,6 +42,7 @@ public interface RxHttpClientFactory {
      * @param url The base URL
      * @param configuration the client configuration
      * @return The client
+     * @since 2.2.0
      */
     RxHttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration);
 
@@ -61,6 +62,7 @@ public interface RxHttpClientFactory {
      * @param url The base URL
      * @param configuration The client configuration
      * @return The client
+     * @since 2.2.0
      */
     RxStreamingHttpClient createStreamingClient(@Nullable URL url, HttpClientConfiguration configuration);
 }
