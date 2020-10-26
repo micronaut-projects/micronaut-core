@@ -67,6 +67,7 @@ class TypeArgumentsSpec extends AbstractCompilerTest {
         |package test;
         |
         |import javax.inject.Singleton;
+        |import io.micronaut.inject.generics.ScalaObj;
         |
         |abstract class AbstractArrayChain[
         | BOOLEAN,
@@ -79,7 +80,9 @@ class TypeArgumentsSpec extends AbstractCompilerTest {
         | CHAR,
         | STRING,
         | INTARRAY,
-        | STRINGARRAY
+        | STRINGARRAY,
+        | SCALAOBJ,
+        | SCALAOBJARRAY
         |]
         |
         |@Singleton
@@ -94,12 +97,14 @@ class TypeArgumentsSpec extends AbstractCompilerTest {
         | Array[Char],
         | Array[String],
         | Array[Array[Int]],
-        | Array[Array[String]]
+        | Array[Array[String]],
+        | Array[ScalaObj],
+        | Array[Array[ScalaObj]]
         |]
         |
     """.stripMargin)
 
-    assertThat(definition.getTypeArguments("test.AbstractArrayChain")).size().isEqualTo(11)
+    assertThat(definition.getTypeArguments("test.AbstractArrayChain")).size().isEqualTo(13)
     assertThat(definition.getTypeArguments("test.AbstractArrayChain").get(0).getType).isSameAs(classOf[Array[Boolean]])
     assertThat(definition.getTypeArguments("test.AbstractArrayChain").get(1).getType).isSameAs(classOf[Array[Int]])
     assertThat(definition.getTypeArguments("test.AbstractArrayChain").get(2).getType).isSameAs(classOf[Array[Float]])
@@ -111,6 +116,8 @@ class TypeArgumentsSpec extends AbstractCompilerTest {
     assertThat(definition.getTypeArguments("test.AbstractArrayChain").get(8).getType).isSameAs(classOf[Array[String]])
     assertThat(definition.getTypeArguments("test.AbstractArrayChain").get(9).getType).isSameAs(classOf[Array[Array[Int]]])
     assertThat(definition.getTypeArguments("test.AbstractArrayChain").get(10).getType).isSameAs(classOf[Array[Array[String]]])
+    assertThat(definition.getTypeArguments("test.AbstractArrayChain").get(11).getType).isSameAs(classOf[Array[ScalaObj]])
+    assertThat(definition.getTypeArguments("test.AbstractArrayChain").get(12).getType).isSameAs(classOf[Array[Array[ScalaObj]]])
   }
 
   @Test

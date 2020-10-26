@@ -1,7 +1,7 @@
 package io.micronaut.scala
 
 import java.util
-import java.util.{Collections, Map}
+import java.util.Collections
 
 import io.micronaut.core.annotation.AnnotationMetadata
 
@@ -58,8 +58,7 @@ object ExecutableElementParamInfo {
 
           val argType = TypeFunctions.argTypeForTypeSymbol(
             paramSymbol.originalInfo.typeSymbol,
-            paramSymbol.originalInfo.typeArgs,
-            false
+            paramSymbol.originalInfo.typeArgs
           )
 
 //          if (/*isConstructBinding &&*/ Stream.of(classOf[Property], classOf[Value], classOf[Parameter]).noneMatch(annotationMetadata.hasAnnotation)) {
@@ -68,8 +67,6 @@ object ExecutableElementParamInfo {
 //            else AnnotationMetadata.EMPTY_METADATA
 //            if (!parameterTypeMetadata.hasStereotype(classOf[Scope])) annotationMetadata = addPropertyMetadata(annotationMetadata, paramElement, argName)
 //          }
-
-
 
             val kind = paramSymbol.originalInfo.typeSymbol
 

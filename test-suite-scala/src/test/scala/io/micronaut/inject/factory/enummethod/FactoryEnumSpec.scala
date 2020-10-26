@@ -8,7 +8,7 @@ class FactoryEnumSpec extends AbstractCompilerTest {
 
   @Test
   def `test a factory can return an enum`():Unit = {
-    val context = buildContext("test.$TestFactory", """
+    val context = buildContext("""
     |package test
     |
     |import io.micronaut.inject.annotation._

@@ -42,7 +42,7 @@ abstract class AbstractCompilerTest {
     null
   }
 
-  def buildContext(className: String, code: String):ApplicationContext = {
+  def buildContext(code: String):ApplicationContext = {
     val classLoader = buildClassLoader(code)
     new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader),"test") {
       override def resolveBeanDefinitionReferences():java.util.List[BeanDefinitionReference[_]] = {

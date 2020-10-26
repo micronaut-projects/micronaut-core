@@ -121,8 +121,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
         requiresReflection,
         argTypeForTypeSymbol(
           methodSymbol.originalInfo.resultType.typeSymbol,
-          methodSymbol.originalInfo.resultType.typeArgs,
-          false
+          methodSymbol.originalInfo.resultType.typeArgs
         ),
         methodSymbol.nameString,
         params.parameters,
@@ -138,8 +137,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
             requiresReflection,
             argTypeForTypeSymbol(
               methodSymbol.originalInfo.resultType.typeSymbol,
-              methodSymbol.originalInfo.resultType.typeArgs,
-          false
+              methodSymbol.originalInfo.resultType.typeArgs
             ),
             methodSymbol.nameString,
             params.parameters,
@@ -153,8 +151,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
         requiresReflection,
          argTypeForTypeSymbol(
            methodSymbol.originalInfo.resultType.typeSymbol,
-           methodSymbol.originalInfo.resultType.typeArgs,
-           false
+           methodSymbol.originalInfo.resultType.typeArgs
          ),
          methodSymbol.nameString,
         params.parameters,
@@ -263,8 +260,6 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
   }
 
   private def visitExecutableMethod(methodSymbol: Global#Symbol, methodAnnotationMetadata: AnnotationMetadata, beanDefinitionWriter: BeanDefinitionWriter):Unit = {
-    val returnType = methodSymbol.thisType
-
     val declaringClass = methodSymbol.owner
     if (declaringClass == null || declaringClass.isRoot) {
       return
@@ -283,7 +278,10 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
     val returnTypeGenerics: java.util.Map[String, AnyRef] = new java.util.LinkedHashMap[String, AnyRef]
     //genericUtils.resolveBoundGenerics(method.getEnclosingElement.asInstanceOf[TypeElement], returnType, genericUtils.buildGenericTypeArgumentElementInfo(concreteClass)).forEach((key: String, value: TypeMirror) => returnTypeGenerics.put(key, modelUtils.resolveTypeReference(value)))
 
-    val resolvedReturnType: Any = returnType //modelUtils.resolveTypeReference(returnType)
+    val resolvedReturnType =  argTypeForTypeSymbol(
+      methodSymbol.originalInfo.resultType.typeSymbol,
+      methodSymbol.originalInfo.resultType.typeArgs
+    )
 
     val enclosingElement = methodSymbol.enclClass
 
@@ -320,7 +318,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
         params.genericTypes,
         methodAnnotationMetadata,
         enclosingElement.isInterface,
-        false) //m ethod.isDefault)
+        false) //method.isDefault)
 //    }
 
 
@@ -330,7 +328,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
 
 
     // shouldn't visit around advice on an introduction advice instance
-    if (!((beanDefinitionWriter.isInstanceOf[AopProxyWriter]))) {
+    if (!beanDefinitionWriter.isInstanceOf[AopProxyWriter]) {
       val isConcrete: Boolean = concreteClass.symbol.isConcreteClass
       val isPublic: Boolean = methodSymbol.isPublic || methodSymbol.hasPackageFlag
 //      if ((isAopProxyType && isPublic) || (!(isAopProxyType) && methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) || (methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE) && isConcrete)) {
@@ -457,8 +455,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
     val parameterSymbol = methodSymbol.paramss.head.head
     val fieldType = TypeFunctions.argTypeForTypeSymbol(
       parameterSymbol.originalInfo.typeSymbol,
-      parameterSymbol.originalInfo.typeArgs,
-      false
+      parameterSymbol.originalInfo.typeArgs
     )
 //    val fieldType: Any = Globals.argTypeForTree(valueType.)
     var genericTypes: util.Map[String, AnyRef] = Collections.emptyMap()
@@ -496,8 +493,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
           declaringClass,
           argTypeForTypeSymbol(
             methodSymbol.originalInfo.resultType.typeSymbol,
-            methodSymbol.originalInfo.resultType.typeArgs,
-            false
+            methodSymbol.originalInfo.resultType.typeArgs
           ),
           annotationMetadata,
           requiresReflection,
@@ -545,8 +541,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       factoryMethodBeanDefinitionName,
       argTypeForTypeSymbol(
         methodSymbol.originalInfo.resultType.typeSymbol,
-        methodSymbol.originalInfo.resultType.typeArgs,
-        false
+        methodSymbol.originalInfo.resultType.typeArgs
       ).toString,
       isInterface,
       originatingElement,
@@ -584,8 +579,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
         beanMethodDeclaringType,
         argTypeForTypeSymbol(
           methodSymbol.originalInfo.resultType.typeSymbol,
-          methodSymbol.originalInfo.resultType.typeArgs,
-          false
+          methodSymbol.originalInfo.resultType.typeArgs
         ),
         beanMethodName,
         methodAnnotationMetadata,
@@ -751,8 +745,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
           concreteClass.symbol.fullName,
           TypeFunctions.argTypeForTypeSymbol(
             valSymbol.originalInfo.typeSymbol,
-            valSymbol.originalInfo.typeArgs,
-            false
+            valSymbol.originalInfo.typeArgs
           ),
           valSymbol.nameString,
           requiresReflection,
@@ -764,8 +757,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
           concreteClass.symbol.fullName,
           TypeFunctions.argTypeForTypeSymbol(
             valSymbol.originalInfo.typeSymbol,
-            valSymbol.originalInfo.typeArgs,
-            false
+            valSymbol.originalInfo.typeArgs
           ),
           valSymbol.nameString,
           requiresReflection,
@@ -850,7 +842,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
     }
   }
 
-  def filterAncestors(symbol:Global#Symbol) = !FILTERED_ANCESTORS.contains(symbol)
+  def filterAncestors(symbol:Global#Symbol) = !FILTERED_ANCESTORS.contains(symbol.fullName)
 
   def visitTypeArguments(typeSymbol:Global#Symbol, beanDefinitionWriter:BeanDefinitionWriter):Unit = {
     val typeArguments = new util.LinkedHashMap[String, util.Map[String, AnyRef]]()
@@ -876,11 +868,11 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
               }
               case typeRef: Global#ArgsTypeRef => {
                 typeArguments.computeIfAbsent(parentSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]())
-                  .put(param.nameString, argTypeForTypeSymbol(typeRef.sym, typeRef.args, true))
+                  .put(param.nameString, argTypeForTypeSymbol(typeRef.sym, typeRef.args))
               }
               case _ => {
                 typeArguments.computeIfAbsent(parentSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]())
-                  .put(param.nameString, argTypeForTypeSymbol(arg.typeSymbol, List(), true))
+                  .put(param.nameString, argTypeForTypeSymbol(arg.typeSymbol, List()))
               }
             }
           }
