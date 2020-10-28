@@ -14,16 +14,15 @@ class CompilerPlugin(override val global: Global)
   override val name = "compiler-plugin"
   override val description = "Compiler plugin"
   override val components =
-    List(new InitPluginComponent(global),
-      new TypeElementVisitorPluginComponent(global),
+    List(
+      new InitPluginComponent(global),
       new BeanDefinitionInjectPluginComponent(global),
-      new FinalizePluginComponent(global)
     )
 }
 
 class InitPluginComponent(val global: Global) extends PluginComponent {
   import global._
-  override val phaseName = "compiler-plugin-type-element-init"
+  override val phaseName = "init-plugin"
   override val runsAfter = List("explicitouter")
   override def newPhase(prev: Phase) =
     new StdPhase(prev) {
@@ -54,12 +53,34 @@ class InitPluginComponent(val global: Global) extends PluginComponent {
         //        }
         //        super.traverse(tree)
         //      }
-        case classDef:ClassDef => processSymbolAnnotations(classDef.symbol, classDef.symbol)
+        case classDef:ClassDef => {
+          processSymbolAnnotations(classDef.symbol, classDef.symbol)
+          buildMethodSymbolBridgeOverride(classDef)
+        }
         case defDef:DefDef => processSymbolAnnotations(defDef.symbol, defDef.symbol.enclClass)
         case valDef:ValDef => processSymbolAnnotations(valDef.symbol, valDef.symbol.enclClass)
         case _ => ()
       }
       super.traverse(tree)
+    }
+  }
+
+  /*
+  This is needed because after the explicit-outer phase, overridden methods that require a bridge
+  method (extends a method with a generic) are no longer returned in the Global#MethodSymbol.overrides method
+  This could be eliminated if this can be moved sooner, but that broke thing last time I tried.
+   */
+  def buildMethodSymbolBridgeOverride(classDef:Global#ClassDef): Unit = {
+    classDef.impl.body.foreach {
+      case defDef:Global#DefDef if defDef.symbol.overrides.nonEmpty => {
+        if (defDef.symbol.isBridge) {
+          defDef.children.foreach {
+            case treeApply: Global#Apply => Globals.methodsToBridgeOverrides.addOne((treeApply.symbol, defDef.symbol.overrides))
+            case _ => ()
+          }
+        }
+      }
+      case _ => ()
     }
   }
 
@@ -88,36 +109,11 @@ class InitPluginComponent(val global: Global) extends PluginComponent {
   }
 }
 
-class TypeElementVisitorPluginComponent(val global: Global) extends PluginComponent {
-  import global._
-  override val phaseName = "compiler-plugin-type-element-visitor"
-  override val runsAfter = List("compiler-plugin-type-element-init")
-  override def newPhase(prev: Phase) =
-    new StdPhase(prev) {
-      override def apply(unit: CompilationUnit):Unit = {
-        new TypeElementVisitorTraverser().traverse(unit.body)
-      }
-    }
-
-  class TypeElementVisitorTraverser extends Traverser {
-
-    override def traverse(tree: Tree) = tree match {
-      case classDef: ClassDef => {
-//        Globals.loadedVisitors.values./*filter(v.matches)*/foreach{ loadedVisitor =>
-//          new ScalaElementVisitor(classDef.symbol, List(loadedVisitor)).visitType(classDef.symbol.asInstanceOf[Global#ClassSymbol], null)
-//        }
-        super.traverse(tree)
-      }
-      case _ => super.traverse(tree)
-    }
-  }
-}
-
 class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComponent {
   import global._
 
-  override val phaseName = "compiler-plugin-bean-definition-inject"
-  override val runsAfter = List("compiler-plugin-type-element-visitor")
+  override val phaseName = "bean-definition-inject"
+  override val runsAfter = List("init-plugin")
 
   override def newPhase(prev: Phase) =
     new StdPhase(prev) {
@@ -161,7 +157,7 @@ class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComp
       case classDef:ClassDef => {
         if (Globals.beanableSymbols.contains(classDef.symbol)) {
           val visitorContext = new ScalaVisitorContext(global, unit.source)
-          val visitor = new AnnBeanElementVisitor(classDef, visitorContext)
+          val visitor = new AnnBeanElementVisitor(global, classDef, visitorContext)
           visitor.visit()
           visitor.beanDefinitionWriters.iterator.foreach { tuple =>
             if (!processed.contains(tuple._1)) {
@@ -177,25 +173,6 @@ class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComp
   }
 }
 
-class FinalizePluginComponent(val global: Global) extends PluginComponent {
-  import global._
-
-  override val phaseName = "compiler-plugin-type-element-end"
-  override val runsAfter = List("compiler-plugin-bean-definition-inject")
-
-  override def newPhase(prev: Phase) = {
-    new StdPhase(prev) {
-      override def apply(unit: CompilationUnit):Unit = {
-//        val values = new util.ArrayList[LoadedVisitor]()
-//        values.addAll(Globals.loadedVisitors.values.asJavaCollection)
-//        OrderUtil.reverseSort(values)
-//        for (loadedVisitor <- asScalaIterator(values.iterator())) {
-//          loadedVisitor.finish()
-//        }
-      }
-    }
-  }
-}
 
 
 

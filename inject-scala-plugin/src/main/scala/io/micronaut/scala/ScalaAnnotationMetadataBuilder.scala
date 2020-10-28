@@ -139,8 +139,9 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[E
               val hierarchy = if (inheritTypeAnnotations)
                 buildHierarchy(SymbolFacade(deff.owner), false, declaredOnly)
               else new util.ArrayList[ElementFacade]
-              if (hasAnnotation(SymbolFacade(deff), classOf[Override])) hierarchy.addAll(findOverriddenMethods(SymbolFacade(deff)))
-              hierarchy.add(SymbolFacade(symbol))
+              val symbolFacade = SymbolFacade(deff)
+               if (deff.isOverride) hierarchy.addAll(findOverriddenMethods(symbolFacade))
+              hierarchy.add(symbolFacade)
               hierarchy
             }
             case varSym: Global#TermSymbol => {
@@ -184,11 +185,10 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[E
     }
   }
 
-  private def findOverriddenMethods(executableElement: ElementFacade) = {
-    val overridden = new util.ArrayList[ElementFacade]
+  private def findOverriddenMethods(executableElement: ElementFacade):util.List[_ <: SymbolFacade] = {
     executableElement match {
-      case SymbolFacade(symbol) => symbol.owner match {
-        case supertype:Global#TypeSymbol =>
+      case SymbolFacade(symbol) => symbol match {
+        //case supertype:Global#TypeSymbol =>
         //      var supertype = enclosingElement.asInstanceOf[TypeElement]
         //      while ( {
         //        supertype != null && !(supertype.toString == classOf[Any].getName)
@@ -203,10 +203,14 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[E
         //        if (superclass.isInstanceOf[DeclaredType]) supertype = superclass.asInstanceOf[DeclaredType].asElement.asInstanceOf[TypeElement]
         //        else break //todo: break is not supported
         //      }
+        case methodSymbol:Global#MethodSymbol => {
+          (methodSymbol.overrides ++
+            Globals.methodsToBridgeOverrides.getOrElse(methodSymbol, List[Global#Symbol]()))
+              .map(SymbolFacade(_:Global#Symbol)).asJava
+        }
       }
-      case _ => ()
+      case _ => Collections.emptyList()
     }
-    overridden
   }
 
   /**

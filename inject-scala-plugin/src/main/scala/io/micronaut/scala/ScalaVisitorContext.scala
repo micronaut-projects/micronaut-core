@@ -15,13 +15,13 @@ import scala.tools.nsc.{Global, Settings}
 
 class ScalaVisitorContext(val global: Global, val source: SourceFile) extends VisitorContext {
 
-  override def info(message: String, element: Element) { }
+  override def info(message: String, element: Element):Unit = ()
 
-  override def info(message: String) { }
+  override def info(message: String):Unit = ()
 
-  override def fail(message: String, element: Element) { }
+  override def fail(message: String, element: Element):Unit = ()
 
-  override def warn(message: String, element: Element) { }
+  override def warn(message: String, element: Element):Unit = ()
 
   override def visitMetaInfFile(path: String): Optional[GeneratedFile] = {
     val classesDir = global.settings.outputDirs.outputDirFor(source.file).file

@@ -1,9 +1,6 @@
 package io.micronaut.scala
 
-import java.util.Collections
-
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
-import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.inject.processing.ProcessedTypes
 
 import scala.collection.mutable
@@ -30,4 +27,5 @@ object Globals {
   val loadedVisitors = new mutable.LinkedHashMap[String, LoadedVisitor]
   val visitorAttributes = new MutableConvertibleValuesMap[AnyRef]
   val beanableSymbols = new mutable.HashSet[Global#Symbol]
+  val methodsToBridgeOverrides = new mutable.HashMap[Global#Symbol, List[Global#Symbol]]()
 }

@@ -8,12 +8,12 @@ import io.micronaut.core.naming.NameUtils
 import org.assertj.core.api.Assertions.assertThat
 
 import scala.jdk.CollectionConverters._
-
 import scala.reflect.internal.util.BatchSourceFile
 import scala.reflect.io.Directory
 import scala.tools.nsc.io.AbstractFile
+import scala.tools.nsc.plugins.PluginComponent
 import scala.tools.nsc.reporters.ConsoleReporter
-import scala.tools.nsc.{Global, Settings}
+import scala.tools.nsc.{Global, Phase, Settings}
 
 abstract class AbstractCompilerTest {
   private val outputDirPath = "build/generated/spec"
@@ -32,14 +32,18 @@ abstract class AbstractCompilerTest {
     val beanFullName = packageName + "." + beanDefName
 
     val classLoader = buildClassLoader(code)
-    classLoader.loadClass(beanFullName).getDeclaredConstructors() foreach { ctor => {
-      if (ctor.getParameterCount == 0) {
-        ctor.setAccessible(true)
-        return ctor.newInstance().asInstanceOf[BeanDefinition[_]]
+    val clazz = classLoader.loadClass(beanFullName)
+    if (clazz != null) {
+      clazz.getDeclaredConstructors() foreach { ctor =>
+        if (ctor.getParameterCount == 0) {
+          ctor.setAccessible(true)
+          return ctor.newInstance().asInstanceOf[BeanDefinition[_]]
+        }
       }
+      null
+    } else {
+      null
     }
-    }
-    null
   }
 
   def buildContext(code: String):ApplicationContext = {
@@ -75,8 +79,8 @@ abstract class AbstractCompilerTest {
     val compiler = new Global(settings, new ConsoleReporter(settings)) {
       override protected def computeInternalPhases(): Unit = {
         super.computeInternalPhases()
-        for (phase <- new io.micronaut.scala.CompilerPlugin(this).components)
-          phasesSet += phase
+        for (phase <- new io.micronaut.scala.CompilerPlugin(this).components) phasesSet += phase
+        //phasesSet += new DebugComponent(this)
       }
     }
 
@@ -92,7 +96,25 @@ abstract class AbstractCompilerTest {
             return defineClass(name, bytes, 0, bytes.length)
           }
         }
-        super.findClass(name)
+        try {
+          super.findClass(name)
+        } catch {
+          case _:Throwable => null
+        }
+      }
+    }
+  }
+}
+
+class DebugComponent(val global: Global) extends PluginComponent {
+  import global._
+  val runsAfter: List[String] = List[String]("explicitouter")
+  val phaseName: String = "debug-phase"
+  def newPhase(prev: Phase) = new StdPhase(prev) {
+
+    def apply(unit: CompilationUnit): Unit = {
+      for (tree@q"$mods def $tname[..$tparams](...$paramss): $tpt = $expr" <- unit.body) {
+        println(s"tree=$tree, symbol=${tree.symbol.fullName}, symbol.overrides=${tree.symbol.overrides.map(_.fullName)}")
       }
     }
   }

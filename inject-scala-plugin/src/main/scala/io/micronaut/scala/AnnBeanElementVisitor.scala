@@ -31,7 +31,7 @@ object AnnBeanElementVisitor {
   val FILTERED_ANCESTORS = List("java.lang.Object")
 }
 
-class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:VisitorContext) {
+class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visitorContext:VisitorContext) {
   private val concreteClassMetadata = Globals.metadataBuilder.getOrCreate(new SymbolFacade(concreteClass.symbol))
 
   private val isFactoryType = concreteClassMetadata.hasStereotype(classOf[Factory])
@@ -259,7 +259,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
     }
   }
 
-  private def visitExecutableMethod(methodSymbol: Global#Symbol, methodAnnotationMetadata: AnnotationMetadata, beanDefinitionWriter: BeanDefinitionWriter):Unit = {
+  private def visitExecutableMethod(methodSymbol: Global#Symbol, methodAnnotationMetadata: AnnotationMetadata, beanDefinitionWriter: BeanDefinitionVisitor):Unit = {
     val declaringClass = methodSymbol.owner
     if (declaringClass == null || declaringClass.isRoot) {
       return
@@ -401,8 +401,8 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
       }
    }
 
-  private def  visitExecutable(methodSymbol: Global#Symbol,
-                                   beanDefinitionWriter: BeanDefinitionWriter):Unit = {
+  private def visitExecutable(methodSymbol: Global#Symbol,
+                               beanDefinitionWriter: BeanDefinitionWriter):Unit = {
     val annotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(methodSymbol))
 
     val methodAnnotationMetadata = if (annotationMetadata.isInstanceOf[AnnotationMetadataHierarchy]) annotationMetadata
@@ -789,7 +789,7 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
   }
 
   def visit(): Unit = {
-    if (!concreteClass.symbol.isAbstractType) {
+    if (!concreteClass.symbol.isAbstract || isDeclaredBean) {
       val concreteClassMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(concreteClass.symbol))
 
       val beanDefinitionWriter = new BeanDefinitionWriter(
@@ -820,12 +820,19 @@ class AnnBeanElementVisitor(concreteClass:Global#ClassDef, visitorContext:Visito
 
       visitTypeArguments(concreteClass.symbol, beanDefinitionWriter)
 
+      val overridden = new mutable.HashSet[Global#Symbol]()
+
       concreteClass.symbol.baseClasses.filter(filterAncestors).foreach { classSymbol =>
           classSymbol.originalInfo.decls.foreach { child: Global#Symbol =>
             child match {
               case methodSymbol: Global#MethodSymbol if methodSymbol.isMethod &&
-                !(methodSymbol.isConstructor || methodSymbol.isVariable) => {
-                visitExecutable(methodSymbol, beanDefinitionWriter)
+                !(methodSymbol.isConstructor || methodSymbol.isVariable) =>
+              {
+                if (!overridden.contains(methodSymbol)) {
+                  visitExecutable(methodSymbol, beanDefinitionWriter)
+                  overridden ++= methodSymbol.overrides
+                  Globals.methodsToBridgeOverrides.get(methodSymbol).foreach(overridden ++= _)
+                }
               }
               case termSymbol: Global#TermSymbol if termSymbol.isMutable => {
                 visitVariable(termSymbol, beanDefinitionWriter)
