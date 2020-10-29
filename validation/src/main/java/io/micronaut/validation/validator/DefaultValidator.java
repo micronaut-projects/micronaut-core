@@ -854,24 +854,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                 }
                             } else {
                                 context.addParameterNode(argument.getName(), i);
-                                String messageTemplate = "{" + Introspected.class.getName() + ".message}";
-                                overallViolations.add(new DefaultConstraintViolation(
-                                        object,
-                                        rootClass,
-                                        object,
-                                        parameterValue,
-                                        messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(Collections.singletonMap("type", parameterType.getName()))),
-                                        messageTemplate,
-                                        new PathImpl(context.currentPath),
-                                        null,
-                                        parameters));
+                                overallViolations.add(createIntrospectionConstraintViolation(rootClass, object, context,
+                                    parameterType, parameterValue, parameters));
                                 context.removeLast();
                             }
                         }
                     }
                 }
-
-
             }
 
         }
@@ -1331,6 +1320,14 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             @Nullable DefaultPropertyNode container) {
 
         final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(propertyValue);
+        AnnotationMetadata annotationMetadata = cascadeProperty.getAnnotationMetadata();
+        if (beanIntrospection == null && annotationMetadata.getDeclaredAnnotationNames().equals(
+            Collections.singleton(javax.validation.Valid.class.getName()))) {
+            // error: only has @Valid but the propertyValue class is not @Introspected
+            overallViolations.add(createIntrospectionConstraintViolation(
+                rootClass, rootBean, context, propertyValue.getClass(), propertyValue));
+            return;
+        }
 
         if (beanIntrospection != null) {
             if (container != null) {
@@ -1755,6 +1752,21 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             builder.append(']');
             throw new BeanInstantiationException(resolutionContext, builder.toString());
         }
+    }
+
+    @NonNull
+    private <T> DefaultConstraintViolation<T> createIntrospectionConstraintViolation(
+        @NonNull Class<T> rootClass,
+        T object,
+        DefaultConstraintValidatorContext context,
+        Class<?> parameterType,
+        Object parameterValue,
+        Object... parameters
+    ) {
+        String messageTemplate = "{" + Introspected.class.getName() + ".message}";
+        return new DefaultConstraintViolation<>(object, rootClass, object, parameterValue,
+            messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(Collections.singletonMap("type", parameterType.getName()))),
+            messageTemplate, new PathImpl(context.currentPath), null, parameters);
     }
 
     /**
