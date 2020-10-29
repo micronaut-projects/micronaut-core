@@ -1321,7 +1321,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
         final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(propertyValue);
         AnnotationMetadata annotationMetadata = cascadeProperty.getAnnotationMetadata();
-        if (beanIntrospection == null && annotationMetadata.getDeclaredAnnotation(Constraint.class) == null) {
+        if (beanIntrospection == null && !annotationMetadata.hasStereotype(Constraint.class)) {
             // error: only has @Valid but the propertyValue class is not @Introspected
             overallViolations.add(createIntrospectionConstraintViolation(
                 rootClass, rootBean, context, propertyValue.getClass(), propertyValue));
