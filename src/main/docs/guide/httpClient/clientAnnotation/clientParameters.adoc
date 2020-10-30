@@ -28,7 +28,7 @@ The `save` method when called will perform an HTTP `POST` with the following JSO
 
 You may however want to customize what is sent as the body, the parameters, URI variables and so on. The ann:http.client.annotation.Client[] annotation is very flexible in this regard and supports the same pkg:http.annotation[HTTP Annotations] as Micronaut's HTTP server.
 
-For example, the following defines a URI template and the `name` parameter is used as part of the URI template, whilst ann:http.annotation.Body[] is used declare that the contents to send to the server are represented by the `Pet` POJO:
+For example, the following defines a URI template and the `name` parameter is used as part of the URI template, whilst ann:http.annotation.Body[] is used to declare that the contents to send to the server are represented by the `Pet` POJO:
 
 .PetOperations.java
 [source,java]
