@@ -100,7 +100,7 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
     }
 
     @Override
-    protected HttpRequest createStreamedMessage(HttpRequest httpRequest, Publisher<HttpContent> stream) {
+    protected HttpRequest createStreamedMessage(HttpRequest httpRequest, Publisher<? extends HttpContent> stream) {
         return new DelegateStreamedHttpRequest(httpRequest, stream);
     }
 
