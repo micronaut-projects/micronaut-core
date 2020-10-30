@@ -15,7 +15,6 @@
  */
 package io.micronaut.upload
 
-
 import io.micronaut.AbstractMicronautSpec
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -25,7 +24,6 @@ import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
 import spock.lang.Retry
 
-import javax.xml.bind.DatatypeConverter
 import java.security.MessageDigest
 
 /**
@@ -492,7 +490,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         given:
         byte[] b = new byte[15360] //15mb
         new Random().nextBytes(b)
-        String originalmd5 = calculateMd5(b)
+        byte[] originalmd5 = calculateMd5(b)
         MultipartBody requestBody = MultipartBody.builder()
                 .addPart("title", "bar-stream")
                 .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, b)
@@ -522,10 +520,9 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         super.getConfiguration() << ['micronaut.http.client.read-timeout': 300]
     }
 
-    private String calculateMd5(byte[] bytes) {
+    private byte[] calculateMd5(byte[] bytes) {
         MessageDigest md = MessageDigest.getInstance("MD5")
         md.update(bytes)
-        byte[] digest = md.digest()
-        DatatypeConverter.printHexBinary(digest)
+        md.digest()
     }
 }
