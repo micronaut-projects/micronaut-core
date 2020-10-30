@@ -5,4 +5,4 @@ import org.atinject.tck.auto.Seat
 
 @Singleton
 @Inject
-class Cupholder(  val seatProvider: Provider[Seat])
+class Cupholder(val seatProvider: Provider[Seat])

@@ -113,8 +113,11 @@ class DebugComponent(val global: Global) extends PluginComponent {
   def newPhase(prev: Phase) = new StdPhase(prev) {
 
     def apply(unit: CompilationUnit): Unit = {
+      for (tree@q"$mods var ..$patsnel: $tpe" <- unit.body) {
+        println(s"tree=$tree, symbol=${tree.symbol.fullName}, symbol.annotations=${tree.symbol.annotations.map(_.symbol.fullName)}")
+      }
       for (tree@q"$mods def $tname[..$tparams](...$paramss): $tpt = $expr" <- unit.body) {
-        println(s"tree=$tree, symbol=${tree.symbol.fullName}, symbol.overrides=${tree.symbol.overrides.map(_.fullName)}")
+        println(s"tree=$tree, symbol=${tree.symbol.fullName}, symbol.overrides=${tree.symbol.overrides.map(_.fullName)}, symbol.annotations=${tree.symbol.annotations.map(_.symbol.fullName)}")
       }
     }
   }

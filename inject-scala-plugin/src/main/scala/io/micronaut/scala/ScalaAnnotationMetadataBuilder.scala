@@ -106,7 +106,10 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[E
    */
   override protected def getAnnotationsForType(element: ElementFacade): util.List[_ <: AnnotationFacade] =
     element match {
-      case SymbolFacade(symbol) => symbol.annotations.map { ScalaAnnotationFacade(_) }.asJava
+      case SymbolFacade(symbol) => (symbol match {
+        case methodSymbol:Global#MethodSymbol if !symbol.isPrivate && symbol.isAccessor && symbol.isSetter =>  methodSymbol.accessedOrSelf
+        case _ =>symbol
+      }).annotations.map { ScalaAnnotationFacade(_) }.asJava
       case NameFacade(cls, _) => cls.getAnnotations.map { anno =>
         JavaAnnotationFacade(anno.annotationType, Map())
       }.toList.asJava

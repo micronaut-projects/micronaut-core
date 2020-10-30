@@ -86,14 +86,15 @@ object ExecutableElementParamInfo {
                 params.addParameter(
                   argName,
                   paramSymbol.typeOfThis.typeSymbol.fullName,
-                  boundTypes.get(kind.nameString))
+                  boundTypes.getOrDefault(kind.nameString, paramSymbol.originalInfo.bounds.hi.typeSymbol.fullName))
 
-                params.addGenericTypes(
-                  argName,
-                  Collections.singletonMap(
-                    kind.nameString,
-                    boundTypes.get(kind.nameString))
-                )
+                if (boundTypes.containsKey(kind.nameString)) {
+                  params.addGenericTypes(
+                    argName,
+                    Collections.singletonMap(
+                      kind.nameString,
+                      boundTypes.get(kind.nameString)))
+                }
               }
             } else {
 

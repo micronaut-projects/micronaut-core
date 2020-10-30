@@ -72,12 +72,10 @@ class InitPluginComponent(val global: Global) extends PluginComponent {
    */
   def buildMethodSymbolBridgeOverride(classDef:Global#ClassDef): Unit = {
     classDef.impl.body.foreach {
-      case defDef:Global#DefDef if defDef.symbol.overrides.nonEmpty => {
-        if (defDef.symbol.isBridge) {
-          defDef.children.foreach {
-            case treeApply: Global#Apply => Globals.methodsToBridgeOverrides.addOne((treeApply.symbol, defDef.symbol.overrides))
-            case _ => ()
-          }
+      case defDef:Global#DefDef if defDef.symbol.isBridge && defDef.symbol.overrides.nonEmpty => {
+        defDef.children.foreach {
+          case treeApply: Global#Apply => Globals.methodsToBridgeOverrides.addOne((treeApply.symbol, defDef.symbol.overrides))
+          case _ => ()
         }
       }
       case _ => ()
