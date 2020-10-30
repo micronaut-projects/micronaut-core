@@ -23,9 +23,9 @@ import io.micronaut.health.HealthStatus
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
 import io.micronaut.management.health.aggregator.RxJavaHealthAggregator
 import io.micronaut.management.health.indicator.HealthIndicator
 import io.micronaut.management.health.indicator.HealthResult
@@ -343,6 +343,116 @@ class HealthEndpointSpec extends Specification {
         embeddedServer.close()
     }
 
+    void "test health/liveness DOWN status means HttpStatus.SERVICE_UNAVAILABLE by default"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'indicator.name': 'TestLivenessDown',
+                'endpoints.health.sensitive': false
+        ])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        def response = rxClient.exchange("/health/liveness", HealthResult)
+                .onErrorResumeNext(new Function<Throwable, Publisher<? extends HttpResponse<HealthResult>>>() {
+                    @Override
+                    Publisher<? extends HttpResponse<HealthResult>> apply(@NonNull Throwable throwable) throws Exception {
+
+                        def rsp = ((HttpClientResponseException) throwable).response
+                        rsp.getBody(HealthResult)
+                        return Flowable.just(rsp)
+                    }
+                }).blockingFirst()
+        HealthResult result = response.getBody(HealthResult).get()
+
+        then:
+        response.code() == HttpStatus.SERVICE_UNAVAILABLE.code
+        result.status == HealthStatus.DOWN
+
+        cleanup:
+        embeddedServer.close()
+    }
+
+    void "test health/readiness DOWN status means HttpStatus.SERVICE_UNAVAILABLE by default"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'indicator.name': 'TestReadinessDown',
+                'endpoints.health.sensitive': false
+        ])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        def response = rxClient.exchange("/health/readiness", HealthResult)
+                .onErrorResumeNext(new Function<Throwable, Publisher<? extends HttpResponse<HealthResult>>>() {
+                    @Override
+                    Publisher<? extends HttpResponse<HealthResult>> apply(@NonNull Throwable throwable) throws Exception {
+
+                        def rsp = ((HttpClientResponseException) throwable).response
+                        rsp.getBody(HealthResult)
+                        return Flowable.just(rsp)
+                    }
+                }).blockingFirst()
+        HealthResult result = response.getBody(HealthResult).get()
+
+        then:
+        response.code() == HttpStatus.SERVICE_UNAVAILABLE.code
+        result.status == HealthStatus.DOWN
+
+        cleanup:
+        embeddedServer.close()
+    }
+
+    void "test health/readiness endpoint with custom DOWN mapping"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'indicator.name': 'TestReadinessDown',
+                'endpoints.health.sensitive': false,
+                'endpoints.health.status.http-mapping.DOWN': 200
+        ])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        def response = rxClient.exchange("/health/readiness", HealthResult)
+                .blockingFirst()
+        HealthResult result = response.body()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result.status == HealthStatus.DOWN
+
+        cleanup:
+        embeddedServer.close()
+    }
+
+    void "test health/liveness endpoint with custom DOWN mapping"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'indicator.name': 'TestLivenessDown',
+                'endpoints.health.sensitive': false,
+                'endpoints.health.status.http-mapping.DOWN': 200
+        ])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        def response = rxClient.exchange("/health/liveness", HealthResult)
+                .blockingFirst()
+        HealthResult result = response.body()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result.status == HealthStatus.DOWN
+
+        cleanup:
+        embeddedServer.close()
+    }
+
     @Singleton
     @Requires(property = 'spec.name', value = 'HealthEndpointSpec')
     static class TestPrincipalBinder implements TypedRequestArgumentBinder<Principal> {
@@ -390,6 +500,25 @@ class HealthEndpointSpec extends Specification {
         @Override
         Publisher<HealthResult> getResult() {
             return Flowable.just(HealthResult.builder('liveness').status(HealthStatus.UP).build())
+        }
+    }
+
+    @Singleton
+    @Liveness
+    @Requires(property = 'indicator.name', value = 'TestLivenessDown')
+    static class TestLivenessDownHealthIndicator implements HealthIndicator {
+        @Override
+        Publisher<HealthResult> getResult() {
+            return Flowable.just(HealthResult.builder('liveness').status(HealthStatus.DOWN).build())
+        }
+    }
+    @Singleton
+    @Readiness
+    @Requires(property = 'indicator.name', value = 'TestReadinessDown')
+    static class TestReadinessDownHealthIndicator implements HealthIndicator {
+        @Override
+        Publisher<HealthResult> getResult() {
+            return Flowable.just(HealthResult.builder('readiness').status(HealthStatus.DOWN).build())
         }
     }
 }
