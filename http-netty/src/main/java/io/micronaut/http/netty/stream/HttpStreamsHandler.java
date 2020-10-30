@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.stream;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.micronaut.http.netty.reactive.HandlerSubscriber;
 import io.netty.channel.*;
@@ -108,7 +109,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
      * @param stream The publisher for the Http Content
      * @return An streamed incoming message
      */
-    protected abstract In createStreamedMessage(In in, Publisher<HttpContent> stream);
+    protected abstract In createStreamedMessage(In in, Publisher<? extends HttpContent> stream);
 
     /**
      * Invoked when an incoming message is first received.
@@ -205,22 +206,49 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
                 currentlyStreamedMessage = inMsg;
                 // It has a body, stream it
-                HandlerPublisher<HttpContent> publisher = new HandlerPublisher<HttpContent>(ctx.executor(), HttpContent.class) {
-                    @Override
-                    protected void cancelled() {
-                        if (ctx.executor().inEventLoop()) {
-                            handleCancelled(ctx, inMsg);
-                        } else {
-                            ctx.executor().execute(() -> handleCancelled(ctx, inMsg));
+                int streamId = getStreamId(msg);
+                HandlerPublisher<? extends HttpContent> publisher;
+                if (streamId > -1) {
+                    publisher = new HandlerPublisher<Http2Content>(ctx.executor(), Http2Content.class) {
+                        @Override
+                        protected boolean acceptInboundMessage(Object msg) {
+                            return super.acceptInboundMessage(msg) && ((Http2Content) msg).stream().id() == streamId;
                         }
-                    }
 
-                    @Override
-                    protected void requestDemand() {
-                        bodyRequested(ctx);
-                        super.requestDemand();
-                    }
-                };
+                        @Override
+                        protected void cancelled() {
+                            if (ctx.executor().inEventLoop()) {
+                                handleCancelled(ctx, inMsg);
+                            } else {
+                                ctx.executor().execute(() -> handleCancelled(ctx, inMsg));
+                            }
+                        }
+
+                        @Override
+                        protected void requestDemand() {
+                            bodyRequested(ctx);
+                            super.requestDemand();
+                        }
+                    };
+                } else {
+
+                    publisher = new HandlerPublisher<HttpContent>(ctx.executor(), HttpContent.class) {
+                        @Override
+                        protected void cancelled() {
+                            if (ctx.executor().inEventLoop()) {
+                                handleCancelled(ctx, inMsg);
+                            } else {
+                                ctx.executor().execute(() -> handleCancelled(ctx, inMsg));
+                            }
+                        }
+
+                        @Override
+                        protected void requestDemand() {
+                            bodyRequested(ctx);
+                            super.requestDemand();
+                        }
+                    };
+                }
 
                 ctx.channel().pipeline().addAfter(ctx.name(), HANDLER_BODY_PUBLISHER, publisher);
                 ctx.fireChannelRead(createStreamedMessage(inMsg, publisher));
@@ -228,6 +256,18 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         } else if (msg instanceof HttpContent) {
             handleReadHttpContent(ctx, (HttpContent) msg);
         }
+    }
+
+    /**
+     * Gets the stream ID from the message.
+     * @param msg The message
+     * @return The stream id
+     */
+    protected int getStreamId(Object msg) {
+        if (msg instanceof io.netty.handler.codec.http.HttpMessage) {
+            return ((io.netty.handler.codec.http.HttpMessage) msg).headers().getInt(AbstractNettyHttpRequest.STREAM_ID, -1);
+        }
+        return -1;
     }
 
     private void handleCancelled(ChannelHandlerContext ctx, In msg) {

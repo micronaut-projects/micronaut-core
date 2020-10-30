@@ -285,14 +285,14 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
             // end of stream, emits a LastHttpContent
             // will be released by HttpStreamsHandler
             if (dataReadableBytes > 0) {
-                final DefaultLastHttpContent content = new DefaultLastHttpContent(data.retain());
+                final DefaultLastHttpContent content = new DefaultLastHttp2Content(data.retain(), stream);
                 fireChannelRead(ctx, content, stream);
             } else {
-                fireChannelRead(ctx, LastHttpContent.EMPTY_LAST_CONTENT, stream);
+                fireChannelRead(ctx, new DefaultLastHttp2Content(Unpooled.EMPTY_BUFFER, stream), stream);
             }
         } else {
             // will be released by HttpStreamsHandler
-            final DefaultHttpContent content = new DefaultHttpContent(data.retain());
+            final DefaultHttp2Content content = new DefaultHttp2Content(data.retain(), stream);
             fireChannelRead(ctx, content, stream);
         }
 
@@ -347,8 +347,9 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
         if (msg != null) {
             onRstStreamRead(stream, msg);
         }
-        ctx.fireExceptionCaught(Http2Exception.streamError(streamId, Http2Error.valueOf(errorCode),
-                "HTTP/2 to HTTP layer caught stream reset"));
+
+        // discard stream since it has been reset
+        stream.close();
     }
 
     @Override
