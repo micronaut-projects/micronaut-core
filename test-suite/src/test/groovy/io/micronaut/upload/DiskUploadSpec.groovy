@@ -23,6 +23,8 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
 
+import java.security.MessageDigest
+
 /**
  * Any changes or additions to this test should also be done
  * in {@link StreamUploadSpec} and {@link MixedUploadSpec}
@@ -363,8 +365,43 @@ class DiskUploadSpec extends AbstractMicronautSpec {
         response.body() == val
     }
 
+    void "test the file is not corrupted with transferTo"() {
+        given:
+        byte[] b = new byte[15360] //15mb
+        new Random().nextBytes(b)
+        byte[] originalmd5 = calculateMd5(b)
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("title", "bar-stream")
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, b)
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-file-upload", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE), String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def result = response.getBody().get()
+        File file = new File(uploadDir, "bar-stream.json")
+        file.deleteOnExit()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result == "Uploaded ${b.size()}"
+        file.exists()
+        file.length() == b.size()
+        calculateMd5(file.getBytes()) == originalmd5
+    }
+
     @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.http.client.read-timeout': 300, 'micronaut.server.multipart.disk': true]
+    }
+
+    private byte[] calculateMd5(byte[] bytes) {
+        MessageDigest md = MessageDigest.getInstance("MD5")
+        md.update(bytes)
+        md.digest()
     }
 }
