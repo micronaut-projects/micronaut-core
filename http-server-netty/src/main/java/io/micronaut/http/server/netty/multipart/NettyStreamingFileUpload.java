@@ -36,7 +36,6 @@ import java.io.*;
 import java.nio.file.Files;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
-import java.util.function.BooleanSupplier;
 
 /**
  * An implementation of the {@link StreamingFileUpload} interface for Netty.
