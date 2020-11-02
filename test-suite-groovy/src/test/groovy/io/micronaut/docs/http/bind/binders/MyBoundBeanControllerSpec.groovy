@@ -21,9 +21,10 @@ class MyBoundBeanControllerSpec extends Specification{
 
     void testAnnotationBinding() {
         when:
+        Set cookiesSet = [Cookie.of("shoppingCart", "5"),
+                          Cookie.of("displayName", "John Q Micronaut")]
         HttpRequest request = HttpRequest.POST("/customBinding/annotated", "{\"key\":\"value\"}")
-                .cookies(Set.of(Cookie.of("shoppingCart", "5"),
-                        Cookie.of("displayName", "John Q Micronaut")))
+                .cookies(cookiesSet)
                 .basicAuth("munaut", "P@ssw0rd")
         Map<String, String> body = client.toBlocking().retrieve(request, Argument.mapOf(String.class, String.class))
 
@@ -36,9 +37,10 @@ class MyBoundBeanControllerSpec extends Specification{
 
     void testTypeBinding() {
         when:
+        Set cookiesSet = [Cookie.of("shoppingCart", "5"),
+                          Cookie.of("displayName", "John Q Micronaut")]
         HttpRequest request = HttpRequest.POST("/customBinding/typed", "{\"key\":\"value\"}")
-                .cookies(Set.of(Cookie.of("shoppingCart", "5"),
-                        Cookie.of("displayName", "John Q Micronaut")))
+                .cookies(cookiesSet)
                 .basicAuth("munaut", "P@ssw0rd")
         Map<String, String> body = client.toBlocking().retrieve(request, Argument.mapOf(String.class, String.class))
 
