@@ -803,7 +803,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                             (FileUpload) data,
                                                             serverConfiguration.getMultipart(),
                                                             getIoExecutor(),
-                                                            flowable));
+                                                            (Flowable<PartData>) flowable));
                                                 } else {
                                                     namedSubject.onNext(flowable);
                                                 }
@@ -812,9 +812,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             }
                                             return subject;
                                         });
-
                                     }
-
 
                                     UnicastProcessor subject;
 
@@ -846,7 +844,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                         (FileUpload) data,
                                                         serverConfiguration.getMultipart(),
                                                         getIoExecutor(),
-                                                        processFlowable(subject, dataKey, true));
+                                                        (Flowable<PartData>) processFlowable(subject, dataKey, true));
                                             }
                                             return upload;
                                         });

@@ -65,6 +65,7 @@ public class MaybeBodyBinder extends DefaultBodyAnnotationBinder<Maybe> implemen
     }
 
     @Deprecated
+    @Override
     public boolean supportsSuperTypes() {
         return false;
     }
