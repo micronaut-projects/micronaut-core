@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.http.MutableHttpRequest
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.DefaultFullHttpRequest
 import io.netty.handler.codec.http.HttpVersion
@@ -45,6 +46,24 @@ class NettyHttpRequestSpec extends Specification {
         then:
         altered.path == '/another'
         altered.headers.get("foo") == 'bar'
+    }
+
+    void "test mutating a mutable request"() {
+        given:
+        DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, GET, "/foo/bar")
+        def request = new NettyHttpRequest(nettyRequest, Mock(ChannelHandlerContext), new DefaultConversionService(), new HttpServerConfiguration())
+
+        when:
+        request = request.mutate()
+
+        then:
+        request instanceof MutableHttpRequest
+
+        when: //mutate called on the result of .mutate()
+        request.mutate()
+
+        then:
+        noExceptionThrown()
     }
 
     void "test netty http request parameters"() {

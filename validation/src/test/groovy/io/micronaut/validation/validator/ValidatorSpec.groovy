@@ -6,6 +6,7 @@ import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.validation.validator.resolver.CompositeTraversableResolver
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -377,6 +378,80 @@ class ValidatorSpec extends Specification {
         !beanDescriptor.isBeanConstrained()
         beanDescriptor.getConstrainedProperties().size() == 0
     }
+
+    void "test cascade to container of non-introspected class" () {
+        when:
+        Bee notIntrospected = new Bee(name: "")
+        HiveOfBeeList beeHive = new HiveOfBeeList(bees: [notIntrospected])
+        def violations = validator.validate(beeHive)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+    }
+
+    void "test cascade to map of non-introspected value class" () {
+        when:
+        Bee notIntrospected = new Bee(name: "")
+        HiveOfBeeMap beeHive = new HiveOfBeeMap(bees: ["blank" : notIntrospected])
+        def violations = validator.validate(beeHive)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+    }
+
+    @Ignore("FIXME: https://github.com/micronaut-projects/micronaut-core/issues/4410")
+    void "test element validation in String collection" () {
+        when:
+        ListOfStrings strings = new ListOfStrings(strings: ["", null, "a string that's too long"])
+        def violations = validator.validate(strings)
+
+        then:
+        // should be: two for violating element size, and one null string violation
+        violations.size() == 3
+        violations[0].constraintDescriptor
+        violations[0].constraintDescriptor.annotation instanceof Size
+        violations[1].constraintDescriptor
+        violations[1].constraintDescriptor.annotation instanceof NotNull
+        violations[2].constraintDescriptor
+        violations[2].constraintDescriptor.annotation instanceof Size
+    }
+}
+
+@Introspected
+class HiveOfBeeMap {
+    @Valid
+    Map<String, Bee> bees
+}
+
+@Introspected
+class HiveOfBeeList {
+    @Valid
+    List<Bee> bees
+}
+
+// not introspected, expect validation failure
+class Bee {
+    @NotBlank
+    String name
+}
+
+// FIXME see https://github.com/micronaut-projects/micronaut-core/issues/4410
+// demonstrated by "test fail elements in String list"
+// List, Set and array all work same
+// 1) With Valid and constraints, validation is broken because it also applies @Size constraint to the container itself
+// 2) Without @Valid only the container itself is validated for given constraints (makes sense)
+@Introspected
+class ListOfStrings {
+    @Valid
+    @Size(min=1, max=2)
+    @NotNull
+    List<String> strings
 }
 
 @Introspected

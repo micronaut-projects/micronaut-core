@@ -1,2 +1,2 @@
 
-Check https://micronaut-projects.github.io/micronaut-discovery-client/lastest/guide/index.html#serviceDiscoveryEureka[Micronaut Eureka documentation].
+Check https://micronaut-projects.github.io/micronaut-discovery-client/latest/guide/index.html#serviceDiscoveryEureka[Micronaut Eureka documentation].

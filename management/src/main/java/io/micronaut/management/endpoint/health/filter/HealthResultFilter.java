@@ -37,7 +37,11 @@ import org.reactivestreams.Publisher;
  * @since 1.0
  *
  */
-@Filter(HealthResultFilter.DEFAULT_MAPPING)
+@Filter({
+    HealthResultFilter.DEFAULT_MAPPING,
+    HealthResultFilter.LIVENESS_PROBE_MAPPING,
+    HealthResultFilter.READINESS_PROBE_MAPPING
+})
 @Requires(beans = HealthEndpoint.class)
 public class HealthResultFilter extends OncePerRequestHttpServerFilter {
 
@@ -48,6 +52,8 @@ public class HealthResultFilter extends OncePerRequestHttpServerFilter {
             "${" + EndpointDefaultConfiguration.PREFIX + ".path:" +
                     EndpointDefaultConfiguration.DEFAULT_ENDPOINT_BASE_PATH + "}${" +
                     HealthEndpoint.PREFIX + ".id:health}";
+    public static final String LIVENESS_PROBE_MAPPING = DEFAULT_MAPPING + "/liveness";
+    public static final String READINESS_PROBE_MAPPING = DEFAULT_MAPPING + "/readiness";
 
     private final HealthEndpoint healthEndpoint;
 

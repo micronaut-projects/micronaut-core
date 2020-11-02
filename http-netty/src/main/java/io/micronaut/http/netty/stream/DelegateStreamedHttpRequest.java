@@ -32,13 +32,13 @@ import org.reactivestreams.Subscriber;
 @Internal
 final class DelegateStreamedHttpRequest extends DelegateHttpRequest implements StreamedHttpRequest {
 
-    private final Publisher<HttpContent> stream;
+    private final Publisher<? extends HttpContent> stream;
 
     /**
      * @param request The Http request
      * @param stream  The publisher
      */
-    DelegateStreamedHttpRequest(HttpRequest request, Publisher<HttpContent> stream) {
+    DelegateStreamedHttpRequest(HttpRequest request, Publisher<? extends HttpContent> stream) {
         super(request);
         this.stream = stream;
     }

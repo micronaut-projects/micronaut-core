@@ -66,6 +66,7 @@ public class MaybeBodyBinder extends DefaultBodyAnnotationBinder<Maybe> implemen
 
     @SuppressWarnings("checkstyle:designforextension")
     @Deprecated
+    @Override
     public boolean supportsSuperTypes() {
         return false;
     }

@@ -31,6 +31,8 @@ import io.micronaut.inject.writer.ClassGenerationException;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
+
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -193,7 +195,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             for (AnnotationClassValue aClass : classes) {
                 final Optional<ClassElement> classElement = context.getClassElement(aClass.getName());
                 classElement.ifPresent(ce -> {
-                    if (!ce.isAbstract() && ce.isPublic() && !ce.hasStereotype(Introspected.class)) {
+                    if (ce.isPublic() && !ce.hasStereotype(Introspected.class)) {
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                                 element.getName(),
                                 index.getAndIncrement(),
@@ -292,7 +294,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             ClassElement ce,
             BeanIntrospectionWriter writer) {
         Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
-        if (ce.isAbstract() && !constructorElement.isPresent()) {
+        if (ce.isAbstract() && !constructorElement.isPresent() && ce.hasStereotype(Introspected.class)) {
             currentAbstractIntrospection = new AbstractIntrospection(
                     writer,
                     includes,
@@ -351,9 +353,16 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         writers.put(writer.getBeanType().getClassName(), writer);
     }
 
-    private void processBeanProperties(BeanIntrospectionWriter writer, Collection<? extends PropertyElement> beanProperties, Set<String> includes, Set<String> excludes, Set<String> ignored, Set<AnnotationValue> indexedAnnotations, boolean metadata) {
+    private void processBeanProperties(
+            BeanIntrospectionWriter writer,
+            Collection<? extends PropertyElement> beanProperties,
+            Set<String> includes,
+            Set<String> excludes,
+            Set<String> ignored,
+            Set<AnnotationValue> indexedAnnotations,
+            boolean metadata) {
         for (PropertyElement beanProperty : beanProperties) {
-            final ClassElement type = beanProperty.getType();
+            final ClassElement type = beanProperty.getGenericType();
 
             final String name = beanProperty.getName();
             if (!includes.isEmpty() && !includes.contains(name)) {

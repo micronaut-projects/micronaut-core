@@ -778,6 +778,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 annotationMetadata
                         );
                     } else {
+                        boolean isInterface = JavaModelUtils.isInterface(method.getEnclosingElement());
+                        boolean isDefault = method.isDefault();
+                        if (isInterface && isDefault) {
+                            // Default methods cannot be "super" accessed on the defined type
+                            owningType = introductionTypeName;
+                        }
+
                         // only apply around advise to non-abstract methods of introduction advise
                         aopProxyWriter.visitAroundMethod(
                                 owningType,
@@ -790,8 +797,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 parameterAnnotationMetadata,
                                 methodGenericTypes,
                                 annotationMetadata,
-                                JavaModelUtils.isInterface(method.getEnclosingElement()),
-                                method.isDefault()
+                                isInterface,
+                                isDefault
                         );
                     }
 
