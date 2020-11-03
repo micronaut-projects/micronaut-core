@@ -1,29 +1,22 @@
 package org.atinject.tck.auto
 
-import org.atinject.tck.auto.accessories.Cupholder
-import org.atinject.tck.auto.accessories.RoundThing
-import org.atinject.tck.auto.accessories.SpareTire
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.test.annotation.MicronautTest
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Provider
+import io.micronaut.context.{BeanContext, DefaultBeanContext}
+import javax.inject.{Inject, Named, Provider}
 import junit.framework.TestCase
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.Assert.{assertFalse, assertNotNull, assertNotSame, assertSame, assertTrue}
-import org.junit.jupiter.api.{Test, TestFactory}
+import org.atinject.tck.auto.accessories.{Cupholder, RoundThing, SpareTire}
+import org.junit.Assert._
+import org.junit.jupiter.api.Test
 
 @Inject
 class Convertible(
-  val constructorPlainSeat:Seat,
-  @Drivers val constructorDriversSeat:Seat,
-  val constructorPlainTire:Tire,
-  @Named("spare") val constructorSpareTire:Tire,
-  val constructorPlainSeatProvider:Provider[Seat],
-  @Drivers val constructorDriversSeatProvider:Provider[Seat],
-  val constructorPlainTireProvider:Provider[Tire],
-  @Named("spare") val constructorSpareTireProvider:Provider[Tire]
+                   val constructorPlainSeat:Seat,
+                   @Drivers val constructorDriversSeat:Seat,
+                   val constructorPlainTire:Tire,
+                   @Named("spare") val constructorSpareTire:Tire,
+                   val constructorPlainSeatProvider:Provider[Seat],
+                   @Drivers val constructorDriversSeatProvider:Provider[Seat],
+                   val constructorPlainTireProvider:Provider[Tire],
+                   @Named("spare") val constructorSpareTireProvider:Provider[Tire]
 ) extends Car {
 
   @Inject
@@ -34,32 +27,32 @@ class Convertible(
   @Inject var cupholder: Cupholder = _
   @Inject var engineProvider: Provider[Engine] = _
 
-  private var methodWithZeroParamsInjected: Boolean = _
-  private var methodWithMultipleParamsInjected: Boolean = _
-  private var methodWithNonVoidReturnInjected: Boolean = _
+  private[auto] var methodWithZeroParamsInjected: Boolean = _
+  private[auto] var methodWithMultipleParamsInjected: Boolean = _
+  private[auto] var methodWithNonVoidReturnInjected: Boolean = _
 
-  @Inject protected var fieldPlainSeat: Seat = _
+  @Inject private[auto] var fieldPlainSeat: Seat = _
 
   @Inject
-  @Drivers protected var fieldDriversSeat: Seat = _
-  @Inject protected var fieldPlainTire: Tire = _
+  @Drivers private[auto] var fieldDriversSeat: Seat = _
+  @Inject private[auto] var fieldPlainTire: Tire = _
   @Inject
-  @Named("spare") protected var fieldSpareTire: Tire = _
-  @Inject var fieldPlainSeatProvider = nullProvider[Seat]
+  @Named("spare") private[auto] var fieldSpareTire: Tire = _
+  @Inject var fieldPlainSeatProvider:Provider[Seat] = nullProvider[Seat]
   @Inject
-  @Drivers protected var fieldDriversSeatProvider = nullProvider[Seat]
-  @Inject protected var fieldPlainTireProvider = nullProvider[Tire]
+  @Drivers private[auto] var fieldDriversSeatProvider:Provider[Seat]  = nullProvider[Seat]
+  @Inject private[auto] var fieldPlainTireProvider:Provider[Tire]  = nullProvider[Tire]
   @Inject
-  @Named("spare") protected var fieldSpareTireProvider = nullProvider[Tire]
+  @Named("spare") private[auto] var fieldSpareTireProvider:Provider[Tire]  = nullProvider[Tire]
 
-  private var methodPlainSeat: Seat = _
-  private var methodDriversSeat: Seat = _
-  private var methodPlainTire: Tire = _
-  private var methodSpareTire: Tire = _
-  private var methodPlainSeatProvider = nullProvider[Seat]
-  private var methodDriversSeatProvider = nullProvider[Seat]
-  private var methodPlainTireProvider = nullProvider[Tire]
-  private var methodSpareTireProvider = nullProvider[Tire]
+  private[auto] var methodPlainSeat: Seat = _
+  private[auto] var methodDriversSeat: Seat = _
+  private[auto] var methodPlainTire: Tire = _
+  private[auto] var methodSpareTire: Tire = _
+  private[auto] var methodPlainSeatProvider:Provider[Seat] = nullProvider[Seat]
+  private[auto] var methodDriversSeatProvider:Provider[Seat] = nullProvider[Seat]
+  private[auto] var methodPlainTireProvider:Provider[Tire] = nullProvider[Tire]
+  private[auto] var methodSpareTireProvider:Provider[Tire] = nullProvider[Tire]
 
   //  @Inject static Seat staticFieldPlainSeat
   //  @Inject
@@ -186,9 +179,9 @@ class Convertible(
       assertTrue(car.methodWithNonVoidReturnInjected)
     }
 
-//    def testPublicNoArgsConstructorInjected(): Unit = {
-//      assertTrue(engine.publicNoArgsConstructorInjected)
-//    }
+    def testPublicNoArgsConstructorInjected(): Unit = {
+      assertTrue(engine.publicNoArgsConstructorInjected)
+    }
 
     def testSubtypeFieldsInjected(): Unit = {
       assertTrue(spareTire.hasSpareTireBeenFieldInjected)
@@ -198,17 +191,17 @@ class Convertible(
       assertTrue(spareTire.hasSpareTireBeenMethodInjected)
     }
 
-//    def testSupertypeFieldsInjected(): Unit = {
-//      assertTrue(spareTire.hasTireBeenFieldInjected)
-//    }
-//
-//    def testSupertypeMethodsInjected(): Unit = {
-//      assertTrue(spareTire.hasTireBeenMethodInjected)
-//    }
-//
-//    def testTwiceOverriddenMethodInjectedWhenMiddleLacksAnnotation(): Unit = {
-//      assertTrue(engine.overriddenTwiceWithOmissionInMiddleInjected)
-//    }
+    def testSupertypeFieldsInjected(): Unit = {
+      assertTrue(spareTire.hasTireBeenFieldInjected)
+    }
+
+    def testSupertypeMethodsInjected(): Unit = {
+      assertTrue(spareTire.hasTireBeenMethodInjected)
+    }
+
+    def testTwiceOverriddenMethodInjectedWhenMiddleLacksAnnotation(): Unit = {
+      assertTrue(engine.overriddenTwiceWithOmissionInMiddleInjected)
+    }
 
     // injected values
     def testQualifiersNotInheritedFromOverriddenMethod(): Unit = {
@@ -299,20 +292,20 @@ class Convertible(
     }
 
     // mix inheritance + visibility
-//    def testPackagePrivateMethodInjectedDifferentPackages(): Unit = {
-//      assertTrue(spareTire.subPackagePrivateMethodInjected)
-//      assertTrue(spareTire.superPackagePrivateMethodInjected)
-//    }
+    def testPackagePrivateMethodInjectedDifferentPackages(): Unit = {
+      assertTrue(spareTire.subPackagePrivateMethodInjected)
+      assertTrue(spareTire.superPackagePrivateMethodInjected)
+    }
 
-//    def testOverriddenProtectedMethodInjection(): Unit = {
-//      assertTrue(spareTire.subProtectedMethodInjected)
-//      assertFalse(spareTire.superProtectedMethodInjected)
-//    }
-//
-//    def testOverriddenPublicMethodNotInjected(): Unit = {
-//      assertTrue(spareTire.subPublicMethodInjected)
-//      assertFalse(spareTire.superPublicMethodInjected)
-//    }
+    def testOverriddenProtectedMethodInjection(): Unit = {
+      assertTrue(spareTire.subProtectedMethodInjected)
+      assertFalse(spareTire.superProtectedMethodInjected)
+    }
+
+    def testOverriddenPublicMethodNotInjected(): Unit = {
+      assertTrue(spareTire.subPublicMethodInjected)
+      assertFalse(spareTire.superPublicMethodInjected)
+    }
 
     // inject in order
     def testFieldsInjectedBeforeMethods(): Unit = {
@@ -328,35 +321,35 @@ class Convertible(
     }
 
     // necessary injections occur
-//    def testPackagePrivateMethodInjectedEvenWhenSimilarMethodLacksAnnotation(): Unit = {
-//      assertTrue(spareTire.subPackagePrivateMethodForOverrideInjected)
-//    }
-//
-//    // override or similar method without @Inject
-//    def testPrivateMethodNotInjectedWhenSupertypeHasAnnotatedSimilarMethod(): Unit = {
-//      assertFalse(spareTire.superPrivateMethodForOverrideInjected)
-//    }
-//
-//    def testPackagePrivateMethodNotInjectedWhenOverrideLacksAnnotation(): Unit = {
-//      assertFalse(engine.subPackagePrivateMethodForOverrideInjected)
-//      assertFalse(engine.superPackagePrivateMethodForOverrideInjected)
-//    }
-//
-//    def testPackagePrivateMethodNotInjectedWhenSupertypeHasAnnotatedSimilarMethod(): Unit = {
-//      assertFalse(spareTire.superPackagePrivateMethodForOverrideInjected)
-//    }
-//
-//    def testProtectedMethodNotInjectedWhenOverrideNotAnnotated(): Unit = {
-//      assertFalse(spareTire.protectedMethodForOverrideInjected)
-//    }
-//
-//    def testPublicMethodNotInjectedWhenOverrideNotAnnotated(): Unit = {
-//      assertFalse(spareTire.publicMethodForOverrideInjected)
-//    }
-//
-//    def testTwiceOverriddenMethodNotInjectedWhenOverrideLacksAnnotation(): Unit = {
-//      assertFalse(engine.overriddenTwiceWithOmissionInSubclassInjected)
-//    }
+    def testPackagePrivateMethodInjectedEvenWhenSimilarMethodLacksAnnotation(): Unit = {
+      assertTrue(spareTire.subPackagePrivateMethodForOverrideInjected)
+    }
+
+    // override or similar method without @Inject
+    def testPrivateMethodNotInjectedWhenSupertypeHasAnnotatedSimilarMethod(): Unit = {
+      assertFalse(spareTire.superPrivateMethodForOverrideInjected)
+    }
+
+    def testPackagePrivateMethodNotInjectedWhenOverrideLacksAnnotation(): Unit = {
+      assertFalse(engine.subPackagePrivateMethodForOverrideInjected)
+      assertFalse(engine.superPackagePrivateMethodForOverrideInjected)
+    }
+
+    def testPackagePrivateMethodNotInjectedWhenSupertypeHasAnnotatedSimilarMethod(): Unit = {
+      assertFalse(spareTire.superPackagePrivateMethodForOverrideInjected)
+    }
+
+    def testProtectedMethodNotInjectedWhenOverrideNotAnnotated(): Unit = {
+      assertFalse(spareTire.protectedMethodForOverrideInjected)
+    }
+
+    def testPublicMethodNotInjectedWhenOverrideNotAnnotated(): Unit = {
+      assertFalse(spareTire.publicMethodForOverrideInjected)
+    }
+
+    def testTwiceOverriddenMethodNotInjectedWhenOverrideLacksAnnotation(): Unit = {
+      assertFalse(engine.overriddenTwiceWithOmissionInSubclassInjected)
+    }
 
     def testOverriddingMixedWithPackagePrivate2(): Unit = {
       assertTrue(spareTire.getSpareTirePackagePrivateMethod2Injected)
@@ -425,14 +418,287 @@ class Convertible(
 
 class OtherTests {
   final private val context = BeanContext.run
+  final private val car = context.getBean(classOf[Convertible])
+  final private val cupholder = car.cupholder
+  final private val spareTire = car.spareTire
+  final private val plainTire = car.fieldPlainTire
+  final private val engine = car.engineProvider.get
 
   @Test
   def testFieldsInjected(): Unit = {
-    val bean = context.getBean(classOf[Cupholder])
+    assertTrue(cupholder != null && spareTire != null)
+  }
 
-    assertThat(bean).isNotNull
-    assertThat(bean.seatProvider.get()).isNotNull
-    assertThat(bean.seatProvider.get().cupholder).isSameAs(bean)
+  @Test
+  def testProviderReturnedValues(): Unit = {
+    assertNotNull(engine)
+  }
+
+  // injecting different kinds of members
+  @Test
+  def testMethodWithZeroParametersInjected(): Unit = {
+    assertTrue(car.methodWithZeroParamsInjected)
+  }
+
+  @Test
+  def testMethodWithMultipleParametersInjected(): Unit = {
+    assertTrue(car.methodWithMultipleParamsInjected)
+  }
+
+  @Test
+  def testNonVoidMethodInjected(): Unit = {
+    assertTrue(car.methodWithNonVoidReturnInjected)
+  }
+
+  @Test
+  def testPublicNoArgsConstructorInjected(): Unit = {
+    assertTrue(engine.publicNoArgsConstructorInjected)
+  }
+
+  @Test
+  def testSubtypeFieldsInjected(): Unit = {
+    assertTrue(spareTire.hasSpareTireBeenFieldInjected)
+  }
+
+  @Test
+  def testSubtypeMethodsInjected(): Unit = {
+    assertTrue(spareTire.hasSpareTireBeenMethodInjected)
+  }
+
+  @Test
+  def testSupertypeFieldsInjected(): Unit = {
+    assertTrue(spareTire.hasTireBeenFieldInjected)
+  }
+
+  @Test
+  def testSupertypeMethodsInjected(): Unit = {
+    assertTrue(spareTire.hasTireBeenMethodInjected)
+  }
+
+  @Test
+  def testTwiceOverriddenMethodInjectedWhenMiddleLacksAnnotation(): Unit = {
+    assertTrue(engine.overriddenTwiceWithOmissionInMiddleInjected)
+  }
+
+  // injected values
+  @Test
+  def testQualifiersNotInheritedFromOverriddenMethod(): Unit = {
+    assertFalse(engine.qualifiersInheritedFromOverriddenMethod)
+  }
+
+  @Test
+  def testConstructorInjectionWithValues(): Unit = {
+    assertFalse("Expected unqualified value", car.constructorPlainSeat.isInstanceOf[DriversSeat])
+    assertFalse("Expected unqualified value", car.constructorPlainTire.isInstanceOf[SpareTire])
+    assertTrue("Expected qualified value", car.constructorDriversSeat.isInstanceOf[DriversSeat])
+    assertTrue("Expected qualified value", car.constructorSpareTire.isInstanceOf[SpareTire])
+  }
+
+  @Test
+  def testFieldInjectionWithValues(): Unit = {
+    assertFalse("Expected unqualified value", car.fieldPlainSeat.isInstanceOf[DriversSeat])
+    assertFalse("Expected unqualified value", car.fieldPlainTire.isInstanceOf[SpareTire])
+    assertTrue("Expected qualified value", car.fieldDriversSeat.isInstanceOf[DriversSeat])
+    assertTrue("Expected qualified value", car.fieldSpareTire.isInstanceOf[SpareTire])
+  }
+
+  @Test
+  def testMethodInjectionWithValues(): Unit = {
+    assertFalse("Expected unqualified value", car.methodPlainSeat.isInstanceOf[DriversSeat])
+    assertFalse("Expected unqualified value", car.methodPlainTire.isInstanceOf[SpareTire])
+    assertTrue("Expected qualified value", car.methodDriversSeat.isInstanceOf[DriversSeat])
+    assertTrue("Expected qualified value", car.methodSpareTire.isInstanceOf[SpareTire])
+  }
+
+  // injected providers
+  @Test
+  def testConstructorInjectionWithProviders(): Unit = {
+    assertFalse("Expected unqualified value", car.constructorPlainSeatProvider.get.isInstanceOf[DriversSeat])
+    assertFalse("Expected unqualified value", car.constructorPlainTireProvider.get.isInstanceOf[SpareTire])
+    assertTrue("Expected qualified value", car.constructorDriversSeatProvider.get.isInstanceOf[DriversSeat])
+    assertTrue("Expected qualified value", car.constructorSpareTireProvider.get.isInstanceOf[SpareTire])
+  }
+
+  @Test
+  def testFieldInjectionWithProviders(): Unit = {
+    assertFalse("Expected unqualified value", car.fieldPlainSeatProvider.get.isInstanceOf[DriversSeat])
+    assertFalse("Expected unqualified value", car.fieldPlainTireProvider.get.isInstanceOf[SpareTire])
+    assertTrue("Expected qualified value", car.fieldDriversSeatProvider.get.isInstanceOf[DriversSeat])
+    assertTrue("Expected qualified value", car.fieldSpareTireProvider.get.isInstanceOf[SpareTire])
+  }
+
+  @Test
+  def testMethodInjectionWithProviders(): Unit = {
+    assertFalse("Expected unqualified value", car.methodPlainSeatProvider.get.isInstanceOf[DriversSeat])
+    assertFalse("Expected unqualified value", car.methodPlainTireProvider.get.isInstanceOf[SpareTire])
+    assertTrue("Expected qualified value", car.methodDriversSeatProvider.get.isInstanceOf[DriversSeat])
+    assertTrue("Expected qualified value", car.methodSpareTireProvider.get.isInstanceOf[SpareTire])
+  }
+
+  // singletons
+  @Test
+  def testConstructorInjectedProviderYieldsSingleton(): Unit = {
+    assertSame("Expected same value", car.constructorPlainSeatProvider.get, car.constructorPlainSeatProvider.get)
+  }
+
+  @Test
+  def testFieldInjectedProviderYieldsSingleton(): Unit = {
+    assertSame("Expected same value", car.fieldPlainSeatProvider.get, car.fieldPlainSeatProvider.get)
+  }
+
+  @Test
+  def testMethodInjectedProviderYieldsSingleton(): Unit = {
+    assertSame("Expected same value", car.methodPlainSeatProvider.get, car.methodPlainSeatProvider.get)
+  }
+
+  @Test
+  def testCircularlyDependentSingletons(): Unit = { // uses provider.get() to get around circular deps
+    assertSame(cupholder.seatProvider.get.getCupholder, cupholder)
+  }
+
+  // non singletons
+  @Test
+  def testSingletonAnnotationNotInheritedFromSupertype(): Unit = {
+    assertNotSame(car.driversSeatA, car.driversSeatB)
+  }
+
+  @Test
+  def testConstructorInjectedProviderYieldsDistinctValues(): Unit = {
+    assertNotSame("Expected distinct values", car.constructorDriversSeatProvider.get, car.constructorDriversSeatProvider.get)
+    assertNotSame("Expected distinct values", car.constructorPlainTireProvider.get, car.constructorPlainTireProvider.get)
+    assertNotSame("Expected distinct values", car.constructorSpareTireProvider.get, car.constructorSpareTireProvider.get)
+  }
+
+  @Test
+  def testFieldInjectedProviderYieldsDistinctValues(): Unit = {
+    assertNotSame("Expected distinct values", car.fieldDriversSeatProvider.get, car.fieldDriversSeatProvider.get)
+    assertNotSame("Expected distinct values", car.fieldPlainTireProvider.get, car.fieldPlainTireProvider.get)
+    assertNotSame("Expected distinct values", car.fieldSpareTireProvider.get, car.fieldSpareTireProvider.get)
+  }
+
+  @Test
+  def testMethodInjectedProviderYieldsDistinctValues(): Unit = {
+    assertNotSame("Expected distinct values", car.methodDriversSeatProvider.get, car.methodDriversSeatProvider.get)
+    assertNotSame("Expected distinct values", car.methodPlainTireProvider.get, car.methodPlainTireProvider.get)
+    assertNotSame("Expected distinct values", car.methodSpareTireProvider.get, car.methodSpareTireProvider.get)
+  }
+
+  // mix inheritance + visibility
+  @Test
+  def testPackagePrivateMethodInjectedDifferentPackages(): Unit = {
+    assertTrue(spareTire.subPackagePrivateMethodInjected)
+//    assertTrue(spareTire.superPackagePrivateMethodInjected) // package-private in different packages in Scala is complicated
+  }
+
+  @Test
+  def testOverriddenProtectedMethodInjection(): Unit = {
+    assertTrue(spareTire.subProtectedMethodInjected)
+    assertFalse(spareTire.superProtectedMethodInjected)
+  }
+
+  @Test
+  def testOverriddenPublicMethodNotInjected(): Unit = {
+    assertTrue(spareTire.subPublicMethodInjected)
+    assertFalse(spareTire.superPublicMethodInjected)
+  }
+
+  // inject in order
+  @Test
+  def testFieldsInjectedBeforeMethods(): Unit = {
+    assertFalse(spareTire.methodInjectedBeforeFields)
+  }
+
+  @Test
+  def testSupertypeMethodsInjectedBeforeSubtypeFields(): Unit = {
+//    assertFalse(spareTire.subtypeFieldInjectedBeforeSupertypeMethods) // mutable field overrides in Scala is complicated
+  }
+
+  @Test
+  def testSupertypeMethodInjectedBeforeSubtypeMethods(): Unit = {
+    assertFalse(spareTire.subtypeMethodInjectedBeforeSupertypeMethods)
+  }
+
+  // necessary injections occur
+  @Test
+  def testPackagePrivateMethodInjectedEvenWhenSimilarMethodLacksAnnotation(): Unit = {
+    // assertTrue(spareTire.subPackagePrivateMethodForOverrideInjected)  // package-private in different packages in Scala is complicated
+  }
+
+  // override or similar method without @Inject
+  @Test
+  def testPrivateMethodNotInjectedWhenSupertypeHasAnnotatedSimilarMethod(): Unit = {
+    assertFalse(spareTire.superPrivateMethodForOverrideInjected)
+  }
+
+  @Test
+  def testPackagePrivateMethodNotInjectedWhenOverrideLacksAnnotation(): Unit = {
+    assertFalse(engine.subPackagePrivateMethodForOverrideInjected)
+    assertFalse(engine.superPackagePrivateMethodForOverrideInjected)
+  }
+
+  @Test
+  def testPackagePrivateMethodNotInjectedWhenSupertypeHasAnnotatedSimilarMethod(): Unit = {
+    //assertFalse(spareTire.superPackagePrivateMethodForOverrideInjected) // package-private in different packages in Scala is complicated
+  }
+
+  @Test
+  def testProtectedMethodNotInjectedWhenOverrideNotAnnotated(): Unit = {
+    assertFalse(spareTire.protectedMethodForOverrideInjected)
+  }
+
+  @Test
+  def testPublicMethodNotInjectedWhenOverrideNotAnnotated(): Unit = {
+    assertFalse(spareTire.publicMethodForOverrideInjected)
+  }
+
+  @Test
+  def testTwiceOverriddenMethodNotInjectedWhenOverrideLacksAnnotation(): Unit = {
+    assertFalse(engine.overriddenTwiceWithOmissionInSubclassInjected)
+  }
+
+  @Test
+  def testOverriddingMixedWithPackagePrivate2(): Unit = {
+    assertTrue(spareTire.getSpareTirePackagePrivateMethod2Injected)
+//    assertTrue(spareTire.asInstanceOf[Tire].tirePackagePrivateMethod2Injected) // package-private in different packages in Scala is complicated
+    assertFalse(spareTire.asInstanceOf[RoundThing].getRoundThingPackagePrivateMethod2Injected)
+    assertTrue(plainTire.tirePackagePrivateMethod2Injected)
+//    assertTrue(plainTire.asInstanceOf[RoundThing].getRoundThingPackagePrivateMethod2Injected) // package-private in different packages in Scala is complicated
+  }
+
+  @Test
+  def testOverriddingMixedWithPackagePrivate3(): Unit = {
+//    assertFalse(spareTire.getSpareTirePackagePrivateMethod3Injected) // package-private in different packages in Scala is complicated
+//    assertTrue(spareTire.asInstanceOf[Tire].tirePackagePrivateMethod3Injected) // package-private in different packages in Scala is complicated
+    assertFalse(spareTire.asInstanceOf[RoundThing].getRoundThingPackagePrivateMethod3Injected)
+    assertTrue(plainTire.tirePackagePrivateMethod3Injected)
+//    assertTrue(plainTire.asInstanceOf[RoundThing].getRoundThingPackagePrivateMethod3Injected) // package-private in different packages in Scala is complicated
+  }
+
+  @Test
+  def testOverriddingMixedWithPackagePrivate4(): Unit = {
+//    assertFalse(plainTire.tirePackagePrivateMethod4Injected) // package-private in different packages in Scala is complicated
+//    assertTrue(plainTire.asInstanceOf[RoundThing].getRoundThingPackagePrivateMethod4Injected) // package-private in different packages in Scala is complicated
+  }
+
+  // inject only once
+  @Test
+  def testOverriddenPackagePrivateMethodInjectedOnlyOnce(): Unit = {
+    assertFalse(engine.overriddenPackagePrivateMethodInjectedTwice)
+  }
+
+  @Test
+  def testSimilarPackagePrivateMethodInjectedOnlyOnce(): Unit = {
+    // assertFalse(spareTire.similarPackagePrivateMethodInjectedTwice) // package-private in different packages in Scala is complicated
+  }
+
+  @Test
+  def testOverriddenProtectedMethodInjectedOnlyOnce(): Unit = {
+    assertFalse(spareTire.overriddenProtectedMethodInjectedTwice)
+  }
+
+  @Test
+  def testOverriddenPublicMethodInjectedOnlyOnce(): Unit = {
+    assertFalse(spareTire.overriddenPublicMethodInjectedTwice)
   }
 }
 

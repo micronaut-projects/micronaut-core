@@ -74,43 +74,51 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
               annotationMetadataHierarchy.hasDeclaredStereotype(classOf[Executable]) ||
               declaredMetadata.hasStereotype(classOf[Executable])
 
+  private def isInheritedAndNotPublic(concreteClass: Global#Symbol, declaringClass: Global#Symbol, methodOrField: Global#Symbol) = {
+    val packageOfDeclaringClass = declaringClass.owner
+    val packageOfConcreteClass = concreteClass.owner
+    (declaringClass ne concreteClass) &&
+      !(packageOfDeclaringClass.fullName == packageOfConcreteClass.fullName) &&
+      (methodOrField.isProtected || !methodOrField.isPublic)
+  }
+
   private def visitAnnotatedMethod(methodSymbol: Global#Symbol,
                                    annotationMetadata: AnnotationMetadata,
-                                   beanDefinitionWriter: BeanDefinitionVisitor): Unit = {
+                                   beanDefinitionWriter: BeanDefinitionVisitor,
+                                   overrides:Option[Global#Symbol]): Unit = {
 
-//    val params = populateParameterData(null, method, Collections.emptyMap)
-//    val returnType = method.getReturnType
-//    val declaringClass = modelUtils.classElementFor(method)
-//
-//    if (declaringClass == null) return
-//
-//    val isParent = !(declaringClass.getQualifiedName == this.concreteClass.getQualifiedName)
-//    val overridingMethod = modelUtils.overridingOrHidingMethod(method, this.concreteClass, false).orElse(method)
-//    val overridingClass = modelUtils.classElementFor(overridingMethod)
-//    val overridden = isParent && overridingClass != null && !(overridingClass.getQualifiedName == declaringClass.getQualifiedName)
-//
-//    val isPackagePrivate = modelUtils.isPackagePrivate(method)
-//    val isPrivate = modelUtils.isPrivate(method)
-//    if (overridden && !(isPrivate || isPackagePrivate)) { // bail out if the method has been overridden, since it will have already been handled
-//      return
-//    }
-//
-//    val packageOfOverridingClass = elementUtils.getPackageOf(overridingMethod)
-//    val packageOfDeclaringClass = elementUtils.getPackageOf(declaringClass)
-//    val isPackagePrivateAndPackagesDiffer = overridden && isPackagePrivate && !(packageOfOverridingClass.getQualifiedName == packageOfDeclaringClass.getQualifiedName)
-//    var requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
-//    val overriddenInjected = overridden && annotationUtils.getAnnotationMetadata(overridingMethod).hasDeclaredStereotype(classOf[Inject])
-//
-//    if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && overriddenInjected) { // bail out if the method has been overridden by another method annotated with @Inject
-//      return
-//    }
-//    if (isParent && overridden && !overriddenInjected && !isPackagePrivateAndPackagesDiffer && !isPrivate) { // bail out if the overridden method is package private and in the same package
-//      // and is not annotated with @Inject
-//      return
-//    }
-//    if (!requiresReflection && modelUtils.isInheritedAndNotPublic(this.concreteClass, declaringClass, method)) requiresReflection = true
-//
-    val requiresReflection = methodSymbol.isPrivate // || isPackagePrivateAndPackagesDiffer
+    //    val params = populateParameterData(null, method, Collections.emptyMap)
+    //    val returnType = method.getReturnType
+    val declaringClass = methodSymbol.enclClass
+    //
+    //    if (declaringClass == null) return
+    //
+    val isParent = !(declaringClass.fullName == this.concreteClass.symbol.fullName)
+    val overridingMethod = overrides.getOrElse(methodSymbol)
+    val overridingClass = overridingMethod.enclClass
+    val overridden = isParent && overridingClass != null && !(overridingClass.fullName == declaringClass.fullName)
+    //
+    val isPackagePrivate = methodSymbol.hasPackageFlag || methodSymbol.privateWithin == declaringClass.owner
+    val isPrivate = methodSymbol.isPrivate
+     if (overridden && !(isPrivate || isPackagePrivate)) { // bail out if the method has been overridden, since it will have already been handled
+      return
+    }
+
+    val packageOfOverridingClass = overridingClass.owner
+    val packageOfDeclaringClass = declaringClass.owner
+    val isPackagePrivateAndPackagesDiffer = overridden && isPackagePrivate &&
+      !(packageOfOverridingClass.fullName == packageOfDeclaringClass.fullName)
+    var requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
+    val overriddenInjected = overridden && Globals.metadataBuilder.getOrCreate(SymbolFacade(overridingMethod)).hasDeclaredStereotype(classOf[Inject])
+
+    if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && overriddenInjected) { // bail out if the method has been overridden by another method annotated with @Inject
+      return
+    }
+    if (isParent && overridden && !overriddenInjected && !isPackagePrivateAndPackagesDiffer && !isPrivate) { // bail out if the overridden method is package private and in the same package
+      // and is not annotated with @Inject
+      return
+    }
+    if (!requiresReflection && isInheritedAndNotPublic(this.concreteClass.symbol, declaringClass, methodSymbol)) requiresReflection = true
 
     val paramGenerics = typeGenericsForParamsAndArgs(
       methodSymbol.owner.originalInfo.typeSymbol.originalInfo.typeParams,
@@ -121,11 +129,15 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
 
     var argType = resolveType(methodSymbol.originalInfo.resultType)
 
+    val methodClass = (if (methodSymbol.enclClass.isTrait) concreteClass.symbol else methodSymbol.enclClass).fullName
+
+    if (methodSymbol.enclClass.isTrait && overridden) return // TODO make this work by dealing with linearization : https://riptutorial.com/scala/example/14607/linearization
+
     if (annotationMetadata.hasDeclaredStereotype(ProcessedTypes.POST_CONSTRUCT)) {
       //      final AopProxyWriter aopWriter = resolveAopWriter(writer);
       //      if (aopWriter != null && !aopWriter.isProxyTarget()) writer = aopWriter
       beanDefinitionWriter.visitPostConstructMethod(
-        concreteClass.symbol.fullName,
+        methodClass,
         requiresReflection,
         argType,
         methodSymbol.nameString,
@@ -138,7 +150,7 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
 //        val aopWriter = resolveAopWriter(writer)
 //        if (aopWriter != null && !aopWriter.isProxyTarget) writer = aopWriter
       beanDefinitionWriter.visitPreDestroyMethod(
-            concreteClass.symbol.fullName,
+            methodClass,
             requiresReflection,
             argType,
             methodSymbol.nameString,
@@ -149,7 +161,7 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
     } else if (annotationMetadata.hasDeclaredStereotype(classOf[Inject]) || annotationMetadata.hasDeclaredStereotype(classOf[ConfigurationInject])) {
         //val writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName)
        beanDefinitionWriter.visitMethodInjectionPoint(
-        concreteClass.symbol.fullName,
+         methodClass,
         requiresReflection,
         argType,
         methodSymbol.nameString,
@@ -398,7 +410,8 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
    }
 
   private def visitExecutable(methodSymbol: Global#Symbol,
-                               beanDefinitionWriter: BeanDefinitionVisitor):Unit = {
+                              beanDefinitionWriter: BeanDefinitionVisitor,
+                              overridden:Option[Global#Symbol]):Unit = {
     val annotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(methodSymbol))
 
     var methodAnnotationMetadata = if (annotationMetadata.isInstanceOf[AnnotationMetadataHierarchy]) annotationMetadata
@@ -412,9 +425,9 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
       val preDestroy = annotationMetadata.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY)
       if (injected || postConstruct || preDestroy || annotationMetadata.hasDeclaredStereotype(classOf[ConfigurationInject])) {
         if (isDeclaredBean) {
-          visitAnnotatedMethod(methodSymbol, annotationMetadata, beanDefinitionWriter)
+          visitAnnotatedMethod(methodSymbol, annotationMetadata, beanDefinitionWriter, overridden)
         } else if (injected) { // DEPRECATE: This behaviour should be deprecated in 2.0
-          visitAnnotatedMethod(methodSymbol, annotationMetadata, beanDefinitionWriter)
+          visitAnnotatedMethod(methodSymbol, annotationMetadata, beanDefinitionWriter, overridden)
         }
       }
 
@@ -433,7 +446,7 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
         methodAnnotationMetadata = Globals.metadataBuilder.annotate(methodAnnotationMetadata, io.micronaut.core.annotation.AnnotationValue.builder(ANN_VALIDATED).build)
       }
 
-      if (isDeclaredBean && isExecutable) {
+      if (isDeclaredBean && isExecutable && overridden.isEmpty) {
         visitExecutableMethod(methodSymbol, methodAnnotationMetadata, beanDefinitionWriter)
       } else if (isConfigurationPropertiesType && !methodSymbol.isPrivate && !methodSymbol.isStatic) {
         val methodName = methodSymbol.nameString
@@ -733,8 +746,10 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
     val isValue = !isInjected && (fieldAnnotationMetadata.hasStereotype(classOf[Value]) || fieldAnnotationMetadata.hasStereotype(classOf[Property]))
     if (isInjected || isValue) {
 
+      val declaringClass = valSymbol.enclClass
+
       val isPrivate = valSymbol.isPrivate
-      val requiresReflection = isPrivate
+      val requiresReflection = isPrivate || isInheritedAndNotPublic(this.concreteClass.symbol, declaringClass, valSymbol);
 
       val genericTypeMap = TypeFunctions.genericTypesForSymbol(
         valSymbol
@@ -762,41 +777,26 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
         )
       }
     }
-//    if (variable.getKind ne FIELD) return null
-//    if (modelUtils.isStatic(variable) || modelUtils.isFinal(variable)) return null
-//    var fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable)
-//    if (fieldAnnotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) fieldAnnotationMetadata = DefaultAnnotationMetadata.mutateMember(fieldAnnotationMetadata, "javax.annotation.Nullable", Collections.emptyMap)
-//    val isInjected = fieldAnnotationMetadata.hasStereotype(classOf[Inject])
-//    val isValue = !isInjected && (fieldAnnotationMetadata.hasStereotype(classOf[Value]) || fieldAnnotationMetadata.hasStereotype(classOf[Property]))
-//    if (isInjected || isValue) {
-//      val fieldName = variable.getSimpleName
-//      val writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName)
-//      val declaringClass = modelUtils.classElementFor(variable)
-//      if (declaringClass == null) return null
-//      val isPrivate = modelUtils.isPrivate(variable)
-//      val requiresReflection = isPrivate || modelUtils.isInheritedAndNotPublic(this.concreteClass, declaringClass, variable)
-//      if (!writer.isValidated) writer.setValidated(IS_CONSTRAINT.test(fieldAnnotationMetadata))
-//      val `type` = variable.asType
-//      if ((`type`.getKind eq TypeKind.ERROR) && !processingOver) throw new BeanDefinitionInjectProcessor.PostponeToNextRoundException
-//      val fieldType = modelUtils.resolveTypeReference(`type`)
-//      if (isValue) writer.visitFieldValue(modelUtils.resolveTypeReference(declaringClass), fieldType, fieldName.toString, requiresReflection, fieldAnnotationMetadata, genericUtils.resolveGenericTypes(`type`, Collections.emptyMap), isConfigurationPropertiesType)
-//      else writer.visitFieldInjectionPoint(modelUtils.resolveTypeReference(declaringClass), fieldType, fieldName.toString, requiresReflection, fieldAnnotationMetadata, genericUtils.resolveGenericTypes(`type`, Collections.emptyMap))
-//    }
   }
 
-  def visitSymbol(excludedSymbols:mutable.Set[Global#Symbol], beanDefinitionWriter:BeanDefinitionVisitor)(symbol:Global#Symbol):Unit = {
+  def visitSymbol(symbolToOverrides:mutable.Map[Global#Symbol, Global#Symbol], beanDefinitionWriter:BeanDefinitionVisitor, doVisit:Boolean)(symbol:Global#Symbol):Unit = {
     symbol match {
       case methodSymbol: Global#MethodSymbol if methodSymbol.isMethod &&
         !(methodSymbol.isConstructor || methodSymbol.isAccessor || methodSymbol.isBridge) =>
       {
-        if (!excludedSymbols.contains(methodSymbol)) {
-          visitExecutable(methodSymbol, beanDefinitionWriter)
-          excludedSymbols ++= methodSymbol.overrides
-          Globals.methodsToBridgeOverrides.get(methodSymbol).foreach(excludedSymbols ++= _)
-        }
+          if (doVisit) {
+            visitExecutable(methodSymbol, beanDefinitionWriter, symbolToOverrides.get(methodSymbol))
+          } else {
+            val overridden = methodSymbol.overrides
+            overridden.foreach(ancestor => if (!symbolToOverrides.contains(ancestor)) symbolToOverrides.put(ancestor, methodSymbol))
+            val bridgeOverrides = Globals.methodsToBridgeOverrides.getOrElse(methodSymbol, List())
+            bridgeOverrides.foreach(ancestor => if (!symbolToOverrides.contains(ancestor)) symbolToOverrides.put(ancestor, methodSymbol))
+          }
       }
       case termSymbol: Global#TermSymbol if termSymbol.isMutable /* && !termSymbol.originalInfo.typeSymbol.isAbstract */ => {
-        visitVariable(termSymbol, beanDefinitionWriter)
+        if (doVisit) {
+          visitVariable(termSymbol, beanDefinitionWriter)
+        }
       }
       case _ => ()
     }
@@ -834,12 +834,17 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
 
       visitTypeArguments(concreteClass.symbol, beanDefinitionWriter)
 
-      val excludedSymbols = new mutable.HashSet[Global#Symbol]()
+      val symbolToLowestDescendant = new mutable.HashMap[Global#Symbol, Global#Symbol]()
 
-      concreteClass.impl.body.map(_.symbol).foreach(visitSymbol(excludedSymbols, beanDefinitionWriter)(_))
+      concreteClass.impl.body.map(_.symbol).foreach(visitSymbol(symbolToLowestDescendant, beanDefinitionWriter, false)(_))
 
       concreteClass.symbol.baseClasses.tail.filter(filterAncestors)
-        .foreach((classSymbol:Global#Symbol) => classSymbol.originalInfo.decls.foreach(visitSymbol(excludedSymbols, beanDefinitionWriter)(_)))
+        .foreach((classSymbol:Global#Symbol) => classSymbol.originalInfo.decls.foreach(visitSymbol(symbolToLowestDescendant, beanDefinitionWriter, false)(_)))
+
+      concreteClass.symbol.baseClasses.tail.reverse.filter(filterAncestors)
+        .foreach((classSymbol:Global#Symbol) => classSymbol.originalInfo.decls.foreach(visitSymbol(symbolToLowestDescendant, beanDefinitionWriter, true)(_)))
+
+      concreteClass.impl.body.map(_.symbol).foreach(visitSymbol(symbolToLowestDescendant, beanDefinitionWriter, true)(_))
 
       beanDefinitionWriter.visitBeanDefinitionEnd()
       beanDefinitionWriter.accept(visitorContext)

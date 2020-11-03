@@ -1,8 +1,8 @@
 package org.atinject.tck.auto
 
-import org.atinject.tck.auto.accessories.SpareTire
 import javax.inject.Inject
 import javax.inject.Named
+import org.atinject.tck.auto.accessories.SpareTire
 
 class V8Engine() extends GasEngine {
   publicNoArgsConstructorInjected = true

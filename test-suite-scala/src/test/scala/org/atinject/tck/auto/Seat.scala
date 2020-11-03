@@ -1,7 +1,7 @@
 package org.atinject.tck.auto
 
-import org.atinject.tck.auto.accessories.Cupholder
 import javax.inject.{Inject, Singleton}
+import org.atinject.tck.auto.accessories.Cupholder
 
 @Singleton
 @Inject

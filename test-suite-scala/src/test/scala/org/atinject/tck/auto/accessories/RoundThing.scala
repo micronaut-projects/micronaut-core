@@ -3,6 +3,7 @@ package org.atinject.tck.auto.accessories
 import javax.inject.Inject
 
 class RoundThing {
+
   private var roundThingPackagePrivateMethod2Injected = false
 
   def getRoundThingPackagePrivateMethod2Injected: Boolean = roundThingPackagePrivateMethod2Injected
