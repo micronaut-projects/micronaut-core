@@ -339,11 +339,6 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype, @NonNull ClassLoader classLoader) {
-        return getAnnotationMetadata().getAnnotationTypesByStereotype(stereotype, classLoader);
-    }
-
-    @Override
     default @NonNull <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@NonNull Class<T> annotationClass) {
         return getAnnotationMetadata().findAnnotation(annotationClass);
     }
@@ -451,11 +446,6 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     @Override
     default @NonNull Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
         return getAnnotationMetadata().getAnnotationType(name);
-    }
-
-    @Override
-    default @NonNull Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
-        return getAnnotationMetadata().getAnnotationType(name, classLoader);
     }
 
     @Override
