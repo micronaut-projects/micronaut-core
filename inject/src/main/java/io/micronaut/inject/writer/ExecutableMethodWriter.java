@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -24,17 +25,20 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * Writes out {@link io.micronaut.inject.ExecutableMethod} implementations.
@@ -44,11 +48,6 @@ import java.util.*;
  */
 @Internal
 public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter implements Opcodes {
-
-    /**
-     * Constant for parent field.
-     */
-    public static final String FIELD_PARENT = "$parent";
 
     protected static final org.objectweb.asm.commons.Method METHOD_INVOKE_INTERNAL = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethod.class, "invokeInternal", Object.class, Object[].class));
@@ -60,6 +59,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private static final Type TYPE_REFLECTION_UTILS = Type.getType(ReflectionUtils.class);
     private static final org.objectweb.asm.commons.Method METHOD_GET_REQUIRED_METHOD = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getRequiredMethod", Class.class, String.class, Class[].class));
+    private static final String FIELD_INTERCEPTABLE = "$interceptable";
 
     protected final Type methodType;
 
@@ -72,40 +72,8 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private final boolean isAbstract;
     private final boolean isSuspend;
     private final boolean isDefault;
-    private String outerClassName = null;
-    private boolean isStatic = false;
-
-    /**
-     * @param beanFullClassName    The bean full class name
-     * @param methodClassName      The method class name
-     * @param methodProxyShortName The method proxy short name
-     * @param isInterface          Whether is an interface
-     * @param isDefault            Whether the method is a default method
-     * @param isSuspend            Whether the method is Kotlin suspend function
-     * @param originatingElement   The originating element
-     * @param annotationMetadata   The annotation metadata
-     */
-    public ExecutableMethodWriter(
-            String beanFullClassName,
-            String methodClassName,
-            String methodProxyShortName,
-            boolean isInterface,
-            boolean isDefault,
-            boolean isSuspend,
-            OriginatingElements originatingElement,
-            AnnotationMetadata annotationMetadata) {
-        super(methodClassName, originatingElement, annotationMetadata, true);
-        this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        this.beanFullClassName = beanFullClassName;
-        this.methodProxyShortName = methodProxyShortName;
-        this.className = methodClassName;
-        this.internalName = getInternalName(methodClassName);
-        this.methodType = getObjectType(methodClassName);
-        this.isInterface = isInterface;
-        this.isAbstract = !isInterface || !isDefault;
-        this.isDefault = isDefault;
-        this.isSuspend = isSuspend;
-    }
+    private final String interceptedProxyClassName;
+    private final String interceptedProxyBridgeMethodName;
 
     /**
      * @param beanFullClassName    The bean full class name
@@ -117,6 +85,8 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param isSuspend            Whether the method is Kotlin suspend function
      * @param originatingElements  The originating elements
      * @param annotationMetadata   The annotation metadata
+     * @param interceptedProxyClassName        The intercepted proxy class name
+     * @param interceptedProxyBridgeMethodName The intercepted proxy bridge method name
      */
     public ExecutableMethodWriter(
             String beanFullClassName,
@@ -127,7 +97,9 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             boolean isDefault,
             boolean isSuspend,
             OriginatingElements originatingElements,
-            AnnotationMetadata annotationMetadata) {
+            AnnotationMetadata annotationMetadata,
+            String interceptedProxyClassName,
+            String interceptedProxyBridgeMethodName) {
         super(methodClassName, originatingElements, annotationMetadata, true);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.beanFullClassName = beanFullClassName;
@@ -139,6 +111,15 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         this.isAbstract = isAbstract;
         this.isDefault = isDefault;
         this.isSuspend = isSuspend;
+        this.interceptedProxyClassName = interceptedProxyClassName;
+        this.interceptedProxyBridgeMethodName = interceptedProxyBridgeMethodName;
+    }
+
+    /**
+     * @return Is supports intercepted proxy.
+     */
+    public boolean isSupportsInterceptedProxy() {
+        return interceptedProxyClassName != null;
     }
 
     /**
@@ -184,20 +165,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     }
 
     /**
-     * @param outerName        The outer name
-     * @param outerClassWriter The outer class writer
-     */
-    public void makeInner(String outerName, ClassWriter outerClassWriter) {
-        outerClassWriter.visitInnerClass(internalName, getInternalName(outerName), methodProxyShortName.substring(1), 0);
-        classWriter.visitOuterClass(getInternalName(outerName), null, null);
-        if (!isStatic) {
-
-            classWriter.visitField(ACC_PRIVATE | ACC_FINAL, FIELD_PARENT, getTypeDescriptor(outerName), null, null);
-        }
-        this.outerClassName = outerName;
-    }
-
-    /**
      * Write the method.
      *
      * @param declaringType              The declaring type
@@ -223,8 +190,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         boolean hasArgs = !argumentTypes.isEmpty();
         Collection<Object> argumentTypeClasses = hasArgs ? argumentTypes.values() : Collections.emptyList();
 
-        int modifiers = isStatic ? ACC_SYNTHETIC | ACC_STATIC : ACC_SYNTHETIC;
-        classWriter.visit(V1_8, modifiers,
+        classWriter.visit(V1_8, ACC_SYNTHETIC,
                 internalName,
                 null,
                 Type.getInternalName(AbstractExecutableMethod.class),
@@ -240,25 +206,39 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
         MethodVisitor executorMethodConstructor;
         GeneratorAdapter constructorWriter;
+        if (interceptedProxyBridgeMethodName != null) {
+            // Create default constructor call other one with 'false'
 
-        boolean hasOuter = outerClassName != null && !isStatic;
-        String constructorDescriptor;
-        if (hasOuter) {
-            executorMethodConstructor = startConstructor(classWriter, outerClassName);
-            constructorDescriptor = getConstructorDescriptor(outerClassName);
-        } else {
-            executorMethodConstructor = startConstructor(classWriter);
-            constructorDescriptor = DESCRIPTOR_DEFAULT_CONSTRUCTOR;
-        }
-        constructorWriter = new GeneratorAdapter(executorMethodConstructor,
-                Opcodes.ACC_PUBLIC,
-                CONSTRUCTOR_NAME,
-                constructorDescriptor);
+            String descriptor = Type.getDescriptor(boolean.class);
+            classWriter.visitField(ACC_FINAL | ACC_PRIVATE, FIELD_INTERCEPTABLE, descriptor, null, null);
 
-        if (hasOuter) {
+            GeneratorAdapter defaultConstructorWriter = new GeneratorAdapter(startConstructor(classWriter),
+                    Opcodes.ACC_PUBLIC,
+                    CONSTRUCTOR_NAME,
+                    DESCRIPTOR_DEFAULT_CONSTRUCTOR);
+
+            String executorMethodConstructorDescriptor = getConstructorDescriptor(boolean.class);
+            executorMethodConstructor = startConstructor(classWriter, boolean.class);
+            constructorWriter = new GeneratorAdapter(executorMethodConstructor,
+                    Opcodes.ACC_PUBLIC,
+                    CONSTRUCTOR_NAME,
+                    executorMethodConstructorDescriptor);
+
+            defaultConstructorWriter.loadThis();
+            defaultConstructorWriter.push(false);
+            defaultConstructorWriter.visitMethodInsn(INVOKESPECIAL, internalName, CONSTRUCTOR_NAME, executorMethodConstructorDescriptor, false);
+            defaultConstructorWriter.visitInsn(RETURN);
+            defaultConstructorWriter.visitMaxs(DEFAULT_MAX_STACK, 1);
+
             constructorWriter.loadThis();
             constructorWriter.loadArg(0);
-            constructorWriter.putField(methodType, FIELD_PARENT, getObjectType(outerClassName));
+            constructorWriter.putField(Type.getObjectType(internalName), FIELD_INTERCEPTABLE, Type.getType(boolean.class));
+        } else {
+            executorMethodConstructor = startConstructor(classWriter);
+            constructorWriter = new GeneratorAdapter(executorMethodConstructor,
+                    Opcodes.ACC_PUBLIC,
+                    CONSTRUCTOR_NAME,
+                    DESCRIPTOR_DEFAULT_CONSTRUCTOR);
         }
 
         // ALOAD 0
@@ -382,15 +362,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         }
     }
 
-    /**
-     * @param parentInternalName The parent internal name
-     * @param classWriter        The current class writer
-     */
-    public void makeStaticInner(String parentInternalName, ClassWriter classWriter) {
-        this.isStatic = true;
-        makeInner(parentInternalName, classWriter);
-    }
-
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, getOriginatingElements())) {
@@ -418,8 +389,61 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             Collection<Object> argumentTypes,
             GeneratorAdapter invokeMethodVisitor) {
         Type returnTypeObject = getTypeReference(returnType);
+
+        // load this
         invokeMethodVisitor.visitVarInsn(ALOAD, 1);
-        pushCastToType(invokeMethodVisitor,  declaringTypeObject.getClassName());
+        // duplicate target
+        invokeMethodVisitor.dup();
+
+        if (interceptedProxyClassName != null) {
+            Label invokeTargetBlock = new Label();
+
+            Type interceptedProxyType = getObjectType(interceptedProxyClassName);
+
+            // load this.$interceptable field value
+            invokeMethodVisitor.loadThis();
+            invokeMethodVisitor.getField(Type.getObjectType(internalName), FIELD_INTERCEPTABLE, Type.getType(boolean.class));
+            // check if it equals true
+            invokeMethodVisitor.push(true);
+            invokeMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, invokeTargetBlock);
+
+            // target instanceOf intercepted proxy
+            invokeMethodVisitor.loadArg(0);
+            invokeMethodVisitor.instanceOf(interceptedProxyType);
+            // check if instanceOf
+            invokeMethodVisitor.push(true);
+            invokeMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, invokeTargetBlock);
+
+            pushCastToType(invokeMethodVisitor, interceptedProxyType.getClassName());
+
+            // load arguments
+            Iterator<Object> iterator = argumentTypes.iterator();
+            for (int i = 0; i < argumentTypes.size(); i++) {
+                invokeMethodVisitor.loadArg(1);
+                invokeMethodVisitor.push(i);
+                invokeMethodVisitor.visitInsn(AALOAD);
+
+                pushCastToType(invokeMethodVisitor, iterator.next());
+            }
+
+            invokeMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                    interceptedProxyType.getInternalName(), interceptedProxyBridgeMethodName,
+                    getMethodDescriptor(returnType, argumentTypes), false);
+
+            if (returnTypeObject.equals(Type.VOID_TYPE)) {
+                invokeMethodVisitor.visitInsn(ACONST_NULL);
+            } else {
+                pushBoxPrimitiveIfNecessary(returnType, invokeMethodVisitor);
+            }
+            invokeMethodVisitor.visitInsn(ARETURN);
+
+            invokeMethodVisitor.visitLabel(invokeTargetBlock);
+
+            // remove parent
+            invokeMethodVisitor.pop();
+        }
+
+        pushCastToType(invokeMethodVisitor, declaringTypeObject.getClassName());
         boolean hasArgs = !argumentTypes.isEmpty();
         String methodDescriptor;
         if (hasArgs) {

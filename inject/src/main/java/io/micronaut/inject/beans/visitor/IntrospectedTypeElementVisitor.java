@@ -31,7 +31,6 @@ import io.micronaut.inject.writer.ClassGenerationException;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.util.*;
