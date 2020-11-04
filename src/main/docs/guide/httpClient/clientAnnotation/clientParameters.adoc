@@ -93,7 +93,7 @@ Some parameters are recognized by their type instead of their annotation. The fo
 
 The api:http.client.bind.ClientArgumentRequestBinder[] API is what is responsible for binding client arguments to the request. Custom binder classes registered as beans will automatically be used during the binding process. Annotation based binders are searched for first, with type based binders being searched if a binder was not found.
 
-IMPORTANT: This is an experimental feature in 2.1 and subject to change! One limitation of binding is that binders many not manipulate or set the request URI because it can be a combination of many arguments.
+IMPORTANT: This is an experimental feature in 2.1 and subject to change! One limitation of binding is that binders may not manipulate or set the request URI because it can be a combination of many arguments.
 
 ===== Binding By Annotation
 
