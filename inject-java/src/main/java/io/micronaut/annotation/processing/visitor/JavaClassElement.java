@@ -46,11 +46,11 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
-public class JavaClassElement extends AbstractJavaElement implements ClassElement {
+public class JavaClassElement extends AbstractJavaElement implements ArrayableClassElement {
 
     protected final TypeElement classElement;
-    protected int arrayDimensions;
-    private final JavaVisitorContext visitorContext;
+    protected final JavaVisitorContext visitorContext;
+    private final int arrayDimensions;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
 
     /**
@@ -381,8 +381,8 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     }
 
     @Override
-    public ClassElement toArray() {
-        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions + 1);
+    public ClassElement withArrayDimensions(int arrayDimensions) {
+        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions);
     }
 
     @Override

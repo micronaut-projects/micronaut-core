@@ -14,6 +14,7 @@ dependencies {
 
     testImplementation dependencyVersion("validation")
     testImplementation project(":inject-groovy")
+    testImplementation project(":inject-test-utils")
     testImplementation "com.github.stefanbirkner:system-lambda:1.1.0"
 
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {

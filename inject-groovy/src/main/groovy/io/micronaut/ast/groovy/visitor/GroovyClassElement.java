@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
@@ -48,10 +49,10 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached;
  * @since 1.0
  */
 @Internal
-public class GroovyClassElement extends AbstractGroovyElement implements ClassElement {
+public class GroovyClassElement extends AbstractGroovyElement implements ArrayableClassElement {
 
     protected final ClassNode classNode;
-    protected int arrayDimensions;
+    private final int arrayDimensions;
     private Map<String, Map<String, ClassNode>> genericInfo;
 
     /**
@@ -70,7 +71,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
      * @param genericInfo        The generic info
-     * @param arrayDimensions    The number of array dimensions for arrays
+     * @param arrayDimensions    The number of array dimensions
      */
     GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata, Map<String, Map<String, ClassNode>> genericInfo, int arrayDimensions) {
         super(sourceUnit, compilationUnit, classNode, annotationMetadata);
@@ -411,8 +412,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     }
 
     @Override
-    public ClassElement toArray() {
-        return new GroovyClassElement(sourceUnit, compilationUnit, classNode, getAnnotationMetadata(), getGenericTypeInfo(), arrayDimensions + 1);
+    public ClassElement withArrayDimensions(int arrayDimensions) {
+        return new GroovyClassElement(sourceUnit, compilationUnit, classNode, getAnnotationMetadata(), getGenericTypeInfo(), arrayDimensions);
     }
 
     @Override

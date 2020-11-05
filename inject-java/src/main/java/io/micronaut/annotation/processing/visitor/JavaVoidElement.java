@@ -49,6 +49,11 @@ final class JavaVoidElement implements ClassElement, AnnotationMetadataDelegate 
     }
 
     @Override
+    public ClassElement fromArray() {
+        return PrimitiveElement.VOID.fromArray();
+    }
+
+    @Override
     public String getName() {
         return "void";
     }
