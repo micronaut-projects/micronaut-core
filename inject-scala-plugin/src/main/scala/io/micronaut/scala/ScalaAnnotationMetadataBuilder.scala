@@ -230,11 +230,15 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[E
 //    if (memberName != null && annotationValue.isInstanceOf[AnnotationValue] && !annotationValues.containsKey(memberName)) {
 //      val resolver = new JavaAnnotationMetadataBuilder#MetadataAnnotationValueVisitor(originatingElement)
 //      annotationValue.asInstanceOf[AnnotationValue].accept(resolver, this)
-      val resolvedValue = annotationValue.toString
+      val resolvedValue = annotationValue match {
+        case Array(elements@_*) => elements.map {
+          case typeRef:Global#TypeRef => new AnnotationClassValue(typeRef.toString)
+        }.toArray
+        case _ => new AnnotationClassValue(annotationValue.toString)
+    }
       if (resolvedValue != null) {
-        val resolvedAnnotationValue = new AnnotationClassValue(resolvedValue)
-        validateAnnotationValue(originatingElement, annotationName, member, memberName, resolvedAnnotationValue)
-        annotationValues.put(memberName, resolvedAnnotationValue)
+        validateAnnotationValue(originatingElement, annotationName, member, memberName, resolvedValue)
+        annotationValues.put(memberName, resolvedValue)
       }
 //    }
   }
@@ -317,6 +321,14 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[E
     Collections.emptyMap()
   }
 
+  private def processAnnotationRawValue(arg:Global#ClassfileAnnotArg):Any = {
+    arg match {
+      case literal:Global#LiteralAnnotArg => literal.const.value
+      case array:Global#ArrayAnnotArg => array.args.map(processAnnotationRawValue)
+      case _ => ???
+    }
+  }
+
   /**
    * Read the raw annotation values from the given annotation.
    *
@@ -333,9 +345,10 @@ class ScalaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder[E
           //        case (ident:Global#Ident, literal:Global#Literal) => result.put(ScalaNameElement(annotationMirror.symbol, ident.name), literal.value.value.toString)
           //        case _ => ()
           //      }
-          case (name, arg) if (arg.isInstanceOf[Global#LiteralAnnotArg]) => {
-            result.put(NameFacade(Class.forName(annotationInfo.symbol.fullName), name.toString), arg.asInstanceOf[Global#LiteralAnnotArg].const.value)
-          }
+          case (name, arg) => result.put(
+              NameFacade(Class.forName(annotationInfo.symbol.fullName), name.toString),
+              processAnnotationRawValue(arg))
+          case _ => ???
         }
       }
       case JavaAnnotationFacade(els, values) => {

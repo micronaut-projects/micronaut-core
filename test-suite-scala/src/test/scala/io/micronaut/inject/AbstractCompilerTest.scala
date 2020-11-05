@@ -80,7 +80,7 @@ abstract class AbstractCompilerTest {
       override protected def computeInternalPhases(): Unit = {
         super.computeInternalPhases()
         for (phase <- new io.micronaut.scala.CompilerPlugin(this).components) phasesSet += phase
-        //phasesSet += new DebugComponent(this)
+        phasesSet += new DebugComponent(this)
       }
     }
 
@@ -113,12 +113,23 @@ class DebugComponent(val global: Global) extends PluginComponent {
   def newPhase(prev: Phase) = new StdPhase(prev) {
 
     def apply(unit: CompilationUnit): Unit = {
-      for (tree@q"$mods var ..$patsnel: $tpe" <- unit.body) {
-        println(s"tree=$tree, symbol=${tree.symbol.fullName}, symbol.annotations=${tree.symbol.annotations.map(_.symbol.fullName)}")
-      }
-      for (tree@q"$mods def $tname[..$tparams](...$paramss): $tpt = $expr" <- unit.body) {
-        println(s"tree=$tree, symbol=${tree.symbol.fullName}, symbol.overrides=${tree.symbol.overrides.map(_.fullName)}, symbol.annotations=${tree.symbol.annotations.map(_.symbol.fullName)}")
-      }
+//      for (tree@q"$mods var ..$patsnel: $tpe" <- unit.body) {
+//        println(s"tree=$tree, symbol=${tree.symbol.fullName}, symbol.annotations=${tree.symbol.annotations.map(_.symbol.fullName)}")
+//      }
+//      for (tree@q"$mods def $tname[..$tparams](...$paramss): $tpt = $expr" <- unit.body) {
+//        println(s"tree=$tree, symbol=${tree.symbol.fullName}, symbol.overrides=${tree.symbol.overrides.map(_.fullName)}, symbol.annotations=${tree.symbol.annotations.map(_.symbol.fullName)}")
+//      }
+//    new Traverser {
+//      override def traverse(tree: Tree) = {
+//        tree match {
+//          case classDef:ClassDef => {
+//            println(classDef.symbol.fullName)
+//          }
+//          case _ => ()
+//        }
+//        super.traverse(tree)
+//      }
+//      }.traverse(unit.body)
     }
   }
 }

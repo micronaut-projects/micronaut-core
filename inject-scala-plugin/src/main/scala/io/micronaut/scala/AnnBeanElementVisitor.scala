@@ -120,10 +120,7 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
     }
     if (!requiresReflection && isInheritedAndNotPublic(this.concreteClass.symbol, declaringClass, methodSymbol)) requiresReflection = true
 
-    val paramGenerics = typeGenericsForParamsAndArgs(
-      methodSymbol.owner.originalInfo.typeSymbol.originalInfo.typeParams,
-      methodSymbol.originalInfo.typeArgs
-    )
+    val paramGenerics = typeArgumentsForType(concreteClass.symbol).getOrDefault(declaringClass.fullName, Collections.emptyMap())
 
     val params = ExecutableElementParamInfo.populateParameterData(Option.empty, Some(methodSymbol), paramGenerics)
 
@@ -779,7 +776,9 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
     }
   }
 
-  def visitSymbol(symbolToOverrides:mutable.Map[Global#Symbol, Global#Symbol], beanDefinitionWriter:BeanDefinitionVisitor, doVisit:Boolean)(symbol:Global#Symbol):Unit = {
+  def visitSymbol(
+    symbolToOverrides:mutable.Map[Global#Symbol, Global#Symbol],
+    beanDefinitionWriter:BeanDefinitionVisitor, doVisit:Boolean)(symbol:Global#Symbol):Unit = {
     symbol match {
       case methodSymbol: Global#MethodSymbol if methodSymbol.isMethod &&
         !(methodSymbol.isConstructor || methodSymbol.isAccessor || methodSymbol.isBridge) =>
@@ -855,40 +854,45 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
 
   def filterAncestors(symbol:Global#Symbol) = !FILTERED_ANCESTORS.contains(symbol.fullName)
 
-  def visitTypeArguments(typeSymbol:Global#Symbol, beanDefinitionWriter:BeanDefinitionWriter):Unit = {
+  def typeArgumentsForType(typeSymbol:Global#Symbol):util.Map[String, util.Map[String, AnyRef]] = {
     val typeArguments = new util.LinkedHashMap[String, util.Map[String, AnyRef]]()
     typeSymbol.baseClasses.filter(filterAncestors).foreach { classSymbol =>
-        val typeCtor = classSymbol.originalInfo.typeConstructor
+      val typeCtor = classSymbol.originalInfo.typeConstructor
 
-        typeCtor.parents.foreach { parent =>
-          val parentSymbol = parent.typeSymbol
-          val args = parent.typeArgs
-          val params = parent.typeSymbol.originalInfo.typeParams
+      typeCtor.parents.foreach { parent =>
+        val parentSymbol = parent.typeSymbol
+        val args = parent.typeArgs
+        val params = parent.typeSymbol.originalInfo.typeParams
 
-          (args, params).zipped.foreach { (arg, param) =>
-            arg match {
-              case absTypeRef: Global#AbstractTypeRef => {
-                val asStr = absTypeRef.toString()
-                val valueList = typeArguments.values().toList
-                valueList.foreach { otherMap =>
-                  if (otherMap.containsKey(asStr)) {
-                    typeArguments.computeIfAbsent(parentSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]())
-                      .put(param.nameString, otherMap.get(asStr))
-                  }
+        (args, params).zipped.foreach { (arg, param) =>
+          arg match {
+            case absTypeRef: Global#AbstractTypeRef => {
+              val asStr = absTypeRef.toString()
+              val valueList = typeArguments.values().toList
+              valueList.foreach { otherMap =>
+                if (otherMap.containsKey(asStr)) {
+                  typeArguments.computeIfAbsent(parentSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]())
+                    .put(param.nameString, otherMap.get(asStr))
                 }
               }
-              case typeRef: Global#ArgsTypeRef => {
-                typeArguments.computeIfAbsent(parentSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]())
-                  .put(param.nameString, argTypeForTypeSymbol(typeRef.sym, typeRef.args))
-              }
-              case _ => {
-                typeArguments.computeIfAbsent(parentSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]())
-                  .put(param.nameString, argTypeForTypeSymbol(arg.typeSymbol, arg.typeArgs))
-              }
+            }
+            case typeRef: Global#ArgsTypeRef => {
+              typeArguments.computeIfAbsent(parentSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]())
+                .put(param.nameString, argTypeForTypeSymbol(typeRef.sym, typeRef.args))
+            }
+            case _ => {
+              typeArguments.computeIfAbsent(parentSymbol.fullName, _ => new util.LinkedHashMap[String, AnyRef]())
+                .put(param.nameString, argTypeForTypeSymbol(arg.typeSymbol, arg.typeArgs))
             }
           }
         }
+      }
     }
+    typeArguments
+  }
+
+  def visitTypeArguments(typeSymbol:Global#Symbol, beanDefinitionWriter:BeanDefinitionWriter):Unit = {
+    val typeArguments = typeArgumentsForType(typeSymbol)
     if (!typeArguments.isEmpty) {
       beanDefinitionWriter.visitTypeArguments(typeArguments);
     }

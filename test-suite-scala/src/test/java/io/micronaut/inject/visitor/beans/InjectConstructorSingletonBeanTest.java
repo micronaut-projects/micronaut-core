@@ -17,10 +17,9 @@ public class InjectConstructorSingletonBeanTest {
 
         assertNotNull(singletonBean);
         assertEquals("not injected", singletonBean.singletonBean.getNotInjected());
-       // assertEquals("not injected", singletonBean.singletonScalaBean.getNotInjected());
         assertEquals(2, singletonBean.engines.length);
 
-//TODO        assertTrue(singletonBean.existingOptionalEngine.isPresent());
+        assertTrue(singletonBean.existingOptionalEngine.isPresent());
         assertFalse(singletonBean.nonExistingOptionalEngine.isPresent());
 
     }

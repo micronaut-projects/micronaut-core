@@ -47,7 +47,7 @@ class InjectSingletonBeanScalaTest {
     assertSame(singletonBean.injectedFieldSingletonBean, singletonBean.singletonBean)
     assertSame(singletonBean.injectedFieldSingletonScalaBean, singletonBean.singletonScalaBean)
 
-//TODO    assertTrue(singletonBean.existingOptionalEngine.isPresent)
+    assertTrue(singletonBean.existingOptionalEngine.isPresent)
     assertFalse(singletonBean.nonExistingOptionalEngine.isPresent)
   }
 }

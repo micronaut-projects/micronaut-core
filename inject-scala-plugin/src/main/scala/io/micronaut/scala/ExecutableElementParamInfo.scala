@@ -81,12 +81,12 @@ object ExecutableElementParamInfo {
                 params.addGenericTypes(paramSymbol.nameString, genericTypeMap)
               }
             } else if (kind.isTypeParameter) {
-              val parameterType = paramSymbol.typeOfThis
-              if (parameterType != null) {
                 params.addParameter(
                   argName,
                   paramSymbol.typeOfThis.typeSymbol.fullName,
-                  boundTypes.getOrDefault(kind.nameString, paramSymbol.originalInfo.bounds.hi.typeSymbol.fullName))
+                  //boundTypes.getOrDefault(kind.nameString, paramSymbol.typeOfThis.typeSymbol.fullName),
+                  boundTypes.getOrDefault(kind.nameString, paramSymbol.originalInfo.bounds.hi.typeSymbol.fullName)
+                )
 
                 if (boundTypes.containsKey(kind.nameString)) {
                   params.addGenericTypes(
@@ -95,7 +95,6 @@ object ExecutableElementParamInfo {
                       kind.nameString,
                       boundTypes.get(kind.nameString)))
                 }
-              }
             } else {
 
             }
