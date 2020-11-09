@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.EnumElement;
 
 import javax.lang.model.element.ElementKind;
@@ -39,7 +40,17 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
      * @param visitorContext The visitor context
      */
     JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(classElement, annotationMetadata, visitorContext, Collections.emptyMap());
+        this(classElement, annotationMetadata, visitorContext, 0);
+    }
+
+    /**
+     * @param classElement       The {@link TypeElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
+     * @param arrayDimensions    The number of array dimensions
+     */
+    JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, int arrayDimensions) {
+        super(classElement, annotationMetadata, visitorContext, Collections.emptyMap(), arrayDimensions);
     }
 
     @Override
@@ -51,5 +62,10 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
                                     .map(e -> e.getSimpleName().toString())
                                     .collect(Collectors.toList());
         return Collections.unmodifiableList(results);
+    }
+
+    @Override
+    public ClassElement withArrayDimensions(int arrayDimensions) {
+        return new JavaEnumElement(classElement, getAnnotationMetadata(), visitorContext, arrayDimensions);
     }
 }

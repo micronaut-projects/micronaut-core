@@ -28,7 +28,7 @@ The `save` method when called will perform an HTTP `POST` with the following JSO
 
 You may however want to customize what is sent as the body, the parameters, URI variables and so on. The ann:http.client.annotation.Client[] annotation is very flexible in this regard and supports the same pkg:http.annotation[HTTP Annotations] as Micronaut's HTTP server.
 
-For example, the following defines a URI template and the `name` parameter is used as part of the URI template, whilst ann:http.annotation.Body[] is used declare that the contents to send to the server are represented by the `Pet` POJO:
+For example, the following defines a URI template and the `name` parameter is used as part of the URI template, whilst ann:http.annotation.Body[] is used to declare that the contents to send to the server are represented by the `Pet` POJO:
 
 .PetOperations.java
 [source,java]
@@ -93,7 +93,7 @@ Some parameters are recognized by their type instead of their annotation. The fo
 
 The api:http.client.bind.ClientArgumentRequestBinder[] API is what is responsible for binding client arguments to the request. Custom binder classes registered as beans will automatically be used during the binding process. Annotation based binders are searched for first, with type based binders being searched if a binder was not found.
 
-IMPORTANT: This is an experimental feature in 2.1 and subject to change! One limitation of binding is that binders many not manipulate or set the request URI because it can be a combination of many arguments.
+IMPORTANT: This is an experimental feature in 2.1 and subject to change! One limitation of binding is that binders may not manipulate or set the request URI because it can be a combination of many arguments.
 
 ===== Binding By Annotation
 

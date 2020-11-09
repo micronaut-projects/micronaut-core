@@ -212,4 +212,13 @@ public interface ClassElement extends TypedElement {
      * @return A new class element
      */
     ClassElement toArray();
+
+    /**
+     * Dereference a class element denoting an array type by converting it to its element type.
+     * Do not mutate the existing instance. Create a new instance instead.
+     *
+     * @return A new class element
+     * @throws IllegalStateException if this class element doesn't denote an array type
+     */
+    ClassElement fromArray();
 }

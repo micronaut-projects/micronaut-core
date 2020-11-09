@@ -110,6 +110,7 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
@@ -166,6 +167,7 @@ public class DefaultHttpClient implements
         AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
+    private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
 
@@ -2775,7 +2777,15 @@ public class DefaultHttpClient implements
                             if (msg instanceof LastHttpContent) {
                                 super.channelRead(ctx, msg);
                             } else {
-                                super.channelRead(ctx, ((HttpContent) msg).content());
+                                Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
+                                if (msg instanceof Http2Content) {
+                                    streamKey.set(((Http2Content) msg).stream());
+                                }
+                                try {
+                                    super.channelRead(ctx, ((HttpContent) msg).content());
+                                } finally {
+                                    streamKey.set(null);
+                                }
                             }
                         } else {
                             super.channelRead(ctx, msg);
@@ -2793,12 +2803,19 @@ public class DefaultHttpClient implements
                     @Override
                     protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
                         try {
-                            ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
+                            Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
+                            Http2Stream http2Stream = streamKey.get();
+                            if (http2Stream != null) {
+                                ctx.fireChannelRead(new DefaultHttp2Content(msg.copy(), http2Stream));
+                            } else {
+                                ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
+                            }
                         } finally {
                             msg.release();
                         }
                     }
                 });
+
             }
         }
 

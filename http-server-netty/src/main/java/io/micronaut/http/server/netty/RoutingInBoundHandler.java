@@ -115,6 +115,8 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.handler.codec.http2.Http2Error;
+import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.reactivex.*;
@@ -801,7 +803,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                             (FileUpload) data,
                                                             serverConfiguration.getMultipart(),
                                                             getIoExecutor(),
-                                                            flowable));
+                                                            (Flowable<PartData>) flowable));
                                                 } else {
                                                     namedSubject.onNext(flowable);
                                                 }
@@ -810,9 +812,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             }
                                             return subject;
                                         });
-
                                     }
-
 
                                     UnicastProcessor subject;
 
@@ -844,7 +844,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                         (FileUpload) data,
                                                         serverConfiguration.getMultipart(),
                                                         getIoExecutor(),
-                                                        processFlowable(subject, dataKey, true));
+                                                        (Flowable<PartData>) processFlowable(subject, dataKey, true));
                                             }
                                             return upload;
                                         });
@@ -1691,6 +1691,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             if (!future.isSuccess()) {
                                 final Throwable throwable = future.cause();
                                 if (!(throwable instanceof ClosedChannelException)) {
+                                    if (throwable instanceof Http2Exception.StreamException) {
+                                        Http2Exception.StreamException se = (Http2Exception.StreamException) throwable;
+                                        if (se.error() == Http2Error.STREAM_CLOSED) {
+                                            // ignore
+                                            return;
+                                        }
+                                    }
                                     if (LOG.isErrorEnabled()) {
                                         LOG.error("Error writing final response: " + throwable.getMessage(), throwable);
                                     }

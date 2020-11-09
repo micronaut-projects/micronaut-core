@@ -21,13 +21,7 @@ import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.reactive.CancelledSubscriber;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpUtil;
-import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http.*;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
@@ -130,7 +124,7 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
     }
 
     @Override
-    protected HttpResponse createStreamedMessage(HttpResponse response, Publisher<HttpContent> stream) {
+    protected HttpResponse createStreamedMessage(HttpResponse response, Publisher<? extends HttpContent> stream) {
         return new DelegateStreamedHttpResponse(response, stream);
     }
 
