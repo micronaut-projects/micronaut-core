@@ -106,7 +106,7 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
         Object result = context.proceed();
         replaceContinuation.accept(continuation);
         if (result != KotlinUtils.COROUTINE_SUSPENDED) {
-            throw new IllegalStateException("Not a Kotlin coroutine");
+            completableFutureContinuation.resumeWith(result);
         }
         return completableFutureContinuation.getCompletableFuture();
     }
@@ -123,7 +123,7 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
         Object result = context.proceed(from);
         replaceContinuation.accept(continuation);
         if (result != KotlinUtils.COROUTINE_SUSPENDED) {
-            throw new IllegalStateException("Not a Kotlin coroutine");
+            completableFutureContinuation.resumeWith(result);
         }
         return completableFutureContinuation.getCompletableFuture();
     }
