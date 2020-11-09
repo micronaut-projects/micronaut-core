@@ -9,7 +9,7 @@ import java.util.{List => JavaList}
 import scala.jdk.CollectionConverters._
 import scala.tools.nsc.Global
 
-class ScalaElementVisitor(concreteClass:Global#Symbol, visitors:List[LoadedVisitor]) {
+class ScalaElementVisitor(global: Global, concreteClass:Global#Symbol, visitors:List[LoadedVisitor]) {
   private def scan(symbol:Global#Symbol, o:Any): Any = {
     symbol match {
       case methodSymbol:Global#MethodSymbol => visitExecutable(methodSymbol, o)
@@ -18,7 +18,7 @@ class ScalaElementVisitor(concreteClass:Global#Symbol, visitors:List[LoadedVisit
   }
 
   def visitType (classElement: Global#ClassSymbol, o: Any): Any = {
-    var typeAnnotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(classElement))
+    var typeAnnotationMetadata = Globals.metadataBuilder(global).getOrCreate(classElement)
     for (visitor <- visitors) {
       val resultingElement = visitor.visit(classElement, typeAnnotationMetadata)
       if (resultingElement != null) typeAnnotationMetadata = resultingElement.getAnnotationMetadata
@@ -76,7 +76,9 @@ class ScalaElementVisitor(concreteClass:Global#Symbol, visitors:List[LoadedVisit
   }
 
    def visitExecutable(executableElement: Global#MethodSymbol, o: Any): Any = {
-    var methodAnnotationMetadata: AnnotationMetadata = new AnnotationMetadataHierarchy(Globals.metadataBuilder.getOrCreate(SymbolFacade(executableElement.owner)), Globals.metadataBuilder.build(SymbolFacade(executableElement)))
+    var methodAnnotationMetadata: AnnotationMetadata = new AnnotationMetadataHierarchy(
+      Globals.metadataBuilder(global).getOrCreate(executableElement.owner),
+      Globals.metadataBuilder(global).build(executableElement))
     if (executableElement.nameString == "<init>") {
       for (visitor <- visitors) {
         val resultingElement = visitor.visit(executableElement, methodAnnotationMetadata)

@@ -34,23 +34,24 @@ class ExecutableElementParamInfo(requiresReflection: Boolean, val metadata: Anno
 
 object ExecutableElementParamInfo {
 
-  def populateParameterData(element:Global#Symbol):ExecutableElementParamInfo = populateParameterData(Option.empty, Some(element), Collections.emptyMap())
+  def populateParameterData(element:Global#Symbol, global: Global):ExecutableElementParamInfo = populateParameterData(Option.empty, Some(element), Collections.emptyMap(), global)
 
   def populateParameterData(
       declaringTypeName: Option[String],
       element: Option[Global#Symbol],
-      boundTypes: java.util.Map[String, AnyRef]
+      boundTypes: java.util.Map[String, AnyRef],
+      global: Global
   ): ExecutableElementParamInfo = {
     element.map { defSymbol =>
       val elementMetadata = if (declaringTypeName.isDefined) {
-        new ScalaAnnotationMetadataBuilder().build(declaringTypeName.get, SymbolFacade(defSymbol))
+        new ScalaAnnotationMetadataBuilder(global).build(declaringTypeName.get, defSymbol)
       } else {
-        Globals.metadataBuilder.getOrCreate(SymbolFacade(defSymbol))
+        Globals.metadataBuilder(global).getOrCreate(defSymbol)
       }
       val params = new ExecutableElementParamInfo(false, elementMetadata)
 
       defSymbol.originalInfo.params.foreach { paramSymbol =>
-          val valDefMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(paramSymbol))
+          val valDefMetadata = Globals.metadataBuilder(global).getOrCreate(paramSymbol)
 
           val argName = paramSymbol.nameString
 

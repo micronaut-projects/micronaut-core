@@ -23,9 +23,10 @@ object Globals {
     AROUND_TYPE,
     INTRODUCTION_TYPE)
 
-  val metadataBuilder = new ScalaAnnotationMetadataBuilder()
   val loadedVisitors = new mutable.LinkedHashMap[String, LoadedVisitor]
   val visitorAttributes = new MutableConvertibleValuesMap[AnyRef]
   val beanableSymbols = new mutable.HashSet[Global#Symbol]
   val methodsToBridgeOverrides = new mutable.HashMap[Global#Symbol, List[Global#Symbol]]()
+
+  def metadataBuilder(global: Global) = new ScalaAnnotationMetadataBuilder(global)
 }

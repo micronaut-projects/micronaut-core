@@ -97,7 +97,7 @@ class InitPluginComponent(val global: Global) extends PluginComponent {
       true
     } else {
       try {
-        val annotationMetadata: AnnotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(element))
+        val annotationMetadata: AnnotationMetadata = Globals.metadataBuilder(global).getOrCreate(element)
         stereotypes.exists(annotationMetadata.hasStereotype)
       } catch {
         case _:ClassNotFoundException => false
@@ -121,7 +121,7 @@ class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComp
     }
 
   class BeanDefinitionInjectTraverser(unit:CompilationUnit) extends Traverser {
-    val processed = new mutable.HashSet[ElementFacade]
+    val processed = new mutable.HashSet[Global#Symbol]
 
     private def processBeanDefinitions(beanClassElement: Global#ClassDef, beanDefinitionWriter: BeanDefinitionVisitor, visitorContext: VisitorContext): Unit = {
         beanDefinitionWriter.visitBeanDefinitionEnd()

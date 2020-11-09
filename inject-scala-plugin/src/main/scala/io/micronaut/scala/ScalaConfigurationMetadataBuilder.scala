@@ -9,7 +9,7 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 
 import scala.tools.nsc.Global
 
-class ScalaConfigurationMetadataBuilder extends ConfigurationMetadataBuilder[Global#Symbol] {
+class ScalaConfigurationMetadataBuilder(global: Global) extends ConfigurationMetadataBuilder[Global#Symbol] {
   /**
    * <p>Build a property path for the given declaring type and property name.</p>
    * <p>
@@ -70,7 +70,7 @@ class ScalaConfigurationMetadataBuilder extends ConfigurationMetadataBuilder[Glo
       var break = false
       while (!break && superInterface.isInstanceOf[Global#ClassSymbol]) {
         //val element = superInterface.asInstanceOf[TypeElement]
-        val annotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(superInterface))
+        val annotationMetadata = Globals.metadataBuilder(global).getOrCreate(superInterface)
         val parentConfig = annotationMetadata.getValue(classOf[ConfigurationReader], classOf[String])
         if (parentConfig.isPresent) {
           val parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply(parentConfig.get)
@@ -84,8 +84,7 @@ class ScalaConfigurationMetadataBuilder extends ConfigurationMetadataBuilder[Glo
       var superclass = declaringType.superClass
       var break = false
       while (!break && superclass.isInstanceOf[Global#ClassSymbol]) {
-        val element = new SymbolFacade(superclass)
-        val annotationMetadata = Globals.metadataBuilder.getOrCreate(element)
+        val annotationMetadata = Globals.metadataBuilder(global).getOrCreate(superclass)
         val parentConfig = annotationMetadata.getValue(classOf[ConfigurationReader], classOf[String])
         if (parentConfig.isPresent) {
           val parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply(parentConfig.get)
@@ -99,7 +98,7 @@ class ScalaConfigurationMetadataBuilder extends ConfigurationMetadataBuilder[Glo
 
   private def resolveSuperInterface(declaringType: Global#Symbol) =
     declaringType.owner.baseClasses
-      .filter((tm: Global#Symbol) => tm.isInterface && tm.isInstanceOf[Global#TypeSymbol] && Globals.metadataBuilder.getOrCreate(SymbolFacade(tm)).hasStereotype(classOf[ConfigurationReader]))
+      .filter((tm: Global#Symbol) => tm.isInterface && tm.isInstanceOf[Global#TypeSymbol] && Globals.metadataBuilder(global).getOrCreate(tm).hasStereotype(classOf[ConfigurationReader]))
       .map((dt: Global#Symbol) => dt.asInstanceOf[Global#ClassSymbol])
       .headOption
       .orNull
@@ -139,7 +138,7 @@ class ScalaConfigurationMetadataBuilder extends ConfigurationMetadataBuilder[Glo
    * @param tpe The type
    * @return The annotation metadata for the type
    */
-  override protected def getAnnotationMetadata(tpe: Global#Symbol): AnnotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(tpe))
+  override protected def getAnnotationMetadata(tpe: Global#Symbol): AnnotationMetadata = Globals.metadataBuilder(global).getOrCreate(tpe)
 
   private def calculateInitialPath(owningType: Global#Symbol, annotationMetadata: AnnotationMetadata): String = {
     val forType = annotationMetadata.getValue(

@@ -6,7 +6,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 
 import scala.tools.nsc.Global
 
-class LoadedVisitor(classSymbol:Global#ClassDef, visitor: TypeElementVisitor[_, _], visitorContext:ScalaVisitorContext) {
+class LoadedVisitor(classSymbol:Global#ClassDef, visitor: TypeElementVisitor[_, _], visitorContext:ScalaVisitorContext, global:Global) {
   var rootClassElement : ScalaClassElement = _
   var classAnnotation = "java.lang.Object" // TODO
   var elementAnnotation = "java.lang.Object" // TODO
@@ -19,7 +19,7 @@ class LoadedVisitor(classSymbol:Global#ClassDef, visitor: TypeElementVisitor[_, 
     if (classSymbol.name.toString() == "java.lang.Object") {
       true
     } else {
-      val annotationMetadata = Globals.metadataBuilder.getOrCreate(SymbolFacade(classSymbol.symbol))
+      val annotationMetadata = Globals.metadataBuilder(global).getOrCreate(classSymbol.symbol)
       annotationMetadata.hasStereotype(classAnnotation)
     }
   }
