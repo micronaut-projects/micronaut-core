@@ -90,6 +90,14 @@ class SuspendControllerSpec: StringSpec() {
             response.status shouldBe HttpStatus.OK
         }
 
+        "test suspend service with retries without delay"() {
+            val response = client.exchange(HttpRequest.GET<Any>("/suspend/callSuspendServiceWithRetriesWithoutDelay"), String::class.java).blockingFirst()
+            val body = response.body.get()
+
+            body shouldBe "delayedCalculation3"
+            response.status shouldBe HttpStatus.OK
+        }
+
         "test suspend"() {
             val response = client.exchange(HttpRequest.GET<Any>("/suspend/simple"), String::class.java).blockingFirst()
             val body = response.body.get()
