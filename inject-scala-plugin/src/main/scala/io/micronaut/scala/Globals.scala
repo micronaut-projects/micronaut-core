@@ -23,8 +23,7 @@ object Globals {
     AROUND_TYPE,
     INTRODUCTION_TYPE)
 
-  val loadedVisitors = new mutable.LinkedHashMap[String, LoadedVisitor]
-  val visitorAttributes = new MutableConvertibleValuesMap[AnyRef]
+   val visitorAttributes = new MutableConvertibleValuesMap[AnyRef]
   val beanableSymbols = new mutable.HashSet[Global#Symbol]
   val methodsToBridgeOverrides = new mutable.HashMap[Global#Symbol, List[Global#Symbol]]()
 

@@ -6,6 +6,10 @@ import io.micronaut.inject.visitor.VisitorContext
 
 import scala.tools.nsc.Global
 
+/*
+Class exists to provided ClassElement implements to pass to object in the micronaut-core project
+ */
+
 class ScalaClassElement(
   symbol: Global#ClassSymbol,
   annotationMetadata: AnnotationMetadata,
@@ -37,10 +41,10 @@ class ScalaClassElement(
   /**
    * Tests whether one type is assignable to another.
    *
-   * @param type The type to check
+   * @param tpe The type to check
    * @return {@code true} if and only if the this type is assignable to the second
    */
-  override def isAssignable(`type`: String): Boolean = ???
+  override def isAssignable(tpe: String): Boolean = ???
 
   /**
    * Convert the class element to an element for the same type, but representing an array.

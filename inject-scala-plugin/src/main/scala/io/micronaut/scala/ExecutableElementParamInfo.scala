@@ -7,14 +7,14 @@ import io.micronaut.core.annotation.AnnotationMetadata
 
 import scala.tools.nsc.Global
 
-class ExecutableElementParamInfo(requiresReflection: Boolean, val metadata: AnnotationMetadata) {
+class ExecutableElementParamInfo(val metadata: AnnotationMetadata) {
   val parameters = new util.LinkedHashMap[String, AnyRef]
   val genericParameters = new util.LinkedHashMap[String, AnyRef]
   val parameterMetadata = new util.LinkedHashMap[String, AnnotationMetadata]
   val genericTypes = new util.LinkedHashMap[String, util.Map[String, AnyRef]]
 
-  def this(requiresReflection: Boolean, metadata: Option[AnnotationMetadata]) = {
-    this(requiresReflection, metadata.getOrElse(AnnotationMetadata.EMPTY_METADATA))
+  def this(metadata: Option[AnnotationMetadata]) = {
+    this(metadata.getOrElse(AnnotationMetadata.EMPTY_METADATA))
   }
 
   def addParameter(name: String, argType: AnyRef, genericType: AnyRef): Unit = {
@@ -48,7 +48,7 @@ object ExecutableElementParamInfo {
       } else {
         Globals.metadataBuilder(global).getOrCreate(defSymbol)
       }
-      val params = new ExecutableElementParamInfo(false, elementMetadata)
+      val params = new ExecutableElementParamInfo(elementMetadata)
 
       defSymbol.originalInfo.params.foreach { paramSymbol =>
           val valDefMetadata = Globals.metadataBuilder(global).getOrCreate(paramSymbol)
@@ -173,6 +173,6 @@ object ExecutableElementParamInfo {
       //      foo(paramElement)
       //    })
           params
-    }.getOrElse(new ExecutableElementParamInfo(false, Option.empty))
+    }.getOrElse(new ExecutableElementParamInfo(Option.empty))
   }
 }

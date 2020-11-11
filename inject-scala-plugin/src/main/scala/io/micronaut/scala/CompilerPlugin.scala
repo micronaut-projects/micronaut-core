@@ -34,25 +34,6 @@ class InitPluginComponent(val global: Global) extends PluginComponent {
   class InitTraverser(unit: CompilationUnit) extends Traverser {
     override def traverse(tree: Tree) = {
       tree match {
-        // Annotation are available in symbols at this point
-        //      case classDef: ClassDef => {
-        //        val serviceLoader = SoftServiceLoader.load(classOf[TypeElementVisitor[_, _]])
-        //        for (definition <- asScalaIterator(serviceLoader.iterator())) {
-        //          if (definition.isPresent) {
-        //            val visitor = definition.load()
-        //            Globals.loadedVisitors +=
-        //              definition.getName -> new LoadedVisitor(classDef, visitor, new ScalaVisitorContext(global, unit.source))
-        //
-        //            val values = new java.util.ArrayList[LoadedVisitor]()
-        //            values.addAll(Globals.loadedVisitors.values.asJavaCollection)
-        //            OrderUtil.reverseSort(values)
-        //            for(loadedVisitor <- asScalaIterator(values.iterator())) {
-        //              loadedVisitor.start()
-        //            }
-        //          }
-        //        }
-        //        super.traverse(tree)
-        //      }
         case classDef:ClassDef => {
           processSymbolAnnotations(classDef.symbol, classDef.symbol)
           buildMethodSymbolBridgeOverride(classDef)
@@ -82,6 +63,10 @@ class InitPluginComponent(val global: Global) extends PluginComponent {
     }
   }
 
+  /*
+  This determine whether a class should processed in a later phases by looking at the class, methods and fields
+  within to see if micronaut type stuff is being done.
+   */
   def processSymbolAnnotations(symbol:Global#Symbol, owner:Global#Symbol) = {
     if (symbol.annotations.exists(annotationInfo => {
       val annotationName = annotationInfo.symbol.thisType.toString
@@ -123,30 +108,14 @@ class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComp
   class BeanDefinitionInjectTraverser(unit:CompilationUnit) extends Traverser {
     val processed = new mutable.HashSet[Global#Symbol]
 
-    private def processBeanDefinitions(beanClassElement: Global#ClassDef, beanDefinitionWriter: BeanDefinitionVisitor, visitorContext: VisitorContext): Unit = {
+    private def processBeanDefinitions(beanDefinitionWriter: BeanDefinitionVisitor, visitorContext: VisitorContext): Unit = {
         beanDefinitionWriter.visitBeanDefinitionEnd()
         beanDefinitionWriter.accept(visitorContext)
         val beanDefinitionName = beanDefinitionWriter.getBeanDefinitionName
-        var beanTypeName = beanDefinitionWriter.getBeanTypeName
-//        val interfaces = beanClassElement.impl.ingetInterfaces
-//        for (anInterface <- interfaces) {
-//          if (anInterface.isInstanceOf[DeclaredType]) {
-//            val declaredType = anInterface.asInstanceOf[DeclaredType]
-//            val element = declaredType.asElement
-//            if (element.isInstanceOf[TypeElement]) {
-//              val te = element.asInstanceOf[TypeElement]
-//              val name = te.getQualifiedName.toString
-//              if (classOf[Provider[_]].getName == name) {
-//                val typeArguments = declaredType.getTypeArguments
-//                if (!typeArguments.isEmpty) beanTypeName = genericUtils.resolveTypeReference(typeArguments.get(0)).toString
-//              }
-//            }
-//          }
-//        }
-          val annotationMetadata = beanDefinitionWriter.getAnnotationMetadata
+        val beanTypeName = beanDefinitionWriter.getBeanTypeName
+        val annotationMetadata = beanDefinitionWriter.getAnnotationMetadata
         val beanDefinitionReferenceWriter = new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionName, beanDefinitionWriter.getOriginatingElement, annotationMetadata)
         beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing)
-        val className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName
 //        beanDefinitionReferenceWriter.setContextScope(annotationUtils.hasStereotype(beanClassElement, classOf[Context]))
         beanDefinitionReferenceWriter.accept(visitorContext)
     }
@@ -160,7 +129,7 @@ class BeanDefinitionInjectPluginComponent(val global: Global) extends PluginComp
           visitor.beanDefinitionWriters.iterator.foreach { tuple =>
             if (!processed.contains(tuple._1)) {
               processed.add(tuple._1)
-              processBeanDefinitions(classDef, tuple._2, visitorContext)
+              processBeanDefinitions(tuple._2, visitorContext)
             }
           }
         }

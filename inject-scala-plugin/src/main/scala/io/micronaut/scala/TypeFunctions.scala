@@ -17,6 +17,10 @@ object TypeFunctions {
     }
   }
 
+  /*
+  Hic sunt dracones. Took a lot of trial and error to figure out when and how to translate
+  types to and from Scala primitives and arrays
+   */
   private def argTypeForTypeSymbol(symbol:Global#Symbol, typeArgs:List[Global#Type], usePrimitive:Boolean, inArray:Boolean):AnyRef = symbol match {
     case classSymbol:Global#ClassSymbol => classSymbol.fullName match {
       case "scala.Boolean" => if (usePrimitive) if (inArray) "Z" else classOfPrimitiveFor("boolean") else "java.lang.Boolean"

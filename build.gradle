@@ -582,9 +582,9 @@ ext {
                 modules: ['micronaut-jaxrs-server', 'micronaut-jaxrs-processor']
             ],
             'micronaut.acme': [
-                    version: micronautAcmeVersion,
-                    group  : 'io.micronaut.acme',
-                    name   : 'micronaut-acme'
+                version: micronautAcmeVersion,
+                group  : 'io.micronaut.acme',
+                name   : 'micronaut-acme'
             ],
     ]
 

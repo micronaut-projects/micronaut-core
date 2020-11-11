@@ -24,7 +24,7 @@ class ScalaVisitorContext(val global: Global, val source: SourceFile) extends Vi
   override def warn(message: String, element: Element):Unit = ()
 
   override def visitMetaInfFile(path: String): Optional[GeneratedFile] = {
-    val classesDir = global.settings.outputDirs.outputDirFor(source.file).file
+    val classesDir = global.settings.outputDirs.outputDirFor(source.file).file.getCanonicalFile
     if (classesDir != null) {
       val outputVisitor = new DirectoryClassWriterOutputVisitor(classesDir)
       outputVisitor.visitMetaInfFile(path)
@@ -34,7 +34,7 @@ class ScalaVisitorContext(val global: Global, val source: SourceFile) extends Vi
   }
 
   override def visitGeneratedFile(path: String): Optional[GeneratedFile] = {
-    val classesDir = global.settings.outputDirs.outputDirFor(source.file).file
+    val classesDir = global.settings.outputDirs.outputDirFor(source.file).file.getCanonicalFile
     if (classesDir != null) {
       val outputVisitor = new DirectoryClassWriterOutputVisitor(classesDir)
       outputVisitor.visitGeneratedFile(path)
@@ -52,7 +52,7 @@ class ScalaVisitorContext(val global: Global, val source: SourceFile) extends Vi
   }
 
   override def visitClass(classname: String, originatingElement: Element): OutputStream = {
-    val classesDir = global.settings.outputDirs.outputDirFor(source.file).file
+    val classesDir = global.settings.outputDirs.outputDirFor(source.file).file.getCanonicalFile
     if (classesDir != null) {
       val outputVisitor = new DirectoryClassWriterOutputVisitor(classesDir)
       outputVisitor.visitClass(classname, originatingElement)
@@ -62,7 +62,7 @@ class ScalaVisitorContext(val global: Global, val source: SourceFile) extends Vi
   }
 
   override def visitServiceDescriptor(`type`: String, classname: String): Unit = {
-    val classesDir = global.settings.outputDirs.outputDirFor(source.file).file
+    val classesDir = global.settings.outputDirs.outputDirFor(source.file).file.getCanonicalFile
     if (classesDir != null) {
       val outputVisitor = new DirectoryClassWriterOutputVisitor(classesDir)
       outputVisitor.visitServiceDescriptor(`type`, classname)

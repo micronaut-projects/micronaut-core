@@ -1,6 +1,6 @@
 package io.micronaut.scala
 
-import java.lang.annotation.{Annotation, Repeatable, RetentionPolicy}
+import java.lang.annotation.{Repeatable, RetentionPolicy}
 import java.util
 import java.util.{Collections, Optional}
 

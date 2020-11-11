@@ -775,6 +775,8 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
     }
   }
 
+  private def error(message:String): Unit = throw new RuntimeException(message)
+
   def visitSymbol(
     symbolToOverrides:mutable.Map[Global#Symbol, Global#Symbol],
     beanDefinitionWriter:BeanDefinitionVisitor, doVisit:Boolean)(symbol:Global#Symbol):Unit = {
@@ -802,6 +804,11 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
 
   def visit(): Unit = {
     if (!concreteClass.symbol.isAbstract || isDeclaredBean) {
+      if (concreteClass.symbol.owner.fullName == "<empty>") {
+        error("Micronaut beans cannot be in the default package")
+        return
+      }
+
       val concreteClassMetadata = Globals.metadataBuilder(global).getOrCreate(concreteClass.symbol)
 
       val beanDefinitionWriter = new BeanDefinitionWriter(

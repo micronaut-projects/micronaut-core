@@ -69,7 +69,6 @@ class ScalaConfigurationMetadataBuilder(global: Global) extends ConfigurationMet
       var superInterface = resolveSuperInterface(declaringType)
       var break = false
       while (!break && superInterface.isInstanceOf[Global#ClassSymbol]) {
-        //val element = superInterface.asInstanceOf[TypeElement]
         val annotationMetadata = Globals.metadataBuilder(global).getOrCreate(superInterface)
         val parentConfig = annotationMetadata.getValue(classOf[ConfigurationReader], classOf[String])
         if (parentConfig.isPresent) {
