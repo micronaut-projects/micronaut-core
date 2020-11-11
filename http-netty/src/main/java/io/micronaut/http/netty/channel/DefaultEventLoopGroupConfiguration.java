@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.util.StringUtils;
 
+import java.time.Duration;
 import java.util.Optional;
 
 /**
@@ -39,6 +40,8 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
     private final boolean preferNativeTransport;
     private final String name;
     private final String executor;
+    private final Duration shutdownQuietPeriod;
+    private final Duration shutdownTimeout;
 
     /**
      * Default constructor.
@@ -48,6 +51,8 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
      * @param ioRatio               The IO ratio (optional)
      * @param preferNativeTransport Whether native transport is to be preferred
      * @param executor              A named executor service to use (optional)
+     * @param shutdownQuietPeriod   The shutdown quiet period
+     * @param shutdownTimeout       The shutdown timeout (must be >= shutdownQuietPeriod)
      */
     @ConfigurationInject
     public DefaultEventLoopGroupConfiguration(
@@ -55,12 +60,19 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
             @Bindable(defaultValue = "0") int numThreads,
             @Nullable Integer ioRatio,
             @Bindable(defaultValue = StringUtils.FALSE) boolean preferNativeTransport,
-            @Nullable String executor) {
+            @Nullable String executor,
+            @Nullable Duration shutdownQuietPeriod,
+            @Nullable Duration shutdownTimeout
+    ) {
         this.name = name;
         this.numThreads = numThreads;
         this.ioRatio = ioRatio;
         this.preferNativeTransport = preferNativeTransport;
         this.executor = executor;
+        this.shutdownQuietPeriod = Optional.ofNullable(shutdownQuietPeriod)
+            .orElse(Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD));
+        this.shutdownTimeout = Optional.ofNullable(shutdownTimeout)
+            .orElse(Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT));
     }
 
     /**
@@ -72,6 +84,8 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
         this.ioRatio = null;
         this.preferNativeTransport = false;
         this.executor = null;
+        this.shutdownQuietPeriod = Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD);
+        this.shutdownTimeout = Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
     }
 
     /**
@@ -107,5 +121,15 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
     @Override
     public String getName() {
         return name;
+    }
+
+    @Override
+    public Duration getShutdownQuietPeriod() {
+        return shutdownQuietPeriod;
+    }
+
+    @Override
+    public Duration getShutdownTimeout() {
+        return shutdownTimeout;
     }
 }

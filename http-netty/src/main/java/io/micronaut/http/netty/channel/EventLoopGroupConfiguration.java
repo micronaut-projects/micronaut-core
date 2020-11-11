@@ -17,6 +17,7 @@ package io.micronaut.http.netty.channel;
 
 import io.micronaut.core.naming.Named;
 
+import java.time.Duration;
 import java.util.Optional;
 
 /**
@@ -40,6 +41,20 @@ public interface EventLoopGroupConfiguration extends Named {
     String DEFAULT_LOOP = EVENT_LOOPS + "." + DEFAULT;
 
     /**
+     * The default shutdown quiet period in seconds.
+     *
+     * Implementation note: defaults are from io.netty.util.concurrent.AbstractEventExecutor
+     */
+    long DEFAULT_SHUTDOWN_QUIET_PERIOD = 2;
+
+    /**
+     * The default shutdown quiet period.
+     *
+     * Implementation note: defaults are from io.netty.util.concurrent.AbstractEventExecutor
+     */
+    long DEFAULT_SHUTDOWN_TIMEOUT = 15;
+
+    /**
      * @return The number of threads for the event loop
      */
     int getNumThreads();
@@ -58,4 +73,18 @@ public interface EventLoopGroupConfiguration extends Named {
      * @return Whether to prefer the native transport
      */
     boolean isPreferNativeTransport();
+
+    /**
+     * @return The shutdown quiet period
+     */
+    default Duration getShutdownQuietPeriod() {
+        return Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD);
+    }
+
+    /**
+     * @return The shutdown timeout (must be >= shutdownQuietPeriod)
+     */
+    default Duration getShutdownTimeout() {
+        return Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
+    }
 }

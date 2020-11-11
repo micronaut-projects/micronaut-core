@@ -432,8 +432,11 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      */
     @SuppressWarnings("WeakerAccess")
     protected EventLoopGroup createWorkerEventLoopGroup(@Nullable EventLoopGroupConfiguration workerConfig) {
-        return eventLoopGroupRegistry.getEventLoopGroup(workerConfig != null ? workerConfig.getName() : EventLoopGroupConfiguration.DEFAULT)
+        String configName = workerConfig != null ? workerConfig.getName() : EventLoopGroupConfiguration.DEFAULT;
+        return eventLoopGroupRegistry.getEventLoopGroup(configName)
                 .orElseGet(() -> {
+                    LOG.warn("The configuration for 'micronaut.server.netty.worker.event-loop-groups.{}' is deprecated. " +
+                        "Use 'micronaut.netty.event-loops' configuration instead.", configName);
                     final EventLoopGroup newGroup = newEventLoopGroup(workerConfig);
                     shutdownWorker = true;
                     return newGroup;

@@ -149,6 +149,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS;
+import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS;
+
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
  *
@@ -450,10 +453,13 @@ public class DefaultHttpClient implements
                 }
             }
             if (shutdownGroup) {
-                Duration shutdownTimeout = configuration.getShutdownTimeout().orElse(Duration.ofMillis(100));
+                Duration shutdownTimeout = configuration.getShutdownTimeout()
+                    .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
+                Duration shutdownQuietPeriod = configuration.getShutdownQuietPeriod()
+                    .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS));
 
                 Future<?> future = this.group.shutdownGracefully(
-                        1,
+                        shutdownQuietPeriod.toMillis(),
                         shutdownTimeout.toMillis(),
                         TimeUnit.MILLISECONDS
                 );
