@@ -191,7 +191,7 @@ class ScalaAnnotationMetadataBuilder(val global: Global) extends AbstractAnnotat
     //      annotationValue.asInstanceOf[AnnotationValue].accept(resolver, this)
     val resolvedValue = annotationValue match {
       case Array(elements@_*) => elements.map(resolveAnnotationValue).toArray
-      case _ => new AnnotationClassValue(annotationValue.toString)
+      case _ => resolveAnnotationValue(annotationValue)
     }
     if (resolvedValue != null) {
       validateAnnotationValue(originatingElement, annotationName, member, memberName, resolvedValue)
@@ -200,7 +200,10 @@ class ScalaAnnotationMetadataBuilder(val global: Global) extends AbstractAnnotat
   }
 
   private def resolveAnnotationValue(input:Any):AnnotationClassValue[_] = {
-    new AnnotationClassValue(input.toString)
+    new AnnotationClassValue(input match {
+      case symbol:Global#Symbol =>  symbol.nameString
+      case _ => input.toString
+    })
   }
 
   /**

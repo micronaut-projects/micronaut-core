@@ -35,30 +35,27 @@ class PropertyAnnotationSpec {
     assertThat(constructorInjectedBean.nullable).isNull()
     assertThat(constructorInjectedBean.integer).isEqualTo(10)
     assertThat(constructorInjectedBean.str).isEqualTo("foo")
-    // FIXME      assertThat(constructorInjectedBean.values.asScala.toArray).
-    //  containsExactlyInAnyOrder("one" -> "one", "one.two" -> "two")
+    assertThat(constructorInjectedBean.values.asScala.toArray).
+      containsExactlyInAnyOrder("one" -> "one", "one.two" -> "two")
 
     assertThat(methodInjectedBean.getNullable).isNull()
     assertThat(methodInjectedBean.getInteger).isEqualTo(10)
     assertThat(methodInjectedBean.getStr).isEqualTo("foo")
-    // FIXME  assertThat(methodInjectedBean.getValues.asScala.toArray).
-    //  containsExactlyInAnyOrder("one" -> "one", "one.two" -> "two")
+    assertThat(methodInjectedBean.getValues.asScala.toArray).
+      containsExactlyInAnyOrder("one" -> "one", "one.two" -> "two")
 
     assertThat(fieldInjectedBean.nullable).isNull()
     assertThat(fieldInjectedBean.integer).isEqualTo(10)
     assertThat(fieldInjectedBean.str).isEqualTo("foo")
-    // FIXME  assertThat(fieldInjectedBean.values.asScala.toArray).
-    // containsExactlyInAnyOrder("one" -> "one", "one.two" -> "two")
+    assertThat(fieldInjectedBean.values.asScala.toArray).
+      containsExactlyInAnyOrder("one" -> "one", "one.two" -> "two")
   }
-/*
-    void "test a class with only a property annotation is a bean and injected"() {
-        given:
-        ApplicationContext ctx = ApplicationContext.run(
-                'my.int':10,
-        )
 
-        expect:
-        ctx.getBean(PropertyOnlyInject).integer == 10
-    }
- */
+  @Test
+  def `test a class with only a property annotation is a bean and injected`():Unit = {
+    val ctx = ApplicationContext.run(
+      mutable.HashMap[String, AnyRef]("my.int" -> Integer.valueOf(10)).asJava
+    )
+    assertThat(ctx.getBean(classOf[PropertyOnlyInject]).integer).isEqualTo(10)
+  }
 }

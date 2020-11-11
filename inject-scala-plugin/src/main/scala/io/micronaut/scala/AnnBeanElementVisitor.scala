@@ -777,30 +777,34 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
 
   private def error(message:String): Unit = throw new RuntimeException(message)
 
-  def visitSymbol(
-    symbolToOverrides:mutable.Map[Global#Symbol, Global#Symbol],
-    beanDefinitionWriter:BeanDefinitionVisitor, doVisit:Boolean)(symbol:Global#Symbol):Unit = {
+  private def populateSymbolToOverrides(symbolToOverrides:mutable.Map[Global#Symbol, Global#Symbol])(symbol:Global#Symbol):Unit = {
     symbol match {
-      case methodSymbol: Global#MethodSymbol if methodSymbol.isMethod &&
-        !(methodSymbol.isConstructor || methodSymbol.isAccessor || methodSymbol.isBridge) =>
-      {
-          if (doVisit) {
-            visitExecutable(methodSymbol, beanDefinitionWriter, symbolToOverrides.get(methodSymbol))
-          } else {
-            val overridden = methodSymbol.overrides
-            overridden.foreach(ancestor => if (!symbolToOverrides.contains(ancestor)) symbolToOverrides.put(ancestor, methodSymbol))
-            val bridgeOverrides = Globals.methodsToBridgeOverrides.getOrElse(methodSymbol, List())
-            bridgeOverrides.foreach(ancestor => if (!symbolToOverrides.contains(ancestor)) symbolToOverrides.put(ancestor, methodSymbol))
-          }
-      }
-      case termSymbol: Global#TermSymbol if termSymbol.isMutable /* && !termSymbol.originalInfo.typeSymbol.isAbstract */ => {
-        if (doVisit) {
-          visitVariable(termSymbol, beanDefinitionWriter)
-        }
+      case methodSymbol: Global#MethodSymbol if methodToBeVisited(methodSymbol) => {
+        val overridden = methodSymbol.overrides
+        overridden.foreach(ancestor => if (!symbolToOverrides.contains(ancestor)) symbolToOverrides.put(ancestor, methodSymbol))
+        val bridgeOverrides = Globals.methodsToBridgeOverrides.getOrElse(methodSymbol, List())
+        bridgeOverrides.foreach(ancestor => if (!symbolToOverrides.contains(ancestor)) symbolToOverrides.put(ancestor, methodSymbol))
       }
       case _ => ()
     }
   }
+
+  def visitSymbol(
+    symbolToOverrides:mutable.Map[Global#Symbol, Global#Symbol],
+    beanDefinitionWriter:BeanDefinitionVisitor)(symbol:Global#Symbol):Unit = {
+    symbol match {
+      case methodSymbol: Global#MethodSymbol if methodToBeVisited(methodSymbol) =>
+        visitExecutable(methodSymbol, beanDefinitionWriter, symbolToOverrides.get(methodSymbol))
+      case termSymbol: Global#TermSymbol if termToBeVisited(termSymbol) =>
+        visitVariable(termSymbol, beanDefinitionWriter)
+      case _ => ()
+    }
+  }
+
+  private def methodToBeVisited(methodSymbol:Global#MethodSymbol) = methodSymbol.isMethod &&
+    !(methodSymbol.isConstructor || methodSymbol.isAccessor || methodSymbol.isBridge)
+
+  private def termToBeVisited(termSymbol: Global#TermSymbol) = termSymbol.isMutable /* && !termSymbol.originalInfo.typeSymbol.isAbstract */
 
   def visit(): Unit = {
     if (!concreteClass.symbol.isAbstract || isDeclaredBean) {
@@ -839,17 +843,17 @@ class AnnBeanElementVisitor(global:Global, concreteClass:Global#ClassDef, visito
 
       visitTypeArguments(concreteClass.symbol, beanDefinitionWriter)
 
-      val symbolToLowestDescendant = new mutable.HashMap[Global#Symbol, Global#Symbol]()
+      val symbolToOverrides = new mutable.HashMap[Global#Symbol, Global#Symbol]()
 
-      concreteClass.impl.body.map(_.symbol).foreach(visitSymbol(symbolToLowestDescendant, beanDefinitionWriter, false)(_))
+      concreteClass.impl.body.map(_.symbol).foreach(populateSymbolToOverrides(symbolToOverrides)(_))
 
       concreteClass.symbol.baseClasses.tail.filter(filterAncestors)
-        .foreach((classSymbol:Global#Symbol) => classSymbol.originalInfo.decls.foreach(visitSymbol(symbolToLowestDescendant, beanDefinitionWriter, false)(_)))
+        .foreach((classSymbol:Global#Symbol) => classSymbol.originalInfo.decls.foreach(populateSymbolToOverrides(symbolToOverrides)(_)))
 
       concreteClass.symbol.baseClasses.tail.reverse.filter(filterAncestors)
-        .foreach((classSymbol:Global#Symbol) => classSymbol.originalInfo.decls.foreach(visitSymbol(symbolToLowestDescendant, beanDefinitionWriter, true)(_)))
+        .foreach((classSymbol:Global#Symbol) => classSymbol.originalInfo.decls.foreach(visitSymbol(symbolToOverrides, beanDefinitionWriter)(_)))
 
-      concreteClass.impl.body.map(_.symbol).foreach(visitSymbol(symbolToLowestDescendant, beanDefinitionWriter, true)(_))
+      concreteClass.impl.body.map(_.symbol).foreach(visitSymbol(symbolToOverrides, beanDefinitionWriter)(_))
 
       beanDefinitionWriter.visitBeanDefinitionEnd()
       beanDefinitionWriter.accept(visitorContext)

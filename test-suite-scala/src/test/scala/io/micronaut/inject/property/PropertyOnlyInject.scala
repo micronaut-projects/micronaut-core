@@ -1,7 +1,7 @@
-package io.micronaut.inject
+package io.micronaut.inject.property
 
 import io.micronaut.context.annotation.Property
 
 class PropertyOnlyInject {
-//  @Property(name = "my.int") private[property] var integer = 0
+  @Property(name = "my.int") private[property] var integer = 0
 }
