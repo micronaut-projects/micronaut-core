@@ -26,9 +26,9 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor
  * @author Jaroslav Tulach
  * @since 2.2
  */
-class AroundEqualsSpec extends AbstractTypeElementSpec {
+class AroundObjectSpec extends AbstractTypeElementSpec {
 
-    void "test that @Around can intercept also Object.equals"() {
+    void "test that @Around can intercept also Object methods"() {
         when:
         ApplicationContext ctx = buildContext('test.MyBean', '''
 package test;
@@ -45,7 +45,14 @@ import java.util.Properties;
 @Target({ElementType.TYPE, ElementType.METHOD, ElementType.PARAMETER})
 @Around(wrapObjectMethods = true)
 @Type(EqualsInterceptor.class)
-@interface EverythingEvenEquals{}
+@interface EverythingEvenEqualsHashCodeToString{}
+
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD, ElementType.PARAMETER})
+@Around
+@Type(EqualsInterceptor.class)
+@interface NoObjectMethods{}
 
 
 @javax.inject.Singleton
@@ -60,23 +67,55 @@ class EqualsInterceptor implements MethodInterceptor<Object, Object> {\n\
 }
 
 
-@EverythingEvenEquals
+@EverythingEvenEqualsHashCodeToString
 class MyBean {\n\
     public String someMethod() {\n\
         return "MyBean";\n\
     }
 }
 
+@NoObjectMethods
+class ClassicalBean {\n\
+    public String someMethod() {\n\
+        return "ClassicalBean";\n\
+    }
+}
+
 ''')
         then:
-        def bean = ctx.getBean(ctx.classLoader.loadClass("test.MyBean"))
+        def classicalBean = ctx.getBean(ctx.classLoader.loadClass("test.ClassicalBean"))
         def interceptor = ctx.getBean(ctx.classLoader.loadClass("test.EqualsInterceptor"))
         interceptor.methods.getProperty("someMethod") == null
-        bean.someMethod()
+        classicalBean.someMethod()
         interceptor.methods.getProperty("someMethod") != null
 
         interceptor.methods.getProperty("equals") == null
-        bean.equals(bean)
+        classicalBean.equals(classicalBean)
+        interceptor.methods.getProperty("equals") == null
+
+        interceptor.methods.getProperty("hashCode") == null
+        classicalBean.hashCode()
+        interceptor.methods.getProperty("hashCode") == null
+
+        interceptor.methods.getProperty("toString") == null
+        classicalBean.toString()
+        interceptor.methods.getProperty("toString") == null
+
+        def myBean = ctx.getBean(ctx.classLoader.loadClass("test.MyBean"))
+        interceptor.methods.remove("someMethod")
+        myBean.someMethod()
+        interceptor.methods.getProperty("someMethod") != null
+
+        interceptor.methods.getProperty("equals") == null
+        myBean.equals(myBean)
         interceptor.methods.getProperty("equals") != null
+
+        interceptor.methods.getProperty("hashCode") == null
+        myBean.hashCode()
+        interceptor.methods.getProperty("hashCode") != null
+
+        interceptor.methods.getProperty("toString") == null
+        myBean.toString()
+        interceptor.methods.getProperty("toString") != null
     }
 }
