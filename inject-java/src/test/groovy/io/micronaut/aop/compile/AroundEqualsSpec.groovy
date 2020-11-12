@@ -43,7 +43,7 @@ import java.util.Properties;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD, ElementType.PARAMETER})
-@Around
+@Around(wrapObjectMethods = true)
 @Type(EqualsInterceptor.class)
 @interface EverythingEvenEquals{}
 

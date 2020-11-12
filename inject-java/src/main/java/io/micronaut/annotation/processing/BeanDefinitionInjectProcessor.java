@@ -536,8 +536,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         });
                     } else {
                         TypeElement superClass = modelUtils.superClassFor(classElement);
-                        if (superClass != null && !modelUtils.isObjectClass(superClass)) {
-                            superClass.accept(this, o);
+                        if (superClass != null) {
+                            boolean processSuperClass =
+                                !modelUtils.isObjectClass(superClass) ||
+                                isWrapObjectMethods(typeAnnotationMetadata);
+                            if (processSuperClass) {
+                                superClass.accept(this, o);
+                            }
                         }
                     }
 
@@ -547,6 +552,18 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
             }
         }
+
+        private boolean isWrapObjectMethods(AnnotationMetadata typeAnnotationMetadata) {
+            if (typeAnnotationMetadata.getAnnotationNameByStereotype("io.micronaut.aop.Around").isPresent()) {
+                Optional<Boolean> wrapEquals = typeAnnotationMetadata.getAnnotation("io.micronaut.aop.Around")
+                        .booleanValue("wrapObjectMethods");
+                if (wrapEquals.isPresent() && wrapEquals.get()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
 
         /**
          * Gets or creates a bean definition writer.
@@ -1254,8 +1271,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             TypeMirror returnType = method.getReturnType();
 
             TypeElement declaringClass = modelUtils.classElementFor(method);
-            if (declaringClass == null || modelUtils.isObjectClass(declaringClass)) {
+            if (declaringClass == null) {
                 return;
+            }
+            if (modelUtils.isObjectClass(declaringClass)) {
+                if (method.getModifiers().contains(Modifier.FINAL)) {
+                    return;
+                }
+                if (!isWrapObjectMethods(concreteClassMetadata)) {
+                    return;
+                }
             }
 
             boolean isOwningClass = declaringClass.getQualifiedName().equals(concreteClass.getQualifiedName());

@@ -80,4 +80,13 @@ public @interface Around {
      * @return True if the proxy target should be resolved lazily
      */
     boolean lazy() default false;
+
+    /**
+     * Process the {@link Object} non-final method by
+     * the {@code @Around} handlers or not.
+     *
+     * @return true if {@code Object} methods shall be processed
+     * @since 2.2
+     */
+    boolean wrapObjectMethods() default false;
 }
