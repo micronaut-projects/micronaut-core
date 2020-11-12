@@ -324,7 +324,6 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
         return environmentAnnotationMetadata.getAnnotationType(name);
     }
 
-
     @Override
     public @NonNull Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
         ArgumentUtils.requireNonNull("name", name);
