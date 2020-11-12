@@ -37,21 +37,24 @@ import io.micronaut.aop.*;
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
-import java.lang.annotation.*;
+import java.lang.annotation.*;\n\
+import java.util.Properties;
 
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD, ElementType.PARAMETER})
 @Around
-@Type(SomeInterceptor.class)
+@Type(EqualsInterceptor.class)
 @interface EverythingEvenEquals{}
 
 
 @javax.inject.Singleton
-class SomeInterceptor implements MethodInterceptor<Object, Object> {
+class EqualsInterceptor implements MethodInterceptor<Object, Object> {\n\
+    public final Properties methods = new Properties();
+
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {\n\
-        System.setProperty("intercepted." + context.getMethodName(), "true");
+        methods.setProperty(context.getMethodName(), "true");
         return context.proceed();
     }
 }
@@ -66,14 +69,14 @@ class MyBean {\n\
 
 ''')
         then:
-        Class clazz = ctx.classLoader.loadClass("test.MyBean")
-        def bean = ctx.getBean(clazz)
-        System.getProperty("intercepted.someMethod") == null
+        def bean = ctx.getBean(ctx.classLoader.loadClass("test.MyBean"))
+        def interceptor = ctx.getBean(ctx.classLoader.loadClass("test.EqualsInterceptor"))
+        interceptor.methods.getProperty("someMethod") == null
         bean.someMethod()
-        System.getProperty("intercepted.someMethod") != null
+        interceptor.methods.getProperty("someMethod") != null
 
-        System.getProperty("intercepted.equals") == null
+        interceptor.methods.getProperty("equals") == null
         bean.equals(bean)
-        System.getProperty("intercepted.equals") != null
+        interceptor.methods.getProperty("equals") != null
     }
 }
