@@ -430,15 +430,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return The type if present
      */
     default Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
-        ArgumentUtils.requireNonNull("name", name);
-        final Optional<Class> aClass = ClassUtils.forName(name, getClass().getClassLoader());
-        return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
-            if (Annotation.class.isAssignableFrom(aClass1)) {
-                //noinspection unchecked
-                return Optional.of(aClass1);
-            }
-            return Optional.empty();
-        });
+        return getAnnotationType(name, getClass().getClassLoader());
     }
 
     /**

@@ -27,6 +27,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -85,13 +86,12 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
-        for (AnnotationMetadata metadata : hierarchy) {
-            final Optional<Class<? extends Annotation>> annotationType = metadata.getAnnotationType(name);
-            if (annotationType.isPresent()) {
-                return annotationType;
-            }
-        }
-        return Optional.empty();
+        return getAnnotationType((metadata) -> metadata.getAnnotationType(name));
+    }
+
+    @Override
+    public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
+        return getAnnotationType((metadata) -> metadata.getAnnotationType(name, classLoader));
     }
 
     /**
@@ -694,5 +694,15 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Override
     public Iterator<AnnotationMetadata> iterator() {
         return ArrayUtils.reverseIterator(hierarchy);
+    }
+
+    private Optional<Class<? extends Annotation>> getAnnotationType(Function<AnnotationMetadata, Optional<Class<? extends Annotation>>> annotationTypeSupplier) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            final Optional<Class<? extends Annotation>> annotationType = annotationTypeSupplier.apply(metadata);
+            if (annotationType.isPresent()) {
+                return annotationType;
+            }
+        }
+        return Optional.empty();
     }
 }
