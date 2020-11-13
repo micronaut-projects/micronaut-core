@@ -200,6 +200,8 @@ abstract class GenBase<T> {
         beanProperties[1].type == String
         introspection.getRequiredProperty("name", String)
                 .get(test) == 'test'
+        introspection.getRequiredProperty("other", String)
+                .get(test) == 'other'
     }
 
     void "test bean introspection with argument of generic interface"() {
