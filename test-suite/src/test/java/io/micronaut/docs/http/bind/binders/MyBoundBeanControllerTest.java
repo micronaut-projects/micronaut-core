@@ -10,6 +10,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -39,9 +40,12 @@ public class MyBoundBeanControllerTest {
 
     @Test
     public void testAnnotationBinding() {
+        Set<Cookie> cookieSet = new HashSet<>();
+        cookieSet.add(Cookie.of("shoppingCart", "5"));
+        cookieSet.add(Cookie.of("displayName", "John Q Micronaut"));
+
         HttpRequest request = HttpRequest.POST("/customBinding/annotated", "{\"key\":\"value\"}")
-                .cookies(Set.of(Cookie.of("shoppingCart", "5"),
-                        Cookie.of("displayName", "John Q Micronaut")))
+                .cookies(cookieSet)
                 .basicAuth("munaut", "P@ssw0rd");
         Map<String, String> body = client.toBlocking().retrieve(request, Argument.mapOf(String.class, String.class));
 
@@ -53,9 +57,12 @@ public class MyBoundBeanControllerTest {
 
     @Test
     public void testTypeBinding() {
+        Set<Cookie> cookieSet = new HashSet<>();
+        cookieSet.add(Cookie.of("shoppingCart", "5"));
+        cookieSet.add(Cookie.of("displayName", "John Q Micronaut"));
+
         HttpRequest request = HttpRequest.POST("/customBinding/typed", "{\"key\":\"value\"}")
-                .cookies(Set.of(Cookie.of("shoppingCart", "5"),
-                        Cookie.of("displayName", "John Q Micronaut")))
+                .cookies(cookieSet)
                 .basicAuth("munaut", "P@ssw0rd");
         Map<String, String> body = client.toBlocking().retrieve(request, Argument.mapOf(String.class, String.class));
 
