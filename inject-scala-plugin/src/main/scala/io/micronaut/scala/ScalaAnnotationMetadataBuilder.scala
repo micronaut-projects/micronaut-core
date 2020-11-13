@@ -4,7 +4,7 @@ import java.lang.annotation.{Repeatable, RetentionPolicy}
 import java.util
 import java.util.{Collections, Optional}
 
-import io.micronaut.core.annotation.{AnnotationClassValue, AnnotationMetadata}
+import io.micronaut.core.annotation.{AnnotationClassValue, AnnotationMetadata, AnnotationValue}
 import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
@@ -84,11 +84,15 @@ class ScalaAnnotationMetadataBuilder(val global: Global) extends AbstractAnnotat
    * @param element The type element
    * @return The annotations
    */
-  override protected def getAnnotationsForType(element: Global#Symbol): util.List[_ <: Global#AnnotationInfo] =
-    (element match {
+  override protected def getAnnotationsForType(element: Global#Symbol): util.List[_ <: Global#AnnotationInfo] = {
+    val symbol:Global#Symbol = element match {
       case methodSymbol:Global#MethodSymbol if !methodSymbol.isPrivate && methodSymbol.isAccessor && methodSymbol.isSetter =>  methodSymbol.accessedOrSelf
+      case classSymbol:Global#ClassSymbol => classSymbol.baseClasses.head  // mitigate possible bug cause annotations to be empty?
+      // Spent hours trying to figure why-the=[heck] annotations was empty when it shouldn't
       case _ => element
-    }).annotations.asJava
+    }
+    symbol.annotations.asJava
+  }
 
   /**
    * Build the type hierarchy for the given element.
@@ -185,25 +189,18 @@ class ScalaAnnotationMetadataBuilder(val global: Global) extends AbstractAnnotat
    * @param annotationValue    The value
    * @param annotationValues   The values to populate
    */
-  override protected def readAnnotationRawValues(originatingElement: Global#Symbol, annotationName: String, member: Global#Symbol, memberName: String, annotationValue: Any, annotationValues: util.Map[CharSequence, AnyRef]): Unit = {
+  override protected def readAnnotationRawValues(originatingElement: Global#Symbol, annotationName: String, member: Global#Symbol, memberName: String, annotationValue: AnyRef, annotationValues: util.Map[CharSequence, AnyRef]): Unit = {
     //    if (memberName != null && annotationValue.isInstanceOf[AnnotationValue] && !annotationValues.containsKey(memberName)) {
     //      val resolver = new JavaAnnotationMetadataBuilder#MetadataAnnotationValueVisitor(originatingElement)
     //      annotationValue.asInstanceOf[AnnotationValue].accept(resolver, this)
     val resolvedValue = annotationValue match {
-      case Array(elements@_*) => elements.map(resolveAnnotationValue).toArray
-      case _ => resolveAnnotationValue(annotationValue)
+      case annotationArg:Global#ClassfileAnnotArg => processAnnotationRawValue(originatingElement)(annotationArg)
+      case _ => annotationValue
     }
     if (resolvedValue != null) {
       validateAnnotationValue(originatingElement, annotationName, member, memberName, resolvedValue)
       annotationValues.put(memberName, resolvedValue)
     }
-  }
-
-  private def resolveAnnotationValue(input:Any):AnnotationClassValue[_] = {
-    new AnnotationClassValue(input match {
-      case symbol:Global#Symbol =>  symbol.nameString
-      case _ => input.toString
-    })
   }
 
   /**
@@ -224,12 +221,10 @@ class ScalaAnnotationMetadataBuilder(val global: Global) extends AbstractAnnotat
    * @return The object
    */
   override protected def readAnnotationValue(originatingElement: Global#Symbol, member: Global#Symbol, memberName: String, annotationValue: AnyRef): AnyRef = {
-    if (memberName != null /* && annotationValue.isInstanceOf[Global#TypeRef] */) {
-      resolveAnnotationValue(annotationValue)
-    } else if (memberName != null && annotationValue != null && ClassUtils.isJavaLangType(annotationValue.getClass)) { // only allow basic types
-      annotationValue
-    } else {
-      null
+    annotationValue match {
+      case annoArg:Global#ClassfileAnnotArg if memberName != null => processAnnotationRawValue(originatingElement)(annoArg)
+      case other if memberName != null && annotationValue != null && ClassUtils.isJavaLangType(annotationValue.getClass) => other
+      case _ => null
     }
   }
 
@@ -283,10 +278,30 @@ class ScalaAnnotationMetadataBuilder(val global: Global) extends AbstractAnnotat
     }
   }
 
-  private def processAnnotationRawValue(arg:Global#ClassfileAnnotArg):Any = {
+  private def processAnnotationRawValue(originatingElement:Global#Symbol)(arg:Global#ClassfileAnnotArg):AnyRef = {
     arg match {
-      case literal:Global#LiteralAnnotArg => literal.const.value
-      case array:Global#ArrayAnnotArg => array.args.map(processAnnotationRawValue)
+      case literal:Global#LiteralAnnotArg => literal.const.value match {
+        case typeRef:Global#TypeRef => new AnnotationClassValue(typeRef.sym.fullName)
+        case symbol:Global#Symbol => symbol.nameString // ENUM need name, might need other logic
+        case _ => literal.const.value.toString
+      }
+      case array:Global#ArrayAnnotArg => {
+        val arr = array.args.map(processAnnotationRawValue(originatingElement))
+        // Java code elsewhere expect AnnotationValue[] or AnnotationClassValue[] arrays
+        // TODO - a better way?
+        if (arr.nonEmpty) {
+          if (arr(0).isInstanceOf[AnnotationClassValue[_]]) {
+            arr.map(_.asInstanceOf[AnnotationClassValue[_]])
+          } else if (arr(0).isInstanceOf[AnnotationValue[_]]) {
+            arr.map(_.asInstanceOf[AnnotationValue[_]])
+          } else {
+            arr
+          }
+        } else {
+          arr
+        }
+      }
+      case nested:Global#NestedAnnotArg => readNestedAnnotationValue(originatingElement, nested.annInfo)
       case _ => ???
     }
   }
@@ -297,14 +312,17 @@ class ScalaAnnotationMetadataBuilder(val global: Global) extends AbstractAnnotat
    * @param annotationMirror The annotation
    * @return The values
    */
-  override protected def readAnnotationRawValues(annotationMirror: Global#AnnotationInfo): util.Map[_ <: Global#Symbol, _] = {
-    val result = new util.HashMap[Global#Symbol, Any]()
-    val methodMap:Map[String, Global#Symbol] = annotationMirror.symbol.originalInfo.decls
-      .filter((it:Global#Symbol) => it.isMethod && !it.isConstructor)
+  override protected def readAnnotationRawValues(annotationMirror: Global#AnnotationInfo): util.Map[_ <: Global#Symbol, _ <: AnyRef] = {
+    val result = new util.HashMap[Global#Symbol, AnyRef]()
+    val methodMap:Map[String, Global#Symbol] = annotationMirror.symbol.baseClasses
+      .flatMap(classSymbol => classSymbol.originalInfo.decls
+        .filter((it:Global#Symbol) => it.isMethod && !it.isConstructor))
       .map(it => (it.nameString, it))
       .toMap
     annotationMirror.assocs.foreach {
-      case (name, arg) => result.put(methodMap(name.toString()), processAnnotationRawValue(arg))
+      case (name, arg) => {
+        result.put(methodMap(name.toString()), arg)
+      }
       case _ => ??? // Is this possible? TODO
     }
     result
@@ -326,7 +344,7 @@ class ScalaAnnotationMetadataBuilder(val global: Global) extends AbstractAnnotat
         val values = readAnnotationRawValues(annotationMirror)
         values.entrySet.forEach { entry =>
           val key = entry.getKey
-          val value = entry.getValue
+          val value:AnyRef = entry.getValue
           readAnnotationRawValues(originatingElement, annotationName, member, key.nameString, value, converted)
         }
       }

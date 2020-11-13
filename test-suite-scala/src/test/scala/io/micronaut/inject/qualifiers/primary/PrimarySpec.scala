@@ -44,7 +44,7 @@ class PrimarySpec {
   }
 
   @Test
-  def `test duplicate @Primary bean throws exception`() {
+  def `test duplicate @Primary bean throws exception`():Unit = {
     val context = BeanContext.run()
 
     assertThatExceptionOfType(classOf[NonUniqueBeanException])
