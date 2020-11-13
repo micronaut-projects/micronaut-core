@@ -12,19 +12,37 @@ The Gradle plugin has a new `testNativeImage` task that builds the GraalVM Nativ
 
 === Micronaut Launch Enhancements
 
+==== Support for Kotlin Gradle Builds
+
+It is now possible to create applications that use `build.gradle.kts` instead of `build.gradle` using the `--build` argument of the CLI:
+
+[source,bash]
+----
+$ mn create-app demo --build gradle_kotlin && cd demo
+$ ./gradlew test
+----
+
+Or via the Micronaut Launch API:
+
+[source,bash]
+----
+$ curl https://launch.micronaut.io/demo.zip?build=gradle_kotlin -o demo.zip && unzip demo.zip -d demo && cd demo
+$ ./gradlew test
+----
+
 ==== Push to Github
 
-It is now possible to create an application with and https://micronaut.io/launch/[Micronaut Launch] and have it pushed automatically to Github, creating the necessary repository. When generating an application just select the "Push to Github" option.
+It is now possible to create an application with and https://micronaut.io/launch/[Micronaut Launch] and have it pushed automatically to a repository in your Github account. When generating an application just select the "Push to Github" option.
 
 === New Micronaut Modules
 
 ==== MQTT Support
 
-Micronaut now has integration with MQTT similar to the integration with Kafka and RabbitMQ. See the https://micronaut-projects.github.io/micronaut-mqtt/latest/guide/[Micronaut MQTT documentation] to get started.
+Improving the experience in IoT use cases, Micronaut now has integration with MQTT similar to the integration with Kafka and RabbitMQ. See the https://micronaut-projects.github.io/micronaut-mqtt/latest/guide/[Micronaut MQTT documentation] to get started.
 
 ==== Micronaut Data R2DBC
 
-A new module that adds support for R2DBC has been added in preview status. Micronaut Data R2DBC lets you define reactive data repositories using R2DBC that work with any of the supported drivers and include support for GraalVM Native Image.
+A new module that adds support for R2DBC (Reactive Database Connectivity) has been added in preview status. Micronaut Data R2DBC lets you define reactive data repositories using R2DBC that work with any of the supported drivers and include support for GraalVM Native Image.
 
 See the https://micronaut-projects.github.io/micronaut-r2dbc/1.0.x/guide/[Documentation for Micronaut R2DBC] for more information.
 
