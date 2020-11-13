@@ -59,4 +59,17 @@ public interface RxStreamingHttpClient extends StreamingHttpClient, RxHttpClient
     static RxStreamingHttpClient create(URL url) {
         return HttpClientConfiguration.createStreamingClient(url);
     }
+
+    /**
+     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration The client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    static RxStreamingHttpClient create(URL url, HttpClientConfiguration configuration) {
+        return HttpClientConfiguration.createStreamingClient(url, configuration);
+    }
 }

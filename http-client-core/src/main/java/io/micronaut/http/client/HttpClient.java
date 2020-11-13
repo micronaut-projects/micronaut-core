@@ -233,4 +233,17 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     static HttpClient create(@Nullable URL url) {
         return HttpClientConfiguration.createClient(url);
     }
+
+    /**
+     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    static HttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
+        return HttpClientConfiguration.createClient(url, configuration);
+    }
 }

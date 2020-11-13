@@ -353,11 +353,17 @@ ext {
                     group:'org.neo4j.driver',
                     name:'neo4j-java-driver'
             ],
-            ojdbc                      : [
-                    version: ojdbcVersion,
+            oracle                      : [
+                    version: oracleDriverVersion,
                     group  : 'com.oracle.database.jdbc',
                     name   : 'ojdbc8',
                     modules: ['ucp']
+            ],
+            // TODO Deprecated: Remove in the next major version
+            oldOracle                  : [
+                    version: oldOracleDriverVersion,
+                    group  : 'com.oracle.ojdbc',
+                    name   : 'ojdbc8'
             ],
             'jcache'                   : [
                     version: jcacheVersion,
@@ -524,17 +530,6 @@ ext {
                     version: mssqlDriverVersion,
                     group  : 'com.microsoft.sqlserver',
                     name   : 'mssql-jdbc'
-            ],
-            oracle                  : [
-                version: oracleDriverVersion,
-                group  : 'com.oracle.database.jdbc',
-                name   : 'ojdbc8'
-            ],
-            // TODO Deprecated: Remove in the next major version
-            oldOracle                  : [
-                version: oldOracleDriverVersion,
-                group  : 'com.oracle.ojdbc',
-                name   : 'ojdbc8'
             ],
             tomcatJdbc                 : [
                     version: tomcatJdbcVersion,
