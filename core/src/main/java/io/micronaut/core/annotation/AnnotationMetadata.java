@@ -409,11 +409,12 @@ public interface AnnotationMetadata extends AnnotationSource {
     /**
      * Gets the type for a given annotation if it is present on the classpath. Subclasses can potentially override to provide optimized loading.
      * @param name The type name
+     * @param classLoader The ClassLoader to load the type
      * @return The type if present
      */
-    default Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
+    default Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
         ArgumentUtils.requireNonNull("name", name);
-        final Optional<Class> aClass = ClassUtils.forName(name, getClass().getClassLoader());
+        final Optional<Class> aClass = ClassUtils.forName(name, classLoader);
         return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
             if (Annotation.class.isAssignableFrom(aClass1)) {
                 //noinspection unchecked
@@ -421,6 +422,15 @@ public interface AnnotationMetadata extends AnnotationSource {
             }
             return Optional.empty();
         });
+    }
+
+    /**
+     * Gets the type for a given annotation if it is present on the classpath. Subclasses can potentially override to provide optimized loading.
+     * @param name The type name
+     * @return The type if present
+     */
+    default Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
+        return getAnnotationType(name, getClass().getClassLoader());
     }
 
     /**
@@ -484,6 +494,23 @@ public interface AnnotationMetadata extends AnnotationSource {
             .filter(Optional::isPresent)
             .map(opt -> (Class<? extends Annotation>) opt.get())
             .collect(Collectors.toList());
+    }
+
+    /**
+     * Resolve all of the annotation names that feature the given stereotype.
+     *
+     * @param stereotype The annotation names
+     * @param classLoader The classloader to load annotation type
+     * @return A set of annotation names
+     */
+    default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype, @NonNull ClassLoader classLoader) {
+        ArgumentUtils.requireNonNull("stereotype", stereotype);
+
+        List<String> names = getAnnotationNamesByStereotype(stereotype.getName());
+        return names.stream().map(name -> getAnnotationType(name, classLoader))
+                .filter(Optional::isPresent)
+                .map(opt -> (Class<? extends Annotation>) opt.get())
+                .collect(Collectors.toList());
     }
 
     /**
