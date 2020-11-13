@@ -128,6 +128,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         .filter(p -> p.getName().equals(methodName))
                         .findFirst();
                 parameterElement.ifPresent(value -> currentRecordWriter.visitProperty(
+                        element.getReturnType(),
                         element.getGenericReturnType(),
                         methodName,
                         element,
@@ -361,7 +362,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             Set<AnnotationValue> indexedAnnotations,
             boolean metadata) {
         for (PropertyElement beanProperty : beanProperties) {
-            final ClassElement type = beanProperty.getGenericType();
+            final ClassElement type = beanProperty.getType();
+            final ClassElement genericType = beanProperty.getGenericType();
 
             final String name = beanProperty.getName();
             if (!includes.isEmpty() && !includes.contains(name)) {
@@ -377,6 +379,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
             writer.visitProperty(
                     type,
+                    genericType,
                     name,
                     beanProperty.getReadMethod().orElse(null),
                     beanProperty.getWriteMethod().orElse(null),
