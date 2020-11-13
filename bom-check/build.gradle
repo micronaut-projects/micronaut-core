@@ -6,8 +6,8 @@ plugins {
 
 repositories {
     mavenCentral()
-    maven { url "https://repo.grails.org/grails/core" }
-    maven { url "https://dl.bintray.com/micronaut/core-releases-local" }
+    jcenter()
+    maven { url "https://repo.grails.org/grails/libs-releases" }
 }
 
 boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
