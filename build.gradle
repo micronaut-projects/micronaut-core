@@ -625,6 +625,11 @@ ext {
                 name   : 'ignite-core',
                 modules: ['ignite-kubernetes']
             ],
+            'micronaut.mqtt': [
+                version: micronautMQTTVersion,
+                group  : 'io.micronaut.mqtt',
+                modules: ['micronaut-mqtt-core', 'micronaut-mqtt-ssl',  'micronaut-mqttv3',  'micronaut-mqttv5']
+            ],
     ]
 
     dependencyVersion = { String name ->
