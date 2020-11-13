@@ -1764,7 +1764,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 Object fieldType = modelUtils.resolveTypeReference(type);
-
+                addOriginatingElementIfNecessary(writer, declaringClass);
                 if (isValue) {
                     writer.visitFieldValue(
                             modelUtils.resolveTypeReference(declaringClass),
@@ -1776,7 +1776,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             isConfigurationPropertiesType
                     );
                 } else {
-                    addOriginatingElementIfNecessary(writer, declaringClass);
                     writer.visitFieldInjectionPoint(
                             modelUtils.resolveTypeReference(declaringClass),
                             fieldType,
