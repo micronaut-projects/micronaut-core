@@ -47,7 +47,11 @@ ext {
                     name: 'micronaut-oraclecloud-bom',
                     version: micronautOracleCloudVersion
             ],
-
+            'micronaut.r2dbc': [
+                    group: 'io.micronaut.r2dbc',
+                    name: 'micronaut-r2dbc-bom',
+                    version: micronautR2DBCVersion
+            ],
             //Third-party
             'netty': [
                     group: 'io.netty',
