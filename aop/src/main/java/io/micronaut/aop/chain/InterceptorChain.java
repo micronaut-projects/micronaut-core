@@ -243,7 +243,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     @UsedByGeneratedCode
     public static Interceptor[] resolveAroundInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
-        return resolveInterceptorsInternal(method, Around.class, interceptors);
+        return resolveInterceptorsInternal(method, Around.class, interceptors, beanContext.getClassLoader());
     }
 
     /**
@@ -259,7 +259,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     @UsedByGeneratedCode
     public static Interceptor[] resolveIntroductionInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
-        Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors);
+        Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors, beanContext.getClassLoader());
         if (introductionInterceptors.length == 0) {
             if (method.hasStereotype(Adapter.class)) {
                 introductionInterceptors = new Interceptor[] { new AdapterIntroduction(beanContext, method) };
@@ -279,8 +279,8 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         }
     }
 
-    private static Interceptor[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method, Class<? extends Annotation> annotationType, Interceptor[] interceptors) {
-        List<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType);
+    private static Interceptor[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method, Class<? extends Annotation> annotationType, Interceptor[] interceptors, ClassLoader classLoader) {
+        List<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType, classLoader);
 
         Set<Class> applicableClasses = new HashSet<>();
 

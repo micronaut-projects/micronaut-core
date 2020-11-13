@@ -210,6 +210,11 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
+    public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
+        return Optional.empty();
+    }
+
+    @Override
     public Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(@Nullable String stereotype) {
         return Optional.empty();
     }

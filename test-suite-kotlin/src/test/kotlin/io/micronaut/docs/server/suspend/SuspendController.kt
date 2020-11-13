@@ -110,4 +110,9 @@ class SuspendController(@Named(TaskExecutors.IO) private val executor: ExecutorS
             suspendService.delayedCalculation2()
         }
     }
+
+    @Get("/callSuspendServiceWithRetriesWithoutDelay")
+    suspend fun callSuspendServiceWithRetriesWithoutDelay(): String {
+        return suspendService.calculation3()
+    }
 }

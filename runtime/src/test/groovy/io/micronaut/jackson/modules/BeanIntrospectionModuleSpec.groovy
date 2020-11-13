@@ -11,12 +11,9 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.jackson.JacksonConfiguration
-import org.checkerframework.checker.nullness.qual.NonNull
-import spock.lang.Issue
+import io.micronaut.jackson.modules.testcase.EmailTemplate
+import io.micronaut.jackson.modules.testcase.Notification
 import spock.lang.Specification
-
-import javax.annotation.Nullable
-import javax.validation.constraints.NotBlank
 
 class BeanIntrospectionModuleSpec extends Specification {
 
@@ -219,6 +216,25 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         cleanup:
         ctx.close()
+    }
+
+    def "should deserialize field with hierarchy"() {
+        given:
+            ApplicationContext ctx = ApplicationContext.run(
+                    (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
+            )
+            ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+            def notif = """
+{"id":586387198220282880, "template":{"templateType":"email","textTemplate":"Ahoj"}}
+"""
+            def value = objectMapper.readValue(notif, Notification.class)
+        then:
+            value.getTemplate() instanceof EmailTemplate
+
+        cleanup:
+            ctx.close()
     }
 
     @Introspected
