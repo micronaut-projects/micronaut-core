@@ -20,7 +20,7 @@ It is now possible to create an application with and https://micronaut.io/launch
 
 ==== MQTT Support
 
-TODO
+Micronaut now has integration with MQTT similar to the integration with Kafka and RabbitMQ. See the https://micronaut-projects.github.io/micronaut-mqtt/latest/guide/[Micronaut MQTT documentation] to get started.
 
 ==== Micronaut Data R2DBC
 
