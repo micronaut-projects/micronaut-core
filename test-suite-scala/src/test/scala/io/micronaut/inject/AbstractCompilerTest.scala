@@ -46,6 +46,8 @@ abstract class AbstractCompilerTest {
     }
   }
 
+
+
   def buildContext(code: String):ApplicationContext = {
     val classLoader = buildClassLoader(code)
     new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader),"test") {
