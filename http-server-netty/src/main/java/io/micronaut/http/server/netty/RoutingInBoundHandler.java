@@ -1429,17 +1429,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     if (throwable != null) {
                                         emitter.onError(throwable);
                                     } else {
-                                        MutableHttpResponse<?> response;
-                                        if (o instanceof HttpResponse) {
-                                            response = toMutableResponse((HttpResponse<?>) o);
+                                        if (o == null) {
+                                            emitter.onNext(newNotFoundError(request));
                                         } else {
-                                            response = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus);
-                                            if (!isKotlinFunctionReturnTypeUnit) {
-                                                response = response.body(o);
+                                            MutableHttpResponse<?> response;
+                                            if (o instanceof HttpResponse) {
+                                                response = toMutableResponse((HttpResponse<?>) o);
+                                            } else {
+                                                response = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus);
+                                                if (!isKotlinFunctionReturnTypeUnit) {
+                                                    response = response.body(o);
+                                                }
                                             }
+                                            response.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
+                                            emitter.onNext(response);
                                         }
-                                        response.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
-                                        emitter.onNext(response);
                                         emitter.onComplete();
                                     }
                                 });

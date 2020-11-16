@@ -17,7 +17,8 @@ class SuspendClientController {
     }
 
     @Get
-    fun notFound(): String? {
+    suspend fun notFound(): String? {
+        delay(1)
         return null
     }
 }
