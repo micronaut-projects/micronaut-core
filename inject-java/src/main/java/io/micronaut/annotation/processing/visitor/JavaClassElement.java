@@ -46,11 +46,11 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
-public class JavaClassElement extends AbstractJavaElement implements ClassElement {
+public class JavaClassElement extends AbstractJavaElement implements ArrayableClassElement {
 
     protected final TypeElement classElement;
-    protected int arrayDimensions;
-    private final JavaVisitorContext visitorContext;
+    protected final JavaVisitorContext visitorContext;
+    private final int arrayDimensions;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
 
     /**
@@ -95,6 +95,11 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         this.visitorContext = visitorContext;
         this.genericTypeInfo = genericsInfo;
         this.arrayDimensions = arrayDimensions;
+    }
+
+    @Override
+    public boolean isInner() {
+        return classElement.getNestingKind().isNested();
     }
 
     @Override
@@ -296,6 +301,14 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                             value.type,
                             value.setter == null,
                             visitorContext) {
+
+                        @Override
+                        public ClassElement getGenericType() {
+                            TypeMirror returnType = value.getter.getReturnType();
+                            Map<String, Map<String, TypeMirror>> declaredGenericInfo = getGenericTypeInfo();
+                            return parameterizedClassElement(returnType, visitorContext, declaredGenericInfo);
+                        }
+
                         @Override
                         public Optional<String> getDocumentation() {
                             Elements elements = visitorContext.getElements();
@@ -368,8 +381,8 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     }
 
     @Override
-    public ClassElement toArray() {
-        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions + 1);
+    public ClassElement withArrayDimensions(int arrayDimensions) {
+        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions);
     }
 
     @Override
@@ -396,6 +409,10 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         final ModelUtils modelUtils = visitorContext.getModelUtils();
         ExecutableElement method = modelUtils.staticCreatorFor(classElement, annotationUtils);
         if (method == null) {
+            if (isInner() && !isStatic()) {
+                // only static inner classes can be constructed
+                return Optional.empty();
+            }
             method = modelUtils.concreteConstructorFor(classElement, annotationUtils);
         }
 
@@ -408,6 +425,10 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         final ModelUtils modelUtils = visitorContext.getModelUtils();
         ExecutableElement method = modelUtils.defaultStaticCreatorFor(classElement, annotationUtils);
         if (method == null) {
+            if (isInner() && !isStatic()) {
+                // only static inner classes can be constructed
+                return Optional.empty();
+            }
             method = modelUtils.defaultConstructorFor(classElement);
         }
         return createMethodElement(annotationUtils, method);

@@ -10,6 +10,7 @@ open class SuspendService {
 
     var counter1: Int = 0
     var counter2: Int = 0
+    var counter3: Int = 0
 
     @Retryable
     open suspend fun delayedCalculation1(): String {
@@ -31,6 +32,15 @@ open class SuspendService {
         }
         delay(1)
         return "delayedCalculation2"
+    }
+
+    @Retryable
+    open suspend fun calculation3(): String {
+        if (counter3 != 2) {
+            counter3++
+            throw RuntimeException("error $counter3")
+        }
+        return "delayedCalculation3"
     }
 
 }

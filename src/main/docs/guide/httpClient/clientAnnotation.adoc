@@ -42,7 +42,7 @@ Recall that the value of `@Client` can be:
 
 In a production deployment you would typically use a service ID and <<serviceDiscovery, Service Discovery>> to discover services automatically.
 
-Another important thing to notice regarding the `save` method in the example above is that is returns a rx:Single[] type.
+Another important thing to notice regarding the `save` method in the example above is that it returns a rx:Single[] type.
 
 This is a non-blocking reactive type and typically you want your HTTP clients not to block. There are cases where you may want to write an HTTP client that does block (such as in unit test cases), but this are rare.
 

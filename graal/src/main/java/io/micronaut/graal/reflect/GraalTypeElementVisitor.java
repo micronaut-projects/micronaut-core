@@ -329,7 +329,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(resourcesFile);
                     generatedFile.ifPresent(gf -> {
                         resourceFiles.addAll(visitorContext.getGeneratedResources());
-                        resourceFiles.addAll(fetchAdditionalResources(visitorContext));
 
                         List<Map> resourceList = resourceFiles.stream()
                                 .map(this::mapToGraalResource)
@@ -353,25 +352,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 visitorContext.fail("There was an error generating " + RESOURCE_CONFIG_JSON + ": " + e.getMessage(), null);
             }
         }
-    }
-
-    /** This should be removed eventually. Future versions of the openapi type element visitors can
-     * add generated resources to the {@link VisitorContext}.
-     *
-     * @see VisitorContext#addGeneratedResource(String)
-     * @see VisitorContext#getGeneratedResources()
-     */
-    private List<String> fetchAdditionalResources(VisitorContext visitorContext) {
-        // If swagger (openapi) is present, add the appropriate metadata to expose the yml file an the UI
-        return visitorContext.getClassElement("io.swagger.v3.oas.annotations.info.Info")
-                .map(classElement -> Arrays.asList(
-                        ".*/swagger/.*yml",
-                        "META-INF/swagger",
-                        "META-INF/swagger/views/rapidoc/index.html",
-                        "META-INF/swagger/views/redoc/index.html",
-                        "META-INF/swagger/views/swagger-ui/index.html"
-                ))
-                .orElse(Collections.emptyList());
     }
 
     private Map mapToGraalResource(String resourceName) {

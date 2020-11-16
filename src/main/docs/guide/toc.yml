@@ -242,9 +242,8 @@ multitenancy:
   multitenancyGorm: Multi-Tenancy GORM
 cli:
   title: Micronaut CLI
-  createProject: Creating a Project
-  profiles:
-    title: Profiles
+  createProject:
+    title: Creating a Project
     comparingVersions: Comparing Versions
   features: Features
   commands: Commands

@@ -15,11 +15,12 @@
  */
 package io.micronaut.aop.compile
 
-import io.micronaut.aop.chain.InterceptorChain
+
 import io.micronaut.aop.exceptions.UnimplementedAdviceException
 import io.micronaut.aop.introduction.NotImplementedAdvice
 import io.micronaut.context.BeanContext
 import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -31,7 +32,7 @@ import javax.validation.constraints.NotBlank
  * @author graemerocher
  * @since 1.0
  */
-class IntroductionAnnotationSpec extends AbstractTypeElementSpec{
+class IntroductionAnnotationSpec extends AbstractTypeElementSpec {
 
     void 'test unimplemented introduction advice'() {
         given:
@@ -51,15 +52,17 @@ interface MyBean {
 ''')
         def context = BeanContext.run()
         def bean = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+
         when:
         bean.test()
 
         then:
+        beanDefinition instanceof AdvisedBeanType
+        beanDefinition.interceptedType.name == 'test.MyBean'
         thrown(UnimplementedAdviceException)
 
         cleanup:
         context.close()
-
     }
 
     void 'test unimplemented introduction advice on abstract class with concrete methods'() {
