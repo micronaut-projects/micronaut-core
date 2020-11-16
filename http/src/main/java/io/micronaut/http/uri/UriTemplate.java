@@ -65,7 +65,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
 
     private final String templateString;
-    private final List<PathSegment> segments = new ArrayList<>();
+    final List<PathSegment> segments = new ArrayList<>();
 
     /**
      * Construct a new URI template for the given template.

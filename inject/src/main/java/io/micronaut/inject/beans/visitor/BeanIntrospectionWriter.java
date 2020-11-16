@@ -41,6 +41,7 @@ import org.objectweb.asm.commons.Method;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
@@ -76,7 +77,8 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     /**
      * Default constructor.
-     * @param classElement The class element
+     *
+     * @param classElement           The class element
      * @param beanAnnotationMetadata The bean annotation metadata
      */
     BeanIntrospectionWriter(ClassElement classElement, AnnotationMetadata beanAnnotationMetadata) {
@@ -92,10 +94,11 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     /**
      * Constructor used to generate a reference for already compiled classes.
-     * @param generatingType The originating type
-     * @param index A unique index
-     * @param originatingElement The originating element
-     * @param classElement The class element
+     *
+     * @param generatingType         The originating type
+     * @param index                  A unique index
+     * @param originatingElement     The originating element
+     * @param classElement           The class element
      * @param beanAnnotationMetadata The bean annotation metadata
      */
     BeanIntrospectionWriter(
@@ -130,6 +133,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     /**
      * The instropection type.
+     *
      * @return The type
      */
     Type getIntrospectionType() {
@@ -138,6 +142,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     /**
      * The bean type.
+     *
      * @return The bean type
      */
     public Type getBeanType() {
@@ -147,16 +152,18 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     /**
      * Visit a property.
      *
-     * @param type The property type
-     * @param name The property name
-     * @param readMethod The read method
-     * @param writeMethod The write methodname
-     * @param isReadOnly Is the property read only
+     * @param type               The property type
+     * @param genericType        The generic type
+     * @param name               The property name
+     * @param readMethod         The read method
+     * @param writeMethod        The write methodname
+     * @param isReadOnly         Is the property read only
      * @param annotationMetadata The property annotation metadata
-     * @param typeArguments The type arguments
+     * @param typeArguments      The type arguments
      */
     void visitProperty(
             @NonNull TypedElement type,
+            @NonNull TypedElement genericType,
             @NonNull String name,
             @Nullable MethodElement readMethod,
             @Nullable MethodElement writeMethod,
@@ -165,6 +172,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             @Nullable Map<String, ClassElement> typeArguments) {
 
         final Type propertyType = getTypeReference(type);
+        final Type propertyGenericType = getTypeReference(genericType);
 
         DefaultAnnotationMetadata.contributeDefaults(
                 this.annotationMetadata,
@@ -175,6 +183,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                         this,
                         type,
                         propertyType,
+                        propertyGenericType,
                         name,
                         readMethod,
                         writeMethod,
@@ -182,15 +191,15 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                         propertyIndex++,
                         annotationMetadata,
                         typeArguments
-        ));
+                ));
     }
 
     /**
      * Builds an index for the given property and annotation.
      *
      * @param annotation The annotation
-     * @param property The property
-     * @param value the value of the annotation
+     * @param property   The property
+     * @param value      the value of the annotation
      */
     void indexProperty(AnnotationValue<?> annotation, String property, @Nullable String value) {
         indexes.computeIfAbsent(property, s -> new HashSet<>(2)).add(new AnnotationValueIndex(annotation, property, value));
@@ -334,7 +343,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 desc);
 
         Collection<Type> argumentTypes = Arrays.stream(constructorArguments).map(pe ->
-            getTypeReference(pe.getType())
+                getTypeReference(pe.getType())
         ).collect(Collectors.toList());
 
         boolean isConstructor = constructor instanceof ConstructorElement;
@@ -495,6 +504,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     /**
      * Visit the constructor. If any.
+     *
      * @param constructor The constructor method
      */
     void visitConstructor(MethodElement constructor) {
@@ -503,6 +513,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     /**
      * Visit the default constructor. If any.
+     *
      * @param constructor The constructor method
      */
     void visitDefaultConstructor(MethodElement constructor) {
@@ -513,9 +524,12 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * index to be created.
      */
     private class AnnotationValueIndex {
-        final @NonNull AnnotationValue annotationValue;
-        final @NonNull String property;
-        final @Nullable String value;
+        final @NonNull
+        AnnotationValue annotationValue;
+        final @NonNull
+        String property;
+        final @Nullable
+        String value;
 
         public AnnotationValueIndex(@NonNull AnnotationValue annotationValue, @NonNull String property, @Nullable String value) {
             this.annotationValue = annotationValue;
