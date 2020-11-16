@@ -73,7 +73,6 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     private boolean complete;
     private byte[] bodyBytes;
 
-
     /**
      * @param fullHttpResponse       The full Http response
      * @param httpStatus             The Http status

@@ -36,6 +36,17 @@ public interface RxHttpClientFactory {
     RxHttpClient createClient(@Nullable URL url);
 
     /**
+     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    RxHttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration);
+
+    /**
      * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
      * {@link javax.inject.Inject} to inject a client instead
      *
@@ -43,4 +54,15 @@ public interface RxHttpClientFactory {
      * @return The client
      */
     RxStreamingHttpClient createStreamingClient(@Nullable URL url);
+
+    /**
+     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration The client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    RxStreamingHttpClient createStreamingClient(@Nullable URL url, HttpClientConfiguration configuration);
 }

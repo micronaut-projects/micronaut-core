@@ -12,6 +12,7 @@ boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
 
 def excludedProjects = [
         "benchmarks",
+        "inject-test-utils",
         "test-suite",
         "test-suite-groovy",
         "test-suite-helper",

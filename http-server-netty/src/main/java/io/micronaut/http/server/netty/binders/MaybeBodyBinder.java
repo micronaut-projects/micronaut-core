@@ -64,6 +64,7 @@ public class MaybeBodyBinder extends DefaultBodyAnnotationBinder<Maybe> implemen
         return Collections.singletonList(MaybeSource.class);
     }
 
+    @SuppressWarnings("checkstyle:designforextension")
     @Deprecated
     @Override
     public boolean supportsSuperTypes() {
