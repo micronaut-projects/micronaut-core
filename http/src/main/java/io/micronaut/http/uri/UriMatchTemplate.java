@@ -53,9 +53,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     protected UriMatchTemplate(CharSequence templateString, Object... parserArguments) {
         super(templateString, parserArguments);
         this.matchPattern = Pattern.compile(pattern.toString());
-        String tmpl = templateString.toString();
-        int len = tmpl.length();
-        this.isRoot = len == 0 || (len == 1 && tmpl.charAt(0) == '/');
+        this.isRoot = isRoot();
         // cleanup / reduce memory consumption
         this.pattern = null;
     }
@@ -70,9 +68,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         super(templateString.toString(), segments);
         this.matchPattern = matchPattern;
         this.variables = variables;
-        String tmpl = templateString.toString();
-        int len = tmpl.length();
-        this.isRoot = len == 0 || (len == 1 && tmpl.charAt(0) == '/');
+        this.isRoot = isRoot();
     }
 
     /**
@@ -200,6 +196,29 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             this.variables = new ArrayList<>();
         }
         return new UriMatchTemplateParser(templateString, this);
+    }
+
+    private boolean isRoot() {
+        CharSequence rawSegment = null;
+        for (PathSegment segment : segments) {
+            if (segment.isVariable()) {
+                if (!segment.isQuerySegment()) {
+                    return false;
+                }
+            } else {
+                if (rawSegment == null) {
+                    rawSegment = segment;
+                } else {
+                    return false;
+                }
+            }
+        }
+        if (rawSegment == null) {
+            return true;
+        } else {
+            int len = rawSegment.length();
+            return len == 0 || (len == 1 && rawSegment.charAt(0) == '/');
+        }
     }
 
     /**
