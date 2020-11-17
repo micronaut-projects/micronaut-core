@@ -4,7 +4,21 @@ Micronaut {version} includes the following changes:
 
 ==== Maven Plugin Improvements
 
-TODO
+The Maven plugin now supports different `<packaging>` types:
+
+* `jar` (default): produces a runnable fat JAR.
+* `native-image`: generates a GraalVM native image.
+* `docker`: builds a Docker image with the application artifacts (compiled classes, resources, dependencies, etc).
+* `docker-native`: builds a Docker image with a GraalVM native image inside.
+
+To package an application, `mvn package` is the one-stop shop to produce the desired artifact.
+
+It also supports using `mvn deploy` as the only command required to deploy an application that, depending on the `<packaging>`:
+
+* `jar` (default): will deploy the artifact to a remote repository using `org.apache.maven.plugins:maven-deploy-plugin:deploy`.
+* `docker` or `docker-native`: will push the Docker image to the configured Docker registry.
+
+Read more information in the https://micronaut-projects.github.io/micronaut-maven-plugin/latest[Maven Plugin documentation].
 
 ==== Gradle Plugin Improvements
 
