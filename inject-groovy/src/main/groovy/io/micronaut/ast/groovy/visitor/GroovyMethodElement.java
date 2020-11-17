@@ -152,12 +152,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @Override
     @NonNull
     public ClassElement getReturnType() {
-        ClassNode returnType = methodNode.getReturnType();
-        if (returnType.isEnum()) {
-            return new GroovyEnumElement(sourceUnit, compilationUnit, returnType, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, returnType));
-        } else {
-            return new GroovyClassElement(sourceUnit, compilationUnit, returnType, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, returnType));
-        }
+        return toClassElement(sourceUnit, compilationUnit, methodNode.getReturnType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode.getReturnType()));
     }
 
     @Override
@@ -176,7 +171,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     @Override
     public ClassElement getDeclaringType() {
-        return new GroovyClassElement(
+        return toClassElement(
                 sourceUnit,
                 compilationUnit,
                 methodNode.getDeclaringClass(),

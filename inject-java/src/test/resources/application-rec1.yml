@@ -1,0 +1,39 @@
+rec:
+  names-list-of:
+    - ABC
+    - 123
+  list-children:
+    - names-list-of:
+        - A
+        - B
+      list-children:
+        - names-list-of:
+            - A2
+            - B2
+      map-children:
+        a:
+          - names-list-of:
+              - A2
+              - B2
+        b:
+          - names-list-of:
+              - A2
+              - B2
+  map-children:
+    xyz:
+      - names-list-of:
+          - A
+          - B
+        list-children:
+          - names-list-of:
+              - A2
+              - B2
+        map-children:
+          a:
+            - names-list-of:
+                - A2
+                - B2
+          b:
+            - names-list-of:
+                - X2
+                - Y2

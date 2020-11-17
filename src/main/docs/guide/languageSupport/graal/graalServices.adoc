@@ -54,11 +54,11 @@ The provided `Dockerfile` is a multi-stage dockerfile which builds the project i
 
 To build your native image without using Docker you need to install GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using https://sdkman.io/[Sdkman!]:
 
-.Installing GraalVM 20.1.0 with SDKman
+.Installing GraalVM 20.2.0 with SDKman
 [source,bash]
 ----
-$ sdk install java 20.1.0.r8-grl # or 20.1.0.r11-grl if you want to use JDK 11
-$ sdk use java 20.1.0.r8-grl
+$ sdk install java 20.2.0.r8-grl # or 20.2.0.r11-grl if you want to use JDK 11
+$ sdk use java 20.2.0.r8-grl
 ----
 
 The `native-image` tool was extracted from the base GraalVM distribution. Currently it is available as an early adopter plugin. To install it, run:
@@ -74,14 +74,14 @@ $ gu install native-image
 [source,bash]
 ----
 $ ./gradlew assemble
-$ native-image --no-server -cp build/libs/hello-world-0.1-all.jar
+$ native-image -cp build/libs/hello-world-0.1-all.jar
 ----
 
 .Creating native image with Maven
 [source,bash]
 ----
 $ ./mvnw package
-$ native-image --no-server -cp target/hello-world-0.1-all.jar
+$ native-image -cp target/hello-world-0.1-all.jar
 ----
 
 .Run native image
@@ -159,11 +159,9 @@ GraalVM's `native-image` command is used to generate native images. You can use 
 .The `native-image` command
 [source,bash]
 ----
-native-image --no-server \ # <1>
-             --class-path build/libs/hello-world-0.1-all.jar # <2>
+native-image --class-path build/libs/hello-world-0.1-all.jar # <1>
 ----
-<1> Do not start a background server to generate the native image
-<2> The `class-path` argument is used to refer to the Micronaut shaded JAR
+<1> The `class-path` argument is used to refer to the Micronaut shaded JAR
 
 Once the image has been built you can run the application using the native image name:
 

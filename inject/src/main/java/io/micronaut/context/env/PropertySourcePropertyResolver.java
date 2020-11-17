@@ -536,7 +536,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         }
                         if (first) {
                             Map<String, Object> normalized = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.NORMALIZED);
-                            normalized.put(propertyName, value);
+                            if (normalized != null) {
+                                normalized.put(propertyName, value);
+                            }
                             first = false;
                         }
                     } else {

@@ -24,18 +24,19 @@ import org.graalvm.nativeimage.hosted.Feature.BeforeAnalysisAccess;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-
 /**
  * Utility methods for implementing Graal's {@link com.oracle.svm.core.annotate.AutomaticFeature}.
  *
  * @author Álvaro Sánchez-Mariscal
  * @author graemerocher
+ * @author Iván López
  * @since 2.0.0
  */
 @Internal
@@ -44,67 +45,118 @@ public final class AutomaticFeatureUtils {
     /**
      * Marks the given class to be initialized at build time, only if it is present.
      *
-     * @param access the {@link BeforeAnalysisAccess} instance
-     * @param className the class name
+     * @param access     The {@link BeforeAnalysisAccess} instance
+     * @param classNames The class names
      */
-    public static void initializeAtBuildTime(BeforeAnalysisAccess access, String className) {
-        findClass(access, className).ifPresent(RuntimeClassInitialization::initializeAtBuildTime);
+    public static void initializeAtBuildTime(BeforeAnalysisAccess access, String... classNames) {
+        for (String className : classNames) {
+            findClass(access, className).ifPresent(RuntimeClassInitialization::initializeAtBuildTime);
+        }
     }
 
     /**
      * Marks the given class to be initialized at runtime, only if it is present.
      *
-     * @param access the {@link BeforeAnalysisAccess} instance
-     * @param className the class name
+     * @param access     The {@link BeforeAnalysisAccess} instance
+     * @param classNames The class names
      */
-    public static void initializeAtRunTime(BeforeAnalysisAccess access, String className) {
-        findClass(access, className).ifPresent(RuntimeClassInitialization::initializeAtRunTime);
+    public static void initializeAtRunTime(BeforeAnalysisAccess access, String... classNames) {
+        for (String className : classNames) {
+            findClass(access, className).ifPresent(RuntimeClassInitialization::initializeAtRunTime);
+        }
     }
 
     /**
-     * Allows reflection usage for all fields and methods of the given class, only if it is present.
+     * Initializes the packages at build time.
      *
-     * @param access the {@link BeforeAnalysisAccess} instance
-     * @param className the class name
+     * @param packages The packages
      */
-    public static void registerAllForRuntimeReflection(BeforeAnalysisAccess access, String className) {
-        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerAllAccess);
+    public static void initializePackagesAtBuildTime(String... packages) {
+        RuntimeClassInitialization.initializeAtBuildTime(packages);
     }
 
     /**
-     * Allows reflection instantiation of the given class, only if it is present.
+     * Initializes the packages at run time.
      *
-     * @param access the {@link BeforeAnalysisAccess} instance
-     * @param className the class name
+     * @param packages The packages
      */
-    public static void registerClassForRuntimeReflection(BeforeAnalysisAccess access, String className) {
-        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerClassForRuntimeReflection);
+    public static void initializePackagesAtRunTime(String... packages) {
+        RuntimeClassInitialization.initializeAtRunTime(packages);
     }
 
     /**
-     * Allows reflection usage for all methods of the given class, only if it is present.
+     * Register all constructors of the given class for runtime reflection, only if the class is present.
      *
-     * @param access the {@link BeforeAnalysisAccess} instance
-     * @param className the class name
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
      */
-    public static void registerMethodsForRuntimeReflection(BeforeAnalysisAccess access, String className) {
-        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerMethodsForRuntimeReflection);
+    public static void registerConstructorsForRuntimeReflection(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerConstructorsForRuntimeReflection);
     }
 
     /**
-     * Allows reflection usage for all fields of the given class, only if it is present.
+     * Register all fields of the given class for runtime reflection, only if the class is present.
      *
-     * @param access the {@link BeforeAnalysisAccess} instance
-     * @param className the class name
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
      */
     public static void registerFieldsForRuntimeReflection(BeforeAnalysisAccess access, String className) {
         findClass(access, className).ifPresent(AutomaticFeatureUtils::registerFieldsForRuntimeReflection);
     }
 
     /**
+     * Register all methods of the given class for runtime reflection, only if the class is present.
+     *
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
+     */
+    public static void registerMethodsForRuntimeReflection(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerMethodsForRuntimeReflection);
+    }
+
+    /**
+     * Register the class for runtime reflection, only if it is present.
+     *
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
+     */
+    public static void registerClassForRuntimeReflection(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerForRuntimeReflection);
+    }
+
+    /**
+     * Register the class for reflective instantiation at runtime, only if it is present.
+     *
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
+     */
+    public static void registerClassForRuntimeReflectiveInstantiation(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerForReflectiveInstantiation);
+    }
+
+    /**
+     * Register the class and allow reflective instantiation at runtime, only if it is present.
+     *
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
+     */
+    public static void registerClassForRuntimeReflectionAndReflectiveInstantiation(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerForRuntimeReflectionAndReflectiveInstantiation);
+    }
+
+    /**
+     * Register the class and allow reflective instantiation at runtime.
+     *
+     * @param clazz the class
+     */
+    public static void registerClassForRuntimeReflectionAndReflectiveInstantiation(Class<?> clazz) {
+        AutomaticFeatureUtils.registerForRuntimeReflectionAndReflectiveInstantiation(clazz);
+    }
+
+    /**
      * Registers the given interfaces for dynamic proxy generation.
      *
-     * @param access the {@link BeforeAnalysisAccess} instance
+     * @param access     The {@link BeforeAnalysisAccess} instance
      * @param interfaces the list of interfaces that the generated proxy can implement
      */
     public static void addProxyClass(BeforeAnalysisAccess access, String... interfaces) {
@@ -122,6 +174,7 @@ public final class AutomaticFeatureUtils {
 
     /**
      * Adds resource patterns.
+     *
      * @param patterns The patterns
      */
     public static void addResourcePatterns(String... patterns) {
@@ -137,6 +190,7 @@ public final class AutomaticFeatureUtils {
 
     /**
      * Adds resource bundles.
+     *
      * @param bundles The bundles
      */
     public static void addResourceBundles(String... bundles) {
@@ -150,13 +204,69 @@ public final class AutomaticFeatureUtils {
         }
     }
 
-    private static void registerAllAccess(Class<?> clazz) {
-        registerClassForRuntimeReflection(clazz);
-        registerFieldsForRuntimeReflection(clazz);
-        registerMethodsForRuntimeReflection(clazz);
+    /**
+     * Register class for runtime reflection and allows reflective instantiation. Also register all fields, methods and
+     * constructors for runtime reflection; only if the class is present.
+     *
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
+     */
+    public static void registerAllForRuntimeReflectionAndReflectiveInstantiation(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerAllForRuntimeReflectionAndReflectiveInstantiation);
     }
 
-    private static void registerClassForRuntimeReflection(Class<?> clazz) {
+    /**
+     * Register class for runtime reflection without allowing reflective instantiation. Also register all fields, methods
+     * and constructors for runtime reflection; only if the class is present.
+     *
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
+     */
+    public static void registerAllForRuntimeReflection(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerAllForRuntimeReflection);
+    }
+
+    /**
+     * Register class for runtime reflection and allows reflective instantiation. Also register all fields and methods
+     * for runtime reflection; only if the class is present.
+     *
+     * @param access    The {@link BeforeAnalysisAccess} instance
+     * @param className The class name
+     */
+    public static void registerFieldsAndMethodsWithReflectiveAccess(BeforeAnalysisAccess access, String className) {
+        findClass(access, className).ifPresent(AutomaticFeatureUtils::registerFieldsAndMethodsWithReflectiveAccess);
+    }
+
+    private static void registerAllForRuntimeReflectionAndReflectiveInstantiation(Class<?> clazz) {
+        registerForRuntimeReflection(clazz);
+        registerForReflectiveInstantiation(clazz);
+        registerFieldsForRuntimeReflection(clazz);
+        registerMethodsForRuntimeReflection(clazz);
+        registerConstructorsForRuntimeReflection(clazz);
+    }
+
+    private static void registerAllForRuntimeReflection(Class<?> clazz) {
+        registerForRuntimeReflection(clazz);
+        registerFieldsForRuntimeReflection(clazz);
+        registerMethodsForRuntimeReflection(clazz);
+        registerConstructorsForRuntimeReflection(clazz);
+    }
+
+    private static void registerFieldsAndMethodsWithReflectiveAccess(Class<?> clazz) {
+        registerForRuntimeReflectionAndReflectiveInstantiation(clazz);
+        registerMethodsForRuntimeReflection(clazz);
+        registerFieldsForRuntimeReflection(clazz);
+    }
+
+    private static void registerForRuntimeReflection(Class<?> clazz) {
+        RuntimeReflection.register(clazz);
+    }
+
+    private static void registerForReflectiveInstantiation(Class<?> clazz) {
+        RuntimeReflection.registerForReflectiveInstantiation(clazz);
+    }
+
+    private static void registerForRuntimeReflectionAndReflectiveInstantiation(Class<?> clazz) {
         RuntimeReflection.register(clazz);
         RuntimeReflection.registerForReflectiveInstantiation(clazz);
     }
@@ -173,8 +283,13 @@ public final class AutomaticFeatureUtils {
         }
     }
 
+    private static void registerConstructorsForRuntimeReflection(Class<?> clazz) {
+        for (Constructor<?> constructor : clazz.getConstructors()) {
+            RuntimeReflection.register(constructor);
+        }
+    }
+
     private static Optional<Class<?>> findClass(BeforeAnalysisAccess access, String className) {
         return Optional.ofNullable(access.findClassByName(className));
     }
-
 }

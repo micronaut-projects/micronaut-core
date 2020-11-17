@@ -5,7 +5,7 @@ buildscript {
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:6.0.0'
-        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.6"
+        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.8"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
     }
@@ -255,7 +255,7 @@ ext {
                     version: micronautGrpcVersion,
                     group  : 'io.micronaut.grpc',
                     name   : 'micronaut-grpc-runtime',
-                    modules: ['micronaut-grpc-annotation']
+                    modules: ['micronaut-grpc-annotation', 'micronaut-grpc-client-runtime', 'micronaut-grpc-server-runtime', 'micronaut-protobuff-support']
             ],
             'micronaut.xml':[
                 version:micronautXmlVersion,
@@ -338,8 +338,8 @@ ext {
             ojdbc                      : [
                     version: ojdbcVersion,
                     group  : 'com.oracle.database.jdbc',
-                    name   : 'ucp',
-                    modules: ['ojdbc8']
+                    name   : 'ojdbc8',
+                    modules: ['ucp']
             ],
             'jcache'                   : [
                     version: jcacheVersion,
@@ -504,6 +504,12 @@ ext {
             ],
             oracle                  : [
                 version: oracleDriverVersion,
+                group  : 'com.oracle.database.jdbc',
+                name   : 'ojdbc8'
+            ],
+            // TODO Deprecated: Remove in the next major version
+            oldOracle                  : [
+                version: oldOracleDriverVersion,
                 group  : 'com.oracle.ojdbc',
                 name   : 'ojdbc8'
             ],

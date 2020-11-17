@@ -157,7 +157,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
 
-        final Type propertyType = getTypeForElement(type);
+        final Type propertyType = getTypeReference(type);
 
         DefaultAnnotationMetadata.contributeDefaults(
                 this.annotationMetadata,
@@ -327,7 +327,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 desc);
 
         Collection<Type> argumentTypes = Arrays.stream(constructorArguments).map(pe ->
-            getTypeForElement(pe.getType())
+            getTypeReference(pe.getType())
         ).collect(Collectors.toList());
 
         boolean isConstructor = constructor instanceof ConstructorElement;
