@@ -36,5 +36,9 @@ class PrincipalTenantResolverEnabledSpec extends Specification {
 
         then:
         noExceptionThrown()
+
+        and:
+        context.containsBean(HttpRequestTenantResolver)
+        context.getBean(HttpRequestTenantResolver) instanceof PrincipalTenantResolver
     }
 }

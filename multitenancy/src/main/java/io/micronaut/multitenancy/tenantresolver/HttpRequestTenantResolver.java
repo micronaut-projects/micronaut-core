@@ -16,40 +16,26 @@
 package io.micronaut.multitenancy.tenantresolver;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.multitenancy.MultitenancyConfiguration;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.multitenancy.exceptions.TenantNotFoundException;
 
+import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 
 /**
- * An interface for applications that implement Multi Tenancy to implement in order to resolve the current identifier.
+ * An interface for multi-tenant aware applications which resolve the current identifier for the current request.
  *
  * @author Sergio del Amo
- * @since 1.0
+ * @since 2.1.2
  */
 @FunctionalInterface
-public interface TenantResolver {
-
-    String PREFIX = MultitenancyConfiguration.PREFIX + ".tenantresolver";
-
+public interface HttpRequestTenantResolver {
     /**
-     * The name of the default tenant.
-     */
-    String DEFAULT = "DEFAULT";
-
-    /**
-     * Constant for a mapping to all tenants.
-     */
-    String ALL = "DEFAULT";
-
-    /**
-     * <p>Resolves the current tenant identifier.
-     *
-     * <p>In a Multi Tenant setup where a single database is being used amongst multiple tenants this would be the object that is used as the tenantId property for each domain class.</p>
-     *
+     * Resolves the current tenant identifier.
+     * @param request The HTTP request
      * @return The tenant identifier
      * @throws TenantNotFoundException if tenant not found
      */
     @NonNull
-    Serializable resolveTenantIdentifier() throws TenantNotFoundException;
+    Serializable resolveTenantIdentifier(@NonNull @NotNull HttpRequest<?> request) throws TenantNotFoundException;
 }
