@@ -61,38 +61,46 @@ You can start the application with `./gradlew run`, and it will include the agen
 
 === Maven
 
-
-Add the path to `pom.xml` as a build profile (if using the CLI feature, the profile `jrebel` is already provided - simply update the path to the agent JAR).
+Configure the Micronaut Maven Plugin accordingly:
 
 [source,xml]
 ----
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-<!-- ... -->
-    <profiles>
-        <profile>
-            <id>jrebel</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <version>1.6.0</version>
-                        <configuration>
-                            <executable>java</executable>
-                            <arguments>
-                                <argument>-noverify</argument>
-                                <argument>-XX:TieredStopAtLevel=1</argument>
-                                <argument>-agentpath:~/bin/jrebel/lib/jrebel6/lib/libjrebel64.dylib</argument>
-                                <argument>-classpath</argument>
-                                <classpath/>
-                                <argument>${exec.mainClass}</argument>
-                            </arguments>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
+
+  <!-- ... -->
+
+  <build>
+    <plugins>
+
+      <!-- ... -->
+
+      <plugin>
+        <groupId>io.micronaut.build</groupId>
+        <artifactId>micronaut-maven-plugin</artifactId>
+          <configuration>
+            <jvmArguments>
+              <jvmArgument>-agentpath:~/bin/jrebel/lib/jrebel6/lib/libjrebel64.dylib</jvmArgument>
+            </jvmArguments>
+          </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.zeroturnaround</groupId>
+        <artifactId>jrebel-maven-plugin</artifactId>
+        <version>1.1.8</version>
+        <executions>
+          <execution>
+            <id>generate-rebel-xml</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ... -->
+    </plugins>
+  </build>
 </project>
 ----

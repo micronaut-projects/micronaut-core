@@ -23,74 +23,16 @@ Every time you change a class Micronaut's plugin will automatically restart the 
 
 === Gradle Restart
 
-For Gradle restart you can create a new application with the `file-watch` feature already configured using the CLI with the command `mn create-app myapp --features file-watch`
-
-This essentially introduces the following configuration to `application.yml`:
-
-.File Watch Configuration
-[source,yaml]
-----
-micronaut:
-    io:
-        watch:
-            paths: src/main
-            restart: true
-----
-
-By setting `micronaut.io.watch.paths` what happens is that Micronaut will fire a api:scheduling.io.watch.event.FileChangedEvent[] if any file is changed. Setting `micronaut.io.watch.restart` tells Micronaut to stop the server if a file is changed.
-
-TIP: The `micronaut.io.watch.paths` setting can be used for more than just automatic restart, you can use this setting to monitor for file changes within your production application.
-
-Once this is in place to have Gradle automatically restart on any change add run the following command:
+Gradle automatic restart can be activated when using the Micronaut Gradle plugin simplify by activating Gradle's support for continuous builds via the `-t` flag:
 
 .Using Gradle for Automatic Restart
 [source,bash]
 ----
-./gradlew run --continuous
+./gradlew run -t
 ----
 
 Every time you make a change to class or resources Gradle will recompile and restart the application.
 
-=== File Watch and Mac OS X
-
-The native JVM implementation of the `WatchService` interface for Mac OS X using polling which is slow. To improve file watch performance add the following dependencies to your build if you are using OS X:
-
-.Gradle - Configuring Native File Watch on Mac OS X
-[source,gradle]
-----
-configurations {
-    developmentOnly
-}
-dependencies {
-    // Automatically added with the 'file-watch' feature in the CLi
-    developmentOnly "io.micronaut:micronaut-runtime-osx"
-    ...
-    developmentOnly "net.java.dev.jna:jna"
-    developmentOnly "io.methvin:directory-watcher"
-
-}
-run.classpath += configurations.developmentOnly
-----
-
-NOTE: A custom `developmentOnly` configuration is used to ensure the dependencies don't go into the production JAR.
-
-Or with Maven:
-
-[source,xml]
-----
-<dependency>
-  <groupId>io.methvin</groupId>
-  <artifactId>directory-watcher</artifactId>
-  <scope>provided</scope>
-</dependency>
-<dependency>
-  <groupId>net.java.dev.jna</groupId>
-  <artifactId>jna</artifactId>
-  <scope>provided</scope>
-</dependency>
-----
-
-NOTE: The `provided` scope is used to ensure the dependencies don't go into the production JAR.
 
 
 
