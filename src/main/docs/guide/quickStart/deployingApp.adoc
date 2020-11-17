@@ -24,3 +24,25 @@ Then use `dockerPush` to push a built image of the application:
 ----
 $ ./gradlew dockerPush
 ----
+
+For Maven, define the following plugin in your POM:
+
+[source,xml]
+----
+<plugin>
+  <groupId>com.google.cloud.tools</groupId>
+  <artifactId>jib-maven-plugin</artifactId>
+  <configuration>
+    <to>
+      <image>docker.io/my-company/my-image:${project.version}</image>
+    </to>
+  </configuration>
+</plugin>
+----
+
+Then invoke the `deploy` lifecycle phase specifying the packaging type to either `docker` or `docker-native`:
+
+[source,bash]
+----
+$ ./mvnw deploy -Dpackaging=docker
+----

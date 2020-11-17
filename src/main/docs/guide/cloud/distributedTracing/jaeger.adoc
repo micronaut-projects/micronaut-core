@@ -35,11 +35,7 @@ $ mn create-app my-app --features tracing-jaeger
 
 To send tracing spans to Jaeger the minimal configuration requires you add the following dependencies to `build.gradle` or `pom.xml`:
 
-.Adding Jaeger Dependencies
-[source,groovy]
-----
-compile 'io.jaegertracing:jaeger-thrift:0.31.0'
-----
+dependency:io.jaegertracing:jaeger-thrift:0.31.0[]
 
 Then you need to enable Jaeger tracing in your configuration (potentially only your production configuration):
 

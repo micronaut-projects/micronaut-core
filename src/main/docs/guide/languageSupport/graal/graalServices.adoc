@@ -25,7 +25,7 @@ To build your native image using Maven and Docker simply run:
 .Building a Native Image with Docker and Maven
 [source,bash]
 ----
-$ ./mvnw package -Pdocker-native
+$ ./mvnw package -Dpackaging=docker-native
 ----
 
 ==== Building a Native Image Without Using Docker
@@ -62,7 +62,7 @@ To create a native image with Maven and the Micronaut Maven plugin use `native-i
 .Creating native image with Maven
 [source,bash]
 ----
-$ ./mvnw package -Pnative-image
+$ ./mvnw package -Dpackaging=native-image
 ----
 
 Which will build the native image into the `target` directory.
