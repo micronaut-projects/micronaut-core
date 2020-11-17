@@ -57,7 +57,7 @@ class AnotherClass<A> {
 
     void testVoid(String name, int age) {
         assert name.equals("changed")
-        assert age == 10
+        assert age == 100
     }
 
     boolean testBoolean(String name) {
