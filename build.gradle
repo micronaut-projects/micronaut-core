@@ -630,6 +630,11 @@ ext {
                 group  : 'io.micronaut.mqtt',
                 modules: ['micronaut-mqtt-core', 'micronaut-mqtt-ssl',  'micronaut-mqttv3',  'micronaut-mqttv5']
             ],
+            'lombok': [
+                version: lombokVersion,
+                group  : 'org.projectlombok',
+                name   : 'lombok'
+            ]
     ]
 
     dependencyVersion = { String name ->
