@@ -48,11 +48,6 @@ public class DefaultStreamedHttpRequest extends DefaultHttpRequest implements St
         this.stream = stream;
     }
 
-    @Override
-    public boolean isConsumed() {
-        return this.consumed;
-    }
-
     /**
      * @param httpVersion     The Http Version
      * @param method          The Http Method
@@ -63,6 +58,11 @@ public class DefaultStreamedHttpRequest extends DefaultHttpRequest implements St
     public DefaultStreamedHttpRequest(HttpVersion httpVersion, HttpMethod method, String uri, boolean validateHeaders, Publisher<HttpContent> stream) {
         super(httpVersion, method, uri, validateHeaders);
         this.stream = stream;
+    }
+
+    @Override
+    public boolean isConsumed() {
+        return this.consumed;
     }
 
     @Override
