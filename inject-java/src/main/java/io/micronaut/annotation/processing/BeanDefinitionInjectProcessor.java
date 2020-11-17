@@ -2116,7 +2116,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     interceptorTypes
             );
 
-            Set<TypeElement> additionalInterfaces = Arrays.stream(interfaceTypes).map(elementUtils::getTypeElement).collect(Collectors.toSet());
+            Set<TypeElement> additionalInterfaces = Arrays.stream(interfaceTypes)
+                    .map(elementUtils::getTypeElement)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
 
             if (ArrayUtils.isNotEmpty(interfaceTypes)) {
                 List<? extends AnnotationMirror> annotationMirrors = typeElement.getAnnotationMirrors();
