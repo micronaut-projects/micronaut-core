@@ -1,6 +1,6 @@
 # Micronaut 
 
-[![Build Status](https://github.com/micronaut-projects/micronaut-core/workflows/Java%20CI/badge.svg)](https://github.com/micronaut-projects/micronaut-core/actions)
+![Java CI](https://github.com/micronaut-projects/micronaut-core/workflows/Java%20CI/badge.svg?branch=2.1.x)
 
 [Micronaut](https://micronaut.io) is a modern, JVM-based, full stack Java framework designed for building modular, easily testable JVM applications with support for Java, Kotlin and the Groovy language.
 
