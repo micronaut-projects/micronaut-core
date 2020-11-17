@@ -35,6 +35,7 @@ import org.reactivestreams.Subscriber;
 public class DefaultStreamedHttpRequest extends DefaultHttpRequest implements StreamedHttpRequest {
 
     private final Publisher<HttpContent> stream;
+    private boolean consumed;
 
     /**
      * @param httpVersion The Http Version
@@ -45,6 +46,11 @@ public class DefaultStreamedHttpRequest extends DefaultHttpRequest implements St
     public DefaultStreamedHttpRequest(HttpVersion httpVersion, HttpMethod method, String uri, Publisher<HttpContent> stream) {
         super(httpVersion, method, uri);
         this.stream = stream;
+    }
+
+    @Override
+    public boolean isConsumed() {
+        return this.consumed;
     }
 
     /**
@@ -61,6 +67,7 @@ public class DefaultStreamedHttpRequest extends DefaultHttpRequest implements St
 
     @Override
     public void subscribe(Subscriber<? super HttpContent> subscriber) {
+        consumed = true;
         stream.subscribe(subscriber);
     }
 
