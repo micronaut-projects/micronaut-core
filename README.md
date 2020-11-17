@@ -1,7 +1,6 @@
 # Micronaut 
 
-![Java CI](https://github.com/micronaut-projects/micronaut-core/workflows/Java%20CI/badge.svg?branch=2.1.x)
-
+[![Build Status](https://github.com/micronaut-projects/micronaut-core/workflows/Java%20CI/badge.svg?branch=2.1.x)](https://github.com/micronaut-projects/micronaut-core/actions)
 [Micronaut](https://micronaut.io) is a modern, JVM-based, full stack Java framework designed for building modular, easily testable JVM applications with support for Java, Kotlin and the Groovy language.
 
 Micronaut is developed by the creators of the Grails framework and takes inspiration from lessons learnt over the years building real-world applications from monoliths to microservices using Spring, Spring Boot and Grails.
