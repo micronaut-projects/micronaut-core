@@ -51,7 +51,6 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.http.FullHttpRequest;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -573,6 +572,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     request,
                     nettyHttpRequest,
                     defaultResponse,
+                    MediaType.APPLICATION_JSON_TYPE,
                     false
             );
         }
@@ -583,85 +583,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             HttpRequest<?> request,
             NettyHttpRequest nettyHttpRequest,
             MutableHttpResponse<Object> finalResponse,
+            MediaType defaultResponseMediaType,
             boolean skipOncePerRequest) {
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
-        io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
-        if (HttpMethod.permitsRequestBody(request.getMethod()) && nativeRequest instanceof StreamedHttpRequest) {
-            // this method is invoked to directly return a response, however
-            // we must ensure that the flow control handler reads all queued messages first
-            // before calling context.read() to put Netty back into read mode otherwise
-            // flow controller handler will ignore the call to context.read() if there
-            // are any pending messages to be read
-            StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) nativeRequest;
-            //noinspection ReactiveStreamsSubscriberImplementation
-            streamedHttpRequest.subscribe(new Subscriber<HttpContent>() {
-                private Subscription subscription;
-
-                @Override
-                public void onSubscribe(Subscription s) {
-                    this.subscription = s;
-                    s.request(1);
-                }
-
-                @Override
-                public void onNext(HttpContent httpContent) {
-                    httpContent.release();
-                    subscription.request(1);
-                }
-
-                @Override
-                public void onError(Throwable t) {
-                    filterPublisher(
-                            requestReference,
-                            Flowable.just(finalResponse),
-                            ctx.channel().eventLoop(),
-                            skipOncePerRequest
-                    ).singleOrError().subscribe((Consumer<MutableHttpResponse<?>>) mutableHttpResponse ->
-                                    encodeHttpResponse(
-                                            ctx,
-                                            nettyHttpRequest,
-                                            mutableHttpResponse,
-                                            mutableHttpResponse.body(),
-                                            MediaType.APPLICATION_JSON_TYPE
-                                    )
-                            , throwable -> exceptionCaughtInternal(ctx, throwable, nettyHttpRequest, false));
-                }
-
-                @Override
-                public void onComplete() {
-                    filterPublisher(
-                            requestReference,
-                            Flowable.just(finalResponse),
-                            ctx.channel().eventLoop(),
-                            skipOncePerRequest
-                    ).singleOrError().subscribe((Consumer<MutableHttpResponse<?>>) mutableHttpResponse ->
-                                    encodeHttpResponse(
-                                            ctx,
-                                            nettyHttpRequest,
-                                            mutableHttpResponse,
-                                            mutableHttpResponse.body(),
-                                            MediaType.APPLICATION_JSON_TYPE
-                                    )
-                            , throwable -> exceptionCaughtInternal(ctx, throwable, nettyHttpRequest, false));
-                }
-            });
-        } else {
-            filterPublisher(
-                    requestReference,
-                    Flowable.just(finalResponse),
-                    ctx.channel().eventLoop(),
-                    skipOncePerRequest
-            ).singleOrError().subscribe((Consumer<MutableHttpResponse<?>>) mutableHttpResponse ->
-                            encodeHttpResponse(
-                                    ctx,
-                                    nettyHttpRequest,
-                                    mutableHttpResponse,
-                                    mutableHttpResponse.body(),
-                                    MediaType.APPLICATION_JSON_TYPE
-                            )
-                    , throwable -> exceptionCaughtInternal(ctx, throwable, nettyHttpRequest, false));
-
-        }
+        filterPublisher(
+                requestReference,
+                Flowable.just(finalResponse),
+                ctx.channel().eventLoop(),
+                skipOncePerRequest
+        ).singleOrError().subscribe((Consumer<MutableHttpResponse<?>>) mutableHttpResponse ->
+            encodeHttpResponse(
+                    ctx,
+                    nettyHttpRequest,
+                    mutableHttpResponse,
+                    mutableHttpResponse.body(),
+                    defaultResponseMediaType
+            )
+        , throwable -> exceptionCaughtInternal(ctx, throwable, nettyHttpRequest, false));
     }
 
     private Optional<? extends FileCustomizableResponseType> matchFile(String path) {
@@ -693,6 +631,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 request,
                 (NettyHttpRequest) request,
                 res,
+                MediaType.APPLICATION_JSON_TYPE,
                 skipOncePerRequest);
     }
 
@@ -1972,8 +1911,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 nettyHttpRequest,
                 nettyHttpRequest,
                 error,
-                skipOncePerRequest
-        );
+                MediaType.APPLICATION_JSON_TYPE,
+                skipOncePerRequest);
     }
 
     private void logException(Throwable cause) {
