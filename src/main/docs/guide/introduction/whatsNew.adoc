@@ -62,8 +62,46 @@ See the https://micronaut-projects.github.io/micronaut-r2dbc/1.0.x/guide/[Docume
 
 === Module Upgrades
 
-TODO
+- Micronaut Aws `2.2.3`
+- Micronaut Azure `2.1.0`
+- Micronaut Cache `2.2.0`
+- Micronaut Cassandra `3.1.0`
+- Micronaut Data `2.2.0`
+- Micronaut DiscoveryClient `2.2.0`
+- Micronaut ElasticSearch `2.1.0`
+- Micronaut Flyway `3.1.0`
+- Micronaut Gcp `3.3.0`
+- Micronaut GraphQL `2.2.0`
+- Micronaut Grpc `2.1.0`
+- Micronaut Jmx `2.1.0`
+- Micronaut Liquibase `3.0.0`
+- Micronaut MQTT `1.0.0.RC1`
+- Micronaut Micrometer `3.1.0`
+- Micronaut Mongo `3.1.0`
+- Micronaut Neo4j `4.1.0`
+- Micronaut OpenApi `2.2.0`
+- Micronaut R2DBC `1.0.0.M2`
+- Micronaut Reactor `1.1.0`
+- Micronaut Redis `3.1.0`
+- Micronaut Rss `2.2.0`
+- Micronaut Security `2.1.4`
+- Micronaut Servlet `2.1.0`
+- Micronaut Sql `3.3.1`
+- Micronaut Test `2.2.1`
+- Micronaut Views `2.1.0`
+- Micronaut Xml `2.1.0`
+
 
 === Dependency Upgrades
 
-TODO
+- Caffeine `2.8.6`
+- Elasticsearch `7.9.3`
+- Flyway `7.0.4`
+- gRPC `1.32.2`
+- Hibernate `5.4.23.Final`
+- Kotlin Coroutines `1.4.1`
+- Liquibase `4.2.0`
+- Lombok `1.18.16`
+- Oracle JDBC Driver `19.8.0.0`
+- Reactor `3.4.0`
+- Swagger `2.1.5`
