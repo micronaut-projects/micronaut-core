@@ -92,6 +92,11 @@ ext {
                     group:'com.google.protobuf',
                     name:'protobuf-bom',
                     version:protobufJavaVersion
+            ],
+            'testcontainers':[
+                    group:'org.testcontainers',
+                    name:'testcontainers-bom',
+                    version:testContainersVersion
             ]
     ]
     dependencyVersions = [
