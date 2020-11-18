@@ -19,6 +19,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -126,7 +127,11 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                                 Optional<Argument<?>> genericType = argument.getFirstTypeVariable();
                                 if (genericType.isPresent()) {
                                     Class beanType = genericType.get().getType();
-                                    fulfilled.put(argumentName, ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier));
+                                    try {
+                                        fulfilled.put(argumentName, ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier));
+                                    } catch (NoSuchBeanException e) {
+                                        //If the parameter is not null it will be caught by AbstractParametrizedBeanDefinition
+                                    }
                                 }
                             } else {
                                 Optional bean = context.findBean(argumentType, qualifier);
