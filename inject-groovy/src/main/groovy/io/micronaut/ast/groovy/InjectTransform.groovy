@@ -207,8 +207,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             String beanTypeName = beanDefWriter.beanTypeName
             AnnotatedNode beanClassNode = entry.key
             try {
-                String beanDefinitionName = beanDefWriter.beanDefinitionName
-
                 if (beanClassNode instanceof ClassNode) {
                     ClassNode cn = (ClassNode) beanClassNode
                     ClassNode providerType = AstGenericUtils.resolveInterfaceGenericType(cn, Provider.class)
@@ -220,9 +218,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(
                         beanTypeName,
-                        beanDefinitionName,
-                        beanDefWriter,
-                        beanDefWriter.annotationMetadata
+                        beanDefWriter
                 )
 
                 beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing())

@@ -20,6 +20,7 @@ import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.StartupEvent
 import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import org.atinject.tck.auto.events.EventHandlerMultipleArguments
 import org.atinject.tck.auto.events.Metadata
@@ -49,6 +50,7 @@ class Test {
 ''')
         then:"Then a bean is produced that is valid"
         definition != null
+        !(definition instanceof AdvisedBeanType)
         ApplicationEventListener.isAssignableFrom(definition.getBeanType())
         !definition.getTypeArguments(ApplicationEventListener).isEmpty()
         definition.getTypeArguments(ApplicationEventListener).get(0).type == StartupEvent

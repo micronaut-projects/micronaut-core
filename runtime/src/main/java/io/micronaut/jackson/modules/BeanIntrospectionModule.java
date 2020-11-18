@@ -297,8 +297,16 @@ public class BeanIntrospectionModule extends SimpleModule {
                                 } catch (JsonMappingException e) {
                                     typeDeserializer = null;
                                 }
+                                PropertyName propertyName = PropertyName.construct(simpleName);
+                                if (typeDeserializer == null) {
+                                    SettableBeanProperty settableBeanProperty = builder.findProperty(propertyName);
+                                    if (settableBeanProperty != null) {
+                                        typeDeserializer = settableBeanProperty.getValueTypeDeserializer();
+                                    }
+                                }
+
                                 props[i] = new CreatorProperty(
-                                        PropertyName.construct(simpleName),
+                                        propertyName,
                                         javaType,
                                         null,
                                         typeDeserializer,

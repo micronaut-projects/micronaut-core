@@ -20,6 +20,8 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import org.objectweb.asm.ClassWriter;
@@ -49,6 +51,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     private final String beanDefinitionName;
     private final String beanDefinitionClassInternalName;
     private final String beanDefinitionReferenceClassName;
+    private final Type interceptedType;
     private boolean contextScope = false;
     private boolean requiresMethodProcessing;
 
@@ -58,6 +61,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
      * @param originatingElements The originating element
      * @param annotationMetadata  The annotation metadata
      */
+    @Deprecated
     public BeanDefinitionReferenceWriter(
             String beanTypeName,
             String beanDefinitionName,
@@ -68,6 +72,26 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         this.beanDefinitionName = beanDefinitionName;
         this.beanDefinitionReferenceClassName = beanDefinitionName + REF_SUFFIX;
         this.beanDefinitionClassInternalName = getInternalName(beanDefinitionName) + REF_SUFFIX;
+        this.interceptedType = null;
+    }
+
+    /**
+     * Default constructor.
+     *
+     * @param beanTypeName The bean type name
+     * @param visitor      The visitor
+     */
+    public BeanDefinitionReferenceWriter(String beanTypeName, BeanDefinitionVisitor visitor) {
+        super(
+                visitor.getBeanDefinitionName() + REF_SUFFIX,
+                visitor.getOriginatingElement(),
+                visitor.getAnnotationMetadata(),
+                true);
+        this.beanTypeName = beanTypeName;
+        this.beanDefinitionName = visitor.getBeanDefinitionName();
+        this.beanDefinitionReferenceClassName = beanDefinitionName + REF_SUFFIX;
+        this.beanDefinitionClassInternalName = getInternalName(beanDefinitionName) + REF_SUFFIX;
+        this.interceptedType = visitor.getInterceptedType().orElse(null);
     }
 
     /**
@@ -124,7 +148,19 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
         Type superType = Type.getType(AbstractBeanDefinitionReference.class);
-        startService(classWriter, BeanDefinitionReference.class, beanDefinitionClassInternalName, superType);
+        String[] interfaceInternalNames;
+        if (interceptedType != null) {
+            interfaceInternalNames = new String[] { Type.getType(AdvisedBeanType.class).getInternalName() };
+        } else {
+            interfaceInternalNames = StringUtils.EMPTY_STRING_ARRAY;
+        }
+        startService(
+                classWriter,
+                BeanDefinitionReference.class.getName(),
+                beanDefinitionClassInternalName,
+                superType,
+                interfaceInternalNames
+        );
         Type beanDefinitionType = getTypeReference(beanDefinitionName);
         writeAnnotationMetadataStaticInitializer(classWriter);
 
@@ -191,6 +227,9 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         writeBooleanMethod(classWriter, "isConfigurationProperties", () ->
                 annotationMetadata.hasDeclaredStereotype(ConfigurationReader.class));
 
+        if (interceptedType != null) {
+            super.implementInterceptedTypeMethod(interceptedType, classWriter);
+        }
         for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {
             generatorAdapter.visitMaxs(3, 1);
         }

@@ -8,6 +8,8 @@ snippet::io.micronaut.docs.lifecycle.V8Engine[tags="imports, class", indent=0]
 <2> A field is defined that requires initialization
 <3> A method is annotated with `@PostConstruct` and will be invoked once the object is constructed and fully injected.
 
+To manage when a bean is constructed, see the section on <<scopes, bean scopes>>.
+
 == When The Context Closes
 
 If you wish for a particular method to be invoked when the context is closed then you can use the `javax.annotation.PreDestroy` annotation:

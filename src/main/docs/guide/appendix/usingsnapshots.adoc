@@ -5,16 +5,11 @@ The following snippet shows how to use Micronaut `BUILD-SNAPSHOT` with Gradle. T
 [source, groovy]
 ----
 ext {
-  micronautVersion = '1.0.2.BUILD-SNAPSHOT'
+  micronautVersion = '2.2.0.BUILD-SNAPSHOT'
 }
 repositories {
   jcenter() <1>
   maven { url "https://oss.jfrog.org/oss-snapshot-local" } // <2>
-}
-dependencyManagement {
-  imports {
-      mavenBom "io.micronaut:micronaut-bom:$micronautVersion"
-  }
 }
 ----
 
@@ -28,8 +23,14 @@ In the case of Maven, edit `pom.xml`:
 <?xml version="1.0" encoding="UTF-8"?>
   ...
 
+  <parent>
+    <groupId>io.micronaut</groupId>
+    <artifactId>micronaut-parent</artifactId>
+    <version>2.2.0.BUILD-SNAPSHOT</version>
+  </parent>
+
   <properties>
-    <micronaut.version>1.0.2.BUILD-SNAPSHOT</micronaut.version> <!--1-->
+    <micronaut.version>2.2.0.BUILD-SNAPSHOT</micronaut.version> <!--1-->
     ...
   </properties>
 
@@ -43,18 +44,6 @@ In the case of Maven, edit `pom.xml`:
       <url>https://oss.jfrog.org/oss-snapshot-local</url> <!--3-->
     </repository>
   </repositories>
-
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>io.micronaut</groupId>
-        <artifactId>micronaut-bom</artifactId>
-        <version>${micronaut.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
 
   ...
 </project>

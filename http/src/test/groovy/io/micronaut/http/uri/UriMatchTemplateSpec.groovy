@@ -132,6 +132,7 @@ class UriMatchTemplateSpec extends Specification {
         "/books{?max,offset}"            | "/books?offset=100"        | true    | [:]
         "/books{?max,offset}"            | "/books?foo=bar"           | true    | [:] //query parameters are not considered for matching
         "/books{#hashtag}"               | "/books"                   | true    | [:]
+        "/{?max,offset}"                 | "/"                        | true    | [:]
     }
 
     @Unroll

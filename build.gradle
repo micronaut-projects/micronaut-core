@@ -47,7 +47,11 @@ ext {
                     name: 'micronaut-oraclecloud-bom',
                     version: micronautOracleCloudVersion
             ],
-
+            'micronaut.r2dbc': [
+                    group: 'io.micronaut.r2dbc',
+                    name: 'micronaut-r2dbc-bom',
+                    version: micronautR2DBCVersion
+            ],
             //Third-party
             'netty': [
                     group: 'io.netty',
@@ -426,12 +430,12 @@ ext {
                     modules: ['swagger-models', 'swagger-annotations']
             ],
             'google.function.framework'                    : [
-                    version: '1.0.1',
+                    version: '1.0.2',
                     group  : 'com.google.cloud.functions',
                     name   : 'functions-framework-api'
             ],
             'google.function.invoker'                    : [
-                    version: '1.0.0-beta1',
+                    version: '1.0.0',
                     group  : 'com.google.cloud.functions.invoker',
                     name   : 'java-function-invoker'
             ],
@@ -621,6 +625,16 @@ ext {
                 name   : 'ignite-core',
                 modules: ['ignite-kubernetes']
             ],
+            'micronaut.mqtt': [
+                version: micronautMQTTVersion,
+                group  : 'io.micronaut.mqtt',
+                modules: ['micronaut-mqtt-core', 'micronaut-mqtt-ssl',  'micronaut-mqttv3',  'micronaut-mqttv5']
+            ],
+            'lombok': [
+                version: lombokVersion,
+                group  : 'org.projectlombok',
+                name   : 'lombok'
+            ]
     ]
 
     dependencyVersion = { String name ->

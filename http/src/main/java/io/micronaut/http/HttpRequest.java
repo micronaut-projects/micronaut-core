@@ -127,10 +127,10 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * @return Get the path without any parameters
+     * @return Get the raw, percent-encoded path without any parameters
      */
     default @NonNull String getPath() {
-        return getUri().getPath();
+        return getUri().getRawPath();
     }
 
     /**

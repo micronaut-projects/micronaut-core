@@ -55,17 +55,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -221,6 +211,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         );
         startClass(classWriter, getInternalName(proxyFullName), getTypeReference(targetClassFullName));
         processAlreadyVisitedMethods(parent);
+        proxyBeanDefinitionWriter.setInterceptedType(targetClassFullName);
     }
 
     /**
@@ -293,6 +284,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 this,
                 annotationMetadata
         );
+        if (isInterface) {
+            if (implementInterface) {
+                proxyBeanDefinitionWriter.setInterceptedType(targetClassFullName);
+            }
+        } else {
+            proxyBeanDefinitionWriter.setInterceptedType(targetClassFullName);
+        }
         startClass(classWriter, proxyInternalName, getTypeReference(targetClassFullName));
     }
 
@@ -366,6 +364,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public void setValidated(boolean validated) {
         proxyBeanDefinitionWriter.setValidated(validated);
+    }
+
+    @Override
+    public void setInterceptedType(String typeName) {
+        proxyBeanDefinitionWriter.setInterceptedType(typeName);
+    }
+
+    @Override
+    public Optional<Type> getInterceptedType() {
+        return proxyBeanDefinitionWriter.getInterceptedType();
     }
 
     @Override

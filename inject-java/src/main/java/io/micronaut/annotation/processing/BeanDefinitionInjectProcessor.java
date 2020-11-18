@@ -245,9 +245,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionWriter.visitBeanDefinitionEnd();
             beanDefinitionWriter.accept(classWriterOutputVisitor);
 
-            String beanDefinitionName = beanDefinitionWriter.getBeanDefinitionName();
             String beanTypeName = beanDefinitionWriter.getBeanTypeName();
-
             List<? extends TypeMirror> interfaces = beanClassElement.getInterfaces();
             for (TypeMirror anInterface : interfaces) {
 
@@ -267,14 +265,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
             }
 
-            AnnotationMetadata annotationMetadata = beanDefinitionWriter.getAnnotationMetadata();
             BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                    new BeanDefinitionReferenceWriter(
-                            beanTypeName,
-                            beanDefinitionName,
-                            beanDefinitionWriter,
-                            annotationMetadata
-                    );
+                    new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter);
             beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
 
             String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();
@@ -1772,7 +1764,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 Object fieldType = modelUtils.resolveTypeReference(type);
-
+                addOriginatingElementIfNecessary(writer, declaringClass);
                 if (isValue) {
                     writer.visitFieldValue(
                             modelUtils.resolveTypeReference(declaringClass),
@@ -1784,7 +1776,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             isConfigurationPropertiesType
                     );
                 } else {
-                    addOriginatingElementIfNecessary(writer, declaringClass);
                     writer.visitFieldInjectionPoint(
                             modelUtils.resolveTypeReference(declaringClass),
                             fieldType,
@@ -2125,7 +2116,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     interceptorTypes
             );
 
-            Set<TypeElement> additionalInterfaces = Arrays.stream(interfaceTypes).map(elementUtils::getTypeElement).collect(Collectors.toSet());
+            Set<TypeElement> additionalInterfaces = Arrays.stream(interfaceTypes)
+                    .map(elementUtils::getTypeElement)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
 
             if (ArrayUtils.isNotEmpty(interfaceTypes)) {
                 List<? extends AnnotationMirror> annotationMirrors = typeElement.getAnnotationMirrors();

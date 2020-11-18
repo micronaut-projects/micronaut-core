@@ -106,7 +106,7 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
         Object result = context.proceed();
         replaceContinuation.accept(continuation);
         if (result != KotlinUtils.COROUTINE_SUSPENDED) {
-            throw new IllegalStateException("Not a Kotlin coroutine");
+            completableFutureContinuation.resumeWith(result);
         }
         return completableFutureContinuation.getCompletableFuture();
     }
@@ -123,7 +123,7 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
         Object result = context.proceed(from);
         replaceContinuation.accept(continuation);
         if (result != KotlinUtils.COROUTINE_SUSPENDED) {
-            throw new IllegalStateException("Not a Kotlin coroutine");
+            completableFutureContinuation.resumeWith(result);
         }
         return completableFutureContinuation.getCompletableFuture();
     }
@@ -152,7 +152,8 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
                     if (isUnitValueType) {
                         value = kotlin.Unit.INSTANCE;
                     } else {
-                        throw new IllegalStateException("Cannot complete Kotlin coroutine with null: " + returnTypeValue.getType());
+                        CompletableFutureContinuation.Companion.completeExceptionally(continuation, new IllegalStateException("Cannot complete Kotlin coroutine with null: " + returnTypeValue.getType()));
+                        return;
                     }
                 }
                 CompletableFutureContinuation.Companion.completeSuccess(continuation, value);
