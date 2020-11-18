@@ -2,7 +2,7 @@ https://www.graalvm.org[GraalVM] is a new universal virtual machine from Oracle 
 
 Any Micronaut application can be run using the GraalVM JVM, however special support has been added to Micronaut to support running Micronaut applications using https://www.graalvm.org/docs/reference-manual/aot-compilation/[GraalVM's `native-image` tool].
 
-Micronaut currently supports GraalVM 20.2.0 version and the team is improving the support in every new release. Don't
+Micronaut currently supports GraalVM {graalVersion} version and the team is improving the support in every new release. Don't
 hesitate to https://github.com/micronaut-projects/micronaut-core/issues[report issues] however if you find any problem.
 
 A lot of Micronaut's modules and third party libraries have been verified to work with GraalVM: HTTP server, HTTP client,

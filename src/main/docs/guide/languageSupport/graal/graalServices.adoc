@@ -32,14 +32,14 @@ $ ./mvnw package -Dpackaging=docker-native
 
 To build your native image without using Docker you need to install GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using https://sdkman.io/[Sdkman!]:
 
-.Installing GraalVM 20.2.0 with SDKman
-[source,bash]
+.Installing GraalVM {graalVersion} with SDKman
+[source,bash,subs="attributes+"]
 ----
-$ sdk install java 20.2.0.r8-grl # or 20.2.0.r11-grl if you want to use JDK 11
-$ sdk use java 20.2.0.r8-grl
+$ sdk install java {graalVersion}.r8-grl # or {graalVersion}.r11-grl if you want to use JDK 11
+$ sdk use java {graalVersion}.r8-grl
 ----
 
-The `native-image` tool was extracted from the base GraalVM distribution. Currently it is available as an early adopter plugin. To install it, run:
+The `native-image` tool was extracted from the base GraalVM distribution. Currently, it is available as an early adopter plugin. To install it, run:
 
 .Installing `native-image` tool
 [source,bash]
