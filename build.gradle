@@ -514,7 +514,7 @@ ext {
                     version: graalVersion,
                     group  : 'org.graalvm.sdk',
                     name   : 'graal-sdk'
-            ],            
+            ],
             h2                         : [
                     version: h2Version,
                     group  : 'com.h2database',
@@ -726,6 +726,7 @@ subprojects { Project subproject ->
 
     apply plugin: "io.micronaut.build.common"
     if (!subproject.name.startsWith('test-') &&
+            !subproject.name.startsWith('inject-test-') &&
             !subproject.toString().contains('benchmarks')) {
         apply plugin: "io.micronaut.build.dependency-updates"
         apply plugin: "io.micronaut.build.publishing"
@@ -746,6 +747,10 @@ subprojects { Project subproject ->
         }
     }
 
+    tasks.withType(JavaCompile){
+       options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
+       options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+    }
     tasks.withType(Checkstyle) {
         reports {
             xml.enabled = !System.getenv("GITHUB_ACTIONS")

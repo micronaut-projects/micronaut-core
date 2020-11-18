@@ -70,9 +70,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     protected static Set<String> arrays = new HashSet<>();
 
     private static final TypeHint.AccessType[] DEFAULT_ACCESS_TYPE = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS};
-    private static final String REFLECTION_CONFIG_JSON = "reflection-config.json";
-    private static final String NATIVE_IMAGE_PROPERTIES = "native-image.properties";
-
+    private static final String REFLECTION_CONFIG_JSON = "reflect-config.json";
     private static final String BASE_RESOURCE_CONFIG_JSON = "src/main/graal/resource-config.json";
     private static final String RESOURCE_CONFIG_JSON = "resource-config.json";
     private static final String RESOURCES_DIR = "src/main/resources";
@@ -261,16 +259,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         try {
             String path = buildNativeImagePath(visitorContext);
             String reflectFile = path + REFLECTION_CONFIG_JSON;
-            String propsFile = path + NATIVE_IMAGE_PROPERTIES;
-
-            visitorContext.visitMetaInfFile(propsFile).ifPresent(gf -> {
-                visitorContext.info("Writing " + NATIVE_IMAGE_PROPERTIES + " file to destination: " + gf.getName());
-                try (PrintWriter w = new PrintWriter(gf.openWriter())) {
-                    w.println("Args = -H:ReflectionConfigurationResources=${.}/reflection-config.json");
-                } catch (IOException e) {
-                    visitorContext.fail("Error writing " + NATIVE_IMAGE_PROPERTIES + ": " + e.getMessage(), null);
-                }
-            });
             final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(reflectFile);
             generatedFile.ifPresent(gf -> {
                 for (Map<String, Object> value : classes.values()) {
