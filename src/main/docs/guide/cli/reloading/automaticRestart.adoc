@@ -23,7 +23,7 @@ Every time you change a class Micronaut's plugin will automatically restart the 
 
 === Gradle Restart
 
-Gradle automatic restart can be activated when using the Micronaut Gradle plugin simplify by activating Gradle's support for continuous builds via the `-t` flag:
+Gradle automatic restart can be activated when using the Micronaut Gradle plugin simply by activating Gradle's support for continuous builds via the `-t` flag:
 
 .Using Gradle for Automatic Restart
 [source,bash]

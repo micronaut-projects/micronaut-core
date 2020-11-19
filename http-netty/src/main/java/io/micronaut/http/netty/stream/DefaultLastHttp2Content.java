@@ -27,7 +27,9 @@ import io.netty.handler.codec.http2.Http2Stream;
  * @since 2.1.3
  */
 final class DefaultLastHttp2Content extends DefaultLastHttpContent implements LastHttp2Content {
+    
     private final Http2Stream stream;
+
     public DefaultLastHttp2Content(Http2Stream stream) {
         this.stream = stream;
     }

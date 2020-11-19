@@ -119,6 +119,8 @@ import io.netty.handler.codec.http2.Http2Error;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.*;
 import io.reactivex.functions.Consumer;
 import io.reactivex.functions.LongConsumer;
@@ -1688,30 +1690,68 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (isHttp2) {
                 addHttp2StreamHeader(request, nettyResponse);
             }
+            io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
 
-            context.writeAndFlush(nettyResponse)
-                    .addListener(future -> {
-                        try {
-                            if (!future.isSuccess()) {
-                                final Throwable throwable = future.cause();
-                                if (!(throwable instanceof ClosedChannelException)) {
-                                    if (throwable instanceof Http2Exception.StreamException) {
-                                        Http2Exception.StreamException se = (Http2Exception.StreamException) throwable;
-                                        if (se.error() == Http2Error.STREAM_CLOSED) {
-                                            // ignore
-                                            return;
-                                        }
-                                    }
-                                    if (LOG.isErrorEnabled()) {
-                                        LOG.error("Error writing final response: " + throwable.getMessage(), throwable);
-                                    }
+            GenericFutureListener<Future<? super Void>> requestCompletor = future -> {
+                try {
+                    if (!future.isSuccess()) {
+                        final Throwable throwable = future.cause();
+                        if (!(throwable instanceof ClosedChannelException)) {
+                            if (throwable instanceof Http2Exception.StreamException) {
+                                Http2Exception.StreamException se = (Http2Exception.StreamException) throwable;
+                                if (se.error() == Http2Error.STREAM_CLOSED) {
+                                    // ignore
+                                    return;
                                 }
                             }
-                        } finally {
-                            cleanupRequest(context, nettyHttpRequest);
-                            context.read();
+                            if (LOG.isErrorEnabled()) {
+                                LOG.error("Error writing final response: " + throwable.getMessage(), throwable);
+                            }
                         }
-                    });
+                    }
+                } finally {
+                    cleanupRequest(context, nettyHttpRequest);
+                    context.read();
+                }
+            };
+            if (nativeRequest instanceof StreamedHttpRequest && !((StreamedHttpRequest) nativeRequest).isConsumed()) {
+                StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) nativeRequest;
+                // We have to clear the buffer of FlowControlHandler before writing the response
+                // If this is a streamed request and there is still content to consume then subscribe
+                // and write the buffer is empty.
+
+                //noinspection ReactiveStreamsSubscriberImplementation
+                streamedHttpRequest.subscribe(new Subscriber<HttpContent>() {
+                    private Subscription streamSub;
+
+                    @Override
+                    public void onSubscribe(Subscription s) {
+                        streamSub = s;
+                        s.request(1);
+                    }
+
+                    @Override
+                    public void onNext(HttpContent httpContent) {
+                        httpContent.release();
+                        streamSub.request(1);
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+                        context.writeAndFlush(nettyResponse)
+                                .addListener(requestCompletor);
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        context.writeAndFlush(nettyResponse)
+                                .addListener(requestCompletor);
+                    }
+                });
+            } else {
+                context.writeAndFlush(nettyResponse)
+                        .addListener(requestCompletor);
+            }
 
         }
     }

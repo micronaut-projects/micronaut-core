@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal
 import java.util.concurrent.CompletableFuture
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.jvm.internal.CoroutineStackFrame
 
 /**
  * Continuation represented as CompletableFuture
@@ -29,9 +30,14 @@ import kotlin.coroutines.CoroutineContext
  */
 @Internal
 @Experimental
-class CompletableFutureContinuation(private val continuation: Continuation<Any>) : Continuation<Any> {
+class CompletableFutureContinuation(private val continuation: Continuation<Any>) : Continuation<Any>, CoroutineStackFrame {
 
     var completableFuture = CompletableFuture<Any>()
+
+    override val callerFrame: CoroutineStackFrame?
+        get() = continuation as? CoroutineStackFrame
+
+    override fun getStackTraceElement(): StackTraceElement? = null
 
     override val context: CoroutineContext
         get() = continuation.context

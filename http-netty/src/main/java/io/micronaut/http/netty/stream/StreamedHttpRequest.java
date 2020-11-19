@@ -31,4 +31,12 @@ public interface StreamedHttpRequest extends HttpRequest, StreamedHttpMessage {
      * Releases the stream if there is no subscriber.
      */
     default void closeIfNoSubscriber() { }
+
+    /**
+     * Has the stream been consumed.
+     * @return True if it has
+     */
+    default boolean isConsumed() {
+        return false;
+    }
 }
