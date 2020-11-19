@@ -691,7 +691,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                                 metadata,
                                                 isDeclared,
                                                 mappedAnnotationName,
-                                                parentAnnotations,
+                                                Collections.emptyList(),
                                                 annotationValues,
                                                 member,
                                                 value
