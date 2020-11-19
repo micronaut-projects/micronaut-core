@@ -33,6 +33,7 @@ This essentially introduces the following configuration to `application.yml`:
 micronaut:
     io:
         watch:
+            enabled: true
             paths: src/main
             restart: true
 ----
