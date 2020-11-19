@@ -239,7 +239,6 @@ security:
   title: Security
 multitenancy:
   title: Multi-Tenancy
-  multitenancyGorm: Multi-Tenancy GORM
 cli:
   title: Micronaut CLI
   createProject:

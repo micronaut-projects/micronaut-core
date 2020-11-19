@@ -1,3 +1,0 @@
-http://gorm.grails.org[GORM] supports Multi-tenancy and integrates with Micronaut Multi-tenancy support.
-
-See the https://micronaut-projects.github.io/micronaut-groovy/latest/guide/index.html#multitenancyGorm[Micronaut Groovy module] for more information.
