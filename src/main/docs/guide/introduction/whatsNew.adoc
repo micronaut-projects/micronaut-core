@@ -62,6 +62,7 @@ See the https://micronaut-projects.github.io/micronaut-r2dbc/1.0.x/guide/[Docume
 
 === Module Upgrades
 
+- Micronaut Acme `2.1.0`
 - Micronaut Aws `2.2.3`
 - Micronaut Azure `2.1.0`
 - Micronaut Cache `2.2.0`
@@ -72,20 +73,31 @@ See the https://micronaut-projects.github.io/micronaut-r2dbc/1.0.x/guide/[Docume
 - Micronaut Flyway `3.1.0`
 - Micronaut Gcp `3.3.0`
 - Micronaut GraphQL `2.2.0`
-- Micronaut Grpc `2.1.0`
+- Micronaut Groovy `2.2.0`
+- Micronaut gRPC `2.2.0`
+- Micronaut Hibernate Validator `3.0.0`
 - Micronaut Jmx `2.1.0`
+- Micronaut Kafka `3.1.0`
+- Micronaut Kotlin `2.2.0`
 - Micronaut Liquibase `3.0.0`
-- Micronaut MQTT `1.0.0.RC1`
+- Micronaut MQTT `1.0.0`
 - Micronaut Micrometer `3.1.0`
 - Micronaut Mongo `3.1.0`
+- Micronaut NatsIo `2.2.0`
 - Micronaut Neo4j `4.1.0`
 - Micronaut OpenApi `2.2.0`
+- Micronaut Oracle Cloud `1.1.0`
+- Micronaut Picocli `3.1.0`
 - Micronaut R2DBC `1.0.0.M2`
+- Micronaut RabbitMQ `2.2.0`
 - Micronaut Reactor `1.1.0`
 - Micronaut Redis `3.1.0`
 - Micronaut Rss `2.2.0`
+- Micronaut Rss `2.3.0`
+- Micronaut RxJava3 `1.1.0`
 - Micronaut Security `2.1.4`
-- Micronaut Servlet `2.1.0`
+- Micronaut Security `2.2.0`
+- Micronaut Servlet `2.1.1`
 - Micronaut Sql `3.3.1`
 - Micronaut Test `2.2.1`
 - Micronaut Views `2.1.0`
@@ -95,13 +107,19 @@ See the https://micronaut-projects.github.io/micronaut-r2dbc/1.0.x/guide/[Docume
 === Dependency Upgrades
 
 - Caffeine `2.8.6`
+- Eclipse Paho v3 `1.2.5`
+- Eclipse Paho v5 `1.2.5`
 - Elasticsearch `7.9.3`
 - Flyway `7.0.4`
-- gRPC `1.32.2`
+- gRPC `1.33.1`
 - Hibernate `5.4.23.Final`
+- Kafka `2.6.0`
 - Kotlin Coroutines `1.4.1`
+- Ktor `1.4.1`
 - Liquibase `4.2.0`
 - Lombok `1.18.16`
 - Oracle JDBC Driver `19.8.0.0`
+- Picocli `4.5.2`
+- Protobuf `3.14.0`
 - Reactor `3.4.0`
 - Swagger `2.1.5`
