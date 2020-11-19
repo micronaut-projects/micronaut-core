@@ -635,6 +635,16 @@ ext {
                 group  : 'io.micronaut.mqtt',
                 modules: ['micronaut-mqtt-core', 'micronaut-mqtt-ssl',  'micronaut-mqttv3',  'micronaut-mqttv5']
             ],
+            'pahov3': [
+                version: pahov3Version,
+                group  : 'org.eclipse.paho',
+                name   : 'org.eclipse.paho.client.mqttv3'
+            ],
+            'pahov5': [
+                version: pahov5Version,
+                group  : 'org.eclipse.paho',
+                name   : 'org.eclipse.paho.mqttv5.client'
+            ],
             'lombok': [
                 version: lombokVersion,
                 group  : 'org.projectlombok',
