@@ -25,6 +25,7 @@ import java.util.function.Supplier
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.coroutines.jvm.internal.CoroutineStackFrame
 
 class ContinuationArgumentBinder: TypedRequestArgumentBinder<Continuation<*>> {
     override fun bind(context: ArgumentConversionContext<Continuation<*>>?, source: HttpRequest<*>): ArgumentBinder.BindingResult<Continuation<*>> =
@@ -47,7 +48,7 @@ class ContinuationArgumentBinder: TypedRequestArgumentBinder<Continuation<*>> {
     }
 }
 
-private class CustomContinuation: Continuation<Any>, Supplier<CompletableFuture<*>> {
+private class CustomContinuation: Continuation<Any>, CoroutineStackFrame, Supplier<CompletableFuture<*>> {
     private val completableFuture = CompletableFuture<Any>()
 
     override fun get(): CompletableFuture<*> = completableFuture
@@ -62,4 +63,9 @@ private class CustomContinuation: Continuation<Any>, Supplier<CompletableFuture<
             completableFuture.completeExceptionally(result.exceptionOrNull())
         }
     }
+
+    override val callerFrame: CoroutineStackFrame?
+        get() = this
+
+    override fun getStackTraceElement(): StackTraceElement? = null
 }
