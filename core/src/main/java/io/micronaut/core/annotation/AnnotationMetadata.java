@@ -412,9 +412,9 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param classLoader The ClassLoader to load the type
      * @return The type if present
      */
-    default Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
+    default Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @Nullable ClassLoader classLoader) {
         ArgumentUtils.requireNonNull("name", name);
-        final Optional<Class> aClass = ClassUtils.forName(name, classLoader);
+        final Optional<Class> aClass = ClassUtils.forName(name, classLoader == null ? getClass().getClassLoader() : classLoader);
         return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
             if (Annotation.class.isAssignableFrom(aClass1)) {
                 //noinspection unchecked
@@ -503,7 +503,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param classLoader The classloader to load annotation type
      * @return A set of annotation names
      */
-    default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype, @NonNull ClassLoader classLoader) {
+    default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype, @Nullable ClassLoader classLoader) {
         ArgumentUtils.requireNonNull("stereotype", stereotype);
 
         List<String> names = getAnnotationNamesByStereotype(stereotype.getName());

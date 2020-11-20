@@ -15,6 +15,7 @@
  */
 package io.micronaut.aop.chain;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.aop.*;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.ApplicationContext;
@@ -243,7 +244,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     @UsedByGeneratedCode
     public static Interceptor[] resolveAroundInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
-        return resolveInterceptorsInternal(method, Around.class, interceptors, beanContext.getClassLoader());
+        return resolveInterceptorsInternal(method, Around.class, interceptors, beanContext != null ? beanContext.getClassLoader() : null);
     }
 
     /**
@@ -259,7 +260,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     @UsedByGeneratedCode
     public static Interceptor[] resolveIntroductionInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
-        Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors, beanContext.getClassLoader());
+        Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors, beanContext != null ? beanContext.getClassLoader() : null);
         if (introductionInterceptors.length == 0) {
             if (method.hasStereotype(Adapter.class)) {
                 introductionInterceptors = new Interceptor[] { new AdapterIntroduction(beanContext, method) };
@@ -279,7 +280,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         }
     }
 
-    private static Interceptor[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method, Class<? extends Annotation> annotationType, Interceptor[] interceptors, ClassLoader classLoader) {
+    private static Interceptor[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method, Class<? extends Annotation> annotationType, Interceptor[] interceptors, @Nullable ClassLoader classLoader) {
         List<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType, classLoader);
 
         Set<Class> applicableClasses = new HashSet<>();
