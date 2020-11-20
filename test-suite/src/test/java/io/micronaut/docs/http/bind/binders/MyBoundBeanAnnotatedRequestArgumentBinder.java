@@ -30,8 +30,14 @@ public class MyBoundBeanAnnotatedRequestArgumentBinder extends AbstractAnnotated
         result.setShoppingCartSize(source.getCookies().get("shoppingCart", Integer.class).orElse(null));
         result.setDisplayName(source.getCookies().get("displayName").getValue());
         String userNameBase64 = source.getHeaders().getAuthorization().orElse(null);
-        String userName = new String(Base64.getDecoder().decode(userNameBase64.substring(6)))
-                .split(":", 2)[0];
+        String userName;
+        try {
+            userName = new String(Base64.getDecoder().decode(userNameBase64.substring(6)))
+                    .split(":", 2)[0];
+        } catch (IllegalArgumentException iae) {
+            context.reject(iae);
+            return BindingResult.EMPTY;
+        }
         result.setUserName(userName);
         result.setBody(source.getBody(String.class).orElse(null));
         return () -> Optional.of(result);

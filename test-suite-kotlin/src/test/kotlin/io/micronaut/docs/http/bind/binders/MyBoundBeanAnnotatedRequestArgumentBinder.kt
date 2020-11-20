@@ -17,15 +17,29 @@ protected constructor(conversionService: ConversionService<*>?) :
         AnnotatedRequestArgumentBinder<MyBindingAnnotation, MyBoundBean> { //<1>
 
     override fun bind(context: ArgumentConversionContext<MyBoundBean>, source: HttpRequest<*>?):
-            ArgumentBinder.BindingResult<MyBoundBean> { //<2>
+            ArgumentBinder.BindingResult<MyBoundBean>? { //<2>
         val result = MyBoundBean()
         result.bindingType = "ANNOTATED"
         if (source != null) {
             result.shoppingCartSize = source.cookies.get("shoppingCart", Int::class.java).orElse(null)
             result.displayName = source.cookies["displayName"].value
             val userNameBase64 = source.headers.authorization.orElse(null)
-            val userName = String(Base64.getDecoder().decode(userNameBase64.substring(6)))
-                    .split(":").toTypedArray()[0]
+            val userName: String
+            userName = try {
+                String(Base64.getDecoder().decode(userNameBase64.substring(6)))
+                        .split(":").toTypedArray()[0]
+            } catch (iae: IllegalArgumentException) {
+                context.reject(iae)
+                return object : ArgumentBinder.BindingResult<MyBoundBean> {
+                    override fun getValue(): Optional<MyBoundBean>? {
+                        return Optional.empty<MyBoundBean>()
+                    }
+
+                    override fun isSatisfied(): Boolean {
+                        return true
+                    }
+                }
+            }
             result.userName = userName
             result.body = source.getBody(String::class.java).orElse(null)
         }

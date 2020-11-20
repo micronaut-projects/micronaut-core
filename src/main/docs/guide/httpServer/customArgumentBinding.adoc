@@ -8,22 +8,24 @@ argument binder that supports that annotation.
 
 If no fitting annotation is found Micronaut will try to find an argument binder that supports the argument's type.
 
-An api:core.bind.ArgumentBinder[ArgumentBinder] can be registered as a bean. In this case it is only present when a
+An api:core.bind.ArgumentBinder[ArgumentBinder] can be registered as a bean. It is only present when a
 api:context.BeanContext[BeanContext] is initialized.
 
-Binders are called by the same server logic that calls the api:io.micronaut.http.annotation.Controller[Controller]. Once
-the request is received and the argument is resolved in the api:http.bind.binders.ArgumentBinderRegistry[ArgumentBinderRegistry]
-api:io.micronaut.http.filter.HttpFilter[HttpFilter]s are called before returning results to the Controller. Your
+When a request is received the api:http.bind.binders.ArgumentBinderRegistry[ArgumentBinderRegistry] will make several calls
+to the argument binders attempting to find one that can resolve the argument. The binders are processed before the body
+is read and before any api:io.micronaut.http.filter.HttpFilter[HttpFilter]s have been executed. Your
 api:io.micronaut.core.bind.BindingResult[BindingResult] may depend on those being initialized before returning the binding
 result.
 
 A binding result of the class you are binding will be returned from the bind method in the implementation written. The
 result will be classified as either `SATISFIED` or `UNSATISFIED`. Returning a binding of the type `EMPTY` will be considered
-SATISFIED. If the returned binding is UNSATISFIED the registry will continue to attempt to find argument binders that match
-the argument.
+SATISFIED. If the returned binding is UNSATISFIED the registry will attempt to execute this binder multiple times attempting
+to get a SATISFIED result.
 
 If the binding result throws an exception that is not handled it will bubble up to the api:io.micronaut.http.annotation.Controller[Controller]
-where it can be caught by an api:io.micronaut.http.annotation.Error[Error] handler.
+where it can be caught by an api:io.micronaut.http.annotation.Error[Error] handler. This should not be relied upon, however,
+and the exceptions should be caught within the binder and passed to the
+io.micronaut.core.convert.ArgumentConversionContext[ArgumentConversionContext] via `context.reject`.
 
 Key interfaces are:
 
@@ -46,6 +48,9 @@ snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanTypedRequestArgumentBind
 <1> Override the bind method with the data type to bind, in this case MyBoundBean
 <2> After building the bound type as desired return the api:io.micronaut.core.bind.BindingResult[BindingResult]
 <3> Also override the argumentType method which is used by the ArgumentBinderRegistry.
+
+snippet::io.micronaut.docs.http.bind.binders.MyBindingAnnotation[tags="class", indent=0, title="An example of a binding annotation"]
+<1> The binding annotation must itself be annotated as api:io.micronaut.core.bind.annotation.Bindable[@Bindable]
 
 snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanController[tags="typed", indent=0, title="A controller operation with this typed binding"]
 <1> The parameter will be bound with no annotation.

@@ -20,14 +20,20 @@ class MyBoundBeanAnnotatedRequestArgumentBinder extends AbstractAnnotatedArgumen
     BindingResult<MyBoundBean> bind(ArgumentConversionContext<MyBoundBean> context, HttpRequest<?> source) { //<2>
         MyBoundBean result = new MyBoundBean()
         result.bindingType = "ANNOTATED"
-        result.setShoppingCartSize(source.getCookies().get("shoppingCart", Integer.class).orElse(null));
-        result.setDisplayName(source.getCookies().get("displayName").getValue());
-        String userNameBase64 = source.getHeaders().getAuthorization().orElse(null);
-        String userName = new String(Base64.getDecoder().decode(userNameBase64.substring(6)))
-                .split(":", 2)[0];
-        result.setUserName(userName);
-        result.setBody(source.getBody(String.class).orElse(null));
-        return () -> Optional.of(result);
+        result.setShoppingCartSize(source.getCookies().get("shoppingCart", Integer.class).orElse(null))
+        result.setDisplayName(source.getCookies().get("displayName").getValue())
+        String userNameBase64 = source.getHeaders().getAuthorization().orElse(null)
+        String userName
+        try {
+            userName = new String(Base64.getDecoder().decode(userNameBase64.substring(6)))
+                    .split(":", 2)[0]
+        } catch (IllegalArgumentException iae) {
+            context.reject(iae)
+            return BindingResult.EMPTY
+        }
+        result.setUserName(userName)
+        result.setBody(source.getBody(String.class).orElse(null))
+        return () -> Optional.of(result)
     }
 
     @Override

@@ -4,6 +4,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
+import org.checkerframework.checker.nullness.Opt;
 
 import javax.inject.Singleton;
 import java.util.Base64;
@@ -19,8 +20,14 @@ public class MyBoundBeanTypedRequestArgumentBinder implements TypedRequestArgume
         result.setShoppingCartSize(source.getCookies().get("shoppingCart", Integer.class).orElse(null));
         result.setDisplayName(source.getCookies().get("displayName").getValue());
         String userNameBase64 = source.getHeaders().getAuthorization().orElse(null);
-        String userName = new String(Base64.getDecoder().decode(userNameBase64.substring(6)))
-                .split(":", 2)[0];
+        String userName;
+        try {
+             userName = new String(Base64.getDecoder().decode(userNameBase64.substring(6)))
+                    .split(":", 2)[0];
+        } catch (IllegalArgumentException iae) {
+            context.reject(iae);
+            return Optional::empty;
+        }
         result.setUserName(userName);
         result.setBody(source.getBody(String.class).orElse(null));
         return () -> Optional.of(result); //<2>

@@ -5,10 +5,13 @@ import io.kotlintest.shouldNotBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.runtime.server.EmbeddedServer
+import org.junit.jupiter.api.Assertions
 
 class MyBoundBeanControllerTest: StringSpec(){
 
@@ -22,6 +25,20 @@ class MyBoundBeanControllerTest: StringSpec(){
 
 
     init {
+        "test binding bad credentials" {
+            val request: HttpRequest<*> = HttpRequest.POST("/customBinding/annotated", "{\"key\":\"value\"}")
+                    .cookies(setOf(Cookie.of("shoppingCart", "5"),
+                            Cookie.of("displayName", "John Q Micronaut")))
+                    .header(HttpHeaders.AUTHORIZATION, "munaut:P@ssw0rd")
+            val responseException = Assertions.assertThrows(HttpClientResponseException::class.java) {
+                client!!.toBlocking().retrieve(request, Argument.mapOf(String::class.java, Object::class.java))
+            }
+
+            responseException shouldNotBe null
+            responseException.message shouldBe "Failed to convert argument [bean] for value [null] due to: Illegal base64 character 3a"
+
+        }
+
         "test annotation binding" {
             val request: HttpRequest<*> = HttpRequest.POST("/customBinding/annotated", "{\"key\":\"value\"}")
                     .cookies(setOf(Cookie.of("shoppingCart", "5"),

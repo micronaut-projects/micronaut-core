@@ -2,8 +2,10 @@ package io.micronaut.docs.http.bind.binders;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
@@ -15,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class MyBoundBeanControllerTest {
     private static EmbeddedServer server;
@@ -36,6 +39,22 @@ public class MyBoundBeanControllerTest {
         if(client != null) {
             client.stop();
         }
+    }
+
+    @Test
+    public void testBindingBadCredentials() {
+        Set<Cookie> cookieSet = new HashSet<>();
+        cookieSet.add(Cookie.of("shoppingCart", "5"));
+        cookieSet.add(Cookie.of("displayName", "John Q Micronaut"));
+
+        HttpRequest request = HttpRequest.POST("/customBinding/annotated", "{\"key\":\"value\"}")
+                .cookies(cookieSet)
+                .header(HttpHeaders.AUTHORIZATION, "munaut:P@ssw0rd");
+        HttpClientResponseException responseException = assertThrows(HttpClientResponseException.class,
+                () -> client.toBlocking().exchange(request, Argument.mapOf(String.class, String.class)));
+
+        assertEquals("Failed to convert argument [bean] for value [null] due to: Illegal base64 character 3a", responseException.getMessage());
+
     }
 
     @Test
