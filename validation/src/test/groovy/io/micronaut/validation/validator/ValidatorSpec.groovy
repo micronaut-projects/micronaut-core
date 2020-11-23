@@ -413,6 +413,18 @@ class ValidatorSpec extends Specification {
         !violations[0].constraintDescriptor
         violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
                 "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+
+        when:
+        Map<String, Bee> map = [:]
+        map.put("blank", null)
+        beeHive = new HiveOfBeeMap(bees: map)
+        violations = validator.validate(beeHive)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
     }
 
     @Ignore("FIXME: https://github.com/micronaut-projects/micronaut-core/issues/4410")
