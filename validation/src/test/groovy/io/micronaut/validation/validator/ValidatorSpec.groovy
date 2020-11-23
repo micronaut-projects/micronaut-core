@@ -390,6 +390,16 @@ class ValidatorSpec extends Specification {
         !violations[0].constraintDescriptor
         violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
                 "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+
+        when:
+        beeHive = new HiveOfBeeList(bees: [null])
+        violations = validator.validate(beeHive)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
     }
 
     void "test cascade to map of non-introspected value class" () {
@@ -420,6 +430,19 @@ class ValidatorSpec extends Specification {
         violations[1].constraintDescriptor.annotation instanceof NotNull
         violations[2].constraintDescriptor
         violations[2].constraintDescriptor.annotation instanceof Size
+    }
+
+    void "test cascade to bean - enum"() {
+        given:
+        EnumList b = new EnumList(
+                enums: [null]
+        )
+
+        def violations = validator.validate(b)
+
+        expect:
+        violations.size() == 1
+        violations.first().message == "must not be null"
     }
 }
 
@@ -521,4 +544,17 @@ class BookService {
     Book saveBook(@NotBlank String title, @Min(100l) int pages) {
         new Book(title: title, pages: pages)
     }
+}
+
+@Introspected
+class EnumList {
+
+    @Valid
+    @NotNull
+    List<AuthorState> enums
+}
+
+enum AuthorState {
+    PUBLISHED,
+    DRAFT
 }
