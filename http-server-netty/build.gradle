@@ -34,7 +34,7 @@ dependencies {
     // following 3 dependencies needed for Http2PostTest
     testImplementation 'io.vertx:vertx-core:3.9.4'
     testImplementation 'io.vertx:vertx-web-client:3.9.4'
-    testImplementation group: 'org.eclipse.jetty', name: 'jetty-alpn-openjdk8-client', version: '9.4.33.v20201020'
+    testImplementation group: 'org.eclipse.jetty', name: 'jetty-alpn-openjdk8-client', version: '9.4.35.v20201120'
 
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation dependencyModuleVersion("groovy", "groovy-templates")
