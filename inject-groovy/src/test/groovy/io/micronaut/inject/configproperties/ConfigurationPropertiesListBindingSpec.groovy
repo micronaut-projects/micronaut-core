@@ -4,15 +4,15 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.env.yaml.YamlPropertySourceLoader
+import io.micronaut.core.annotation.Introspected
 import io.netty.handler.codec.http.HttpMethod
-import org.yaml.snakeyaml.Yaml
 import spock.lang.Specification
 
 class ConfigurationPropertiesListBindingSpec extends Specification {
 
     void "test bind to list of POJO"() {
         given:
-        def map = new YamlPropertySourceLoader().read("myconfig.yml", '''
+        def map = new YamlPropertySourceLoader().read("myconfig.ymlmyconfig.yml", '''
 my:
   security:
     intercept-url-map:
@@ -46,6 +46,7 @@ my:
         Map<String, List<BindableInterceptUrlMapPattern>> interceptUrlMap
     }
 
+    @Introspected
     static class BindableInterceptUrlMapPattern {
         String pattern;
         List<String> access = new ArrayList<>();

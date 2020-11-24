@@ -25,8 +25,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ContainerNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
-import io.micronaut.core.bind.ArgumentBinder;
-import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.*;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
@@ -50,21 +48,17 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
 
     private final Provider<ObjectMapper> objectMapper;
     private final ConversionService<?> conversionService;
-    private final Provider<BeanPropertyBinder> beanPropertyBinder;
 
     /**
      * Default constructor.
      * @param objectMapper The object mapper provider
-     * @param beanPropertyBinder The bean property binder provider
      * @param conversionService The conversion service
      */
     protected JacksonConverterRegistrar(
             Provider<ObjectMapper> objectMapper,
-            Provider<BeanPropertyBinder> beanPropertyBinder,
             ConversionService<?> conversionService) {
         this.objectMapper = objectMapper;
         this.conversionService = conversionService;
-        this.beanPropertyBinder = beanPropertyBinder;
     }
 
     @Override
@@ -93,11 +87,6 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
                 Object.class,
                 JsonNode.class,
                 objectToJsonNodeConverter()
-        );
-        conversionService.addConverter(
-                Map.class,
-                Object.class,
-                mapToObjectConverter()
         );
         conversionService.addConverter(
                 CharSequence.class,
@@ -138,50 +127,6 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
                     return Optional.ofNullable(propertyNamingStrategy);
                 }
         );
-    }
-
-    /**
-     * @return The map to object converter
-     */
-    protected TypeConverter<Map, Object> mapToObjectConverter() {
-        return (map, targetType, context) -> {
-            ArgumentConversionContext<Object> conversionContext;
-            if (context instanceof ArgumentConversionContext) {
-                conversionContext = (ArgumentConversionContext<Object>) context;
-            } else {
-                conversionContext = ConversionContext.of(targetType);
-            }
-            ArgumentBinder binder = this.beanPropertyBinder.get();
-            ArgumentBinder.BindingResult result = binder.bind(conversionContext, correctKeys(map));
-            return result.getValue();
-        };
-    }
-
-    private Map correctKeys(Map<?, ?> map) {
-        Map mapWithExtraProps = new LinkedHashMap(map.size());
-        for (Map.Entry entry : map.entrySet()) {
-            Object key = entry.getKey();
-            Object value = correctKeys(entry.getValue());
-            mapWithExtraProps.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), value);
-        }
-        return mapWithExtraProps;
-    }
-
-    private List correctKeys(List list) {
-        List newList = new ArrayList(list.size());
-        for (Object o : list) {
-            newList.add(correctKeys(o));
-        }
-        return newList;
-    }
-
-    private Object correctKeys(Object o) {
-        if (o instanceof List) {
-            return correctKeys((List) o);
-        } else if (o instanceof Map) {
-            return correctKeys((Map) o);
-        }
-        return o;
     }
 
     /**
