@@ -1319,12 +1319,22 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             Object propertyValue,
             @Nullable DefaultPropertyNode container) {
 
-        final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(propertyValue);
+        Class<?> beanType = Object.class;
+        if (propertyValue != null) {
+            beanType = propertyValue.getClass();
+        } else if (cascadeProperty instanceof BeanProperty) {
+            Argument[] typeParameters = ((BeanProperty) cascadeProperty).asArgument().getTypeParameters();
+            if (typeParameters.length > 0) {
+                beanType = typeParameters[0].getType();
+            }
+        }
+
+        final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(beanType);
         AnnotationMetadata annotationMetadata = cascadeProperty.getAnnotationMetadata();
         if (beanIntrospection == null && !annotationMetadata.hasStereotype(Constraint.class)) {
             // error: only has @Valid but the propertyValue class is not @Introspected
             overallViolations.add(createIntrospectionConstraintViolation(
-                rootClass, rootBean, context, propertyValue.getClass(), propertyValue));
+                rootClass, rootBean, context, beanType, propertyValue));
             return;
         }
 
