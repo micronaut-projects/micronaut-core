@@ -21,6 +21,7 @@ import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.naming.Described;
+import io.micronaut.core.version.VersionUtils;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
@@ -59,6 +60,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     public @NonNull ApplicationContext start() {
         long start = System.currentTimeMillis();
         ApplicationContext applicationContext = super.build();
+        String micronautVersion = VersionUtils.getMicronautVersion();
 
         try {
             applicationContext.start();
@@ -67,6 +69,10 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
             embeddedContainerBean.ifPresent((embeddedApplication -> {
                 try {
+                    if (LOG.isInfoEnabled() && micronautVersion != null) {
+                        LOG.info("Micronaut version: {}", micronautVersion);
+                    }
+
                     embeddedApplication.start();
 
                     boolean keepAlive = false;
