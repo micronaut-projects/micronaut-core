@@ -1,6 +1,6 @@
 package io.micronaut.http.client.aop
 
-
+import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.ArgumentConversionContext
@@ -33,6 +33,17 @@ class RequestBeanSpec extends Specification {
 
     @Shared
     RequestBeanClient client = embeddedServer.getApplicationContext().getBean(RequestBeanClient)
+
+    void "test client RequestBean"() {
+        ClientRequestBean bean = new ClientRequestBean()
+        bean.queryValues = ["ABC", "XYZ"]
+        bean.queryValue = "FOO"
+        bean.forwardedFor = "Tester"
+        when:
+            ClientRequestBean resp = client.getBean(bean)
+        then:
+            resp == bean
+    }
 
     void "test @QueryValue is injected to Bean"() {
         expect:
@@ -113,6 +124,11 @@ class RequestBeanSpec extends Specification {
     @Controller('/request/bean')
     static class RequestBeanController {
 
+        @Get("/client-request-bean")
+        ClientRequestBean getBean(@RequestBean ClientRequestBean bean) {
+            return bean
+        }
+
         @Get("/queryValue{?queryValue}")
         String getQueryValue(@RequestBean Bean bean) {
             return bean.queryValue
@@ -178,6 +194,9 @@ class RequestBeanSpec extends Specification {
     @Client('/request/bean')
     static interface RequestBeanClient {
 
+        @Get("/client-request-bean")
+        ClientRequestBean getBean(@RequestBean ClientRequestBean bean)
+
         @Get("/queryValue{?queryValue}")
         String getQueryValue(String queryValue)
 
@@ -214,6 +233,20 @@ class RequestBeanSpec extends Specification {
         @Get("/extended/values{?extendingValue,superValue}")
         String getExtendingBeanValues(String extendingValue, String superValue)
 
+    }
+
+    @Introspected
+    @EqualsAndHashCode
+    static class ClientRequestBean {
+        @Nullable
+        @QueryValue
+        String queryValue
+        @Nullable
+        @QueryValue
+        List<String> queryValues
+        @Nullable
+        @Header("X-Forwarded-For")
+        String forwardedFor
     }
 
     @Introspected
