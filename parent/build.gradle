@@ -56,6 +56,11 @@ ext.extraPomInfo = {
                     delegate.version '${graal.version}'
                     scope "provided"
                 }
+                delegate.dependency {
+                    groupId "org.graalvm.nativeimage"
+                    artifactId "svm"
+                    scope "provided"
+                }
             }
             delegate.build {
                 delegate.plugins {
