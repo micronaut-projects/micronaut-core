@@ -143,21 +143,17 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
-     * Provide the URI to the annotation processing classes output directory, i.e. the parent of META-INF.
+     * Provide the Path to the annotation processing classes output directory, i.e. the parent of META-INF.
      *
      * <p>This might, for example, be used as a convenience for {@link TypeElementVisitor} classes to provide
      * relative path strings to {@link VisitorContext#addGeneratedResource(String)}</p>
      * <pre>
      * Path resource = ... // absolute path to the resource
-     * Optional<URI> classesOutputURI = visitorContext.getClassesOutputUri();
-     * if (classesOutputURI.isPresent()) {
-     *     // path to resource, relative to classes output
-     *     Path relativePath = classesOutputURI.get().relativize(resource)
-     *     visitorContext.addGeneratedResource(relativePath.toString());
-     * }
+     * visitorContext.getClassesOutputPath().ifPresent(path ->
+     *     visitorContext.addGeneratedResource(path.relativize(resource).toString()));
      * </pre>
      *
-     * @return URI pointing to the classes output directory
+     * @return Path pointing to the classes output directory
      */
     @Experimental
     default Optional<Path> getClassesOutputPath() {

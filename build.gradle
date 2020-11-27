@@ -47,7 +47,11 @@ ext {
                     name: 'micronaut-oraclecloud-bom',
                     version: micronautOracleCloudVersion
             ],
-
+            'micronaut.r2dbc': [
+                    group: 'io.micronaut.r2dbc',
+                    name: 'micronaut-r2dbc-bom',
+                    version: micronautR2DBCVersion
+            ],
             //Third-party
             'netty': [
                     group: 'io.netty',
@@ -88,6 +92,11 @@ ext {
                     group:'com.google.protobuf',
                     name:'protobuf-bom',
                     version:protobufJavaVersion
+            ],
+            'testcontainers':[
+                    group:'org.testcontainers',
+                    name:'testcontainers-bom',
+                    version:testContainersVersion
             ]
     ]
     dependencyVersions = [
@@ -426,12 +435,12 @@ ext {
                     modules: ['swagger-models', 'swagger-annotations']
             ],
             'google.function.framework'                    : [
-                    version: '1.0.1',
+                    version: '1.0.2',
                     group  : 'com.google.cloud.functions',
                     name   : 'functions-framework-api'
             ],
             'google.function.invoker'                    : [
-                    version: '1.0.0-beta1',
+                    version: '1.0.0',
                     group  : 'com.google.cloud.functions.invoker',
                     name   : 'java-function-invoker'
             ],
@@ -505,7 +514,7 @@ ext {
                     version: graalVersion,
                     group  : 'org.graalvm.sdk',
                     name   : 'graal-sdk'
-            ],            
+            ],
             h2                         : [
                     version: h2Version,
                     group  : 'com.h2database',
@@ -621,6 +630,26 @@ ext {
                 name   : 'ignite-core',
                 modules: ['ignite-kubernetes']
             ],
+            'micronaut.mqtt': [
+                version: micronautMQTTVersion,
+                group  : 'io.micronaut.mqtt',
+                modules: ['micronaut-mqtt-core', 'micronaut-mqtt-ssl',  'micronaut-mqttv3',  'micronaut-mqttv5']
+            ],
+            'pahov3': [
+                version: pahov3Version,
+                group  : 'org.eclipse.paho',
+                name   : 'org.eclipse.paho.client.mqttv3'
+            ],
+            'pahov5': [
+                version: pahov5Version,
+                group  : 'org.eclipse.paho',
+                name   : 'org.eclipse.paho.mqttv5.client'
+            ],
+            'lombok': [
+                version: lombokVersion,
+                group  : 'org.projectlombok',
+                name   : 'lombok'
+            ]
     ]
 
     dependencyVersion = { String name ->
@@ -707,6 +736,7 @@ subprojects { Project subproject ->
 
     apply plugin: "io.micronaut.build.common"
     if (!subproject.name.startsWith('test-') &&
+            !subproject.name.startsWith('inject-test-') &&
             !subproject.toString().contains('benchmarks')) {
         apply plugin: "io.micronaut.build.dependency-updates"
         apply plugin: "io.micronaut.build.publishing"
@@ -727,6 +757,10 @@ subprojects { Project subproject ->
         }
     }
 
+    tasks.withType(JavaCompile){
+       options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
+       options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+    }
     tasks.withType(Checkstyle) {
         reports {
             xml.enabled = !System.getenv("GITHUB_ACTIONS")

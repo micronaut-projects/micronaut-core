@@ -1,46 +1,57 @@
-Profiles can include commands for generating common code artifacts. Not all commands are supported by all profiles; the available commands for a given profile can be viewed using the `profile-info` command.
+You can view a full list of available commands using the help flag, like this:
 
 [source,bash]
 ----
-$ mn profile-info service
-Profile: service
-------------------
-The service profile
+$ mn -h
+Usage: mn [-hvVx] [COMMAND]
+Micronaut CLI command line interface for generating projects and services.
+Application generation commands are: # <1>
 
-Provided Commands:
---------------------
-  create-bean              Creates a singleton bean
+*  create-app NAME
+*  create-cli-app NAME
+*  create-function-app NAME
+*  create-grpc-app NAME
+*  create-messaging-app NAME
+
+Options:
+  -h, --help         Show this help message and exit.
+  -v, --verbose      Create verbose output.
+  -V, --version      Print version information and exit.
+  -x, --stacktrace   Show full stack trace when exceptions occur.
+
+Commands: # <2>
+  create-app             Creates an application
+  create-cli-app         Creates a CLI application
+  create-function-app    Creates a Cloud Function
+  create-grpc-app        Creates a gRPC application
+  create-messaging-app   Creates a messaging application
+  create-test            Creates a simple test for the projects testing framework # <3>
+  create-websocket-server  Creates a Websocket server
   create-client            Creates a client interface
   create-controller        Creates a controller and associated test
-  create-job               Creates a job with scheduled method
-  create-test              Creates a simple test for the project's testing framework
-  create-websocket-client  Creates a Websocket client
-  create-websocket-server  Creates a Websocket server
-  help                     Prints help information for a specific command
-
-
-Provided Features:
-------------------
-...
+  create-bean              Creates a singleton bean
 ----
+
+<1> Here you can see the project generation commands lists
+<2> All commands available in the current directory are listed here
+<3> **Note:** the things listed after the project creation commands (always available) will depend on the current directory context
 
 All of the code-generation commands will honor the values written in `micronaut-cli.yml`. For example, assume the following `micronaut-cli.yml` file.
 
 .micronaut-cli.yml
 [source,yaml]
 ----
-profile: service
 defaultPackage: example
 ---
 testFramework: spock
 sourceLanguage: java
 ----
 
-With the above settings, the `create-controller` command will (by default) generate Java controllers with an associated Spock test, under the `example` package. Commands accept arguments and these defaults can be overriden on a per-command basis.
+With the above settings, the `create-bean` command will (by default) generate a Java class with an associated Spock test, under the `example` package. Commands accept arguments and these defaults can be overriden on a per-command basis.
 
-== Base Profile Commands
+== Base Commands
 
-Commands in the base profile are inherited by all other profiles and are always available.
+These commands are always available within the context of a micronaut project.
 
 === Create-Bean
 
@@ -92,9 +103,7 @@ $ mn create-job UpdateFeeds --lang groovy
 | Rendered template Job.groovy to destination src/main/groovy/example/UpdateFeedsJob.groovy
 ----
 
-== Service Profile Commands
-
-The service profile includes commands that are dependent upon the HTTP server and client dependencies (which are not included in the base profile).
+== HTTP-Related Commands
 
 === Create-Controller
 
@@ -198,9 +207,7 @@ $ mn create-websocket-client MyChat
 | Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java
 ----
 
-== CLI Profile Commands
-
-The cli profile lets you generate CLI commands to control your application.
+== CLI Project Commands
 
 === Create-Command
 
@@ -230,3 +237,8 @@ $ mn create-command print
 | Rendered template Command.java to destination src/main/java/example/PrintCommand.java
 | Rendered template CommandTest.java to destination src/test/java/example/PrintCommandTest.java
 ----
+
+This list is just a small subset of all the code generation commands in the Micronaut CLI.
+To see all the context-sensitive commands the CLI has available (and under what circumstances they apply), check out the
+https://github.com/micronaut-projects/micronaut-starter[micronaut-starter] project and find the classes that
+extend `CodeGenCommand`. The `applies` method dictates whether a command is available or not.

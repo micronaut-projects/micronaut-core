@@ -374,6 +374,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                     if (e.getStatus() == HttpStatus.NOT_FOUND) {
                                         if (reactiveValueType == Optional.class) {
                                             future.complete(Optional.empty());
+                                        } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
+                                            future.complete(e.getResponse());
                                         } else {
                                             future.complete(null);
                                         }

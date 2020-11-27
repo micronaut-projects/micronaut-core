@@ -6,7 +6,9 @@ import io.micronaut.context.annotation.ConfigurationInject
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.Creator
 import io.micronaut.core.bind.annotation.Bindable
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
@@ -76,6 +78,28 @@ class Test {
         header.value() == 'test'
     }
 
+    void "test stereotypes are not applied to the mapped from annotation"() {
+        given:
+        def metadata = buildMethodAnnotationMetadata('''
+package test;
+
+@javax.inject.Singleton
+class Test {
+
+    @io.micronaut.inject.annotation.CustomGet
+    void test() {
+    }   
+}
+
+''', 'test')
+
+        expect:
+        metadata != null
+        def annotations = metadata.getAnnotationTypesByStereotype(HttpMethodMapping)
+        annotations.size() == 1
+        annotations[0] == Get
+    }
+
     @Override
     protected List<AnnotationMapper<? extends Annotation>> getLocalAnnotationMappers(@NonNull String annotationName) {
         if (annotationName == CustomCreator.name) {
@@ -88,6 +112,12 @@ class Test {
 
             return [
                     new CustomQueryMapper()
+            ]
+        }
+        if (annotationName == CustomGet.name) {
+
+            return [
+                    new CustomGetMapper()
             ]
         }
         return Collections.emptyList()
@@ -129,6 +159,10 @@ class Test {
 @Retention(RetentionPolicy.RUNTIME)
 @interface CustomHeader {}
 
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+@interface CustomGet {}
+
 class CustomHeaderMapper implements TypedAnnotationMapper<CustomHeader> {
 
     @Override
@@ -141,5 +175,20 @@ class CustomHeaderMapper implements TypedAnnotationMapper<CustomHeader> {
     @Override
     Class<CustomHeader> annotationType() {
         return CustomHeader
+    }
+}
+
+class CustomGetMapper implements TypedAnnotationMapper<CustomGet> {
+
+    @Override
+    List<AnnotationValue<?>> map(AnnotationValue<CustomGet> annotation, VisitorContext visitorContext) {
+        return Collections.singletonList(
+                AnnotationValue.builder(Get).value("/test").build()
+        )
+    }
+
+    @Override
+    Class<CustomGet> annotationType() {
+        return CustomGet
     }
 }

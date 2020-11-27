@@ -542,6 +542,24 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     public abstract void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
 
     /**
+     * Implements a method called "getInterceptedType" for the given type and class writer.
+     * @param interceptedType The intercepted type
+     * @param classWriter The class writer
+     */
+    protected void implementInterceptedTypeMethod(Type interceptedType, ClassWriter classWriter) {
+        GeneratorAdapter getTargetTypeMethod = startPublicMethodZeroArgs(
+                classWriter,
+                Class.class,
+                "getInterceptedType"
+        );
+        getTargetTypeMethod.loadThis();
+        getTargetTypeMethod.push(interceptedType);
+        getTargetTypeMethod.returnValue();
+        getTargetTypeMethod.visitMaxs(1, 1);
+        getTargetTypeMethod.visitEnd();
+    }
+
+    /**
      * Returns the descriptor corresponding to the given class.
      *
      * @param type The type
@@ -1106,9 +1124,10 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param serviceName       The service name
      * @param internalClassName The class name
      * @param superType         The super type
+     * @param interfaces        The interfaces
      */
-    protected void startService(ClassVisitor classWriter, String serviceName, String internalClassName, Type superType) {
-        classWriter.visit(V1_8, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, internalClassName, null, superType.getInternalName(), null);
+    protected void startService(ClassVisitor classWriter, String serviceName, String internalClassName, Type superType, String... interfaces) {
+        classWriter.visit(V1_8, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, internalClassName, null, superType.getInternalName(), interfaces);
         AnnotationVisitor annotationVisitor = classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
         annotationVisitor.visit("service", serviceName);
         annotationVisitor.visitEnd();

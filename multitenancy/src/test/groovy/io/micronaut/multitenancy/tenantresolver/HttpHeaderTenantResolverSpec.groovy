@@ -24,15 +24,16 @@ class HttpHeaderTenantResolverSpec extends Specification {
 
     void "Test not tenant id found"() {
         setup:
-        def request = Mock(HttpRequest)
+        def request = Stub(HttpRequest) {
+            getHeaders() >> new MockHttpHeaders([:])
+        }
 
         when:
         new HttpHeaderTenantResolver(null).resolveTenantIdentifierAtRequest(request)
 
         then:
         def e = thrown(TenantNotFoundException)
-        e.message == "Tenant could not be resolved from HTTP Header: ${HttpHeaderTenantResolverConfiguration.DEFAULT_HEADER_NAME}"
-        1 * request.getHeaders()
+        e.message == "Tenant could not be resolved. Header ${HttpHeaderTenantResolverConfiguration.DEFAULT_HEADER_NAME} value is null"
     }
 
     void "Test HttpHeader value is the tenant id when a request is present"() {
