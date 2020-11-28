@@ -258,7 +258,9 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
      */
     @Internal
     @UsedByGeneratedCode
-    public static Interceptor[] resolveIntroductionInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
+    public static Interceptor[] resolveIntroductionInterceptors(@Nullable BeanContext beanContext,
+                                                                ExecutableMethod<?, ?> method,
+                                                                Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
         Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors, beanContext != null ? beanContext.getClassLoader() : null);
         if (introductionInterceptors.length == 0) {
