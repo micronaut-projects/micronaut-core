@@ -41,7 +41,7 @@ import java.util.function.Predicate;
  */
 @Singleton
 @Requires(beans = RoutesVersioningConfiguration.class)
-public class RouteVersionFilter implements RouteMatchFilter {
+public class RouteVersionFilter implements VersionRouteMatchFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(RouteVersionFilter.class);
 
@@ -54,7 +54,6 @@ public class RouteVersionFilter implements RouteMatchFilter {
      * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
      * @param defaultVersionProvider The Default Version Provider
      */
-    @Inject
     public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
                               @Nullable DefaultVersionProvider defaultVersionProvider) {
         this.resolvingStrategies = resolvingStrategies;

@@ -19,11 +19,15 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.Router;
+import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.filter.FilteredRouter;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+
+import java.util.function.Predicate;
 
 import static io.micronaut.web.router.version.RoutesVersioningConfiguration.PREFIX;
 
@@ -38,16 +42,32 @@ import static io.micronaut.web.router.version.RoutesVersioningConfiguration.PREF
 @Requires(beans = RoutesVersioningConfiguration.class)
 public class VersionAwareRouterListener implements BeanCreatedEventListener<Router> {
 
-    private final RouteVersionFilter routeVersionFilter;
+    private final VersionRouteMatchFilter routeVersionFilter;
+
+    /**
+     * Creates a configuration to decorate existing {@link Router} beans with a {@link FilteredRouter}.
+     *
+     * @param filter A {@link VersionRouteMatchFilter} to delegate routes filtering
+     */
+    @Inject
+    public VersionAwareRouterListener(VersionRouteMatchFilter filter) {
+        this.routeVersionFilter = filter;
+    }
 
     /**
      * Creates a configuration to decorate existing {@link Router} beans with a {@link FilteredRouter}.
      *
      * @param filter A {@link io.micronaut.web.router.filter.RouteMatchFilter} to delegate routes filtering
+     * @deprecated Use {@link VersionAwareRouterListener(VersionRouteMatchFilter)} instead.
      */
-    @Inject
+    @Deprecated
     public VersionAwareRouterListener(RouteVersionFilter filter) {
-        this.routeVersionFilter = filter;
+        this.routeVersionFilter = new VersionRouteMatchFilter() {
+            @Override
+            public <T, R> Predicate<UriRouteMatch<T, R>> filter(HttpRequest<?> request) {
+                return filter.filter(request);
+            }
+        };
     }
 
     /**
