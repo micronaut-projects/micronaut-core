@@ -29,8 +29,6 @@ import io.micronaut.http.annotation.*;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import kotlin.coroutines.Continuation;
-
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -55,7 +53,6 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
      * @param conversionService The conversion service
      * @param binders           The request argument binders
      */
-    @Inject
     protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
                                               List<ClientArgumentRequestBinder> binders) {
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> {

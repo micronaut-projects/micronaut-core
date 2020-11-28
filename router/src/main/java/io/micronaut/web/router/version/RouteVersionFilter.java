@@ -26,7 +26,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
 import java.util.Objects;
@@ -54,7 +53,6 @@ public class RouteVersionFilter implements RouteMatchFilter {
      * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
      * @param defaultVersionProvider The Default Version Provider
      */
-    @Inject
     public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
                               @Nullable DefaultVersionProvider defaultVersionProvider) {
         this.resolvingStrategies = resolvingStrategies;

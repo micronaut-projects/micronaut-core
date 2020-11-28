@@ -38,7 +38,6 @@ import org.reactivestreams.Subscriber;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import javax.inject.Inject;
 import javax.inject.Singleton;
 
 /**
@@ -82,7 +81,6 @@ class RxJava2Instrumentation implements AutoCloseable {
      *
      * @param instrumenterFactory to instrument rx calls
      */
-    @Inject
     public RxJava2Instrumentation(RxInstrumenterFactory instrumenterFactory) {
         this.instrumenterFactory = instrumenterFactory;
     }

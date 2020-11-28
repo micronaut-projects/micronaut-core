@@ -34,7 +34,6 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.time.Duration;
@@ -72,7 +71,6 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      * @param eventPublisher  The event publisher to publish retry events
      * @param executorService The executor service to use for completable futures
      */
-    @Inject
     public DefaultRetryInterceptor(ApplicationEventPublisher eventPublisher, @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
         this.eventPublisher = eventPublisher;
         this.executorService = (ScheduledExecutorService) executorService;

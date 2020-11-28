@@ -56,7 +56,6 @@ public class TracingHystrixConcurrentStrategy extends HystrixConcurrencyStrategy
      * @param tracingInvocationInstrumenterFactory For instrumenting callable
      * @param hystrixConcurrencyStrategy           Different behavior or implementations for concurrency related aspects of the system with default implementations
      */
-    @Inject
     public TracingHystrixConcurrentStrategy(TracingInvocationInstrumenterFactory tracingInvocationInstrumenterFactory,
                                             @Nullable HystrixConcurrencyStrategy hystrixConcurrencyStrategy) {
         this.delegate = hystrixConcurrencyStrategy != null ? hystrixConcurrencyStrategy : HystrixConcurrencyStrategyDefault.getInstance();
