@@ -20,13 +20,11 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.UriRouteMatch;
-import io.micronaut.web.router.filter.RouteMatchFilter;
 import io.micronaut.web.router.version.resolution.RequestVersionResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
 import java.util.Objects;
