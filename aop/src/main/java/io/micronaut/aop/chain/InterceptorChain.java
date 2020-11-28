@@ -242,7 +242,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    public static Interceptor[] resolveAroundInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
+    public static Interceptor[] resolveAroundInterceptors(@Nullable BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
         return resolveInterceptorsInternal(method, Around.class, interceptors, beanContext != null ? beanContext.getClassLoader() : null);
     }
