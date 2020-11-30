@@ -1946,10 +1946,11 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         if (bean != null) {
+            Qualifier finalQualifier = qualifier != null ? qualifier : declaredQualifier;
             if (!BeanCreatedEventListener.class.isInstance(bean) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
                 for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
                     if (entry.getKey().isAssignableFrom(beanType)) {
-                        BeanKey beanKey = new BeanKey(beanDefinition, qualifier);
+                        BeanKey beanKey = new BeanKey(beanDefinition, finalQualifier);
                         for (BeanCreatedEventListener listener : entry.getValue()) {
                             bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
                             if (bean == null) {
@@ -1963,7 +1964,7 @@ public class DefaultBeanContext implements BeanContext {
                 bean = ((ValidatedBeanDefinition<T>) beanDefinition).validate(resolutionContext, bean);
             }
             if (LOG_LIFECYCLE.isDebugEnabled()) {
-                LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, qualifier);
+                LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, finalQualifier);
             }
         }
 
