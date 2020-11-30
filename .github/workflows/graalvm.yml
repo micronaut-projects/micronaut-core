@@ -1,0 +1,42 @@
+name: GraalVM CE CI
+on:
+  push:
+    branches:
+      - master
+      - '[1-9]+.[0-9]+.x'
+  pull_request:
+    branches:
+      - master
+      - '[1-9]+.[0-9]+.x'
+jobs:
+  build:
+    if: github.repository != 'micronaut-projects/micronaut-project-template'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        graalvm: ['20.3.0.java8', '20.3.0.java11']
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2.1.2
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: Setup GraalVM CE
+        uses: DeLaGuardo/setup-graalvm@8bbfe44ef9c6f5c07e5af036a1bffd561c037d18
+        with:
+          graalvm-version: ${{ matrix.graalvm }}
+      - name: Install Native Image
+        run: gu install native-image
+      - name: Build with Gradle
+        run: |
+          if ./gradlew tasks --all | grep -w "testNativeImage"
+          then
+            ./gradlew check testNativeImage --continue --no-daemon
+          else
+            ./gradlew check --continue --no-daemon
+          fi
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: true
+

@@ -96,6 +96,7 @@
         </module>
         <module name="JavadocType"/>
         <module name="JavadocStyle"/>
+        <module name="MissingJavadocType"/>
 
         <!-- Checks for Naming Conventions.                  -->
         <!-- See https://checkstyle.org/config_naming.html -->

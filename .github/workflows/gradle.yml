@@ -40,7 +40,6 @@ jobs:
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
       - name: Publish Test Report
-        if: failure()
         uses: scacap/action-surefire-report@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
