@@ -649,6 +649,11 @@ ext {
                 version: lombokVersion,
                 group  : 'org.projectlombok',
                 name   : 'lombok'
+            ],
+            mockito: [
+                version: mockitoVersion,
+                group  : 'org.mockito',
+                name   : 'mockito-core'
             ]
     ]
 
