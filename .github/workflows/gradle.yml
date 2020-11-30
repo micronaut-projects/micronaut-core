@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['8', '11', '14']
+        java: ['8', '11', '15']
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -40,7 +40,6 @@ jobs:
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
       - name: Publish Test Report
-        if: failure()
         uses: scacap/action-surefire-report@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
