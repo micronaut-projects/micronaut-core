@@ -16,7 +16,7 @@ class SemanticVersionSpec extends Specification {
         SemanticVersion.isAtLeastMajorMinor(version.version, 1, 0)
 
         where:
-        semver << ["1.0.0", "1.0.0.M1", "1.0.0.RC1", "1.0.0.BUILD-SNAPSHOT", "1.0.0-M1", "1.0.0-RC1", "1.0.0-BUILD-SNAPSHOT"]
+        semver << ["1.0.0", "1.0.0.M1", "1.0.0.RC1", "1.0.0.BUILD-SNAPSHOT", "1.0.0-M1", "1.0.0-RC1", "1.0.0-BUILD-SNAPSHOT", "1.0.0-SNAPSHOT"]
     }
 
 }
