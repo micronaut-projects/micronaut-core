@@ -7,17 +7,17 @@ dependencies {
     }
     compileOnly dependencyVersion("validation")
 
-    testImplementation 'com.github.spotbugs:spotbugs-annotations:4.1.2'
+    testImplementation 'com.github.spotbugs:spotbugs-annotations:4.2.0'
     testImplementation project(':aop')
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
     testImplementation dependencyVersion("rxjava2")
-    testImplementation "org.hibernate:hibernate-core:5.4.22.Final"
+    testImplementation "org.hibernate:hibernate-core:5.4.24.Final"
     testImplementation "junit:junit:4.13.1"
     testImplementation "com.google.testing.compile:compile-testing:0.19"
     testImplementation 'org.mongodb:mongo-java-driver:3.12.7'
-    testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'
+    testImplementation 'org.neo4j.driver:neo4j-java-driver:4.2.0'
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     if (!JavaVersion.current().isJava9Compatible()) {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
