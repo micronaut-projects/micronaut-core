@@ -26,6 +26,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.BodyArgumentBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.bind.binders.RequestBeanAnnotationBinder;
 import io.micronaut.web.router.NullArgument;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UnresolvedArgument;
@@ -121,9 +122,11 @@ public class RequestArgumentSatisfier {
                 } else {
                     value = getValueForBlockingBodyArgumentBinder(request, argumentBinder, conversionContext);
                 }
+            } else if (argumentBinder instanceof RequestBeanAnnotationBinder) {
+                // Resolve RequestBean after filters since some field types may depend on filters, i.e. Authentication
+                value = (UnresolvedArgument<?>) () -> argumentBinder.bind(conversionContext, request);
             } else {
-                ArgumentBinder.BindingResult bindingResult = argumentBinder
-                    .bind(conversionContext, request);
+                ArgumentBinder.BindingResult bindingResult = argumentBinder.bind(conversionContext, request);
 
                 if (argument.getType() == Optional.class) {
                     if (bindingResult.isSatisfied() || satisfyOptionals) {
