@@ -194,7 +194,7 @@ class ValidatedSpec extends Specification {
         when:
         HttpResponse<String> response = client.toBlocking().exchange(
                 HttpRequest.POST("/validated/pojo", '{"email":"abc","name":"Micronaut"}')
-                        .contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE),
+                        .contentType(MediaType.APPLICATION_JSON_TYPE),
                 String
         )
 
@@ -206,7 +206,9 @@ class ValidatedSpec extends Specification {
         def result = new JsonSlurper().parseText((String) e.response.getBody().get())
 
         then:
-        result.message == 'pojo.email: Email should be valid'
+        result.message == 'Bad Request'
+        result._embedded.errors.size == 1
+        result._embedded.errors.find { it.message == 'pojo.email: Email should be valid' }
 
         cleanup:
         server.close()
@@ -224,7 +226,7 @@ class ValidatedSpec extends Specification {
         when:
         HttpResponse<String> response = client.toBlocking().exchange(
                 HttpRequest.POST("/validated/pojo", '{"email":"abc"}')
-                        .contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE),
+                        .contentType(MediaType.APPLICATION_JSON_TYPE),
                 String
         )
 
@@ -257,7 +259,7 @@ class ValidatedSpec extends Specification {
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/validated/args", '{"amount":"xxx"}')
-                        .contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE),
+                        .contentType(MediaType.APPLICATION_JSON_TYPE),
                 String
         ))
         flowable.blockingFirst()
@@ -270,7 +272,9 @@ class ValidatedSpec extends Specification {
         def result = new JsonSlurper().parseText((String) e.response.getBody().get())
 
         then:
-        result.message == 'amount: numeric value out of bounds (<3 digits>.<2 digits> expected)'
+        result.message == 'Bad Request'
+        result._embedded.errors.size == 1
+        result._embedded.errors.find { it.message == 'amount: numeric value out of bounds (<3 digits>.<2 digits> expected)' }
 
         cleanup:
         server.close()
@@ -301,7 +305,9 @@ class ValidatedSpec extends Specification {
         Map result = e.response.getBody(Argument.of(Map, String, Object)).get()
 
         then:
-        result.message == 'limit: must be greater than or equal to 1'
+        result.message == 'Bad Request'
+        result._embedded.errors.size == 1
+        result._embedded.errors.find { it.message == 'limit: must be greater than or equal to 1' }
 
         cleanup:
         server.close()
@@ -354,7 +360,9 @@ class ValidatedSpec extends Specification {
         Map result = e.response.getBody(Argument.of(Map, String, Object)).get()
 
         then:
-        result.message == 'limit: must not be null'
+        result.message == 'Bad Request'
+        result._embedded.errors.size == 1
+        result._embedded.errors.find { it.message == 'limit: must not be null' }
 
         cleanup:
         server.close()
@@ -370,8 +378,14 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == 'value: size must be between 2 and 2147483647'
 
+        when:
+        def result = new JsonSlurper().parseText((String) e.response.getBody().get())
+
+        then:
+        result.message == 'Bad Request'
+        result._embedded.errors.size == 1
+        result._embedded.errors.find { it.message == 'value: size must be between 2 and 2147483647' }
 
         cleanup:
         server.close()
@@ -450,7 +464,7 @@ class ValidatedSpec extends Specification {
         when:
         HttpResponse<String> response = client.toBlocking().exchange(
                 HttpRequest.POST("/validated/no-introspection", '{"email":"a@a.com","name":"Micronaut"}')
-                        .contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE),
+                        .contentType(MediaType.APPLICATION_JSON_TYPE),
                 String
         )
 
@@ -462,7 +476,9 @@ class ValidatedSpec extends Specification {
         def result = new JsonSlurper().parseText((String) e.response.getBody().get())
 
         then:
-        result.message == 'pojo: Cannot validate io.micronaut.validation.PojoNoIntrospection. No bean introspection present. Please add @Introspected to the class and ensure Micronaut annotation processing is enabled'
+        result.message == 'Bad Request'
+        result._embedded.errors.size == 1
+        result._embedded.errors.find { it.message == 'pojo: Cannot validate io.micronaut.validation.PojoNoIntrospection. No bean introspection present. Please add @Introspected to the class and ensure Micronaut annotation processing is enabled' }
 
         cleanup:
         server.close()

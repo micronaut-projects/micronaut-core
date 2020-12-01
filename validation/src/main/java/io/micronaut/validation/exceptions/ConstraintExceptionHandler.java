@@ -49,25 +49,30 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
     @Override
     public HttpResponse<JsonError> handle(HttpRequest request, ConstraintViolationException exception) {
         Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
+
+        JsonError error;
+
         if (constraintViolations == null || constraintViolations.isEmpty()) {
-            JsonError error = new JsonError(exception.getMessage() == null ? HttpStatus.BAD_REQUEST.getReason() : exception.getMessage());
-            error.link(Link.SELF, Link.of(request.getUri()));
-            return HttpResponse.badRequest(error);
-        } else if (constraintViolations.size() == 1) {
-            ConstraintViolation<?> violation = constraintViolations.iterator().next();
-            JsonError error = new JsonError(buildMessage(violation));
-            error.link(Link.SELF, Link.of(request.getUri()));
-            return HttpResponse.badRequest(error);
+            if (exception.getMessage() == null) {
+                error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
+            } else {
+                error = new JsonError(exception.getMessage());
+            }
         } else {
-            JsonError error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
+            error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
+
             List<Resource> errors = new ArrayList<>();
+
             for (ConstraintViolation<?> violation : constraintViolations) {
                 errors.add(new JsonError(buildMessage(violation)));
             }
+
             error.embedded("errors", errors);
-            error.link(Link.SELF, Link.of(request.getUri()));
-            return HttpResponse.badRequest(error);
         }
+
+        error.link(Link.SELF, Link.of(request.getUri()));
+
+        return HttpResponse.badRequest(error);
     }
 
     /**
