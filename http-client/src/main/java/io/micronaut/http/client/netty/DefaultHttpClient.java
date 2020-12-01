@@ -1774,10 +1774,11 @@ public class DefaultHttpClient implements
                 permitsBody,
                 poolMap == null
         );
+
         if (log.isDebugEnabled()) {
-            log.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
-            log.debug("Chosen Server: {}({})", requestURI.getHost(), requestURI.getPort());
+            debugRequest(requestURI, nettyRequest);
         }
+
         if (log.isTraceEnabled()) {
             traceRequest(finalRequest, nettyRequest);
         }
@@ -1938,10 +1939,11 @@ public class DefaultHttpClient implements
                 }
             }
         });
+
         if (log.isDebugEnabled()) {
-            log.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
-            log.debug("Chosen Server: {}({})", requestURI.getHost(), requestURI.getPort());
+            debugRequest(requestURI, nettyRequest);
         }
+
         if (log.isTraceEnabled()) {
             traceRequest(requestWrapper.get(), nettyRequest);
         }
@@ -2043,9 +2045,12 @@ public class DefaultHttpClient implements
 
                     try {
                         HttpHeaders headers = fullResponse.headers();
+
+                        if (log.isDebugEnabled()) {
+                            log.debug("Received response {} from {}", status.code(), request.getUri());
+                        }
+
                         if (log.isTraceEnabled()) {
-                            log.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri());
-                            log.trace("Status Code: {}", status);
                             traceHeaders(headers);
                             traceBody("Response", fullResponse.content());
                         }
@@ -2397,6 +2402,12 @@ public class DefaultHttpClient implements
         }
 
         return postRequestEncoder;
+    }
+
+    private void debugRequest(URI requestURI, io.netty.handler.codec.http.HttpRequest nettyRequest) {
+        log.debug("Sending HTTP {} to {}",
+                nettyRequest.method(),
+                requestURI.toString());
     }
 
     private void traceRequest(io.micronaut.http.HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
