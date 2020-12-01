@@ -406,7 +406,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         String requestPath = request.getPath();
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Matching route {} - {}", httpMethod, requestPath);
+            LOG.debug("Request {} {}", httpMethod, request.getUri());
         }
 
         NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) request;
@@ -444,7 +444,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         final String requestMethodName = request.getMethodName();
         if (routeMatch == null) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("No matching route found for URI {} and method {}", request.getUri(), httpMethod);
+                LOG.debug("No matching route: {} {}", httpMethod, request.getUri());
             }
 
             // if there is no route present try to locate a route that matches a different HTTP method
@@ -534,11 +534,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             route = routeMatch;
         }
 
-        if (LOG.isDebugEnabled()) {
+        if (LOG.isTraceEnabled()) {
             if (route instanceof MethodBasedRouteMatch) {
-                LOG.debug("Matched route {} - {} to controller {}", requestMethodName, requestPath, route.getDeclaringType());
+                LOG.trace("Matched route {} - {} to controller {}", requestMethodName, requestPath, route.getDeclaringType());
             } else {
-                LOG.debug("Matched route {} - {}", requestMethodName, requestPath);
+                LOG.trace("Matched route {} - {}", requestMethodName, requestPath);
             }
         }
         // all ok proceed to try and execute the route
@@ -1237,8 +1237,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                 MediaTypeCodec codec = mediaTypeCodecRegistry.findCodec(mediaType, message.getClass()).orElse(
                                                         new TextPlainCodec(serverConfiguration.getDefaultCharset()));
 
-                                                if (LOG.isDebugEnabled()) {
-                                                    LOG.debug("Encoding emitted response object [{}] using codec: {}", message, codec);
+                                                if (LOG.isTraceEnabled()) {
+                                                    LOG.trace("Encoding emitted response object [{}] using codec: {}", message, codec);
                                                 }
                                                 ByteBuffer<ByteBuf> encoded = codec.encode(message, byteBufferFactory);
                                                 httpContent = new DefaultHttpContent(encoded.asNativeBuffer());
@@ -1751,8 +1751,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             } else {
                 context.writeAndFlush(nettyResponse)
                         .addListener(requestCompletor);
-            }
 
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Response {} - {} {}",
+                            nettyResponse.status().code(),
+                            request.getMethodName(),
+                            request.getUri());
+                }
+            }
         }
     }
 
@@ -1872,8 +1878,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
 
         } else {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Encoding emitted response object [{}] using codec: {}", body, codec);
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Encoding emitted response object [{}] using codec: {}", body, codec);
             }
             byteBuf = codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
         }

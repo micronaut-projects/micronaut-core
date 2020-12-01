@@ -25,7 +25,6 @@ import io.micronaut.validation.validator.ExecutableMethodValidator;
 import io.micronaut.validation.validator.ReactiveValidator;
 import io.micronaut.validation.validator.Validator;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
@@ -57,7 +56,6 @@ public class ValidatingInterceptor implements MethodInterceptor<Object, Object> 
      * @param micronautValidator The micronaut validator use if no factory is available
      * @param validatorFactory   Factory returning initialized {@code Validator} instances
      */
-    @Inject
     public ValidatingInterceptor(@Nullable Validator micronautValidator,
                                  @Nullable ValidatorFactory validatorFactory) {
 

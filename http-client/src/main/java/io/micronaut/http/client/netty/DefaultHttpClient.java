@@ -1774,9 +1774,12 @@ public class DefaultHttpClient implements
                 permitsBody,
                 poolMap == null
         );
+
         if (log.isDebugEnabled()) {
             debugRequest(requestURI, nettyRequest);
-        } else if (log.isTraceEnabled()) {
+        }
+
+        if (log.isTraceEnabled()) {
             traceRequest(finalRequest, nettyRequest);
         }
 
@@ -1936,9 +1939,12 @@ public class DefaultHttpClient implements
                 }
             }
         });
+
         if (log.isDebugEnabled()) {
             debugRequest(requestURI, nettyRequest);
-        } else if (log.isTraceEnabled()) {
+        }
+
+        if (log.isTraceEnabled()) {
             traceRequest(requestWrapper.get(), nettyRequest);
         }
 
@@ -2039,11 +2045,12 @@ public class DefaultHttpClient implements
 
                     try {
                         HttpHeaders headers = fullResponse.headers();
+
                         if (log.isDebugEnabled()) {
                             log.debug("Received response {} from {}", status.code(), request.getUri());
-                        } else if (log.isTraceEnabled()) {
-                            log.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri());
-                            log.trace("Status Code: {}", status);
+                        }
+
+                        if (log.isTraceEnabled()) {
                             traceHeaders(headers);
                             traceBody("Response", fullResponse.content());
                         }
