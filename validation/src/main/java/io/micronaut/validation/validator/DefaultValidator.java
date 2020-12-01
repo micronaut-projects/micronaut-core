@@ -57,7 +57,6 @@ import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.*;
 import javax.validation.groups.Default;
@@ -96,7 +95,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
      *
      * @param configuration The validator configuration
      */
-    @Inject
     protected DefaultValidator(
             @NonNull ValidatorConfiguration configuration) {
         ArgumentUtils.requireNonNull("configuration", configuration);

@@ -50,7 +50,6 @@ public class ResourceLoaderFactory {
      *
      * @param environment The environment
      */
-    @Inject
     public ResourceLoaderFactory(Environment environment) {
         this.classLoader = environment.getClassLoader();
     }

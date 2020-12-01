@@ -86,7 +86,6 @@ import org.slf4j.LoggerFactory;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 
-import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.io.File;
@@ -170,7 +169,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param channelOptionFactory                    The channel option factory
      */
     @SuppressWarnings("ParameterNumber")
-    @Inject
     public NettyHttpServer(
             NettyHttpServerConfiguration serverConfiguration,
             ApplicationContext applicationContext,
