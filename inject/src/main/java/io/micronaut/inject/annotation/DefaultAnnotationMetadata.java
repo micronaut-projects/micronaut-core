@@ -1106,6 +1106,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return AnnotationMetadataSupport.getAnnotationType(name);
     }
 
+    @Override
+    public @NonNull
+    Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
+        return AnnotationMetadataSupport.getAnnotationType(name, classLoader);
+    }
+
     @SuppressWarnings("Duplicates")
     @Override
     public @NonNull

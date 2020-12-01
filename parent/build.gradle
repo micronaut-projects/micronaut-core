@@ -42,6 +42,45 @@ ext.extraPomInfo = {
                 'maven.compiler.release'('${release.version}')
             }
         }
+        delegate.profile {
+            id('graalvm')
+            delegate.activation {
+                delegate.file {
+                    exists('${env.JAVA_HOME}/bin/native-image')
+                }
+            }
+            delegate.dependencies {
+                delegate.dependency {
+                    groupId "org.graalvm.sdk"
+                    artifactId "graal-sdk"
+                    delegate.version '${graal.version}'
+                    scope "provided"
+                }
+                delegate.dependency {
+                    groupId "org.graalvm.nativeimage"
+                    artifactId "svm"
+                    scope "provided"
+                }
+            }
+            delegate.build {
+                delegate.plugins {
+                    delegate.plugin {
+                        groupId "org.apache.maven.plugins"
+                        artifactId "maven-compiler-plugin"
+                        delegate.version '${maven-compiler-plugin.version}'
+                        delegate.configuration {
+                            annotationProcessorPaths("combine.children": "append") {
+                                delegate.path {
+                                    groupId "io.micronaut"
+                                    artifactId "micronaut-graal"
+                                    delegate.version '${micronaut.version}'
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     delegate.build {
         delegate.pluginManagement {

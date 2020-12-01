@@ -13,9 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.multitenancy.tenantresolver
+package io.micronaut.http
 
 import spock.lang.Specification
 
-class SubdomainTenantResolverSpec extends Specification {
+import java.nio.charset.Charset
+
+class HttpRequestSpec extends Specification {
+
+    def "HttpRequest.getPath() returns the non-decoded URI path component"() {
+        when:
+        String pathSegment = "?bar"
+        String encodedPathSegment = URLEncoder.encode(pathSegment, Charset.defaultCharset().name())
+        String path = "http://www.example.org/foo/$encodedPathSegment?queryParam=true"
+        HttpRequest request = HttpRequest.GET(path)
+
+        then:
+        request.getPath() == "/foo/%3Fbar"
+    }
+
 }

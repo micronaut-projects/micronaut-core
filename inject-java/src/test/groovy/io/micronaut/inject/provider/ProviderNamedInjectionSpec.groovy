@@ -16,12 +16,12 @@
 package io.micronaut.inject.provider
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.BeanInstantiationException
 import org.atinject.tck.auto.DriversSeat
 import org.atinject.tck.auto.accessories.SpareTire
 import spock.lang.Specification
 
 class ProviderNamedInjectionSpec extends Specification {
-
 
     void "test qualified provider injection"() {
         given:
@@ -31,5 +31,25 @@ class ProviderNamedInjectionSpec extends Specification {
         expect:
         seats.driversSeatProvider.get() instanceof DriversSeat
         seats.spareTireProvider.get() instanceof SpareTire
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test each bean with a nullable provider parameter"() {
+        ApplicationContext ctx = ApplicationContext.run()
+
+        expect:
+        ctx.getBeansOfType(EachBeanProvider).size() == 2
+
+        when:
+        ctx.getBeansOfType(ErrorEachBeanProvider)
+
+        then:
+        def ex = thrown(BeanInstantiationException)
+        ex.message.contains("Missing bean argument value: notABeanProvider")
+
+        cleanup:
+        ctx.close()
     }
 }

@@ -1,158 +1,125 @@
 Micronaut {version} includes the following changes:
 
-=== Core Features
-
-==== Introspections for JDK 14 Records
-
-It is now possible to define <<introspection, bean introspections>> on JDK 14+ record types (note these currently require the `––enable–preview` flag to the compiler and JVM).
-
-==== @Client + Kotlin
-
-@Client interfaces now support suspend methods!
-
-==== Default Environment
-
-Micronaut 2.1 introduces the concept of a default environment. One or more default environments can be set and they will apply if no other environments are explicitly specified or deduced. See the <<environments, environments documentation>> for information on how to use this new feature.
-
-==== @Order Annotation
-
-The ann:core.annotation.Order[] annotation has been added to support supplying bean order for factory methods or for those who prefer the use of annotations over the api:core.order.Ordered[] interface.
-
-==== Kotlin 1.4
-
-Micronaut now ships with Kotlin 1.4 for those users using Kotlin.
-
 === Build Features
 
-==== New Gradle Plugin
+==== Maven Plugin Improvements
 
-A new Gradle plugin is available that provides a more expressive way to define a Micronaut application and includes awesome new features for GraalVM Native Image and Docker. The minimum required build to build a Micronaut application is now:
+The Maven plugin now supports different `<packaging>` types:
 
-.Micronaut Minimal Gradle Build
-[source,groovy]
-----
-plugins {
-     id 'io.micronaut.application' version '{version}'
-}
-repositories {
-    jcenter()
-    mavenCentral()
-}
+* `jar` (default): produces a runnable fat JAR.
+* `native-image`: generates a GraalVM native image.
+* `docker`: builds a Docker image with the application artifacts (compiled classes, resources, dependencies, etc).
+* `docker-native`: builds a Docker image with a GraalVM native image inside.
 
-micronaut {
-    version = "2.1.0" // The Micronaut Version
-    runtime "netty" // Using the Netty runtime
-}
-mainClassName = "example.Application" // Your main class
-----
+To package an application, `mvn package` is the one-stop shop to produce the desired artifact.
 
-Building a Native Image is then as simple as:
+It also supports using `mvn deploy` as the only command required to deploy an application that, depending on the `<packaging>`:
 
-[source,bash]
-----
-$ ./gradlew nativeImage
-----
+* `jar` (default): will deploy the artifact to a remote repository using `org.apache.maven.plugins:maven-deploy-plugin:deploy`.
+* `docker` or `docker-native`: will push the Docker image to the configured Docker registry.
 
-Whilst building a docker image using GraalVM Native Image can be done with:
+Read more information in the https://micronaut-projects.github.io/micronaut-maven-plugin/latest[Maven Plugin documentation].
+
+==== Gradle Plugin Improvements
+
+The Gradle plugin has a new `testNativeImage` task that builds the GraalVM Native Image and uses the native application as an embedded server enabling the ability to write native integration tests.
+
+=== Micronaut Launch Enhancements
+
+==== Support for Kotlin Gradle Builds
+
+It is now possible to create applications that use `build.gradle.kts` instead of `build.gradle` using the `--build` argument of the CLI:
 
 [source,bash]
 ----
-$ ./gradlew dockerBuildNative
-
-# Or to push a native image to a Docker registry
-$ ./gradlew dockerPushNative
+$ mn create-app demo --build gradle_kotlin && cd demo
+$ ./gradlew test
 ----
 
-=== Web Features
+Or via the Micronaut Launch API:
 
-==== Client Binding API
+[source,bash]
+----
+$ curl https://launch.micronaut.io/demo.zip?build=gradle_kotlin -o demo.zip && unzip demo.zip -d demo && cd demo
+$ ./gradlew test
+----
 
-A new API has been created to allow for binding declarative HTTP client method arguments to an HTTP request. See the <<clientParameters, documentation>> for more information.
+==== Push to Github
 
-==== Websocket Improvements
+It is now possible to create an application with and https://micronaut.io/launch/[Micronaut Launch] and have it pushed automatically to a repository in your Github account. When generating an application just select the "Push to Github" option.
 
-Query parameters are now respected and bindable in the Micronaut websocket support.
+=== New Micronaut Modules
 
-==== HttpResponse Improvements
+==== MQTT Support
 
-Cookies in HTTP responses from the client side are now retrievable on the HttpResponse. These are the cookies found in the `Set-Cookie` header.
+Improving the experience in IoT use cases, Micronaut now has integration with MQTT similar to the integration with Kafka and RabbitMQ. See the https://micronaut-projects.github.io/micronaut-mqtt/latest/guide/[Micronaut MQTT documentation] to get started.
 
-=== Cloud Features
+==== Micronaut Data R2DBC
 
-==== Support for Oracle Cloud SDK
+A new module that adds support for R2DBC (Reactive Database Connectivity) has been added in preview status. Micronaut Data R2DBC lets you define reactive data repositories using R2DBC that work with any of the supported drivers and include support for GraalVM Native Image.
 
-A new GraalVM Native Image compatible https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/[module for Oracle Cloud SDK] has been added allowing you to use any part of the Oracle Cloud SDK with Native Image and also enhancing the SDK with RxJava 2 support.
-
-==== Support for Oracle Function
-
-Support has been added for building https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/#functions[Oracle Functions] deployable to Oracle Cloud including the ability to compute the functions in native images using GraalVM.
-
-==== Support for Google Pub/Sub
-
-Thanks to https://github.com/viniciusccarvalho[Vinicius Carvalho] at Google, Micronaut now features dedicated support for https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#pubsub[Google Pub/Sub] for seamless messaging in Google Cloud.
-
-==== Support for Google Cloud Log Format
-
-Thanks to https://github.com/viniciusccarvalho[Vinicius Carvalho] at Google, Micronaut can now https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#logging[output logs in the official JSON format] supported by Stackdriver on Google Cloud
-
-==== Liveness/Readiness Probes
-
-Micronaut's `/health` endpoint now allows you to distinguish liveness and readiness probes at the URIs `/health/liveness` and `/health/readiness`. Micronaut Launch's Kubernetes support has been updated to generate a Kubenetes descriptor that is configured to with these probe endpoints by default.
-
+See the https://micronaut-projects.github.io/micronaut-r2dbc/1.0.x/guide/[Documentation for Micronaut R2DBC] for more information.
 
 === Module Upgrades
 
-- Micronaut AWS `2.1.0`
-- Micronaut Acme `2.0.0`
-- Micronaut Azure `2.0.1`
-- Micronaut Cache `2.1.0`
-- Micronaut Cassandra `3.0.0`
-- Micronaut Data `2.0.0`
-- Micronaut Elasticsearch `2.0.1`
-- Micronaut Flyway `2.1.1`
-- Micronaut GCP `3.2.1`
-- Micronaut GraphQL `2.1.0`
-- Micronaut Groovy `2.1.0`
-- Micronaut gRPC `2.0.5`
-- Micronaut Ignite `1.0.0.RC1`
-- Micronaut Kafka `3.0.0`
-- Micronaut Kotlin `2.1.1`
-- Micronaut Liquibase `2.1.0`
-- Micronaut Micrometer `3.0.1`
-- Micronaut Mongo `DB 3.0.0`
-- Micronaut Neo4j `4.0.0`
-- Micronaut Open `API 2.1.0`
-- Micronaut Oracle `Cloud 1.0.0`
-- Micronaut Picocli `3.0.0`
-- Micronaut RabbitMQ `2.1.0`
-- Micronaut Redis `3.0.0`
-- Micronaut Security `2.1.0`
-- Micronaut Servlet `2.0.0`
-- Micronaut Sql `3.1.0`
-- Micronaut Test `2.1.0`
-- Micronaut Xml `2.0.0`
+- Micronaut Acme `2.1.0`
+- Micronaut Aws `2.2.3`
+- Micronaut Azure `2.1.0`
+- Micronaut Cache `2.2.0`
+- Micronaut Cassandra `3.1.0`
+- Micronaut Data `2.2.0`
+- Micronaut DiscoveryClient `2.2.0`
+- Micronaut ElasticSearch `2.1.0`
+- Micronaut Flyway `3.1.0`
+- Micronaut Gcp `3.3.0`
+- Micronaut GraphQL `2.2.0`
+- Micronaut Groovy `2.2.0`
+- Micronaut gRPC `2.2.0`
+- Micronaut Hibernate Validator `3.0.0`
+- Micronaut Jmx `2.1.0`
+- Micronaut Kafka `3.1.0`
+- Micronaut Kotlin `2.2.0`
+- Micronaut Liquibase `3.0.0`
+- Micronaut MQTT `1.0.0`
+- Micronaut Micrometer `3.1.0`
+- Micronaut Mongo `3.1.0`
+- Micronaut NatsIo `2.2.0`
+- Micronaut Neo4j `4.1.0`
+- Micronaut OpenApi `2.2.0`
+- Micronaut Oracle Cloud `1.1.0`
+- Micronaut Picocli `3.1.0`
+- Micronaut R2DBC `1.0.0.M2`
+- Micronaut RabbitMQ `2.2.0`
+- Micronaut Reactor `1.1.0`
+- Micronaut Redis `3.1.0`
+- Micronaut Rss `2.2.0`
+- Micronaut Rss `2.3.0`
+- Micronaut RxJava3 `1.1.0`
+- Micronaut Security `2.1.4`
+- Micronaut Security `2.2.0`
+- Micronaut Servlet `2.1.1`
+- Micronaut Sql `3.3.1`
+- Micronaut Test `2.2.1`
+- Micronaut Views `2.1.0`
+- Micronaut Xml `2.1.0`
+
 
 === Dependency Upgrades
 
-- Commons Dbcp `2.8.0`
-- Dekorate `1.0.3`
-- Elasticsearch `7.8.1`
-- Flyway `6.5.4`
-- gRPC `1.32.1`
-- Hibernate `5.4.21.Final`
-- Ignite `2.8.1`
-- JUnit `5.7.0`
-- Kotlin `1.4.10`
-- Ktor `1.4.0`
-- Liquibase `3.10.2`
-- MSSQL Driver `8.4.1.jre8`
-- MariaDB Driver `2.6.2`
-- Micrometer `1.5.5`
-- Mongo Driver `4.1.0`
-- Mongo Reactive Driver `4.1.0`
-- Neo4j Driver `4.1.1`
-- Netty `4.1.52.Final`
-- Picocli `4.5.1`
-- Postgres Driver `42.2.16`
-- Redis Lettuce `5.3.4.RELEASE`
-- Tomcat Jdbc `9.0.38`
+- Caffeine `2.8.6`
+- Eclipse Paho v3 `1.2.5`
+- Eclipse Paho v5 `1.2.5`
+- Elasticsearch `7.9.3`
+- Flyway `7.0.4`
+- gRPC `1.33.1`
+- Hibernate `5.4.23.Final`
+- Kafka `2.6.0`
+- Kotlin Coroutines `1.4.1`
+- Ktor `1.4.1`
+- Liquibase `4.2.0`
+- Lombok `1.18.16`
+- Oracle JDBC Driver `19.8.0.0`
+- Picocli `4.5.2`
+- Protobuf `3.14.0`
+- Reactor `3.4.0`
+- Swagger `2.1.5`

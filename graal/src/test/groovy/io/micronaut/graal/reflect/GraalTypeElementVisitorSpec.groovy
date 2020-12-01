@@ -8,7 +8,7 @@ class GraalTypeElementVisitorSpec extends AbstractTypeElementSpec {
     void "test write reflect.json for @Introspected"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -39,7 +39,7 @@ class Test {
     void "test write reflect.json for @Introspected with classes"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -71,7 +71,7 @@ class Bar {}
     void "test write reflect.json for @TypeHint with classes"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -102,7 +102,7 @@ class Bar {}
     void "test write reflect.json for @TypeHint with classes and type names"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -134,7 +134,7 @@ class Bar {}
     void "test write reflect.json for @TypeHint with access type"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -164,7 +164,7 @@ class Bar {}
     void "test write reflect.json for @ReflectiveAccess with access type"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -202,7 +202,7 @@ class Test {
     void "test write reflect.json for @ReflectiveAccess with inheritance"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.HTTPCheck', '''
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.HTTPCheck', '''
 package test;
 
 import io.micronaut.core.annotation.*;

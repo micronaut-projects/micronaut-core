@@ -69,8 +69,10 @@ class EachPropertySpec extends Specification {
         when:
         MyConfiguration bean = applicationContext.getBean(MyConfiguration, Qualifiers.byName("one"))
         MyConfiguration bean2 = applicationContext.getBean(MyConfiguration, Qualifiers.byName("two"))
+        def listener = applicationContext.getBean(MyContextBeanListener)
 
         then:
+        listener.createdNames == ['one', 'two'] as Set
         bean.port == 8080
         bean.anotherPort == 9090
         bean.intList == [1,2,3]

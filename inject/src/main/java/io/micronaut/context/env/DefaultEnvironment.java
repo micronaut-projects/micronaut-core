@@ -653,7 +653,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 }
 
                 if (deduceEnvironments) {
-                    if (Stream.of("org.spockframework", "org.junit", "io.kotlintest").anyMatch(className::startsWith)) {
+                    if (Stream.of("org.spockframework", "org.junit", "io.kotlintest", "io.kotest").anyMatch(className::startsWith)) {
                         environments.add(TEST);
                     }
 
