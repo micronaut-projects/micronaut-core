@@ -23,15 +23,19 @@ import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AnnotationUtils
 import io.micronaut.annotation.processing.GenericUtils
 import io.micronaut.annotation.processing.ModelUtils
+import io.micronaut.annotation.processing.visitor.JavaClassElement
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
+import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.support.Parser
 import spock.lang.Specification
@@ -81,6 +85,43 @@ abstract class AbstractTypeElementSpec extends Specification {
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
         return metadata
+    }
+
+    protected ClassElement buildClassElement(String cls) {
+        List<Element> elements = Parser.parseLines("",
+                cls
+        ).toList()
+        def context = new Context()
+        def env = JavacProcessingEnvironment.instance(context)
+        try {
+            final com.sun.tools.javac.main.JavaCompiler jc = com.sun.tools.javac.main.JavaCompiler.instance(context)
+            jc?.initModules(com.sun.tools.javac.util.List.nil())
+        } catch (e) {
+            // ignore, must be JDK 8
+        }
+        def typeElements = JavacElements.instance(context)
+        ModelUtils modelUtils = new ModelUtils(typeElements, env.typeUtils) {}
+        GenericUtils genericUtils = new GenericUtils(typeElements, env.typeUtils, modelUtils) {}
+        AnnotationUtils annotationUtils = new AnnotationUtils(env, typeElements, env.messager, env.typeUtils, modelUtils, genericUtils, env.filer) {
+        }
+        def element = elements ? elements[0] : null
+        assert element instanceof TypeElement
+        def builder = newJavaAnnotationBuilder()
+        return new JavaClassElement(
+                element,
+                builder.build(element),
+                new JavaVisitorContext(
+                        env,
+                        env.messager,
+                        typeElements,
+                        annotationUtils,
+                        env.typeUtils,
+                        modelUtils,
+                        genericUtils,
+                        env.filer,
+                        new MutableConvertibleValuesMap<Object>()
+                )
+        )
     }
 
     protected TypeElement buildTypeElement(String cls) {

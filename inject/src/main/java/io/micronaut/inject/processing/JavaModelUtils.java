@@ -180,6 +180,15 @@ public class JavaModelUtils {
      * @return True if it is
      */
     public static boolean isRecordOrRecordComponent(Element e) {
-        return isRecord(e) || resolveKind(e, RECORD_COMPONENT_KIND).isPresent();
+        return isRecord(e) || isRecordComponent(e);
+    }
+
+    /**
+     * Return whether this is a component of a record.
+     * @param e The element
+     * @return True if it is
+     */
+    public static boolean isRecordComponent(Element e) {
+        return resolveKind(e, RECORD_COMPONENT_KIND).isPresent();
     }
 }
