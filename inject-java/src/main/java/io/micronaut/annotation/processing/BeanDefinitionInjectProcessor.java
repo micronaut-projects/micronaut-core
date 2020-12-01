@@ -385,6 +385,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         @Override
         public Object visitType(TypeElement classElement, Object o) {
             Name classElementQualifiedName = classElement.getQualifiedName();
+            if ("java.lang.Record".equals(classElementQualifiedName.toString())) {
+                return o;
+            }
             if (visitedTypes.contains(classElementQualifiedName)) {
                 // bail out if already visited
                 return o;
@@ -1909,8 +1912,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         @Override
         public Object visitUnknown(Element e, Object o) {
-            note("Visit unknown %s for %s", e.getSimpleName(), o);
-            return super.visitUnknown(e, o);
+            if (!JavaModelUtils.isRecordOrRecordComponent(e)) {
+                note("Visit unknown %s for %s", e.getSimpleName(), o);
+                return super.visitUnknown(e, o);
+            }
+            return o;
         }
 
         /**
