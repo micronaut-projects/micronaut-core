@@ -1916,7 +1916,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 note("Visit unknown %s for %s", e.getSimpleName(), o);
                 return super.visitUnknown(e, o);
             }
-            return 0;
+            return o;
         }
 
         /**
