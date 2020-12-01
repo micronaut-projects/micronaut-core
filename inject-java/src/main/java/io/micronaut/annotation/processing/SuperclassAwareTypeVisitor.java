@@ -25,7 +25,6 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
 import javax.lang.model.util.Types;
-import java.lang.reflect.AnnotatedType;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -58,7 +57,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
         return visitDeclared(type, p, true);
     }
 
-    public R visitDeclared(DeclaredType type, P p, boolean visitInterfaces) {
+    private R visitDeclared(DeclaredType type, P p, boolean visitInterfaces) {
         final Element element = type.asElement();
 
         if ((JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element)) &&
