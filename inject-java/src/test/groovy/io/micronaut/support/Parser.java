@@ -36,6 +36,8 @@ import com.sun.source.util.Trees;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.util.Context;
 import io.micronaut.annotation.processing.*;
+import io.micronaut.core.util.CollectionUtils;
+import spock.util.environment.Jvm;
 
 import java.io.File;
 import java.io.IOException;
@@ -72,6 +74,7 @@ public final class Parser {
         InMemoryJavaFileManager fileManager =
                 new InMemoryJavaFileManager(
                         compiler.getStandardFileManager(diagnosticCollector, Locale.getDefault(), UTF_8));
+        Set<String> options = getCompilerOptions();
         Context context = new Context();
         JavacTask task =
                 ((JavacTool) compiler)
@@ -79,7 +82,7 @@ public final class Parser {
                                 null, // explicitly use the default because old javac logs some output on stderr
                                 fileManager,
                                 diagnosticCollector,
-                                ImmutableSet.of(),
+                                options,
                                 ImmutableSet.of(),
                                 Arrays.asList(sources),
                                 context);
@@ -97,6 +100,20 @@ public final class Parser {
         }
     }
 
+    private static Set<String> getCompilerOptions() {
+        Set<String> options;
+        if (Jvm.getCurrent().isJava15Compatible()) {
+            options = CollectionUtils.setOf(
+                    "--enable-preview",
+                    "-source",
+                    "15"
+            );
+        } else {
+            options = Collections.emptySet();
+        }
+        return options;
+    }
+
     /**
      * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
      * <b>does not</b> compile the sources.
@@ -109,13 +126,14 @@ public final class Parser {
                 new InMemoryJavaFileManager(
                         standardFileManager);
         Context context = new Context();
+        Set<String> options = getCompilerOptions();
         JavacTask task =
                 ((JavacTool) compiler)
                         .getTask(
                                 null, // explicitly use the default because old javac logs some output on stderr
                                 fileManager,
                                 diagnosticCollector,
-                                ImmutableSet.of(),
+                                options,
                                 ImmutableSet.of(),
                                 Arrays.asList(sources),
                                 context);
