@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.ast.Element;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -88,13 +89,14 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
      * Writes the service entries.
      *
      * @param serviceEntries The service entries
+     * @param originatingElements The originating elements
      */
-    public void writeServiceEntries(Map<String, Set<String>> serviceEntries) {
+    public void writeServiceEntries(Map<String, Set<String>> serviceEntries, Element... originatingElements) {
         for (Map.Entry<String, Set<String>> entry : serviceEntries.entrySet()) {
             String serviceName = entry.getKey();
             Set<String> serviceTypes = entry.getValue();
 
-            Optional<GeneratedFile> serviceFile = visitMetaInfFile("services/" + serviceName);
+            Optional<GeneratedFile> serviceFile = visitMetaInfFile("services/" + serviceName, originatingElements);
             if (serviceFile.isPresent()) {
                 GeneratedFile generatedFile = serviceFile.get();
 

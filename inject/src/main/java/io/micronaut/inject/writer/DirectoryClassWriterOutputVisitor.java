@@ -60,7 +60,7 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
-    public Optional<GeneratedFile> visitMetaInfFile(String path) {
+    public Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements) {
         return Optional.ofNullable(targetDir).map(root ->
             new FileBackedGeneratedFile(
                 new File(root, "META-INF" + File.separator + path)
