@@ -25,7 +25,6 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
 import javax.lang.model.util.Types;
-import java.lang.reflect.AnnotatedType;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
