@@ -24,6 +24,8 @@ import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
+import io.micronaut.jackson.JacksonConfiguration;
+import io.micronaut.validation.validator.DefaultValidatorConfiguration;
 
 import javax.inject.Singleton;
 import javax.validation.ConstraintViolation;
@@ -46,33 +48,63 @@ import java.util.Set;
 @Requires(classes = {ConstraintViolationException.class, ExceptionHandler.class})
 public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintViolationException, HttpResponse<JsonError>> {
 
+    private final JacksonConfiguration jacksonConfiguration;
+
+    public ConstraintExceptionHandler(JacksonConfiguration jacksonConfiguration) {
+        this.jacksonConfiguration = jacksonConfiguration;
+    }
+
+    // @Override
+    // public HttpResponse<JsonError> handle(HttpRequest request, ConstraintViolationException exception) {
+    //     Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
+    //
+    //     JsonError error;
+    //
+    //     if (constraintViolations == null || constraintViolations.isEmpty()) {
+    //         if (exception.getMessage() == null) {
+    //             error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
+    //         } else {
+    //             error = new JsonError(exception.getMessage());
+    //         }
+    //     } else {
+    //         error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
+    //
+    //         List<Resource> errors = new ArrayList<>();
+    //
+    //         for (ConstraintViolation<?> violation : constraintViolations) {
+    //             errors.add(new JsonError(buildMessage(violation)));
+    //         }
+    //
+    //         error.embedded("errors", errors);
+    //     }
+    //
+    //     error.link(Link.SELF, Link.of(request.getUri()));
+    //
+    //     return HttpResponse.badRequest(error);
+    // }
+
     @Override
     public HttpResponse<JsonError> handle(HttpRequest request, ConstraintViolationException exception) {
         Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
-
-        JsonError error;
-
         if (constraintViolations == null || constraintViolations.isEmpty()) {
-            if (exception.getMessage() == null) {
-                error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
-            } else {
-                error = new JsonError(exception.getMessage());
-            }
+            JsonError error = new JsonError(exception.getMessage() == null ? HttpStatus.BAD_REQUEST.getReason() : exception.getMessage());
+            error.link(Link.SELF, Link.of(request.getUri()));
+            return HttpResponse.badRequest(error);
+        } else if (constraintViolations.size() == 1 && !jacksonConfiguration.getHateoas().isAlwaysSerializeErrorsAsList()) {
+            ConstraintViolation<?> violation = constraintViolations.iterator().next();
+            JsonError error = new JsonError(buildMessage(violation));
+            error.link(Link.SELF, Link.of(request.getUri()));
+            return HttpResponse.badRequest(error);
         } else {
-            error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
-
+            JsonError error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
             List<Resource> errors = new ArrayList<>();
-
             for (ConstraintViolation<?> violation : constraintViolations) {
                 errors.add(new JsonError(buildMessage(violation)));
             }
-
             error.embedded("errors", errors);
+            error.link(Link.SELF, Link.of(request.getUri()));
+            return HttpResponse.badRequest(error);
         }
-
-        error.link(Link.SELF, Link.of(request.getUri()));
-
-        return HttpResponse.badRequest(error);
     }
 
     /**
