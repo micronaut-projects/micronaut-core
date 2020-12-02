@@ -54,35 +54,6 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
         this.jacksonConfiguration = jacksonConfiguration;
     }
 
-    // @Override
-    // public HttpResponse<JsonError> handle(HttpRequest request, ConstraintViolationException exception) {
-    //     Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
-    //
-    //     JsonError error;
-    //
-    //     if (constraintViolations == null || constraintViolations.isEmpty()) {
-    //         if (exception.getMessage() == null) {
-    //             error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
-    //         } else {
-    //             error = new JsonError(exception.getMessage());
-    //         }
-    //     } else {
-    //         error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
-    //
-    //         List<Resource> errors = new ArrayList<>();
-    //
-    //         for (ConstraintViolation<?> violation : constraintViolations) {
-    //             errors.add(new JsonError(buildMessage(violation)));
-    //         }
-    //
-    //         error.embedded("errors", errors);
-    //     }
-    //
-    //     error.link(Link.SELF, Link.of(request.getUri()));
-    //
-    //     return HttpResponse.badRequest(error);
-    // }
-
     @Override
     public HttpResponse<JsonError> handle(HttpRequest request, ConstraintViolationException exception) {
         Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
