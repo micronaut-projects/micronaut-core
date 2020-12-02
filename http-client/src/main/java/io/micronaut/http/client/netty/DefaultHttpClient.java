@@ -960,7 +960,15 @@ public class DefaultHttpClient implements
                 }
                 NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
-                return httpContentFlowable.filter(message -> !(message.content() instanceof EmptyByteBuf)).map(contentMapper);
+                return httpContentFlowable
+                        .filter(message -> !(message.content() instanceof EmptyByteBuf))
+                        .map(contentMapper)
+                        .doAfterNext(buffer -> {
+                            ByteBuf byteBuf = (ByteBuf) buffer.asNativeBuffer();
+                            if (byteBuf.refCnt() > 0) {
+                                ReferenceCountUtil.safeRelease(byteBuf);
+                            }
+                        });
             }).doOnTerminate(() -> {
                 final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
                 if (o instanceof Channel) {
