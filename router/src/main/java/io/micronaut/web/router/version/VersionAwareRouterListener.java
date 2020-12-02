@@ -23,8 +23,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.filter.FilteredRouter;
-
-import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import java.util.function.Predicate;
@@ -49,7 +47,6 @@ public class VersionAwareRouterListener implements BeanCreatedEventListener<Rout
      *
      * @param filter A {@link VersionRouteMatchFilter} to delegate routes filtering
      */
-    @Inject
     public VersionAwareRouterListener(VersionRouteMatchFilter filter) {
         this.routeVersionFilter = filter;
     }

@@ -58,7 +58,6 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.Closeable;
 import java.lang.annotation.Annotation;
@@ -106,7 +105,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @param transformers         transformation classes
      * @param binderRegistry       The client binder registry
      */
-    @Inject
     public HttpClientIntroductionAdvice(
             BeanContext beanContext,
             RxHttpClientRegistry clientFactory,
