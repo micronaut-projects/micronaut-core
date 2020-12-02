@@ -25,7 +25,6 @@ import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.jackson.JacksonConfiguration;
-import io.micronaut.validation.validator.DefaultValidatorConfiguration;
 
 import javax.inject.Singleton;
 import javax.validation.ConstraintViolation;
