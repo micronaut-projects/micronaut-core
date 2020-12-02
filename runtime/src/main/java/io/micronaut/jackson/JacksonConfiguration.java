@@ -329,24 +329,6 @@ public class JacksonConfiguration {
         this.hateoas = hateoas;
     }
 
-    @ConfigurationProperties("hateoas")
-    @Requires("jackson.hateoas")
-    public static class Hateoas {
-        /**
-         * If true _embedded.errors will always be an array. When set to false, _embedded.errors will be serialized
-         * as an object for 1 error or serialized as an array for 2 or more errors.
-         */
-        private boolean alwaysSerializeErrorsAsList = false;
-
-        public boolean isAlwaysSerializeErrorsAsList() {
-            return alwaysSerializeErrorsAsList;
-        }
-
-        public void setAlwaysSerializeErrorsAsList(boolean alwaysSerializeErrorsAsList) {
-            this.alwaysSerializeErrorsAsList = alwaysSerializeErrorsAsList;
-        }
-    }
-
     /**
      * Constructors a JavaType for the given argument and type factory.
      * @param type The type
@@ -396,5 +378,23 @@ public class JacksonConfiguration {
             }
         }
         return javaTypes.toArray(new JavaType[0]);
+    }
+
+    @ConfigurationProperties("hateoas")
+    @Requires("jackson.hateoas")
+    public static final class Hateoas {
+        /**
+         * If true _embedded.errors will always be an array. When set to false, _embedded.errors will be serialized
+         * as an object for 1 error or serialized as an array for 2 or more errors.
+         */
+        private boolean alwaysSerializeErrorsAsList = false;
+
+        public boolean isAlwaysSerializeErrorsAsList() {
+            return alwaysSerializeErrorsAsList;
+        }
+
+        public void setAlwaysSerializeErrorsAsList(boolean alwaysSerializeErrorsAsList) {
+            this.alwaysSerializeErrorsAsList = alwaysSerializeErrorsAsList;
+        }
     }
 }
