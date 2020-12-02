@@ -116,14 +116,18 @@ class DataStreamSpec extends Specification {
 
     void "test read response bytebuffer stream"() {
         when:
-        List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(
+        List<byte[]> arrays = []
+        PollingConditions conditions = new PollingConditions(timeout: 2)
+        client.exchangeStream(HttpRequest.GET(
                 '/datastream/books'
-        )).map({res -> res.body.get().toByteArray() }).toList().blockingGet()
+        )).subscribe({res -> arrays.add(res.body.get().toByteArray()) })
 
         then:
-        arrays.size() == 2
-        new String(arrays[0]) == 'The Stand'
-        new String(arrays[1]) == 'The Shining'
+        conditions.eventually {
+            assert arrays.size() == 2
+            assert new String(arrays[0]) == 'The Stand'
+            assert new String(arrays[1]) == 'The Shining'
+        }
     }
 
     @Retry
