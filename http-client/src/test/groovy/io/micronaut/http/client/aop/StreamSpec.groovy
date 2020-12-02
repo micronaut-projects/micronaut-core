@@ -93,7 +93,6 @@ class StreamSpec extends Specification {
         // using blockingForEach for variations sake
         responseFlowable.blockingForEach { ByteBuffer bytes ->
             sum += bytes.toByteArray().count('!')
-            ((ReferenceCounted)bytes).release()
         }
         then:
         sum == n
