@@ -339,8 +339,8 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype, @Nullable ClassLoader classLoader) {
-        return getAnnotationMetadata().getAnnotationTypesByStereotype(stereotype, classLoader != null ? classLoader : getClass().getClassLoader());
+    default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype, @NonNull ClassLoader classLoader) {
+        return getAnnotationMetadata().getAnnotationTypesByStereotype(stereotype, classLoader);
     }
 
     @Override
