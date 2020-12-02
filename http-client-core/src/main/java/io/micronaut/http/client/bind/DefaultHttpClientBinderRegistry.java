@@ -17,6 +17,8 @@ package io.micronaut.http.client.bind;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -118,6 +120,17 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         });
         byAnnotation.put(Body.class, (ClientArgumentRequestBinder<Object>) (context, uriContext, value, request) -> {
             request.body(value);
+        });
+        byAnnotation.put(RequestBean.class, (ClientArgumentRequestBinder<Object>) (context, uriContext, value, request) -> {
+            BeanIntrospection<Object> introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
+            for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
+                findArgumentBinder(beanProperty.asArgument()).ifPresent(binder -> {
+                    Object propertyValue = beanProperty.get(value);
+                    if (propertyValue != null) {
+                        binder.bind(context.with(beanProperty.asArgument()), uriContext, propertyValue, request);
+                    }
+                });
+            }
         });
 
         if (KOTLIN_COROUTINES_SUPPORTED) {
