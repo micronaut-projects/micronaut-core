@@ -851,14 +851,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
                     if (isDeclared) {
                         metadata.addDeclaredStereotype(
-                                parentAnnotations,
+                                Collections.emptyList(),
                                 aliasedAnnotationName,
                                 Collections.singletonMap(aliasedMemberName, v),
                                 retentionPolicy
                         );
                     } else {
                         metadata.addStereotype(
-                                parentAnnotations,
+                                Collections.emptyList(),
                                 aliasedAnnotationName,
                                 Collections.singletonMap(aliasedMemberName, v),
                                 retentionPolicy
@@ -866,7 +866,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     }
 
                     annotationMirror.ifPresent(annMirror -> processAnnotationStereotype(
-                            parentAnnotations,
+                            Collections.singletonList(aliasedAnnotationName),
                             annMirror,
                             aliasedAnnotationName,
                             metadata,
