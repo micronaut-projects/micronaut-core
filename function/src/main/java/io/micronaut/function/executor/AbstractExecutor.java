@@ -40,7 +40,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-class AbstractExecutor<C> implements ApplicationContextProvider, Closeable, AutoCloseable  {
+public class AbstractExecutor<C> implements ApplicationContextProvider, Closeable, AutoCloseable  {
 
     /**
      * The current {@link ApplicationContext}.
