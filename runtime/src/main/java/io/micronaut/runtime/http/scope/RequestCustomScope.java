@@ -15,6 +15,7 @@
  */
 package io.micronaut.runtime.http.scope;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.LifeCycle;
@@ -54,6 +55,7 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
      * The request attribute to store scoped beans in.
      */
     public static final String SCOPED_BEANS_ATTRIBUTE = "io.micronaut.http.SCOPED_BEANS";
+    public static final String SCOPED_BEAN_DEFINITIONS_ATTRIBUTE = "io.micronaut.http.SCOPED_BEAN_DEFINITIONS";
 
     private static final Logger LOG = LoggerFactory.getLogger(RequestCustomScope.class);
 
@@ -82,6 +84,7 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
         }
         HttpRequest<T> httpRequest = currentRequest.get();
         Map scopedBeanMap = getRequestScopedBeans(httpRequest);
+        Map scopedBeanDefinitionMap = getRequestScopedBeanDefinitions(httpRequest);
         T bean = (T) scopedBeanMap.get(identifier);
         if (bean == null) {
             synchronized (this) { // double check
@@ -92,6 +95,7 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
                         ((RequestAware) bean).setRequest(httpRequest);
                     }
                     scopedBeanMap.put(identifier, bean);
+                    scopedBeanDefinitionMap.put(identifier, beanDefinition);
                 }
             }
         }
@@ -100,32 +104,29 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
 
     @Override
     public <T> Optional<T> remove(BeanIdentifier identifier) {
-        return ServerRequestContext.currentRequest()
-                .map(this::getRequestScopedBeans)
-                .flatMap(m -> destroyRequestScopedBean(identifier, m));
+        Optional<HttpRequest<Object>> request = ServerRequestContext.currentRequest();
+        if (request.isPresent()) {
+            T bean = (T) getRequestScopedBeans(request.get()).remove(identifier);
+            BeanDefinition<T> beanDefinition = (BeanDefinition<T>) getRequestScopedBeanDefinitions(request.get()).remove(identifier);
+            destroyRequestScopedBean(bean, beanDefinition);
+            return Optional.ofNullable(bean);
+        } else {
+            return Optional.empty();
+        }
     }
 
-    private <T> Optional<T> destroyRequestScopedBean(BeanIdentifier identifier, Map m) {
-        T bean = (T) m.remove(identifier);
-        if (bean != null) {
-            beanContext.findBeanDefinition(bean.getClass())
-                    .ifPresent(definition -> {
-                                if (definition instanceof DisposableBeanDefinition) {
-                                    try {
-                                        ((DisposableBeanDefinition<T>) definition).dispose(
-                                                beanContext, bean
-                                        );
-                                    } catch (Exception e) {
-                                        if (LOG.isErrorEnabled()) {
-                                            LOG.error("Error disposing of request scoped bean: " + bean, e);
-                                        }
-                                    }
-                                }
-                            }
-
-                    );
+    private <T> void destroyRequestScopedBean(@Nullable T bean, @Nullable BeanDefinition<T> beanDefinition) {
+        if (bean != null && beanDefinition instanceof DisposableBeanDefinition) {
+            try {
+                ((DisposableBeanDefinition<T>) beanDefinition).dispose(
+                        beanContext, bean
+                );
+            } catch (Exception e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Error disposing of request scoped bean: " + bean, e);
+                }
+            }
         }
-        return Optional.ofNullable(bean);
     }
 
     @NonNull
@@ -151,26 +152,37 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
      */
     private void destroyBeans(HttpRequest<?> request) {
         ArgumentUtils.requireNonNull("request", request);
-        Map beans = getRequestScopedBeans(request);
-        if (CollectionUtils.isNotEmpty(beans)) {
-            beans.keySet().forEach(o -> {
-                if (o instanceof BeanIdentifier) {
-                    destroyRequestScopedBean((BeanIdentifier) o, beans);
+        Map<?, ?> beans = getRequestScopedBeans(request);
+        Map<?, ?> beanDefinitions = getRequestScopedBeanDefinitions(request);
+        for (Object key: beans.keySet()) {
+            if (key instanceof BeanIdentifier) {
+                Object bean = beans.remove(key);
+                Object beanDefinition = beanDefinitions.remove(key);
+                if (beanDefinition instanceof BeanDefinition) {
+                    destroyRequestScopedBean(bean, (BeanDefinition<Object>) beanDefinition);
                 }
-            });
+            }
         }
     }
 
-    private synchronized <T> Map getRequestScopedBeans(HttpRequest<T> httpRequest) {
+    private synchronized <T> ConcurrentHashMap<?, ?> getRequestScopedBeans(HttpRequest<T> httpRequest) {
+        return getRequestAttributeMap(httpRequest, SCOPED_BEANS_ATTRIBUTE);
+    }
+
+    private synchronized <T> ConcurrentHashMap<?, ?> getRequestScopedBeanDefinitions(HttpRequest<T> httpRequest) {
+        return getRequestAttributeMap(httpRequest, SCOPED_BEAN_DEFINITIONS_ATTRIBUTE);
+    }
+
+    private synchronized <T> ConcurrentHashMap<?, ?> getRequestAttributeMap(HttpRequest<T> httpRequest, String attribute) {
         MutableConvertibleValues<Object> attrs = httpRequest.getAttributes();
-        return attrs.get(SCOPED_BEANS_ATTRIBUTE, Object.class).flatMap(o -> {
-            if (o instanceof Map) {
-                return Optional.of((Map) o);
+        return attrs.get(attribute, Object.class).flatMap(o -> {
+            if (o instanceof ConcurrentHashMap) {
+                return Optional.of((ConcurrentHashMap) o);
             }
             return Optional.empty();
         }).orElseGet(() -> {
-            Map scopedBeans = new ConcurrentHashMap(5);
-            attrs.put(SCOPED_BEANS_ATTRIBUTE, scopedBeans);
+            ConcurrentHashMap scopedBeans = new ConcurrentHashMap(5);
+            attrs.put(attribute, scopedBeans);
             return scopedBeans;
         });
     }
