@@ -48,13 +48,19 @@ import java.util.Set;
 @Requires(classes = {ConstraintViolationException.class, ExceptionHandler.class})
 public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintViolationException, HttpResponse<JsonError>> {
 
+    private final boolean alwaysSerializeErrorsAsList;
+
+    public ConstraintExceptionHandler() {
+        this.alwaysSerializeErrorsAsList = false;
+    }
+
     @Inject
-    private JacksonConfiguration jacksonConfiguration;
+    public ConstraintExceptionHandler(JacksonConfiguration jacksonConfiguration) {
+        this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
+    }
 
     @Override
     public HttpResponse<JsonError> handle(HttpRequest request, ConstraintViolationException exception) {
-        final boolean alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
-
         Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
         if (constraintViolations == null || constraintViolations.isEmpty()) {
             JsonError error = new JsonError(exception.getMessage() == null ? HttpStatus.BAD_REQUEST.getReason() : exception.getMessage());

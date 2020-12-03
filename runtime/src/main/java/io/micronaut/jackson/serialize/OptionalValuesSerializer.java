@@ -38,8 +38,16 @@ import java.util.Optional;
 @Singleton
 public class OptionalValuesSerializer extends JsonSerializer<OptionalValues<?>> {
 
+    private final boolean alwaysSerializeErrorsAsList;
+
+    public OptionalValuesSerializer() {
+        this.alwaysSerializeErrorsAsList = false;
+    }
+
     @Inject
-    private JacksonConfiguration jacksonConfiguration;
+    public OptionalValuesSerializer(JacksonConfiguration jacksonConfiguration) {
+        this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
+    }
 
     @Override
     public boolean isEmpty(SerializerProvider provider, OptionalValues<?> value) {
@@ -48,8 +56,6 @@ public class OptionalValuesSerializer extends JsonSerializer<OptionalValues<?>> 
 
     @Override
     public void serialize(OptionalValues<?> value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-        final boolean alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
-
         gen.writeStartObject();
 
         for (CharSequence key : value) {
