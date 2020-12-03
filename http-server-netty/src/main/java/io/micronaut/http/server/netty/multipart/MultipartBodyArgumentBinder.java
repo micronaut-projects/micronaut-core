@@ -65,6 +65,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
     }
 
     @Override
+    @Deprecated
     public boolean supportsSuperTypes() {
         return false;
     }

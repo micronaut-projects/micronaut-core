@@ -47,6 +47,7 @@ jobs:
           BRANCH: gh-pages
           FOLDER: build/docs
           VERSION: ${{ steps.release_version.outputs.release_version }}
+          TARGET_REPOSITORY: ${{ env.docsRepository }}
       - name: Checkout micronaut-core
         uses: actions/checkout@v2
         with:

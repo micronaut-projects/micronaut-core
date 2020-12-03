@@ -29,9 +29,15 @@ import java.util.function.Consumer;
  * Stores data about a compile time element. The underlying object can be a class, field, or method.
  *
  * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
 public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
+    /**
+     * An empty array of elements.
+     * @since 2.1.1
+     */
+    Element[] EMPTY_ELEMENT_ARRAY = new Element[0];
 
     /**
      * @return The name of the element.

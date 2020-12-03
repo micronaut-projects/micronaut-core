@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ClassGenerationException;
 import io.micronaut.inject.writer.GeneratedFile;
@@ -32,9 +33,7 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.net.URI;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * An implementation of {@link io.micronaut.inject.writer.ClassWriterOutputVisitor} for annotation processing.
@@ -53,31 +52,52 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
      * @param filer The {@link Filer} for creating new files
      */
     public AnnotationProcessingOutputVisitor(Filer filer) {
+        super(isEclipseFiler(filer));
         this.filer = filer;
+    }
+
+    private static boolean isEclipseFiler(Filer filer) {
+        return filer.getClass().getTypeName().startsWith("org.eclipse.jdt");
     }
 
     @Override
     public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
-        JavaFileObject javaFileObject;
-        if (originatingElement != null) {
-            Object nativeType = originatingElement.getNativeType();
-            if (nativeType instanceof Element) {
-                javaFileObject = filer.createClassFile(classname, (Element) nativeType);
-            } else {
-                javaFileObject = filer.createClassFile(classname);
-            }
-        } else {
-            javaFileObject = filer.createClassFile(classname);
-        }
-        return javaFileObject.openOutputStream();
-
+        return visitClass(classname, new io.micronaut.inject.ast.Element[]{originatingElement});
     }
 
     @Override
+    public OutputStream visitClass(String classname, io.micronaut.inject.ast.Element... originatingElements) throws IOException {
+        JavaFileObject javaFileObject;
+        Element[] nativeOriginatingElements;
+        if (ArrayUtils.isNotEmpty(originatingElements)) {
+            List<Element> list = new ArrayList<>(originatingElements.length);
+            for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
+                Object nativeType = originatingElement.getNativeType();
+                if (nativeType instanceof Element) {
+                    list.add((Element) nativeType);
+                }
+            }
+            nativeOriginatingElements = list.toArray(new Element[0]);
+        } else {
+            nativeOriginatingElements = new Element[0];
+        }
+        javaFileObject = filer.createClassFile(classname, nativeOriginatingElements);
+        return javaFileObject.openOutputStream();
+    }
+
+    @Override
+    @Deprecated
     public Optional<GeneratedFile> visitMetaInfFile(String path) {
+        return visitMetaInfFile(path, io.micronaut.inject.ast.Element.EMPTY_ELEMENT_ARRAY);
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitMetaInfFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
         return metaInfFiles.computeIfAbsent(path, s -> {
             String finalPath = "META-INF/" + path;
-            return Optional.of(new GeneratedFileObject(finalPath));
+            Element[] nativeOriginatingElements = Arrays.stream(originatingElements)
+                    .map(e -> (Element) e.getNativeType()).toArray(Element[]::new);
+            return Optional.of(new GeneratedFileObject(finalPath, nativeOriginatingElements));
         });
     }
 
@@ -93,24 +113,29 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
         private final String path;
         private final StandardLocation classOutput;
+        private final Element[] originatingElements;
         private FileObject inputObject;
         private FileObject outputObject;
 
         /**
-         * @param path The path for the generated file
+         * @param path                The path for the generated file
+         * @param originatingElements the originating elements
          */
-        GeneratedFileObject(String path) {
+        GeneratedFileObject(String path, Element... originatingElements) {
             this.path = path;
-            classOutput = StandardLocation.CLASS_OUTPUT;
+            this.classOutput = StandardLocation.CLASS_OUTPUT;
+            this.originatingElements = originatingElements;
         }
 
         /**
-         * @param path The path for the generated file
-         * @param location The location
+         * @param path                The path for the generated file
+         * @param location            The location
+         * @param originatingElements The originating elements
          */
-        GeneratedFileObject(String path, StandardLocation location) {
+        GeneratedFileObject(String path, StandardLocation location, Element... originatingElements) {
             this.path = path;
             this.classOutput = location;
+            this.originatingElements = originatingElements;
         }
 
         @Override
@@ -177,7 +202,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
         private FileObject getOutputObject() throws IOException {
             if (outputObject == null) {
-                outputObject = filer.createResource(classOutput, "", path);
+                outputObject = filer.createResource(classOutput, "", path, originatingElements);
             }
             return outputObject;
         }

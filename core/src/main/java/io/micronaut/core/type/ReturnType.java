@@ -129,10 +129,11 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
         if (javaReturnType == void.class) {
             return true;
         } else {
+            if (isCompletable()) {
+                return true;
+            }
             if (isReactive() || isAsync()) {
-                return isCompletable() ||
-                        getFirstTypeVariable()
-                                .filter(arg -> arg.getType() == Void.class).isPresent();
+                return getFirstTypeVariable().filter(arg -> arg.getType() == Void.class).isPresent();
             }
         }
         return false;

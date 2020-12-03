@@ -1,5 +1,6 @@
 package io.micronaut.inject.visitor.beans
 
+import com.blazebit.persistence.impl.function.entity.ValuesEntity
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
@@ -30,11 +31,129 @@ import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
+import javax.validation.Constraint
+import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+    @IgnoreIf({ !jvm.isJava14Compatible() })
+    void "test bean introspection on a Java 14+ record"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
 
+import io.micronaut.core.annotation.Creator;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(@javax.validation.constraints.NotBlank String name){
+}
+''')
+        when:
+        def test = introspection.instantiate("test")
+        def property = introspection.getRequiredProperty("name", String)
+        def argument = introspection.getConstructorArguments()[0]
+
+        then:
+        argument.name == 'name'
+        argument.getAnnotationMetadata().hasAnnotation(NotBlank)
+        test.name == 'test'
+        test.name() == 'test'
+        introspection.propertyNames.length == 1
+        introspection.propertyNames == ['name'] as String[]
+        property.hasAnnotation(NotBlank)
+        property.isReadOnly()
+        property.name == 'name'
+        property.get(test) == 'test'
+    }
+
+    void "test create bean introspection for external inner class"() {
+        given:
+        ApplicationContext applicationContext = buildContext('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+import io.micronaut.inject.visitor.beans.*;
+
+@Introspected(classes=OuterBean.InnerBean.class)
+class Test {}
+''')
+
+        when:"the reference is loaded"
+        def clazz = applicationContext.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getBeanType() == OuterBean.InnerBean.class
+
+        when:
+        BeanIntrospection i = reference.load()
+
+        then:
+        i.propertyNames.length == 1
+        i.propertyNames[0] == 'name'
+
+        when:
+        def o = i.instantiate()
+
+        then:
+        def e = thrown(InstantiationException)
+        e.message == 'No default constructor exists'
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test create bean introspection for external inner interface"() {
+        given:
+        ApplicationContext applicationContext = buildContext('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+import io.micronaut.inject.visitor.beans.*;
+
+@Introspected(classes=OuterBean.InnerInterface.class)
+class Test {}
+''')
+
+        when:"the reference is loaded"
+        def clazz = applicationContext.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getBeanType() == OuterBean.InnerInterface.class
+
+        when:
+        BeanIntrospection i = reference.load()
+
+        then:
+        i.propertyNames.length == 1
+        i.propertyNames[0] == 'name'
+
+        when:
+        def o = i.instantiate()
+
+        then:
+        def e = thrown(InstantiationException)
+        e.message == 'No default constructor exists'
+
+        cleanup:
+        applicationContext.close()
+    }
+    void "test introspection class member configuration works 2"() {
+        when:
+            BeanIntrospection introspection = BeanIntrospection.getIntrospection(ValuesEntity)
+
+        then:
+            noExceptionThrown()
+            introspection != null
+    }
 
     void "test bean introspection with property of generic interface"() {
         given:
@@ -56,8 +175,42 @@ interface GenBase<T> {
         def test = introspection.instantiate()
 
         then:
+        introspection.beanProperties.first().type == String
         introspection.getRequiredProperty("name", String)
                 .get(test) == 'test'
+    }
+
+    void "test bean introspection with property of generic superclass"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Foo extends GenBase<String> {
+    public String getName() {
+        return "test";
+    }
+}
+
+abstract class GenBase<T> {
+    abstract T getName();
+    
+    public T getOther() {
+        return (T) "other";
+    }
+}
+''')
+        when:
+        def test = introspection.instantiate()
+
+        def beanProperties = introspection.beanProperties.toList()
+        then:
+        beanProperties[0].type == String
+        beanProperties[1].type == String
+        introspection.getRequiredProperty("name", String)
+                .get(test) == 'test'
+        introspection.getRequiredProperty("other", String)
+                .get(test) == 'other'
     }
 
     void "test bean introspection with argument of generic interface"() {
@@ -116,6 +269,34 @@ interface Foo {
         def test = introspection.instantiate("test")
 
         then:
+        introspection.constructorArguments.length == 1
+        introspection.getRequiredProperty("name", String)
+                .get(test) == 'test'
+    }
+
+    void "test bean introspection with property with static creator method on interface with generic type arguments"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+
+@io.micronaut.core.annotation.Introspected
+interface Foo<T> {
+    String getName();
+    
+    @Creator
+    static <T1> Foo<T1> create(String name) {
+        return () -> name;
+    }
+}
+
+''')
+        when:
+        def test = introspection.instantiate("test")
+
+        then:
+        introspection.constructorArguments.length == 1
         introspection.getRequiredProperty("name", String)
                 .get(test) == 'test'
     }
@@ -1911,6 +2092,37 @@ class Test {
 
         then:
         property.get(instance) == threeDimensions
+    }
+
+    void "test superclass methods are read before interface methods"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import javax.validation.constraints.NotNull;
+
+interface IEmail {
+String getEmail();
+}
+@Introspected
+class SuperClass implements IEmail {
+    @NotNull
+    public String getEmail() {
+        return null;
+    }
+}
+@Introspected
+class SubClass extends SuperClass {
+}
+@Introspected
+class Test extends SuperClass implements IEmail {
+}
+
+''')
+        expect:
+        introspection != null
+        introspection.getProperty("email").isPresent()
+        introspection.getIndexedProperties(Constraint).size() == 1
     }
 
 

@@ -1,0 +1,7 @@
+dependencies {
+    api dependencyModuleVersion("groovy", "groovy")
+    api(dependencyVersion("spock")) {
+        exclude module:'groovy-all'
+    }
+    api project(":inject")
+}

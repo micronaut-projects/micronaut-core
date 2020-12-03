@@ -15,19 +15,16 @@
  */
 package io.micronaut.validation;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.aop.InterceptPhase;
+import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.validation.validator.ExecutableMethodValidator;
 import io.micronaut.validation.validator.ReactiveValidator;
 import io.micronaut.validation.validator.Validator;
-import org.reactivestreams.Publisher;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
@@ -35,7 +32,6 @@ import javax.validation.ValidatorFactory;
 import javax.validation.executable.ExecutableValidator;
 import java.lang.reflect.Method;
 import java.util.Set;
-import java.util.concurrent.CompletionStage;
 
 /**
  * A {@link MethodInterceptor} that validates method invocations.
@@ -44,7 +40,7 @@ import java.util.concurrent.CompletionStage;
  * @since 1.0
  */
 @Singleton
-public class ValidatingInterceptor implements MethodInterceptor {
+public class ValidatingInterceptor implements MethodInterceptor<Object, Object> {
 
     /**
      * The position of the interceptor. See {@link io.micronaut.core.order.Ordered}
@@ -60,7 +56,6 @@ public class ValidatingInterceptor implements MethodInterceptor {
      * @param micronautValidator The micronaut validator use if no factory is available
      * @param validatorFactory   Factory returning initialized {@code Validator} instances
      */
-    @Inject
     public ValidatingInterceptor(@Nullable Validator micronautValidator,
                                  @Nullable ValidatorFactory validatorFactory) {
 
@@ -88,79 +83,87 @@ public class ValidatingInterceptor implements MethodInterceptor {
     }
 
     @Override
-    public Object intercept(MethodInvocationContext context) {
-        final boolean isValidatorBeanNull = executableValidator == null;
-        if (isValidatorBeanNull && micronautValidator == null) {
-            return context.proceed();
-        }
-        final Object target = context.getTarget();
-        if (isValidatorBeanNull) {
-            final ExecutableMethod executableMethod = context.getExecutableMethod();
-            @SuppressWarnings("unchecked")
-            Set<ConstraintViolation<Object>> constraintViolations = this.micronautValidator.validateParameters(
-                    target,
-                    executableMethod,
-                    context.getParameterValues());
-            final boolean supportsReactive = micronautValidator instanceof ReactiveValidator;
-            if (constraintViolations.isEmpty()) {
-                final Object result = context.proceed();
-                if (context.hasStereotype(Validator.ANN_VALID) || context.hasStereotype(Validator.ANN_CONSTRAINT)) {
-                    final boolean hasResult = result != null;
-                    if (supportsReactive && hasResult && Publishers.isConvertibleToPublisher(result)) {
-                        ReactiveValidator reactiveValidator = (ReactiveValidator) micronautValidator;
-                        final Publisher newPublisher = reactiveValidator.validatePublisher(
-                                Publishers.convertPublisher(result, Publisher.class)
-                        );
-                        return Publishers.convertPublisher(newPublisher, executableMethod.getReturnType().getType());
-                    } else if (supportsReactive && result instanceof CompletionStage) {
-                        return ((ReactiveValidator) micronautValidator).validateCompletionStage(((CompletionStage) result));
-                    } else {
-                        constraintViolations = this.micronautValidator.validateReturnValue(target, executableMethod, result);
-                        if (!constraintViolations.isEmpty()) {
-                            throw new ConstraintViolationException(constraintViolations);
-                        }
-                    }
-                }
-                return result;
-            } else {
-                throw new ConstraintViolationException(constraintViolations);
-            }
-        } else {
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        if (executableValidator != null) {
             Method targetMethod = context.getTargetMethod();
-            if (targetMethod.getParameterTypes().length == 0) {
-                final Object result = context.proceed();
-                return validateReturnValue(executableValidator, context, target, targetMethod, result);
-            } else {
+            if (targetMethod.getParameterTypes().length != 0) {
                 Set<ConstraintViolation<Object>> constraintViolations = executableValidator
                         .validateParameters(
-                                target,
+                                context.getTarget(),
                                 targetMethod,
                                 context.getParameterValues()
                         );
-                if (constraintViolations.isEmpty()) {
-                    final Object result = context.proceed();
-                    return validateReturnValue(executableValidator, context, target, targetMethod, result);
-                } else {
+                if (!constraintViolations.isEmpty()) {
                     throw new ConstraintViolationException(constraintViolations);
                 }
             }
-
+            return validateReturnExecutableValidator(context, targetMethod);
+        } else if (micronautValidator != null) {
+            ExecutableMethod<Object, Object> executableMethod = context.getExecutableMethod();
+            if (executableMethod.getArguments().length != 0) {
+                Set<ConstraintViolation<Object>> constraintViolations = micronautValidator.validateParameters(
+                        context.getTarget(),
+                        executableMethod,
+                        context.getParameterValues());
+                if (!constraintViolations.isEmpty()) {
+                    throw new ConstraintViolationException(constraintViolations);
+                }
+            }
+            if (hasValidationAnnotation(context)) {
+                if (micronautValidator instanceof ReactiveValidator) {
+                    InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+                    try {
+                        switch (interceptedMethod.resultType()) {
+                            case PUBLISHER:
+                                return interceptedMethod.handleResult(
+                                        ((ReactiveValidator) micronautValidator).validatePublisher(interceptedMethod.interceptResultAsPublisher())
+                                );
+                            case COMPLETION_STAGE:
+                                return interceptedMethod.handleResult(
+                                        ((ReactiveValidator) micronautValidator).validateCompletionStage(interceptedMethod.interceptResultAsCompletionStage())
+                                );
+                            case SYNCHRONOUS:
+                                return validateReturnMicronautValidator(context, executableMethod);
+                            default:
+                                return interceptedMethod.unsupported();
+                        }
+                    } catch (Exception e) {
+                        return interceptedMethod.handleException(e);
+                    }
+                } else {
+                    return validateReturnMicronautValidator(context, executableMethod);
+                }
+            }
+            return context.proceed();
         }
+        return context.proceed();
     }
 
-    private Object validateReturnValue(@NonNull ExecutableValidator validator, MethodInvocationContext context, Object target, Method targetMethod, Object result) {
-        Set<ConstraintViolation<Object>> constraintViolations;
-        if (context.hasStereotype(Validator.ANN_VALID)) {
-            constraintViolations = validator.validateReturnValue(
-                    target,
+    private Object validateReturnMicronautValidator(MethodInvocationContext<Object, Object> context, ExecutableMethod<Object, Object> executableMethod) {
+        Object result = context.proceed();
+        Set<ConstraintViolation<Object>> constraintViolations = micronautValidator.validateReturnValue(context.getTarget(), executableMethod, result);
+        if (!constraintViolations.isEmpty()) {
+            throw new ConstraintViolationException(constraintViolations);
+        }
+        return result;
+    }
+
+    private Object validateReturnExecutableValidator(MethodInvocationContext<Object, Object> context, Method targetMethod) {
+        final Object result = context.proceed();
+        if (hasValidationAnnotation(context)) {
+            Set<ConstraintViolation<Object>> constraintViolations = executableValidator.validateReturnValue(
+                    context.getTarget(),
                     targetMethod,
                     result
             );
-
             if (!constraintViolations.isEmpty()) {
                 throw new ConstraintViolationException(constraintViolations);
             }
         }
         return result;
+    }
+
+    private boolean hasValidationAnnotation(MethodInvocationContext<Object, Object> context) {
+        return context.hasStereotype(Validator.ANN_VALID) || context.hasStereotype(Validator.ANN_CONSTRAINT);
     }
 }

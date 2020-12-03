@@ -23,7 +23,6 @@ import io.micronaut.core.naming.conventions.PropertyConvention;
 import io.micronaut.inject.BeanDefinition;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import javax.inject.Inject;
 import javax.inject.Singleton;
 
 /**
@@ -46,7 +45,6 @@ public class ConfigurableUriNamingStrategy extends HyphenatedUriNamingStrategy {
      *
      * @param contextPath the "micronaut.server.context-path" property value
      */
-    @Inject
     public ConfigurableUriNamingStrategy(@Value("${micronaut.server.context-path}") String contextPath) {
         this.contextPath = normalizeContextPath(contextPath);
     }

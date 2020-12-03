@@ -187,7 +187,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             roundEnv.getRootElements()
                     .stream()
-                    .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))
+                    .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
                     .filter(element -> element.getAnnotation(Generated.class) == null)
                     .map(modelUtils::classElementFor)
                     .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
@@ -206,6 +206,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             }
         }
 
+        if (roundEnv.processingOver()) {
+            javaVisitorContext.finish();
+        }
         return false;
     }
 
@@ -265,6 +268,12 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         ElementVisitor(TypeElement concreteClass, List<LoadedVisitor> visitors) {
             this.concreteClass = concreteClass;
             this.visitors = visitors;
+        }
+
+        @Override
+        public Object visitUnknown(Element e, Object o) {
+            // ignore
+            return o;
         }
 
         @Override

@@ -80,7 +80,7 @@ public class ModelUtils {
      * @return The {@link TypeElement}
      */
     @Nullable public final TypeElement classElementFor(Element element) {
-        while (element != null && !(JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))) {
+        while (element != null && !(JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isRecord(element) || JavaModelUtils.isEnum(element))) {
             element = element.getEnclosingElement();
         }
         if (element instanceof  TypeElement) {
@@ -316,7 +316,7 @@ public class ModelUtils {
                 .stream()
                 .filter(method -> method.getModifiers().contains(STATIC))
                 .filter(method -> !method.getModifiers().contains(PRIVATE))
-                .filter(method -> method.getReturnType().equals(classElement.asType()))
+                .filter(method -> typeUtils.isAssignable(typeUtils.erasure(method.getReturnType()), classElement.asType()))
                 .filter(method -> {
                     final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
                     return annotationMetadata.hasStereotype(Creator.class);

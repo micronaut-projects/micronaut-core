@@ -18,42 +18,47 @@ package io.micronaut.runtime.context.env;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.value.PropertyNotFoundException;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
  * Internal introduction advice used to allow {@link io.micronaut.context.annotation.ConfigurationProperties} on interfaces. Considered internal and not for direct use.
  *
  * @author graemerocher
- * @since 1.3.0
  * @see ConfigurationAdvice
  * @see io.micronaut.context.annotation.ConfigurationProperties
+ * @since 1.3.0
  */
-@Singleton
+@Prototype
 @Internal
 public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object, Object> {
     private static final String MEMBER_BEAN = "bean";
     private static final String MEMBER_NAME = "name";
     private final Environment environment;
     private final BeanContext beanContext;
+    private final String name;
 
     /**
      * Default constructor.
+     *
+     * @param qualifier   The qualifier
      * @param environment The environment
-     * @param beanContext  The bean locator
+     * @param beanContext The bean locator
      */
-    ConfigurationIntroductionAdvice(Environment environment, BeanContext beanContext) {
+    ConfigurationIntroductionAdvice(Qualifier<?> qualifier, Environment environment, BeanContext beanContext) {
         this.environment = environment;
         this.beanContext = beanContext;
+        this.name = qualifier instanceof Named ? ((Named) qualifier).getName() : null;
     }
 
     @Override
@@ -81,9 +86,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
             }
             boolean iterable = property.indexOf('*') > -1;
             if (iterable) {
-                final BeanRegistration<Object> registration = beanContext.findBeanRegistration(context.getTarget()).orElse(null);
-                if (registration != null) {
-                    final String name = registration.getIdentifier().getName();
+                if (name != null) {
                     property = property.replace("*", name);
                 }
             }

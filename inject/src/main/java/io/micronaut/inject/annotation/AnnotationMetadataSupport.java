@@ -103,12 +103,23 @@ class AnnotationMetadataSupport {
      * @return The annotation
      */
     static Optional<Class<? extends Annotation>> getAnnotationType(String name) {
+        return getAnnotationType(name, AnnotationMetadataSupport.class.getClassLoader());
+    }
+
+    /**
+     * Gets a registered annotation type.
+     *
+     * @param name The name of the annotation type
+     * @param classLoader The classloader to retrieve the type
+     * @return The annotation
+     */
+    static Optional<Class<? extends Annotation>> getAnnotationType(String name, ClassLoader classLoader) {
         final Class<? extends Annotation> type = ANNOTATION_TYPES.get(name);
         if (type != null) {
             return Optional.of(type);
         } else {
             // last resort, try dynamic load, shouldn't normally happen.
-            final Optional<Class> aClass = ClassUtils.forName(name, AnnotationMetadataSupport.class.getClassLoader());
+            final Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
                 if (Annotation.class.isAssignableFrom(aClass1)) {
                     //noinspection unchecked

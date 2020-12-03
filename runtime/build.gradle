@@ -26,10 +26,11 @@ dependencies {
         transitive = false
     }
 
-    compileOnly 'org.glassfish:javax.el:3.0.1-b11'
+    compileOnly "org.apache.logging.log4j:log4j-core:2.12.1"
+    compileOnly 'org.glassfish:javax.el:3.0.1-b12'
     compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.9-native-mt'
-    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.3.9-native-mt'
+    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion"
+    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$kotlinCoroutinesVersion"
     compileOnly "ch.qos.logback:logback-classic:1.2.3"
     testImplementation "ch.qos.logback:logback-classic:1.2.3"
 

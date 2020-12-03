@@ -50,6 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -111,10 +112,20 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         super(configuration.getConversionService());
         this.configuration = configuration;
         Set<String> environments = new LinkedHashSet<>(3);
-        List<String> specifiedNames = configuration.getEnvironments();
+        List<String> specifiedNames = new ArrayList<>(configuration.getEnvironments());
+
+        specifiedNames.addAll(0, Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
+                System.getenv(ENVIRONMENTS_ENV))
+                .filter(StringUtils::isNotEmpty)
+                .flatMap(s -> Arrays.stream(s.split(",")))
+                .map(String::trim)
+                .collect(Collectors.toList()));
 
         this.deduceEnvironments = configuration.getDeduceEnvironments().orElse(null);
         EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
+        if (environmentsAndPackage.enviroments.isEmpty() && specifiedNames.isEmpty()) {
+            specifiedNames = configuration.getDefaultEnvironments();
+        }
         environments.addAll(environmentsAndPackage.enviroments);
         String aPackage = environmentsAndPackage.aPackage;
         if (aPackage != null) {
@@ -642,7 +653,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 }
 
                 if (deduceEnvironments) {
-                    if (Stream.of("org.spockframework", "org.junit", "io.kotlintest").anyMatch(className::startsWith)) {
+                    if (Stream.of("org.spockframework", "org.junit", "io.kotlintest", "io.kotest").anyMatch(className::startsWith)) {
                         environments.add(TEST);
                     }
 
@@ -730,13 +741,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 environments.add(Environment.CLOUD);
             }
         }
-
-        Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
-            System.getenv(ENVIRONMENTS_ENV))
-            .filter(StringUtils::isNotEmpty)
-            .flatMap(s -> Arrays.stream(s.split(",")))
-            .map(String::trim)
-            .forEach(environments::add);
 
         return environmentsAndPackage;
     }

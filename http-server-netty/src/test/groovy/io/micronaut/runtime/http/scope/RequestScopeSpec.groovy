@@ -15,6 +15,8 @@
  */
 package io.micronaut.runtime.http.scope
 
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Factory
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
@@ -44,35 +46,43 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         then:
         result == "message count 1, count within request 1"
         RequestBean.BEANS_CREATED.size() == 1
+        RequestScopeFactoryBean.BEANS_CREATED.size() == 1
         conditions.eventually {
             listener.callCount == 1
             RequestBean.BEANS_CREATED.first().dead
+            RequestScopeFactoryBean.BEANS_CREATED.first().dead
         }
 
         when:
         RequestBean.BEANS_CREATED.clear()
+        RequestScopeFactoryBean.BEANS_CREATED.clear()
         listener.callCount = 0
         result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
 
         then:
         result == "message count 2, count within request 1"
         RequestBean.BEANS_CREATED.size() == 1
+        RequestScopeFactoryBean.BEANS_CREATED.size() == 1
         conditions.eventually {
             listener.callCount == 1
             RequestBean.BEANS_CREATED.first().dead
+            RequestScopeFactoryBean.BEANS_CREATED.first().dead
         }
 
         when:
         RequestBean.BEANS_CREATED.clear()
+        RequestScopeFactoryBean.BEANS_CREATED.clear()
         listener.callCount = 0
         result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
 
         then:
         result == "message count 3, count within request 1"
         RequestBean.BEANS_CREATED.size() == 1
+        RequestScopeFactoryBean.BEANS_CREATED.size() == 1
         conditions.eventually {
             listener.callCount == 1
             RequestBean.BEANS_CREATED.first().dead
+            RequestScopeFactoryBean.BEANS_CREATED.first().dead
         }
     }
 
@@ -126,6 +136,9 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         @Inject
         RequestBean requestBean
 
+        @Inject
+        RequestScopeFactoryBean requestScopeFactoryBean
+
         int num = 0
 
         int count() {
@@ -134,7 +147,10 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         }
 
         String getMessage() {
-            return "message count ${count()}, count within request ${requestBean.count()}"
+            int count1 = requestBean.count()
+            int count2 = requestScopeFactoryBean.count()
+            assert count1 == count2
+            return "message count ${count()}, count within request ${count1}"
         }
     }
 

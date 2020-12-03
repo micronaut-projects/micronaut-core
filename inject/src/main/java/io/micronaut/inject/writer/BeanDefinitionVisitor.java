@@ -26,6 +26,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Interface for {@link BeanDefinitionVisitor} implementations such as {@link BeanDefinitionWriter}.
@@ -33,7 +34,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanDefinitionVisitor {
+public interface BeanDefinitionVisitor extends OriginatingElements {
 
     /**
      * The suffix use for generated AOP intercepted types.
@@ -42,7 +43,9 @@ public interface BeanDefinitionVisitor {
 
     /**
      * @return The element where the bean definition originated from.
+     * @deprecated Use {@link #getOriginatingElements()} instead
      */
+    @Deprecated
     @Nullable Element getOriginatingElement();
 
     /**
@@ -69,7 +72,6 @@ public interface BeanDefinitionVisitor {
      */
     void visitBeanDefinitionConstructor(AnnotationMetadata annotationMetadata,
                                         boolean requiresReflection,
-
                                         Map<String, Object> argumentTypes,
                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                         Map<String, Map<String, Object>> genericTypes);
@@ -131,6 +133,17 @@ public interface BeanDefinitionVisitor {
      * @param validated Whether the bean definition is validated
      */
     void setValidated(boolean validated);
+
+    /**
+     * Sets the name of the intercepted type.
+     * @param typeName The type name
+     */
+    void setInterceptedType(String typeName);
+
+    /**
+     * @return The intercepted type
+     */
+    Optional<Type> getInterceptedType();
 
     /**
      * @return Return whether the bean definition is validated.

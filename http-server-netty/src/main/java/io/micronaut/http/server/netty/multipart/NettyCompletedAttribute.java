@@ -36,7 +36,7 @@ import java.util.Optional;
  * @since 1.3.0
  */
 @Internal
-class NettyCompletedAttribute implements CompletedPart {
+public class NettyCompletedAttribute implements CompletedPart {
 
     private final Attribute attribute;
     private final boolean controlRelease;

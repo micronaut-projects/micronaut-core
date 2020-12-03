@@ -24,7 +24,9 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.multitenancy.propagation.TenantPropagationHttpClientFilter
+import io.micronaut.multitenancy.tenantresolver.CookieTenantResolver
 import io.micronaut.multitenancy.tenantresolver.HttpHeaderTenantResolver
+import io.micronaut.multitenancy.tenantresolver.HttpRequestTenantResolver
 import io.micronaut.multitenancy.tenantresolver.TenantResolver
 import io.micronaut.multitenancy.writer.HttpHeaderTenantWriter
 import io.micronaut.multitenancy.writer.TenantWriter
@@ -81,6 +83,12 @@ class HttpHeaderTenantResolverSpec extends Specification {
 
         then:
         noExceptionThrown()
+
+        and:
+        gormEmbeddedServer.applicationContext.containsBean(TenantResolver)
+        gormEmbeddedServer.applicationContext.getBean(TenantResolver) instanceof HttpHeaderTenantResolver
+        gormEmbeddedServer.applicationContext.containsBean(HttpRequestTenantResolver)
+        gormEmbeddedServer.applicationContext.getBean(HttpRequestTenantResolver) instanceof HttpHeaderTenantResolver
     }
 
     def "setup gateway server"() {

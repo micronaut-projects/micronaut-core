@@ -12,9 +12,14 @@ micronaut:
         name: hello-world
     config-client:
         enabled: true
+aws:
+    client:
+        system-manager:
+            parameterstore:
+                enabled: true
 ----
 
-See the https://micronaut-projects.github.io/micronaut-discovery-client/latest/guide/configurationreference.html#io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfiguration[configuration reference] for all configuration options.
+See the https://micronaut-projects.github.io/micronaut-aws/latest/guide/configurationreference.html#io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfiguration[configuration reference] for all configuration options.
 
 You can configure shared properties by going into the AWS Console -> System Manager -> Parameter Store
 
@@ -46,5 +51,3 @@ Each level of the tree can be composed of key=value pairs. If you want multiple 
 
 For special secure information, like keys or passwords, use the type "SecureString". KMS will be automatically invoked when you
 add and retrieve values and decrypt them with the default key store for your account. If you set the configuration to not use secure strings, they will be returned to you encrypted and you must manually decrypt them.
-
-The https://github.com/micronaut-projects/micronaut-examples/aws repository showcases a sample application using this feature.

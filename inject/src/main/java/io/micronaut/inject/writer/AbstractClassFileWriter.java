@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
@@ -46,7 +47,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractClassFileWriter implements Opcodes {
+public abstract class AbstractClassFileWriter implements Opcodes, OriginatingElements {
 
     protected static final Type TYPE_ARGUMENT = Type.getType(Argument.class);
     protected static final Type TYPE_ARGUMENT_ARRAY = Type.getType(Argument[].class);
@@ -100,13 +101,40 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         NAME_TO_TYPE_MAP.put("short", "S");
     }
 
-    protected final Element originatingElement;
+    private final OriginatingElements originatingElements;
 
     /**
      * @param originatingElement The originating element
+     * @deprecated Use {@link #AbstractClassFileWriter(Element...)} instead
      */
+    @Deprecated
     protected AbstractClassFileWriter(Element originatingElement) {
-        this.originatingElement = originatingElement;
+        this(OriginatingElements.of(originatingElement));
+    }
+
+    /**
+     * @param originatingElements The originating elements
+     */
+    protected AbstractClassFileWriter(Element... originatingElements) {
+        this(OriginatingElements.of(originatingElements));
+    }
+
+    /**
+     * @param originatingElements The originating elements
+     */
+    protected AbstractClassFileWriter(OriginatingElements originatingElements) {
+        this.originatingElements = Objects.requireNonNull(originatingElements, "The originating elements cannot be null");
+    }
+
+    @NotNull
+    @Override
+    public Element[] getOriginatingElements() {
+        return originatingElements.getOriginatingElements();
+    }
+
+    @Override
+    public void addOriginatingElement(@NotNull Element element) {
+        originatingElements.addOriginatingElement(element);
     }
 
     /**
@@ -495,9 +523,14 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     /**
      * @return The originating element
      */
-    public @Nullable
-    Element getOriginatingElement() {
-        return this.originatingElement;
+    @Deprecated
+    public @Nullable Element getOriginatingElement() {
+        Element[] originatingElements = getOriginatingElements();
+        if (ArrayUtils.isNotEmpty(originatingElements)) {
+            return originatingElements[0];
+        } else {
+            return null;
+        }
     }
 
     /**
@@ -507,6 +540,24 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @throws IOException if there is an error writing to disk
      */
     public abstract void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
+
+    /**
+     * Implements a method called "getInterceptedType" for the given type and class writer.
+     * @param interceptedType The intercepted type
+     * @param classWriter The class writer
+     */
+    protected void implementInterceptedTypeMethod(Type interceptedType, ClassWriter classWriter) {
+        GeneratorAdapter getTargetTypeMethod = startPublicMethodZeroArgs(
+                classWriter,
+                Class.class,
+                "getInterceptedType"
+        );
+        getTargetTypeMethod.loadThis();
+        getTargetTypeMethod.push(interceptedType);
+        getTargetTypeMethod.returnValue();
+        getTargetTypeMethod.visitMaxs(1, 1);
+        getTargetTypeMethod.visitEnd();
+    }
 
     /**
      * Returns the descriptor corresponding to the given class.
@@ -1073,9 +1124,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @param serviceName       The service name
      * @param internalClassName The class name
      * @param superType         The super type
+     * @param interfaces        The interfaces
      */
-    protected void startService(ClassVisitor classWriter, String serviceName, String internalClassName, Type superType) {
-        classWriter.visit(V1_8, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, internalClassName, null, superType.getInternalName(), null);
+    protected void startService(ClassVisitor classWriter, String serviceName, String internalClassName, Type superType, String... interfaces) {
+        classWriter.visit(V1_8, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, internalClassName, null, superType.getInternalName(), interfaces);
         AnnotationVisitor annotationVisitor = classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
         annotationVisitor.visit("service", serviceName);
         annotationVisitor.visitEnd();

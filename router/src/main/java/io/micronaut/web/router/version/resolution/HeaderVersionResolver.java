@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.version.RoutesVersioningConfiguration;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
 import java.util.Objects;
@@ -42,7 +41,6 @@ public class HeaderVersionResolver implements RequestVersionResolver {
      *
      * @param configuration A configuration to pick correct request header names.
      */
-    @Inject
     public HeaderVersionResolver(HeaderVersionResolverConfiguration configuration) {
         this.headerNames = configuration.getNames();
     }

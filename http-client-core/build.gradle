@@ -3,6 +3,8 @@ dependencies {
     api dependencyVersion("rxjava2")
     api project(":runtime")
     api project(":websocket")
+
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
 }
 
 //tasks.withType(Test) {

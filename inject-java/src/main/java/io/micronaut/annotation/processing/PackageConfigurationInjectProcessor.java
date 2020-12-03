@@ -65,6 +65,11 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
         AnnotationElementScanner scanner = new AnnotationElementScanner();
         Set<? extends Element> elements = roundEnv.getRootElements();
         ElementFilter.packagesIn(elements).forEach(element -> element.accept(scanner, element));
+        try {
+            classWriterOutputVisitor.finish();
+        } catch (Exception e) {
+            error("I/O error occurred writing META-INF services information: %s", e);
+        }
         return false;
     }
 

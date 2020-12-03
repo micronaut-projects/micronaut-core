@@ -23,12 +23,20 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.concurrent.DefaultThreadFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.annotation.PreDestroy;
 import javax.inject.Named;
 import javax.inject.Singleton;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Factory for creating named event loop groups.
@@ -40,24 +48,41 @@ import java.util.concurrent.ThreadFactory;
 @Internal
 @BootstrapContextCompatible
 public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultEventLoopGroupRegistry.class);
+
     private final EventLoopGroupFactory eventLoopGroupFactory;
-    private final ThreadFactory threadFactory;
     private final BeanLocator beanLocator;
+
+    private final Map<EventLoopGroup, EventLoopGroupConfiguration> eventLoopGroups = new ConcurrentHashMap<>();
 
     /**
      * Default constructor.
      *
      * @param eventLoopGroupFactory The event loop group factory
-     * @param threadFactory         The thread factory
      * @param beanLocator           The bean locator
      */
-    public DefaultEventLoopGroupRegistry(
-            EventLoopGroupFactory eventLoopGroupFactory,
-            @Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
-            BeanLocator beanLocator) {
+    public DefaultEventLoopGroupRegistry(EventLoopGroupFactory eventLoopGroupFactory, BeanLocator beanLocator) {
         this.eventLoopGroupFactory = eventLoopGroupFactory;
-        this.threadFactory = threadFactory;
         this.beanLocator = beanLocator;
+    }
+
+    /**
+     * Shut down event loop groups according to configuration.
+     */
+    @PreDestroy
+    void shutdown() {
+        eventLoopGroups.forEach((eventLoopGroup, configuration) -> {
+            try {
+                long quietPeriod = configuration.getShutdownQuietPeriod().toMillis();
+                long timeout = configuration.getShutdownTimeout().toMillis();
+                eventLoopGroup.shutdownGracefully(quietPeriod, timeout, TimeUnit.MILLISECONDS);
+            } catch (Throwable t) {
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn("Error shutting down EventLoopGroup: {}", t.getMessage(), t);
+                }
+            }
+        });
+        eventLoopGroups.clear();
     }
 
     /**
@@ -67,34 +92,43 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
      * @return The event loop group
      */
     @EachBean(EventLoopGroupConfiguration.class)
-    @Bean(preDestroy = "shutdownGracefully")
+    @Bean
     @BootstrapContextCompatible
     protected EventLoopGroup eventLoopGroup(EventLoopGroupConfiguration configuration) {
         final String executor = configuration.getExecutorName().orElse(null);
+        EventLoopGroup eventLoopGroup;
         if (executor != null) {
-            return beanLocator.findBean(Executor.class, Qualifiers.byName(executor))
-                              .map(executorService -> eventLoopGroupFactory.createEventLoopGroup(
-                                      configuration.getNumThreads(),
-                                      executorService,
-                                      configuration.getIoRatio().orElse(null)
-                              )).orElseThrow(() -> new ConfigurationException("No executor service configured for name: " + executor));
+            eventLoopGroup = beanLocator.findBean(Executor.class, Qualifiers.byName(executor))
+                .map(executorService -> eventLoopGroupFactory.createEventLoopGroup(
+                    configuration.getNumThreads(),
+                    executorService,
+                    configuration.getIoRatio().orElse(null)
+                )).orElseThrow(() -> new ConfigurationException("No executor service configured for name: " + executor));
         } else {
-            return eventLoopGroupFactory.createEventLoopGroup(configuration, threadFactory);
+            ThreadFactory threadFactory = beanLocator.findBean(ThreadFactory.class, Qualifiers.byName(configuration.getName()))
+                    .orElseGet(() ->  new DefaultThreadFactory(configuration.getName() + "-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class)));
+            eventLoopGroup = eventLoopGroupFactory.createEventLoopGroup(configuration, threadFactory);
         }
+        eventLoopGroups.put(eventLoopGroup, configuration);
+        return eventLoopGroup;
     }
 
     /**
      * Constructs an event loop group with default Configuration.
      *
+     * @param threadFactory The default Netty thread factory
      * @return The event loop group
      */
     @Singleton
     @Requires(missingProperty = EventLoopGroupConfiguration.DEFAULT_LOOP)
     @Primary
-    @Bean(preDestroy = "shutdownGracefully")
+    @Bean
     @BootstrapContextCompatible
-    protected EventLoopGroup defaultEventLoopGroup() {
-        return eventLoopGroupFactory.createEventLoopGroup(new DefaultEventLoopGroupConfiguration(), threadFactory);
+    protected EventLoopGroup defaultEventLoopGroup(@Named(NettyThreadFactory.NAME) ThreadFactory threadFactory) {
+        EventLoopGroupConfiguration configuration = new DefaultEventLoopGroupConfiguration();
+        EventLoopGroup eventLoopGroup = eventLoopGroupFactory.createEventLoopGroup(configuration, threadFactory);
+        eventLoopGroups.put(eventLoopGroup, configuration);
+        return eventLoopGroup;
     }
 
     @NonNull

@@ -48,7 +48,7 @@ class Test {
         expect:
         definition != null
         definition.getAnnotationTypeByStereotype(Qualifier).isPresent()
-        definition.getAnnotationTypeByStereotype(Qualifier).get() == TestAnnotation
+        definition.getAnnotationTypeByStereotype(Qualifier).get() == Named
         definition.getValue(Named, String).get() == 'foo'
     }
 }

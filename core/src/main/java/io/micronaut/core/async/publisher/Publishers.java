@@ -350,6 +350,9 @@ public class Publishers {
     public static <T> T convertPublisher(Object object, Class<T> publisherType) {
         Objects.requireNonNull(object, "Argument [object] cannot be null");
         Objects.requireNonNull(publisherType, "Argument [publisherType] cannot be null");
+        if (publisherType.isInstance(object)) {
+            return (T) object;
+        }
         if (object instanceof CompletableFuture) {
             @SuppressWarnings("unchecked") Publisher<T> futurePublisher = Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
             return ConversionService.SHARED.convert(futurePublisher, publisherType)

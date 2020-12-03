@@ -560,6 +560,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         public boolean isStream() {
             return NettyHttpRequest.this.nettyRequest instanceof StreamedHttpRequest;
         }
+
+        @Override
+        public MutableHttpRequest<T> mutate() {
+            return new NettyMutableHttpRequest();
+        }
     }
 
 }

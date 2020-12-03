@@ -15,10 +15,14 @@
  */
 package io.micronaut.scheduling.executor;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.util.ArgumentUtils;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+
+import javax.inject.Inject;
 import javax.validation.constraints.Min;
 import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
@@ -37,18 +41,53 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      */
     public static final int AVAILABLE_PROCESSORS = Runtime.getRuntime().availableProcessors();
 
+    protected String name;
     // needs to be protected to allow for nThreads to be set in config
     @SuppressWarnings("WeakerAccess")
-    protected Integer nThreads = AVAILABLE_PROCESSORS * 2;
-    private ExecutorType type = ExecutorType.SCHEDULED;
-    private Integer parallelism = AVAILABLE_PROCESSORS;
-    private Integer corePoolSize = AVAILABLE_PROCESSORS * 2;
+    protected Integer nThreads;
+    private ExecutorType type;
+    private Integer parallelism;
+    private Integer corePoolSize;
     private Class<? extends ThreadFactory> threadFactoryClass;
 
     /**
-     * Default Constructor.
+     * Private Constructor.
+     *
+     * @param name The name
      */
-    protected UserExecutorConfiguration() {
+    private UserExecutorConfiguration(@Parameter String name) {
+        this(name, null, null, null, null, null);
+    }
+
+    /**
+     * Default Constructor.
+     *
+     * @param name the name
+     * @param nThreads number of threads
+     * @param type the type
+     * @param parallelism the parallelism
+     * @param corePoolSize the core pool size
+     * @param threadFactoryClass the thread factory class
+     */
+    @Inject
+    protected UserExecutorConfiguration(@Nullable @Parameter String name,
+                                        @Nullable Integer nThreads,
+                                        @Nullable ExecutorType type,
+                                        @Nullable Integer parallelism,
+                                        @Nullable Integer corePoolSize,
+                                        @Nullable Class<? extends ThreadFactory> threadFactoryClass) {
+        this.name = name;
+        this.nThreads = nThreads == null ? AVAILABLE_PROCESSORS * 2 : nThreads;
+        this.type = type == null ? ExecutorType.SCHEDULED : type;
+        this.parallelism = parallelism == null ? AVAILABLE_PROCESSORS : parallelism;
+        this.corePoolSize = corePoolSize == null ? AVAILABLE_PROCESSORS * 2 : corePoolSize;
+        this.threadFactoryClass = threadFactoryClass;
+    }
+
+    @NonNull
+    @Override
+    public String getName() {
+        return name;
     }
 
     @Override
@@ -77,6 +116,15 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     @Override
     public Optional<Class<? extends ThreadFactory>> getThreadFactoryClass() {
         return Optional.ofNullable(threadFactoryClass);
+    }
+
+    /**
+     * Sets the executor name.
+     *
+     * @param name The name
+     */
+    public void setName(String name) {
+        this.name = name;
     }
 
     /**
@@ -141,7 +189,22 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      */
     public static UserExecutorConfiguration of(ExecutorType type) {
         ArgumentUtils.check("type", type).notNull();
-        UserExecutorConfiguration configuration = new UserExecutorConfiguration();
+        UserExecutorConfiguration configuration = new UserExecutorConfiguration(null);
+        configuration.type = type;
+        return configuration;
+    }
+
+    /**
+     * Construct a {@link UserExecutorConfiguration} for the given {@link io.micronaut.scheduling.executor.ExecutorType}.
+     *
+     * @param name The name
+     * @param type The type
+     * @return The configuration
+     */
+    public static UserExecutorConfiguration of(String name, ExecutorType type) {
+        ArgumentUtils.check("name", name).notNull();
+        ArgumentUtils.check("type", type).notNull();
+        UserExecutorConfiguration configuration = new UserExecutorConfiguration(name);
         configuration.type = type;
         return configuration;
     }

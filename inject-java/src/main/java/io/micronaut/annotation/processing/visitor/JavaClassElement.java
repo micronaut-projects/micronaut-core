@@ -15,9 +15,11 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.annotation.processing.PublicMethodVisitor;
+import io.micronaut.annotation.processing.SuperclassAwareTypeVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
@@ -26,9 +28,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.processing.JavaModelUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import javax.lang.model.element.*;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
@@ -46,11 +47,11 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
-public class JavaClassElement extends AbstractJavaElement implements ClassElement {
+public class JavaClassElement extends AbstractJavaElement implements ArrayableClassElement {
 
     protected final TypeElement classElement;
-    protected int arrayDimensions;
-    private final JavaVisitorContext visitorContext;
+    protected final JavaVisitorContext visitorContext;
+    private final int arrayDimensions;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
 
     /**
@@ -95,6 +96,16 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         this.visitorContext = visitorContext;
         this.genericTypeInfo = genericsInfo;
         this.arrayDimensions = arrayDimensions;
+    }
+
+    @Override
+    public boolean isInner() {
+        return classElement.getNestingKind().isNested();
+    }
+
+    @Override
+    public boolean isRecord() {
+        return JavaModelUtils.isRecord(classElement);
     }
 
     @NonNull
@@ -169,102 +180,148 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     public List<PropertyElement> getBeanProperties() {
         Map<String, BeanPropertyData> props = new LinkedHashMap<>();
         Map<String, VariableElement> fields = new LinkedHashMap<>();
-
-        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext) {
-
-            @Override
-            protected boolean isAcceptable(javax.lang.model.element.Element element) {
-                if (element.getKind() == ElementKind.FIELD) {
-                    return true;
+        if (isRecord()) {
+            classElement.asType().accept(new SuperclassAwareTypeVisitor<Object, Object>(visitorContext) {
+                @Override
+                protected boolean isAcceptable(Element element) {
+                    return JavaModelUtils.isRecord(element);
                 }
-                if (element.getKind() == ElementKind.METHOD && element instanceof ExecutableElement) {
-                    Set<Modifier> modifiers = element.getModifiers();
-                    if (modifiers.contains(Modifier.PUBLIC) && !modifiers.contains(Modifier.STATIC)) {
-                        ExecutableElement executableElement = (ExecutableElement) element;
-                        String methodName = executableElement.getSimpleName().toString();
-                        if (methodName.contains("$")) {
-                            return false;
-                        }
 
-                        if (NameUtils.isGetterName(methodName) && executableElement.getParameters().isEmpty()) {
-                            return true;
-                        } else {
-                            return NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1;
+                @Override
+                public Object visitDeclared(DeclaredType type, Object o) {
+                    Element element = type.asElement();
+                    if (isAcceptable(element)) {
+                        List<? extends Element> enclosedElements = element.getEnclosedElements();
+                        for (Element enclosedElement : enclosedElements) {
+                            if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
+                                if (enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
+                                    accept(type, enclosedElement, o);
+                                }
+                            }
                         }
                     }
-                }
-                return false;
-            }
-
-            @Override
-            protected void accept(DeclaredType declaringType, javax.lang.model.element.Element element, Object o) {
-
-                if (element instanceof VariableElement) {
-                    fields.put(element.getSimpleName().toString(), (VariableElement) element);
-                    return;
+                    return o;
                 }
 
+                @Override
+                protected void accept(DeclaredType type, Element element, Object o) {
+                    String name = element.getSimpleName().toString();
+                    if (element instanceof ExecutableElement) {
+                        BeanPropertyData beanPropertyData = props.get(name);
+                        if (beanPropertyData != null) {
+                            beanPropertyData.getter = (ExecutableElement) element;
+                        }
+                    } else {
 
-                ExecutableElement executableElement = (ExecutableElement) element;
-                String methodName = executableElement.getSimpleName().toString();
-                final TypeElement declaringTypeElement = (TypeElement) executableElement.getEnclosingElement();
+                        props.computeIfAbsent(name, propertyName -> {
 
-                if (NameUtils.isGetterName(methodName) && executableElement.getParameters().isEmpty()) {
-                    String propertyName = NameUtils.getPropertyNameForGetter(methodName);
-                    TypeMirror returnType = executableElement.getReturnType();
-                    ClassElement getterReturnType;
-                    if (returnType instanceof TypeVariable) {
-                        TypeVariable tv = (TypeVariable) returnType;
-                        final String tvn = tv.toString();
-                        final ClassElement classElement = getTypeArguments().get(tvn);
-                        if (classElement != null) {
-                            getterReturnType = classElement;
+                            BeanPropertyData beanPropertyData = new BeanPropertyData(propertyName);
+                            beanPropertyData.declaringType = JavaClassElement.this;
+                            beanPropertyData.type = mirrorToClassElement(element.asType(), visitorContext, genericTypeInfo);
+                            return beanPropertyData;
+                        });
+                    }
+                }
+
+            }, null);
+        } else {
+
+            classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext) {
+
+                @Override
+                protected boolean isAcceptable(javax.lang.model.element.Element element) {
+                    if (element.getKind() == ElementKind.FIELD) {
+                        return true;
+                    }
+                    if (element.getKind() == ElementKind.METHOD && element instanceof ExecutableElement) {
+                        Set<Modifier> modifiers = element.getModifiers();
+                        if (modifiers.contains(Modifier.PUBLIC) && !modifiers.contains(Modifier.STATIC)) {
+                            ExecutableElement executableElement = (ExecutableElement) element;
+                            String methodName = executableElement.getSimpleName().toString();
+                            if (methodName.contains("$")) {
+                                return false;
+                            }
+
+                            if (NameUtils.isGetterName(methodName) && executableElement.getParameters().isEmpty()) {
+                                return true;
+                            } else {
+                                return NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1;
+                            }
+                        }
+                    }
+                    return false;
+                }
+
+                @Override
+                protected void accept(DeclaredType declaringType, javax.lang.model.element.Element element, Object o) {
+
+                    if (element instanceof VariableElement) {
+                        fields.put(element.getSimpleName().toString(), (VariableElement) element);
+                        return;
+                    }
+
+
+                    ExecutableElement executableElement = (ExecutableElement) element;
+                    String methodName = executableElement.getSimpleName().toString();
+                    final TypeElement declaringTypeElement = (TypeElement) executableElement.getEnclosingElement();
+
+                    if (NameUtils.isGetterName(methodName) && executableElement.getParameters().isEmpty()) {
+                        String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+                        TypeMirror returnType = executableElement.getReturnType();
+                        ClassElement getterReturnType;
+                        if (returnType instanceof TypeVariable) {
+                            TypeVariable tv = (TypeVariable) returnType;
+                            final String tvn = tv.toString();
+                            final ClassElement classElement = getTypeArguments().get(tvn);
+                            if (classElement != null) {
+                                getterReturnType = classElement;
+                            } else {
+                                getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo);
+                            }
                         } else {
                             getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo);
                         }
-                    } else {
-                        getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo);
-                    }
 
-                    BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                    configureDeclaringType(declaringTypeElement, beanPropertyData);
-                    beanPropertyData.type = getterReturnType;
-                    beanPropertyData.getter = executableElement;
-                    if (beanPropertyData.setter != null) {
-                        TypeMirror typeMirror = beanPropertyData.setter.getParameters().get(0).asType();
-                        ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
-                        if (!setterParameterType.getName().equals(getterReturnType.getName())) {
-                            beanPropertyData.setter = null; // not a compatible setter
+                        BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+                        configureDeclaringType(declaringTypeElement, beanPropertyData);
+                        beanPropertyData.type = getterReturnType;
+                        beanPropertyData.getter = executableElement;
+                        if (beanPropertyData.setter != null) {
+                            TypeMirror typeMirror = beanPropertyData.setter.getParameters().get(0).asType();
+                            ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
+                            if (!setterParameterType.getName().equals(getterReturnType.getName())) {
+                                beanPropertyData.setter = null; // not a compatible setter
+                            }
                         }
-                    }
-                } else if (NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1) {
-                    String propertyName = NameUtils.getPropertyNameForSetter(methodName);
-                    TypeMirror typeMirror = executableElement.getParameters().get(0).asType();
-                    ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
+                    } else if (NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1) {
+                        String propertyName = NameUtils.getPropertyNameForSetter(methodName);
+                        TypeMirror typeMirror = executableElement.getParameters().get(0).asType();
+                        ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
 
-                    BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                    configureDeclaringType(declaringTypeElement, beanPropertyData);
-                    ClassElement propertyType = beanPropertyData.type;
-                    if (propertyType != null) {
-                        if (propertyType.getName().equals(setterParameterType.getName())) {
+                        BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+                        configureDeclaringType(declaringTypeElement, beanPropertyData);
+                        ClassElement propertyType = beanPropertyData.type;
+                        if (propertyType != null) {
+                            if (propertyType.getName().equals(setterParameterType.getName())) {
+                                beanPropertyData.setter = executableElement;
+                            }
+                        } else {
                             beanPropertyData.setter = executableElement;
                         }
-                    } else {
-                        beanPropertyData.setter = executableElement;
                     }
                 }
-            }
 
-            private void configureDeclaringType(TypeElement declaringTypeElement, BeanPropertyData beanPropertyData) {
-                if (beanPropertyData.declaringType == null && !classElement.equals(declaringTypeElement)) {
-                    beanPropertyData.declaringType = mirrorToClassElement(
-                            declaringTypeElement.asType(),
-                            visitorContext,
-                            genericTypeInfo
-                    );
+                private void configureDeclaringType(TypeElement declaringTypeElement, BeanPropertyData beanPropertyData) {
+                    if (beanPropertyData.declaringType == null && !classElement.equals(declaringTypeElement)) {
+                        beanPropertyData.declaringType = mirrorToClassElement(
+                                declaringTypeElement.asType(),
+                                visitorContext,
+                                genericTypeInfo
+                        );
+                    }
                 }
-            }
-        }, null);
+            }, null);
+        }
 
         if (!props.isEmpty()) {
             List<PropertyElement> propertyElements = new ArrayList<>();
@@ -291,6 +348,14 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                             value.type,
                             value.setter == null,
                             visitorContext) {
+
+                        @Override
+                        public ClassElement getGenericType() {
+                            TypeMirror returnType = value.getter.getReturnType();
+                            Map<String, Map<String, TypeMirror>> declaredGenericInfo = getGenericTypeInfo();
+                            return parameterizedClassElement(returnType, visitorContext, declaredGenericInfo);
+                        }
+
                         @Override
                         public Optional<String> getDocumentation() {
                             Elements elements = visitorContext.getElements();
@@ -328,7 +393,6 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         } else {
             return Collections.emptyList();
         }
-
     }
 
     @Override
@@ -363,8 +427,8 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     }
 
     @Override
-    public ClassElement toArray() {
-        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions + 1);
+    public ClassElement withArrayDimensions(int arrayDimensions) {
+        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions);
     }
 
     @Override
@@ -391,6 +455,10 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         final ModelUtils modelUtils = visitorContext.getModelUtils();
         ExecutableElement method = modelUtils.staticCreatorFor(classElement, annotationUtils);
         if (method == null) {
+            if (isInner() && !isStatic()) {
+                // only static inner classes can be constructed
+                return Optional.empty();
+            }
             method = modelUtils.concreteConstructorFor(classElement, annotationUtils);
         }
 
@@ -403,6 +471,10 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         final ModelUtils modelUtils = visitorContext.getModelUtils();
         ExecutableElement method = modelUtils.defaultStaticCreatorFor(classElement, annotationUtils);
         if (method == null) {
+            if (isInner() && !isStatic()) {
+                // only static inner classes can be constructed
+                return Optional.empty();
+            }
             method = modelUtils.defaultConstructorFor(classElement);
         }
         return createMethodElement(annotationUtils, method);

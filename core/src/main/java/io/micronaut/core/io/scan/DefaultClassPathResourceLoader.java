@@ -193,7 +193,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                         }
 
                     }
-                } catch (URISyntaxException | IOException e) {
+                } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
                     }

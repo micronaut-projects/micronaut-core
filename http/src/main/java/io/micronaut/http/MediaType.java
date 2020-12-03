@@ -62,6 +62,11 @@ public class MediaType implements CharSequence {
     public static final String EXTENSION_XML = "xml";
 
     /**
+     * Default file extension used for PDF.
+     */
+    public static final String EXTENSION_PDF = "pdf";
+
+    /**
      * Default empty media type array.
      */
     public static final MediaType[] EMPTY_ARRAY = new MediaType[0];
@@ -261,6 +266,16 @@ public class MediaType implements CharSequence {
      */
     public static final MediaType APPLICATION_GRAPHQL_TYPE = new MediaType(APPLICATION_GRAPHQL);
 
+    /**
+     * PDF: application/pdf.
+     */
+    public static final String APPLICATION_PDF = "application/pdf";
+
+    /**
+     * PDF: application/pdf.
+     */
+    public static final MediaType APPLICATION_PDF_TYPE = new MediaType(APPLICATION_PDF);
+    
     /**
      * Png Image: image/png.
      */

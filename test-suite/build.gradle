@@ -35,7 +35,7 @@ dependencies {
         exclude module:'micronaut-inject'
     }
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
-    testImplementation("org.junit.jupiter:junit-jupiter-api:$junit5Version")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
 
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
         exclude module:'micronaut-runtime'
@@ -46,7 +46,7 @@ dependencies {
     testImplementation dependencyVersion("jaeger")
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     // tag::testcontainers-dependencies[]
-    testImplementation "org.testcontainers:spock:1.14.3"
+    testImplementation "org.testcontainers:spock:1.15.0"
     // end::testcontainers-dependencies[]
     testImplementation 'org.awaitility:awaitility:4.0.3'
 
@@ -56,15 +56,15 @@ dependencies {
 
     testRuntimeOnly dependencyVersion("tomcatJdbc")
     testRuntimeOnly dependencyVersion("h2")
-    testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junit5Version"
+    testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junitVersion"
     testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
-    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.862'
+    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.903'
 
     // needed for HTTP/2 tests
     testImplementation 'io.netty:netty-tcnative:2.0.34.Final'
     testImplementation 'io.netty:netty-tcnative-boringssl-static:2.0.34.Final'
     testImplementation "io.netty:netty-tcnative-boringssl-static:2.0.34.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
-    testImplementation 'org.zalando:logbook-netty:2.1.0'
+    testImplementation 'org.zalando:logbook-netty:2.3.0'
     testImplementation "ch.qos.logback:logback-classic:1.2.3"
 }
 

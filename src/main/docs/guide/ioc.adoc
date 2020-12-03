@@ -14,31 +14,33 @@ The goals of the Micronaut IoC container are summarized as:
 * Reduce memory footprint
 * Provide clear, understandable error handling
 
-Note that the IoC part of Micronaut can be used completely independently of Micronaut itself for whatever application type you may wish to build. To do so all you need to do is configure your build appropriately to include the `micronaut-inject-java` dependency as an annotation processor. For example with Gradle:
+Note that the IoC part of Micronaut can be used completely independently of Micronaut itself for whatever application type you may wish to build.
+
+To do so all you need to do is configure your build appropriately to include the `micronaut-inject-java` dependency as an annotation processor.
+
+The easiest way to do this is with Micronaut's Gradle or Maven plugins. For example with Gradle:
 
 .Configuring Gradle
 [source,groovy,subs="attributes"]
 ----
 plugins {
-  id "com.diffplug.eclipse.apt" version "3.22.0" // <1>
+    id 'io.micronaut.library' version '1.1.0' // <1>
 }
 
-...
-dependencies {
-    annotationProcessor("io.micronaut:micronaut-inject-java:{version}") // <2>
-    implementation("io.micronaut:micronaut-inject:{version}")
-    ...
-    testAnnotationProcessor("io.micronaut:micronaut-inject-java:{version}") // <3>
-    ...
+version "0.1"
+group "com.example"
+
+repositories {
+    mavenCentral()
 }
 
+micronaut {
+    version = "{version}" // <2>
+}
 ----
 
-<1> Apply `com.diffplug.eclipse.apt` Gradle plugin which modifes Eclipse projects to include gradle annotationProcessor dependencies
-<2> Include the minimal dependencies required to perform dependency injection
-<3> This is necessary to create beans in the `test` directory
-
-NOTE: For the Groovy language you should include `micronaut-inject-groovy` in the `compileOnly` and `testCompileOnly` scopes.
+<1> Define the https://plugins.gradle.org/plugin/io.micronaut.library[Micronaut Library plugin]
+<2> Specify the Micronaut version to use
 
 The entry point for IoC is then the api:context.ApplicationContext[] interface, which includes a `run` method. The following example demonstrates using it:
 
@@ -50,7 +52,6 @@ try (ApplicationContext context = ApplicationContext.run()) { // <1>
     // do something with your bean
 }
 ----
-// TODO should this be converted? The commentary is calling out a specific language's feature
 
 <1> Run the api:context.ApplicationContext[]
 <2> Retrieve a bean that has been dependency injected

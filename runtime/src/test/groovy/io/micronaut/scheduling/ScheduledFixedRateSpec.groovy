@@ -130,6 +130,9 @@ class ScheduledFixedRateSpec extends Specification {
         @Retryable(delay = "10ms")
         @Scheduled(initialDelay = '10ms')
         void runInitialDelay() {
+            if (!Thread.currentThread().getName().startsWith("scheduled-executor-thread")) {
+                throw new RuntimeException("Incorrect thread name")
+            }
             if (attempts.addAndGet(1) < 2) {
                 throw new RuntimeException()
             }

@@ -120,6 +120,11 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     Argument<List<String>> LIST_OF_STRING = Argument.listOf(String.class);
 
     /**
+     * Constant for Void object argument.
+     */
+    Argument<Void> VOID_OBJECT = Argument.of(Void.class);
+
+    /**
      * @return The name of the argument
      */
     @Override
