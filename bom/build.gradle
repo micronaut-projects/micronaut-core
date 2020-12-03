@@ -88,12 +88,6 @@ javaPlatform {
     allowDependencies()
 }
 dependencies {
-    for (dep in bomVersions) {
-        def info = dep.value
-        def versionExpr = info.version
-        api platform("$info.group:$info.name:$versionExpr")
-    }
-
     constraints {
         for (Project p : rootProject.subprojects) {
             if (!p.subprojects.empty) continue
@@ -122,19 +116,19 @@ dependencies {
             }
         }
     }
-
-    for (Project p : rootProject.subprojects) {
-        if (!p.subprojects.empty) continue
-        if (p.name.contains("bom")) continue
-        if (excludedProjects.contains(p.name)) continue
-
-        verification "$p.group:micronaut-$p.name:$p.version"
+    for (dep in bomVersions) {
+        def info = dep.value
+        def versionExpr = info.version
+        api platform("$info.group:$info.name:$versionExpr")
     }
-
     for (dep in dependencyVersions) {
         def info = dep.value
-        // don't include snapshots
+        // don't verify snapshots
         if (info.version.toString().endsWith("-SNAPSHOT") && !micronautSnapshot) {
+            continue
+        }
+        // don't verify GORM modules
+        if (info.group == "org.grails" && info.name.startsWith("grails-datastore")) {
             continue
         }
 

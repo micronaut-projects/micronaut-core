@@ -1,19 +1,5 @@
 plugins {
     id 'java-platform'
-    id 'maven-publish'
-}
-
-publishing {
-    repositories {
-        maven {
-            url "${rootProject.buildDir}/repo"
-        }
-    }
-    publications {
-        maven(MavenPublication) {
-            from components.javaPlatform
-        }
-    }
 }
 
 configurations {
@@ -23,6 +9,7 @@ configurations {
     }
 }
 
-def bomVerification = extensions.create('bomVerification', io.micronaut.bom.verifier.BomVerifier)
+def bomVerification = extensions.create('bomVerification', io.micronaut.bom.verifier.BomVerification)
 
 tasks.register('verifyAll')
+check.dependsOn verifyAll

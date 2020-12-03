@@ -42,7 +42,7 @@ abstract class BomVerifier extends DefaultTask {
             def unresolved = result.allDependencies.findAll { it instanceof UnresolvedDependencyResult }
             if (unresolved) {
                 def unresolvedComponents = unresolved.collect { it.requested }.join(", ")
-                throw new GradleException("The BOM contains references to the following components which weren't found in any remote repository: ${unresolvedComponents}")
+                throw new GradleException("The BOM contains references to the following components which weren't found in the remote repository [${repo}]: ${unresolvedComponents}")
             }
         } finally {
             repositories.remove(repo)
