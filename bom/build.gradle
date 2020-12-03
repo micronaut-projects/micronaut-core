@@ -1,5 +1,6 @@
 plugins {
     id 'java-platform'
+    id 'io.micronaut.bom.verifier'
 }
 
 group projectGroupId
@@ -121,7 +122,44 @@ dependencies {
             }
         }
     }
+
+    for (Project p : rootProject.subprojects) {
+        if (!p.subprojects.empty) continue
+        if (p.name.contains("bom")) continue
+        if (excludedProjects.contains(p.name)) continue
+
+        verification "$p.group:micronaut-$p.name:$p.version"
+    }
+
+    for (dep in dependencyVersions) {
+        def info = dep.value
+        // don't include snapshots
+        if (info.version.toString().endsWith("-SNAPSHOT") && !micronautSnapshot) {
+            continue
+        }
+
+        def versionExpr = dep.value.version
+
+        if (info.name) {
+            verification "$info.group:$info.name:$versionExpr"
+        }
+        if (info.modules) {
+            for (m in info.modules) {
+                verification "$info.group:$m:$versionExpr"
+            }
+        }
+    }
 }
 
 apply plugin: "io.micronaut.build.publishing"
 bintray.pkg.version.gpg.sign = false
+
+bomVerification {
+    verifyOnRepository {
+        repositories.mavenCentral()
+    }
+    verifyOnRepository {
+        repositories.jcenter()
+    }
+}
+
