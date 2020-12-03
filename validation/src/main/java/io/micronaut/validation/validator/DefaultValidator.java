@@ -1377,8 +1377,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 beanIntrospection.getIndexedProperties(Constraint.class);
         final Collection<BeanProperty<Object, Object>> cascadeNestedProperties =
                 beanIntrospection.getIndexedProperties(Valid.class);
+        final List<Class<? extends Annotation>> pojoConstraints =
+            beanIntrospection.getAnnotationMetadata().getAnnotationTypesByStereotype(Constraint.class);
 
-        if (CollectionUtils.isNotEmpty(cascadeConstraints) || CollectionUtils.isNotEmpty(cascadeNestedProperties)) {
+        if (CollectionUtils.isNotEmpty(cascadeConstraints) ||
+            CollectionUtils.isNotEmpty(cascadeNestedProperties) ||
+            CollectionUtils.isNotEmpty(pojoConstraints)
+        ) {
             doValidate(
                     beanIntrospection,
                     rootBean,
@@ -1387,7 +1392,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     cascadeNestedProperties,
                     context,
                     overallViolations,
-                    Collections.emptyList()
+                    pojoConstraints
             );
         }
     }
