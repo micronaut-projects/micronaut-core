@@ -23,6 +23,7 @@ import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.jackson.JacksonConfiguration;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.util.List;
@@ -37,11 +38,8 @@ import java.util.Optional;
 @Singleton
 public class OptionalValuesSerializer extends JsonSerializer<OptionalValues<?>> {
 
-    private final JacksonConfiguration jacksonConfiguration;
-
-    public OptionalValuesSerializer(JacksonConfiguration jacksonConfiguration) {
-        this.jacksonConfiguration = jacksonConfiguration;
-    }
+    @Inject
+    private JacksonConfiguration jacksonConfiguration;
 
     @Override
     public boolean isEmpty(SerializerProvider provider, OptionalValues<?> value) {
@@ -50,6 +48,8 @@ public class OptionalValuesSerializer extends JsonSerializer<OptionalValues<?>> 
 
     @Override
     public void serialize(OptionalValues<?> value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+        final boolean alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
+
         gen.writeStartObject();
 
         for (CharSequence key : value) {
@@ -61,7 +61,7 @@ public class OptionalValuesSerializer extends JsonSerializer<OptionalValues<?>> 
                 if (value instanceof OptionalMultiValues) {
                     List<?> list = (List<?>) v;
 
-                    if (list.size() == 1 && canSerializeElementAsObject(list.get(0).getClass())) {
+                    if (list.size() == 1 && (list.get(0).getClass() != JsonError.class || !alwaysSerializeErrorsAsList)) {
                         gen.writeObject(list.get(0));
                     } else {
                         gen.writeObject(list);
@@ -72,9 +72,5 @@ public class OptionalValuesSerializer extends JsonSerializer<OptionalValues<?>> 
             }
         }
         gen.writeEndObject();
-    }
-
-    private boolean canSerializeElementAsObject(Class<?> type) {
-        return type != JsonError.class || !jacksonConfiguration.getHateoas().isAlwaysSerializeErrorsAsList();
     }
 }

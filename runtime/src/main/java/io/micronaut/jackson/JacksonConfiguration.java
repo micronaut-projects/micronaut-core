@@ -21,7 +21,6 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.type.Argument;
@@ -31,8 +30,6 @@ import io.micronaut.core.util.CollectionUtils;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 
-import javax.annotation.Nullable;
-import javax.inject.Inject;
 import java.util.*;
 
 /**
@@ -79,7 +76,7 @@ public class JacksonConfiguration {
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
     private ObjectMapper.DefaultTyping defaultTyping = null;
     private PropertyNamingStrategy propertyNamingStrategy = null;
-    private Hateoas hateoas;
+    private boolean alwaysSerializeErrorsAsList = false;
 
     /**
      * Whether the {@link io.micronaut.core.beans.BeanIntrospection} should be used for reflection free object serialialization/deserialialization.
@@ -202,10 +199,13 @@ public class JacksonConfiguration {
     }
 
     /**
-     * @return Settings for the hateoas configuration
+     * Whether _embedded.errors should always be serialized as list. If set to false, _embedded.errors
+     * with 1 element will be serialized as an object.
+     *
+     * @return True if _embedded.errors should always be serialized as list.
      */
-    public Hateoas getHateoas() {
-        return hateoas;
+    public boolean isAlwaysSerializeErrorsAsList() {
+        return alwaysSerializeErrorsAsList;
     }
 
     /**
@@ -320,13 +320,13 @@ public class JacksonConfiguration {
     }
 
     /**
-     * Sets the property for hateoas configuration.
+     * Sets whether _embedded.errors should always be serialized as list (defaults to false).
+     * If set to false, _embedded.errors with 1 element will be serialized as an object.
      *
-     * @param hateoas The hateoas configuration
+     * @param alwaysSerializeErrorsAsList True if _embedded.errors should always be serialized as list.
      */
-    @Inject
-    void setHateoas(@Nullable Hateoas hateoas) {
-        this.hateoas = hateoas;
+    public void setAlwaysSerializeErrorsAsList(boolean alwaysSerializeErrorsAsList) {
+        this.alwaysSerializeErrorsAsList = alwaysSerializeErrorsAsList;
     }
 
     /**
@@ -378,23 +378,5 @@ public class JacksonConfiguration {
             }
         }
         return javaTypes.toArray(new JavaType[0]);
-    }
-
-    @ConfigurationProperties("hateoas")
-    @Requires("jackson.hateoas")
-    public static final class Hateoas {
-        /**
-         * If true _embedded.errors will always be an array. When set to false, _embedded.errors will be serialized
-         * as an object for 1 error or serialized as an array for 2 or more errors.
-         */
-        private boolean alwaysSerializeErrorsAsList = false;
-
-        public boolean isAlwaysSerializeErrorsAsList() {
-            return alwaysSerializeErrorsAsList;
-        }
-
-        public void setAlwaysSerializeErrorsAsList(boolean alwaysSerializeErrorsAsList) {
-            this.alwaysSerializeErrorsAsList = alwaysSerializeErrorsAsList;
-        }
     }
 }

@@ -216,7 +216,7 @@ class ValidatedSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run([
                 'spec.name': getClass().simpleName,
-                'jackson.hateoas.always-serialize-errors-as-list': true
+                'jackson.always-serialize-errors-as-list': true
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -313,7 +313,7 @@ class ValidatedSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run([
                 'spec.name': getClass().simpleName,
-                'jackson.hateoas.always-serialize-errors-as-list': true
+                'jackson.always-serialize-errors-as-list': true
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -378,7 +378,7 @@ class ValidatedSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run([
                 'spec.name': getClass().simpleName,
-                'jackson.hateoas.always-serialize-errors-as-list': true
+                'jackson.always-serialize-errors-as-list': true
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -465,7 +465,7 @@ class ValidatedSpec extends Specification {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
-                'jackson.hateoas.always-serialize-errors-as-list': true
+                'jackson.always-serialize-errors-as-list': true
         ])
         HttpClient client = server.applicationContext.createBean(HttpClient, server.getURL())
 
@@ -513,7 +513,7 @@ class ValidatedSpec extends Specification {
     void "test validated response with annotation with standard embedded errors"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-                'jackson.hateoas.always-serialize-errors-as-list': true
+                'jackson.always-serialize-errors-as-list': true
         ])
         TestClient client = server.applicationContext.getBean(TestClient)
 
@@ -630,7 +630,7 @@ class ValidatedSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run([
                 'spec.name': getClass().simpleName,
-                'jackson.hateoas.always-serialize-errors-as-list': true
+                'jackson.always-serialize-errors-as-list': true
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
