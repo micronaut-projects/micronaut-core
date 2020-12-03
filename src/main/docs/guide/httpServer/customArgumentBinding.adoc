@@ -1,64 +1,52 @@
-
-== Custom argument binding
-
-Micronaut uses an api:http.bind.binders.ArgumentBinderRegistry[ArgumentBinderRegistry] to look up api:core.bind.ArgumentBinder[ArgumentBinder]s
+Micronaut uses an api:http.bind.binders.ArgumentBinderRegistry[ArgumentBinderRegistry] to look up api:core.bind.ArgumentBinder[ArgumentBinder]s beans
 capable of binding to the arguments in the controller methods. The default implementation will look for an annotation on
-the argument that is, itself, annotated with `@Bindable`. If one exists the argument binder registry will search for an
+the argument that is, itself, annotated with ann:core.bind.annotation.Bindable[]. If one exists the argument binder registry will search for an
 argument binder that supports that annotation.
 
 If no fitting annotation is found Micronaut will try to find an argument binder that supports the argument's type.
 
-An api:core.bind.ArgumentBinder[ArgumentBinder] can be registered as a bean. It is only present when a
-api:context.BeanContext[BeanContext] is initialized.
+An argument binder returns a api:core.bind.ArgumentBinder.BindingResult[]. The binding result gives Micronaut more information than just the value. Binding results are either satisfied or unsatisfied, and either empty or not empty. If an argument binder returns an unsatisfied result, the binder may be called again at different times in the request processing. Argument binders are initially called before the body is read and before any filters are executed. If a binder relies on any of that data and the data is not present, then an api:core.bind.ArgumentBinder.BindingResult#UNSATISFIED[] result should be returned. Returning an api:core.bind.ArgumentBinder.BindingResult#EMPTY[] or satisfied result will be the final result and the binder will not be called again for that request.
 
-When a request is received the api:http.bind.binders.ArgumentBinderRegistry[ArgumentBinderRegistry] will make several calls
-to the argument binders attempting to find one that can resolve the argument. The binders are processed before the body
-is read and before any api:io.micronaut.http.filter.HttpFilter[HttpFilter]s have been executed. Your
-api:io.micronaut.core.bind.BindingResult[BindingResult] may depend on those being initialized before returning the binding
-result.
-
-A binding result of the class you are binding will be returned from the bind method in the implementation written. The
-result will be classified as either `SATISFIED` or `UNSATISFIED`. Returning a binding of the type `EMPTY` will be considered
-SATISFIED. If the returned binding is UNSATISFIED the registry will attempt to execute this binder multiple times attempting
-to get a SATISFIED result.
-
-If the binding result throws an exception that is not handled it will bubble up to the api:io.micronaut.http.annotation.Controller[Controller]
-where it can be caught by an api:io.micronaut.http.annotation.Error[Error] handler. This should not be relied upon, however,
-and the exceptions should be caught within the binder and passed to the
-io.micronaut.core.convert.ArgumentConversionContext[ArgumentConversionContext] via `context.reject`.
+NOTE: At the end of processing if the result is still api:core.bind.ArgumentBinder.BindingResult#UNSATISFIED[], it is considered api:core.bind.ArgumentBinder.BindingResult#EMPTY[].
 
 Key interfaces are:
 
 === AnnotatedRequestArgumentBinders
-* api:http.bind.binders.AnnotatedRequestArgumentBinder[AnnotatedRequestArgumentBinder]
 
-- An interface for classes that bind an api:core.type.Argument[Argument] from an api:http.HttpRequest[HttpRequest] driven
-by an annotation.
-
-TIP: It is common to use api:io.micronaut.core.convert.ConversionService[ConversionService] to convert the data to the type of argument.
-
-=== TypedRequestArgumentBinders
-
-* api:http.bind.binders.TypedRequestArgumentBinder[TypedRequestArgumentBinder]
-
-- An interface for classes that bind an api:core.type.Argument[Argument] from an api:http.HttpRequest[HttpRequest] driven by
-the argument's type.
-
-snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanTypedRequestArgumentBinder[tags="class", indent=0, title="Example of typed data binding"]
-<1> Override the bind method with the data type to bind, in this case MyBoundBean
-<2> After building the bound type as desired return the api:io.micronaut.core.bind.BindingResult[BindingResult]
-<3> Also override the argumentType method which is used by the ArgumentBinderRegistry.
+Argument binders that bind based on the presence of an annotation must implement api:http.bind.binders.AnnotatedRequestArgumentBinder[AnnotatedRequestArgumentBinder]. For example:
 
 snippet::io.micronaut.docs.http.bind.binders.MyBindingAnnotation[tags="class", indent=0, title="An example of a binding annotation"]
+
 <1> The binding annotation must itself be annotated as api:io.micronaut.core.bind.annotation.Bindable[@Bindable]
 
-snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanController[tags="typed", indent=0, title="A controller operation with this typed binding"]
-<1> The parameter will be bound with no annotation.
-
 snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanAnnotatedRequestArgumentBinder[tags="class", indent=0, title="Example of annotated data binding"]
+
 <1> Use an extension of api:io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder[AbstractAnnotatedArgumentBinder] that implements api:io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder[AnnotatedRequestArgumentBinder] using the annotation intended to trigger this binder, in this case MyBindingAnnotation
 <2> Override the bind method with the data type to bind
 <3> Also override the getAnnotationType method which is used by the ArgumentBinderRegistry.
 
+TIP: It is common to use api:io.micronaut.core.convert.ConversionService[ConversionService] to convert the data to the type of the value to the type of the argument.
+
+Once the binder is created, it can be used like in the following example:
+
 snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanController[tags="annotated", indent=0, title="A controller operation with this annotated binding"]
+
 <1> The parameter will be bound with with the annotated binder. This will take precedence over the typed binder.
+
+=== TypedRequestArgumentBinders
+
+Argument binders that bind based on the type of the argument must implement api:http.bind.binders.TypedRequestArgumentBinder[TypedRequestArgumentBinder]. For example:
+
+snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanTypedRequestArgumentBinder[tags="class", indent=0, title="Example of typed data binding"]
+
+<1> Override the bind method with the data type to bind, in this case MyBoundBean
+<2> After building the bound type as desired return the api:io.micronaut.core.bind.BindingResult[BindingResult]
+<3> Also override the argumentType method which is used by the ArgumentBinderRegistry.
+
+Once the binder is created, it can be used like in the following example:
+
+snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanController[tags="typed", indent=0, title="A controller operation with this typed binding"]
+
+<1> The parameter will be bound with no annotation.
+
+
