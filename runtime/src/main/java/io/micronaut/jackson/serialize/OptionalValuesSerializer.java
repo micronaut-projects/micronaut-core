@@ -20,7 +20,10 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.core.value.OptionalValues;
+import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.jackson.JacksonConfiguration;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.util.List;
@@ -34,6 +37,17 @@ import java.util.Optional;
  */
 @Singleton
 public class OptionalValuesSerializer extends JsonSerializer<OptionalValues<?>> {
+
+    private final boolean alwaysSerializeErrorsAsList;
+
+    public OptionalValuesSerializer() {
+        this.alwaysSerializeErrorsAsList = false;
+    }
+
+    @Inject
+    public OptionalValuesSerializer(JacksonConfiguration jacksonConfiguration) {
+        this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
+    }
 
     @Override
     public boolean isEmpty(SerializerProvider provider, OptionalValues<?> value) {
@@ -51,8 +65,9 @@ public class OptionalValuesSerializer extends JsonSerializer<OptionalValues<?>> 
                 gen.writeFieldName(fieldName);
                 Object v = opt.get();
                 if (value instanceof OptionalMultiValues) {
-                    List list = (List) v;
-                    if (list.size() == 1) {
+                    List<?> list = (List<?>) v;
+
+                    if (list.size() == 1 && (list.get(0).getClass() != JsonError.class || !alwaysSerializeErrorsAsList)) {
                         gen.writeObject(list.get(0));
                     } else {
                         gen.writeObject(list);
