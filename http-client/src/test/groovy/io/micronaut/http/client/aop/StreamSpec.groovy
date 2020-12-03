@@ -38,6 +38,7 @@ import spock.lang.Unroll
 
 import javax.annotation.Nullable
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.CountDownLatch
 
 /**
  * @author Jesper Steen Møller
@@ -90,11 +91,12 @@ class StreamSpec extends Specification {
         when:
         Flowable<ByteBuffer> responseFlowable = myClient.echoAsByteBuffers(n, "Hello, World!")
         int sum = 0
-        // using blockingForEach for variations sake
-        responseFlowable.blockingForEach { ByteBuffer bytes ->
+        CountDownLatch latch = new CountDownLatch(1)
+        responseFlowable.doOnTerminate { latch.countDown() }.forEach { ByteBuffer bytes ->
             sum += bytes.toByteArray().count('!')
-            ((ReferenceCounted)bytes).release()
         }
+        latch.await()
+
         then:
         sum == n
     }
