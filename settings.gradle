@@ -2,8 +2,7 @@ rootProject.name = 'micronaut'
 
 include "aop"
 include "bom"
-include "bom-check"
-include "parent"
+include "parªent"
 include "buffer-netty"
 include "core"
 include "function"
