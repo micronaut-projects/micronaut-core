@@ -2,15 +2,16 @@ package io.micronaut.docs.server.suspend
 
 import io.micronaut.retry.annotation.Retryable
 import kotlinx.coroutines.delay
-import java.lang.RuntimeException
 import javax.inject.Singleton
 
 @Singleton
-open class SuspendService {
-
+open class SuspendService(
+    private val suspendRequestScopedService: SuspendRequestScopedService
+) {
     var counter1: Int = 0
     var counter2: Int = 0
     var counter3: Int = 0
+    var counter4: Int = 0
 
     @Retryable
     open suspend fun delayedCalculation1(): String {
@@ -43,4 +44,12 @@ open class SuspendService {
         return "delayedCalculation3"
     }
 
+    @Retryable
+    open suspend fun requestScopedCalculation(): String {
+        if (counter4 != 2) {
+            counter4++
+            throw RuntimeException("error $counter4")
+        }
+        return "${suspendRequestScopedService.requestId},${Thread.currentThread().id}"
+    }
 }

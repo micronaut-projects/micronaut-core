@@ -19,18 +19,23 @@ import io.micronaut.core.bind.ArgumentBinder
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.context.ServerRequestContext
+import kotlinx.coroutines.ThreadContextElement
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.function.Supplier
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.coroutines.jvm.internal.CoroutineStackFrame
 
-class ContinuationArgumentBinder: TypedRequestArgumentBinder<Continuation<*>> {
-    override fun bind(context: ArgumentConversionContext<Continuation<*>>?, source: HttpRequest<*>): ArgumentBinder.BindingResult<Continuation<*>> =
-        with (CustomContinuation()) {
+class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
+    override fun bind(
+        context: ArgumentConversionContext<Continuation<*>>?,
+        source: HttpRequest<*>
+    ): ArgumentBinder.BindingResult<Continuation<*>> =
+        with(CustomContinuation(source)) {
             source.setAttribute(CONTINUATION_ARGUMENT_ATTRIBUTE_KEY, this)
-            ArgumentBinder.BindingResult { Optional.of(this as Continuation<*>) }
+            ArgumentBinder.BindingResult { Optional.of(this) }
         }
 
     override fun argumentType(): Argument<Continuation<*>> = Argument.of(Continuation::class.java)
@@ -40,26 +45,49 @@ class ContinuationArgumentBinder: TypedRequestArgumentBinder<Continuation<*>> {
 
     companion object {
         @JvmStatic
-        fun extractContinuationCompletableFutureSupplier(source: HttpRequest<*>): Supplier<CompletableFuture<*>> =
-            source.getAttribute(CONTINUATION_ARGUMENT_ATTRIBUTE_KEY).orElse(null) as CustomContinuation
+        fun extractContinuationCompletableFutureSupplier(source: HttpRequest<*>): Supplier<CompletableFuture<*>>? =
+            source.getAttribute(CONTINUATION_ARGUMENT_ATTRIBUTE_KEY, CustomContinuation::class.java).orElse(null)
 
         private const val CONTINUATION_ARGUMENT_ATTRIBUTE_KEY = "__continuation__"
     }
 }
 
-private class CustomContinuation: Continuation<Any>, Supplier<CompletableFuture<*>> {
-    private val completableFuture = CompletableFuture<Any>()
+private class CustomContinuation(
+    httpRequest: HttpRequest<*>
+) : Continuation<Any?>, CoroutineStackFrame, Supplier<CompletableFuture<*>> {
 
-    override fun get(): CompletableFuture<*> = completableFuture
+    private val serverRequestScopeHandler = ServerRequestScopeHandler(httpRequest)
+    private val completableFuture = CompletableFuture<Any?>()
 
-    override val context: CoroutineContext
-        get() = EmptyCoroutineContext
+    override fun get(): CompletableFuture<Any?> = completableFuture
 
-    override fun resumeWith(result: Result<Any>) {
+    override val context: CoroutineContext =
+        serverRequestScopeHandler
+
+    override fun resumeWith(result: Result<Any?>) {
         if (result.isSuccess) {
             completableFuture.complete(result.getOrNull())
         } else {
             completableFuture.completeExceptionally(result.exceptionOrNull())
         }
     }
+
+    override val callerFrame: CoroutineStackFrame? = null
+    override fun getStackTraceElement(): StackTraceElement? = null
+}
+
+private class ServerRequestScopeHandler(
+    private val httpRequest: HttpRequest<*>
+) : ThreadContextElement<Unit> {
+
+    companion object Key : CoroutineContext.Key<ServerRequestScopeHandler>
+
+    override val key: CoroutineContext.Key<ServerRequestScopeHandler>
+        get() = Key
+
+    override fun updateThreadContext(context: CoroutineContext) =
+        ServerRequestContext.set(httpRequest)
+
+    override fun restoreThreadContext(context: CoroutineContext, oldState: Unit) =
+        ServerRequestContext.set(null)
 }
