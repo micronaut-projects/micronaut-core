@@ -83,10 +83,24 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      *
      * @param path The path to the file
      * @return An optional file it was possible to create it
+     * @deprecated Visiting a file should supply the originating elements. Use {@link #visitMetaInfFile(String, Element...)} instead
      */
     @Override
     @Experimental
-    Optional<GeneratedFile> visitMetaInfFile(String path);
+    @Deprecated
+    default Optional<GeneratedFile> visitMetaInfFile(String path) {
+        return visitMetaInfFile(path, Element.EMPTY_ELEMENT_ARRAY);
+    }
+
+    /**
+     * Visit a file within the META-INF directory.
+     *
+     * @param path The path to the file
+     * @return An optional file it was possible to create it
+     */
+    @Override
+    @Experimental
+    Optional<GeneratedFile> visitMetaInfFile(String path, Element...originatingElements);
 
     /**
      * Visit a file that will be located within the generated source directory.
@@ -143,21 +157,17 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
-     * Provide the URI to the annotation processing classes output directory, i.e. the parent of META-INF.
+     * Provide the Path to the annotation processing classes output directory, i.e. the parent of META-INF.
      *
      * <p>This might, for example, be used as a convenience for {@link TypeElementVisitor} classes to provide
      * relative path strings to {@link VisitorContext#addGeneratedResource(String)}</p>
      * <pre>
      * Path resource = ... // absolute path to the resource
-     * Optional<URI> classesOutputURI = visitorContext.getClassesOutputUri();
-     * if (classesOutputURI.isPresent()) {
-     *     // path to resource, relative to classes output
-     *     Path relativePath = classesOutputURI.get().relativize(resource)
-     *     visitorContext.addGeneratedResource(relativePath.toString());
-     * }
+     * visitorContext.getClassesOutputPath().ifPresent(path ->
+     *     visitorContext.addGeneratedResource(path.relativize(resource).toString()));
      * </pre>
      *
-     * @return URI pointing to the classes output directory
+     * @return Path pointing to the classes output directory
      */
     @Experimental
     default Optional<Path> getClassesOutputPath() {

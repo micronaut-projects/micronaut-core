@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.TypeHint;
@@ -28,7 +29,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.*;
 
 /**
@@ -75,6 +75,7 @@ public class JacksonConfiguration {
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
     private ObjectMapper.DefaultTyping defaultTyping = null;
     private PropertyNamingStrategy propertyNamingStrategy = null;
+    private boolean alwaysSerializeErrorsAsList = false;
 
     /**
      * Whether the {@link io.micronaut.core.beans.BeanIntrospection} should be used for reflection free object serialialization/deserialialization.
@@ -197,6 +198,16 @@ public class JacksonConfiguration {
     }
 
     /**
+     * Whether _embedded.errors should always be serialized as list. If set to false, _embedded.errors
+     * with 1 element will be serialized as an object.
+     *
+     * @return True if _embedded.errors should always be serialized as list.
+     */
+    public boolean isAlwaysSerializeErrorsAsList() {
+        return alwaysSerializeErrorsAsList;
+    }
+
+    /**
      * Sets the default date format to use.
      * @param dateFormat The date format
      */
@@ -305,6 +316,16 @@ public class JacksonConfiguration {
      */
     public void setPropertyNamingStrategy(PropertyNamingStrategy propertyNamingStrategy) {
         this.propertyNamingStrategy = propertyNamingStrategy;
+    }
+
+    /**
+     * Sets whether _embedded.errors should always be serialized as list (defaults to false).
+     * If set to false, _embedded.errors with 1 element will be serialized as an object.
+     *
+     * @param alwaysSerializeErrorsAsList True if _embedded.errors should always be serialized as list.
+     */
+    public void setAlwaysSerializeErrorsAsList(boolean alwaysSerializeErrorsAsList) {
+        this.alwaysSerializeErrorsAsList = alwaysSerializeErrorsAsList;
     }
 
     /**

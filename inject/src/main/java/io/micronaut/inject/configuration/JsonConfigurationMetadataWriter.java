@@ -36,7 +36,7 @@ public class JsonConfigurationMetadataWriter implements ConfigurationMetadataWri
 
     @Override
     public void write(ConfigurationMetadataBuilder<?> metadataBuilder, ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        Optional<GeneratedFile> opt = classWriterOutputVisitor.visitMetaInfFile(getFileName());
+        Optional<GeneratedFile> opt = classWriterOutputVisitor.visitMetaInfFile(getFileName(), metadataBuilder.getOriginatingElements());
         if (opt.isPresent()) {
             GeneratedFile file = opt.get();
             List<ConfigurationMetadata> configurations = metadataBuilder.getConfigurations();

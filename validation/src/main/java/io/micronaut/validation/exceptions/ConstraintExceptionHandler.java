@@ -24,7 +24,9 @@ import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
+import io.micronaut.jackson.JacksonConfiguration;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
@@ -46,6 +48,17 @@ import java.util.Set;
 @Requires(classes = {ConstraintViolationException.class, ExceptionHandler.class})
 public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintViolationException, HttpResponse<JsonError>> {
 
+    private final boolean alwaysSerializeErrorsAsList;
+
+    public ConstraintExceptionHandler() {
+        this.alwaysSerializeErrorsAsList = false;
+    }
+
+    @Inject
+    public ConstraintExceptionHandler(JacksonConfiguration jacksonConfiguration) {
+        this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
+    }
+
     @Override
     public HttpResponse<JsonError> handle(HttpRequest request, ConstraintViolationException exception) {
         Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
@@ -53,7 +66,7 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
             JsonError error = new JsonError(exception.getMessage() == null ? HttpStatus.BAD_REQUEST.getReason() : exception.getMessage());
             error.link(Link.SELF, Link.of(request.getUri()));
             return HttpResponse.badRequest(error);
-        } else if (constraintViolations.size() == 1) {
+        } else if (constraintViolations.size() == 1 && !alwaysSerializeErrorsAsList) {
             ConstraintViolation<?> violation = constraintViolations.iterator().next();
             JsonError error = new JsonError(buildMessage(violation));
             error.link(Link.SELF, Link.of(request.getUri()));

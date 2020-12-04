@@ -15,6 +15,7 @@
  */
 package io.micronaut.multitenancy.tenantresolver;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
@@ -23,6 +24,7 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.multitenancy.exceptions.TenantNotFoundException;
 
 import javax.inject.Singleton;
+import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.util.Optional;
 
@@ -34,9 +36,10 @@ import java.util.Optional;
  */
 @Singleton
 @Requires(property = SubdomainTenantResolverConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
-public class SubdomainTenantResolver implements TenantResolver {
+public class SubdomainTenantResolver implements TenantResolver, HttpRequestTenantResolver {
 
     @Override
+    @NonNull
     public Serializable resolveTenantIdentifier() {
         Optional<HttpRequest<Object>> current = ServerRequestContext.currentRequest();
         return current.map(this::resolveTenantIdentifierAtRequest).orElseThrow(() -> new TenantNotFoundException("Tenant could not be resolved outside a web request"));
@@ -46,9 +49,17 @@ public class SubdomainTenantResolver implements TenantResolver {
      *
      * @param request The HTTP request
      * @return the tenant ID if resolved.
+     * @deprecated Use {@link SubdomainTenantResolver#resolveTenantIdentifier(HttpRequest)} instead;
      * @throws TenantNotFoundException if tenant not found
      */
+    @Deprecated
     protected Serializable resolveTenantIdentifierAtRequest(HttpRequest<Object> request) throws TenantNotFoundException {
+        return resolveTenantIdentifier(request);
+    }
+
+    @Override
+    @NonNull
+    public Serializable resolveTenantIdentifier(@NonNull @NotNull HttpRequest<?> request) throws TenantNotFoundException {
         if (request.getHeaders() != null) {
             String host = request.getHeaders().get(HttpHeaders.HOST);
             if (host != null) {

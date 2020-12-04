@@ -26,10 +26,9 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.multitenancy.propagation.TenantPropagationHttpClientFilter
 import io.micronaut.multitenancy.tenantresolver.CookieTenantResolver
-import io.micronaut.multitenancy.tenantresolver.HttpHeaderTenantResolver
+import io.micronaut.multitenancy.tenantresolver.HttpRequestTenantResolver
 import io.micronaut.multitenancy.tenantresolver.TenantResolver
 import io.micronaut.multitenancy.writer.CookieTenantWriter
-import io.micronaut.multitenancy.writer.HttpHeaderTenantWriter
 import io.micronaut.multitenancy.writer.TenantWriter
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -86,6 +85,12 @@ class CookieTenantResolverSpec extends Specification {
 
         then:
         noExceptionThrown()
+
+        and:
+        gormEmbeddedServer.applicationContext.containsBean(TenantResolver)
+        gormEmbeddedServer.applicationContext.getBean(TenantResolver) instanceof CookieTenantResolver
+        gormEmbeddedServer.applicationContext.containsBean(HttpRequestTenantResolver)
+        gormEmbeddedServer.applicationContext.getBean(HttpRequestTenantResolver) instanceof CookieTenantResolver
     }
 
     def "setup gateway server"() {

@@ -16,6 +16,7 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.http.client.RxHttpClientFactory;
 import io.micronaut.http.client.RxStreamingHttpClient;
@@ -36,7 +37,17 @@ public class NettyRxHttpClientFactory implements RxHttpClientFactory {
     }
 
     @Override
+    public RxHttpClient createClient(URL url, HttpClientConfiguration configuration) {
+        return new DefaultHttpClient(url, configuration);
+    }
+
+    @Override
     public RxStreamingHttpClient createStreamingClient(URL url) {
         return new DefaultHttpClient(url);
+    }
+
+    @Override
+    public RxStreamingHttpClient createStreamingClient(URL url, HttpClientConfiguration configuration) {
+        return new DefaultHttpClient(url, configuration);
     }
 }

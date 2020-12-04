@@ -10,6 +10,11 @@ import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
 
 class OriginatingElementsSpec extends AbstractTypeElementSpec {
+
+    def cleanup() {
+        StaticOriginatingElements.INSTANCE.clear()
+    }
+
     @RestoreSystemProperties
     void "test inject annotation inherited through abstract base"() {
         given:

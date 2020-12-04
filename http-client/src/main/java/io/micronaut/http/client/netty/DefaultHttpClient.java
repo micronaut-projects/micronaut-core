@@ -149,6 +149,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS;
+import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS;
+
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
  *
@@ -450,10 +453,13 @@ public class DefaultHttpClient implements
                 }
             }
             if (shutdownGroup) {
-                Duration shutdownTimeout = configuration.getShutdownTimeout().orElse(Duration.ofMillis(100));
+                Duration shutdownTimeout = configuration.getShutdownTimeout()
+                    .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
+                Duration shutdownQuietPeriod = configuration.getShutdownQuietPeriod()
+                    .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS));
 
                 Future<?> future = this.group.shutdownGracefully(
-                        1,
+                        shutdownQuietPeriod.toMillis(),
                         shutdownTimeout.toMillis(),
                         TimeUnit.MILLISECONDS
                 );
@@ -954,7 +960,15 @@ public class DefaultHttpClient implements
                 }
                 NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
-                return httpContentFlowable.filter(message -> !(message.content() instanceof EmptyByteBuf)).map(contentMapper);
+                return httpContentFlowable
+                        .filter(message -> !(message.content() instanceof EmptyByteBuf))
+                        .map(contentMapper)
+                        .doAfterNext(buffer -> {
+                            ByteBuf byteBuf = (ByteBuf) buffer.asNativeBuffer();
+                            if (byteBuf.refCnt() > 0) {
+                                ReferenceCountUtil.safeRelease(byteBuf);
+                            }
+                        });
             }).doOnTerminate(() -> {
                 final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
                 if (o instanceof Channel) {
@@ -1768,10 +1782,11 @@ public class DefaultHttpClient implements
                 permitsBody,
                 poolMap == null
         );
+
         if (log.isDebugEnabled()) {
-            log.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
-            log.debug("Chosen Server: {}({})", requestURI.getHost(), requestURI.getPort());
+            debugRequest(requestURI, nettyRequest);
         }
+
         if (log.isTraceEnabled()) {
             traceRequest(finalRequest, nettyRequest);
         }
@@ -1932,10 +1947,11 @@ public class DefaultHttpClient implements
                 }
             }
         });
+
         if (log.isDebugEnabled()) {
-            log.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
-            log.debug("Chosen Server: {}({})", requestURI.getHost(), requestURI.getPort());
+            debugRequest(requestURI, nettyRequest);
         }
+
         if (log.isTraceEnabled()) {
             traceRequest(requestWrapper.get(), nettyRequest);
         }
@@ -2037,9 +2053,12 @@ public class DefaultHttpClient implements
 
                     try {
                         HttpHeaders headers = fullResponse.headers();
+
+                        if (log.isDebugEnabled()) {
+                            log.debug("Received response {} from {}", status.code(), request.getUri());
+                        }
+
                         if (log.isTraceEnabled()) {
-                            log.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri());
-                            log.trace("Status Code: {}", status);
                             traceHeaders(headers);
                             traceBody("Response", fullResponse.content());
                         }
@@ -2391,6 +2410,12 @@ public class DefaultHttpClient implements
         }
 
         return postRequestEncoder;
+    }
+
+    private void debugRequest(URI requestURI, io.netty.handler.codec.http.HttpRequest nettyRequest) {
+        log.debug("Sending HTTP {} to {}",
+                nettyRequest.method(),
+                requestURI.toString());
     }
 
     private void traceRequest(io.micronaut.http.HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {

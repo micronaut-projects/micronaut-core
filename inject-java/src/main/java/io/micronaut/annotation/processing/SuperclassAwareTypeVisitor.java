@@ -25,11 +25,7 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
 import javax.lang.model.util.Types;
-import java.lang.reflect.AnnotatedType;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -58,7 +54,11 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
 
     @Override
     public R visitDeclared(DeclaredType type, P p) {
-       final Element element = type.asElement();
+        return visitDeclared(type, p, true);
+    }
+
+    private R visitDeclared(DeclaredType type, P p, boolean visitInterfaces) {
+        final Element element = type.asElement();
 
         if ((JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element)) &&
                 !element.toString().equals(Object.class.getName()) &&
@@ -95,17 +95,47 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
             if (superMirror instanceof DeclaredType) {
                 visitDeclared((DeclaredType) superMirror, p);
             }
-            List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
-            for (TypeMirror anInterface : interfaces) {
-                if (anInterface instanceof DeclaredType) {
-
-                    DeclaredType interfaceType = (DeclaredType) anInterface;
-                    visitDeclared(interfaceType, p);
+            if (visitInterfaces) {
+                List<TypeMirror> interfaces = new ArrayList<>();
+                for (TypeMirror anInterface : typeElement.getInterfaces()) {
+                    if (anInterface instanceof DeclaredType) {
+                        DeclaredType interfaceType = (DeclaredType) anInterface;
+                        interfaces.add(anInterface);
+                        interfaces.addAll(getInterfaces(interfaceType));
+                    }
                 }
+                interfaces.stream()
+                        .distinct()
+                        .sorted((o1, o2) -> {
+                            if (types.isSubtype(o1, o2)) {
+                                return -1;
+                            } else {
+                                return 0;
+                            }
+                        })
+                        .filter(DeclaredType.class::isInstance)
+                        .map(DeclaredType.class::cast)
+                        .forEach((dt) -> visitDeclared(dt, p, false));
             }
         }
 
         return null;
+    }
+
+    private List<TypeMirror> getInterfaces(DeclaredType declaredType) {
+        Element interfaceElement = declaredType.asElement();
+        List<TypeMirror> interfaces = new ArrayList<>();
+        if (interfaceElement instanceof TypeElement) {
+            TypeElement interfaceTypeElement = (TypeElement) interfaceElement;
+            for (TypeMirror anInterface : interfaceTypeElement.getInterfaces()) {
+                if (anInterface instanceof DeclaredType) {
+                    DeclaredType interfaceType = (DeclaredType) anInterface;
+                    interfaces.add(interfaceType);
+                    interfaces.addAll(getInterfaces(interfaceType));
+                }
+            }
+        }
+        return interfaces;
     }
 
     /**

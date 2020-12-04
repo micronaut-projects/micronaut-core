@@ -47,7 +47,11 @@ ext {
                     name: 'micronaut-oraclecloud-bom',
                     version: micronautOracleCloudVersion
             ],
-
+            'micronaut.r2dbc': [
+                    group: 'io.micronaut.r2dbc',
+                    name: 'micronaut-r2dbc-bom',
+                    version: micronautR2DBCVersion
+            ],
             //Third-party
             'netty': [
                     group: 'io.netty',
@@ -88,6 +92,11 @@ ext {
                     group:'com.google.protobuf',
                     name:'protobuf-bom',
                     version:protobufJavaVersion
+            ],
+            'testcontainers':[
+                    group:'org.testcontainers',
+                    name:'testcontainers-bom',
+                    version:testContainersVersion
             ]
     ]
     dependencyVersions = [
@@ -161,9 +170,15 @@ ext {
                     group:'io.micronaut.cassandra',
                     name:'micronaut-cassandra'
             ],
+            // TODO Deprecated: Remove in the next major version
+            'micronaut.discovery.old': [
+                    version:micronautOldDiscoveryClientVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-discovery-client'
+            ],
             'micronaut.discovery': [
                     version:micronautDiscoveryClientVersion,
-                    group:'io.micronaut',
+                    group:'io.micronaut.discovery',
                     name:'micronaut-discovery-client'
             ],
             'micronaut.hibernate.validator': [
@@ -347,11 +362,17 @@ ext {
                     group:'org.neo4j.driver',
                     name:'neo4j-java-driver'
             ],
-            ojdbc                      : [
-                    version: ojdbcVersion,
+            oracle                      : [
+                    version: oracleDriverVersion,
                     group  : 'com.oracle.database.jdbc',
                     name   : 'ojdbc8',
                     modules: ['ucp']
+            ],
+            // TODO Deprecated: Remove in the next major version
+            oldOracle                  : [
+                    version: oldOracleDriverVersion,
+                    group  : 'com.oracle.ojdbc',
+                    name   : 'ojdbc8'
             ],
             'jcache'                   : [
                     version: jcacheVersion,
@@ -489,6 +510,11 @@ ext {
                     group  : 'org.graalvm.nativeimage',
                     name   : 'svm'
             ],
+            graalSdk                   : [
+                    version: graalVersion,
+                    group  : 'org.graalvm.sdk',
+                    name   : 'graal-sdk'
+            ],
             h2                         : [
                     version: h2Version,
                     group  : 'com.h2database',
@@ -513,17 +539,6 @@ ext {
                     version: mssqlDriverVersion,
                     group  : 'com.microsoft.sqlserver',
                     name   : 'mssql-jdbc'
-            ],
-            oracle                  : [
-                version: oracleDriverVersion,
-                group  : 'com.oracle.database.jdbc',
-                name   : 'ojdbc8'
-            ],
-            // TODO Deprecated: Remove in the next major version
-            oldOracle                  : [
-                version: oldOracleDriverVersion,
-                group  : 'com.oracle.ojdbc',
-                name   : 'ojdbc8'
             ],
             tomcatJdbc                 : [
                     version: tomcatJdbcVersion,
@@ -615,6 +630,26 @@ ext {
                 name   : 'ignite-core',
                 modules: ['ignite-kubernetes']
             ],
+            'micronaut.mqtt': [
+                version: micronautMQTTVersion,
+                group  : 'io.micronaut.mqtt',
+                modules: ['micronaut-mqtt-core', 'micronaut-mqtt-ssl',  'micronaut-mqttv3',  'micronaut-mqttv5']
+            ],
+            'pahov3': [
+                version: pahov3Version,
+                group  : 'org.eclipse.paho',
+                name   : 'org.eclipse.paho.client.mqttv3'
+            ],
+            'pahov5': [
+                version: pahov5Version,
+                group  : 'org.eclipse.paho',
+                name   : 'org.eclipse.paho.mqttv5.client'
+            ],
+            'lombok': [
+                version: lombokVersion,
+                group  : 'org.projectlombok',
+                name   : 'lombok'
+            ]
     ]
 
     dependencyVersion = { String name ->
@@ -701,6 +736,7 @@ subprojects { Project subproject ->
 
     apply plugin: "io.micronaut.build.common"
     if (!subproject.name.startsWith('test-') &&
+            !subproject.name.startsWith('inject-test-') &&
             !subproject.toString().contains('benchmarks')) {
         apply plugin: "io.micronaut.build.dependency-updates"
         apply plugin: "io.micronaut.build.publishing"
@@ -721,6 +757,10 @@ subprojects { Project subproject ->
         }
     }
 
+    tasks.withType(JavaCompile){
+       options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
+       options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+    }
     tasks.withType(Checkstyle) {
         reports {
             xml.enabled = !System.getenv("GITHUB_ACTIONS")

@@ -1,5 +1,6 @@
 package io.micronaut.inject.visitor.beans
 
+import com.blazebit.persistence.impl.function.entity.ValuesEntity
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
@@ -144,6 +145,14 @@ class Test {}
 
         cleanup:
         applicationContext.close()
+    }
+    void "test introspection class member configuration works 2"() {
+        when:
+            BeanIntrospection introspection = BeanIntrospection.getIntrospection(ValuesEntity)
+
+        then:
+            noExceptionThrown()
+            introspection != null
     }
 
     void "test bean introspection with property of generic interface"() {

@@ -68,8 +68,8 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
 
     @Override
     protected void decode(ChannelHandlerContext ctx, HttpRequest msg, List<Object> out) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Server {}:{} Received Request: {} {}", embeddedServer.getHost(), embeddedServer.getPort(), msg.method(), msg.uri());
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Server {}:{} Received Request: {} {}", embeddedServer.getHost(), embeddedServer.getPort(), msg.method(), msg.uri());
         }
         try {
             NettyHttpRequest<Object> request = new NettyHttpRequest<>(msg, ctx, conversionService, configuration);

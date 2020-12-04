@@ -15,6 +15,7 @@
  */
 package io.micronaut.multitenancy.tenantresolver;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.multitenancy.MultitenancyConfiguration;
 import io.micronaut.multitenancy.exceptions.TenantNotFoundException;
 
@@ -26,6 +27,7 @@ import java.io.Serializable;
  * @author Sergio del Amo
  * @since 1.0
  */
+@FunctionalInterface
 public interface TenantResolver {
 
     String PREFIX = MultitenancyConfiguration.PREFIX + ".tenantresolver";
@@ -48,5 +50,6 @@ public interface TenantResolver {
      * @return The tenant identifier
      * @throws TenantNotFoundException if tenant not found
      */
+    @NonNull
     Serializable resolveTenantIdentifier() throws TenantNotFoundException;
 }

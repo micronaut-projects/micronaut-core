@@ -20,6 +20,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.net.URL;
 import java.util.Enumeration;
 import java.util.Iterator;
@@ -213,7 +214,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                         unprocessed = lines.iterator();
 
                     }
-                } catch (IOException e) {
+                } catch (IOException | UncheckedIOException e) {
                     // ignore, can't do anything here and can't log because class used in compiler
                 }
             }

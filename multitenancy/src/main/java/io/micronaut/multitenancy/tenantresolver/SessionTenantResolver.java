@@ -15,6 +15,7 @@
  */
 package io.micronaut.multitenancy.tenantresolver;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
@@ -24,6 +25,7 @@ import io.micronaut.session.Session;
 import io.micronaut.session.http.HttpSessionFilter;
 
 import javax.inject.Singleton;
+import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.util.Optional;
 
@@ -37,7 +39,7 @@ import java.util.Optional;
 @Requires(beans = SessionTenantResolverConfiguration.class)
 @Requires(property = SessionTenantResolverConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Singleton
-public class SessionTenantResolver implements TenantResolver {
+public class SessionTenantResolver implements TenantResolver, HttpRequestTenantResolver {
 
     /**
      * The name of the session attribute.
@@ -53,6 +55,7 @@ public class SessionTenantResolver implements TenantResolver {
     }
 
     @Override
+    @NonNull
     public Serializable resolveTenantIdentifier() throws TenantNotFoundException {
         Optional<HttpRequest<Object>> current = ServerRequestContext.currentRequest();
         return current.map(this::resolveTenantIdentifierAtRequest).orElseThrow(() -> new TenantNotFoundException("Tenant could not be resolved outside a web request"));
@@ -62,9 +65,17 @@ public class SessionTenantResolver implements TenantResolver {
      *
      * @param request The HTTP request
      * @return the tenant ID if resolved.
+     * @deprecated Use {@link SessionTenantResolver#resolveTenantIdentifier(HttpRequest)} instead;
      * @throws TenantNotFoundException if tenant not found
      */
+    @Deprecated
     protected Serializable resolveTenantIdentifierAtRequest(HttpRequest<Object> request) throws TenantNotFoundException {
+        return resolveTenantIdentifier(request);
+    }
+
+    @Override
+    @NonNull
+    public Serializable resolveTenantIdentifier(@NonNull @NotNull HttpRequest<?> request) throws TenantNotFoundException {
         if (this.attribute == null) {
             throw new TenantNotFoundException("Tenant could not be resolved from HTTP Session, because session attribute name is not set");
         }

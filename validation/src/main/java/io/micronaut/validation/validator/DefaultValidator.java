@@ -57,7 +57,6 @@ import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.*;
 import javax.validation.groups.Default;
@@ -96,7 +95,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
      *
      * @param configuration The validator configuration
      */
-    @Inject
     protected DefaultValidator(
             @NonNull ValidatorConfiguration configuration) {
         ArgumentUtils.requireNonNull("configuration", configuration);
@@ -1319,12 +1317,22 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             Object propertyValue,
             @Nullable DefaultPropertyNode container) {
 
-        final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(propertyValue);
+        Class<?> beanType = Object.class;
+        if (propertyValue != null) {
+            beanType = propertyValue.getClass();
+        } else if (cascadeProperty instanceof BeanProperty) {
+            Argument[] typeParameters = ((BeanProperty) cascadeProperty).asArgument().getTypeParameters();
+            if (typeParameters.length > 0) {
+                beanType = typeParameters[0].getType();
+            }
+        }
+
+        final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(beanType);
         AnnotationMetadata annotationMetadata = cascadeProperty.getAnnotationMetadata();
         if (beanIntrospection == null && !annotationMetadata.hasStereotype(Constraint.class)) {
             // error: only has @Valid but the propertyValue class is not @Introspected
             overallViolations.add(createIntrospectionConstraintViolation(
-                rootClass, rootBean, context, propertyValue.getClass(), propertyValue));
+                rootClass, rootBean, context, beanType, propertyValue));
             return;
         }
 
@@ -1369,8 +1377,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 beanIntrospection.getIndexedProperties(Constraint.class);
         final Collection<BeanProperty<Object, Object>> cascadeNestedProperties =
                 beanIntrospection.getIndexedProperties(Valid.class);
+        final List<Class<? extends Annotation>> pojoConstraints =
+            beanIntrospection.getAnnotationMetadata().getAnnotationTypesByStereotype(Constraint.class);
 
-        if (CollectionUtils.isNotEmpty(cascadeConstraints) || CollectionUtils.isNotEmpty(cascadeNestedProperties)) {
+        if (CollectionUtils.isNotEmpty(cascadeConstraints) ||
+            CollectionUtils.isNotEmpty(cascadeNestedProperties) ||
+            CollectionUtils.isNotEmpty(pojoConstraints)
+        ) {
             doValidate(
                     beanIntrospection,
                     rootBean,
@@ -1379,7 +1392,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     cascadeNestedProperties,
                     context,
                     overallViolations,
-                    Collections.emptyList()
+                    pojoConstraints
             );
         }
     }

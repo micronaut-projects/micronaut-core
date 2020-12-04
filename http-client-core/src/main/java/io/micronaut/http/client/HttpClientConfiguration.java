@@ -36,7 +36,10 @@ import java.util.*;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * Configuration for the {@link HttpClient}.
+ * Configuration for the {@link HttpClient}. This configuration only takes affect for {@link HttpClient}
+ * instances created outside the application context using {@link HttpClient#create(URL, HttpClientConfiguration)}.
+ * For clients created within the context using, e.g. {@link javax.inject.Inject} or
+ * {@link io.micronaut.context.ApplicationContext#createBean(Class)}, use event loop group configuration.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -54,6 +57,12 @@ public abstract class HttpClientConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_READ_IDLE_TIMEOUT_MINUTES = 5;
+
+    /**
+     * The default shutdown timeout in millis.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS = 1;
 
     /**
      * The default shutdown timeout in millis.
@@ -97,6 +106,8 @@ public abstract class HttpClientConfiguration {
     private Duration readTimeout = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS);
 
     private Duration readIdleTimeout = Duration.of(DEFAULT_READ_IDLE_TIMEOUT_MINUTES, ChronoUnit.MINUTES);
+
+    private Duration shutdownQuietPeriod = Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS);
 
     private Duration shutdownTimeout = Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS);
 
@@ -158,6 +169,7 @@ public abstract class HttpClientConfiguration {
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
             this.eventLoopGroup = copy.eventLoopGroup;
             this.followRedirects = copy.followRedirects;
+            this.logLevel = copy.logLevel;
             this.loggerName = copy.loggerName;
             this.maxContentLength = copy.maxContentLength;
             this.proxyAddress = copy.proxyAddress;
@@ -168,6 +180,7 @@ public abstract class HttpClientConfiguration {
             this.readIdleTimeout = copy.readIdleTimeout;
             this.readTimeout = copy.readTimeout;
             this.shutdownTimeout = copy.shutdownTimeout;
+            this.shutdownQuietPeriod = copy.shutdownQuietPeriod;
             this.sslConfiguration = copy.sslConfiguration;
             this.threadFactory = copy.threadFactory;
             this.httpVersion = copy.httpVersion;
@@ -356,12 +369,32 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * The amount of quiet period for shutdown.
+     *
+     * @return The shutdown timeout
+     */
+    public Optional<Duration> getShutdownQuietPeriod() {
+        return Optional.ofNullable(shutdownQuietPeriod);
+    }
+
+    /**
      * The amount of time to wait for shutdown.
      *
      * @return The shutdown timeout
      */
     public Optional<Duration> getShutdownTimeout() {
         return Optional.ofNullable(shutdownTimeout);
+    }
+
+    /**
+     * Sets the amount of quiet period for shutdown of client thread pools. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS} milliseconds).
+     *
+     * If a task is submitted during the quiet period, it will be accepted and the quiet period will start over.
+     *
+     * @param shutdownQuietPeriod The shutdown quiet period
+     */
+    public void setShutdownQuietPeriod(@Nullable Duration shutdownQuietPeriod) {
+        this.shutdownQuietPeriod = shutdownQuietPeriod;
     }
 
     /**
@@ -586,17 +619,25 @@ public abstract class HttpClientConfiguration {
      */
     @Internal
     static RxHttpClient createClient(@Nullable URL url) {
-        RxHttpClientFactory clientFactory = HttpClientConfiguration.clientFactory;
-        if (clientFactory == null) {
-            synchronized (HttpClientConfiguration.class) { // double check
-                clientFactory = HttpClientConfiguration.clientFactory;
-                if (clientFactory == null) {
-                    clientFactory = resolveClientFactory();
-                    HttpClientConfiguration.clientFactory = clientFactory;
-                }
-            }
-        }
+        RxHttpClientFactory clientFactory = getRxHttpClientFactory();
+
         return clientFactory.createClient(url);
+    }
+
+    /**
+     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    @Internal
+    static RxHttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration) {
+        RxHttpClientFactory clientFactory = getRxHttpClientFactory();
+
+        return clientFactory.createClient(url, configuration);
     }
 
     /**
@@ -609,6 +650,27 @@ public abstract class HttpClientConfiguration {
     @Internal
     static RxStreamingHttpClient createStreamingClient(@NonNull URL url) {
         ArgumentUtils.requireNonNull("url", url);
+        RxHttpClientFactory clientFactory = getRxHttpClientFactory();
+        return clientFactory.createStreamingClient(url);
+    }
+
+    /**
+     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration The client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    @Internal
+    static RxStreamingHttpClient createStreamingClient(@NonNull URL url, HttpClientConfiguration configuration) {
+        ArgumentUtils.requireNonNull("url", url);
+        RxHttpClientFactory clientFactory = getRxHttpClientFactory();
+        return clientFactory.createStreamingClient(url, configuration);
+    }
+
+    private static RxHttpClientFactory getRxHttpClientFactory() {
         RxHttpClientFactory clientFactory = HttpClientConfiguration.clientFactory;
         if (clientFactory == null) {
             synchronized (HttpClientConfiguration.class) { // double check
@@ -619,7 +681,7 @@ public abstract class HttpClientConfiguration {
                 }
             }
         }
-        return clientFactory.createStreamingClient(url);
+        return clientFactory;
     }
 
     private static RxHttpClientFactory resolveClientFactory() {

@@ -24,7 +24,7 @@ ext.extraPomInfo = {
         'azure-functions-maven-plugin.version'('1.5.0')
         'exec-maven-plugin.version'('1.6.0')
         'function-maven-plugin.version'('0.9.4')
-        'jib-maven-plugin.version'('2.5.2')
+        'jib-maven-plugin.version'('2.6.0')
         'maven-compiler-plugin.version'('3.8.1') // Override actual Maven compiler version (3.1) because some bugs cause annotation processors doesn't work well
         'maven-failsafe-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
         'maven-resources-plugin.version'('3.1.0')
@@ -50,6 +50,7 @@ ext.extraPomInfo = {
                     groupId "io.micronaut.build"
                     artifactId "micronaut-maven-plugin"
                     delegate.version '${micronaut-maven-plugin.version}'
+                    extensions true
                 }
                 delegate.plugin {
                     groupId "com.github.os72"
@@ -101,11 +102,6 @@ ext.extraPomInfo = {
                     delegate.version '${function-maven-plugin.version}'
                 }
                 delegate.plugin {
-                    groupId "com.google.cloud.tools"
-                    artifactId "jib-maven-plugin"
-                    delegate.version '${jib-maven-plugin.version}'
-                }
-                delegate.plugin {
                     groupId "com.microsoft.azure"
                     artifactId "azure-functions-maven-plugin"
                     delegate.version '${azure-functions-maven-plugin.version}'
@@ -120,6 +116,20 @@ ext.extraPomInfo = {
                     groupId "org.apache.maven.plugins"
                     artifactId "maven-compiler-plugin"
                     delegate.version '${maven-compiler-plugin.version}'
+                    delegate.configuration {
+                        annotationProcessorPaths {
+                            delegate.path {
+                                groupId "io.micronaut"
+                                artifactId "micronaut-inject-java"
+                                delegate.version '${micronaut.version}'
+                            }
+                            delegate.path {
+                                groupId "io.micronaut"
+                                artifactId "micronaut-validation"
+                                delegate.version '${micronaut.version}'
+                            }
+                        }
+                    }
                 }
                 delegate.plugin {
                     groupId 'org.apache.maven.plugins'
@@ -145,10 +155,7 @@ ext.extraPomInfo = {
                     delegate.version '${maven-shade-plugin.version}'
                     delegate.executions {
                         execution {
-                            delegate.phase "package"
-                            goals {
-                                goal "shade"
-                            }
+                            id 'default-shade'
                             delegate.configuration {
                                 createDependencyReducedPom(false)
                                 transformers {
@@ -157,6 +164,41 @@ ext.extraPomInfo = {
                                     }
                                     transformer(implementation:'org.apache.maven.plugins.shade.resource.ServicesResourceTransformer')
                                 }
+                            }
+                        }
+                    }
+                }
+                delegate.plugin {
+                    groupId "org.graalvm.nativeimage"
+                    artifactId "native-image-maven-plugin"
+                    delegate.version '${graal.version}'
+                    delegate.configuration {
+                        imageName '${project.artifactId}'
+                        mainClass '${exec.mainClass}'
+                        buildArgs {
+                            buildArg '--no-fallback'
+                            buildArg '-cp ${project.build.directory}/${project.artifactId}-${project.version}.jar'
+                        }
+                    }
+                }
+                delegate.plugin {
+                    groupId 'com.google.cloud.tools'
+                    artifactId 'jib-maven-plugin'
+                    delegate.version '${jib-maven-plugin.version}'
+                    delegate.dependencies {
+                        dependency {
+                            groupId "io.micronaut.build"
+                            artifactId "micronaut-maven-plugin"
+                            delegate.version '${micronaut-maven-plugin.version}'
+                        }
+                    }
+                    delegate.configuration {
+                        to {
+                            image '${project.artifactId}'
+                        }
+                        pluginExtensions {
+                            pluginExtension {
+                                implementation 'io.micronaut.build.jib.JibMicronautExtension'
                             }
                         }
                     }
