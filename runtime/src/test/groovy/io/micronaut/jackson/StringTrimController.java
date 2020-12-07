@@ -20,7 +20,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 
 @Controller("/trim")
-public class TrimStringsController {
+public class StringTrimController {
 
     @Post("/pojo")
     public Pojo pojo(@Body Pojo pojo) {
