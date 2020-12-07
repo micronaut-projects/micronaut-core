@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Blocking;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -23,6 +24,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 
 import java.io.Closeable;
+import java.util.Optional;
 
 /**
  * A blocking HTTP client interface that features a subset of the operations provided by {@link HttpClient} and
@@ -140,12 +142,18 @@ public interface BlockingHttpClient extends Closeable {
         if (HttpStatus.class.isAssignableFrom(bodyType.getType())) {
             return (O) response.getStatus();
         } else {
-            return response
-                    .getBody()
-                    .orElseThrow(() -> new HttpClientResponseException(
-                            "Empty body",
-                            response
-                    ));
+            Optional<O> body = response.getBody();
+            if (!body.isPresent() && response.getBody(ByteBuffer.class).isPresent()) {
+                throw new HttpClientResponseException(
+                        String.format("Failed to decode the body for the given content type [%s]", response.getContentType().orElse(null)),
+                        response
+                );
+            } else {
+                return body.orElseThrow(() -> new HttpClientResponseException(
+                        "Empty body",
+                        response
+                ));
+            }
         }
     }
 
