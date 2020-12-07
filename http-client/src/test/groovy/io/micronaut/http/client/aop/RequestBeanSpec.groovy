@@ -45,6 +45,8 @@ class RequestBeanSpec extends Specification {
         bean.queryValues = ["ABC", "XYZ"]
         bean.queryValue = "FOO"
         bean.forwardedFor = "Tester"
+        bean.path = "request-bean"
+
         when:
             ClientRequestBean resp = client.getBean(bean)
         then:
@@ -146,7 +148,7 @@ class RequestBeanSpec extends Specification {
     @Controller('/request/bean')
     static class RequestBeanController {
 
-        @Get("/client-request-bean")
+        @Get("/client-{path}")
         ClientRequestBean getBean(@RequestBean ClientRequestBean bean) {
             return bean
         }
@@ -226,7 +228,7 @@ class RequestBeanSpec extends Specification {
     @Client('/request/bean')
     static interface RequestBeanClient {
 
-        @Get("/client-request-bean")
+        @Get("/client-{path}")
         ClientRequestBean getBean(@RequestBean ClientRequestBean bean)
 
         @Get("/queryValue{?queryValue}")
@@ -279,12 +281,17 @@ class RequestBeanSpec extends Specification {
         @Nullable
         @QueryValue
         String queryValue
+
         @Nullable
         @QueryValue
         List<String> queryValues
+
         @Nullable
         @Header("X-Forwarded-For")
         String forwardedFor
+
+        @PathVariable
+        String path
     }
 
     @Introspected

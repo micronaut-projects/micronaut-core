@@ -70,7 +70,6 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
             request.basicAuth(value.getUsername(), value.getPassword());
         });
         byAnnotation.put(QueryValue.class, (context, uriContext, value, request) -> {
-
             String parameterName = context.getAnnotationMetadata().stringValue(QueryValue.class)
                     .filter (StringUtils::isNotEmpty)
                     .orElse(context.getArgument().getName());
@@ -86,11 +85,9 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .filter (StringUtils::isNotEmpty)
                     .orElse(context.getArgument().getName());
 
-            if (!(value instanceof String)) {
-                conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
-                        .filter(StringUtils::isNotEmpty)
-                        .ifPresent(param -> uriContext.getPathParameters().put(parameterName, param));
-            }
+            conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                    .filter(StringUtils::isNotEmpty)
+                    .ifPresent(param -> uriContext.getPathParameters().put(parameterName, param));
         });
         byAnnotation.put(CookieValue.class, (context, uriContext, value, request) -> {
             String cookieName = context.getAnnotationMetadata().stringValue(CookieValue.class)
