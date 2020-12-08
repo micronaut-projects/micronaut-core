@@ -15,7 +15,13 @@
  */
 package io.micronaut.http.uri;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -191,7 +197,11 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
     @Override
     protected UriTemplateParser createParser(String templateString, Object... parserArguments) {
-        this.pattern = new StringBuilder();
+
+        if (Objects.isNull(this.pattern)) {
+            this.pattern = new StringBuilder();
+        }
+
         if (this.variables == null) {
             this.variables = new ArrayList<>();
         }
