@@ -13,7 +13,7 @@ dependencies {
     testImplementation project(":inject-test-utils")
     testImplementation project(":inject-groovy-test")
     testImplementation project(":validation")
-    testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'
+    testImplementation 'org.neo4j.driver:neo4j-java-driver:4.2.0'
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation "com.blazebit:blaze-persistence-core-impl:1.6.0-Alpha1"
 
