@@ -132,4 +132,38 @@ class JacksonSetupSpec extends Specification {
         expect:
         applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy == PropertyNamingStrategy.SNAKE_CASE
     }
+
+    void "verify trim strings with custom property enabled"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(MapPropertySource.of(
+                'jackson.trim-strings': true
+        ))
+        applicationContext.start()
+
+        expect:
+        applicationContext.containsBean(ObjectMapper.class)
+        applicationContext.getBean(ObjectMapper.class).valueToTree([foo: ' bar ']).get('foo').textValue() == 'bar'
+        applicationContext.getBean(ObjectMapper.class).valueToTree([foo: '     ']).get('foo').textValue() == null
+
+        cleanup:
+        applicationContext?.close()
+    }
+
+    void "verify don't trim strings with custom property disabled"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(MapPropertySource.of(
+                'jackson.trim-strings': false
+        ))
+        applicationContext.start()
+
+        expect:
+        applicationContext.containsBean(ObjectMapper.class)
+        applicationContext.getBean(ObjectMapper.class).valueToTree([foo: ' bar ']).get('foo').textValue() == ' bar '
+        applicationContext.getBean(ObjectMapper.class).valueToTree([foo: '     ']).get('foo').textValue() == '     '
+
+        cleanup:
+        applicationContext?.close()
+    }
 }

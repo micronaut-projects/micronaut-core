@@ -35,8 +35,6 @@ dependencies {
     testImplementation "ch.qos.logback:logback-classic:1.2.3"
 
     testAnnotationProcessor project(":inject-java")
-    testImplementation project(":http-server-netty")
-    testImplementation project(":http-client")
     testImplementation 'org.jsr107.ri:cache-ri-impl:1.1.1'
     testImplementation dependencyVersion("jcache")
     testImplementation project(":inject-java")

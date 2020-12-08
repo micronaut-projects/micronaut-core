@@ -17,27 +17,38 @@ package io.micronaut.jackson.deserialize;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import io.micronaut.context.annotation.Requires;
+import com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.jackson.JacksonConfiguration;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.IOException;
 
 @Singleton
-@Requires(property = "jackson.trim-strings", value = StringUtils.TRUE)
-public class StringTrimModule extends SimpleModule {
+public class StringTrimModule extends StdScalarDeserializer<String> {
+
+    private final boolean trimStrings;
 
     public StringTrimModule() {
-        addDeserializer(String.class, new StringDeserializer() {
+        super(String.class);
 
-            @Override
-            public String deserialize(JsonParser jsonParser, DeserializationContext context) throws IOException {
-                String value = super.deserialize(jsonParser, context);
+        this.trimStrings = false;
+    }
 
-                return StringUtils.trimToNull(value);
-            }
-        });
+    @Inject
+    public StringTrimModule(JacksonConfiguration jacksonConfiguration) {
+        super(String.class);
+
+        this.trimStrings = jacksonConfiguration.isTrimStrings();
+    }
+
+    @Override
+    public String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+        if (trimStrings) {
+            return StringUtils.trimToNull(p.getValueAsString());
+        }
+
+        return p.getValueAsString();
     }
 }
