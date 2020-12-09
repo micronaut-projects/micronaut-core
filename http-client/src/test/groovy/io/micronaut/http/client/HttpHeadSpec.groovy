@@ -15,9 +15,7 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.format.Format
-import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -28,15 +26,13 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Head
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.annotation.Status
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.functions.Consumer
-import spock.lang.AutoCleanup
-import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -329,6 +325,15 @@ class HttpHeadSpec extends Specification {
         ex.message == "Empty body"
     }
 
+    void "test no body returned"() {
+        when:
+        myGetClient.noContent()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.message == "Empty body"
+    }
+
     void "test a request with a custom host header"() {
         when:
         String body = client.toBlocking().retrieve(
@@ -478,6 +483,10 @@ class HttpHeadSpec extends Specification {
         HttpResponse multipleMappings() {
             return HttpResponse.ok().header("X-Test", "multiple mappings")
         }
+
+        @Head("/no-content")
+        @Status(HttpStatus.NO_CONTENT)
+        void noContent() {}
     }
 
     static class Book {
@@ -531,6 +540,9 @@ class HttpHeadSpec extends Specification {
 
         @Head("/multiple/mappings")
         HttpResponse multipleMappings()
+
+        @Head("/no-content")
+        String noContent()
     }
 
     @javax.inject.Singleton
