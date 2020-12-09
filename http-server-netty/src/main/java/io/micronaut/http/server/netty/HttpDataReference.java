@@ -126,7 +126,7 @@ public class HttpDataReference {
     }
 
     private long readableBytes(HttpData httpData) throws IOException {
-        if (httpData.isInMemory()) {
+        if (httpData.isInMemory() && httpData.length() != 0) {
             return httpData.getByteBuf().readableBytes();
         } else {
             return httpData.length();
