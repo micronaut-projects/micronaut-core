@@ -403,7 +403,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     protected void channelRead0(ChannelHandlerContext ctx, io.micronaut.http.HttpRequest<?> request) {
         ctx.channel().config().setAutoRead(false);
         io.micronaut.http.HttpMethod httpMethod = request.getMethod();
-        String requestPath = request.getPath();
+        String requestPath = request.getUri().getPath();
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Request {} {}", httpMethod, request.getUri());
