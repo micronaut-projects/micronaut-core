@@ -30,9 +30,11 @@ import kotlin.coroutines.jvm.internal.CoroutineStackFrame
  */
 @Internal
 @Experimental
-class CompletableFutureContinuation(private val continuation: Continuation<Any>) : Continuation<Any>, CoroutineStackFrame {
+class CompletableFutureContinuation(
+    private val continuation: Continuation<Any?>
+) : Continuation<Any?>, CoroutineStackFrame {
 
-    var completableFuture = CompletableFuture<Any>()
+    var completableFuture = CompletableFuture<Any?>()
 
     override val callerFrame: CoroutineStackFrame?
         get() = continuation as? CoroutineStackFrame
@@ -42,7 +44,7 @@ class CompletableFutureContinuation(private val continuation: Continuation<Any>)
     override val context: CoroutineContext
         get() = continuation.context
 
-    override fun resumeWith(result: Result<Any>) {
+    override fun resumeWith(result: Result<Any?>) {
         if (result.isSuccess) {
             completableFuture.complete(result.getOrNull())
         } else {
@@ -51,13 +53,12 @@ class CompletableFutureContinuation(private val continuation: Continuation<Any>)
     }
 
     companion object {
-
-        fun completeSuccess(continuation: Continuation<Any>, result: Any) {
+        fun completeSuccess(continuation: Continuation<Any?>, result: Any?) {
             continuation.resumeWith(Result.success(result))
         }
-        fun completeExceptionally(continuation: Continuation<Any>, exception: Throwable) {
+
+        fun completeExceptionally(continuation: Continuation<Any?>, exception: Throwable) {
             continuation.resumeWith(Result.failure(exception))
         }
     }
-
 }

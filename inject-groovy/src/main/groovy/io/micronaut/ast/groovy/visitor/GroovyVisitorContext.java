@@ -229,7 +229,7 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
-    public Optional<GeneratedFile> visitMetaInfFile(String path) {
+    public Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements) {
         File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
 

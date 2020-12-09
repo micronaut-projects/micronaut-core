@@ -15,13 +15,18 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaClassElement;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -50,17 +55,20 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        List<io.micronaut.inject.ast.Element> originatingElements = new ArrayList<>();
         for (TypeElement annotation : annotations) {
             Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(annotation);
             for (Element element : elements) {
                 if (element instanceof TypeElement) {
-                    String name = ((TypeElement) element).getQualifiedName().toString();
+                    TypeElement typeElement = (TypeElement) element;
+                    String name = typeElement.getQualifiedName().toString();
                     Generated generated = element.getAnnotation(Generated.class);
                     if (generated != null) {
                         String serviceName = generated.service();
                         if (StringUtils.isNotEmpty(serviceName)) {
                             serviceDescriptors.computeIfAbsent(serviceName, s1 -> new HashSet<>())
                                     .add(name);
+                            originatingElements.add(new JavaClassElement(typeElement, AnnotationMetadata.EMPTY_METADATA, null));
                         }
                     }
 
@@ -70,9 +78,37 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
         }
         if (roundEnv.processingOver() && !serviceDescriptors.isEmpty()) {
             classWriterOutputVisitor.writeServiceEntries(
-                    serviceDescriptors
+                    serviceDescriptors,
+                    originatingElements.toArray(io.micronaut.inject.ast.Element.EMPTY_ELEMENT_ARRAY)
             );
+
+            writeConfigurationMetadata();
         }
         return true;
+    }
+
+    private void writeConfigurationMetadata() {
+        ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().ifPresent(metadataBuilder -> {
+            try {
+                if (metadataBuilder.hasMetadata()) {
+                    ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
+
+                    try {
+                        for (ConfigurationMetadataWriter writer : writers) {
+                            try {
+                                writer.write(metadataBuilder, classWriterOutputVisitor);
+                            } catch (IOException e) {
+                                warning("Error occurred writing configuration metadata: %s", e.getMessage());
+                            }
+                        }
+                    } catch (ServiceConfigurationError e) {
+                        warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
+                    }
+                }
+            } finally {
+                ConfigurationMetadataBuilder.setConfigurationMetadataBuilder(null);
+            }
+        });
+
     }
 }

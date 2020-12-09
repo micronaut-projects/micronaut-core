@@ -83,10 +83,24 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      *
      * @param path The path to the file
      * @return An optional file it was possible to create it
+     * @deprecated Visiting a file should supply the originating elements. Use {@link #visitMetaInfFile(String, Element...)} instead
      */
     @Override
     @Experimental
-    Optional<GeneratedFile> visitMetaInfFile(String path);
+    @Deprecated
+    default Optional<GeneratedFile> visitMetaInfFile(String path) {
+        return visitMetaInfFile(path, Element.EMPTY_ELEMENT_ARRAY);
+    }
+
+    /**
+     * Visit a file within the META-INF directory.
+     *
+     * @param path The path to the file
+     * @return An optional file it was possible to create it
+     */
+    @Override
+    @Experimental
+    Optional<GeneratedFile> visitMetaInfFile(String path, Element...originatingElements);
 
     /**
      * Visit a file that will be located within the generated source directory.

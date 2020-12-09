@@ -17,6 +17,8 @@ package io.micronaut.http.client.bind;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -68,7 +70,6 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
             request.basicAuth(value.getUsername(), value.getPassword());
         });
         byAnnotation.put(QueryValue.class, (context, uriContext, value, request) -> {
-
             String parameterName = context.getAnnotationMetadata().stringValue(QueryValue.class)
                     .filter (StringUtils::isNotEmpty)
                     .orElse(context.getArgument().getName());
@@ -84,11 +85,9 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .filter (StringUtils::isNotEmpty)
                     .orElse(context.getArgument().getName());
 
-            if (!(value instanceof String)) {
-                conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
-                        .filter(StringUtils::isNotEmpty)
-                        .ifPresent(param -> uriContext.getPathParameters().put(parameterName, param));
-            }
+            conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                    .filter(StringUtils::isNotEmpty)
+                    .ifPresent(param -> uriContext.getPathParameters().put(parameterName, param));
         });
         byAnnotation.put(CookieValue.class, (context, uriContext, value, request) -> {
             String cookieName = context.getAnnotationMetadata().stringValue(CookieValue.class)
@@ -118,6 +117,17 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         });
         byAnnotation.put(Body.class, (ClientArgumentRequestBinder<Object>) (context, uriContext, value, request) -> {
             request.body(value);
+        });
+        byAnnotation.put(RequestBean.class, (ClientArgumentRequestBinder<Object>) (context, uriContext, value, request) -> {
+            BeanIntrospection<Object> introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
+            for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
+                findArgumentBinder(beanProperty.asArgument()).ifPresent(binder -> {
+                    Object propertyValue = beanProperty.get(value);
+                    if (propertyValue != null) {
+                        binder.bind(context.with(beanProperty.asArgument()), uriContext, propertyValue, request);
+                    }
+                });
+            }
         });
 
         if (KOTLIN_COROUTINES_SUPPORTED) {

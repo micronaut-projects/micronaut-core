@@ -16,7 +16,6 @@
 package io.micronaut.http.client
 
 import io.micronaut.core.io.buffer.ByteBufferFactory
-import io.micronaut.core.io.buffer.ReferenceCounted
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
@@ -26,30 +25,24 @@ import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.codec.CodecException
 import io.micronaut.http.multipart.PartData
 import io.micronaut.http.multipart.StreamingFileUpload
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.reactivex.Single
-import io.reactivex.internal.operators.flowable.FlowableBlockingSubscribe
-import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
-import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Retry
-import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import javax.inject.Inject
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -88,9 +81,10 @@ class DataStreamSpec extends Specification {
         def publisher = client.dataStream(HttpRequest.GET(
                 '/datastream/books'
         ))
+        PollingConditions conditions = new PollingConditions(timeout: 2)
 
         List<byte[]> arrays = []
-        FlowableBlockingSubscribe.subscribe(publisher, new Subscriber<ByteBuffer<?>>() {
+        publisher.subscribe(new Subscriber<ByteBuffer<?>>() {
             Subscription subscription
             @Override
             void onSubscribe(Subscription s) {
@@ -106,30 +100,34 @@ class DataStreamSpec extends Specification {
 
             @Override
             void onError(Throwable t) {
-
             }
 
             @Override
             void onComplete() {
-
             }
         })
 
         then:
-        arrays.size() == 1
-        new String(arrays[0]) == 'The Stand'
+        conditions.eventually {
+            assert arrays.size() == 1
+            assert new String(arrays[0]) == 'The Stand'
+        }
     }
 
     void "test read response bytebuffer stream"() {
         when:
-        List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(
+        List<byte[]> arrays = []
+        PollingConditions conditions = new PollingConditions(timeout: 2)
+        client.exchangeStream(HttpRequest.GET(
                 '/datastream/books'
-        )).map({res -> res.body.get().toByteArray() }).toList().blockingGet()
+        )).subscribe({res -> arrays.add(res.body.get().toByteArray()) })
 
         then:
-        arrays.size() == 2
-        new String(arrays[0]) == 'The Stand'
-        new String(arrays[1]) == 'The Shining'
+        conditions.eventually {
+            assert arrays.size() == 2
+            assert new String(arrays[0]) == 'The Stand'
+            assert new String(arrays[1]) == 'The Shining'
+        }
     }
 
     @Retry

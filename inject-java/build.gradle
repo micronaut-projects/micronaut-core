@@ -13,7 +13,7 @@ dependencies {
     testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
     testImplementation dependencyVersion("rxjava2")
-    testImplementation "org.hibernate:hibernate-core:5.4.22.Final"
+    testImplementation "org.hibernate:hibernate-core:5.4.25.Final"
     testImplementation "junit:junit:4.13.1"
     testImplementation "com.google.testing.compile:compile-testing:0.19"
     testImplementation 'org.mongodb:mongo-java-driver:3.12.7'

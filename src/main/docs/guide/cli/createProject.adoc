@@ -104,7 +104,7 @@ The create-* commands will generate a basic Micronaut project, with optional fla
 |`--test spock`
 
 |`-b`, `--build`
-|Build tool (one of `gradle`, `maven` - default is `gradle`)
+|Build tool (one of `gradle`, `gradle_kotlin`, `maven` - default is `gradle` for the languages `java` and `groovy`; default is `gradle_kotlin` for language `kotlin`)
 |`--build maven`
 
 |`-f`, `--features`

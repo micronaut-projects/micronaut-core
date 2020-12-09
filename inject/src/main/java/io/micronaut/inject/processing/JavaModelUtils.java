@@ -35,6 +35,13 @@ public class JavaModelUtils {
             return Optional.empty();
         }
     }).orElse(null);
+    private static final ElementKind RECORD_COMPONENT_KIND = ReflectionUtils.findDeclaredField(ElementKind.class, "RECORD_COMPONENT").flatMap(field -> {
+        try {
+            return Optional.of((ElementKind) field.get(ElementKind.class));
+        } catch (IllegalAccessException e) {
+            return Optional.empty();
+        }
+    }).orElse(null);
 
     /**
      * The Java APT throws an internal exception {code com.sun.tools.javac.code.Symbol$CompletionFailure} if a class is missing from the classpath and {@link Element#getKind()} is called. This method
@@ -165,5 +172,23 @@ public class JavaModelUtils {
      */
     public static String getClassArrayName(TypeElement typeElement) {
         return "[L" + getClassName(typeElement) + ";";
+    }
+
+    /**
+     * Return whether this is a record or a component of a record.
+     * @param e The element
+     * @return True if it is
+     */
+    public static boolean isRecordOrRecordComponent(Element e) {
+        return isRecord(e) || isRecordComponent(e);
+    }
+
+    /**
+     * Return whether this is a component of a record.
+     * @param e The element
+     * @return True if it is
+     */
+    public static boolean isRecordComponent(Element e) {
+        return resolveKind(e, RECORD_COMPONENT_KIND).isPresent();
     }
 }

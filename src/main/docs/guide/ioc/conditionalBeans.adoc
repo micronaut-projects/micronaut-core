@@ -37,10 +37,10 @@ The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotati
 |===
 |Requirement | Example
 
-|Require the presence of one ore more classes
+|Require the presence of one or more classes
 |`@Requires(classes=javax.servlet.Servlet)`
 
-|Require the absence of one ore more classes
+|Require the absence of one or more classes
 |`@Requires(missing=javax.servlet.Servlet)`
 
 |Require the presence one or more beans

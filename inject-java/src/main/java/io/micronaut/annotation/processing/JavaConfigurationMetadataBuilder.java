@@ -15,10 +15,13 @@
  */
 package io.micronaut.annotation.processing;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 
 import javax.lang.model.element.Element;
@@ -29,6 +32,8 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -44,6 +49,7 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
     private final AnnotationUtils annotationUtils;
     private final ModelUtils modelUtils;
     private final Elements elements;
+    private final Map<String, ClassElement> originatingElements = new LinkedHashMap<>();
 
     /**
      * @param elements The {@link Elements}
@@ -72,14 +78,22 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
         return elements;
     }
 
+    @NonNull
+    @Override
+    public io.micronaut.inject.ast.Element[] getOriginatingElements() {
+        return originatingElements.values().toArray(io.micronaut.inject.ast.Element.EMPTY_ELEMENT_ARRAY);
+    }
+
     @Override
     protected String buildPropertyPath(TypeElement owningType, TypeElement declaringType, String propertyName) {
+        addOriginatingElements(owningType);
         String value = buildTypePath(owningType, declaringType);
         return value + '.' + propertyName;
     }
 
     @Override
     protected String buildTypePath(TypeElement owningType, TypeElement declaringType, AnnotationMetadata annotationMetadata) {
+        addOriginatingElements(owningType, declaringType);
         String initialPath = calculateInitialPath(owningType, annotationMetadata);
         StringBuilder path = new StringBuilder(initialPath);
 
@@ -117,8 +131,22 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
 
     @Override
     protected String buildTypePath(TypeElement owningType, TypeElement declaringType) {
+        addOriginatingElements(owningType, declaringType);
         AnnotationMetadata annotationMetadata = getAnnotationMetadata(declaringType);
         return buildTypePath(owningType, declaringType, annotationMetadata);
+    }
+
+    private void addOriginatingElements(TypeElement... types) {
+        for (TypeElement type : types) {
+            String className = type.getQualifiedName().toString();
+            if (!originatingElements.containsKey(className)) {
+                originatingElements.put(className, new JavaClassElement(
+                        type,
+                        AnnotationMetadata.EMPTY_METADATA,
+                        null
+                ));
+            }
+        }
     }
 
     private String calculateInitialPath(TypeElement owningType, AnnotationMetadata annotationMetadata) {

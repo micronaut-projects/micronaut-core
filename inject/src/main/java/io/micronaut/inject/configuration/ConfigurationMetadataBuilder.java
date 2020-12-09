@@ -21,11 +21,14 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.inject.ast.Element;
+
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * <p>A builder for producing metadata for the available {@link io.micronaut.context.annotation.ConfigurationProperties}.</p>
@@ -38,9 +41,14 @@ import java.util.List;
  * @since 1.0
  */
 public abstract class ConfigurationMetadataBuilder<T> {
-
+    private static ConfigurationMetadataBuilder<?> currentBuilder = null;
     private final List<PropertyMetadata> properties = new ArrayList<>();
     private final List<ConfigurationMetadata> configurations = new ArrayList<>();
+
+    /**
+     * @return The originating elements for the builder.
+     */
+    public abstract @NonNull Element[] getOriginatingElements();
 
     /**
      * @return The properties
@@ -222,6 +230,22 @@ public abstract class ConfigurationMetadataBuilder<T> {
      * @return The annotation metadata for the type
      */
     protected abstract AnnotationMetadata getAnnotationMetadata(T type);
+
+    /**
+     * Obtains the currently active metadata builder.
+     * @return The builder
+     */
+    public static Optional<ConfigurationMetadataBuilder<?>> getConfigurationMetadataBuilder() {
+        return Optional.ofNullable(currentBuilder);
+    }
+
+    /**
+     * Sets or clears the current {@link ConfigurationMetadataBuilder}.
+     * @param builder the builder
+     */
+    public static void setConfigurationMetadataBuilder(@Nullable ConfigurationMetadataBuilder<?> builder) {
+        currentBuilder = builder;
+    }
 
     /**
      * Quote a string.

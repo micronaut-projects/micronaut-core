@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
@@ -36,22 +37,18 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
-import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
+import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessedTypes;
-import io.micronaut.inject.writer.*;
-
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
+import io.micronaut.inject.writer.BeanDefinitionVisitor;
+import io.micronaut.inject.writer.BeanDefinitionWriter;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Provider;
-import javax.inject.Scope;
-import javax.inject.Qualifier;
+import javax.inject.*;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
@@ -116,6 +113,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     public final synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils, annotationUtils);
+        ConfigurationMetadataBuilder.setConfigurationMetadataBuilder(metadataBuilder);
         this.beanDefinitions = new LinkedHashSet<>();
     }
 
@@ -199,7 +197,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         */
         if (processingOver) {
             try {
-                writeConfigurationMetadata();
                 writeBeanDefinitionsToMetaInf();
             } finally {
                 AnnotationUtils.invalidateCache();
@@ -219,24 +216,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         } catch (Exception e) {
             String message = e.getMessage();
             error("Error occurred writing META-INF files: %s", message != null ? message : e);
-        }
-    }
-
-    private void writeConfigurationMetadata() {
-        if (metadataBuilder.hasMetadata()) {
-            ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
-
-            try {
-                for (ConfigurationMetadataWriter writer : writers) {
-                    try {
-                        writer.write(metadataBuilder, classWriterOutputVisitor);
-                    } catch (IOException e) {
-                        error("Error occurred writing configuration metadata: %s", e.getMessage());
-                    }
-                }
-            } catch (ServiceConfigurationError e) {
-                warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
-            }
         }
     }
 
@@ -385,6 +364,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         @Override
         public Object visitType(TypeElement classElement, Object o) {
             Name classElementQualifiedName = classElement.getQualifiedName();
+            if ("java.lang.Record".equals(classElementQualifiedName.toString())) {
+                return o;
+            }
             if (visitedTypes.contains(classElementQualifiedName)) {
                 // bail out if already visited
                 return o;
@@ -1909,8 +1891,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         @Override
         public Object visitUnknown(Element e, Object o) {
-            note("Visit unknown %s for %s", e.getSimpleName(), o);
-            return super.visitUnknown(e, o);
+            if (!JavaModelUtils.isRecordOrRecordComponent(e)) {
+                note("Visit unknown %s for %s", e.getSimpleName(), o);
+                return super.visitUnknown(e, o);
+            }
+            return o;
         }
 
         /**

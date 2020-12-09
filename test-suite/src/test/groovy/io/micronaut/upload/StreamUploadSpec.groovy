@@ -24,6 +24,8 @@ import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
 import spock.lang.Retry
 
+import java.nio.file.Files
+import java.nio.file.Path
 import java.security.MessageDigest
 
 /**
@@ -488,12 +490,24 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
     void "test the file is not corrupted with transferTo"() {
         given:
-        byte[] b = new byte[15360] //15mb
-        new Random().nextBytes(b)
-        byte[] originalmd5 = calculateMd5(b)
+        Path toUpload = Files.createTempFile("random", "bytes")
+        OutputStream outputStream = Files.newOutputStream(toUpload)
+        int size = 1024 * 1024 * 15
+        int created = 0
+        Random random = new Random()
+        while (created < size) {
+            byte[] chunk = new byte[1024]
+            random.nextBytes(chunk)
+            created += chunk.length
+            outputStream.write(chunk)
+        }
+        outputStream.close()
+
+        byte[] originalmd5 = calculateMd5(toUpload)
+
         MultipartBody requestBody = MultipartBody.builder()
                 .addPart("title", "bar-stream")
-                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, b)
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, toUpload.toFile())
                 .build()
 
         when:
@@ -503,26 +517,67 @@ class StreamUploadSpec extends AbstractMicronautSpec {
                         .accept(MediaType.TEXT_PLAIN_TYPE), String
         ))
         HttpResponse<String> response = flowable.blockingFirst()
-        def result = response.getBody().get()
         File file = new File(uploadDir, "bar-stream.json")
         file.deleteOnExit()
 
         then:
         response.code() == HttpStatus.OK.code
-        result == "Uploaded ${b.size()}"
-        file.exists()
-        file.length() == b.size()
-        calculateMd5(file.getBytes()) == originalmd5
+        calculateMd5(file.toPath()) == originalmd5
+    }
+
+    void "test the file is not corrupted with transferTo when file has to be buffered"() {
+        given:
+        Path toUpload = Files.createTempFile("random", "bytes")
+        OutputStream outputStream = Files.newOutputStream(toUpload)
+        int size = 1024 * 1024 * 15
+        int created = 0
+        Random random = new Random()
+        while (created < size) {
+            byte[] chunk = new byte[1024]
+            random.nextBytes(chunk)
+            created += chunk.length
+            outputStream.write(chunk)
+        }
+        outputStream.close()
+
+        byte[] originalmd5 = calculateMd5(toUpload)
+        //title comes second which means the file has to be buffered
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, toUpload.toFile())
+                .addPart("title", "bar-stream")
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-file-upload", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE), String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        File file = new File(uploadDir, "bar-stream.json")
+        file.deleteOnExit()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        calculateMd5(file.toPath()) == originalmd5
     }
 
     @Override
     Map<String, Object> getConfiguration() {
-        super.getConfiguration() << ['micronaut.http.client.read-timeout': 300]
+        super.getConfiguration() << [
+                'micronaut.http.client.read-timeout': 300,
+                'micronaut.server.multipart.max-file-size': '20mb',
+                'micronaut.server.max-request-size': '20mb',
+        ]
     }
 
-    private byte[] calculateMd5(byte[] bytes) {
+    private byte[] calculateMd5(Path path) {
         MessageDigest md = MessageDigest.getInstance("MD5")
-        md.update(bytes)
+        InputStream is = Files.newInputStream(path)
+        byte[] chunk = new byte[1024]
+        while (is.read(chunk) != -1) {
+            md.update(chunk)
+        }
         md.digest()
     }
 }

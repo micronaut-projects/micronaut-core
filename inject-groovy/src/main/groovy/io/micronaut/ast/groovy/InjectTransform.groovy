@@ -262,6 +262,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
 
                         @Override
+                        Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements) {
+                            return Optional.empty()
+                        }
+
+                        @Override
                         void finish() {
                             // no-op
                         }
