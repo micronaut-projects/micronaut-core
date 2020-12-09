@@ -38,7 +38,7 @@ The above example will configure a cache called "my-cache" with a maximum size o
 [NOTE]
 .Naming Caches
 ====
-Names of caches under `micronaut.caches` should be defined in kebab case (lowercase and hyphen seperated), if camel case is used the names are normalized to kebab case. So for example specifing `myCache` will become `my-cache`. The kebab case form should be used when referencing caches in the ann:cache.annotation.Cacheable[] annotation.
+Names of caches under `micronaut.caches` should be defined in kebab case (lowercase and hyphen separated), if camel case is used the names are normalized to kebab case. So for example specifying `myCache` will become `my-cache`. The kebab case form should be used when referencing caches in the ann:cache.annotation.Cacheable[] annotation.
 ====
 
 To configure a weigher to be used with the `maximumWeight` configuration, create a bean that implements `io.micronaut.caffeine.cache.Weigher`. To associate a given weigher with only a specific cache, annotate the bean with `@Named(<cache name>)`. Weighers without a named qualifier will apply to all caches that don't have a named weigher. If no beans are found, a default implementation will be used.
