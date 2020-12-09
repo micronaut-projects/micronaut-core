@@ -34,7 +34,11 @@ For macOS:
 
 dependency:netty-transport-native-kqueue[groupId="io.netty",scope="runtime",classifier="osx-x86_64"]
 
-For Linux:
+For Linux on ARM64:
+
+dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtime",classifier="linux-aarch_64"]
+
+For Linux on x86:
 
 dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtime",classifier="linux-x86_64"]
 
