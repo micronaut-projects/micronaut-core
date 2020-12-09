@@ -142,26 +142,20 @@ class JacksonSetupSpec extends Specification {
         applicationContext.start()
 
         expect:
-        applicationContext.containsBean(ObjectMapper.class)
-        applicationContext.getBean(ObjectMapper.class).valueToTree([foo: ' bar ']).get('foo').textValue() == 'bar'
-        applicationContext.getBean(ObjectMapper.class).valueToTree([foo: '     ']).get('foo').textValue() == null
+        applicationContext.getBean(ObjectMapper.class).readValue('{"foo": "  bar  "}', Map.class).get("foo") == "bar"
 
         cleanup:
         applicationContext?.close()
     }
 
-    void "verify don't trim strings with custom property disabled"() {
+    void "verify strings are not trimmed by default"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'jackson.trim-strings': false
-        ))
         applicationContext.start()
 
         expect:
-        applicationContext.containsBean(ObjectMapper.class)
-        applicationContext.getBean(ObjectMapper.class).valueToTree([foo: ' bar ']).get('foo').textValue() == ' bar '
-        applicationContext.getBean(ObjectMapper.class).valueToTree([foo: '     ']).get('foo').textValue() == '     '
+        applicationContext.getBean(ObjectMapper.class).readValue('{"foo": "  bar  "}', Map.class).get("foo") == "  bar  "
+
 
         cleanup:
         applicationContext?.close()
