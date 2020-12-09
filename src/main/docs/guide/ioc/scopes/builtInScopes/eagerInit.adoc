@@ -1,6 +1,6 @@
 Eager initialization of `@Singleton` beans maybe desirable in certain scenarios, such as on AWS Lambda where more CPU resources are assigned to Lamdba construction than execution.
 
-You can specify whether you want to initialize eagerly `@Singleton` scoped beans using the link:{api}/io/micronaut/context/scope/ApplicationContextBuilder.html[ApplicationContextBuilder] interface:
+You can specify whether you want to initialize eagerly `@Singleton` scoped beans using the link:{api}/io/micronaut/context/ApplicationContextBuilder.html[ApplicationContextBuilder] interface:
 
 .Enabling Eager Initialization of Singletons
 [source,java]
