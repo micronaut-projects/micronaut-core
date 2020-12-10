@@ -70,7 +70,7 @@ Here are the supported markers:
 * *%q* - Query string (excluding the '?' character)
 * *%r* - First line of the request
 * *%s* - HTTP status code of the response
-* *%{<format>}t* - Date and time. If the argument is ommitted the Common Log Format format is used ("'['dd/MMM/yyyy:HH:mm:ss Z']'").
+* *%{<format>}t* - Date and time. If the argument is omitted the Common Log Format format is used ("'['dd/MMM/yyyy:HH:mm:ss Z']'").
 ** If the format starts with begin: (default) the time is taken at the beginning of the request processing. If it starts with end: it is the time when the log entry gets written, close to the end of the request processing.
 ** The format should follow the DateTimeFormatter syntax.
 * *%{property}u* - Remote user that was authenticated. When *micronaut-session* is on the classpath, returns the session id if the argument is omitted or the specified property otherwise prints '-'
