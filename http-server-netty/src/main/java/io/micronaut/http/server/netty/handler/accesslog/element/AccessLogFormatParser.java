@@ -54,7 +54,7 @@ import io.netty.channel.socket.SocketChannel;
  * <li><b>%q</b> - Query string (excluding the '?' character)</li>
  * <li><b>%r</b> - First line of the request</li>
  * <li><b>%s</b> - HTTP status code of the response</li>
- * <li><b>%{<format>}t</b> - Date and time. If the argument is ommitted the Common Log Format format is used ("'['dd/MMM/yyyy:HH:mm:ss Z']'").
+ * <li><b>%{<format>}t</b> - Date and time. If the argument is omitted the Common Log Format format is used ("'['dd/MMM/yyyy:HH:mm:ss Z']'").
  * If the format starts with begin: (default) the time is taken at the beginning of the request processing. If it starts with end: it is the time when the log entry gets written, close to the end of the request processing.
  * The format should follow the DateTimeFormatter syntax.</li>
  * <li><b>%u</b> - Remote user that was authenticated. Not implemented. Prints '-'.</li>

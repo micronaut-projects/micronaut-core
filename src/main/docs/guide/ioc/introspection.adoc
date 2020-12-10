@@ -26,7 +26,7 @@ snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="usage", indent=0]
 
 <1> You can retrieve a api:core.beans.BeanIntrospection[] with the `getIntrospection` static method
 <2> Once you have a api:core.beans.BeanIntrospection[] you can instantiate a bean with the `instantiate` method.
-<3> A api:core.beans.BeanProperty[] can be retreived from the introspection
+<3> A api:core.beans.BeanProperty[] can be retrieved from the introspection
 <4> .. and the `set` method used to set the property value
 <5> .. and the `get` method used to retrieve the property value
 
@@ -89,7 +89,7 @@ snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="wrapper", indent=0]
 
 === Jackson and Bean Introspection
 
-Jackson is configured to use the api:core.beans.BeanIntrospection[] API to read and write property values and construct objects resulting in reflection-free serialization/deserialization which is benefitial from a performance perspective and requires less configuring to operate correctly with runtimes such as GraalVM native.
+Jackson is configured to use the api:core.beans.BeanIntrospection[] API to read and write property values and construct objects resulting in reflection-free serialization/deserialization which is beneficial from a performance perspective and requires less configuring to operate correctly with runtimes such as GraalVM native.
 
 This feature is enabled by default, you can disable it by setting the `jackson.bean-introspection-module` configuration to `false`.
 

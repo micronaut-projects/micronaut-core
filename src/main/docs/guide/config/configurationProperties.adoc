@@ -38,7 +38,7 @@ The names supplied to the includes/excludes list should be the "property" name. 
 
 == Property Type Conversion
 
-When resolving properties Micronaut will use the api:io.micronaut.core.convert.ConversionService[] bean to convert properties. You can register additional converters for types not supported by micronaut by defining beans that implement the api:io.micronaut.core.convert.TypeConverter[] interface.
+When resolving properties Micronaut will use the api:io.micronaut.core.convert.ConversionService[] bean to convert properties. You can register additional converters for types not supported by Micronaut by defining beans that implement the api:io.micronaut.core.convert.TypeConverter[] interface.
 
 
 Micronaut features some built-in conversions that are useful, which are detailed below.
