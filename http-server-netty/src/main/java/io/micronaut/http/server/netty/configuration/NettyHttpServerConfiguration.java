@@ -29,7 +29,7 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 
 import javax.inject.Inject;
-
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -677,6 +677,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private Integer ioRatio;
         private String executor;
         private boolean preferNativeTransport = false;
+        private Duration shutdownQuietPeriod = Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD);
+        private Duration shutdownTimeout = Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
         private String name;
 
         /**
@@ -734,6 +736,24 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         }
 
         /**
+         * @param shutdownQuietPeriod Set the shutdown quiet period
+         */
+        public void setShutdownQuietPeriod(Duration shutdownQuietPeriod) {
+            if (shutdownQuietPeriod != null) {
+                this.shutdownQuietPeriod = shutdownQuietPeriod;
+            }
+        }
+
+        /**
+         * @param shutdownTimeout Set the shutdown timeout (must be >= shutdownQuietPeriod)
+         */
+        public void setShutdownTimeout(Duration shutdownTimeout) {
+            if (shutdownTimeout != null) {
+                this.shutdownTimeout = shutdownTimeout;
+            }
+        }
+
+        /**
          * @return The number of threads to use
          */
         public int getNumOfThreads() {
@@ -770,6 +790,16 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Override
         public boolean isPreferNativeTransport() {
             return preferNativeTransport;
+        }
+
+        @Override
+        public Duration getShutdownQuietPeriod() {
+            return shutdownQuietPeriod;
+        }
+
+        @Override
+        public Duration getShutdownTimeout() {
+            return shutdownTimeout;
         }
     }
 }

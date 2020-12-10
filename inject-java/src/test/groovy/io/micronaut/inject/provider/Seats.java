@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.provider;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import org.atinject.tck.auto.Drivers;
 import org.atinject.tck.auto.Seat;
 import org.atinject.tck.auto.Tire;
@@ -28,8 +29,11 @@ public class Seats {
     Provider<Seat> driversSeatProvider;
     Provider<Tire> spareTireProvider;
 
-    Seats(@Drivers Provider<Seat> driversSeatProvider, @Named("spare") Provider<Tire> spareTireProvider) {
+    Seats(@Drivers Provider<Seat> driversSeatProvider,
+          @Named("spare") Provider<Tire> spareTireProvider,
+          @Nullable Provider<NotABean> notABeanProvider) {
         this.driversSeatProvider = driversSeatProvider;
         this.spareTireProvider = spareTireProvider;
+        assert notABeanProvider == null;
     }
 }

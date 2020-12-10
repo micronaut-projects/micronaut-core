@@ -21,15 +21,20 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.annotation.Read;
+import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.management.health.aggregator.HealthAggregator;
+import io.micronaut.management.health.indicator.HealthCheckType;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
+import io.micronaut.management.health.indicator.annotation.Liveness;
 import io.reactivex.Single;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import java.security.Principal;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -59,28 +64,72 @@ public class HealthEndpoint {
 
     private HealthAggregator<HealthResult> healthAggregator;
     private HealthIndicator[] healthIndicators;
+    private HealthIndicator[] livenessHealthIndicators;
+    private HealthIndicator[] readinessHealthIndicators;
     private DetailsVisibility detailsVisible = DetailsVisibility.AUTHENTICATED;
     private StatusConfiguration statusConfiguration;
 
     /**
      * @param healthAggregator            The {@link HealthAggregator}
      * @param healthIndicators            The {@link HealthIndicator}
+     * @param livenessHealthIndicators    The {@link HealthIndicator} qualified by {@link Liveness}
      */
     public HealthEndpoint(HealthAggregator<HealthResult> healthAggregator,
-                          HealthIndicator[] healthIndicators) {
+                          HealthIndicator[] healthIndicators,
+                          @Liveness HealthIndicator[] livenessHealthIndicators) {
         this.healthAggregator = healthAggregator;
         this.healthIndicators = healthIndicators;
+        this.livenessHealthIndicators = livenessHealthIndicators;
+        this.readinessHealthIndicators = getReadinessHealthIndicators(healthIndicators, livenessHealthIndicators);
+    }
+
+    protected final HealthIndicator[] getReadinessHealthIndicators(HealthIndicator[] allHealthIndicators,
+                                                                   HealthIndicator[] livenessHealthIndicators) {
+        List<HealthIndicator> liveness = Arrays.asList(livenessHealthIndicators);
+        return Arrays.stream(allHealthIndicators).
+                filter(healthIndicator -> !liveness.contains(healthIndicator)).
+                toArray(HealthIndicator[]::new);
     }
 
     /**
+     * Return all health indicators.
+     *
      * @param principal Authenticated user
      * @return The health information as a {@link Single}
      */
     @Read
     public Single<HealthResult> getHealth(@Nullable Principal principal) {
         HealthLevelOfDetail detail = levelOfDetail(principal);
+
         return Single.fromPublisher(
                 healthAggregator.aggregate(healthIndicators, detail)
+        );
+    }
+
+    /**
+     * Return health indicators based on the selector.
+     *
+     * @param principal Authenticated user
+     * @param selector HealthEndpointSelector
+     * @return The health information as a {@link Single}
+     */
+    @Read
+    public Single<HealthResult> getHealth(@Nullable Principal principal, @Selector HealthCheckType selector) {
+        HealthLevelOfDetail detail = levelOfDetail(principal);
+        HealthIndicator[] indicators;
+
+        switch (selector) {
+            case LIVENESS:
+                indicators = livenessHealthIndicators;
+                break;
+            case READINESS:
+            default:
+                indicators = readinessHealthIndicators;
+                break;
+        }
+
+        return Single.fromPublisher(
+                healthAggregator.aggregate(indicators, detail)
         );
     }
 

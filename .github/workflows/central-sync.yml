@@ -5,25 +5,24 @@
 # and edit them there. Note that it will be sync'ed to all the Micronaut repos
 name: Maven Central Sync
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version (eg: 1.2.3)'
+        required: true
 jobs:
   central-sync:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          ref: v${{ github.event.inputs.release_version }}
       - uses: gradle/wrapper-validation-action@v1
       - name: Set up JDK
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
-      - name: Set the current release version
-        id: release_version
-        run: |
-          release_version=${GITHUB_REF:11}
-          sed -i "s/^projectVersion.*$/projectVersion\=${release_version}/" gradle.properties
-          echo ::set-output name=release_version::${release_version}
       - name: Publish to Sonatype OSSRH
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}

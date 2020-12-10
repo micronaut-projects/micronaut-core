@@ -69,12 +69,14 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
     private final TypedElement typeElement;
     private final ClassElement declaringElement;
+    private final Type propertyGenericType;
 
     /**
      * Default constructor.
      * @param introspectionWriter The outer inspection writer.
      * @param typeElement  The type element
      * @param propertyType The property type
+     * @param propertyGenericType The generic type of the property
      * @param propertyName The property name
      * @param readMethod The read method name
      * @param writeMethod The write method name
@@ -87,6 +89,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             @NonNull BeanIntrospectionWriter introspectionWriter,
             @NonNull TypedElement typeElement,
             @NonNull Type propertyType,
+            @NonNull Type propertyGenericType,
             @NonNull String propertyName,
             @Nullable MethodElement readMethod,
             @Nullable MethodElement writeMethod,
@@ -94,12 +97,13 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             int index,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
-        super(introspectionWriter.getOriginatingElement());
+        super(introspectionWriter.getOriginatingElements());
         Type introspectionType = introspectionWriter.getIntrospectionType();
         this.declaringElement = introspectionWriter.getClassElement();
         this.typeElement = typeElement;
         this.beanType = introspectionWriter.getBeanType();
         this.propertyType = propertyType;
+        this.propertyGenericType = propertyGenericType;
         this.readMethod = readMethod;
         this.writeMethod = writeMethod;
         this.propertyName = propertyName;
@@ -138,7 +142,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        try (OutputStream classOutput = classWriterOutputVisitor.visitClass(getName(), getOriginatingElement())) {
+        try (OutputStream classOutput = classWriterOutputVisitor.visitClass(getName(), getOriginatingElements())) {
             startFinalClass(classWriter, type.getInternalName(), TYPE_BEAN_PROPERTY);
 
             writeConstructor();
@@ -240,7 +244,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         constructor.loadArg(0);
 
         // 2nd argument: The property type
-        constructor.push(propertyType);
+        constructor.push(propertyGenericType);
 
         // 3rd argument: The property name
         constructor.push(propertyName);

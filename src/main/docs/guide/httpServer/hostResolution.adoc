@@ -4,7 +4,7 @@ The default implementation will look for host information in the following place
 
 1. The supplied configuration
 2. The `Forwarded` header
-3. The `X-Forwarded-` headers
+3. The `X-Forwarded-` headers. If the `X-Forwarded-Host` header is not present, the other `X-Forwarded` headers are ignored.
 4. The `Host` header
 5. The properties on the request URI
 6. The properties on the embedded server URI

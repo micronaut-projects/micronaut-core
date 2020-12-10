@@ -232,6 +232,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
+    public @NonNull Micronaut defaultEnvironments(@Nullable String... environments) {
+        return (Micronaut) super.defaultEnvironments(environments);
+    }
+
+    @Override
     public @NonNull Micronaut packages(@Nullable String... packages) {
         return (Micronaut) super.packages(packages);
     }

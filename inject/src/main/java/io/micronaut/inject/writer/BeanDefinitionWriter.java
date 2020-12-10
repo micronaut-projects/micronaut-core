@@ -17,8 +17,21 @@ package io.micronaut.inject.writer;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import io.micronaut.context.*;
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.AbstractBeanDefinition;
+import io.micronaut.context.AbstractParametrizedBeanDefinition;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DefaultBeanContext;
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Provided;
+import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
@@ -33,8 +46,11 @@ import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
@@ -46,8 +62,20 @@ import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
@@ -195,6 +223,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private Map<String, Map<String, Object>> typeArguments;
     private List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
     private List<MethodVisitData> preDestroyMethodVisits = new ArrayList<>(2);
+    private String interceptedType;
+
+    private List<Runnable> deferredInjectionPoints = new ArrayList<>();
 
     /**
      * Creates a bean definition writer.
@@ -231,6 +262,57 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     /**
      * Creates a bean definition writer.
      *
+     * @param packageName         The package name of the bean
+     * @param className           The class name, without the package, of the bean
+     * @param isInterface         Whether the writer is for an interface.
+     * @param originatingElements The originating elements
+     * @param annotationMetadata  The annotation metadata
+     * @since 2.1.1
+     */
+    public BeanDefinitionWriter(String packageName,
+                                String className,
+                                boolean isInterface,
+                                OriginatingElements originatingElements,
+                                AnnotationMetadata annotationMetadata) {
+        this(packageName,
+                className,
+                packageName + '.' + className,
+                isInterface,
+                originatingElements,
+                annotationMetadata
+        );
+    }
+
+    /**
+     * Creates a bean definition writer.
+     *
+     * @param packageName         The package name of the bean
+     * @param className           The class name, without the package, of the bean
+     * @param providedClassName   The type this bean definition provides, in this case where the bean implements {@link javax.inject.Provider}
+     * @param isInterface         Is the type an interface
+     * @param originatingElements The originating elements
+     * @param annotationMetadata  The annotation metadata
+     */
+    public BeanDefinitionWriter(String packageName,
+                                String className,
+                                String providedClassName,
+                                boolean isInterface,
+                                OriginatingElements originatingElements,
+                                AnnotationMetadata annotationMetadata) {
+        this(
+                packageName,
+                className,
+                packageName + ".$" + className + "Definition",
+                providedClassName,
+                isInterface,
+                originatingElements,
+                annotationMetadata
+        );
+    }
+
+    /**
+     * Creates a bean definition writer.
+     *
      * @param packageName        The package name of the bean
      * @param className          The class name, without the package, of the bean
      * @param providedClassName  The type this bean definition provides, in this case where the bean implements {@link javax.inject.Provider}
@@ -244,7 +326,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 boolean isInterface,
                                 Element originatingElement,
                                 AnnotationMetadata annotationMetadata) {
-        this(packageName, className, packageName + ".$" + className + "Definition", providedClassName, isInterface, originatingElement, annotationMetadata);
+        this(
+                packageName,
+                className,
+                packageName + ".$" + className + "Definition",
+                providedClassName,
+                isInterface,
+                OriginatingElements.of(originatingElement),
+                annotationMetadata
+        );
     }
 
     /**
@@ -265,8 +355,28 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 boolean isInterface,
                                 Element originatingElement,
                                 AnnotationMetadata annotationMetadata) {
-        super(originatingElement);
+        this(packageName, className, beanDefinitionName, providedClassName, isInterface, OriginatingElements.of(originatingElement), annotationMetadata);
+    }
 
+    /**
+     * Creates a bean definition writer.
+     *
+     * @param packageName         The package name of the bean
+     * @param className           The class name, without the package, of the bean
+     * @param beanDefinitionName  The name of the bean definition
+     * @param providedClassName   The type this bean definition provides, which differs from the class name in the case of factory beans
+     * @param isInterface         Whether the provided type is an interface
+     * @param originatingElements The originating elements
+     * @param annotationMetadata  The annotation metadata
+     */
+    public BeanDefinitionWriter(String packageName,
+                                String className,
+                                String beanDefinitionName,
+                                String providedClassName,
+                                boolean isInterface,
+                                OriginatingElements originatingElements,
+                                AnnotationMetadata annotationMetadata) {
+        super(originatingElements);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.packageName = packageName;
         this.isInterface = isInterface;
@@ -357,6 +467,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         } else {
             this.interfaceTypes.remove(ValidatedBeanDefinition.class);
         }
+    }
+
+    @Override
+    public void setInterceptedType(String typeName) {
+        if (typeName != null) {
+            this.interfaceTypes.add(AdvisedBeanType.class);
+        }
+        this.interceptedType = typeName;
+    }
+
+    @Override
+    public Optional<Type> getInterceptedType() {
+        return Optional.ofNullable(interceptedType)
+                       .map(BeanDefinitionWriter::getTypeReferenceForName);
     }
 
     @Override
@@ -507,6 +631,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             requiresMethodProcessing.visitEnd();
         }
 
+        for (Runnable fieldInjectionPoint : deferredInjectionPoints) {
+            fieldInjectionPoint.run();
+        }
+
         constructorVisitor.visitInsn(RETURN);
         constructorVisitor.visitMaxs(DEFAULT_MAX_STACK, 1);
         if (buildMethodVisitor != null) {
@@ -526,6 +654,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             preDestroyMethodVisitor.visitInsn(ARETURN);
             preDestroyMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, preDestroyMethodLocalCount);
         }
+
+        getInterceptedType().ifPresent(t -> implementInterceptedTypeMethod(t, this.classWriter));
 
         for (GeneratorAdapter method : loadTypeMethods.values()) {
             method.visitMaxs(3, 1);
@@ -548,7 +678,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 pushStoreStringInArray(visitor, i++, totalSize, typeName);
                 // use the property type as the value
                 pushStoreInArray(visitor, i++, totalSize, () ->
-                    pushTypeArguments(visitor, entry.getValue())
+                        pushTypeArguments(visitor, entry.getValue())
                 );
             }
             // invoke the AbstractBeanDefinition.createMap method
@@ -629,7 +759,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
-        try (OutputStream out = visitor.visitClass(getBeanDefinitionName(), getOriginatingElement())) {
+        try (OutputStream out = visitor.visitClass(getBeanDefinitionName(), getOriginatingElements())) {
             try {
                 for (ExecutableMethodWriter methodWriter : methodExecutors.values()) {
                     methodWriter.accept(visitor);
@@ -868,6 +998,75 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                                         boolean isInterface,
                                                         boolean isDefault) {
 
+        return visitExecutableMethod(
+                declaringType,
+                returnType,
+                genericReturnType,
+                returnTypeGenericTypes,
+                methodName,
+                argumentTypes,
+                genericArgumentTypes,
+                argumentAnnotationMetadata,
+                genericTypes,
+                annotationMetadata,
+                isInterface && !isDefault,
+                isInterface,
+                isDefault,
+                null, null);
+    }
+
+    /**
+     * Visit a method that is to be made executable allow invocation of said method without reflection.
+     *
+     * @param declaringType                    The declaring type of the method. Either a Class or a string representing the
+     *                                         name of the type
+     * @param returnType                       The return type of the method. Either a Class or a string representing the name
+     *                                         of the type
+     * @param genericReturnType                The generic return type
+     * @param returnTypeGenericTypes           The return type for generic types
+     * @param methodName                       The method name
+     * @param argumentTypes                    The argument types. Note: an ordered map should be used such as LinkedHashMap.
+     *                                         Can be null or empty.
+     * @param genericArgumentTypes             The generic argument types. Note: an ordered map should be used such as LinkedHashMap.
+     *                                         Can be null or empty.
+     * @param argumentAnnotationMetadata       The argument annotation metadata
+     * @param genericTypes                     The generic types of each argument. Can be null.
+     * @param annotationMetadata               The annotation metadata for the method
+     * @param isAbstract                       If the method abstract
+     * @param isInterface                      If the method belongs to an interface
+     * @param isDefault                        If the method is a default method
+     * @param interceptedProxyClassName        The intercepted proxy class name
+     * @param interceptedProxyBridgeMethodName The intercepted proxy bridge method name
+     * @return The {@link ExecutableMethodWriter}.
+     */
+    public ExecutableMethodWriter visitExecutableMethod(Object declaringType,
+                                                        Object returnType,
+                                                        Object genericReturnType,
+                                                        Map<String, Object> returnTypeGenericTypes,
+                                                        String methodName,
+                                                        Map<String, Object> argumentTypes,
+                                                        Map<String, Object> genericArgumentTypes,
+                                                        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+                                                        Map<String, Map<String, Object>> genericTypes,
+                                                        AnnotationMetadata annotationMetadata,
+                                                        boolean isAbstract,
+                                                        boolean isInterface,
+                                                        boolean isDefault,
+                                                        String interceptedProxyClassName,
+                                                        String interceptedProxyBridgeMethodName) {
+
+        String methodKey = new StringBuilder(methodName)
+                .append("(")
+                .append(argumentTypes.values().stream()
+                        .map(Object::toString)
+                        .collect(Collectors.joining(",")))
+                .append(")")
+                .toString();
+
+        if (methodExecutors.containsKey(methodKey)) {
+            return methodExecutors.get(methodKey);
+        }
+
         DefaultAnnotationMetadata.contributeDefaults(
                 this.annotationMetadata,
                 annotationMetadata
@@ -896,12 +1095,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 methodExecutorClassName,
                 methodProxyShortName,
                 this.isInterface || isInterface,
+                isAbstract,
                 isDefault,
                 isSuspend,
-                getOriginatingElement(),
-                annotationMetadata
+                this,
+                annotationMetadata,
+                interceptedProxyClassName,
+                interceptedProxyBridgeMethodName
         );
-//        executableMethodWriter.makeStaticInner(beanDefinitionInternalName, (ClassWriter) classWriter);
+
         executableMethodWriter.visitMethod(
                 declaringType,
                 returnType,
@@ -914,23 +1116,28 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 genericTypes
         );
 
-        methodExecutors.put(methodExecutorClassName, executableMethodWriter);
+        methodExecutors.put(methodKey, executableMethodWriter);
 
-        if (constructorVisitor == null) {
-            throw new IllegalStateException("Method visitBeanDefinitionConstructor(..) should be called first!");
-        }
+        deferredInjectionPoints.add(() -> {
 
-        constructorVisitor.visitVarInsn(ALOAD, 0);
-        String methodExecutorInternalName = executableMethodWriter.getInternalName();
-        constructorVisitor.visitTypeInsn(NEW, methodExecutorInternalName);
-        constructorVisitor.visitInsn(DUP);
-        constructorVisitor.visitMethodInsn(INVOKESPECIAL,
-                methodExecutorInternalName,
-                CONSTRUCTOR_NAME,
-                DESCRIPTOR_DEFAULT_CONSTRUCTOR,
-                false);
+            if (constructorVisitor == null) {
+                throw new IllegalStateException("Method visitBeanDefinitionConstructor(..) should be called first!");
+            }
 
-        pushInvokeMethodOnSuperClass(constructorVisitor, ADD_EXECUTABLE_METHOD);
+            constructorVisitor.visitVarInsn(ALOAD, 0);
+            String methodExecutorInternalName = executableMethodWriter.getInternalName();
+            constructorVisitor.visitTypeInsn(NEW, methodExecutorInternalName);
+            constructorVisitor.visitInsn(DUP);
+            constructorVisitor.visitMethodInsn(INVOKESPECIAL,
+                    methodExecutorInternalName,
+                    CONSTRUCTOR_NAME,
+                    DESCRIPTOR_DEFAULT_CONSTRUCTOR,
+                    false);
+
+            pushInvokeMethodOnSuperClass(constructorVisitor, ADD_EXECUTABLE_METHOD);
+
+        });
+
         return executableMethodWriter;
     }
 
@@ -2219,14 +2426,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         /**
          * Default constructor.
-         * @param declaringType The declaring type
-         * @param requiresReflection Whether reflection is required
-         * @param returnType The return type
-         * @param methodName The method name
-         * @param argumentTypes The argument types
+         *
+         * @param declaringType              The declaring type
+         * @param requiresReflection         Whether reflection is required
+         * @param returnType                 The return type
+         * @param methodName                 The method name
+         * @param argumentTypes              The argument types
          * @param argumentAnnotationMetadata The argument metadata
-         * @param genericTypes The generic type metadata
-         * @param annotationMetadata The method annotation metadata
+         * @param genericTypes               The generic type metadata
+         * @param annotationMetadata         The method annotation metadata
          */
         MethodVisitData(
                 Object declaringType,

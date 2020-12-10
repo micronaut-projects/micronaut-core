@@ -15,6 +15,8 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import groovy.lang.GroovyClassLoader;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
@@ -44,8 +46,6 @@ import org.codehaus.groovy.control.messages.SimpleMessage;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -66,6 +66,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final CompilationUnit compilationUnit;
     private final SourceUnit sourceUnit;
     private final MutableConvertibleValues<Object> attributes;
+    private final List<String> generatedResources = new ArrayList<>();
 
     /**
      * @param sourceUnit      The source unit
@@ -183,12 +184,17 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
+        return visitClass(classname, new Element[]{ originatingElement });
+    }
+
+    @Override
+    public OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
         File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                     classesDir
             );
-            return outputVisitor.visitClass(classname, originatingElement);
+            return outputVisitor.visitClass(classname, originatingElements);
         } else {
             // should only arrive here in testing scenarios
             if (compilationUnit.getClassLoader() instanceof InMemoryByteCodeGroovyClassLoader) {
@@ -223,7 +229,7 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
-    public Optional<GeneratedFile> visitMetaInfFile(String path) {
+    public Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements) {
         File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
 
@@ -309,4 +315,13 @@ public class GroovyVisitorContext implements VisitorContext {
         return attributes.get(name, conversionContext);
     }
 
+    @Override
+    public Collection<String> getGeneratedResources() {
+        return Collections.unmodifiableCollection(generatedResources);
+    }
+
+    @Override
+    public void addGeneratedResource(@NonNull String resource) {
+        generatedResources.add(resource);
+    }
 }

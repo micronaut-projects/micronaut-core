@@ -15,11 +15,14 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -397,5 +400,22 @@ public interface HttpResponse<B> extends HttpMessage<B> {
         } catch (URISyntaxException e) {
             throw new UriSyntaxException(e);
         }
+    }
+
+    /**
+     * Helper method for retrieving all Cookies on a response.
+     * @return The cookies on the response
+     */
+    default Cookies getCookies() {
+        throw new UnsupportedOperationException("Operation not supported on a " + this.getClass() + " response.");
+    }
+
+    /**
+     * Helper method for retrieving a single Cookie on a response.
+     * @param name The name of the Cookie
+     * @return The Cookie
+     */
+    default Optional<Cookie> getCookie(String name) {
+        throw new UnsupportedOperationException("Operation not supported on a " + this.getClass() + " response.");
     }
 }

@@ -36,7 +36,9 @@ public interface TypedRequestArgumentBinder<T> extends RequestArgumentBinder<T>,
      * implements are candidates for binding.
      *
      * @return True if super interfaces are binding candidates
+     * @deprecated Use {@link #superTypes()} instead
      */
+    @Deprecated
     default boolean supportsSuperTypes() {
         return true;
     }

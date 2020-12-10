@@ -21,7 +21,15 @@ import io.micronaut.core.util.StringUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.StringJoiner;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -65,7 +73,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
 
     private final String templateString;
-    private final List<PathSegment> segments = new ArrayList<>();
+    final List<PathSegment> segments = new ArrayList<>();
 
     /**
      * Construct a new URI template for the given template.
@@ -103,7 +111,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 this.templateString = templateAsString;
                 String scheme = matcher.group(2);
                 if (scheme != null) {
-                    segments.add(new UriTemplateParser.RawPathSegment(false, scheme + "://"));
+                    createParser(scheme + "://", parserArguments).parse(segments);
                 }
                 String userInfo = matcher.group(5);
                 String host = matcher.group(6);

@@ -42,6 +42,7 @@ import org.reactivestreams.Subscription;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.Principal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -317,6 +318,78 @@ public class UploadController {
     Single<String> go(@Body MultipartBody multipartBody) {
         return Single.create(emitter -> {
             multipartBody.subscribe(new Subscriber<CompletedPart>() {
+                private Subscription s;
+                List<String> datas = new ArrayList<>();
+                @Override
+                public void onSubscribe(Subscription s) {
+                    this.s = s;
+                    s.request(1);
+                }
+
+                @Override
+                public void onNext(CompletedPart data) {
+                    try {
+                        datas.add(new String(data.getBytes(), StandardCharsets.UTF_8));
+                        s.request(1);
+                    } catch (IOException e) {
+                        s.cancel();
+                        emitter.onError(e);
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    emitter.onError(t);
+                }
+
+                @Override
+                public void onComplete() {
+                    emitter.onSuccess(String.join("|", datas));
+                }
+            });
+        });
+    }
+
+    @Post(value =  "/receive-multipart-body-principal", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    Single<String> multipartBodyWithPrincipal(Principal principal, @Body MultipartBody multipartBody) {
+        return Single.create(emitter -> {
+            multipartBody.subscribe(new Subscriber<CompletedPart>() {
+                private Subscription s;
+                List<String> datas = new ArrayList<>();
+                @Override
+                public void onSubscribe(Subscription s) {
+                    this.s = s;
+                    s.request(1);
+                }
+
+                @Override
+                public void onNext(CompletedPart data) {
+                    try {
+                        datas.add(new String(data.getBytes(), StandardCharsets.UTF_8));
+                        s.request(1);
+                    } catch (IOException e) {
+                        s.cancel();
+                        emitter.onError(e);
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    emitter.onError(t);
+                }
+
+                @Override
+                public void onComplete() {
+                    emitter.onSuccess(String.join("|", datas));
+                }
+            });
+        });
+    }
+
+    @Post(value = "/publisher-completedpart", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    Single<String> publisherCompletedPart(Publisher<CompletedPart> recipients) {
+        return Single.create(emitter -> {
+            recipients.subscribe(new Subscriber<CompletedPart>() {
                 private Subscription s;
                 List<String> datas = new ArrayList<>();
                 @Override

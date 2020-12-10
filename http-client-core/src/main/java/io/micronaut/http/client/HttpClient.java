@@ -157,11 +157,17 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
                 return (O) response.getStatus();
             } else {
                 Optional<O> body = response.getBody();
-                return body
-                        .orElseThrow(() -> new HttpClientResponseException(
-                                "Empty body",
-                                response
-                        ));
+                if (!body.isPresent() && response.getBody(byte[].class).isPresent()) {
+                    throw new HttpClientResponseException(
+                            String.format("Failed to decode the body for the given content type [%s]", response.getContentType().orElse(null)),
+                            response
+                    );
+                } else {
+                    return body.orElseThrow(() -> new HttpClientResponseException(
+                            "Empty body",
+                            response
+                    ));
+                }
             }
         });
     }
@@ -232,5 +238,18 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      */
     static HttpClient create(@Nullable URL url) {
         return HttpClientConfiguration.createClient(url);
+    }
+
+    /**
+     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    static HttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
+        return HttpClientConfiguration.createClient(url, configuration);
     }
 }

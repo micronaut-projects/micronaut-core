@@ -19,7 +19,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import io.micronaut.core.annotation.*;
+import io.micronaut.core.annotation.Creator;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
+import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -30,7 +33,6 @@ import io.micronaut.inject.writer.GeneratedFile;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.Writer;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -67,9 +69,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     protected static Set<String> arrays = new HashSet<>();
 
     private static final TypeHint.AccessType[] DEFAULT_ACCESS_TYPE = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS};
-    private static final String REFLECTION_CONFIG_JSON = "reflection-config.json";
-    private static final String NATIVE_IMAGE_PROPERTIES = "native-image.properties";
-
+    private static final String REFLECTION_CONFIG_JSON = "reflect-config.json";
     private static final String BASE_RESOURCE_CONFIG_JSON = "src/main/graal/resource-config.json";
     private static final String RESOURCE_CONFIG_JSON = "resource-config.json";
     private static final String RESOURCES_DIR = "src/main/resources";
@@ -106,6 +106,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 packages.add(element.getPackageName());
                 final String beanName = element.getName();
                 addBean(beanName);
+                resolveClassData(beanName + "[]");
                 final String[] introspectedClasses = element.getValue(Introspected.class, "classes", String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
                 for (String introspectedClass : introspectedClasses) {
                     addBean(introspectedClass);
@@ -257,16 +258,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         try {
             String path = buildNativeImagePath(visitorContext);
             String reflectFile = path + REFLECTION_CONFIG_JSON;
-            String propsFile = path + NATIVE_IMAGE_PROPERTIES;
-
-            visitorContext.visitMetaInfFile(propsFile).ifPresent(gf -> {
-                visitorContext.info("Writing " + NATIVE_IMAGE_PROPERTIES + " file to destination: " + gf.getName());
-                try (PrintWriter w = new PrintWriter(gf.openWriter())) {
-                    w.println("Args = -H:ReflectionConfigurationResources=${.}/reflection-config.json");
-                } catch (IOException e) {
-                    visitorContext.fail("Error writing " + NATIVE_IMAGE_PROPERTIES + ": " + e.getMessage(), null);
-                }
-            });
             final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(reflectFile);
             generatedFile.ifPresent(gf -> {
                 for (Map<String, Object> value : classes.values()) {
@@ -324,7 +315,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
                     final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(resourcesFile);
                     generatedFile.ifPresent(gf -> {
-                        resourceFiles.addAll(fetchAdditionalResources(visitorContext));
+                        resourceFiles.addAll(visitorContext.getGeneratedResources());
 
                         List<Map> resourceList = resourceFiles.stream()
                                 .map(this::mapToGraalResource)
@@ -348,19 +339,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 visitorContext.fail("There was an error generating " + RESOURCE_CONFIG_JSON + ": " + e.getMessage(), null);
             }
         }
-    }
-
-    private List<String> fetchAdditionalResources(VisitorContext visitorContext) {
-        // If swagger (openapi) is present, add the appropriate metadata to expose the yml file an the UI
-        return visitorContext.getClassElement("io.swagger.v3.oas.annotations.info.Info")
-                .map(classElement -> Arrays.asList(
-                        ".*/swagger/.*yml",
-                        "META-INF/swagger",
-                        "META-INF/swagger/views/rapidoc/index.html",
-                        "META-INF/swagger/views/redoc/index.html",
-                        "META-INF/swagger/views/swagger-ui/index.html"
-                ))
-                .orElse(Collections.emptyList());
     }
 
     private Map mapToGraalResource(String resourceName) {

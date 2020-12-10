@@ -26,14 +26,15 @@ dependencies {
         transitive = false
     }
 
-    compileOnly 'org.glassfish:javax.el:3.0.1-b11'
+    compileOnly "org.apache.logging.log4j:log4j-core:2.14.0"
+    compileOnly 'org.glassfish:javax.el:3.0.1-b12'
     compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.8'
-    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.3.9'
+    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion"
+    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$kotlinCoroutinesVersion"
     compileOnly "ch.qos.logback:logback-classic:1.2.3"
     testImplementation "ch.qos.logback:logback-classic:1.2.3"
 
-    testAnnotationProcessor project(":inject-java") 
+    testAnnotationProcessor project(":inject-java")
     testImplementation 'org.jsr107.ri:cache-ri-impl:1.1.1'
     testImplementation dependencyVersion("jcache")
     testImplementation project(":inject-java")

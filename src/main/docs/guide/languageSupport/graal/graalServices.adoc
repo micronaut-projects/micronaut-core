@@ -1,67 +1,45 @@
 === Getting Started with Micronaut and Graal
 
-To get started creating a Microservice that can be compiled into a native image, use the `graalvm` feature when creating the application with the CLI:
+Since Micronaut 2.2, any Micronaut application is already ready to be built into a native image using the Micronaut Gradle or Maven plugins, to get started simply create a new application:
 
 .Creating a Graal Native Microservice
 [source,bash]
 ----
-$ mn create-app hello-world --features graalvm
+$ mn create-app hello-world
 ----
 
-The `graalvm` feature adds three important items:
-
-1. The `svm` and `graal` dependencies to your `build.gradle` (or `pom.xml` if `--build maven` is used).
-2. A `Dockerfile` which can be used to construct the native image using Docker and a script `docker-build.sh` to run it.
-3. A `native-image.properties` configuration file `src/main/resources/META-INF/native-image` to simplify building the image.
-
-The `native-image.properties` file that is generated looks something like:
-
-[source,properties]
-----
-Args = -H:Name=example \ # <1>
-       -H:Class=example.Application # <2>
-----
-
-<1> The `-H:Name` argument specifies the name of the native image that will be generated.
-<2> The `-H:Class` argument specifies the entry point of your application (the class that defines a `static void main` method.
+You can use `--build maven` for a Maven build.
 
 ==== Building a Native Image Using Docker
 
-To build your native image using Docker simply run:
+To build your native image using Gradle and Docker simply run:
 
+.Building a Native Image with Docker and Gradle
 [source,bash]
 ----
-$ ./gradlew assemble # or ./mvnw package if using Maven
-$ docker build . -t hello-world
-$ docker run -p 8080:8080 hello-world
+$ ./gradlew dockerBuildNative
 ----
 
-Or use the provided script:
+To build your native image using Maven and Docker simply run:
 
+.Building a Native Image with Docker and Maven
 [source,bash]
 ----
-$ ./gradlew assemble # or ./mvnw package if using Maven
-$ ./docker-build.sh
+$ ./mvnw package -Dpackaging=docker-native
 ----
-
-The provided `Dockerfile` is a multi-stage dockerfile which builds the project in two steps:
-
-1. A GraalVM official image will build the native image.
-2. A typical dockerfile structure will build the final image which is smaller due to layering.
-
 
 ==== Building a Native Image Without Using Docker
 
 To build your native image without using Docker you need to install GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using https://sdkman.io/[Sdkman!]:
 
-.Installing GraalVM 20.2.0 with SDKman
-[source,bash]
+.Installing GraalVM {graalVersion} with SDKman
+[source,bash,subs="attributes+"]
 ----
-$ sdk install java 20.2.0.r8-grl # or 20.2.0.r11-grl if you want to use JDK 11
-$ sdk use java 20.2.0.r8-grl
+$ sdk install java {graalVersion}.r8-grl # or {graalVersion}.r11-grl if you want to use JDK 11
+$ sdk use java {graalVersion}.r8-grl
 ----
 
-The `native-image` tool was extracted from the base GraalVM distribution. Currently it is available as an early adopter plugin. To install it, run:
+The `native-image` tool was extracted from the base GraalVM distribution. Currently, it is available as an early adopter plugin. To install it, run:
 
 .Installing `native-image` tool
 [source,bash]
@@ -69,20 +47,27 @@ The `native-image` tool was extracted from the base GraalVM distribution. Curren
 $ gu install native-image
 ----
 
+Now you can build a native image with Gradle simply by running the `nativeImage` task:
 
 .Creating native image with Gradle
 [source,bash]
 ----
-$ ./gradlew assemble
-$ native-image -cp build/libs/hello-world-0.1-all.jar
+$ ./gradlew nativeImage
 ----
+
+The native image will be built to the `build/native-image` directory.
+
+To create a native image with Maven and the Micronaut Maven plugin use `native-image` as the packaging format:
 
 .Creating native image with Maven
 [source,bash]
 ----
-$ ./mvnw package
-$ native-image -cp target/hello-world-0.1-all.jar
+$ ./mvnw package -Dpackaging=native-image
 ----
+
+Which will build the native image into the `target` directory.
+
+You can then run the native image from the directory you built it to.
 
 .Run native image
 [source,bash]

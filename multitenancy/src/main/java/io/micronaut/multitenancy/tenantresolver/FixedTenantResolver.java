@@ -15,6 +15,7 @@
  */
 package io.micronaut.multitenancy.tenantresolver;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.multitenancy.exceptions.TenantNotFoundException;
@@ -48,6 +49,7 @@ public class FixedTenantResolver implements TenantResolver {
      * @throws TenantNotFoundException if tenant not found
      */
     @Override
+    @NonNull
     public Serializable resolveTenantIdentifier() throws TenantNotFoundException {
         final Serializable tenantId = fixedTenantResolverConfiguration.getTenantId();
 

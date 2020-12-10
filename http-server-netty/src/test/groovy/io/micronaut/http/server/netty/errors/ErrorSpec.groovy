@@ -16,12 +16,14 @@
 package io.micronaut.http.server.netty.errors
 
 import groovy.json.JsonSlurper
+import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.server.exceptions.ExceptionHandler
@@ -116,6 +118,18 @@ class ErrorSpec extends AbstractMicronautSpec {
         response.getBody(String).get() == '<div>Error</div>'
     }
 
+    void "test calling a controller that fails to inject with a local error handler"() {
+        given:
+        def response = rxClient.exchange(
+                HttpRequest.GET('/errors/injection')
+
+        ).onErrorReturn({ t -> t.response; return t.response } ).blockingFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.getBody(JsonError).get().message.contains("Failed to inject value for parameter [prop]")
+    }
+
     @Controller('/errors')
     static class ErrorController {
 
@@ -134,6 +148,22 @@ class ErrorSpec extends AbstractMicronautSpec {
         @Get("/handler-content-type-error")
         String handlerContentTypeError() {
             throw new ContentTypeExceptionHandlerException()
+        }
+    }
+
+    @Controller('/errors/injection')
+    static class ErrorInjectionController {
+
+        ErrorInjectionController(@Property(name = "does.not.exist") String prop) {}
+
+        @Get
+        String ok() {
+            "OK"
+        }
+
+        @Error
+        HttpResponse<String> error(HttpRequest<?> request, Throwable e) {
+            HttpResponse.serverError("Server error")
         }
     }
 

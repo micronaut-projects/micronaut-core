@@ -35,15 +35,15 @@ public interface ClassWriterOutputVisitor {
     /**
      * Visits a new class and returns the output stream with which should be written the bytes of the class to be
      * generated.
-     *
+     * <p>
      * Note that this method should only be called from a {@link io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind#AGGREGATING} visitor from within the {@link io.micronaut.inject.visitor.TypeElementVisitor#finish(io.micronaut.inject.visitor.VisitorContext)} method. If the file
      *
-     * @param classname          the fully qualified classname
+     * @param classname the fully qualified classname
      * @return the output stream to write to
      * @throws IOException if an error occurs creating the output stream
      */
     default OutputStream visitClass(String classname) throws IOException {
-        return visitClass(classname, null);
+        return visitClass(classname, Element.EMPTY_ELEMENT_ARRAY);
     }
 
     /**
@@ -55,8 +55,22 @@ public interface ClassWriterOutputVisitor {
      * @return the output stream to write to
      * @throws IOException if an error occurs creating the output stream
      */
-    OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException;
+    default OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
+        return visitClass(classname, new Element[]{originatingElement});
+    }
 
+    /**
+     * Visits a new class and returns the output stream with which should be written the bytes of the class to be
+     * generated.
+     * <p>
+     * Note that this method should only be called from a {@link io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind#AGGREGATING} visitor from within the {@link io.micronaut.inject.visitor.TypeElementVisitor#finish(io.micronaut.inject.visitor.VisitorContext)} method. If the file
+     *
+     * @param classname           the fully qualified classname
+     * @param originatingElements The originating elements
+     * @return the output stream to write to
+     * @throws IOException if an error occurs creating the output stream
+     */
+    OutputStream visitClass(String classname, Element... originatingElements) throws IOException;
 
     /**
      * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
@@ -74,8 +88,22 @@ public interface ClassWriterOutputVisitor {
      * @param path The path to the file
      * @return An optional file it was possible to create it
      * @throws IOException If the file couldn't be created
+     * @deprecated Visiting a file should supply the originating elements. Use {@link #visitMetaInfFile(String, Element...)} instead
      */
-    Optional<GeneratedFile> visitMetaInfFile(String path);
+    @Deprecated
+    default Optional<GeneratedFile> visitMetaInfFile(String path) {
+        return visitMetaInfFile(path, Element.EMPTY_ELEMENT_ARRAY);
+    }
+
+    /**
+     * Visit a file within the META-INF directory of the classes directory.
+     *
+     * @param path The path to the file
+     * @param originatingElements The originating elements
+     * @return An optional file it was possible to create it
+     * @throws IOException If the file couldn't be created
+     */
+    Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements);
 
     /**
      * Visit a file that will be generated within the generated sources directory.

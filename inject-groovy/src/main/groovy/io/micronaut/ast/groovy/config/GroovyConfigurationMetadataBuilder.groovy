@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.EachProperty
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.util.StringUtils
+import io.micronaut.inject.ast.Element
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
@@ -46,6 +47,11 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
     GroovyConfigurationMetadataBuilder(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
         this.compilationUnit = compilationUnit
         this.sourceUnit = sourceUnit
+    }
+
+    @Override
+    Element[] getOriginatingElements() {
+        return Element.EMPTY_ELEMENT_ARRAY
     }
 
     @Override

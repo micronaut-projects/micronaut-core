@@ -73,15 +73,15 @@ class CircuitBreakerRetry implements MutableRetryState {
     public void close(@Nullable Throwable exception) {
         if (exception == null && currentState() == CircuitState.HALF_OPEN) {
             closeCircuit();
-        } else if (exception != null) {
-            if (currentState() != CircuitState.OPEN) {
+        } else if (currentState() != CircuitState.OPEN) {
+            if (exception != null) {
                 openCircuit(exception);
+            } else {
+                // reset state for successful operation
+                time = System.currentTimeMillis();
+                lastError = null;
+                this.childState = (MutableRetryState) retryStateBuilder.build();
             }
-        } else {
-            // reset state for successful operation
-            time = System.currentTimeMillis();
-            lastError = null;
-            this.childState = (MutableRetryState) retryStateBuilder.build();
         }
     }
 
@@ -223,7 +223,7 @@ class CircuitBreakerRetry implements MutableRetryState {
     }
 
     /**
-     * Resets the circuit state to {@link CircuitState#CLOSED}.
+     * Resets the circuit state to {@link CircuitState#HALF_OPEN}.
      *
      * @return The current state
      */

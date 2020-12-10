@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.instrument.http;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -30,9 +31,8 @@ import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
+import org.jetbrains.annotations.NotNull;
 import org.reactivestreams.Publisher;
-
-import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * An HTTP server instrumentation filter that uses Open Tracing.
@@ -47,6 +47,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 public class OpenTracingServerFilter extends AbstractOpenTracingFilter implements HttpServerFilter {
 
     private static final CharSequence APPLIED = OpenTracingServerFilter.class.getName() + "-applied";
+    private static final CharSequence CONTINUE = OpenTracingServerFilter.class.getName() + "-continue";
 
     /**
      * Creates an HTTP server instrumentation filter.
@@ -60,49 +61,66 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
     @SuppressWarnings("unchecked")
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
-        if (request.getAttribute(APPLIED, Boolean.class).isPresent()) {
-            return responsePublisher;
-        } else {
-            request.setAttribute(APPLIED, true);
-            SpanContext spanContext = tracer.extract(
-                    Format.Builtin.HTTP_HEADERS,
-                    new HttpHeadersTextMap(request.getHeaders())
-            );
-            request.setAttribute(
-                    TraceRequestAttributes.CURRENT_SPAN_CONTEXT,
-                    spanContext
-            );
-
-            Tracer.SpanBuilder spanBuilder = newSpan(request, spanContext);
-            return new TracingPublisher(responsePublisher, tracer, spanBuilder) {
-                @Override
-                protected void doOnSubscribe(@NonNull Span span) {
-                    span.setTag(TAG_HTTP_SERVER, true);
-                    request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
-
-                }
-
-                @Override
-                protected void doOnNext(@NonNull Object object, @NonNull Span span) {
-                    if (object instanceof HttpResponse) {
-                        HttpResponse<?> response = (HttpResponse<?>) object;
-                        tracer.inject(
-                                span.context(),
-                                Format.Builtin.HTTP_HEADERS,
-                                new HttpHeadersTextMap(response.getHeaders())
-                        );
-
-                        setResponseTags(request, response, span);
-                    }
-                }
-            };
-
+        boolean applied = request.getAttribute(APPLIED, Boolean.class).orElse(false);
+        boolean continued = request.getAttribute(CONTINUE, Boolean.class).orElse(false);
+        if (applied && !continued) {
+            return chain.proceed(request);
         }
+        Tracer.SpanBuilder spanBuilder = continued ? null : newSpan(request, initSpanContext(request));
+        return new TracingPublisher(chain.proceed(request), tracer, spanBuilder) {
+
+            @Override
+            protected void doOnSubscribe(@NonNull Span span) {
+                span.setTag(TAG_HTTP_SERVER, true);
+                request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
+            }
+
+            @Override
+            protected void doOnNext(@NonNull Object object, @NonNull Span span) {
+                if (object instanceof HttpResponse) {
+                    HttpResponse<?> response = (HttpResponse<?>) object;
+                    tracer.inject(
+                            span.context(),
+                            Format.Builtin.HTTP_HEADERS,
+                            new HttpHeadersTextMap(response.getHeaders())
+                    );
+                    setResponseTags(request, response, span);
+                }
+            }
+
+            @Override
+            protected void doOnError(@NotNull Throwable throwable, @NotNull Span span) {
+                request.setAttribute(CONTINUE, true);
+                setErrorTags(span, throwable);
+            }
+
+            @Override
+            protected boolean isContinued() {
+                return continued;
+            }
+
+            @Override
+            protected boolean isFinishOnError() {
+                return false;
+            }
+        };
     }
 
     @Override
     public int getOrder() {
         return ServerFilterPhase.TRACING.order();
+    }
+
+    private @NotNull SpanContext initSpanContext(@NotNull HttpRequest<?> request) {
+        request.setAttribute(APPLIED, true);
+        SpanContext spanContext = tracer.extract(
+                Format.Builtin.HTTP_HEADERS,
+                new HttpHeadersTextMap(request.getHeaders())
+        );
+        request.setAttribute(
+                TraceRequestAttributes.CURRENT_SPAN_CONTEXT,
+                spanContext
+        );
+        return spanContext;
     }
 }

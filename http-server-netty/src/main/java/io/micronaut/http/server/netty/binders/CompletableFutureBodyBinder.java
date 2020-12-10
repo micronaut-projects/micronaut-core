@@ -62,6 +62,7 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
     }
 
     @Override
+    @Deprecated
     public boolean supportsSuperTypes() {
         return false;
     }

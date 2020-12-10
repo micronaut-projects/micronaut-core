@@ -5,9 +5,11 @@ Features consist of additional dependencies and configuration to enable specific
 $ mn create-app my-demo-app --features mongo-reactive
 ----
 
-This will add the necessary dependencies and configuration for the http://mongodb.github.io/mongo-java-driver-reactivestreams[MongoDB Reactive Driver] in your application. You can view all the available features using the `profile-info` command.
+This will add the necessary dependencies and configuration for the http://mongodb.github.io/mongo-java-driver-reactivestreams[MongoDB Reactive Driver] in your application.
+You can view all the available features using the `--list-features` flag for whichever create command you'd like to use.
 
 [source,bash]
 ----
-$ mn profile-info service
+$ mn create-app --list-features # Output will be supported features for the create-app command
+$ mn create-function-app --list-features # Output will be supported features for the create-function-app command, different from above.
 ----

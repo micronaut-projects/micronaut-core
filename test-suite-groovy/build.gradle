@@ -20,10 +20,10 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
-    testImplementation 'org.zalando:logbook-netty:2.1.0'
+    testImplementation 'org.zalando:logbook-netty:2.3.0'
     testImplementation project(":function-client")
     testImplementation project(":function-web")
-    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.842'
+    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.903'
 
 }
 

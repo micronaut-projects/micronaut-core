@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.ssl.ClientSslConfiguration;
@@ -30,6 +31,7 @@ import javax.inject.Inject;
  * @since 1.0
  */
 @ConfigurationProperties(DefaultHttpClientConfiguration.PREFIX)
+@BootstrapContextCompatible
 @Primary
 public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
 
@@ -77,6 +79,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
      * The default connection pool configuration.
      */
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
+    @BootstrapContextCompatible
     @Primary
     public static class DefaultConnectionPoolConfiguration extends ConnectionPoolConfiguration {
     }

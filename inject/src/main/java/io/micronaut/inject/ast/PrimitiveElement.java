@@ -18,7 +18,7 @@ package io.micronaut.inject.ast;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 
-public final class PrimitiveElement implements ClassElement {
+public final class PrimitiveElement implements ArrayableClassElement {
 
     public static final PrimitiveElement VOID = new PrimitiveElement("void");
     private static final PrimitiveElement INT = new PrimitiveElement("int");
@@ -39,14 +39,13 @@ public final class PrimitiveElement implements ClassElement {
      * @param name The type name
      */
     private PrimitiveElement(String name) {
-        this.typeName = name;
-        this.arrayDimensions = 0;
+        this(name, 0);
     }
 
     /**
      * Default constructor.
-     * @param name The type name
-     * @param arrayDimensions The array dimension count
+     * @param name            The type name
+     * @param arrayDimensions The number of array dimensions
      */
     private PrimitiveElement(String name, int arrayDimensions) {
         this.typeName = name;
@@ -95,12 +94,9 @@ public final class PrimitiveElement implements ClassElement {
         return AnnotationMetadata.EMPTY_METADATA;
     }
 
-    /**
-     * Converts the array representation of this primitive type.
-     * @return The array rep
-     */
-    public ClassElement toArray() {
-        return new PrimitiveElement(typeName, arrayDimensions + 1);
+    @Override
+    public ClassElement withArrayDimensions(int arrayDimensions) {
+        return new PrimitiveElement(typeName, arrayDimensions);
     }
 
     @Override

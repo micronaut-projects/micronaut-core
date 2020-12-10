@@ -39,6 +39,23 @@ public interface ClassElement extends TypedElement {
     boolean isAssignable(String type);
 
     /**
+     * @return Whether this element is a record
+     * @since 2.1.0
+     */
+    default boolean isRecord() {
+        return false;
+    }
+
+    /**
+     * Is this type an inner class.
+     * @return True if it is an inner class
+     * @since 2.1.2
+     */
+    default boolean isInner() {
+        return false;
+    }
+
+    /**
      * Whether this element is an enum.
      * @return True if it is an enum
      */
@@ -195,4 +212,13 @@ public interface ClassElement extends TypedElement {
      * @return A new class element
      */
     ClassElement toArray();
+
+    /**
+     * Dereference a class element denoting an array type by converting it to its element type.
+     * Do not mutate the existing instance. Create a new instance instead.
+     *
+     * @return A new class element
+     * @throws IllegalStateException if this class element doesn't denote an array type
+     */
+    ClassElement fromArray();
 }

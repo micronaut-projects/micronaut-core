@@ -16,10 +16,10 @@
 package io.micronaut.retry.intercept;
 
 import io.micronaut.aop.InterceptPhase;
+import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.inject.BeanDefinition;
@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * A {@link MethodInterceptor} that will attempt to execute a {@link Fallback}
@@ -58,7 +59,6 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
 
     private final BeanContext beanContext;
 
-
     /**
      * @param beanContext The bean context to allow for DI of class annotated with {@link javax.inject.Inject}.
      */
@@ -76,28 +76,34 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
         if (context.getAttribute(FALLBACK_NOT_FOUND, Boolean.class).orElse(Boolean.FALSE)) {
             return context.proceed();
         }
+        InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
         try {
-            Object result = context.proceed();
-            if (result != null) {
-                if (result instanceof CompletableFuture) {
-                    return fallbackForFuture(context, (CompletableFuture) result);
-                } else if (Publishers.isConvertibleToPublisher(result.getClass())) {
-                    return fallbackForReactiveType(context, result);
-                }
+            switch (interceptedMethod.resultType()) {
+                case PUBLISHER:
+                    return interceptedMethod.handleResult(
+                            fallbackForReactiveType(context, interceptedMethod.interceptResultAsPublisher())
+                    );
+                case COMPLETION_STAGE:
+                    return interceptedMethod.handleResult(
+                            fallbackForFuture(context, interceptedMethod.interceptResultAsCompletionStage())
+                    );
+                case SYNCHRONOUS:
+                    try {
+                        return context.proceed();
+                    } catch (RuntimeException e) {
+                        return resolveFallback(context, e);
+                    }
+                default:
+                    return interceptedMethod.unsupported();
             }
-            return result;
-        } catch (RuntimeException e) {
-            return resolveFallback(context, e);
+        } catch (Exception e) {
+            return interceptedMethod.handleException(e);
         }
     }
 
     @SuppressWarnings("unchecked")
-    private <T> T fallbackForReactiveType(MethodInvocationContext<Object, Object> context, T result) {
-        Flowable<Object> recoveryFlowable = ConversionService.SHARED
-            .convert(result, Flowable.class)
-            .orElseThrow(() -> new FallbackException("Unsupported Reactive type: " + result));
-
-        recoveryFlowable = recoveryFlowable.onErrorResumeNext(throwable -> {
+    private Publisher<?> fallbackForReactiveType(MethodInvocationContext<Object, Object> context, Publisher<?> publisher) {
+        return Flowable.fromPublisher(publisher).onErrorResumeNext(throwable -> {
             Optional<? extends MethodExecutionHandle<?, Object>> fallbackMethod = findFallbackMethod(context);
             if (fallbackMethod.isPresent()) {
                 MethodExecutionHandle<?, Object> fallbackHandle = fallbackMethod.get();
@@ -120,10 +126,6 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
             }
             return Flowable.error(throwable);
         });
-
-        return (T) ConversionService.SHARED
-            .convert(recoveryFlowable, context.getReturnType().asArgument())
-            .orElseThrow(() -> new FallbackException("Unsupported Reactive type: " + result));
     }
 
     /**
@@ -148,9 +150,9 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     @SuppressWarnings("unchecked")
-    private Object fallbackForFuture(MethodInvocationContext<Object, Object> context, CompletableFuture result) {
+    private CompletionStage<?> fallbackForFuture(MethodInvocationContext<Object, Object> context, CompletionStage<?> result) {
         CompletableFuture<Object> newFuture = new CompletableFuture<>();
-        ((CompletableFuture<Object>) result).whenComplete((o, throwable) -> {
+        result.whenComplete((o, throwable) -> {
             if (throwable == null) {
                 newFuture.complete(o);
             } else {

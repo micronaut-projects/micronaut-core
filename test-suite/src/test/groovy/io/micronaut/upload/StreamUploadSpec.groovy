@@ -15,7 +15,6 @@
  */
 package io.micronaut.upload
 
-
 import io.micronaut.AbstractMicronautSpec
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -23,6 +22,11 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
+import spock.lang.Retry
+
+import java.nio.file.Files
+import java.nio.file.Path
+import java.security.MessageDigest
 
 /**
  * Any changes or additions to this test should also be done
@@ -145,10 +149,9 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         response.code() == HttpStatus.OK.code
         result.length() == data.length()
         result == data
-
     }
 
-
+    @Retry
     void "test non-blocking upload with publisher receiving part datas"() {
         given:
         def data = 'some data ' * 500
@@ -156,7 +159,6 @@ class StreamUploadSpec extends AbstractMicronautSpec {
                 .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
                 .addPart("title", "bar")
                 .build()
-
 
         when:
         Flowable<HttpResponse<Long>> flowable = Flowable.fromPublisher(client.exchange(
@@ -445,8 +447,137 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         response.body().contains('bar')
     }
 
+    void "test whole multipart body with principal"() {
+        when: "a large document with partial data is uploaded"
+        def val = 'xxxx'
+        def data = '{"title":"Big ' + val + '"}'
+        def requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .addPart("title", "bar")
+                .build()
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-multipart-body-principal", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
+                String
+        ))
+        def response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().contains('"title":"Big xx')
+        response.body().contains('bar')
+    }
+
+    void "test binding to multiple attributes with the same name"() {
+        when:
+        def requestBody = MultipartBody.builder()
+                .addPart("recipients", "john@google.com")
+                .addPart("recipients", "sally@google.com")
+                .build()
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/publisher-completedpart", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
+                String
+        ))
+        def response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == 'john@google.com|sally@google.com'
+    }
+
+    void "test the file is not corrupted with transferTo"() {
+        given:
+        Path toUpload = Files.createTempFile("random", "bytes")
+        OutputStream outputStream = Files.newOutputStream(toUpload)
+        int size = 1024 * 1024 * 15
+        int created = 0
+        Random random = new Random()
+        while (created < size) {
+            byte[] chunk = new byte[1024]
+            random.nextBytes(chunk)
+            created += chunk.length
+            outputStream.write(chunk)
+        }
+        outputStream.close()
+
+        byte[] originalmd5 = calculateMd5(toUpload)
+
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("title", "bar-stream")
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, toUpload.toFile())
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-file-upload", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE), String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        File file = new File(uploadDir, "bar-stream.json")
+        file.deleteOnExit()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        calculateMd5(file.toPath()) == originalmd5
+    }
+
+    void "test the file is not corrupted with transferTo when file has to be buffered"() {
+        given:
+        Path toUpload = Files.createTempFile("random", "bytes")
+        OutputStream outputStream = Files.newOutputStream(toUpload)
+        int size = 1024 * 1024 * 15
+        int created = 0
+        Random random = new Random()
+        while (created < size) {
+            byte[] chunk = new byte[1024]
+            random.nextBytes(chunk)
+            created += chunk.length
+            outputStream.write(chunk)
+        }
+        outputStream.close()
+
+        byte[] originalmd5 = calculateMd5(toUpload)
+        //title comes second which means the file has to be buffered
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, toUpload.toFile())
+                .addPart("title", "bar-stream")
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-file-upload", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE), String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        File file = new File(uploadDir, "bar-stream.json")
+        file.deleteOnExit()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        calculateMd5(file.toPath()) == originalmd5
+    }
+
     @Override
     Map<String, Object> getConfiguration() {
-        super.getConfiguration() << ['micronaut.http.client.read-timeout': 300]
+        super.getConfiguration() << [
+                'micronaut.http.client.read-timeout': 300,
+                'micronaut.server.multipart.max-file-size': '20mb',
+                'micronaut.server.max-request-size': '20mb',
+        ]
+    }
+
+    private byte[] calculateMd5(Path path) {
+        MessageDigest md = MessageDigest.getInstance("MD5")
+        InputStream is = Files.newInputStream(path)
+        byte[] chunk = new byte[1024]
+        while (is.read(chunk) != -1) {
+            md.update(chunk)
+        }
+        md.digest()
     }
 }

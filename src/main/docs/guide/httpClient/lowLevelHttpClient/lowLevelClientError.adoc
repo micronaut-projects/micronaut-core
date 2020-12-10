@@ -1,3 +1,3 @@
-If an HTTP response is returned with a code of 400 or above, an api:client.response.exceptions.HttpClientResponseException[] is created. The exception contains the original response. How that exception gets thrown depends on the return type of the method.
+If an HTTP response is returned with a code of 400 or above, an api:http.client.exceptions.HttpClientResponseException[] is created. The exception contains the original response. How that exception gets thrown depends on the return type of the method.
 
 For blocking clients, the exception is thrown and should be caught and handled by the caller. For reactive clients, the exception is passed through the publisher as an error.

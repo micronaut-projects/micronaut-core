@@ -5,9 +5,10 @@ buildscript {
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:6.0.0'
-        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.8"
+        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.11"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
     }
 }
 
@@ -41,7 +42,16 @@ ext {
                     name: 'micronaut-data-bom',
                     version: micronautDataVersion
             ],
-
+            'micronaut.oraclecloud': [
+                    group: 'io.micronaut.oraclecloud',
+                    name: 'micronaut-oraclecloud-bom',
+                    version: micronautOracleCloudVersion
+            ],
+            'micronaut.r2dbc': [
+                    group: 'io.micronaut.r2dbc',
+                    name: 'micronaut-r2dbc-bom',
+                    version: micronautR2DBCVersion
+            ],
             //Third-party
             'netty': [
                     group: 'io.netty',
@@ -66,7 +76,7 @@ ext {
             'junit5': [
                     group  : 'org.junit',
                     name   : 'junit-bom',
-                    version: junit5Version
+                    version: junitVersion
             ],
             'jackson':[
                     group:'com.fasterxml.jackson',
@@ -82,6 +92,11 @@ ext {
                     group:'com.google.protobuf',
                     name:'protobuf-bom',
                     version:protobufJavaVersion
+            ],
+            'testcontainers':[
+                    group:'org.testcontainers',
+                    name:'testcontainers-bom',
+                    version:testContainersVersion
             ]
     ]
     dependencyVersions = [
@@ -155,11 +170,17 @@ ext {
                     group:'io.micronaut.cassandra',
                     name:'micronaut-cassandra'
             ],
-            'micronaut.discovery': [
-                    version:micronautDiscoveryClientVersion,
+            // TODO Deprecated: Remove in the next major version
+            'micronaut.discovery.old': [
+                    version:micronautOldDiscoveryClientVersion,
                     group:'io.micronaut',
                     name:'micronaut-discovery-client'
-            ],            
+            ],
+            'micronaut.discovery': [
+                    version:micronautDiscoveryClientVersion,
+                    group:'io.micronaut.discovery',
+                    name:'micronaut-discovery-client'
+            ],
             'micronaut.hibernate.validator': [
                     version:micronautHibernateValidatorVersion,
                     group:'io.micronaut.beanvalidation',
@@ -194,13 +215,13 @@ ext {
                     version:micronautGcpVersion,
                     group:'io.micronaut.gcp',
                     name:'micronaut-gcp-common',
-                    modules:['micronaut-gcp-tracing', 'micronaut-gcp-function-http', 'micronaut-gcp-function', 'micronaut-gcp-http-client']
+                    modules:['micronaut-gcp-tracing', 'micronaut-gcp-function-http', 'micronaut-gcp-function-http-test', 'micronaut-gcp-function', 'micronaut-gcp-http-client', 'micronaut-gcp-logging', 'micronaut-gcp-pubsub']
             ],
             'micronaut.azure': [
                     version:micronautAzureVersion,
                     group:'io.micronaut.azure',
                     name:'micronaut-azure-function',
-                    modules:['micronaut-azure-function-http']
+                    modules:['micronaut-azure-function', 'micronaut-azure-function-http', 'micronaut-azure-function-http-test']
             ],
             'azure.function': [
                     version:'1.3.1',
@@ -221,7 +242,7 @@ ext {
                     version:micronautAwsVersion,
                     group:'io.micronaut.aws',
                     name:'micronaut-function-aws-api-proxy',
-                    modules: ['micronaut-aws-common','micronaut-function-aws','micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver']
+                    modules: ['micronaut-aws-common', 'micronaut-function-aws-api-proxy-test', 'micronaut-function-aws','micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver', 'micronaut-aws-parameter-store', 'micronaut-aws-sdk-v2', 'micronaut-function-client-aws']
             ],
             'micronaut.kotlin': [
                     version:micronautKotlinVersion,
@@ -242,8 +263,14 @@ ext {
             ],
             'micronaut.openapi': [
                     version:micronautOpenApiVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.openapi',
                     name:'micronaut-openapi'
+            ],
+            // TODO Deprecated: Remove in the next major version
+            'micronaut.openapi.old': [
+                    version: micronautOldOpenApiVersion,
+                    group: 'io.micronaut.configuration',
+                    name: 'micronaut-openapi'
             ],
             kafka                      : [
                     version: kafkaVersion,
@@ -335,11 +362,17 @@ ext {
                     group:'org.neo4j.driver',
                     name:'neo4j-java-driver'
             ],
-            ojdbc                      : [
-                    version: ojdbcVersion,
+            oracle                      : [
+                    version: oracleDriverVersion,
                     group  : 'com.oracle.database.jdbc',
                     name   : 'ojdbc8',
                     modules: ['ucp']
+            ],
+            // TODO Deprecated: Remove in the next major version
+            oldOracle                  : [
+                    version: oldOracleDriverVersion,
+                    group  : 'com.oracle.ojdbc',
+                    name   : 'ojdbc8'
             ],
             'jcache'                   : [
                     version: jcacheVersion,
@@ -402,12 +435,12 @@ ext {
                     modules: ['swagger-models', 'swagger-annotations']
             ],
             'google.function.framework'                    : [
-                    version: '1.0.1',
+                    version: '1.0.2',
                     group  : 'com.google.cloud.functions',
                     name   : 'functions-framework-api'
             ],
             'google.function.invoker'                    : [
-                    version: '1.0.0-beta1',
+                    version: '1.0.0',
                     group  : 'com.google.cloud.functions.invoker',
                     name   : 'java-function-invoker'
             ],
@@ -477,6 +510,11 @@ ext {
                     group  : 'org.graalvm.nativeimage',
                     name   : 'svm'
             ],
+            graalSdk                   : [
+                    version: graalVersion,
+                    group  : 'org.graalvm.sdk',
+                    name   : 'graal-sdk'
+            ],
             h2                         : [
                     version: h2Version,
                     group  : 'com.h2database',
@@ -501,17 +539,6 @@ ext {
                     version: mssqlDriverVersion,
                     group  : 'com.microsoft.sqlserver',
                     name   : 'mssql-jdbc'
-            ],
-            oracle                  : [
-                version: oracleDriverVersion,
-                group  : 'com.oracle.database.jdbc',
-                name   : 'ojdbc8'
-            ],
-            // TODO Deprecated: Remove in the next major version
-            oldOracle                  : [
-                version: oldOracleDriverVersion,
-                group  : 'com.oracle.ojdbc',
-                name   : 'ojdbc8'
             ],
             tomcatJdbc                 : [
                     version: tomcatJdbcVersion,
@@ -586,6 +613,43 @@ ext {
                     group  : 'io.micronaut.acme',
                     name   : 'micronaut-acme'
             ],
+            'dekorate': [
+                    version: dekorateVersion,
+                    group  : 'io.dekorate',
+                    name   : 'dekorate-project',
+                    modules: ['jaeger-annotations', 'knative-annotations', 'kubernetes-annotations',  'openshift-annotations', 'prometheus-annotations', 'servicecatalog-annotations']
+            ],
+            'micronaut.ignite': [
+                version: micronautIgniteVersion,
+                group  : 'io.micronaut.ignite',
+                modules: ['micronaut-ignite-core', 'micronaut-ignite-cache']
+            ],
+            ignite: [
+                version: igniteVersion,
+                group  : 'org.apache.ignite',
+                name   : 'ignite-core',
+                modules: ['ignite-kubernetes']
+            ],
+            'micronaut.mqtt': [
+                version: micronautMQTTVersion,
+                group  : 'io.micronaut.mqtt',
+                modules: ['micronaut-mqtt-core', 'micronaut-mqtt-ssl',  'micronaut-mqttv3',  'micronaut-mqttv5']
+            ],
+            'pahov3': [
+                version: pahov3Version,
+                group  : 'org.eclipse.paho',
+                name   : 'org.eclipse.paho.client.mqttv3'
+            ],
+            'pahov5': [
+                version: pahov5Version,
+                group  : 'org.eclipse.paho',
+                name   : 'org.eclipse.paho.mqttv5.client'
+            ],
+            'lombok': [
+                version: lombokVersion,
+                group  : 'org.projectlombok',
+                name   : 'lombok'
+            ]
     ]
 
     dependencyVersion = { String name ->
@@ -671,8 +735,13 @@ subprojects { Project subproject ->
     group projectGroupId
 
     apply plugin: "io.micronaut.build.common"
-    apply plugin: "io.micronaut.build.dependency-updates"
-    apply plugin: "io.micronaut.build.publishing"
+    if (!subproject.name.startsWith('test-') &&
+            !subproject.name.startsWith('inject-test-') &&
+            !subproject.toString().contains('benchmarks')) {
+        apply plugin: "io.micronaut.build.dependency-updates"
+        apply plugin: "io.micronaut.build.publishing"
+        bintray.pkg.version.gpg.sign = false
+    }
 
     micronautBuild {
         enableBom = false
@@ -683,8 +752,15 @@ subprojects { Project subproject ->
         useJUnitPlatform()
         jvmArgs '-Xmx2048m'
         systemProperty "micronaut.cloud.platform", "OTHER"
+        if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
+            jvmArgs "--enable-preview"
+        }
     }
 
+    tasks.withType(JavaCompile){
+       options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
+       options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+    }
     tasks.withType(Checkstyle) {
         reports {
             xml.enabled = !System.getenv("GITHUB_ACTIONS")

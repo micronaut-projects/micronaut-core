@@ -16,7 +16,7 @@ dependencies {
     testImplementation project(":http-client")
 
     testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.7'
-    testImplementation group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.7'
+    testImplementation group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.9'
 
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
         exclude module:'micronaut-runtime'
@@ -26,15 +26,15 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
-    testImplementation 'io.micronaut.xml:micronaut-jackson-xml:1.1.0', {
+    testImplementation 'io.micronaut.xml:micronaut-jackson-xml:2.0.0', {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-http'
     }
 
     // following 3 dependencies needed for Http2PostTest
-    testImplementation 'io.vertx:vertx-core:3.9.2'
-    testImplementation 'io.vertx:vertx-web-client:3.9.2'
-    testImplementation group: 'org.eclipse.jetty', name: 'jetty-alpn-openjdk8-client', version: '9.4.31.v20200723'
+    testImplementation 'io.vertx:vertx-core:3.9.4'
+    testImplementation 'io.vertx:vertx-web-client:3.9.4'
+    testImplementation group: 'org.eclipse.jetty', name: 'jetty-alpn-openjdk8-client', version: '9.4.33.v20201020'
 
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation dependencyModuleVersion("groovy", "groovy-templates")
@@ -47,7 +47,7 @@ dependencies {
         exclude module:'micronaut-inject'
     }
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
-    testImplementation("org.junit.jupiter:junit-jupiter-api:$junit5Version")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
 }
 
 //tasks.withType(Test) {

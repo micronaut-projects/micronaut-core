@@ -295,4 +295,28 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         embeddedServer?.close()
     }
 
+    void "test resolving a file with special characters"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.router.static-resources.default.paths': ['classpath:public'],
+                'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        def response = rxClient.exchange(
+                HttpRequest.GET("/static/%E6%B5%8B%E8%AF%95-0.0.yml"), String
+        ).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == """openapi: 3.0.1
+info:
+  title: 测试
+  version: "0.0"
+"""
+
+        cleanup:
+        embeddedServer.close()
+    }
+
 }

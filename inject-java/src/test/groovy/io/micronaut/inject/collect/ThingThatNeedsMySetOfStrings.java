@@ -25,7 +25,6 @@ public class ThingThatNeedsMySetOfStrings {
     @Inject
     MySetOfStrings otherStrings;
 
-
     @Inject
     public ThingThatNeedsMySetOfStrings(MySetOfStrings strings) {
         this.strings = strings;

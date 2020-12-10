@@ -15,7 +15,13 @@
  */
 package io.micronaut.http.uri;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -53,9 +59,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     protected UriMatchTemplate(CharSequence templateString, Object... parserArguments) {
         super(templateString, parserArguments);
         this.matchPattern = Pattern.compile(pattern.toString());
-        String tmpl = templateString.toString();
-        int len = tmpl.length();
-        this.isRoot = len == 0 || (len == 1 && tmpl.charAt(0) == '/');
+        this.isRoot = isRoot();
         // cleanup / reduce memory consumption
         this.pattern = null;
     }
@@ -70,9 +74,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         super(templateString.toString(), segments);
         this.matchPattern = matchPattern;
         this.variables = variables;
-        String tmpl = templateString.toString();
-        int len = tmpl.length();
-        this.isRoot = len == 0 || (len == 1 && tmpl.charAt(0) == '/');
+        this.isRoot = isRoot();
     }
 
     /**
@@ -195,11 +197,38 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
     @Override
     protected UriTemplateParser createParser(String templateString, Object... parserArguments) {
-        this.pattern = new StringBuilder();
+
+        if (Objects.isNull(this.pattern)) {
+            this.pattern = new StringBuilder();
+        }
+
         if (this.variables == null) {
             this.variables = new ArrayList<>();
         }
         return new UriMatchTemplateParser(templateString, this);
+    }
+
+    private boolean isRoot() {
+        CharSequence rawSegment = null;
+        for (PathSegment segment : segments) {
+            if (segment.isVariable()) {
+                if (!segment.isQuerySegment()) {
+                    return false;
+                }
+            } else {
+                if (rawSegment == null) {
+                    rawSegment = segment;
+                } else {
+                    return false;
+                }
+            }
+        }
+        if (rawSegment == null) {
+            return true;
+        } else {
+            int len = rawSegment.length();
+            return len == 0 || (len == 1 && rawSegment.charAt(0) == '/');
+        }
     }
 
     /**

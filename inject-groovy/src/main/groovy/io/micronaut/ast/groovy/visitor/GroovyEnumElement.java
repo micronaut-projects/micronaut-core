@@ -42,7 +42,7 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
      * @param annotationMetadata The annotation metadata
      */
     GroovyEnumElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
-        super(sourceUnit, compilationUnit, classNode, annotationMetadata);
+        this(sourceUnit, compilationUnit, classNode, annotationMetadata, 0);
     }
 
     /**
@@ -50,7 +50,7 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
      * @param compilationUnit    The compilation unit
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
-     * @param arrayDimensions The number of array dimensions
+     * @param arrayDimensions    The number of array dimensions
      */
     GroovyEnumElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata, int arrayDimensions) {
         super(sourceUnit, compilationUnit, classNode, annotationMetadata, null, arrayDimensions);
@@ -64,7 +64,7 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
     }
 
     @Override
-    public ClassElement toArray() {
-        return new GroovyEnumElement(sourceUnit, compilationUnit, classNode, getAnnotationMetadata(), arrayDimensions + 1);
+    public ClassElement withArrayDimensions(int arrayDimensions) {
+        return new GroovyEnumElement(sourceUnit, compilationUnit, classNode, getAnnotationMetadata(), arrayDimensions);
     }
 }

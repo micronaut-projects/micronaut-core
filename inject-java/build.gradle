@@ -7,14 +7,15 @@ dependencies {
     }
     compileOnly dependencyVersion("validation")
 
-    testImplementation 'com.github.spotbugs:spotbugs-annotations:4.0.6'
+    testImplementation 'com.github.spotbugs:spotbugs-annotations:4.1.2'
     testImplementation project(':aop')
     testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
     testImplementation dependencyVersion("rxjava2")
-    testImplementation "org.hibernate:hibernate-core:5.4.20.Final"
-    testImplementation "junit:junit:4.13"
-    testImplementation "com.google.testing.compile:compile-testing:0.18"
+    testImplementation "org.hibernate:hibernate-core:5.4.25.Final"
+    testImplementation "junit:junit:4.13.1"
+    testImplementation "com.google.testing.compile:compile-testing:0.19"
     testImplementation 'org.mongodb:mongo-java-driver:3.12.7'
     testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
@@ -25,7 +26,7 @@ dependencies {
     testImplementation project(":validation")
 
     testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'
-    testRuntimeOnly 'org.glassfish:javax.el:3.0.1-b11'
+    testRuntimeOnly 'org.glassfish:javax.el:3.0.1-b12'
 }
 
 tasks.withType(Test) {

@@ -1106,6 +1106,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return AnnotationMetadataSupport.getAnnotationType(name);
     }
 
+    @Override
+    public @NonNull
+    Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
+        return AnnotationMetadataSupport.getAnnotationType(name, classLoader);
+    }
+
     @SuppressWarnings("Duplicates")
     @Override
     public @NonNull
@@ -1836,6 +1842,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                     existingDefaults.putAll(
                             additionalDefaults
                     );
+                }
+            } else {
+                final Map<String, Map<CharSequence, Object>> additionalDefaults = ((DefaultAnnotationMetadata) source).annotationDefaultValues;
+                if (additionalDefaults != null) {
+                    additionalDefaults.forEach(((DefaultAnnotationMetadata) target)::addDefaultAnnotationValues);
                 }
             }
         }

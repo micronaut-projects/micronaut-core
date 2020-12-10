@@ -39,6 +39,6 @@ public class ScheduledExecutorServiceConfig {
     @Singleton
     @Named(TaskExecutors.SCHEDULED)
     ExecutorConfiguration configuration() {
-        return UserExecutorConfiguration.of(ExecutorType.SCHEDULED);
+        return UserExecutorConfiguration.of(TaskExecutors.SCHEDULED, ExecutorType.SCHEDULED);
     }
 }

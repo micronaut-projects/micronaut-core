@@ -187,7 +187,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             roundEnv.getRootElements()
                     .stream()
-                    .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))
+                    .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
                     .filter(element -> element.getAnnotation(Generated.class) == null)
                     .map(modelUtils::classElementFor)
                     .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
@@ -206,6 +206,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             }
         }
 
+        if (roundEnv.processingOver()) {
+            javaVisitorContext.finish();
+        }
         return false;
     }
 
@@ -268,6 +271,12 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         }
 
         @Override
+        public Object visitUnknown(Element e, Object o) {
+            // ignore
+            return o;
+        }
+
+        @Override
         public Object visitType(TypeElement classElement, Object o) {
 
             AnnotationMetadata typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(classElement);
@@ -284,7 +293,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     concreteClass.getQualifiedName().equals(classElement.getQualifiedName());
             if (shouldVisit) {
                 if (typeAnnotationMetadata.hasStereotype(Introduction.class) || (typeAnnotationMetadata.hasStereotype(Introspected.class) && modelUtils.isAbstract(classElement))) {
-                    classElement.asType().accept(new PublicAbstractMethodVisitor<Object, Object>(classElement, modelUtils, elementUtils) {
+                    classElement.asType().accept(new PublicAbstractMethodVisitor<Object, Object>(classElement, javaVisitorContext) {
                         @Override
                         protected void accept(DeclaredType type, Element element, Object o) {
                             if (element instanceof ExecutableElement) {

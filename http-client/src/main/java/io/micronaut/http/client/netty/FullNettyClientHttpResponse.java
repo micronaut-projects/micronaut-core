@@ -31,8 +31,11 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
+import io.micronaut.http.netty.cookies.NettyCookies;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
@@ -60,6 +63,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
 
     private final HttpStatus status;
     private final NettyHttpHeaders headers;
+    private final NettyCookies nettyCookies;
     private final MutableConvertibleValues<Object> attributes;
     private final FullHttpResponse nettyHttpResponse;
     private final Map<Argument, Optional> convertedBodies = new HashMap<>();
@@ -67,6 +71,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory;
     private final B body;
     private boolean complete;
+    private byte[] bodyBytes;
 
     /**
      * @param fullHttpResponse       The full Http response
@@ -91,6 +96,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         this.nettyHttpResponse = fullHttpResponse;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.byteBufferFactory = byteBufferFactory;
+        this.nettyCookies = new NettyCookies(fullHttpResponse.headers(), ConversionService.SHARED);
         Class<?> rawBodyType = bodyType != null ? bodyType.getType() : null;
         if (rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
             if (HttpResponse.class.isAssignableFrom(bodyType.getType())) {
@@ -122,6 +128,16 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     @Override
     public HttpHeaders getHeaders() {
         return headers;
+    }
+
+    @Override
+    public Cookies getCookies() {
+        return nettyCookies;
+    }
+
+    @Override
+    public Optional<Cookie> getCookie(String name) {
+        return nettyCookies.findCookie(name);
     }
 
     @Override
@@ -169,12 +185,19 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             return Optional.of((T) (nettyHttpResponse.content()));
         }
 
+        if (javaType == byte[].class && bodyBytes != null) {
+            return Optional.of((T) (bodyBytes));
+        }
+
         Optional<T> result = convertedBodies.computeIfAbsent(type, argument -> {
-            Optional<B> existing = getBody();
             final boolean isOptional = argument.getType() == Optional.class;
             final Argument finalArgument = isOptional ? argument.getFirstTypeVariable().orElse(argument) : argument;
             Optional<T> converted;
             try {
+                if (bodyBytes != null) {
+                    return convertBytes(bodyBytes, finalArgument);
+                }
+                Optional<B> existing = getBody();
                 if (existing.isPresent()) {
                     converted = getBody().flatMap(b -> {
 
@@ -242,25 +265,48 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             return Optional.empty();
         }
         Optional<MediaType> contentType = getContentType();
-        boolean hasContentType = contentType.isPresent();
-        if (mediaTypeCodecRegistry != null && hasContentType) {
-            if (CharSequence.class.isAssignableFrom(type.getType())) {
-                Charset charset = getContentType().flatMap(MediaType::getCharset).orElse(StandardCharsets.UTF_8);
-                return Optional.of(content.toString(charset));
-            } else if (type.getType() == byte[].class) {
-                return Optional.of(ByteBufUtil.getBytes(content));
-            } else {
-                Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
-                if (foundCodec.isPresent()) {
-                    MediaTypeCodec codec = foundCodec.get();
-                    return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
+        if (contentType.isPresent()) {
+            if (mediaTypeCodecRegistry != null) {
+                bodyBytes = ByteBufUtil.getBytes(content);
+                if (CharSequence.class.isAssignableFrom(type.getType())) {
+                    Charset charset = contentType.flatMap(MediaType::getCharset).orElse(StandardCharsets.UTF_8);
+                    return Optional.of(new String(bodyBytes, charset));
+                } else if (type.getType() == byte[].class) {
+                    return Optional.of(bodyBytes);
+                } else {
+                    Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
+                    if (foundCodec.isPresent()) {
+                        MediaTypeCodec codec = foundCodec.get();
+                        return Optional.of(codec.decode(type, bodyBytes));
+                    }
                 }
             }
-        } else if (!hasContentType && LOG.isTraceEnabled()) {
+        } else if (LOG.isTraceEnabled()) {
             LOG.trace("Missing or unknown Content-Type received from server.");
         }
         // last chance, try type conversion
         return ConversionService.SHARED.convert(content, ConversionContext.of(type));
+    }
+
+    private <T> Optional convertBytes(byte[] bytes, Argument<T> type) {
+        Optional<MediaType> contentType = getContentType();
+        boolean hasContentType = contentType.isPresent();
+        if (mediaTypeCodecRegistry != null && hasContentType) {
+            if (CharSequence.class.isAssignableFrom(type.getType())) {
+                Charset charset = contentType.flatMap(MediaType::getCharset).orElse(StandardCharsets.UTF_8);
+                return Optional.of(new String(bytes, charset));
+            } else if (type.getType() == byte[].class) {
+                return Optional.of(bytes);
+            } else {
+                Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
+                if (foundCodec.isPresent()) {
+                    MediaTypeCodec codec = foundCodec.get();
+                    return Optional.of(codec.decode(type, bytes));
+                }
+            }
+        }
+        // last chance, try type conversion
+        return ConversionService.SHARED.convert(bytes, ConversionContext.of(type));
     }
 
     @Override

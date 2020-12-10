@@ -19,10 +19,14 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.ArgumentBinderRegistry;
 import io.micronaut.core.bind.annotation.AnnotatedArgumentBinder;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.bind.binders.QueryValueArgumentBinder;
 import io.micronaut.websocket.RxWebSocketSession;
 import io.micronaut.websocket.WebSocketSession;
 
@@ -42,17 +46,19 @@ public class WebSocketStateBinderRegistry implements ArgumentBinderRegistry<WebS
     private final ArgumentBinderRegistry<HttpRequest<?>> requestBinderRegistry;
 
     private final Map<Class, ArgumentBinder<?, WebSocketState>> byType = new HashMap<>(5);
+    private final ArgumentBinder<Object, HttpRequest<?>> queryValueArgumentBinder;
 
     /**
      * Default constructor.
      *
      * @param requestBinderRegistry The request binder registry
      */
-    public WebSocketStateBinderRegistry(ArgumentBinderRegistry<HttpRequest<?>> requestBinderRegistry) {
+    public WebSocketStateBinderRegistry(RequestBinderRegistry requestBinderRegistry) {
         this.requestBinderRegistry = requestBinderRegistry;
         ArgumentBinder<Object, WebSocketState> sessionBinder = (context, source) -> () -> Optional.of(source.getSession());
         this.byType.put(WebSocketSession.class, sessionBinder);
         this.byType.put(RxWebSocketSession.class, sessionBinder);
+        this.queryValueArgumentBinder = new QueryValueArgumentBinder<>(ConversionService.SHARED);
     }
 
     @Override
@@ -80,8 +86,9 @@ public class WebSocketStateBinderRegistry implements ArgumentBinderRegistry<WebS
             ConvertibleValues<Object> uriVariables = source.getSession().getUriVariables();
             if (uriVariables.contains(argument.getName())) {
                 return Optional.of((context, s) -> () -> uriVariables.get(argument.getName(), argument));
+            } else {
+                return Optional.of((context, s) -> (ArgumentBinder.BindingResult<T>) queryValueArgumentBinder.bind((ArgumentConversionContext<Object>) context, s.getOriginatingRequest()));
             }
         }
-        return Optional.empty();
     }
 }

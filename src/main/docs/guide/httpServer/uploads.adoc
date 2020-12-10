@@ -60,10 +60,11 @@ A route method signature like the above will expect 2 different parts with the n
 
 === Same Name
 
-To handle receiving multiple parts with the same part name, the argument must be a rs:Publisher[]. When used in one of the following ways, the publisher will emit one item per file found with the specified name. The publisher must accept one of the following types:
+To handle receiving multiple parts with the same part name, the argument must be a rs:Publisher[]. When used in one of the following ways, the publisher will emit one item per part found with the specified name. The publisher must accept one of the following types:
 
 * api:http.multipart.StreamingFileUpload[]
 * api:http.multipart.CompletedFileUpload[]
+* api:http.multipart.CompletedPart[] for attributes
 * Any POJO assuming a media codec is found that supports the content type
 * Another rs:Publisher[] that accepts one of the chunked data types described above
 
@@ -74,6 +75,7 @@ HttpResponse upload(Publisher<StreamingFileUpload> files)
 HttpResponse upload(Publisher<CompletedFileUpload> files)
 HttpResponse upload(Publisher<MyObject> files)
 HttpResponse upload(Publisher<Publisher<PartData>> files)
+HttpResponse upload(Publisher<CompletedPart> attributes)
 ----
 
 == Whole Body Binding

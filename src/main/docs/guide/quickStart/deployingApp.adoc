@@ -7,4 +7,42 @@ The constructed JAR file can then be executed with `java -jar`. For example:
 $ java -jar build/libs/hello-world-all.jar
 ----
 
-The runnable JAR can also easily be packaged within a Docker container or deployed to any Cloud infrastructure that supports runnable JAR  files.
+The runnable JAR can be executed locally, deployed to a virtual machine or managed Cloud service that supports runnable JARs.
+
+To publish a layered application to a Docker container registry you can configure your Docker image name in `build.gradle` for Gradle:
+
+[source,groovy]
+----
+dockerBuild {
+    images = ["[REPO_URL]/[NAMESPACE]/my-image:$project.version"]
+}
+----
+
+Then use `dockerPush` to push a built image of the application:
+
+[source,bash]
+----
+$ ./gradlew dockerPush
+----
+
+For Maven, define the following plugin in your POM:
+
+[source,xml]
+----
+<plugin>
+  <groupId>com.google.cloud.tools</groupId>
+  <artifactId>jib-maven-plugin</artifactId>
+  <configuration>
+    <to>
+      <image>docker.io/my-company/my-image:${project.version}</image>
+    </to>
+  </configuration>
+</plugin>
+----
+
+Then invoke the `deploy` lifecycle phase specifying the packaging type to either `docker` or `docker-native`:
+
+[source,bash]
+----
+$ ./mvnw deploy -Dpackaging=docker
+----

@@ -26,6 +26,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.IgnoreIf
+import spock.lang.Requires
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -36,6 +37,7 @@ class HostHeaderSpec extends Specification {
 
     // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
     @IgnoreIf({ os.linux })
+    @Requires({ SocketUtils.isTcpPortAvailable(80) })
     void "test host header with server on 80"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder(['micronaut.server.port': 80]).run(EmbeddedServer)
@@ -78,6 +80,7 @@ class HostHeaderSpec extends Specification {
 
     // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
     @IgnoreIf({ os.linux })
+    @Requires({ SocketUtils.isTcpPortAvailable(80) })
     void "test host header with client authority"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder(['micronaut.server.port': 80]).run(EmbeddedServer)

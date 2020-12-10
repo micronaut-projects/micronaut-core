@@ -28,3 +28,13 @@ In addition to being able to inject beans Micronaut natively supports injecting 
 |===
 
 TIP: A prototype bean will have one instance created per place the bean is injected. When a prototype bean is injected as a `Provider`, each call to `get()` will create a new instance.
+
+=== Collection Ordering
+
+When injecting a collection of beans, they will not be ordered by default. To allow for the beans to be ordered, implement the api:core.order.Ordered[] interface. If the requested bean type does not implement api:core.order.Ordered[], then the ann:core.annotation.Order[] annotation will be searched for on any beans.
+
+The ann:core.annotation.Order[] annotation is especially useful for ordering beans created by factories where the bean type is a class in a third party library. In this example, both `LowRateLimit` and `HighRateLimit` implement the `RateLimit` interface.
+
+snippet::io.micronaut.docs.config.env.RateLimitsFactory[tags="clazz", indent=0, title="Factory with @Order"]
+
+When a collection of `RateLimit` beans are requested from the context, they will be returned in ascending order based on the value supplied in the annotation.

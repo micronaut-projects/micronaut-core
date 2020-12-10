@@ -1,5 +1,6 @@
 package io.micronaut.inject.visitor
 
+import com.blazebit.persistence.impl.function.entity.ValuesEntity
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.core.annotation.Introspected
@@ -763,6 +764,15 @@ enum Test {
         noExceptionThrown()
         introspection != null
         introspection.getProperty("name", String).get().get(new Person(name: "Sally")) == "Sally"
+    }
+
+    void "test introspection class member configuration works 2"() {
+        when:
+        BeanIntrospection introspection = BeanIntrospection.getIntrospection(ValuesEntity)
+
+        then:
+        noExceptionThrown()
+        introspection != null
     }
 
     void "test generate bean introspection for @ConfigurationProperties with validation rules on getters"() {

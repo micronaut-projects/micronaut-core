@@ -189,7 +189,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @NonNull
     @Override
     public Collection<String> getPropertyEntries(@NonNull String name) {
-        return environment.getPropertyEntries(name);
+        return getEnvironment().getPropertyEntries(name);
     }
 
     @NonNull
@@ -513,7 +513,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * Bootstrap environment.
      */
     private static class BootstrapEnvironment extends DefaultEnvironment {
-        BootstrapEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... activeEnvironments) {
+        BootstrapEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, ApplicationContextConfiguration configuration, String... activeEnvironments) {
             super(new ApplicationContextConfiguration() {
                 @Override
                 public Optional<Boolean> getDeduceEnvironments() {
@@ -530,6 +530,23 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 @Override
                 public List<String> getEnvironments() {
                     return Arrays.asList(activeEnvironments);
+                }
+
+                @Override
+                public boolean isEnvironmentPropertySource() {
+                    return configuration.isEnvironmentPropertySource();
+                }
+
+                @Nullable
+                @Override
+                public List<String> getEnvironmentVariableIncludes() {
+                    return configuration.getEnvironmentVariableIncludes();
+                }
+
+                @Nullable
+                @Override
+                public List<String> getEnvironmentVariableExcludes() {
+                    return configuration.getEnvironmentVariableExcludes();
                 }
 
                 @NonNull
@@ -647,12 +664,14 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      */
     private class RuntimeConfiguredEnvironment extends DefaultEnvironment {
 
+        private final ApplicationContextConfiguration configuration;
         private final boolean isRuntimeConfigured;
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
         private BootstrapEnvironment bootstrapEnvironment;
 
         RuntimeConfiguredEnvironment(ApplicationContextConfiguration configuration) {
             super(configuration);
+            this.configuration = configuration;
             this.isRuntimeConfigured = Boolean.getBoolean(Environment.BOOTSTRAP_CONTEXT_PROPERTY) ||
                     DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".yml").isPresent() ||
                     DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".properties").isPresent();
@@ -726,6 +745,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             BootstrapEnvironment bootstrapEnvironment = new BootstrapEnvironment(
                 resourceLoader,
                 conversionService,
+                configuration,
                 environmentNames);
 
             for (PropertySource source : propertySources.values()) {

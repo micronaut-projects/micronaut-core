@@ -36,6 +36,7 @@ import java.util.Optional;
 public class BasicAuthArgumentBinder implements TypedRequestArgumentBinder<BasicAuth> {
 
     @Override
+    @Deprecated
     public boolean supportsSuperTypes() {
         return false;
     }

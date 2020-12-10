@@ -15,6 +15,7 @@
  */
 package io.micronaut.aop.chain;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.aop.*;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.ApplicationContext;
@@ -241,9 +242,9 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    public static Interceptor[] resolveAroundInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
+    public static Interceptor[] resolveAroundInterceptors(@Nullable BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
-        return resolveInterceptorsInternal(method, Around.class, interceptors);
+        return resolveInterceptorsInternal(method, Around.class, interceptors, beanContext != null ? beanContext.getClassLoader() : InterceptorChain.class.getClassLoader());
     }
 
     /**
@@ -257,9 +258,11 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
      */
     @Internal
     @UsedByGeneratedCode
-    public static Interceptor[] resolveIntroductionInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
+    public static Interceptor[] resolveIntroductionInterceptors(@Nullable BeanContext beanContext,
+                                                                ExecutableMethod<?, ?> method,
+                                                                Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
-        Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors);
+        Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors, beanContext != null ? beanContext.getClassLoader() : InterceptorChain.class.getClassLoader());
         if (introductionInterceptors.length == 0) {
             if (method.hasStereotype(Adapter.class)) {
                 introductionInterceptors = new Interceptor[] { new AdapterIntroduction(beanContext, method) };
@@ -279,15 +282,15 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         }
     }
 
-    private static Interceptor[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method, Class<? extends Annotation> annotationType, Interceptor[] interceptors) {
-        List<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType);
+    private static Interceptor[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method, Class<? extends Annotation> annotationType, Interceptor[] interceptors, @NonNull ClassLoader classLoader) {
+        List<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType, classLoader);
 
         Set<Class> applicableClasses = new HashSet<>();
 
         for (Class<? extends Annotation> aClass: annotations) {
-            if (annotationType == Around.class && aClass.getAnnotation(Introduction.class) != null) {
+            if (annotationType == Around.class && aClass.getAnnotation(Around.class) == null && aClass.getAnnotation(Introduction.class) != null) {
                 continue;
-            } else if (annotationType == Introduction.class && aClass.getAnnotation(Around.class) != null) {
+            } else if (annotationType == Introduction.class && aClass.getAnnotation(Introduction.class) == null && aClass.getAnnotation(Around.class) != null) {
                 continue;
             }
             Type typeAnn = aClass.getAnnotation(Type.class);

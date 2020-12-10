@@ -41,7 +41,7 @@ class SimpleRetrySpec extends Specification {
         MyRetryListener listener = context.getBean(MyRetryListener)
 
         when:"A method is annotated retry"
-        int result = counterService.getCount()
+        int result = counterService.getCountSync()
 
         then:"It executes until successful"
         result == 3
@@ -51,7 +51,7 @@ class SimpleRetrySpec extends Specification {
         listener.reset()
         counterService.countThreshold = 10
         counterService.count = 0
-        counterService.getCount()
+        counterService.getCountSync()
 
         then:"The original exception is thrown"
         def e = thrown(IllegalStateException)
@@ -87,6 +87,45 @@ class SimpleRetrySpec extends Specification {
 
         cleanup:
         context.stop()
+    }
+
+    void "test simply retry with rxjava pre errors"() {
+        given:
+            ApplicationContext context = ApplicationContext.run()
+            CounterService counterService = context.getBean(CounterService)
+            MyRetryListener listener = context.getBean(MyRetryListener)
+
+        when:"A method is annotated retry"
+            int result = counterService.getCountSingleRxPreErrors().blockingGet()
+
+        then:"It executes until successful"
+            listener.events.size() == 4
+            result == 3
+
+        when:"The threshold can never be met"
+            listener.reset()
+            counterService.countThreshold = 10
+            counterService.countRx = 0
+            counterService.count = 0
+            counterService.getCountSingleRxPreErrors().blockingGet()
+
+        then:"The original exception is thrown"
+            def e = thrown(IllegalStateException)
+            e.message == "Bad count"
+
+        when:"Pre throws error"
+            listener.reset()
+            counterService.countPreThreshold = 10
+            counterService.countPreRx = 0
+            counterService.count = 0
+            counterService.getCountSingleRxPreErrors().blockingGet()
+
+        then:"The original exception is thrown"
+            def ex = thrown(IllegalStateException)
+            ex.message == "Bad pre count"
+
+        cleanup:
+            context.stop()
     }
 
     void "test simply retry with completablefuture"() {
@@ -146,6 +185,44 @@ class SimpleRetrySpec extends Specification {
         cleanup:
         context.stop()
     }
+
+    void "test simply retry with completion stage pre errors"() {
+        given:
+            ApplicationContext context = ApplicationContext.run()
+            CounterService counterService = context.getBean(CounterService)
+            MyRetryListener listener = context.getBean(MyRetryListener)
+
+        when:"A method is annotated retry"
+            int result = counterService.getCountCompletionStagePreErrors().toCompletableFuture().get()
+
+        then:"It executes until successful"
+            listener.events.size() == 4
+            result == 3
+
+        when:"The threshold can never be met"
+            listener.reset()
+            counterService.countThreshold = 10
+            counterService._countCompletionStage = 0
+            counterService.getCountCompletionStagePreErrors().toCompletableFuture().get()
+
+        then:"The original exception is thrown"
+            def e = thrown(ExecutionException)
+            e.cause.message == "Bad count"
+
+        when:"Pre throws error"
+            listener.reset()
+            counterService.countPreThreshold = 10
+            counterService.countPreCompletionStage = 0
+            counterService.getCountCompletionStagePreErrors().toCompletableFuture().get()
+
+        then:"The original exception is thrown"
+            def ex = thrown(ExecutionException)
+            ex.cause.message == "Bad pre count"
+
+        cleanup:
+            context.stop()
+    }
+
 
     void "test retry with includes"() {
         given:
@@ -240,17 +317,21 @@ class SimpleRetrySpec extends Specification {
     @Singleton
     static class CounterService {
         int count = 0
+        int countPreRx = 0
         int countRx = 0
         int countReact = 0
         int countIncludes = 0
         int countExcludes = 0
+        int countPreCompletion = 0
         int countCompletion = 0
         int _countCompletionStage = 0
+        int countPreCompletionStage = 0
         int countPredicate = 0
         int countThreshold = 3
+        int countPreThreshold = 3
 
         @Retryable(attempts = '5', delay = '5ms')
-        int getCount() {
+        int getCountSync() {
             count++
             if(count < countThreshold) {
                 throw new IllegalStateException("Bad count")
@@ -260,6 +341,21 @@ class SimpleRetrySpec extends Specification {
 
         @Retryable(attempts = '5', delay = '5ms')
         Single<Integer> getCountSingle() {
+            Single.fromCallable({->
+                count++
+                if(count < countThreshold) {
+                    throw new IllegalStateException("Bad count")
+                }
+                return count
+            })
+        }
+
+        @Retryable(attempts = '7', delay = '5ms')
+        Single<Integer> getCountSingleRxPreErrors() {
+            countPreRx++
+            if(countPreRx < countPreThreshold) {
+                throw new IllegalStateException("Bad pre count")
+            }
             Single.fromCallable({->
                 countRx++
                 if(countRx < countThreshold) {
@@ -308,6 +404,21 @@ class SimpleRetrySpec extends Specification {
 
         @Retryable(attempts = '5', delay = '5ms')
         CompletionStage<Integer> getCountCompletionStage() {
+            CompletableFuture.supplyAsync({ ->
+                _countCompletionStage++
+                if(_countCompletionStage < countThreshold) {
+                    throw new IllegalStateException("Bad count")
+                }
+                return _countCompletionStage
+            })
+        }
+
+        @Retryable(attempts = '7', delay = '5ms')
+        CompletionStage<Integer> getCountCompletionStagePreErrors() {
+            countPreCompletionStage++
+            if(countPreCompletionStage < countPreThreshold) {
+                throw new IllegalStateException("Bad pre count")
+            }
             CompletableFuture.supplyAsync({ ->
                 _countCompletionStage++
                 if(_countCompletionStage < countThreshold) {

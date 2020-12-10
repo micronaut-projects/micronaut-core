@@ -59,19 +59,14 @@ import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.multipart.MultipartException;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
-import io.micronaut.http.netty.NettyHttpHeaders;
-import io.micronaut.http.netty.NettyHttpRequestBuilder;
-import io.micronaut.http.netty.NettyHttpResponseBuilder;
+import io.micronaut.http.netty.*;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
-import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.micronaut.http.netty.stream.StreamedHttpResponse;
-import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
+import io.micronaut.http.netty.stream.*;
 import io.micronaut.http.sse.Event;
+import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
@@ -115,6 +110,7 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
@@ -153,6 +149,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS;
+import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS;
+
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
  *
@@ -171,6 +170,7 @@ public class DefaultHttpClient implements
         AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
+    private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
 
@@ -453,10 +453,13 @@ public class DefaultHttpClient implements
                 }
             }
             if (shutdownGroup) {
-                Duration shutdownTimeout = configuration.getShutdownTimeout().orElse(Duration.ofMillis(100));
+                Duration shutdownTimeout = configuration.getShutdownTimeout()
+                    .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
+                Duration shutdownQuietPeriod = configuration.getShutdownQuietPeriod()
+                    .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS));
 
                 Future<?> future = this.group.shutdownGracefully(
-                        1,
+                        shutdownQuietPeriod.toMillis(),
                         shutdownTimeout.toMillis(),
                         TimeUnit.MILLISECONDS
                 );
@@ -792,7 +795,11 @@ public class DefaultHttpClient implements
                     final NettyWebSocketClientHandler webSocketHandler;
                     try {
                         String scheme =  (sslContext == null) ? "ws" : "wss";
-                        URI webSocketURL = URI.create(scheme + "://" + host + ":" + port + uri.getPath());
+                        URI webSocketURL = UriBuilder.of(uri)
+                                .scheme(scheme)
+                                .host(host)
+                                .port(port)
+                                .build();
 
                         MutableHttpHeaders headers = request.getHeaders();
                         HttpHeaders customHeaders = EmptyHttpHeaders.INSTANCE;
@@ -953,7 +960,15 @@ public class DefaultHttpClient implements
                 }
                 NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
-                return httpContentFlowable.filter(message -> !(message.content() instanceof EmptyByteBuf)).map(contentMapper);
+                return httpContentFlowable
+                        .filter(message -> !(message.content() instanceof EmptyByteBuf))
+                        .map(contentMapper)
+                        .doAfterNext(buffer -> {
+                            ByteBuf byteBuf = (ByteBuf) buffer.asNativeBuffer();
+                            if (byteBuf.refCnt() > 0) {
+                                ReferenceCountUtil.safeRelease(byteBuf);
+                            }
+                        });
             }).doOnTerminate(() -> {
                 final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
                 if (o instanceof Channel) {
@@ -1369,6 +1384,13 @@ public class DefaultHttpClient implements
         String username = configuration.getProxyUsername().orElse(null);
         String password = configuration.getProxyPassword().orElse(null);
 
+        if (proxyAddress instanceof InetSocketAddress) {
+            InetSocketAddress isa = (InetSocketAddress) proxyAddress;
+            if (isa.isUnresolved()) {
+                proxyAddress = new InetSocketAddress(isa.getHostString(), isa.getPort());
+            }
+        }
+
         if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
             switch (proxyType) {
                 case HTTP:
@@ -1760,10 +1782,11 @@ public class DefaultHttpClient implements
                 permitsBody,
                 poolMap == null
         );
+
         if (log.isDebugEnabled()) {
-            log.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
-            log.debug("Chosen Server: {}({})", requestURI.getHost(), requestURI.getPort());
+            debugRequest(requestURI, nettyRequest);
         }
+
         if (log.isTraceEnabled()) {
             traceRequest(finalRequest, nettyRequest);
         }
@@ -1794,9 +1817,55 @@ public class DefaultHttpClient implements
         );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
         ChannelPipeline pipeline = channel.pipeline();
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new SimpleChannelInboundHandler<FullHttpResponse>() {
+            final AtomicBoolean received = new AtomicBoolean(false);
+            final AtomicBoolean emitted = new AtomicBoolean(false);
+
+            @Override
+            public boolean acceptInboundMessage(Object msg) {
+                return msg instanceof FullHttpResponse;
+            }
+
+            @Override
+            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                if (received.compareAndSet(false, true)) {
+                    emitter.onError(cause);
+                }
+            }
+
+            @Override
+            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                if (evt instanceof IdleStateEvent && received.compareAndSet(false, true)) {
+                    // closed to idle ste
+                    emitter.onError(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                }
+            }
+
+            @Override
+            protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) {
+                if (received.compareAndSet(false, true)) {
+                    NettyMutableHttpResponse<Object> response = new NettyMutableHttpResponse<>(
+                            msg,
+                            ConversionService.SHARED
+                    );
+                    HttpHeaders headers = msg.headers();
+                    if (log.isTraceEnabled()) {
+                        log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), nettyRequest.method().name(), nettyRequest.uri());
+                        traceHeaders(headers);
+                    }
+                    emitter.onNext(response);
+                    emitter.onComplete();
+                }
+            }
+        });
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandler<StreamedHttpResponse>() {
 
-            AtomicBoolean received = new AtomicBoolean(false);
+            final AtomicBoolean received = new AtomicBoolean(false);
+
+            @Override
+            public boolean acceptInboundMessage(Object msg) {
+                return msg instanceof StreamedHttpResponse;
+            }
 
             @Override
             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
@@ -1878,10 +1947,11 @@ public class DefaultHttpClient implements
                 }
             }
         });
+
         if (log.isDebugEnabled()) {
-            log.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
-            log.debug("Chosen Server: {}({})", requestURI.getHost(), requestURI.getPort());
+            debugRequest(requestURI, nettyRequest);
         }
+
         if (log.isTraceEnabled()) {
             traceRequest(requestWrapper.get(), nettyRequest);
         }
@@ -1983,9 +2053,12 @@ public class DefaultHttpClient implements
 
                     try {
                         HttpHeaders headers = fullResponse.headers();
+
+                        if (log.isDebugEnabled()) {
+                            log.debug("Received response {} from {}", status.code(), request.getUri());
+                        }
+
                         if (log.isTraceEnabled()) {
-                            log.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri());
-                            log.trace("Status Code: {}", status);
                             traceHeaders(headers);
                             traceBody("Response", fullResponse.content());
                         }
@@ -2339,6 +2412,12 @@ public class DefaultHttpClient implements
         return postRequestEncoder;
     }
 
+    private void debugRequest(URI requestURI, io.netty.handler.codec.http.HttpRequest nettyRequest) {
+        log.debug("Sending HTTP {} to {}",
+                nettyRequest.method(),
+                requestURI.toString());
+    }
+
     private void traceRequest(io.micronaut.http.HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
         HttpHeaders headers = nettyRequest.headers();
         traceHeaders(headers);
@@ -2665,7 +2744,7 @@ public class DefaultHttpClient implements
                 if (poolMap == null) {
                     // read timeout settings are not applied to streamed requests.
                     // instead idle timeout settings are applied.
-                    if (stream && readTimeoutMillis == null) {
+                    if (stream) {
                         Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
                         if (readIdleTime.isPresent()) {
                             Duration duration = readIdleTime.get();
@@ -2723,7 +2802,15 @@ public class DefaultHttpClient implements
                             if (msg instanceof LastHttpContent) {
                                 super.channelRead(ctx, msg);
                             } else {
-                                super.channelRead(ctx, ((HttpContent) msg).content());
+                                Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
+                                if (msg instanceof Http2Content) {
+                                    streamKey.set(((Http2Content) msg).stream());
+                                }
+                                try {
+                                    super.channelRead(ctx, ((HttpContent) msg).content());
+                                } finally {
+                                    streamKey.set(null);
+                                }
                             }
                         } else {
                             super.channelRead(ctx, msg);
@@ -2741,12 +2828,19 @@ public class DefaultHttpClient implements
                     @Override
                     protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
                         try {
-                            ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
+                            Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
+                            Http2Stream http2Stream = streamKey.get();
+                            if (http2Stream != null) {
+                                ctx.fireChannelRead(new DefaultHttp2Content(msg.copy(), http2Stream));
+                            } else {
+                                ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
+                            }
                         } finally {
                             msg.release();
                         }
                     }
                 });
+
             }
         }
 
@@ -2764,9 +2858,8 @@ public class DefaultHttpClient implements
                     if (evt instanceof IdleStateEvent) {
                         // close the connection if it is idle for too long
                         ctx.close();
-                    } else {
-                        super.userEventTriggered(ctx, evt);
                     }
+                    super.userEventTriggered(ctx, evt);
                 }
             });
         }

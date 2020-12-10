@@ -193,7 +193,7 @@ public class Publishers {
      * @return The mapped publisher
      */
     public static <T, R> Publisher<R> map(Publisher<T> publisher, Function<T, R> mapper) {
-        return actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
+        return (MicronautPublisher<R>) actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
             @Override
             protected void doOnSubscribe(Subscription subscription) {
                 actual.onSubscribe(subscription);
@@ -203,7 +203,7 @@ public class Publishers {
             protected void doOnNext(T message) {
                 try {
                     R result = Objects.requireNonNull(mapper.apply(message),
-                        "The mapper returned a null value.");
+                            "The mapper returned a null value.");
                     actual.onNext(result);
                 } catch (Throwable e) {
                     onError(e);
@@ -232,7 +232,7 @@ public class Publishers {
      * @return The mapped publisher
      */
     public static <T> Publisher<T> then(Publisher<T> publisher, Consumer<T> consumer) {
-        return actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
+        return (MicronautPublisher<T>) actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
             @Override
             protected void doOnSubscribe(Subscription subscription) {
                 actual.onSubscribe(subscription);
@@ -269,7 +269,7 @@ public class Publishers {
      * @return The mapped publisher
      */
     public static <T> Publisher<T> onComplete(Publisher<T> publisher, Supplier<CompletableFuture<Void>> future) {
-        return actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
+        return (MicronautPublisher<T>) actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
             @Override
             protected void doOnSubscribe(Subscription subscription) {
                 actual.onSubscribe(subscription);
@@ -350,10 +350,15 @@ public class Publishers {
     public static <T> T convertPublisher(Object object, Class<T> publisherType) {
         Objects.requireNonNull(object, "Argument [object] cannot be null");
         Objects.requireNonNull(publisherType, "Argument [publisherType] cannot be null");
+        if (publisherType.isInstance(object)) {
+            return (T) object;
+        }
         if (object instanceof CompletableFuture) {
             @SuppressWarnings("unchecked") Publisher<T> futurePublisher = Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
             return ConversionService.SHARED.convert(futurePublisher, publisherType)
                     .orElseThrow(() -> unconvertibleError(object, publisherType));
+        } else if (object instanceof MicronautPublisher && MicronautPublisher.class.isAssignableFrom(publisherType)) {
+            return (T) object;
         } else {
             return ConversionService.SHARED.convert(object, publisherType)
                     .orElseThrow(() -> unconvertibleError(object, publisherType));
@@ -395,11 +400,21 @@ public class Publishers {
     }
 
     /**
+     * Marker interface for any micronaut produced publishers.
+     *
+     * @param <T> The generic type
+     * @since 2.0.2
+     */
+    @SuppressWarnings("ReactiveStreamsPublisherImplementation")
+    public interface MicronautPublisher<T> extends Publisher<T> {
+    }
+
+    /**
      * A publisher for a value.
      *
      * @param <T> The type
      */
-    private static class JustPublisher<T> implements Publisher<T> {
+    private static class JustPublisher<T> implements MicronautPublisher<T> {
         private final T value;
 
         public JustPublisher(T value) {
@@ -431,12 +446,13 @@ public class Publishers {
         }
     }
 
+
     /**
      * A publisher that throws an error.
      *
      * @param <T> The type
      */
-    private static class JustThrowPublisher<T> implements Publisher<T> {
+    private static class JustThrowPublisher<T> implements MicronautPublisher<T> {
 
         private final Throwable error;
 
@@ -471,7 +487,7 @@ public class Publishers {
      *
      * @param <T> The type
      */
-    private static class JustCompletePublisher<T> implements Publisher<T> {
+    private static class JustCompletePublisher<T> implements MicronautPublisher<T> {
 
         @Override
         public void subscribe(Subscriber<? super T> subscriber) {
