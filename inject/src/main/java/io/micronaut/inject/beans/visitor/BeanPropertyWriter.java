@@ -263,7 +263,14 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
 
         // 5th argument: The type arguments
         if (typeArguments != null) {
-            pushTypeArgumentElements(constructor, typeElement, typeArguments);
+            pushTypeArgumentElements(
+                    type,
+                    classWriter,
+                    constructor,
+                    typeElement,
+                    typeArguments,
+                    loadTypeMethods
+            );
         } else {
             constructor.visitInsn(ACONST_NULL);
         }

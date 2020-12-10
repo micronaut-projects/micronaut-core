@@ -368,7 +368,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     beanProperty.getWriteMethod().orElse(null),
                     beanProperty.isReadOnly(),
                     metadata ? beanProperty.getAnnotationMetadata() : null,
-                    beanProperty.getType().getTypeArguments()
+                    genericType.getTypeArguments()
             );
 
             for (AnnotationValue<?> indexedAnnotation : indexedAnnotations) {

@@ -21,6 +21,8 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PropertyElement;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 
 /**
@@ -40,7 +42,7 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
     /**
      * Default constructor.
      *  @param declaringElement The declaring element
-     * @param getter The element
+     * @param rootElement The element
      * @param annotationMetadata The annotation metadata
      * @param name The name
      * @param type The type
@@ -49,13 +51,13 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
      */
     JavaPropertyElement(
             ClassElement declaringElement,
-            ExecutableElement getter,
+            Element rootElement,
             AnnotationMetadata annotationMetadata,
             String name,
             ClassElement type,
             boolean readOnly,
             JavaVisitorContext visitorContext) {
-        super(getter, annotationMetadata, visitorContext);
+        super(rootElement, annotationMetadata, visitorContext);
         this.name = name;
         this.type = type;
         this.readOnly = readOnly;

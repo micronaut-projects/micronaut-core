@@ -393,7 +393,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     private static void instantiateInternal(
-            Type owningType, ClassWriter declaringClassWriter,
+            Type owningType,
+            ClassWriter declaringClassWriter,
             GeneratorAdapter generatorAdapter,
             DefaultAnnotationMetadata annotationMetadata,
             boolean isNew,

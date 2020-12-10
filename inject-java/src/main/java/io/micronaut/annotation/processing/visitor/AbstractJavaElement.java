@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -28,10 +29,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
@@ -198,10 +196,19 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 if (e instanceof TypeElement) {
                     TypeElement typeElement = (TypeElement) e;
                     Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
+                    AnnotationUtils annotationUtils = visitorContext
+                                                        .getAnnotationUtils();
+                    AnnotationMetadata newAnnotationMetadata;
+                    List<? extends AnnotationMirror> annotationMirrors = dt.getAnnotationMirrors();
+                    if (!annotationMirrors.isEmpty()) {
+                        newAnnotationMetadata = annotationUtils.newAnnotationBuilder().buildDeclared(typeElement, annotationMirrors);
+                    } else {
+                        newAnnotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
+                    }
                     if (visitorContext.getModelUtils().resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
                         return new JavaEnumElement(
                                 typeElement,
-                                visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
+                                newAnnotationMetadata,
                                 visitorContext
                         );
                     } else {
@@ -213,7 +220,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                         );
                         return new JavaClassElement(
                                 typeElement,
-                                visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
+                                newAnnotationMetadata,
                                 visitorContext,
                                 genericsInfo
                         );
