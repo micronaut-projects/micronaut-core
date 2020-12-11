@@ -1287,7 +1287,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param overriddenMethodGenerator The overriden method generator
+     * @param overriddenMethodGenerator The overridden method generator
      */
     protected void returnVoid(GeneratorAdapter overriddenMethodGenerator) {
         overriddenMethodGenerator.pop();

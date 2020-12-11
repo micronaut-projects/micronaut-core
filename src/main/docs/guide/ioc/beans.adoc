@@ -17,7 +17,7 @@ Micronaut will automatically discover dependency injection metadata on the class
 
 Micronaut supports the following types of dependency injection:
 
-* Constructor injection (must be one public constructor or a single contructor annotated with `@Inject`)
+* Constructor injection (must be one public constructor or a single constructor annotated with `@Inject`)
 * Field injection
 * JavaBean property injection
 * Method parameter injection

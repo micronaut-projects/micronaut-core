@@ -9,7 +9,7 @@ $ mn create-app my-app --features micrometer-atlas
 ----
 ====
 
-The metrics endpoint returns information about the "metrics" of the application. To execute the metrics endpoint, send a GET request to `/metrics`. This will return a list of availble metric names.
+The metrics endpoint returns information about the "metrics" of the application. To execute the metrics endpoint, send a GET request to `/metrics`. This will return a list of available metric names.
 
 You can get specific metrics by using `/metrics/[name]` such as `/metrics/jvm.memory.used`.
 

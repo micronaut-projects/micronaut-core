@@ -6,7 +6,7 @@ You may also wish to leverage existing AOP advice from Spring. One example of th
 
 Micronaut provides support for Spring based transaction management without requiring Spring itself. You simply need to add the `spring` module to your application dependencies:
 
-dependency:micronaut-spring[gradleScope="implementation"]
+dependency:io.micronaut.spring:micronaut-spring[gradleScope="implementation"]
 
 NOTE: If you use Micronaut's <<hibernateSupport,Hibernate support>> you already get this dependency and a `HibernateTransactionManager` is configured for you.
 

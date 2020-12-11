@@ -960,7 +960,15 @@ public class DefaultHttpClient implements
                 }
                 NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
-                return httpContentFlowable.filter(message -> !(message.content() instanceof EmptyByteBuf)).map(contentMapper);
+                return httpContentFlowable
+                        .filter(message -> !(message.content() instanceof EmptyByteBuf))
+                        .map(contentMapper)
+                        .doAfterNext(buffer -> {
+                            ByteBuf byteBuf = (ByteBuf) buffer.asNativeBuffer();
+                            if (byteBuf.refCnt() > 0) {
+                                ReferenceCountUtil.safeRelease(byteBuf);
+                            }
+                        });
             }).doOnTerminate(() -> {
                 final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
                 if (o instanceof Channel) {
@@ -1774,9 +1782,12 @@ public class DefaultHttpClient implements
                 permitsBody,
                 poolMap == null
         );
+
         if (log.isDebugEnabled()) {
             debugRequest(requestURI, nettyRequest);
-        } else if (log.isTraceEnabled()) {
+        }
+
+        if (log.isTraceEnabled()) {
             traceRequest(finalRequest, nettyRequest);
         }
 
@@ -1936,9 +1947,12 @@ public class DefaultHttpClient implements
                 }
             }
         });
+
         if (log.isDebugEnabled()) {
             debugRequest(requestURI, nettyRequest);
-        } else if (log.isTraceEnabled()) {
+        }
+
+        if (log.isTraceEnabled()) {
             traceRequest(requestWrapper.get(), nettyRequest);
         }
 
@@ -2039,11 +2053,12 @@ public class DefaultHttpClient implements
 
                     try {
                         HttpHeaders headers = fullResponse.headers();
+
                         if (log.isDebugEnabled()) {
                             log.debug("Received response {} from {}", status.code(), request.getUri());
-                        } else if (log.isTraceEnabled()) {
-                            log.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri());
-                            log.trace("Status Code: {}", status);
+                        }
+
+                        if (log.isTraceEnabled()) {
                             traceHeaders(headers);
                             traceBody("Response", fullResponse.content());
                         }

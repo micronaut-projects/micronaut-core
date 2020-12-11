@@ -357,7 +357,7 @@ open class Convertible : Car {
         // necessary injections occur
 
         fun testPackagePrivateMethodInjectedEvenWhenSimilarMethodLacksAnnotation() {
-            //Not valid because in Kotlin the method is overriden
+            //Not valid because in Kotlin the method is overridden
             //TestCase.assertTrue(spareTire!!.subPackagePrivateMethodForOverrideInjected)
         }
 
@@ -389,7 +389,7 @@ open class Convertible : Car {
             TestCase.assertFalse(engine!!.overriddenTwiceWithOmissionInSubclassInjected)
         }
 
-        fun testOverriddingMixedWithPackagePrivate2() {
+        fun testOverridingMixedWithPackagePrivate2() {
             TestCase.assertTrue(spareTire!!.spareTirePackagePrivateMethod2Injected)
             //Not valid in Kotlin because the method is overridden
             //TestCase.assertTrue((spareTire as Tire).tirePackagePrivateMethod2Injected)
@@ -400,7 +400,7 @@ open class Convertible : Car {
             //TestCase.assertTrue((plainTire as RoundThing).roundThingPackagePrivateMethod2Injected)
         }
 
-        fun testOverriddingMixedWithPackagePrivate3() {
+        fun testOverridingMixedWithPackagePrivate3() {
             TestCase.assertFalse(spareTire!!.spareTirePackagePrivateMethod3Injected)
             //Not valid in Kotlin because the method is overridden
             //TestCase.assertTrue((spareTire as Tire).tirePackagePrivateMethod3Injected)
@@ -411,7 +411,7 @@ open class Convertible : Car {
             //TestCase.assertTrue((plainTire as RoundThing).roundThingPackagePrivateMethod3Injected)
         }
 
-        fun testOverriddingMixedWithPackagePrivate4() {
+        fun testOverridingMixedWithPackagePrivate4() {
             TestCase.assertFalse(plainTire!!.tirePackagePrivateMethod4Injected)
             //Not the same as Java because package private can be overridden by any subclass in the project
             //TestCase.assertTrue((plainTire as RoundThing).roundThingPackagePrivateMethod4Injected)

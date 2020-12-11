@@ -81,6 +81,7 @@ class UriMatchTemplateSpec extends Specification {
         where:
         template                         | uri                        | matches | variables
         // raw unencoded paths
+        "https://www.domain.com/{+path}" |'https://www.domain.com/abc'| true    | [path:'abc']
         "/books/{+path}"                 | '/books/1.xml'             | true    | [path: '1.xml']
         "/books/{+path}"                 | '/books/foo/1.xml'         | true    | [path: 'foo/1.xml']
         "/books/{+path}"                 | '/books/foo/bar/baz'       | true    | [path: 'foo/bar/baz']

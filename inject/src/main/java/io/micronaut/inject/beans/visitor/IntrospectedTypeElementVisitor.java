@@ -63,7 +63,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
     private List<AbstractIntrospection> abstractIntrospections = new ArrayList<>();
     private AbstractIntrospection currentAbstractIntrospection;
-    private BeanIntrospectionWriter currentRecordWriter;
 
     @Override
     public int getOrder() {
@@ -75,7 +74,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void visitClass(ClassElement element, VisitorContext context) {
         // reset
         currentAbstractIntrospection = null;
-        currentRecordWriter = null;
         if (!element.isPrivate() && element.hasStereotype(Introspected.class)) {
             final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
             if (introspected != null && !writers.containsKey(element.getName())) {
@@ -125,21 +123,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         propertyName
                 ));
                 propertyElement.writeMethod = element;
-            }
-        } else if (currentRecordWriter != null) {
-            if (element.getParameters().length == 0) {
-                Optional<ParameterElement> parameterElement = Arrays.stream(currentRecordWriter.getConstructor().getParameters())
-                        .filter(p -> p.getName().equals(methodName))
-                        .findFirst();
-                parameterElement.ifPresent(value -> currentRecordWriter.visitProperty(
-                        element.getReturnType(),
-                        element.getGenericReturnType(),
-                        methodName,
-                        element,
-                        null,
-                        true,
-                        value.getAnnotationMetadata(),
-                        element.getReturnType().getTypeArguments()));
             }
         }
     }
@@ -348,11 +331,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
 
         ClassElement classElement = writer.getClassElement();
-        if (classElement.isRecord()) {
-            this.currentRecordWriter = writer;
-        } else {
-            processBeanProperties(writer, beanProperties, includes, excludes, ignored, indexedAnnotations, metadata);
-        }
+        processBeanProperties(writer, beanProperties, includes, excludes, ignored, indexedAnnotations, metadata);
 
         writers.put(writer.getBeanType().getClassName(), writer);
     }

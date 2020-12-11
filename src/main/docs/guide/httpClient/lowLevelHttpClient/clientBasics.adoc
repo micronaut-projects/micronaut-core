@@ -135,7 +135,7 @@ To resolve this issue you can register api:http.codec.MediaTypeCodec[] as a bean
 
 Sometimes, receiving just the object is not enough and you need information about the response. In this case, instead of `retrieve` you should use the `exchange` method:
 
-snippet::io.micronaut.docs.basics.HelloControllerSpec[tags="pojoresponse", indent=0, title="Recieving the Full HTTP Response"]
+snippet::io.micronaut.docs.basics.HelloControllerSpec[tags="pojoresponse", indent=0, title="Receiving the Full HTTP Response"]
 
 <1> The `exchange` method is used to receive the api:http.HttpResponse[]
 <2> The body can be retrieved using the `getBody(..)` method of the response

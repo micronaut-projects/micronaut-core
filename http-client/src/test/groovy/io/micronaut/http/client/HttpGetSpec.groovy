@@ -588,6 +588,24 @@ class HttpGetSpec extends Specification {
         client.close()
     }
 
+    void "test an invalid content type"() {
+        when:
+        myGetClient.invalidContentType()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.message == "Failed to decode the body for the given content type [does/notexist]"
+    }
+
+    void "test an invalid content type reactive response"() {
+        when:
+        myGetClient.invalidContentTypeReactive().blockingGet()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.message == "Failed to decode the body for the given content type [does/notexist]"
+    }
+
     @Controller("/get")
     static class GetController {
 
@@ -704,6 +722,11 @@ class HttpGetSpec extends Specification {
         @Get(uris = ["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
+        }
+
+        @Get(value = "/invalidContentType", produces = "does/notexist")
+        String invalidContentType() {
+            return "hello"
         }
     }
 
@@ -874,6 +897,13 @@ class HttpGetSpec extends Specification {
 
         @Get("/multiple/mappings")
         String multipleMappings()
+
+        @Get(value = "/invalidContentType", consumes = "does/notexist")
+        Book invalidContentType()
+
+        @Get(value = "/invalidContentType", consumes = "does/notexist")
+        Single<Book> invalidContentTypeReactive()
+
     }
 
     @Client("http://not.used")

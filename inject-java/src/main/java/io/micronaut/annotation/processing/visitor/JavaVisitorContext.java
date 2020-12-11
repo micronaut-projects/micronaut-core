@@ -208,8 +208,8 @@ public class JavaVisitorContext implements VisitorContext {
     }
 
     @Override
-    public Optional<GeneratedFile> visitMetaInfFile(String path) {
-        return outputVisitor.visitMetaInfFile(path);
+    public Optional<GeneratedFile> visitMetaInfFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
+        return outputVisitor.visitMetaInfFile(path, originatingElements);
     }
 
     @Override

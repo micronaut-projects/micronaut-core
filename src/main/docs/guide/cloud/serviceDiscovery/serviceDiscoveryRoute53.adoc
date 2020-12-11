@@ -71,11 +71,11 @@ First decide if you are creating a public facing namespace or a private one, as 
 .Creating Namespace
 [source,bash]
 ----
-$ aws servicediscovery create-public-dns-namespace --name micronaut.io --create-request-id create-1522767790 --description adescrptionhere
+$ aws servicediscovery create-public-dns-namespace --name micronaut.io --create-request-id create-1522767790 --description adescriptionhere
 
 or
 
-$ aws servicediscovery create-private-dns-namespace --name micronaut.internal.io --create-request-id create-1522767790 --description adescrptionhere --vpc yourvpcID
+$ aws servicediscovery create-private-dns-namespace --name micronaut.internal.io --create-request-id create-1522767790 --description adescriptionhere --vpc yourvpcID
 ----
 
 
@@ -98,7 +98,7 @@ The next step is creating the Service and DNS records.
 .Create Service
 [source,bash]
 ----
-$ aws create-service --name yourservicename --create-request-id somenumber --description someservicedescrption --dns-config NamespaceId=yournamespaceid,RoutingPolicy=WEIGHTED,DnsRecords=[{Type=A,TTL=1000},{Type=A,TTL=1000}]
+$ aws create-service --name yourservicename --create-request-id somenumber --description someservicedescription --dns-config NamespaceId=yournamespaceid,RoutingPolicy=WEIGHTED,DnsRecords=[{Type=A,TTL=1000},{Type=A,TTL=1000}]
 ----
 
 The `DnsRecord` type can be `A`(ipv4),`AAAA`(ipv6),`SRV`, or `CNAME`. `RoutingPolicy` can be `WEIGHTED` or `MULTIVALUE`. Keep in mind `CNAME` must use weighted routing type, `SRV` must have a valid port configured.

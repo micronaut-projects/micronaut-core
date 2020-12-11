@@ -86,7 +86,6 @@ import org.slf4j.LoggerFactory;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 
-import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.io.File;
@@ -170,7 +169,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param channelOptionFactory                    The channel option factory
      */
     @SuppressWarnings("ParameterNumber")
-    @Inject
     public NettyHttpServer(
             NettyHttpServerConfiguration serverConfiguration,
             ApplicationContext applicationContext,
@@ -456,12 +454,12 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         boolean isRandomPort = specifiedPort == -1;
         Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         if (applicationName.isPresent()) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Binding {} server to {}:{}", applicationName.get(), host != null ? host : "*", port);
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Binding {} server to {}:{}", applicationName.get(), host != null ? host : "*", port);
             }
         } else {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Binding server to {}:{}", host != null ? host : "*", port);
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Binding server to {}:{}", host != null ? host : "*", port);
             }
         }
 

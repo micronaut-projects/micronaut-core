@@ -24,7 +24,7 @@ Notice how both `attempts` and `delay` are defined as strings. This is to suppor
 
 snippet::io.micronaut.docs.aop.retry.BookService[tags="config", indent=0, title="Setting Retry via Configuration"]
 
-With the above in place if `book.retry.attempts` is specified in configuration it wil be bound the value of the `attempts` member of the `@Retryable` annotation via annotation metadata.
+With the above in place if `book.retry.attempts` is specified in configuration it will be bound the value of the `attempts` member of the `@Retryable` annotation via annotation metadata.
 
 == Reactive Retry
 
