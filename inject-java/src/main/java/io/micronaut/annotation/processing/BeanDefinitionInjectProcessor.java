@@ -2205,7 +2205,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     modelUtils.isPrivate(element),
                     elementMetadata
             );
-            final boolean isConstructBinding = elementMetadata.hasDeclaredStereotype(ConfigurationInject.class);
+            final boolean isConstructBinding = elementMetadata.hasDeclaredStereotype(ConfigurationInject.class) ||
+                    isConfigurationPropertiesType && JavaModelUtils.isRecord(concreteClass);
             if (isConstructBinding) {
                 this.configurationMetadata = metadataBuilder.visitProperties(
                         concreteClass,
@@ -2227,7 +2228,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 TypeMirror typeMirror = paramElement.asType();
-                if (isConstructBinding && Stream.of(Property.class, Value.class, Parameter.class).noneMatch(annotationMetadata::hasAnnotation)) {
+                if (isConstructBinding && Stream.of(Property.class, Value.class, Parameter.class, Qualifier.class).noneMatch(annotationMetadata::hasStereotype)) {
                     final Element parameterElement = typeUtils.asElement(typeMirror);
                     final AnnotationMetadata parameterTypeMetadata = parameterElement != null ? annotationUtils.getAnnotationMetadata(parameterElement) : AnnotationMetadata.EMPTY_METADATA;
                     if (!parameterTypeMetadata.hasStereotype(Scope.class)) {

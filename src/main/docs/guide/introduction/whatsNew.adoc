@@ -1,64 +1,21 @@
 Micronaut {version} includes the following changes:
 
-=== Build Features
+=== Core Features
 
-==== Maven Plugin Improvements
+==== Improved Support for Records
 
-The Maven plugin now supports different `<packaging>` types:
+Java 14+ Records can now be used to define <<configurationProperties, Configuration Properties>>. By default when `@ConfigurationProperties` is used on a `record`, configuration injection is applied. For example:
 
-* `jar` (default): produces a runnable fat JAR.
-* `native-image`: generates a GraalVM native image.
-* `docker`: builds a Docker image with the application artifacts (compiled classes, resources, dependencies, etc).
-* `docker-native`: builds a Docker image with a GraalVM native image inside.
-
-To package an application, `mvn package` is the one-stop shop to produce the desired artifact.
-
-It also supports using `mvn deploy` as the only command required to deploy an application that, depending on the `<packaging>`:
-
-* `jar` (default): will deploy the artifact to a remote repository using `org.apache.maven.plugins:maven-deploy-plugin:deploy`.
-* `docker` or `docker-native`: will push the Docker image to the configured Docker registry.
-
-Read more information in the https://micronaut-projects.github.io/micronaut-maven-plugin/latest[Maven Plugin documentation].
-
-==== Gradle Plugin Improvements
-
-The Gradle plugin has a new `testNativeImage` task that builds the GraalVM Native Image and uses the native application as an embedded server enabling the ability to write native integration tests.
-
-=== Micronaut Launch Enhancements
-
-==== Support for Kotlin Gradle Builds
-
-It is now possible to create applications that use `build.gradle.kts` instead of `build.gradle` using the `--build` argument of the CLI:
-
-[source,bash]
+[source,java]
 ----
-$ mn create-app demo --build gradle_kotlin && cd demo
-$ ./gradlew test
+package example;
+import io.micronaut.context.annotation.*;
+import javax.validation.constraints.*;
+
+@ConfigurationProperties("example")
+record Example(@Min(20) int num, String name) {
+}
 ----
-
-Or via the Micronaut Launch API:
-
-[source,bash]
-----
-$ curl https://launch.micronaut.io/demo.zip?build=gradle_kotlin -o demo.zip && unzip demo.zip -d demo && cd demo
-$ ./gradlew test
-----
-
-==== Push to Github
-
-It is now possible to create an application with and https://micronaut.io/launch/[Micronaut Launch] and have it pushed automatically to a repository in your Github account. When generating an application just select the "Push to Github" option.
-
-=== New Micronaut Modules
-
-==== MQTT Support
-
-Improving the experience in IoT use cases, Micronaut now has integration with MQTT similar to the integration with Kafka and RabbitMQ. See the https://micronaut-projects.github.io/micronaut-mqtt/latest/guide/[Micronaut MQTT documentation] to get started.
-
-==== Micronaut Data R2DBC
-
-A new module that adds support for R2DBC (Reactive Database Connectivity) has been added in preview status. Micronaut Data R2DBC lets you define reactive data repositories using R2DBC that work with any of the supported drivers and include support for GraalVM Native Image.
-
-See the https://micronaut-projects.github.io/micronaut-r2dbc/1.0.x/guide/[Documentation for Micronaut R2DBC] for more information.
 
 === Module Upgrades
 
