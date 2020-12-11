@@ -24,6 +24,7 @@ import spock.lang.IgnoreIf
 //import org.objectweb.asm.util.ASMifier
 //import org.objectweb.asm.util.TraceClassVisitor
 import spock.lang.Issue
+import spock.lang.Requires
 import spock.util.environment.Jvm
 
 import javax.annotation.processing.SupportedAnnotationTypes
@@ -39,7 +40,7 @@ import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
-    @IgnoreIf({ !jvm.isJava14Compatible() })
+    @Requires({ vm.isJava14Compatible() })
     void "test annotations on generic type arguments for Java 14+ records"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
@@ -63,6 +64,7 @@ public record Foo(List<@Min(10) Long> value){
         genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
     }
 
+    @Requires({ vm.isJava11Compatible() })
     void 'test annotations on generic type arguments'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
@@ -71,10 +73,13 @@ package test;
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
 import javax.validation.constraints.Min;
+import java.lang.annotation.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static java.lang.annotation.ElementType.*;
 
 @io.micronaut.core.annotation.Introspected
 public class Foo {
-    private List<@Min(10) Long> value;
+    private List<@Min(10) @SomeAnn Long> value;
 
     public List<Long> getValue() {
         return value;
@@ -83,6 +88,13 @@ public class Foo {
     public void setValue(List<Long> value) {
         this.value = value;
     }
+}
+
+@Documented
+@Retention(RUNTIME)
+@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
+@interface SomeAnn {
+
 }
 ''')
         when:

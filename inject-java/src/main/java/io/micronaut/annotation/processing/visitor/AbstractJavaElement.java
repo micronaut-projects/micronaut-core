@@ -238,7 +238,6 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             if (bound != null) {
                 return mirrorToClassElement(bound, visitorContext, genericsInfo);
             } else {
-
                 return mirrorToClassElement(upperBound, visitorContext, genericsInfo);
             }
 

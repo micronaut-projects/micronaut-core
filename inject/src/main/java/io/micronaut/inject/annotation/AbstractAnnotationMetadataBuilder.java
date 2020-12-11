@@ -162,6 +162,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
 
         DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+        buildInternal(element, element, annotationMetadata, false, true);
 
         try {
             includeAnnotations(annotationMetadata, element, true, annotations);
@@ -927,7 +928,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         List<T> hierarchy = buildHierarchy(element, inheritTypeAnnotations, declaredOnly);
         if (parent != null) {
             final List<T> parentHierarchy = buildHierarchy(parent, inheritTypeAnnotations, declaredOnly);
-            hierarchy.addAll(0, parentHierarchy);
+            if (hierarchy.isEmpty() && !parentHierarchy.isEmpty()) {
+                hierarchy = parentHierarchy;
+            } else {
+                hierarchy.addAll(0, parentHierarchy);
+            }
         }
         Collections.reverse(hierarchy);
         for (T currentElement : hierarchy) {

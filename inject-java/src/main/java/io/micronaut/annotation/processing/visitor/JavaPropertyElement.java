@@ -23,7 +23,6 @@ import io.micronaut.inject.ast.PropertyElement;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
 
 /**
  * Models a {@link PropertyElement} for Java.
@@ -41,13 +40,14 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
 
     /**
      * Default constructor.
-     *  @param declaringElement The declaring element
-     * @param rootElement The element
+     *
+     * @param declaringElement   The declaring element
+     * @param rootElement        The element
      * @param annotationMetadata The annotation metadata
-     * @param name The name
-     * @param type The type
-     * @param readOnly Whether it is read only
-     * @param visitorContext The java visitor context
+     * @param name               The name
+     * @param type               The type
+     * @param readOnly           Whether it is read only
+     * @param visitorContext     The java visitor context
      */
     JavaPropertyElement(
             ClassElement declaringElement,

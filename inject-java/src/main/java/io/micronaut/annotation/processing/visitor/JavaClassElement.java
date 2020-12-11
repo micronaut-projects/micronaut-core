@@ -342,7 +342,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
                     JavaPropertyElement propertyElement = new JavaPropertyElement(
                             value.declaringType == null ? this : value.declaringType,
-                            fieldElement != null ? fieldElement : value.getter,
+                            value.getter,
                             annotationMetadata,
                             propertyName,
                             value.type,
@@ -351,9 +351,15 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
                         @Override
                         public ClassElement getGenericType() {
-                            TypeMirror returnType = fieldElement != null ? fieldElement.asType() : value.getter.getReturnType();
+                            TypeMirror propertyType = value.getter.getReturnType();
+                            if (fieldElement != null) {
+                                TypeMirror fieldType = fieldElement.asType();
+                                if (visitorContext.getTypes().isAssignable(fieldType, propertyType)) {
+                                    propertyType = fieldType;
+                                }
+                            }
                             Map<String, Map<String, TypeMirror>> declaredGenericInfo = getGenericTypeInfo();
-                            return parameterizedClassElement(returnType, visitorContext, declaredGenericInfo);
+                            return parameterizedClassElement(propertyType, visitorContext, declaredGenericInfo);
                         }
 
                         @Override
