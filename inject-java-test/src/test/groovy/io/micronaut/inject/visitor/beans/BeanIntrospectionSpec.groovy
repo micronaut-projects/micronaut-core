@@ -40,7 +40,7 @@ import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
-    @Requires({ vm.isJava14Compatible() })
+    @Requires({ jvm.isJava14Compatible() })
     void "test annotations on generic type arguments for Java 14+ records"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
@@ -64,7 +64,7 @@ public record Foo(List<@Min(10) Long> value){
         genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
     }
 
-    @Requires({ vm.isJava11Compatible() })
+    @Requires({ jvm.isJava11Compatible() })
     void 'test annotations on generic type arguments'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
