@@ -149,6 +149,11 @@ ext {
                     group  : 'javax.annotation',
                     name   : 'javax.annotation-api'
             ],
+            'jakarta.annotation-api'     : [
+                    version: jakartaAnnotationApiVersion,
+                    group  : 'jakarta.annotation',
+                    name   : 'jakarta.annotation-api'
+            ],
             jsr305                     : [
                     version: jsr305Version,
                     group  : 'com.google.code.findbugs',
