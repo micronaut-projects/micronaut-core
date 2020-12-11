@@ -21,6 +21,7 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
 import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
+import io.micronaut.core.convert.util.UtilConverterRegistrar;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.io.IOUtils;
@@ -754,6 +755,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return CollectionUtils.convertCollection((Class) targetType, list);
         });
 
+        // String -> Locale
+        addConverter(CharSequence.class, Locale.class, (object) -> StringUtils.parseLocale(object.toString()));
+
         TypeConverter<Object, Optional> objectToOptionalConverter = (object, targetType, context) -> {
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
             Argument<?> componentType = typeVariable.orElse(Argument.OBJECT_ARGUMENT);
@@ -925,6 +929,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of(result);
         });
 
+        new UtilConverterRegistrar().register(this);
     }
 
     /**

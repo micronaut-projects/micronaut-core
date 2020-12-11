@@ -92,4 +92,15 @@ class StringUtilsSpec extends Specification {
         ''    | null
         null  | null
     }
+
+    void "test trimLeading"() {
+        expect:
+        StringUtils.trimLeading(input, (character) -> character == c) == expected
+
+        where:
+        input    | c   | expected
+        'abc'    | 'a' | 'bc'
+        'abc'    | 'd' | 'abc'
+        '   abc' | ' ' | 'abc'
+    }
 }
