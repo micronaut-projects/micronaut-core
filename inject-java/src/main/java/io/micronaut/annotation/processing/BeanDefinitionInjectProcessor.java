@@ -2245,13 +2245,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 switch (kind) {
                     case ARRAY:
                         ArrayType arrayType = (ArrayType) typeMirror;
-                        TypeMirror componentType = arrayType.getComponentType();
                         Object resolvedType = modelUtils.resolveTypeReference(arrayType);
                         params.addParameter(
                                 argName,
                                 resolvedType,
                                 genericUtils.resolveTypeReference(arrayType, boundTypes)
                         );
+                        TypeMirror componentType = arrayType.getComponentType();
                         params.addGenericTypes(argName, Collections.singletonMap("E", modelUtils.resolveTypeReference(componentType)));
 
                         break;

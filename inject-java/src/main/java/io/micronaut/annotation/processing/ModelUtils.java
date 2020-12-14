@@ -40,6 +40,7 @@ import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import java.lang.reflect.Array;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -482,13 +483,22 @@ public class ModelUtils {
         } else if (type.getKind() == ARRAY) {
             ArrayType arrayType = (ArrayType) type;
             TypeMirror componentType = arrayType.getComponentType();
+            int dimension = 1;
+            while (componentType.getKind() == ARRAY) {
+                componentType = ((ArrayType) componentType).getComponentType();
+                dimension++;
+            }
             if (componentType.getKind().isPrimitive()) {
-                result = classOfPrimitiveArrayFor(resolvePrimitiveTypeReference(componentType).getName());
+                result = Array.newInstance(classOfPrimitiveArrayFor(resolvePrimitiveTypeReference(componentType).getName()), new int[dimension]).getClass();
             } else {
                 final TypeMirror erased = typeUtils.erasure(componentType);
                 final Element e = typeUtils.asElement(erased);
                 if (e instanceof TypeElement) {
-                    result = resolveTypeReferenceForTypeElement((TypeElement) e) + "[]";
+                    StringBuilder typeString = new StringBuilder(resolveTypeReferenceForTypeElement((TypeElement) e));
+                    for (int i = 0; i < dimension; i++) {
+                        typeString.append("[]");
+                    }
+                    result = typeString.toString();
                 }
             }
         } else if (type.getKind() != VOID && type.getKind() != ERROR) {
