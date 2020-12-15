@@ -1,16 +1,16 @@
-Similar to Spring and Grails, Micronaut provides a set of caching annotations within the link:{api}/io/micronaut/cache/package-summary.html[io.micronaut.cache] package.
+Similar to Spring and Grails, Micronaut provides a set of caching annotations within the link:{micronautcacheapi}/package-summary.html[io.micronaut.cache] package.
 
-The link:{api}/io/micronaut/cache/CacheManager.html[CacheManager] interface allows different cache implementations to be plugged in as necessary.
+The link:{micronautcacheapi}/CacheManager.html[CacheManager] interface allows different cache implementations to be plugged in as necessary.
 
-The link:{api}/io/micronaut/cache/SyncCache.html[SyncCache] interface provides a synchronous API for caching, whilst the link:{api}/io/micronaut/cache/AsyncCache.html[AsyncCache] API allows non-blocking operation.
+The link:{micronautcacheapi}/SyncCache.html[SyncCache] interface provides a synchronous API for caching, whilst the link:{micronautcacheapi}/AsyncCache.html[AsyncCache] API allows non-blocking operation.
 
 == Cache Annotations
 
 The following cache annotations are supported:
 
-- link:{api}/io/micronaut/cache/annotation/Cacheable.html[@Cacheable] - Indicates a method is cacheable within the given cache name
-- link:{api}/io/micronaut/cache/annotation/CachePut.html[@CachePut] - Indicates that the return value of a method invocation should be cached. Unlike `@Cacheable` the original operation is never skipped.
-- link:{api}/io/micronaut/cache/annotation/CacheInvalidate.html[@CacheInvalidate] - Indicates the invocation of a method should cause the invalidation of one or many caches.
+- link:{micronautcacheapi}/annotation/Cacheable.html[@Cacheable] - Indicates a method is cacheable within the given cache name
+- link:{micronautcacheapi}/annotation/CachePut.html[@CachePut] - Indicates that the return value of a method invocation should be cached. Unlike `@Cacheable` the original operation is never skipped.
+- link:{micronautcacheapi}/annotation/CacheInvalidate.html[@CacheInvalidate] - Indicates the invocation of a method should cause the invalidation of one or many caches.
 
 
 By using one of the annotations the api:cache.interceptor.CacheInterceptor[] is activated which in the case of `@Cacheable` will cache the return result of the method.
@@ -38,7 +38,7 @@ The above example will configure a cache called "my-cache" with a maximum size o
 [NOTE]
 .Naming Caches
 ====
-Names of caches under `micronaut.caches` should be defined in kebab case (lowercase and hyphen separated), if camel case is used the names are normalized to kebab case. So for example specifying `myCache` will become `my-cache`. The kebab case form should be used when referencing caches in the ann:cache.annotation.Cacheable[] annotation.
+Names of caches under `micronaut.caches` should be defined in kebab case (lowercase and hyphen separated), if camel case is used the names are normalized to kebab case. So for example specifying `myCache` will become `my-cache`. The kebab case form should be used when referencing caches in the {micronautcacheapi}/annotation/Cacheable.html[@Cacheable] annotation.
 ====
 
 To configure a weigher to be used with the `maximumWeight` configuration, create a bean that implements `io.micronaut.caffeine.cache.Weigher`. To associate a given weigher with only a specific cache, annotate the bean with `@Named(<cache name>)`. Weighers without a named qualifier will apply to all caches that don't have a named weigher. If no beans are found, a default implementation will be used.
@@ -47,9 +47,9 @@ See the https://micronaut-projects.github.io/micronaut-cache/latest/guide/config
 
 == Dynamic Cache Creation
 
-For use cases where caches cannot be configured ahead of time, a api:cache.DynamicCacheManager[] bean can be registered. When a cache is attempted to be retrieved that was not predefined, the dynamic cache manager will be invoked to return a cache.
+For use cases where caches cannot be configured ahead of time, a {micronautcacheapi}/DynamicCacheManager.html[DynamicCacheManager] bean can be registered. When a cache is attempted to be retrieved that was not predefined, the dynamic cache manager will be invoked to return a cache.
 
-By default, if there is no other dynamic cache manager defined in the application, Micronaut registers an instance of api:cache.DefaultDynamicCacheManager[] that will create Caffeine caches with default values.
+By default, if there is no other dynamic cache manager defined in the application, Micronaut registers an instance of {micronautcacheapi}/caffeine/DefaultDynamicCacheManager.html[DefaultDynamicCacheManager] that will create Caffeine caches with default values.
 
 == Other Cache Implementations
 
