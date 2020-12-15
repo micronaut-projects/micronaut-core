@@ -28,8 +28,9 @@ Or when using Maven:
   </dependency>
 </dependencies>
 ...
-<annotationProcessorPaths>
+<annotationProcessorPaths combine.self="override">
   <path>
+    <!-- must precede micronaut-inject-java -->
     <groupId>org.projectlombok</groupId>
     <artifactId>lombok</artifactId>
     <version>1.18.12</version>
@@ -37,6 +38,11 @@ Or when using Maven:
   <path>
     <groupId>io.micronaut</groupId>
     <artifactId>micronaut-inject-java</artifactId>
+    <version>${micronaut.version}</version>
+  </path>
+    <path>
+    <groupId>io.micronaut</groupId>
+    <artifactId>micronaut-validation</artifactId>
     <version>${micronaut.version}</version>
   </path>
 </annotationProcessorPaths>

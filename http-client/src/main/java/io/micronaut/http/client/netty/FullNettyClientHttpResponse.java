@@ -267,18 +267,16 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         Optional<MediaType> contentType = getContentType();
         if (contentType.isPresent()) {
             if (mediaTypeCodecRegistry != null) {
+                bodyBytes = ByteBufUtil.getBytes(content);
                 if (CharSequence.class.isAssignableFrom(type.getType())) {
                     Charset charset = contentType.flatMap(MediaType::getCharset).orElse(StandardCharsets.UTF_8);
-                    bodyBytes = ByteBufUtil.getBytes(content);
                     return Optional.of(new String(bodyBytes, charset));
                 } else if (type.getType() == byte[].class) {
-                    bodyBytes = ByteBufUtil.getBytes(content);
                     return Optional.of(bodyBytes);
                 } else {
                     Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
                     if (foundCodec.isPresent()) {
                         MediaTypeCodec codec = foundCodec.get();
-                        bodyBytes = ByteBufUtil.getBytes(content);
                         return Optional.of(codec.decode(type, bodyBytes));
                     }
                 }

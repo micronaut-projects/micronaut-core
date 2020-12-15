@@ -1,9 +1,25 @@
 Micronaut {version} includes the following changes:
 
-=== Module feature highlights
+=== Core Features
 
-* Thanks to a contribution by https://github.com/viniciusccarvalho[Vinicius Carvalho], Micronaut GCP supports
-  https://github.com/micronaut-projects/micronaut-gcp/pull/324[distributed configuration via Google Cloud Secret Manager].
+==== Improved Support for Records
+
+Java 14+ Records can now be used to define <<configurationProperties, Configuration Properties>>. By default when `@ConfigurationProperties` is used on a `record`, configuration injection is applied. For example:
+
+[source,java]
+----
+package example;
+import io.micronaut.context.annotation.*;
+import javax.validation.constraints.*;
+
+@ConfigurationProperties("example")
+record Example(@Min(20) int num, String name) {
+}
+----
+
+==== Google Cloud Secret Manager
+
+Thanks to a contribution by https://github.com/viniciusccarvalho[Vinicius Carvalho], Micronaut GCP supports distributed configuration via Google Cloud Secret Manager.
 
 === Module Upgrades
 
