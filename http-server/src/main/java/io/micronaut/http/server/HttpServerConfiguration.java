@@ -444,7 +444,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * @param hostResolution The host resolution configuration
+     * @param localeResolution The locale resolution configuration
      */
     public void setLocaleResolution(LocaleResolutionConfiguration localeResolution) {
         this.localeResolution = localeResolution;
@@ -754,7 +754,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * Configuration for host resolution with the {@link io.micronaut.http.server.util.LocaleResolver}.
+     * Configuration for locale resolution used by {@link io.micronaut.http.server.util.HttpLocaleResolver}.
      */
     @ConfigurationProperties("locale-resolution")
     public static class LocaleResolutionConfiguration {
@@ -765,7 +765,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         private Locale fixed;
         private String sessionAttribute;
         private String cookieName;
-        private boolean headerResolution = DEFAULT_HEADER_RESOLUTION;
+        private boolean header = DEFAULT_HEADER_RESOLUTION;
         private Locale defaultLocale = Locale.getDefault();
 
         /**
@@ -837,18 +837,18 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         /**
          * @return True if the accept header should be searched for the locale.
          */
-        public boolean isHeaderResolution() {
-            return headerResolution;
+        public boolean isHeader() {
+            return header;
         }
 
         /**
          * Set to true if the locale should be resolved from the `Accept-Language` header.
          * Default value ({@value #DEFAULT_HEADER_RESOLUTION}).
          *
-         * @param headerResolution Header resolution
+         * @param header Header resolution
          */
-        public void setHeaderResolution(boolean headerResolution) {
-            this.headerResolution = headerResolution;
+        public void setHeader(boolean header) {
+            this.header = header;
         }
     }
 }

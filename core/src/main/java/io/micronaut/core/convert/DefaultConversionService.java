@@ -21,7 +21,6 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
 import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
-import io.micronaut.core.convert.util.UtilConverterRegistrar;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.io.IOUtils;
@@ -549,17 +548,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Locale
-        addConverter(CharSequence.class, Locale.class, (CharSequence object, Class<Locale> targetType, ConversionContext context) -> {
-            if (StringUtils.isEmpty(object)) {
-                return Optional.empty();
-            }
-            try {
-                return Optional.of(Locale.forLanguageTag(object.toString().replace('_', '-')));
-            } catch (IllegalArgumentException e) {
-                context.reject(object, e);
-                return Optional.empty();
-            }
-        });
+        addConverter(CharSequence.class, Locale.class, (object) -> StringUtils.parseLocale(object.toString()));
 
         // String -> UUID
         addConverter(CharSequence.class, UUID.class, (CharSequence object, Class<UUID> targetType, ConversionContext context) -> {
@@ -755,9 +744,6 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return CollectionUtils.convertCollection((Class) targetType, list);
         });
 
-        // String -> Locale
-        addConverter(CharSequence.class, Locale.class, (object) -> StringUtils.parseLocale(object.toString()));
-
         TypeConverter<Object, Optional> objectToOptionalConverter = (object, targetType, context) -> {
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
             Argument<?> componentType = typeVariable.orElse(Argument.OBJECT_ARGUMENT);
@@ -929,7 +915,6 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of(result);
         });
 
-        new UtilConverterRegistrar().register(this);
     }
 
     /**
