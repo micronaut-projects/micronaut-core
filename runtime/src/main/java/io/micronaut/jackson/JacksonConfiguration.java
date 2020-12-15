@@ -76,6 +76,7 @@ public class JacksonConfiguration {
     private ObjectMapper.DefaultTyping defaultTyping = null;
     private PropertyNamingStrategy propertyNamingStrategy = null;
     private boolean alwaysSerializeErrorsAsList = false;
+    private boolean trimStrings = false;
 
     /**
      * Whether the {@link io.micronaut.core.beans.BeanIntrospection} should be used for reflection free object serialialization/deserialialization.
@@ -208,6 +209,16 @@ public class JacksonConfiguration {
     }
 
     /**
+     * Whether strings should be trimmed when deserializing. If the resulting string is an empty string,
+     * then null will be applied instead.
+     *
+     * @return True if strings should be trimmed when deserializing.
+     */
+    public boolean isTrimStrings() {
+        return trimStrings;
+    }
+
+    /**
      * Sets the default date format to use.
      * @param dateFormat The date format
      */
@@ -322,10 +333,20 @@ public class JacksonConfiguration {
      * Sets whether _embedded.errors should always be serialized as list (defaults to false).
      * If set to false, _embedded.errors with 1 element will be serialized as an object.
      *
-     * @param alwaysSerializeErrorsAsList True if _embedded.errors should always be serialized as list.
+     * @param alwaysSerializeErrorsAsList True if _embedded.errors should always be serialized as list
      */
     public void setAlwaysSerializeErrorsAsList(boolean alwaysSerializeErrorsAsList) {
         this.alwaysSerializeErrorsAsList = alwaysSerializeErrorsAsList;
+    }
+
+    /**
+     * Whether strings should be trimmed when deserializing (defaults to false).
+     * If the resulting string is an empty string, then null will be applied instead.
+     *
+     * @param trimStrings True if strings should be trimmed when deserializing
+     */
+    public void setTrimStrings(boolean trimStrings) {
+        this.trimStrings = trimStrings;
     }
 
     /**
