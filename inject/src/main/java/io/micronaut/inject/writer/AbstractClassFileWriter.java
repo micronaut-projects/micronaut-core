@@ -369,7 +369,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 argumentType = getTypeReference(value);
             }
 
-
             // 1st argument: The type
             generatorAdapter.push(argumentType);
 
@@ -605,11 +604,17 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         } else if (type instanceof String) {
             String className = type.toString();
 
-            String internalName = getInternalName(className);
-            if (className.endsWith("[]")) {
-                internalName = "[L" + internalName + ";";
+            StringBuilder internalName = new StringBuilder(getInternalName(className));
+            Matcher matcher = ARRAY_PATTERN.matcher(className);
+            if (matcher.find()) {
+                internalName.append(';');
+                internalName.insert(0, 'L');
+                int dimensions = matcher.group(0).length() / 2;
+                for (int i = 0; i < dimensions; i++) {
+                    internalName.insert(0, '[');
+                }
             }
-            return Type.getObjectType(internalName);
+            return Type.getObjectType(internalName.toString());
         } else {
             throw new IllegalArgumentException("Type reference [" + type + "] should be a Class or a String representing the class name");
         }
@@ -1241,8 +1246,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      */
     protected static String getInternalName(String className) {
         String newClassName = className.replace('.', '/');
-        while (newClassName.endsWith("[]")) {
-            newClassName = newClassName.substring(0, newClassName.length() - 2);
+        Matcher matcher = ARRAY_PATTERN.matcher(newClassName);
+        if (matcher.find()) {
+            newClassName = matcher.replaceFirst("");
         }
         return newClassName;
     }

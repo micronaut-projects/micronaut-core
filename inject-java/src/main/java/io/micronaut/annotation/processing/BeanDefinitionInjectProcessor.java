@@ -2251,9 +2251,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 resolvedType,
                                 genericUtils.resolveTypeReference(arrayType, boundTypes)
                         );
-                        TypeMirror componentType = arrayType.getComponentType();
-                        params.addGenericTypes(argName, Collections.singletonMap("E", modelUtils.resolveTypeReference(componentType)));
-
+                        //TypeMirror componentType = arrayType.getComponentType();
+                        //params.addGenericTypes(argName, Collections.singletonMap("E", modelUtils.resolveTypeReference(componentType)));
                         break;
                     case TYPEVAR:
                         TypeVariable typeVariable = (TypeVariable) typeMirror;

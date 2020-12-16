@@ -3,6 +3,7 @@ package io.micronaut.aop.introduction.with_around
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.inject.ExecutableMethod
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -72,5 +73,41 @@ class IntroductionWithAroundOnConcreteClassSpec extends Specification {
         then:
             proxyTargetBeanDefinition.getExecutableMethods().size() == 4
             beanDefinition.getExecutableMethods().size() == 4
+    }
+
+    void "test a multidimensional array property"() {
+        when:
+        def clazz = MyBean9.class
+        def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
+        def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
+
+        then:
+        proxyTargetBeanDefinition.getExecutableMethods().size() == 5
+        beanDefinition.getExecutableMethods().size() == 5
+        beanDefinition.findMethod("getMultidim").get().getReturnType().asArgument().getType() == String[][].class
+        beanDefinition.findMethod("setMultidim", String[][].class).isPresent()
+        beanDefinition.findMethod("getPrimitiveMultidim").get().getReturnType().asArgument().getType() == int[][].class
+        beanDefinition.findMethod("setPrimitiveMultidim", int[][].class).isPresent()
+
+        when:
+        MyBean9 bean = applicationContext.getBean(proxyTargetBeanDefinition)
+        ExecutableMethod getMultiDim = beanDefinition.findMethod('getMultidim').get()
+        ExecutableMethod setMultiDim = beanDefinition.findMethod('setMultidim', String[][].class).get()
+        ExecutableMethod getPrimitiveMultidim = beanDefinition.findMethod('getPrimitiveMultidim').get()
+        ExecutableMethod setPrimitiveMultidim = beanDefinition.findMethod('setPrimitiveMultidim', int[][].class).get()
+
+        then:
+        getMultiDim.invoke(bean) == null
+        getPrimitiveMultidim.invoke(bean) == null
+
+        when:
+        setMultiDim.invoke(bean, new Object[] { new String[][] { new String[] { "test" }, new String[] { "abc" } } })
+        setPrimitiveMultidim.invoke(bean, new Object[] { new int[][] { new int[] { 1 }, new int[] { 2 }} })
+
+        then:
+        bean.getMultidim()[0][0] == "test"
+        bean.getPrimitiveMultidim()[0][0] == 1
+        getMultiDim.invoke(bean)[0][0] == "test"
+        getPrimitiveMultidim.invoke(bean)[0][0] == 1
     }
 }

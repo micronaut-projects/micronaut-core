@@ -489,7 +489,7 @@ public class ModelUtils {
                 dimension++;
             }
             if (componentType.getKind().isPrimitive()) {
-                result = Array.newInstance(classOfPrimitiveArrayFor(resolvePrimitiveTypeReference(componentType).getName()), new int[dimension]).getClass();
+                result = Array.newInstance(resolvePrimitiveTypeReference(componentType), new int[dimension]).getClass();
             } else {
                 final TypeMirror erased = typeUtils.erasure(componentType);
                 final Element e = typeUtils.asElement(erased);
