@@ -26,7 +26,7 @@ import java.util.Optional;
  * @since 2.3.0
  * @param <T> The context object which will be used to resolve the locale
  */
-public class FixedLocaleResolver<T> extends DefaultLocaleResolver<T> {
+public class FixedLocaleResolver<T> extends AbstractLocaleResolver<T> {
 
     protected final Locale locale;
 

@@ -17,10 +17,9 @@ package io.micronaut.session.http;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.util.localeresolution.LocaleResolutionConfiguration;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.util.localeresolution.HttpDefaultLocaleResolver;
+import io.micronaut.http.server.util.localeresolution.HttpAbstractLocaleResolver;
 import io.micronaut.http.server.util.localeresolution.HttpLocaleResolutionConfiguration;
 
 import javax.inject.Singleton;
@@ -30,7 +29,7 @@ import java.util.Optional;
 @Singleton
 @Requires(property = HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.PREFIX + ".session-attribute")
 @Requires(classes = SessionForRequest.class)
-public class SessionLocaleResolver extends HttpDefaultLocaleResolver {
+public class SessionLocaleResolver extends HttpAbstractLocaleResolver {
 
     private final String sessionAttribute;
 

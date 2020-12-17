@@ -27,7 +27,7 @@ import java.util.Locale;
  * @since 2.3.0
  * @param <T> The context object which will be used to resolve the locale
  */
-public abstract class DefaultLocaleResolver<T> implements LocaleResolver<T> {
+public abstract class AbstractLocaleResolver<T> implements LocaleResolver<T> {
 
     protected final Locale defaultLocale;
 
@@ -35,7 +35,7 @@ public abstract class DefaultLocaleResolver<T> implements LocaleResolver<T> {
      *
      * @param localeResolutionConfiguration Locale Resolution configuration
      */
-    public DefaultLocaleResolver(LocaleResolutionConfiguration localeResolutionConfiguration) {
+    public AbstractLocaleResolver(LocaleResolutionConfiguration localeResolutionConfiguration) {
         this.defaultLocale = localeResolutionConfiguration.getDefaultLocale();
     }
 

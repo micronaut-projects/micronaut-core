@@ -34,9 +34,9 @@ import java.util.Optional;
  */
 @Singleton
 @Requires(property = HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.PREFIX + ".header", notEquals = StringUtils.FALSE)
-public class RequestLocaleResolver extends HttpDefaultLocaleResolver {
+public class RequestLocaleResolver extends HttpAbstractLocaleResolver {
 
-    public static final Integer ORDER = HttpDefaultLocaleResolver.ORDER + 25;
+    public static final Integer ORDER = HttpAbstractLocaleResolver.ORDER + 25;
 
     /**
      * @param httpLocaleResolutionConfiguration Locale Resolution configuration for HTTP Requests

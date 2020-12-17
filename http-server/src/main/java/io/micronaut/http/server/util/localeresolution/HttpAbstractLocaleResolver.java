@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.util.localeresolution;
 
-import io.micronaut.core.util.localeresolution.DefaultLocaleResolver;
+import io.micronaut.core.util.localeresolution.AbstractLocaleResolver;
 import io.micronaut.http.HttpRequest;
 
 /**
@@ -24,7 +24,7 @@ import io.micronaut.http.HttpRequest;
  * @author Sergio del Amo
  * @since 2.3.0
  */
-public abstract class HttpDefaultLocaleResolver extends DefaultLocaleResolver<HttpRequest<?>> implements HttpLocaleResolver {
+public abstract class HttpAbstractLocaleResolver extends AbstractLocaleResolver<HttpRequest<?>> implements HttpLocaleResolver {
     public static final Integer ORDER = 50;
 
     protected HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration;
@@ -32,7 +32,7 @@ public abstract class HttpDefaultLocaleResolver extends DefaultLocaleResolver<Ht
     /**
      * @param httpLocaleResolutionConfiguration Locale Resolution configuration for HTTP Requests
      */
-    public HttpDefaultLocaleResolver(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
+    public HttpAbstractLocaleResolver(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
         super(httpLocaleResolutionConfiguration);
         this.httpLocaleResolutionConfiguration = httpLocaleResolutionConfiguration;
     }

@@ -35,7 +35,7 @@ import java.util.Optional;
  */
 @Singleton
 @Primary
-public class CompositeHttpLocaleResolver extends HttpDefaultLocaleResolver {
+public class CompositeHttpLocaleResolver extends HttpAbstractLocaleResolver {
 
     private final HttpLocaleResolver[] localeResolvers;
 

@@ -16,14 +16,12 @@
 package io.micronaut.http.server.util.localeresolution;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 
 import javax.inject.Singleton;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -35,7 +33,7 @@ import java.util.Optional;
  */
 @Singleton
 @Requires(property = HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.PREFIX + ".cookie-name")
-public class CookieLocaleResolver extends HttpDefaultLocaleResolver {
+public class CookieLocaleResolver extends HttpAbstractLocaleResolver {
 
     private final String cookieName;
 
