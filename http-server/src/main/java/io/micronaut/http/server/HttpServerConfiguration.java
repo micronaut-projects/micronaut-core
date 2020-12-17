@@ -22,6 +22,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.server.cors.CorsOriginConfiguration;
+import io.micronaut.http.server.util.localeresolution.HttpLocaleResolutionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.executor.ThreadSelection;
 
@@ -118,7 +119,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private boolean dateHeader = DEFAULT_DATEHEADER;
     private boolean logHandledExceptions = DEFAULT_LOG_HANDLED_EXCEPTIONS;
     private HostResolutionConfiguration hostResolution;
-    private LocaleResolutionConfiguration localeResolution;
+    private HttpLocaleResolutionConfigurationProperties localeResolution;
     private String clientAddressHeader;
     private String contextPath;
     private boolean dualProtocol = DEFAULT_DUAL_PROTOCOL;
@@ -292,7 +293,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      * @return The host resolution configuration
      */
     @Nullable
-    public LocaleResolutionConfiguration getLocaleResolution() {
+    public HttpLocaleResolutionConfiguration getLocaleResolution() {
         return localeResolution;
     }
 
@@ -446,7 +447,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     /**
      * @param localeResolution The locale resolution configuration
      */
-    public void setLocaleResolution(LocaleResolutionConfiguration localeResolution) {
+    public void setLocaleResolution(HttpLocaleResolutionConfigurationProperties localeResolution) {
         this.localeResolution = localeResolution;
     }
 
@@ -754,10 +755,10 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * Configuration for locale resolution used by {@link io.micronaut.http.server.util.HttpLocaleResolver}.
+     * Configuration for locale resolution used by {@link io.micronaut.http.server.util.localeresolution.HttpLocaleResolver}.
      */
     @ConfigurationProperties("locale-resolution")
-    public static class LocaleResolutionConfiguration {
+    public static class HttpLocaleResolutionConfigurationProperties implements HttpLocaleResolutionConfiguration {
 
         public static final String PREFIX = HttpServerConfiguration.PREFIX + ".locale-resolution";
         private static final boolean DEFAULT_HEADER_RESOLUTION = true;
@@ -766,11 +767,14 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         private String sessionAttribute;
         private String cookieName;
         private boolean header = DEFAULT_HEADER_RESOLUTION;
+
+        @NonNull
         private Locale defaultLocale = Locale.getDefault();
 
         /**
          * @return The fixed locale
          */
+        @NonNull
         public Optional<Locale> getFixed() {
             return Optional.ofNullable(fixed);
         }
@@ -781,13 +785,15 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          *
          * @param fixed The fixed locale
          */
-        public void setFixed(Locale fixed) {
+        public void setFixed(@Nullable Locale fixed) {
             this.fixed = fixed;
         }
 
         /**
          * @return The key in the session that stores the locale
          */
+        @Override
+        @NonNull
         public Optional<String> getSessionAttribute() {
             return Optional.ofNullable(sessionAttribute);
         }
@@ -797,13 +803,15 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          *
          * @param sessionAttribute The session attribute key
          */
-        public void setSessionAttribute(String sessionAttribute) {
+        public void setSessionAttribute(@Nullable String sessionAttribute) {
             this.sessionAttribute = sessionAttribute;
         }
 
         /**
          * @return The locale to be used if one cannot be resolved.
          */
+        @Override
+        @NonNull
         public Locale getDefaultLocale() {
             return defaultLocale;
         }
@@ -814,13 +822,15 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          *
          * @param defaultLocale The default locale.
          */
-        public void setDefaultLocale(Locale defaultLocale) {
+        public void setDefaultLocale(@NonNull Locale defaultLocale) {
             this.defaultLocale = defaultLocale;
         }
 
         /**
          * @return The name of the cookie that contains the locale.
          */
+        @Override
+        @NonNull
         public Optional<String> getCookieName() {
             return Optional.ofNullable(cookieName);
         }
@@ -830,13 +840,14 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          *
          * @param cookieName The name of the cookie used to store the locale
          */
-        public void setCookieName(String cookieName) {
+        public void setCookieName(@Nullable String cookieName) {
             this.cookieName = cookieName;
         }
 
         /**
          * @return True if the accept header should be searched for the locale.
          */
+        @Override
         public boolean isHeader() {
             return header;
         }

@@ -13,31 +13,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.util;
+package io.micronaut.http.server.util.localeresolution;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.server.HttpServerConfiguration;
 
 import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
 
+/**
+ * {@link Primary} {@link HttpLocaleResolver} which evaluates every {@link HttpLocaleResolver} by order to resolve a {@link java.util.Locale}.
+ *
+ * @author Sergio del Amo
+ * @author James Kleeh
+ * @since 2.3.0
+ */
 @Singleton
 @Primary
-public class CompositeHttpLocaleResolver implements HttpLocaleResolver {
+public class CompositeHttpLocaleResolver extends HttpAbstractLocaleResolver {
 
     private final HttpLocaleResolver[] localeResolvers;
-    private final Locale defaultLocale;
 
+    /**
+     * @param localeResolvers HTTP Locale Resolvers
+     * @param httpLocaleResolutionConfiguration Locale Resolution configuration for HTTP Requests
+     */
     public CompositeHttpLocaleResolver(HttpLocaleResolver[] localeResolvers,
-                                       HttpServerConfiguration serverConfiguration) {
+                                       HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
+        super(httpLocaleResolutionConfiguration);
         this.localeResolvers = localeResolvers;
-        this.defaultLocale = Optional.ofNullable(serverConfiguration.getLocaleResolution())
-                .map(HttpServerConfiguration.LocaleResolutionConfiguration::getDefaultLocale)
-                .orElse(Locale.getDefault());
     }
 
     @Override
@@ -47,10 +54,5 @@ public class CompositeHttpLocaleResolver implements HttpLocaleResolver {
                 .filter(Optional::isPresent)
                 .findFirst()
                 .orElse(Optional.empty());
-    }
-
-    @Override
-    public Locale resolveOrDefault(@NonNull HttpRequest<?> request) {
-        return resolve(request).orElse(defaultLocale);
     }
 }

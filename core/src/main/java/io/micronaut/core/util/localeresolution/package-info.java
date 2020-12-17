@@ -13,17 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.util;
-
-import io.micronaut.core.util.LocaleResolver;
-import io.micronaut.http.HttpRequest;
-
 /**
- * Responsible for determining the current locale from a request.
+ * Micronaut utilities to resolve a {@link java.util.Locale}.
  *
- * @author James Kleeh
- * @since 2.3.0
+ * @author Sergio del Amo
+ * @since 1.0
  */
-public interface HttpLocaleResolver extends LocaleResolver<HttpRequest<?>> {
+package io.micronaut.core.util.localeresolution;
 
-}

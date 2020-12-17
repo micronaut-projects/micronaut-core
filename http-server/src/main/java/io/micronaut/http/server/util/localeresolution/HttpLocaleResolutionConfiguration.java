@@ -13,30 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.util;
+package io.micronaut.http.server.util.localeresolution;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.core.order.Ordered;
+import io.micronaut.core.util.localeresolution.LocaleResolutionConfiguration;
 
-import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Responsible for determining the current locale given a context.
+ * Configuration for Locale Resolution in a HTTP Request.
  *
- * @author James Kleeh
+ * @author Sergio del Amo
  * @since 2.3.0
- * @param <T> The context object which will be used to resolve the locale
  */
-public interface LocaleResolver<T> extends Ordered {
+public interface HttpLocaleResolutionConfiguration extends LocaleResolutionConfiguration {
+    /**
+     * @return The key in the session that stores the locale
+     */
+    @NonNull
+    Optional<String> getSessionAttribute();
 
     /**
-     * Resolves the locale for the given context.
-     *
-     * @param context The context to retrieve the locale from
-     * @return The locale
+     * @return The name of the cookie that contains the locale.
      */
-    Optional<Locale> resolve(@NonNull T context);
+    @NonNull
+    Optional<String> getCookieName();
 
-    Locale resolveOrDefault(@NonNull T context);
+    /**
+     * @return True if the accept header should be searched for the locale.
+     */
+    boolean isHeader();
 }

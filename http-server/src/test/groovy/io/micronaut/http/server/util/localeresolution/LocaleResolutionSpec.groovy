@@ -1,8 +1,10 @@
-package io.micronaut.http.server.util
+package io.micronaut.http.server.util.localeresolution
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.util.localeresolution.LocaleResolutionConfiguration
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.server.util.MockHttpHeaders
 import io.micronaut.http.simple.cookies.SimpleCookie
 import io.micronaut.http.simple.cookies.SimpleCookies
 import spock.lang.Specification
@@ -66,16 +68,21 @@ class LocaleResolutionSpec extends Specification {
     }
 
     void "test fixed locale"() {
+        given:
         ApplicationContext applicationContext = ApplicationContext.run([
                 'micronaut.server.locale-resolution.cookie-name': 'Locale',
                 'micronaut.server.locale-resolution.fixed': 'ko-KR'
         ])
+
         HttpLocaleResolver localeResolver = applicationContext.getBean(HttpLocaleResolver)
         def request = createMock()
         request.getHeaders() >> new MockHttpHeaders(['Accept-Language': ['en-GB']])
         def cookies = new SimpleCookies(applicationContext.getBean(ConversionService))
         cookies.put('Locale', new SimpleCookie('Locale', 'en_CA'))
         request.getCookies() >> cookies
+
+        expect:
+        applicationContext.containsBean(LocaleResolutionConfiguration)
 
         when:
         Optional<Locale> locale = localeResolver.resolve(request)
