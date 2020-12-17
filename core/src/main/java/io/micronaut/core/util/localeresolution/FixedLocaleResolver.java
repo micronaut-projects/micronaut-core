@@ -16,6 +16,9 @@
 package io.micronaut.core.util.localeresolution;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.util.LocaleResolver;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Locale;
 import java.util.Optional;
 
@@ -26,7 +29,7 @@ import java.util.Optional;
  * @since 2.3.0
  * @param <T> The context object which will be used to resolve the locale
  */
-public class FixedLocaleResolver<T> extends AbstractLocaleResolver<T> {
+public class FixedLocaleResolver<T> implements LocaleResolver<T> {
 
     protected final Locale locale;
 
@@ -35,7 +38,6 @@ public class FixedLocaleResolver<T> extends AbstractLocaleResolver<T> {
      * @param localeResolutionConfiguration Locale Resolution configuration
      */
     public FixedLocaleResolver(LocaleResolutionConfiguration localeResolutionConfiguration) {
-        super(localeResolutionConfiguration);
         this.locale = localeResolutionConfiguration.getFixed()
                 .orElseThrow(() -> new IllegalArgumentException("The fixed locale must be set"));
     }
@@ -43,5 +45,10 @@ public class FixedLocaleResolver<T> extends AbstractLocaleResolver<T> {
     @Override
     public Optional<Locale> resolve(@NonNull T context) {
         return Optional.of(locale);
+    }
+
+    @Override
+    public Locale resolveOrDefault(@NotNull T context) {
+        return resolve(context).orElseThrow(() -> new IllegalArgumentException("The fixed locale must be set"));
     }
 }
