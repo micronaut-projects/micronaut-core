@@ -19,8 +19,8 @@ class LocaleResolutionOrderSpec extends Specification {
         localeResolvers
         localeResolvers.size() == 4
         localeResolvers[0] instanceof HttpFixedLocaleResolver
-        localeResolvers[1] instanceof CookieLocaleResolver
-        localeResolvers[2] instanceof CompositeHttpLocaleResolver
+        localeResolvers[1] instanceof CookieLocaleResolver || localeResolvers[1] instanceof CompositeHttpLocaleResolver
+        localeResolvers[2] instanceof CookieLocaleResolver || localeResolvers[2] instanceof CompositeHttpLocaleResolver
         localeResolvers[3] instanceof RequestLocaleResolver
 
         cleanup:
