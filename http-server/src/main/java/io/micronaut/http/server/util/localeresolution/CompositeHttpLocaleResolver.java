@@ -17,7 +17,6 @@ package io.micronaut.http.server.util.localeresolution;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
 
@@ -46,7 +45,6 @@ public class CompositeHttpLocaleResolver extends HttpAbstractLocaleResolver {
     public CompositeHttpLocaleResolver(HttpLocaleResolver[] localeResolvers,
                                        HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
         super(httpLocaleResolutionConfiguration);
-        OrderUtil.sort(localeResolvers);
         this.localeResolvers = localeResolvers;
     }
 
