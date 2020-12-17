@@ -13,30 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.util;
+package io.micronaut.http.server.util.localeresolution;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.core.order.Ordered;
-
-import java.util.Locale;
-import java.util.Optional;
+import io.micronaut.core.annotation.Indexed;
+import io.micronaut.core.util.LocaleResolver;
+import io.micronaut.http.HttpRequest;
 
 /**
- * Responsible for determining the current locale given a context.
+ * Responsible for determining the current locale from a request.
  *
  * @author James Kleeh
  * @since 2.3.0
- * @param <T> The context object which will be used to resolve the locale
  */
-public interface LocaleResolver<T> extends Ordered {
+@Indexed(HttpLocaleResolver.class)
+public interface HttpLocaleResolver extends LocaleResolver<HttpRequest<?>> {
 
-    /**
-     * Resolves the locale for the given context.
-     *
-     * @param context The context to retrieve the locale from
-     * @return The locale
-     */
-    Optional<Locale> resolve(@NonNull T context);
-
-    Locale resolveOrDefault(@NonNull T context);
 }

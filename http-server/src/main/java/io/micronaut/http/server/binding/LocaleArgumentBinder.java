@@ -19,7 +19,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
-import io.micronaut.http.server.util.HttpLocaleResolver;
+import io.micronaut.http.server.util.localeresolution.HttpLocaleResolver;
 
 import javax.inject.Singleton;
 import java.util.Locale;

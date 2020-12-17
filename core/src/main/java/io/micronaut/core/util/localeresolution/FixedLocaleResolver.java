@@ -13,30 +13,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.util;
+package io.micronaut.core.util.localeresolution;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.core.order.Ordered;
-
 import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Responsible for determining the current locale given a context.
+ * Generic implementation of {@link io.micronaut.core.util.LocaleResolver} for fixed locale resolution.
  *
- * @author James Kleeh
+ * @author Sergio del Amo
  * @since 2.3.0
  * @param <T> The context object which will be used to resolve the locale
  */
-public interface LocaleResolver<T> extends Ordered {
+public class FixedLocaleResolver<T> extends DefaultLocaleResolver<T> {
+
+    protected final Locale locale;
 
     /**
-     * Resolves the locale for the given context.
      *
-     * @param context The context to retrieve the locale from
-     * @return The locale
+     * @param localeResolutionConfiguration Locale Resolution configuration
      */
-    Optional<Locale> resolve(@NonNull T context);
+    public FixedLocaleResolver(LocaleResolutionConfiguration localeResolutionConfiguration) {
+        super(localeResolutionConfiguration);
+        this.locale = localeResolutionConfiguration.getFixed()
+                .orElseThrow(() -> new IllegalArgumentException("The fixed locale must be set"));
+    }
 
-    Locale resolveOrDefault(@NonNull T context);
+    @Override
+    public Optional<Locale> resolve(@NonNull T context) {
+        return Optional.of(locale);
+    }
 }

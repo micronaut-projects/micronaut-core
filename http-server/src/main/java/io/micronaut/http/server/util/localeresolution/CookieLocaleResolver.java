@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.util;
+package io.micronaut.http.server.util.localeresolution;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -25,26 +26,30 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Resolves the Locale from a Cookie within a HTTP Request.
+ *
+ * @author Sergio del Amo
+ * @author James Kleeh
+ * @since 2.3.0
+ */
 @Singleton
-@Requires(property = HttpServerConfiguration.LocaleResolutionConfiguration.PREFIX + ".fixed")
-public class FixedLocaleResolver implements HttpLocaleResolver {
+@Requires(property = HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.PREFIX + ".cookie-name")
+public class CookieLocaleResolver extends HttpDefaultLocaleResolver {
 
-    private final Locale locale;
+    private final String cookieName;
 
-    public FixedLocaleResolver(HttpServerConfiguration serverConfiguration) {
-        HttpServerConfiguration.LocaleResolutionConfiguration resolutionConfiguration = Objects.requireNonNull(serverConfiguration.getLocaleResolution());
-
-        this.locale = resolutionConfiguration.getFixed()
-                .orElseThrow(() -> new IllegalArgumentException("The fixed locale must be set"));
+    /**
+     * @param httpLocaleResolutionConfiguration Locale Resolution configuration for HTTP Requests
+     */
+    public CookieLocaleResolver(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
+        super(httpLocaleResolutionConfiguration);
+        this.cookieName = httpLocaleResolutionConfiguration.getCookieName()
+                .orElseThrow(() -> new IllegalArgumentException("The locale cookie name must be set"));
     }
 
     @Override
     public Optional<Locale> resolve(@NonNull HttpRequest<?> request) {
-        return Optional.of(locale);
-    }
-
-    @Override
-    public Locale resolveOrDefault(@NonNull HttpRequest<?> request) {
-        return locale;
+        return request.getCookies().get(cookieName, Locale.class);
     }
 }

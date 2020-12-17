@@ -1,8 +1,9 @@
-package io.micronaut.http.server.util
+package io.micronaut.http.server.util.localeresolution
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.server.util.MockHttpHeaders
 import io.micronaut.http.simple.cookies.SimpleCookie
 import io.micronaut.http.simple.cookies.SimpleCookies
 import spock.lang.Specification

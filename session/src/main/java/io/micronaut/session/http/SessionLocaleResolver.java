@@ -17,46 +17,32 @@ package io.micronaut.session.http;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.localeresolution.LocaleResolutionConfiguration;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.util.HttpLocaleResolver;
-import io.micronaut.http.server.util.RequestLocaleResolver;
+import io.micronaut.http.server.util.localeresolution.HttpDefaultLocaleResolver;
+import io.micronaut.http.server.util.localeresolution.HttpLocaleResolutionConfiguration;
 
 import javax.inject.Singleton;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Optional;
 
 @Singleton
-@Requires(property = HttpServerConfiguration.LocaleResolutionConfiguration.PREFIX + ".session-attribute")
-public class SessionLocaleResolver implements HttpLocaleResolver {
-
-    public static final Integer ORDER = RequestLocaleResolver.ORDER - 50;
+@Requires(property = HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.PREFIX + ".session-attribute")
+@Requires(classes = SessionForRequest.class)
+public class SessionLocaleResolver extends HttpDefaultLocaleResolver {
 
     private final String sessionAttribute;
-    private final Locale defaultLocale;
 
-    public SessionLocaleResolver(HttpServerConfiguration serverConfiguration) {
-        HttpServerConfiguration.LocaleResolutionConfiguration resolutionConfiguration = Objects.requireNonNull(serverConfiguration.getLocaleResolution());
-
-        this.sessionAttribute = resolutionConfiguration.getSessionAttribute()
+    public SessionLocaleResolver(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
+        super(httpLocaleResolutionConfiguration);
+        this.sessionAttribute = httpLocaleResolutionConfiguration.getSessionAttribute()
                 .orElseThrow(() -> new IllegalArgumentException("The session attribute must be set"));
-        this.defaultLocale = resolutionConfiguration.getDefaultLocale();
     }
 
     @Override
     public Optional<Locale> resolve(@NonNull HttpRequest<?> request) {
         return SessionForRequest.find(request)
                 .flatMap(session -> session.get(sessionAttribute, Locale.class));
-    }
-
-    @Override
-    public Locale resolveOrDefault(@NonNull HttpRequest<?> request) {
-        return resolve(request).orElse(defaultLocale);
-    }
-
-    @Override
-    public int getOrder() {
-        return ORDER;
     }
 }
