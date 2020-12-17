@@ -2,7 +2,6 @@ package io.micronaut.http.server.util.localeresolution
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.order.OrderUtil
-import io.micronaut.core.util.LocaleResolver
 import spock.lang.Specification
 
 class LocaleResolutionOrderSpec extends Specification {
@@ -21,8 +20,8 @@ class LocaleResolutionOrderSpec extends Specification {
         localeResolvers.size() == 4
         localeResolvers[0] instanceof HttpFixedLocaleResolver
         localeResolvers[1] instanceof CookieLocaleResolver
-        localeResolvers[2] instanceof RequestLocaleResolver
-        localeResolvers[3] instanceof CompositeHttpLocaleResolver
+        localeResolvers[2] instanceof CompositeHttpLocaleResolver
+        localeResolvers[3] instanceof RequestLocaleResolver
 
         cleanup:
         applicationContext.close()

@@ -17,7 +17,6 @@ package io.micronaut.http.server.util.localeresolution;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
 
 import javax.inject.Singleton;
@@ -55,10 +54,5 @@ public class CompositeHttpLocaleResolver extends HttpAbstractLocaleResolver {
                 .filter(Optional::isPresent)
                 .findFirst()
                 .orElse(Optional.empty());
-    }
-
-    @Override
-    public int getOrder() {
-        return Ordered.LOWEST_PRECEDENCE;
     }
 }
