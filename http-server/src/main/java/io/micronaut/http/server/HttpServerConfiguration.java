@@ -22,7 +22,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.server.cors.CorsOriginConfiguration;
-import io.micronaut.http.server.util.localeresolution.HttpLocaleResolutionConfiguration;
+import io.micronaut.http.server.util.locale.HttpLocaleResolutionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.executor.ThreadSelection;
 
@@ -755,7 +755,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * Configuration for locale resolution used by {@link io.micronaut.http.server.util.localeresolution.HttpLocaleResolver}.
+     * Configuration for locale resolution used by {@link io.micronaut.http.server.util.locale.HttpLocaleResolver}.
      */
     @ConfigurationProperties("locale-resolution")
     public static class HttpLocaleResolutionConfigurationProperties implements HttpLocaleResolutionConfiguration {

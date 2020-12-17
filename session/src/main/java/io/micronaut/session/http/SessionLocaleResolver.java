@@ -19,8 +19,8 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.util.localeresolution.HttpAbstractLocaleResolver;
-import io.micronaut.http.server.util.localeresolution.HttpLocaleResolutionConfiguration;
+import io.micronaut.http.server.util.locale.HttpAbstractLocaleResolver;
+import io.micronaut.http.server.util.locale.HttpLocaleResolutionConfiguration;
 
 import javax.inject.Singleton;
 import java.util.Locale;

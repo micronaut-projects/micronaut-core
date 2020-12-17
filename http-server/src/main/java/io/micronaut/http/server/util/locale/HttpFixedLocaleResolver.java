@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.util.localeresolution;
+package io.micronaut.http.server.util.locale;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.core.util.localeresolution.FixedLocaleResolutionConfiguration;
-import io.micronaut.core.util.localeresolution.FixedLocaleResolver;
+import io.micronaut.core.util.locale.FixedLocaleResolver;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 
@@ -37,10 +36,10 @@ public class HttpFixedLocaleResolver extends FixedLocaleResolver<HttpRequest<?>>
     public static final Integer ORDER = Ordered.HIGHEST_PRECEDENCE + 100;
 
     /**
-     * @param fixedLocaleResolutionConfiguration Fixed Locale Resolution configuration
+     * @param localeResolutionConfiguration The locale resolution configuration
      */
-    public HttpFixedLocaleResolver(FixedLocaleResolutionConfiguration fixedLocaleResolutionConfiguration) {
-        super(fixedLocaleResolutionConfiguration.getFixed().orElseThrow(() -> new IllegalArgumentException("The fixed locale must be set")));
+    public HttpFixedLocaleResolver(HttpLocaleResolutionConfiguration localeResolutionConfiguration) {
+        super(localeResolutionConfiguration.getFixed().orElseThrow(() -> new IllegalArgumentException("The fixed locale must be set")));
     }
 
     @Override

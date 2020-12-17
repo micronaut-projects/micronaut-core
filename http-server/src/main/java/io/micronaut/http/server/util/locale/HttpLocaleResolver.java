@@ -13,13 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.util.localeresolution;
+package io.micronaut.http.server.util.locale;
+
+import io.micronaut.core.annotation.Indexed;
+import io.micronaut.core.util.LocaleResolver;
+import io.micronaut.http.HttpRequest;
 
 /**
- * Locale resolution configuration.
+ * Responsible for determining the current locale from a request.
  *
- * @author Sergio del Amo
+ * @author James Kleeh
  * @since 2.3.0
  */
-public interface LocaleResolutionConfiguration extends FixedLocaleResolutionConfiguration, DefaultLocaleResolutionConfiguration {
+@Indexed(HttpLocaleResolver.class)
+public interface HttpLocaleResolver extends LocaleResolver<HttpRequest<?>> {
+
 }

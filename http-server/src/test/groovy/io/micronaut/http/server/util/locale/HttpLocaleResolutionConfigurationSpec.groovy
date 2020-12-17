@@ -1,7 +1,6 @@
-package io.micronaut.http.server.util.localeresolution
+package io.micronaut.http.server.util.locale
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.server.util.localeresolution.HttpLocaleResolutionConfiguration
 import spock.lang.Specification
 
 class HttpLocaleResolutionConfigurationSpec extends Specification {

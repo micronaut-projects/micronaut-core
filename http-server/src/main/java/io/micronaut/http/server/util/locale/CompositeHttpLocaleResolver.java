@@ -13,41 +13,46 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.util.localeresolution;
+package io.micronaut.http.server.util.locale;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.server.HttpServerConfiguration;
 
 import javax.inject.Singleton;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Resolves the Locale from a Cookie within a HTTP Request.
+ * {@link Primary} {@link HttpLocaleResolver} which evaluates every {@link HttpLocaleResolver} by order to resolve a {@link java.util.Locale}.
  *
  * @author Sergio del Amo
  * @author James Kleeh
  * @since 2.3.0
  */
 @Singleton
-@Requires(property = HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.PREFIX + ".cookie-name")
-public class CookieLocaleResolver extends HttpAbstractLocaleResolver {
+@Primary
+public class CompositeHttpLocaleResolver extends HttpAbstractLocaleResolver {
 
-    private final String cookieName;
+    private final HttpLocaleResolver[] localeResolvers;
 
     /**
+     * @param localeResolvers HTTP Locale Resolvers
      * @param httpLocaleResolutionConfiguration Locale Resolution configuration for HTTP Requests
      */
-    public CookieLocaleResolver(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
+    public CompositeHttpLocaleResolver(HttpLocaleResolver[] localeResolvers,
+                                       HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
         super(httpLocaleResolutionConfiguration);
-        this.cookieName = httpLocaleResolutionConfiguration.getCookieName()
-                .orElseThrow(() -> new IllegalArgumentException("The locale cookie name must be set"));
+        this.localeResolvers = localeResolvers;
     }
 
     @Override
     public Optional<Locale> resolve(@NonNull HttpRequest<?> request) {
-        return request.getCookies().get(cookieName, Locale.class);
+        return Arrays.stream(localeResolvers)
+                .map(resolver -> resolver.resolve(request))
+                .filter(Optional::isPresent)
+                .findFirst()
+                .orElse(Optional.empty());
     }
 }

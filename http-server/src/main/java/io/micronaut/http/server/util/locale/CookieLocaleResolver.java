@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.util.localeresolution;
+package io.micronaut.http.server.util.locale;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 
@@ -26,32 +25,29 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * {@link HttpLocaleResolver} which resolves the Locale via {@link HttpRequest#getLocale()}.
+ * Resolves the Locale from a Cookie within a HTTP Request.
  *
  * @author Sergio del Amo
  * @author James Kleeh
  * @since 2.3.0
  */
 @Singleton
-@Requires(property = HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.PREFIX + ".header", notEquals = StringUtils.FALSE)
-public class RequestLocaleResolver extends HttpAbstractLocaleResolver {
+@Requires(property = HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.PREFIX + ".cookie-name")
+public class CookieLocaleResolver extends HttpAbstractLocaleResolver {
 
-    public static final Integer ORDER = HttpAbstractLocaleResolver.ORDER + 25;
+    private final String cookieName;
 
     /**
      * @param httpLocaleResolutionConfiguration Locale Resolution configuration for HTTP Requests
      */
-    public RequestLocaleResolver(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
+    public CookieLocaleResolver(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
         super(httpLocaleResolutionConfiguration);
+        this.cookieName = httpLocaleResolutionConfiguration.getCookieName()
+                .orElseThrow(() -> new IllegalArgumentException("The locale cookie name must be set"));
     }
 
     @Override
     public Optional<Locale> resolve(@NonNull HttpRequest<?> request) {
-        return request.getLocale();
-    }
-
-    @Override
-    public int getOrder() {
-        return ORDER;
+        return request.getCookies().get(cookieName, Locale.class);
     }
 }

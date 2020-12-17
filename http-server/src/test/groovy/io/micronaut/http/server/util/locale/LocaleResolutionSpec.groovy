@@ -1,4 +1,4 @@
-package io.micronaut.http.server.util.localeresolution
+package io.micronaut.http.server.util.locale
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService

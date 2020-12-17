@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.util.localeresolution;
+package io.micronaut.http.server.util.locale;
 
-import io.micronaut.core.util.localeresolution.AbstractLocaleResolver;
+import io.micronaut.core.util.locale.AbstractLocaleResolver;
 import io.micronaut.http.HttpRequest;
 
 /**
@@ -33,7 +33,7 @@ public abstract class HttpAbstractLocaleResolver extends AbstractLocaleResolver<
      * @param httpLocaleResolutionConfiguration Locale Resolution configuration for HTTP Requests
      */
     public HttpAbstractLocaleResolver(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
-        super(httpLocaleResolutionConfiguration);
+        super(httpLocaleResolutionConfiguration.getDefaultLocale());
         this.httpLocaleResolutionConfiguration = httpLocaleResolutionConfiguration;
     }
 

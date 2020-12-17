@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.util.localeresolution;
+package io.micronaut.core.util.locale;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 
@@ -21,16 +21,22 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Fixed Locale resolution configuration.
+ * Locale resolution configuration.
  *
  * @author Sergio del Amo
  * @since 2.3.0
  */
-public interface FixedLocaleResolutionConfiguration {
+public interface LocaleResolutionConfiguration {
 
     /**
      * @return The fixed locale.
      */
     @NonNull
     Optional<Locale> getFixed();
+
+    /**
+     * @return The locale to be used if one cannot be resolved.
+     */
+    @NonNull
+    Locale getDefaultLocale();
 }

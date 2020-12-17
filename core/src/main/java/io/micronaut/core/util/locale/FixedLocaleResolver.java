@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.util.localeresolution;
+package io.micronaut.core.util.locale;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.util.LocaleResolver;

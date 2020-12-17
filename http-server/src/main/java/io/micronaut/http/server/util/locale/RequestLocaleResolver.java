@@ -13,46 +13,45 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.util.localeresolution;
+package io.micronaut.http.server.util.locale;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.server.HttpServerConfiguration;
 
 import javax.inject.Singleton;
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
 
 /**
- * {@link Primary} {@link HttpLocaleResolver} which evaluates every {@link HttpLocaleResolver} by order to resolve a {@link java.util.Locale}.
+ * {@link HttpLocaleResolver} which resolves the Locale via {@link HttpRequest#getLocale()}.
  *
  * @author Sergio del Amo
  * @author James Kleeh
  * @since 2.3.0
  */
 @Singleton
-@Primary
-public class CompositeHttpLocaleResolver extends HttpAbstractLocaleResolver {
+@Requires(property = HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.PREFIX + ".header", notEquals = StringUtils.FALSE)
+public class RequestLocaleResolver extends HttpAbstractLocaleResolver {
 
-    private final HttpLocaleResolver[] localeResolvers;
+    public static final Integer ORDER = HttpAbstractLocaleResolver.ORDER + 25;
 
     /**
-     * @param localeResolvers HTTP Locale Resolvers
      * @param httpLocaleResolutionConfiguration Locale Resolution configuration for HTTP Requests
      */
-    public CompositeHttpLocaleResolver(HttpLocaleResolver[] localeResolvers,
-                                       HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
+    public RequestLocaleResolver(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
         super(httpLocaleResolutionConfiguration);
-        this.localeResolvers = localeResolvers;
     }
 
     @Override
     public Optional<Locale> resolve(@NonNull HttpRequest<?> request) {
-        return Arrays.stream(localeResolvers)
-                .map(resolver -> resolver.resolve(request))
-                .filter(Optional::isPresent)
-                .findFirst()
-                .orElse(Optional.empty());
+        return request.getLocale();
+    }
+
+    @Override
+    public int getOrder() {
+        return ORDER;
     }
 }
