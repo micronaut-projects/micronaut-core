@@ -16,7 +16,6 @@
 package io.micronaut.http.server.util.localeresolution;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.util.localeresolution.LocaleResolutionConfiguration;
 
 import java.util.Optional;
@@ -27,7 +26,6 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 2.3.0
  */
-@Indexed(HttpLocaleResolutionConfiguration.class)
 public interface HttpLocaleResolutionConfiguration extends LocaleResolutionConfiguration {
     /**
      * @return The key in the session that stores the locale
