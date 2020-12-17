@@ -35,10 +35,10 @@ public class FixedLocaleResolver<T> implements LocaleResolver<T> {
 
     /**
      *
-     * @param localeResolutionConfiguration Locale Resolution configuration
+     * @param fixedLocaleResolutionConfiguration Default Locale Resolution configuration
      */
-    public FixedLocaleResolver(LocaleResolutionConfiguration localeResolutionConfiguration) {
-        this.locale = localeResolutionConfiguration.getFixed()
+    public FixedLocaleResolver(FixedLocaleResolutionConfiguration fixedLocaleResolutionConfiguration) {
+        this.locale = fixedLocaleResolutionConfiguration.getFixed()
                 .orElseThrow(() -> new IllegalArgumentException("The fixed locale must be set"));
     }
 

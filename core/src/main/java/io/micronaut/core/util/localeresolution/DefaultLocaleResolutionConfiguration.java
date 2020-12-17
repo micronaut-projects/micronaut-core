@@ -15,11 +15,21 @@
  */
 package io.micronaut.core.util.localeresolution;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+
+import java.util.Locale;
+
 /**
- * Locale resolution configuration.
+ * Default Locale resolution configuration.
  *
  * @author Sergio del Amo
  * @since 2.3.0
  */
-public interface LocaleResolutionConfiguration extends FixedLocaleResolutionConfiguration, DefaultLocaleResolutionConfiguration {
+public interface DefaultLocaleResolutionConfiguration {
+
+    /**
+     * @return The locale to be used if one cannot be resolved.
+     */
+    @NonNull
+    Locale getDefaultLocale();
 }
