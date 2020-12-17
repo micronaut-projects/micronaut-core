@@ -34,6 +34,8 @@ import javax.inject.Singleton;
 @Requires(property = HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.PREFIX + ".fixed")
 public class HttpFixedLocaleResolver extends FixedLocaleResolver<HttpRequest<?>> implements HttpLocaleResolver {
 
+    public static final Integer ORDER = Ordered.HIGHEST_PRECEDENCE + 100;
+
     /**
      * @param localeResolutionConfiguration Locale Resolution configuration
      */
@@ -43,6 +45,6 @@ public class HttpFixedLocaleResolver extends FixedLocaleResolver<HttpRequest<?>>
 
     @Override
     public int getOrder() {
-        return Ordered.HIGHEST_PRECEDENCE;
+        return ORDER;
     }
 }
