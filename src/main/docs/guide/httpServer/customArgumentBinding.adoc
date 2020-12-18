@@ -13,25 +13,24 @@ Key interfaces are:
 
 === AnnotatedRequestArgumentBinders
 
-Argument binders that bind based on the presence of an annotation must implement api:http.bind.binders.AnnotatedRequestArgumentBinder[AnnotatedRequestArgumentBinder]. For example:
+Argument binders that bind based on the presence of an annotation must implement api:http.bind.binders.AnnotatedRequestArgumentBinder[AnnotatedRequestArgumentBinder], and can be used by creating an annotation that is annotated with api:io.micronaut.core.bind.annotation.Bindable[@Bindable]. For example:
 
 snippet::io.micronaut.docs.http.bind.binders.MyBindingAnnotation[tags="class", indent=0, title="An example of a binding annotation"]
 
 <1> The binding annotation must itself be annotated as api:io.micronaut.core.bind.annotation.Bindable[@Bindable]
 
-snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanAnnotatedRequestArgumentBinder[tags="class", indent=0, title="Example of annotated data binding"]
+snippet::io.micronaut.docs.http.bind.binders.MyAnnotatedRequestArgumentBinder[tags="class", indent=0, title="Example of annotated data binding"]
 
-<1> Use an extension of api:io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder[AbstractAnnotatedArgumentBinder] that implements api:io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder[AnnotatedRequestArgumentBinder] using the annotation intended to trigger this binder, in this case MyBindingAnnotation
-<2> Override the bind method with the data type to bind
-<3> Also override the getAnnotationType method which is used by the ArgumentBinderRegistry.
+<1> The custom argument binder must implement api:io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder[AnnotatedRequestArgumentBinder], including both the annotation type to trigger the binder (in this case, MyBindingAnnotation) and the type of the argument expected (in this case, Object)
+<2> Override the bind method with the custom argument binding logic - in this case, we are resolving the name of the annotated argument, extracting a value from a cookie with that same name, and converting that value into the argument type
 
-TIP: It is common to use api:io.micronaut.core.convert.ConversionService[ConversionService] to convert the data to the type of the value to the type of the argument.
+TIP: It is common to use api:io.micronaut.core.convert.ConversionService[ConversionService] to convert the data to the type of the argument.
 
-Once the binder is created, it can be used like in the following example:
+Once the binder is created, we can annotate an argument in our controller method, which will be bound using the custom binding logic we've specified.
 
 snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanController[tags="annotated", indent=0, title="A controller operation with this annotated binding"]
 
-<1> The parameter will be bound with with the annotated binder. This will take precedence over the typed binder.
+<1> The parameter will be bound with the binder associated with MyBindingAnnotation. This will take precedence over the typed binder, if applicable.
 
 === TypedRequestArgumentBinders
 

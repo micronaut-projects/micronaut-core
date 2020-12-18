@@ -1,6 +1,7 @@
 package io.micronaut.docs.http.bind.binders;
 
 // tag::class[]
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.bind.annotation.Bindable;
 
 import java.lang.annotation.ElementType;
@@ -13,5 +14,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Bindable //<1>
 public @interface MyBindingAnnotation {
+    @AliasFor(annotation = Bindable.class, member = "value")
+    String value() default "";
 }
+
 // end::class[]

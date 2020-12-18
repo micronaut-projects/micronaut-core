@@ -22,13 +22,8 @@ class MyBoundBeanController {
 
     // tag::annotated[]
     @Post("/annotated")
-    HttpResponse<?> annotatedPost(@MyBindingAnnotation MyBoundBean bean, HttpRequest<MyBoundBean> request) { //<1>
-        Map<String, Object> responseMap = new HashMap<>()
-        responseMap.put("userName", bean.getUserName())
-        responseMap.put("displayName", bean.getDisplayName())
-        responseMap.put("shoppingCartSize", bean.getShoppingCartSize())
-        responseMap.put("bindingType", bean.getBindingType())
-        return HttpResponse.ok(responseMap)
+    HttpResponse<String> loadCart(@MyBindingAnnotation Long id) { //<1>
+        HttpResponse.ok("Session:${id}".toString())
     }
     // end::annotated
 }
