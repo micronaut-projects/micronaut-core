@@ -2,7 +2,7 @@ package io.micronaut.http.server.util.locale
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService
-import io.micronaut.core.util.localeresolution.LocaleResolutionConfiguration
+import io.micronaut.core.util.locale.LocaleResolutionConfiguration
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.server.util.MockHttpHeaders
 import io.micronaut.http.simple.cookies.SimpleCookie
