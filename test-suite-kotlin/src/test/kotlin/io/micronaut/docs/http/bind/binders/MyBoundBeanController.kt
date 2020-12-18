@@ -3,6 +3,7 @@ package io.micronaut.docs.http.bind.binders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import java.util.*
 
@@ -22,9 +23,9 @@ class MyBoundBeanController {
     // end::typed[]
 
     // tag::annotated[]
-    @Post("/annotated")
-    fun loadCart(@MyBindingAnnotation id: Long): HttpResponse<String> { //<1>
-        return HttpResponse.ok("Session:$id")
+    @Get("/annotated")
+    fun loadCart(@MyBindingAnnotation sessionId: Long): HttpResponse<String> { //<1>
+        return HttpResponse.ok("Session:$sessionId")
     }
     // end::annotated
 }

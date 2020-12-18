@@ -27,34 +27,29 @@ class MyBoundBeanControllerSpec extends Specification{
 
     void testBindingBadCredentials() {
         when:
-        Set cookiesSet = [Cookie.of("shoppingCart", "5"),
-                          Cookie.of("displayName", "John Q Micronaut")]
+        Set cookiesSet = [Cookie.of("shoppingCart", "{}")]
 
-        HttpRequest request = HttpRequest.POST("/customBinding/annotated", "{\"key\":\"value\"}")
+        HttpRequest request = HttpRequest.GET("/customBinding/annotated")
                 .cookies(cookiesSet)
-                .header(HttpHeaders.AUTHORIZATION, "munaut:P@ssw0rd")
+
         HttpClientResponseException responseException = assertThrows(HttpClientResponseException.class,
-                () -> client.toBlocking().exchange(request, Argument.mapOf(String.class, String.class)))
+                () -> client.toBlocking().exchange(request))
 
         then:
-        responseException.getMessage() == "Failed to convert argument [bean] for value [null] due to: Illegal base64 character 3a"
+        responseException.getMessage() == "Required MyBindingAnnotation [sessionId] not specified"
 
     }
 
     void testAnnotationBinding() {
         when:
-        Set cookiesSet = [Cookie.of("shoppingCart", "5"),
-                          Cookie.of("displayName", "John Q Micronaut")]
-        HttpRequest request = HttpRequest.POST("/customBinding/annotated", "{\"key\":\"value\"}")
+        Set cookiesSet = [Cookie.of("shoppingCart", "{\"sessionId\": 5}")]
+        HttpRequest request = HttpRequest.GET("/customBinding/annotated")
                 .cookies(cookiesSet)
                 .basicAuth("munaut", "P@ssw0rd")
-        Map<String, String> body = client.toBlocking().retrieve(request, Argument.mapOf(String.class, String.class))
+        String response  = client.toBlocking().retrieve(request, String.class)
 
         then:
-        body.get("userName") == "munaut"
-        body.get("displayName") == "John Q Micronaut"
-        body.get("shoppingCartSize") == "5"
-        body.get("bindingType") == "ANNOTATED"
+        response == "Session:5"
     }
 
     void testTypeBinding() {

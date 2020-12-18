@@ -25,7 +25,7 @@ public class MyBoundBeanController {
     // end::typed[]
 
     // tag::annotated[]
-    @Post("/annotated")
+    @Get("/annotated")
     HttpResponse<String> loadCart(@MyBindingAnnotation Long sessionId) { //<1>
         return HttpResponse.ok("Session:" + sessionId);
     }

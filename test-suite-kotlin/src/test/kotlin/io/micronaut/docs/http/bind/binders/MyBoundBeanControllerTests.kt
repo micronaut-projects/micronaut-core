@@ -26,31 +26,25 @@ class MyBoundBeanControllerTest: StringSpec(){
 
     init {
         "test binding bad credentials" {
-            val request: HttpRequest<*> = HttpRequest.POST("/customBinding/annotated", "{\"key\":\"value\"}")
-                    .cookies(setOf(Cookie.of("shoppingCart", "5"),
-                            Cookie.of("displayName", "John Q Micronaut")))
-                    .header(HttpHeaders.AUTHORIZATION, "munaut:P@ssw0rd")
+            val request: HttpRequest<*> = HttpRequest.GET<Any>("/customBinding/annotated")
+                    .cookies(setOf(Cookie.of("shoppingCart", "{}")))
+
             val responseException = Assertions.assertThrows(HttpClientResponseException::class.java) {
-                client!!.toBlocking().retrieve(request, Argument.mapOf(String::class.java, Object::class.java))
+                client.toBlocking().retrieve(request)
             }
 
             responseException shouldNotBe null
-            responseException.message shouldBe "Failed to convert argument [bean] for value [null] due to: Illegal base64 character 3a"
+            responseException.message shouldBe "Required MyBindingAnnotation [sessionId] not specified"
 
         }
 
         "test annotation binding" {
-            val request: HttpRequest<*> = HttpRequest.POST("/customBinding/annotated", "{\"key\":\"value\"}")
-                    .cookies(setOf(Cookie.of("shoppingCart", "5"),
-                            Cookie.of("displayName", "John Q Micronaut")))
-                    .basicAuth("munaut", "P@ssw0rd")
-            val body: Map<String, String> = client!!.toBlocking().retrieve(request, Argument.mapOf(String::class.java, String::class.java))
+            val request: HttpRequest<*> = HttpRequest.GET<Any>("/customBinding/annotated")
+                    .cookies(setOf(Cookie.of("shoppingCart", "{\"sessionId\":5}")))
+            val response: String = client.toBlocking().retrieve(request, String::class.java)
 
-            body shouldNotBe null
-            body["userName"] shouldBe "munaut"
-            body["displayName"] shouldBe "John Q Micronaut"
-            body["shoppingCartSize"] shouldBe "5"
-            body["bindingType"] shouldBe "ANNOTATED"
+            response shouldNotBe null
+            response shouldBe "Session:5"
         }
 
         "test typed binding" {

@@ -44,34 +44,27 @@ public class MyBoundBeanControllerTest {
     @Test
     public void testBindingBadCredentials() {
         Set<Cookie> cookieSet = new HashSet<>();
-        cookieSet.add(Cookie.of("shoppingCart", "5"));
-        cookieSet.add(Cookie.of("displayName", "John Q Micronaut"));
+        cookieSet.add(Cookie.of("shoppingCart", "{}"));
 
-        HttpRequest request = HttpRequest.POST("/customBinding/annotated", "{\"key\":\"value\"}")
-                .cookies(cookieSet)
-                .header(HttpHeaders.AUTHORIZATION, "munaut:P@ssw0rd");
+        HttpRequest<?> request = HttpRequest.GET("/customBinding/annotated")
+                .cookies(cookieSet);
         HttpClientResponseException responseException = assertThrows(HttpClientResponseException.class,
-                () -> client.toBlocking().exchange(request, Argument.mapOf(String.class, String.class)));
+                () -> client.toBlocking().exchange(request));
 
-        assertEquals("Failed to convert argument [bean] for value [null] due to: Illegal base64 character 3a", responseException.getMessage());
+        assertEquals("Required MyBindingAnnotation [sessionId] not specified", responseException.getMessage());
 
     }
 
     @Test
     public void testAnnotationBinding() {
         Set<Cookie> cookieSet = new HashSet<>();
-        cookieSet.add(Cookie.of("shoppingCart", "5"));
-        cookieSet.add(Cookie.of("displayName", "John Q Micronaut"));
+        cookieSet.add(Cookie.of("shoppingCart", "{\"sessionId\": 5}"));
 
-        HttpRequest request = HttpRequest.POST("/customBinding/annotated", "{\"key\":\"value\"}")
-                .cookies(cookieSet)
-                .basicAuth("munaut", "P@ssw0rd");
-        Map<String, String> body = client.toBlocking().retrieve(request, Argument.mapOf(String.class, String.class));
+        HttpRequest<?> request = HttpRequest.GET("/customBinding/annotated")
+                .cookies(cookieSet);
+        String response = client.toBlocking().retrieve(request);
 
-        assertEquals("munaut", body.get("userName"));
-        assertEquals("John Q Micronaut", body.get("displayName"));
-        assertEquals("5", body.get("shoppingCartSize"));
-        assertEquals("ANNOTATED", body.get("bindingType"));
+        assertEquals("Session:5", response);
     }
 
     @Test
