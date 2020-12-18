@@ -125,7 +125,12 @@ class AstGenericUtils {
                             boundTypes.put(redirect.name, specifiedClassNode.redirect().plainNodeReference)
                         }
                     } else {
-                        boundTypes.put(redirect.name, specifiedClassNode.redirect())
+                        def specifiedGenerics = specifiedType.getType().getGenericsTypes()
+                        if (specifiedGenerics) {
+                            boundTypes.put(redirect.name, specifiedType.type)
+                        } else {
+                            boundTypes.put(redirect.name, specifiedClassNode.redirect())
+                        }
                     }
                 }
 
@@ -156,7 +161,7 @@ class AstGenericUtils {
      * @param classNode The class node
      * @return A type reference. Either a java.lang.Class or a string representing the name of the class
      */
-    static Object resolveTypeReference(ClassNode classNode, Map<String, ClassNode> boundTypes = Collections.emptyMap()) {
+    static ClassNode resolveTypeReference(ClassNode classNode, Map<String, ClassNode> boundTypes = Collections.emptyMap()) {
         if (classNode == null) {
             return null
         } else {
@@ -169,22 +174,23 @@ class AstGenericUtils {
                         if (resolved.isGenericsPlaceHolder()) {
                             return resolveTypeReference(resolved, boundTypes)
                         } else {
-                            return resolved.name
+                            return resolved
                         }
                     }
                 } else {
                     if (classNode.isResolved() || ClassHelper.isPrimitiveType(classNode)) {
                         try {
-                            return classNode.typeClass
+                            return classNode
                         } catch (ClassNotFoundException ignored) {
-                            return classNode.name
+                            return classNode
                         }
                     } else {
-                        String redirectName = classNode.redirect().name
+                        def redirectNode = classNode.redirect()
+                        String redirectName = redirectNode.name
                         if (redirectName != classNode.unresolvedName) {
-                            return redirectName
+                            return redirectNode
                         } else {
-                            return Object.name
+                            return ClassHelper.OBJECT_TYPE
                         }
                     }
                 }
@@ -194,15 +200,15 @@ class AstGenericUtils {
                     String typeVar = componentGenericTypes[0].name
                     if (boundTypes.containsKey(typeVar)) {
                         ClassNode arrayNode = boundTypes.get(typeVar).makeArray()
-                        return arrayNode.isPrimaryClassNode() ? arrayNode.name : arrayNode.toString()
+                        return arrayNode
                     }
                 }
             }
 
             try {
-                return classNode.isResolved() || ClassHelper.isPrimitiveType(classNode) ? classNode.typeClass : classNode.name
+                return classNode
             } catch (ClassNotFoundException ignored) {
-                return classNode.name
+                return classNode
             }
         }
     }
@@ -251,7 +257,9 @@ class AstGenericUtils {
             for (Map.Entry<String, Object> genericEntry : value.entrySet()) {
                 def v = genericEntry.getValue()
                 ClassNode te = null
-                if (v instanceof Class) {
+                if (v instanceof ClassNode) {
+                  te = v
+                } else if (v instanceof Class) {
                     te = ClassHelper.makeCached( (Class)v )
                 } else if(v instanceof String) {
                     String className = v.toString()

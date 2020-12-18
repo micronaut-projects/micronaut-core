@@ -15,13 +15,47 @@
  */
 package io.micronaut.inject.generics
 
+import io.micronaut.core.type.Argument
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
+import io.micronaut.inject.MethodInjectionPoint
+import spock.lang.Unroll
 
 import java.util.function.Function
 
 class GenericTypeArgumentsSpec extends AbstractTypeElementSpec {
+    @Unroll
+    void "test generic return type resolution for return type: #returnType"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test', """\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import java.util.*;
+
+@javax.inject.Singleton
+class Test {
+
+    @Executable
+    public $returnType test() {
+        return null;
+    }
+}
+""")
+        def method = definition.getRequiredMethod("test")
+
+        expect:
+        method.getDescription(true).startsWith("$returnType" )
+
+        where:
+        returnType <<
+                ['List<Map<String, Integer>>',
+                 'List<List<String>>',
+                 'List<String>',
+                 'Map<String, Integer>']
+    }
 
     void "test wildcard placeholder"() {
         given:
@@ -69,7 +103,7 @@ class ConvertibleValuesSerializer extends JsonSerializer<ConvertibleValues<?>> {
 
     void "test recusive generic type parameter"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.TrackedSortedSet','''\
+        BeanDefinition definition = buildBeanDefinition('test.TrackedSortedSet', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -89,7 +123,7 @@ final class TrackedSortedSet<T extends java.lang.Comparable<? super T>> {
 
     void "test type arguments for interface"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -116,7 +150,7 @@ class Foo {}
 
     void "test type arguments for inherited interface"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -143,7 +177,7 @@ interface Foo extends java.util.function.Function<String, Integer> {}
 
     void "test type arguments for inherited interface 2"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -171,7 +205,7 @@ interface Foo<A> extends java.util.function.Function<String, A> {}
 
     void "test type arguments for inherited interface - using same name as another type parameter"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -200,7 +234,7 @@ interface Foo<T> extends java.util.function.Function<String, T> {}
 
     void "test type arguments for superclass that implements interface"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -227,7 +261,7 @@ abstract class Foo implements java.util.function.Function<String, Integer> {}
 
     void "test type arguments for superclass"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -257,7 +291,7 @@ abstract class Foo<T, R> {
 
     void "test type arguments for factory"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc0','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc0', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -284,7 +318,7 @@ class Test {
 
     void "test type arguments for factory with inheritance"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc0','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc0', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -335,7 +369,39 @@ class StatusController extends GenericController<String> {
         expect:
         definition != null
         methods.size() == 1
-        methods[0].getArguments()[0].type == String
-        methods[0].getReturnType().getFirstTypeVariable().get().type == String
+
+
+        and:
+        def method = methods[0]
+        method.getArguments()[0].type == String
+        method.getReturnType().type == String
+    }
+
+    void 'test collection field with generics'() {
+        given:
+        def definition = buildBeanDefinition('test.MyConfig', '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import java.util.*;
+
+@ConfigurationProperties("foo.bar")
+public class MyConfig {
+    private Map<String, Map<String, Value>> map = new HashMap<>();
+
+    public void setMap(Map<String, Map<String, Value>> map) {
+        this.map = map;
+    }
+}
+
+class Value {}
+''')
+        def methodInjectionPoint = definition.injectedMethods.iterator().next()
+        def argument = methodInjectionPoint.arguments[0]
+        def parameters = argument.typeParameters
+        expect:
+        parameters
+        parameters.length == 2
+        parameters[0].type == String
     }
 }

@@ -1,6 +1,7 @@
 package io.micronaut.aop.compile
 
 import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
@@ -37,7 +38,7 @@ abstract class MyBean {
         beanDefinition != null
 
         when:
-        BeanContext context = BeanContext.run()
+        ApplicationContext context = ApplicationContext.run()
         def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
 
         then:

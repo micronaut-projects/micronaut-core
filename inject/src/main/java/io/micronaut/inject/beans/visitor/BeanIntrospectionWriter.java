@@ -313,19 +313,21 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private void writeConstructorArguments() {
         final GeneratorAdapter getConstructorArguments = startPublicMethodZeroArgs(introspectionWriter, Argument[].class, "getConstructorArguments");
         ParameterElement[] constructorArguments = constructor.getParameters();
-        final Map<String, Object> args = toParameterTypes(constructorArguments);
+        final Map<String, ParameterElement> args = toParameterTypes(constructorArguments);
         Map<String, AnnotationMetadata> annotationMetadataMap = new LinkedHashMap<>(args.size());
         for (ParameterElement constructorArgument : constructorArguments) {
             annotationMetadataMap.put(constructorArgument.getName(), constructorArgument.getAnnotationMetadata());
         }
         pushBuildArgumentsForMethod(
+                introspectionType.getClassName(),
                 introspectionType,
                 introspectionWriter,
                 getConstructorArguments,
                 args,
                 annotationMetadataMap,
                 toTypeArguments(constructorArguments),
-                localLoadTypeMethods);
+                localLoadTypeMethods
+        );
 
         getConstructorArguments.returnValue();
         getConstructorArguments.visitMaxs(1, 1);
@@ -365,10 +367,10 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         }
 
         if (isConstructor) {
-            final String constructorDescriptor = getConstructorDescriptor((Collection) argumentTypes);
+            final String constructorDescriptor = getConstructorDescriptor(Arrays.asList(constructorArguments));
             instantiateInternal.invokeConstructor(beanType, new Method("<init>", constructorDescriptor));
         } else if (constructor.isStatic()) {
-            final String methodDescriptor = getMethodDescriptor(beanType, (Collection) argumentTypes);
+            final String methodDescriptor = getMethodDescriptor(beanType, argumentTypes);
             Method method = new Method(constructor.getName(), methodDescriptor);
             if (classElement.isInterface()) {
                 instantiateInternal.visitMethodInsn(Opcodes.INVOKESTATIC, beanType.getInternalName(), method.getName(),

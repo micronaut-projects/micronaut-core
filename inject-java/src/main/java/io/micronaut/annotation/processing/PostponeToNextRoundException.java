@@ -13,20 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.ast;
+package io.micronaut.annotation.processing;
 
 /**
- * Stores data about an element that references a field.
- *
- * @author James Kleeh
- * @since 1.0
+ * Exception to indicate postponing processing to next round.
  */
-public interface FieldElement extends TypedElement, MemberElement {
-    /**
-     * Obtain the generic type with the associated annotation metadata for the field.
-     * @return The generic field
-     */
-    default ClassElement getGenericField() {
-        return getGenericType();
-    };
+public final class PostponeToNextRoundException extends RuntimeException {
+    @Override
+    public synchronized Throwable fillInStackTrace() {
+        // no-op: flow control exception
+        return this;
+    }
 }

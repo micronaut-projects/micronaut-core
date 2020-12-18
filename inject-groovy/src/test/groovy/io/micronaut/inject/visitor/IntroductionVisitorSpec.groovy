@@ -4,6 +4,7 @@ import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.util.environment.RestoreSystemProperties
 
@@ -32,17 +33,18 @@ interface MyInterface extends InterfaceWithGenerics<Foo, Long>  {
 
 class Foo {}
 ''')
+        def visitedElements = IntroductionVisitor.VISITED_METHOD_ELEMENTS
         expect:
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS.find { it.name == 'deleteAll'}.parameters[0].genericType.getFirstTypeArgument().get().name == 'test.Foo'
+        visitedElements.find { it.name == 'deleteAll'}.parameters[0].genericType.getFirstTypeArgument().get().name == 'test.Foo'
         IntroductionVisitor.VISITED_CLASS_ELEMENTS.size() == 1
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS.size() == 5
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].name == 'save'
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].genericReturnType.name == 'test.Foo'
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].parameters[0].genericType.name == 'test.Foo'
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.name == Iterable.name
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().isPresent()
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().get().name == 'test.Foo'
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].genericReturnType.getFirstTypeArgument().get().name == 'test.Foo'
+        visitedElements.size() == 5
+        visitedElements[1].name == 'save'
+        visitedElements[1].genericReturnType.name == 'test.Foo'
+        visitedElements[1].parameters[0].genericType.name == 'test.Foo'
+        visitedElements[2].parameters[0].genericType.name == Iterable.name
+        visitedElements[2].parameters[0].genericType.getFirstTypeArgument().isPresent()
+        visitedElements[2].parameters[0].genericType.getFirstTypeArgument().get().name == 'test.Foo'
+        visitedElements[2].genericReturnType.getFirstTypeArgument().get().name == 'test.Foo'
 
         and:
         ClassElement classElement = IntroductionVisitor.VISITED_CLASS_ELEMENTS[0]

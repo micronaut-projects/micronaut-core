@@ -33,7 +33,7 @@ import javax.lang.model.type.TypeMirror;
  * @since 1.0
  */
 @Internal
-class JavaFieldElement extends AbstractJavaElement implements FieldElement {
+public class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     private final JavaVisitorContext visitorContext;
     private final VariableElement variableElement;
@@ -44,7 +44,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      */
-    JavaFieldElement(VariableElement variableElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
+    public JavaFieldElement(VariableElement variableElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
         super(variableElement, annotationMetadata, visitorContext);
         this.variableElement = variableElement;
         this.visitorContext = visitorContext;
@@ -62,6 +62,21 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
                      JavaVisitorContext visitorContext) {
         this(variableElement, annotationMetadata, visitorContext);
         this.declaringElement = declaringElement;
+    }
+
+    @Override
+    public boolean isPrimitive() {
+        return getType().isPrimitive();
+    }
+
+    @Override
+    public boolean isArray() {
+        return getType().isArray();
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return getType().getArrayDimensions();
     }
 
     @NonNull

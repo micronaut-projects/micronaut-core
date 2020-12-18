@@ -11,8 +11,8 @@ class ImmutableConfigurationPropertiesSpec extends AbstractBeanDefinitionSpec {
     void "test parse immutable configuration properties"() {
 
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.configproperties.MyConfig', '''
+package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.*;
 import java.time.Duration;
@@ -23,7 +23,7 @@ class MyConfig {
     private int serverPort;
     
     @ConfigurationInject
-    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort, @edu.umd.cs.findbugs.annotations.Nullable String nullable) {
         this.host = host;
         this.serverPort = serverPort;
     }
@@ -41,11 +41,12 @@ class MyConfig {
         def arguments = beanDefinition.constructor.arguments
         then:
         beanDefinition instanceof ValidatedBeanDefinition
-        arguments.length == 2
+        arguments.length == 3
         arguments[0].synthesize(Property)
                 .name() == 'foo.bar.host'
         arguments[1].synthesize(Property)
                 .name() == 'foo.bar.server-port'
+        arguments[2].isDeclaredNullable()
 
         when:
         def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999')

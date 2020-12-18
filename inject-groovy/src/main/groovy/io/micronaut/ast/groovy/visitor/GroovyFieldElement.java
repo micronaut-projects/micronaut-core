@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import org.codehaus.groovy.ast.*;
@@ -45,13 +46,58 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
      * @param annotatedNode       The annotated ndoe
      * @param annotationMetadata The annotation medatada
      */
-    GroovyFieldElement(
+    public GroovyFieldElement(
             SourceUnit sourceUnit,
             CompilationUnit compilationUnit,
             Variable variable, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
         super(sourceUnit, compilationUnit, annotatedNode, annotationMetadata);
         this.variable = variable;
         this.sourceUnit = sourceUnit;
+    }
+
+    @Override
+    public ClassElement getGenericField() {
+        if (isPrimitive()) {
+            ClassNode cn = ClassHelper.make(ClassUtils.getPrimitiveType(getType().getName()).orElse(null));
+            if (cn != null) {
+
+                return new GroovyClassElement(
+                        sourceUnit,
+                        compilationUnit,
+                        cn,
+                        getAnnotationMetadata()
+                ) {
+                    @Override
+                    public boolean isPrimitive() {
+                        return true;
+                    }
+                };
+            } else {
+                return getGenericType();
+            }
+        } else {
+            return new GroovyClassElement(
+                    sourceUnit,
+                    compilationUnit,
+                    (ClassNode) getGenericType().getNativeType(),
+                    getAnnotationMetadata()
+            );
+        }
+    }
+
+    @Override
+    public boolean isPrimitive() {
+        return getType().isPrimitive();
+    }
+
+    @Override
+    public boolean isArray() {
+        return getType().isArray();
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return getType().getArrayDimensions();
     }
 
     @Override

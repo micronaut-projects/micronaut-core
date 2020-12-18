@@ -341,7 +341,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     }
 
                     JavaPropertyElement propertyElement = new JavaPropertyElement(
-                            value.declaringType == null ? this : value.declaringType,
+                            value.declaringType == null ? this : (JavaClassElement) value.declaringType,
                             value.getter,
                             annotationMetadata,
                             propertyName,
@@ -526,7 +526,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     /**
      * Internal holder class for getters and setters.
      */
-    private class BeanPropertyData {
+    private static class BeanPropertyData {
         ClassElement type;
         ClassElement declaringType;
         ExecutableElement getter;

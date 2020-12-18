@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.AstClassUtils;
@@ -24,6 +25,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
@@ -61,7 +63,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
      */
-    GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
+    public GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
         this(sourceUnit, compilationUnit, classNode, annotationMetadata, null, 0);
     }
 
@@ -73,11 +75,20 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
      * @param genericInfo        The generic info
      * @param arrayDimensions    The number of array dimensions
      */
-    GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata, Map<String, Map<String, ClassNode>> genericInfo, int arrayDimensions) {
+    GroovyClassElement(
+            SourceUnit sourceUnit,
+            CompilationUnit compilationUnit,
+            ClassNode classNode,
+            AnnotationMetadata annotationMetadata,
+            Map<String, Map<String, ClassNode>> genericInfo,
+            int arrayDimensions) {
         super(sourceUnit, compilationUnit, classNode, annotationMetadata);
         this.classNode = classNode;
         this.genericInfo = genericInfo;
         this.arrayDimensions = arrayDimensions;
+        if (classNode.isArray()) {
+            classNode.setName(classNode.getComponentType().getName());
+        }
     }
 
     @Override
@@ -92,7 +103,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public boolean isPrimitive() {
-        return false;
+        return classNode.isArray() && ClassUtils.getPrimitiveType(classNode.getComponentType().getName()).isPresent();
     }
 
     @Override
@@ -168,11 +179,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             for (Map.Entry<String, ClassNode> entry : forType.entrySet()) {
                 ClassNode classNode = entry.getValue();
 
-                ClassElement rawElement = toClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(
-                        sourceUnit,
-                        compilationUnit,
-                        classNode
-                ));
+                ClassElement rawElement = toClassElement(sourceUnit, compilationUnit, classNode, AnnotationMetadata.EMPTY_METADATA);
                 if (thisSpec != null) {
                     rawElement = getGenericElement(sourceUnit, classNode, rawElement, thisSpec);
                 }
@@ -190,23 +197,63 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         Map<String, Map<String, ClassNode>> genericInfo = getGenericTypeInfo();
         Map<String, ClassNode> info = genericInfo.get(classNode.getName());
         if (info != null) {
-            GenericsType[] genericsTypes = classNode.redirect().getGenericsTypes();
-            if (genericsTypes != null) {
-                Map<String, ClassElement> typeArgumentMap = new HashMap<>(genericsTypes.length);
-                for (GenericsType gt : genericsTypes) {
-                    String name = gt.getName();
-                    ClassNode cn = info.get(name);
-                    while (cn != null && cn.isGenericsPlaceHolder()) {
-                        name = cn.getUnresolvedName();
-                        cn = info.get(name);
+            Map<String, ClassElement> typeArgumentMap = new LinkedHashMap<>(info.size());
+            GenericsType[] genericsTypes = classNode.getGenericsTypes();
+            GenericsType[] redirectTypes = classNode.redirect().getGenericsTypes();
+            if (genericsTypes != null && redirectTypes != null && genericsTypes.length == redirectTypes.length) {
+                for (int i = 0; i < genericsTypes.length; i++) {
+                    GenericsType gt = genericsTypes[i];
+                    GenericsType redirectType = redirectTypes[i];
+                    if (gt.isPlaceholder()) {
+                        ClassNode cn = resolveTypeArgument(info, redirectType.getName());
+                        if (cn != null) {
+                            Map<String, ClassNode> newInfo = alignNewGenericsInfo(genericsTypes, redirectTypes, info);
+                            typeArgumentMap.put(redirectType.getName(), new GroovyClassElement(
+                                    sourceUnit,
+                                    compilationUnit,
+                                    cn,
+                                    AnnotationMetadata.EMPTY_METADATA,
+                                    Collections.singletonMap(cn.getName(), newInfo),
+                                    cn.isArray() ? computeDimensions(cn) : 0
+                            ));
+                        }
+                    } else {
+                        ClassNode type;
+                        String unresolvedName = redirectType.getType().getUnresolvedName();
+                        ClassNode cn = info.get(unresolvedName);
+                        if (cn != null) {
+                            type = cn;
+                        } else {
+                            type = gt.getType();
+                        }
+                        typeArgumentMap.put(redirectType.getName(), new GroovyClassElement(
+                                sourceUnit,
+                                compilationUnit,
+                                type,
+                                AnnotationMetadata.EMPTY_METADATA,
+                                Collections.emptyMap(),
+                                type.isArray() ? computeDimensions(type) : 0
+                        ));
                     }
+                }
+                return typeArgumentMap;
+            } else if (redirectTypes != null) {
 
+                for (GenericsType gt : redirectTypes) {
+                    String name = gt.getName();
+                    ClassNode cn = resolveTypeArgument(info, name);
                     if (cn != null) {
-                        typeArgumentMap.put(name, toClassElement(
+                        Map<String, ClassNode> newInfo = Collections.emptyMap();
+                        if (genericsTypes != null) {
+                            newInfo = alignNewGenericsInfo(genericsTypes, redirectTypes, info);
+                        }
+                        typeArgumentMap.put(gt.getName(), new GroovyClassElement(
                                 sourceUnit,
                                 compilationUnit,
                                 cn,
-                                AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)
+                                AnnotationMetadata.EMPTY_METADATA,
+                                Collections.singletonMap(cn.getName(), newInfo),
+                                cn.isArray() ? computeDimensions(cn) : 0
                         ));
                     }
                 }
@@ -220,12 +267,36 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             Map<String, ClassElement> map = new LinkedHashMap<>(spec.size());
             for (Map.Entry<String, ClassNode> entry : spec.entrySet()) {
                 ClassNode cn = entry.getValue();
-                ClassElement classElement = toClassElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn));
+                ClassElement classElement = toClassElement(sourceUnit, compilationUnit, cn, AnnotationMetadata.EMPTY_METADATA);
                 map.put(entry.getKey(), classElement);
             }
             return Collections.unmodifiableMap(map);
         }
         return Collections.emptyMap();
+    }
+
+    @Nullable
+    private ClassNode resolveTypeArgument(Map<String, ClassNode> info, String name) {
+        ClassNode cn = info.get(name);
+        while (cn != null && cn.isGenericsPlaceHolder()) {
+            name = cn.getUnresolvedName();
+            ClassNode next = info.get(name);
+            if (next == cn) {
+                break;
+            }
+            cn = next;
+        }
+        return cn;
+    }
+
+    private int computeDimensions(ClassNode cn) {
+        ClassNode componentType = cn.getComponentType();
+        int i = 1;
+        while (componentType != null && componentType.isArray()) {
+            i++;
+            componentType = componentType.getComponentType();
+        }
+        return i;
     }
 
     @Override

@@ -23,7 +23,7 @@ class InjectWithWildcardSpec extends Specification {
 
     void "test that wild card injection doesn't produce a ClassNotFoundException"() {
         given:
-        ApplicationContext context = new DefaultApplicationContext("test").start()
+        ApplicationContext context = ApplicationContext.run()
 
         expect:
         context.getBean(WildCardInject) instanceof WildCardInject

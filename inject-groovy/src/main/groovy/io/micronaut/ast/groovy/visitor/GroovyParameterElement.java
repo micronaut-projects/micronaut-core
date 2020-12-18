@@ -39,6 +39,8 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     private final SourceUnit sourceUnit;
     private final Parameter parameter;
     private final GroovyMethodElement methodElement;
+    private ClassElement typeElement;
+    private ClassElement genericType;
 
     /**
      * Default constructor.
@@ -49,18 +51,36 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
      * @param parameter          The parameter
      * @param annotationMetadata The annotation metadata
      */
-    GroovyParameterElement(GroovyMethodElement methodElement, SourceUnit sourceUnit, CompilationUnit compilationUnit, Parameter parameter, AnnotationMetadata annotationMetadata) {
+    public GroovyParameterElement(GroovyMethodElement methodElement, SourceUnit sourceUnit, CompilationUnit compilationUnit, Parameter parameter, AnnotationMetadata annotationMetadata) {
         super(sourceUnit, compilationUnit, parameter, annotationMetadata);
         this.parameter = parameter;
         this.sourceUnit = sourceUnit;
         this.methodElement = methodElement;
     }
 
+    @Override
+    public boolean isPrimitive() {
+        return getType().isPrimitive();
+    }
+
+    @Override
+    public boolean isArray() {
+        return getType().isArray();
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return getType().getArrayDimensions();
+    }
+
     @Nullable
     @Override
     public ClassElement getGenericType() {
-        ClassElement type = getType();
-        return methodElement.getGenericElement(parameter.getType(), type);
+        if (this.genericType == null) {
+            ClassElement type = getType();
+            this.genericType = methodElement.getGenericElement(parameter.getType(), type);
+        }
+        return this.genericType;
     }
 
     @Override
@@ -86,6 +106,9 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @NonNull
     @Override
     public ClassElement getType() {
-        return toClassElement(sourceUnit, compilationUnit, parameter.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, parameter.getType()));
+        if (this.typeElement == null) {
+            this.typeElement = toClassElement(sourceUnit, compilationUnit, parameter.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, parameter.getType()));
+        }
+        return this.typeElement;
     }
 }

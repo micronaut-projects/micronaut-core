@@ -176,7 +176,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     }
 
     private void validateArguments(Object[] argArray) {
-        Argument[] arguments = getArguments();
+        Argument<?>[] arguments = getArguments();
         int requiredCount = arguments.length;
         int actualCount = argArray == null ? 0 : argArray.length;
         if (requiredCount != actualCount) {
@@ -184,11 +184,12 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         }
         if (requiredCount > 0) {
             for (int i = 0; i < arguments.length; i++) {
-                Argument argument = arguments[i];
-                Class type = ReflectionUtils.getWrapperType(argument.getType());
+                Argument<?> argument = arguments[i];
+                Class<?> javaType = argument.getType();
+                Class<?> type = javaType.isPrimitive() ? ReflectionUtils.getWrapperType(javaType) : javaType;
                 Object value = argArray[i];
                 if (value != null && !type.isInstance(value)) {
-                    throw new IllegalArgumentException("Invalid type [" + argArray[i].getClass().getName() + "] for argument [" + argument + "] of method: " + getMethodName());
+                    throw new IllegalArgumentException("Invalid type [" + argArray[i].getClass().getName() + "] for argument [" + argument + "] of method: " + getDescription(true));
                 }
             }
         }
@@ -237,7 +238,8 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
         @Override
         public Argument asArgument() {
-            Collection<Argument<?>> values = getTypeVariables().values();
+            Map<String, Argument<?>> typeVariables = getTypeVariables();
+            Collection<Argument<?>> values = typeVariables.values();
             final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
             return Argument.of(getType(), annotationMetadata, values.toArray(Argument.ZERO_ARGUMENTS));
         }

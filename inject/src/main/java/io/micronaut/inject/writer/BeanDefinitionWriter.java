@@ -44,7 +44,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.*;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -62,18 +62,7 @@ import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -505,6 +494,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * <p>In the case where the produced class is produced by a factory method annotated with
      * {@link io.micronaut.context.annotation.Bean} this method should be called.</p>
      *
+     * @param declaringElement           The declaring element
      * @param factoryClass               The factory class
      * @param producedType               The produced type
      * @param methodName                 The method name
@@ -513,13 +503,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param argumentAnnotationMetadata The argument annotation metadata
      * @param genericTypes               The generic types for the method parameters
      */
-    public void visitBeanFactoryMethod(Object factoryClass,
-                                       Object producedType,
+    public void visitBeanFactoryMethod(TypedElement declaringElement,
+                                       ClassElement factoryClass,
+                                       ClassElement producedType,
                                        String methodName,
                                        AnnotationMetadata methodAnnotationMetadata,
-                                       Map<String, Object> argumentTypes,
+                                       Map<String, ParameterElement> argumentTypes,
                                        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                       Map<String, Map<String, Object>> genericTypes) {
+                                       Map<String, ClassElement> genericTypes) {
         if (constructorVisitor != null) {
             throw new IllegalStateException("Only a single call to visitBeanFactoryMethod(..) is permitted");
         } else {
@@ -533,8 +524,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     methodName,
                     methodAnnotationMetadata,
                     argumentTypes,
-                    argumentAnnotationMetadata,
-                    genericTypes);
+                    genericTypes,
+                    argumentAnnotationMetadata
+            );
 
             // now override the injectBean method
             visitInjectMethodDefinition();
@@ -553,9 +545,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public void visitBeanDefinitionConstructor(AnnotationMetadata annotationMetadata,
                                                boolean requiresReflection,
-                                               Map<String, Object> argumentTypes,
+                                               Map<String, ParameterElement> argumentTypes,
                                                Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                               Map<String, Map<String, Object>> genericTypes) {
+                                               Map<String, ClassElement> genericTypes) {
         if (constructorVisitor == null) {
             // first build the constructor
             visitBeanDefinitionConstructorInternal(
@@ -563,7 +555,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     requiresReflection,
                     argumentTypes,
                     argumentAnnotationMetadata,
-                    genericTypes);
+                    genericTypes
+            );
 
             // now prepare the implementation of the build method. See BeanFactory interface
             visitBuildMethodDefinition(argumentTypes, argumentAnnotationMetadata);
@@ -777,18 +770,24 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitSetterValue(Object declaringType,
-                                 Object returnType,
+    public void visitSetterValue(TypedElement declaringType,
+                                 ClassElement returnType,
                                  AnnotationMetadata annotationMetadata,
                                  boolean requiresReflection,
-                                 Object fieldType,
+                                 ClassElement fieldType,
                                  String fieldName,
                                  String setterName,
-                                 Map<String, Object> genericTypes,
+                                 Map<String, ClassElement> genericTypes,
                                  boolean isOptional) {
         Type declaringTypeRef = getTypeReference(declaringType);
 
-        addInjectionPointForSetterInternal(annotationMetadata, requiresReflection, fieldType, fieldName, setterName, genericTypes, declaringTypeRef);
+        addInjectionPointForSetterInternal(
+                annotationMetadata,
+                requiresReflection,
+                setterName,
+                genericTypes,
+                declaringTypeRef
+        );
 
         if (!requiresReflection) {
             resolveBeanOrValueForSetter(declaringTypeRef, returnType, setterName, fieldType, GET_VALUE_FOR_METHOD_ARGUMENT, isOptional);
@@ -798,13 +797,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitSetterValue(
-            Object declaringType,
-            Object returnType,
+            TypedElement declaringType,
+            ClassElement returnType,
             AnnotationMetadata annotationMetadata,
             boolean requiresReflection,
-            Object valueType,
+            ParameterElement valueType,
             String setterName,
-            Map<String, Object> genericTypes,
+            Map<String, ClassElement> genericTypes,
             AnnotationMetadata setterArgumentMetadata,
             boolean isOptional) {
 
@@ -822,12 +821,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // 3rd argument: the argument types
         String propertyName = NameUtils.getPropertyNameForSetter(setterName);
         pushBuildArgumentsForMethod(
+                declaringTypeRef.getClassName(),
                 beanDefinitionType,
                 classWriter,
                 constructorVisitor,
                 Collections.singletonMap(propertyName, valueType),
                 Collections.singletonMap(propertyName, setterArgumentMetadata),
-                Collections.singletonMap(propertyName, genericTypes),
+                Collections.singletonMap(propertyName, valueType.getGenericType()),
                 loadTypeMethods
         );
 
@@ -858,13 +858,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitPostConstructMethod(Object declaringType,
+    public void visitPostConstructMethod(TypedElement declaringType,
                                          boolean requiresReflection,
-                                         Object returnType,
+                                         ClassElement returnType,
                                          String methodName,
-                                         Map<String, Object> argumentTypes,
+                                         Map<String, ParameterElement> argumentTypes,
                                          Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                         Map<String, Map<String, Object>> genericTypes,
+                                         Map<String, ClassElement> genericTypes,
                                          AnnotationMetadata annotationMetadata) {
 
         visitPostConstructMethodDefinition();
@@ -893,9 +893,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param declaringType The declaring type of the method. Either a Class or a string representing the name of the type
      * @param methodName    The method name
      */
-    public void visitPreDestroyMethod(Object declaringType,
+    public void visitPreDestroyMethod(TypedElement declaringType,
                                       String methodName) {
-        visitPreDestroyMethod(declaringType, Void.TYPE, methodName);
+        visitPreDestroyMethod(declaringType, PrimitiveElement.VOID, methodName);
     }
 
     /**
@@ -905,8 +905,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param returnType    The return type of the method
      * @param methodName    The method name
      */
-    public void visitPreDestroyMethod(Object declaringType,
-                                      Object returnType,
+    public void visitPreDestroyMethod(TypedElement declaringType,
+                                      ClassElement returnType,
                                       String methodName) {
         visitPreDestroyMethodDefinition();
         final MethodVisitData methodVisitData = new MethodVisitData(
@@ -927,13 +927,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitPreDestroyMethod(Object declaringType,
+    public void visitPreDestroyMethod(TypedElement declaringType,
                                       boolean requiresReflection,
-                                      Object returnType,
+                                      ClassElement returnType,
                                       String methodName,
-                                      Map<String, Object> argumentTypes,
+                                      Map<String, ParameterElement> argumentTypes,
                                       Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                      Map<String, Map<String, Object>> genericTypes,
+                                      Map<String, ClassElement> genericTypes,
                                       AnnotationMetadata annotationMetadata) {
 
         visitPreDestroyMethodDefinition();
@@ -955,13 +955,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitMethodInjectionPoint(Object declaringType,
+    public void visitMethodInjectionPoint(TypedElement declaringType,
                                           boolean requiresReflection,
-                                          Object returnType,
+                                          ClassElement returnType,
                                           String methodName,
-                                          Map<String, Object> argumentTypes,
+                                          Map<String, ParameterElement> argumentTypes,
                                           Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                          Map<String, Map<String, Object>> genericTypes,
+                                          Map<String, ClassElement> genericTypes,
                                           AnnotationMetadata annotationMetadata) {
 
         GeneratorAdapter constructorVisitor = this.constructorVisitor;
@@ -985,15 +985,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public ExecutableMethodWriter visitExecutableMethod(Object declaringType,
-                                                        Object returnType,
-                                                        Object genericReturnType,
-                                                        Map<String, Object> returnTypeGenericTypes,
+    public ExecutableMethodWriter visitExecutableMethod(TypedElement declaringType,
+                                                        ClassElement returnType,
+                                                        ClassElement genericReturnType,
                                                         String methodName,
-                                                        Map<String, Object> argumentTypes,
-                                                        Map<String, Object> genericArgumentTypes,
+                                                        Map<String, ParameterElement> argumentTypes,
+                                                        Map<String, ClassElement> genericArgumentTypes,
                                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                                        Map<String, Map<String, Object>> genericTypes,
                                                         AnnotationMetadata annotationMetadata,
                                                         boolean isInterface,
                                                         boolean isDefault) {
@@ -1002,17 +1000,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 declaringType,
                 returnType,
                 genericReturnType,
-                returnTypeGenericTypes,
                 methodName,
                 argumentTypes,
                 genericArgumentTypes,
                 argumentAnnotationMetadata,
-                genericTypes,
                 annotationMetadata,
                 isInterface && !isDefault,
                 isInterface,
                 isDefault,
-                null, null);
+                null, null
+        );
     }
 
     /**
@@ -1023,14 +1020,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param returnType                       The return type of the method. Either a Class or a string representing the name
      *                                         of the type
      * @param genericReturnType                The generic return type
-     * @param returnTypeGenericTypes           The return type for generic types
      * @param methodName                       The method name
      * @param argumentTypes                    The argument types. Note: an ordered map should be used such as LinkedHashMap.
      *                                         Can be null or empty.
      * @param genericArgumentTypes             The generic argument types. Note: an ordered map should be used such as LinkedHashMap.
      *                                         Can be null or empty.
      * @param argumentAnnotationMetadata       The argument annotation metadata
-     * @param genericTypes                     The generic types of each argument. Can be null.
      * @param annotationMetadata               The annotation metadata for the method
      * @param isAbstract                       If the method abstract
      * @param isInterface                      If the method belongs to an interface
@@ -1039,15 +1034,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param interceptedProxyBridgeMethodName The intercepted proxy bridge method name
      * @return The {@link ExecutableMethodWriter}.
      */
-    public ExecutableMethodWriter visitExecutableMethod(Object declaringType,
-                                                        Object returnType,
-                                                        Object genericReturnType,
-                                                        Map<String, Object> returnTypeGenericTypes,
+    public ExecutableMethodWriter visitExecutableMethod(TypedElement declaringType,
+                                                        ClassElement returnType,
+                                                        ClassElement genericReturnType,
                                                         String methodName,
-                                                        Map<String, Object> argumentTypes,
-                                                        Map<String, Object> genericArgumentTypes,
+                                                        Map<String, ParameterElement> argumentTypes,
+                                                        Map<String, ClassElement> genericArgumentTypes,
                                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                                        Map<String, Map<String, Object>> genericTypes,
                                                         AnnotationMetadata annotationMetadata,
                                                         boolean isAbstract,
                                                         boolean isInterface,
@@ -1055,13 +1048,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                                         String interceptedProxyClassName,
                                                         String interceptedProxyBridgeMethodName) {
 
-        String methodKey = new StringBuilder(methodName)
-                .append("(")
-                .append(argumentTypes.values().stream()
-                        .map(Object::toString)
-                        .collect(Collectors.joining(",")))
-                .append(")")
-                .toString();
+        String methodKey = methodName +
+                "(" +
+                argumentTypes.values().stream()
+                        .map(p -> p.getType().getName())
+                        .collect(Collectors.joining(",")) +
+                ")";
 
         if (methodExecutors.containsKey(methodKey)) {
             return methodExecutors.get(methodKey);
@@ -1081,7 +1073,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
         String methodProxyShortName = "$exec" + ++methodExecutorIndex;
         String methodExecutorClassName = beanDefinitionName + "$" + methodProxyShortName;
-        boolean isSuspend = "kotlin.coroutines.Continuation".equals(CollectionUtils.last(argumentTypes.values()));
+        ParameterElement last = CollectionUtils.last(argumentTypes.values());
+        boolean isSuspend = last != null && "kotlin.coroutines.Continuation".equals(last.getType().getName());
 
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
             annotationMetadata = new AnnotationMetadataHierarchy(
@@ -1091,9 +1084,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
-                beanFullClassName,
                 methodExecutorClassName,
-                methodProxyShortName,
                 this.isInterface || isInterface,
                 isAbstract,
                 isDefault,
@@ -1106,14 +1097,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         executableMethodWriter.visitMethod(
                 declaringType,
-                returnType,
+                isSuspend ? ClassElement.of(Object.class) : returnType,
                 genericReturnType,
-                returnTypeGenericTypes,
                 methodName,
                 argumentTypes,
                 genericArgumentTypes,
-                argumentAnnotationMetadata,
-                genericTypes
+                argumentAnnotationMetadata
         );
 
         methodExecutors.put(methodKey, executableMethodWriter);
@@ -1165,7 +1154,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitConfigBuilderField(
-            Object type,
+            ClassElement type,
             String field,
             AnnotationMetadata annotationMetadata,
             ConfigurationMetadataBuilder metadataBuilder,
@@ -1202,7 +1191,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitConfigBuilderMethod(
-            Object type,
+            ClassElement type,
             String methodName,
             AnnotationMetadata annotationMetadata,
             ConfigurationMetadataBuilder metadataBuilder,
@@ -1240,14 +1229,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public void visitConfigBuilderDurationMethod(
             String prefix,
-            Object returnType,
+            ClassElement returnType,
             String methodName,
             String path) {
         visitConfigBuilderMethodInternal(
                 prefix,
                 returnType,
                 methodName,
-                Duration.class,
+                ClassElement.of(Duration.class),
                 Collections.emptyMap(),
                 true,
                 path
@@ -1257,10 +1246,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public void visitConfigBuilderMethod(
             String prefix,
-            Object returnType,
+            ClassElement returnType,
             String methodName,
-            Object paramType,
-            Map<String, Object> generics,
+            ClassElement paramType,
+            Map<String, ClassElement> generics,
             String path) {
 
         visitConfigBuilderMethodInternal(
@@ -1296,12 +1285,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitFieldInjectionPoint(
-            Object declaringType,
-            Object fieldType,
+            TypedElement declaringType,
+            ClassElement fieldType,
             String fieldName,
             boolean requiresReflection,
             AnnotationMetadata annotationMetadata,
-            @Nullable Map<String, Object> typeArguments) {
+            @Nullable Map<String, ClassElement> typeArguments) {
         // Implementation notes.
         // This method modifies the constructor adding addInjectPoint calls for each field that is annotated with @Inject
         // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
@@ -1320,12 +1309,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitFieldValue(
-            Object declaringType,
-            Object fieldType,
+            TypedElement declaringType,
+            ClassElement fieldType,
             String fieldName,
             boolean requiresReflection,
             AnnotationMetadata annotationMetadata,
-            @Nullable Map<String, Object> typeArguments,
+            @Nullable Map<String, ClassElement> typeArguments,
             boolean isOptional) {
         // Implementation notes.
         // This method modifies the constructor adding addInjectPoint calls for each field that is annotated with @Inject
@@ -1345,10 +1334,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void visitConfigBuilderMethodInternal(
             String prefix,
-            Object returnType,
+            ClassElement returnType,
             String methodName,
-            Object paramType,
-            Map<String, Object> generics,
+            ClassElement paramType,
+            Map<String, ClassElement> generics,
             boolean isDurationWithTimeUnit,
             String propertyPath) {
 
@@ -1428,28 +1417,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         new org.objectweb.asm.commons.Method(methodName, methodDescriptor));
             }
 
-            if (returnType != void.class) {
+            if (returnType != PrimitiveElement.VOID) {
                 injectMethodVisitor.pop();
             }
             injectMethodVisitor.visitJumpInsn(GOTO, tryEnd);
             injectMethodVisitor.visitLabel(exceptionHandler);
             injectMethodVisitor.pop();
-
-//          Ignore the exception, currently if the property has been removed from the builder makes no sense to set it
-//          it would be good to log the exception, but unfortunately, this hits a Graal limitation
-//            injectMethodVisitor.push(builderType);
-//            injectMethodVisitor.push(methodName);
-//            injectMethodVisitor.push(propertyName);
-//            injectMethodVisitor.invokeStatic(
-//                    Type.getType(RuntimeUtils.class),
-//                    org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
-//                            RuntimeUtils.class,
-//                            "warnMissingProperty",
-//                            Class.class,
-//                            String.class,
-//                            String.class
-//                    )));
-
             injectMethodVisitor.visitLabel(tryEnd);
             injectMethodVisitor.visitLabel(ifEnd);
         }
@@ -1463,7 +1436,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         ));
     }
 
-    private void pushGetValueForPathCall(GeneratorAdapter injectMethodVisitor, Object propertyType, String propertyName, String propertyPath, boolean zeroArgs, Map<String, Object> generics) {
+    private void pushGetValueForPathCall(GeneratorAdapter injectMethodVisitor, ClassElement propertyType, String propertyName, String propertyPath, boolean zeroArgs, Map<String, ClassElement> generics) {
         injectMethodVisitor.loadThis();
         injectMethodVisitor.loadArg(0); // the resolution context
         injectMethodVisitor.loadArg(1); // the bean context
@@ -1476,9 +1449,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             );
         } else {
             buildArgumentWithGenerics(
+                    beanType,
+                    classWriter,
                     injectMethodVisitor,
                     propertyName,
-                    Collections.singletonMap(propertyType, generics)
+                    getTypeReference(propertyType),
+                    propertyType,
+                    generics,
+                    new HashSet<>(),
+                    loadTypeMethods
             );
         }
 
@@ -1490,13 +1469,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void buildFactoryMethodClassConstructor(
-            Object factoryClass,
-            Object producedType,
+            ClassElement factoryClass,
+            ClassElement producedType,
             String methodName,
             AnnotationMetadata methodAnnotationMetadata,
-            Map<String, Object> argumentTypes,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            Map<String, Map<String, Object>> genericTypes) {
+            Map<String, ParameterElement> argumentTypes,
+            Map<String, ClassElement> genericTypes, Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
         Type factoryTypeRef = getTypeReference(factoryClass);
         Type producedTypeRef = getTypeReference(producedType);
         this.constructorVisitor = buildProtectedConstructor(BEAN_DEFINITION_METHOD_CONSTRUCTOR);
@@ -1529,11 +1507,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // 6th argument: The arguments
         if (CollectionUtils.isNotEmpty(argumentTypes)) {
             pushBuildArgumentsForMethod(
-                    beanDefinitionType, classWriter, defaultConstructor,
-                    argumentTypes,
-                    argumentAnnotationMetadata,
-                    genericTypes,
-                    loadTypeMethods);
+                beanDefinitionType.getClassName(),
+                beanDefinitionType,
+                classWriter,
+                defaultConstructor,
+                argumentTypes,
+                argumentAnnotationMetadata,
+                genericTypes,
+                loadTypeMethods
+            );
         } else {
             defaultConstructor.visitInsn(ACONST_NULL);
         }
@@ -1549,11 +1531,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void visitFieldInjectionPointInternal(
-            Object declaringType,
+            TypedElement declaringType,
             AnnotationMetadata annotationMetadata,
-            Map<String, Object> typeArguments,
+            Map<String, ClassElement> typeArguments,
             boolean requiresReflection,
-            Object fieldType,
+            ClassElement fieldType,
             String fieldName,
             Method methodToInvoke,
             boolean isValueOptional) {
@@ -1578,7 +1560,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         // 5th argument: The type arguments
         if (CollectionUtils.isNotEmpty(typeArguments)) {
-            pushTypeArguments(constructorVisitor, typeArguments);
+            pushTypeArgumentElements(
+                  beanDefinitionType,
+                  classWriter,
+                  constructorVisitor,
+                  declaringType.getName(),
+                  typeArguments,
+                  loadTypeMethods
+            );
         } else {
             constructorVisitor.visitInsn(ACONST_NULL);
         }
@@ -1657,10 +1646,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void addInjectionPointForSetterInternal(
             AnnotationMetadata fieldAnnotationMetadata,
             boolean requiresReflection,
-            Object fieldType,
-            String fieldName,
             String setterName,
-            Map<String, Object> genericTypes,
+            Map<String, ClassElement> genericTypes,
             Type declaringTypeRef) {
 
         // load 'this'
@@ -1675,21 +1662,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         constructorVisitor.push(setterName);
 
         // 3rd argument: the argument types
-        pushBuildArgumentsForMethod(
-                beanDefinitionType, classWriter, constructorVisitor,
-
-                Collections.singletonMap(
-                        fieldName, fieldType
-                ),
-                Collections.singletonMap(
-                        fieldName,
-                        fieldAnnotationMetadata
-                ),
-                Collections.singletonMap(
-                        fieldName,
-                        genericTypes
-                ),
-                loadTypeMethods);
+        pushTypeArgumentElements(
+            beanDefinitionType,
+            classWriter,
+            constructorVisitor,
+            declaringTypeRef.getClassName(),
+            genericTypes,
+            loadTypeMethods
+        );
 
         // 4th argument: the annotation metadata
         if (fieldAnnotationMetadata == null || fieldAnnotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
@@ -1725,11 +1705,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
 
         final AnnotationMetadata annotationMetadata = methodVisitData.annotationMetadata;
-        final Map<String, Object> argumentTypes = methodVisitData.argumentTypes;
-        final Object declaringType = methodVisitData.declaringType;
+        final Map<String, ParameterElement> argumentTypes = methodVisitData.argumentTypes;
+        final TypedElement declaringType = methodVisitData.declaringType;
         final String methodName = methodVisitData.methodName;
         final Map<String, AnnotationMetadata> argumentMetadata = methodVisitData.argumentAnnotationMetadata;
-        final Map<String, Map<String, Object>> genericTypes = methodVisitData.genericTypes;
+        final Map<String, ClassElement> genericTypes = methodVisitData.genericTypes;
         final boolean requiresReflection = methodVisitData.requiresReflection;
         final Object returnType = methodVisitData.returnType;
         DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
@@ -1749,11 +1729,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // 3rd argument: the argument types
         if (hasArguments) {
             pushBuildArgumentsForMethod(
-                    beanDefinitionType, classWriter, constructorVisitor,
+                    declaringType.getName(),
+                    beanDefinitionType,
+                    classWriter,
+                    constructorVisitor,
                     argumentTypes,
                     argumentMetadata,
                     genericTypes,
-                    loadTypeMethods);
+                    loadTypeMethods
+            );
             for (AnnotationMetadata value : argumentMetadata.values()) {
                 DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value);
             }
@@ -1768,7 +1752,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         constructorVisitor.visitInsn(requiresReflection ? ICONST_1 : ICONST_0);
 
 
-        Collection<Object> argumentTypeClasses = hasArguments ? argumentTypes.values() : Collections.emptyList();
+        Collection<ParameterElement> argumentTypeClasses = hasArguments ? argumentTypes.values() : Collections.emptyList();
 
         // invoke add injection point method
         pushInvokeMethodOnSuperClass(constructorVisitor, addMethodInjectionPointMethod);
@@ -1782,9 +1766,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             String methodDescriptor;
             if (hasArguments) {
                 methodDescriptor = getMethodDescriptor(returnType, argumentTypeClasses);
-                Iterator<Map.Entry<String, Object>> argIterator = argumentTypes.entrySet().iterator();
+                Iterator<Map.Entry<String, ParameterElement>> argIterator = argumentTypes.entrySet().iterator();
                 for (int i = 0; i < argCount; i++) {
-                    Map.Entry<String, Object> entry = argIterator.next();
+                    Map.Entry<String, ParameterElement> entry = argIterator.next();
                     AnnotationMetadata argMetadata = argumentMetadata.get(entry.getKey());
 
                     // first get the value of the field by calling AbstractBeanDefinition.getBeanForMethod(..)
@@ -1811,7 +1795,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
                     declaringTypeRef.getInternalName(), methodName,
                     methodDescriptor, isInterface);
-            if (isConfigurationProperties && returnType != void.class) {
+            if (isConfigurationProperties && returnType != PrimitiveElement.VOID) {
                 injectMethodVisitor.pop();
             }
         } else {
@@ -1877,7 +1861,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         injectVisitor.visitMethodInsn(INVOKEVIRTUAL,
                 declaringTypeRef.getInternalName(), setterName,
                 methodDescriptor, false);
-        if (returnType != void.class) {
+        if (returnType != PrimitiveElement.VOID) {
             injectVisitor.pop();
         }
         if (falseCondition != null) {
@@ -2035,9 +2019,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void visitBuildFactoryMethodDefinition(
-            Object factoryClass,
+            ClassElement factoryClass,
             String methodName,
-            Map<String, Object> argumentTypes,
+            Map<String, ParameterElement> argumentTypes,
             Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
         if (buildMethodVisitor == null) {
             boolean isParametrized = isParametrized(argumentAnnotationMetadata);
@@ -2088,7 +2072,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    private void visitBuildMethodDefinition(Map<String, Object> argumentTypes, Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
+    private void visitBuildMethodDefinition(Map<String, ParameterElement> argumentTypes, Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
         if (buildMethodVisitor == null) {
             boolean isParametrized = isParametrized(argumentAnnotationMetadata);
             defineBuilderMethod(isParametrized);
@@ -2111,13 +2095,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void pushConstructorArguments(GeneratorAdapter buildMethodVisitor,
-                                          Map<String, Object> argumentTypes,
+                                          Map<String, ParameterElement> argumentTypes,
                                           Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
         int size = argumentTypes.size();
         if (size > 0) {
-            Iterator<Map.Entry<String, Object>> iterator = argumentTypes.entrySet().iterator();
+            Iterator<Map.Entry<String, ParameterElement>> iterator = argumentTypes.entrySet().iterator();
             for (int i = 0; i < size; i++) {
-                Map.Entry<String, Object> entry = iterator.next();
+                Map.Entry<String, ParameterElement> entry = iterator.next();
                 AnnotationMetadata argMetadata = argumentAnnotationMetadata.get(entry.getKey());
 
                 pushConstructorArgument(buildMethodVisitor, entry.getKey(), entry.getValue(), argMetadata, i);
@@ -2127,7 +2111,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void pushConstructorArgument(GeneratorAdapter buildMethodVisitor,
                                          String argumentName,
-                                         Object argumentType,
+                                         ParameterElement argumentType,
                                          AnnotationMetadata annotationMetadata,
                                          int index) {
         if (isArgumentType(annotationMetadata) && argsIndex > -1) {
@@ -2257,9 +2241,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void visitBeanDefinitionConstructorInternal(
             AnnotationMetadata constructorMetadata,
             boolean requiresReflection,
-            Map<String, Object> argumentTypes,
+            Map<String, ParameterElement> argumentTypes,
             Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            Map<String, Map<String, Object>> genericTypes) {
+            Map<String, ClassElement> genericTypes) {
         if (constructorVisitor == null) {
             DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, constructorMetadata);
             Optional<AnnotationMetadata> argumentQualifier = argumentAnnotationMetadata != null ? argumentAnnotationMetadata.values().stream().filter(this::isArgumentType).findFirst() : Optional.empty();
@@ -2329,6 +2313,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 defaultConstructor.visitInsn(ACONST_NULL);
             } else {
                 pushBuildArgumentsForMethod(
+                        beanFullClassName,
                         beanDefinitionType,
                         classWriter,
                         defaultConstructorVisitor,
@@ -2415,14 +2400,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      */
     @Internal
     public static final class MethodVisitData {
-        private Object declaringType;
-        private boolean requiresReflection;
-        private Object returnType;
-        private String methodName;
-        private Map<String, Object> argumentTypes;
-        private Map<String, AnnotationMetadata> argumentAnnotationMetadata;
-        private Map<String, Map<String, Object>> genericTypes;
-        private AnnotationMetadata annotationMetadata;
+        private final TypedElement declaringType;
+        private final boolean requiresReflection;
+        private final ClassElement returnType;
+        private final String methodName;
+        private final Map<String, ParameterElement> argumentTypes;
+        private final Map<String, AnnotationMetadata> argumentAnnotationMetadata;
+        private final Map<String, ClassElement> genericTypes;
+        private final AnnotationMetadata annotationMetadata;
 
         /**
          * Default constructor.
@@ -2437,13 +2422,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
          * @param annotationMetadata         The method annotation metadata
          */
         MethodVisitData(
-                Object declaringType,
+                TypedElement  declaringType,
                 boolean requiresReflection,
-                Object returnType,
+                ClassElement returnType,
                 String methodName,
-                Map<String, Object> argumentTypes,
+                Map<String, ParameterElement> argumentTypes,
                 Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                Map<String, Map<String, Object>> genericTypes,
+                Map<String, ClassElement> genericTypes,
                 AnnotationMetadata annotationMetadata) {
             this.declaringType = declaringType;
             this.requiresReflection = requiresReflection;
@@ -2458,7 +2443,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         /**
          * @return The declaring type object.
          */
-        public Object getDeclaringType() {
+        public TypedElement getDeclaringType() {
             return declaringType;
         }
 
@@ -2472,7 +2457,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         /**
          * @return The return type object
          */
-        public Object getReturnType() {
+        public ClassElement getReturnType() {
             return returnType;
         }
 
@@ -2486,7 +2471,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         /**
          * @return The argument types
          */
-        public Map<String, Object> getArgumentTypes() {
+        public Map<String, ParameterElement> getArgumentTypes() {
             return argumentTypes;
         }
 
@@ -2500,7 +2485,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         /**
          * @return The generic types
          */
-        public Map<String, Map<String, Object>> getGenericTypes() {
+        public Map<String, ClassElement> getGenericTypes() {
             return genericTypes;
         }
 

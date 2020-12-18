@@ -37,6 +37,15 @@ public interface MethodElement extends MemberElement {
     ParameterElement[] getParameters();
 
     /**
+     * Is the method a Kotlin suspend function.
+     * @return True if it is.
+     * @since 2.3.0
+     */
+    default boolean isSuspend() {
+        return false;
+    }
+
+    /**
      * The generic return type of the method.
      *
      * @return The return type of the method

@@ -29,6 +29,7 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Utility methods for dealing with generic type signatures.
@@ -81,15 +82,30 @@ public class GenericUtils {
      * @return The type argument information
      */
     public Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentElementInfo(@NonNull Element element) {
-        Map<String, Map<String, Object>> data = buildGenericTypeArgumentInfo(element, null);
+        return buildGenericTypeArgumentElementInfo(element, null);
+    }
+
+    /**
+     * Builds type argument information for the given type.
+     *
+     * @param element The element
+     * @return The type argument information
+     */
+    public Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentElementInfo(@NonNull Element element, @Nullable DeclaredType declaredType) {
+        Map<String, Map<String, Object>> data = buildGenericTypeArgumentInfo(element, declaredType);
         Map<String, Map<String, TypeMirror>> elements = new HashMap<>(data.size());
         for (Map.Entry<String, Map<String, Object>> entry : data.entrySet()) {
             Map<String, Object> value = entry.getValue();
             HashMap<String, TypeMirror> submap = new HashMap<>(value.size());
             for (Map.Entry<String, Object> genericEntry : value.entrySet()) {
-                TypeElement te = elementUtils.getTypeElement(genericEntry.getValue().toString());
-                if (te != null) {
-                    submap.put(genericEntry.getKey(), te.asType());
+                Object v = genericEntry.getValue();
+                if (!(v instanceof TypeMirror)) {
+                    TypeElement te = elementUtils.getTypeElement(v.toString());
+                    if (te != null) {
+                        submap.put(genericEntry.getKey(), te.asType());
+                    }
+                } else {
+                    submap.put(genericEntry.getKey(), (TypeMirror) v);
                 }
             }
             elements.put(entry.getKey(), submap);
@@ -334,10 +350,8 @@ public class GenericUtils {
                     return Object.class.getName();
                 } else if (extendsBound != null) {
                     return resolveTypeReference(typeUtils.erasure(extendsBound), boundTypes);
-                } else if (superBound != null) {
-                    return resolveTypeReference(superBound, boundTypes);
                 } else {
-                    return resolveTypeReference(typeUtils.getWildcardType(extendsBound, superBound), boundTypes);
+                    return resolveTypeReference(superBound, boundTypes);
                 }
             case ARRAY:
                 ArrayType arrayType = (ArrayType) mirror;
@@ -534,9 +548,36 @@ public class GenericUtils {
             if (mirror instanceof WildcardType) {
                 WildcardType wt = (WildcardType) mirror;
                 TypeMirror extendsBound = wt.getExtendsBound();
-                resolveVariableForMirror(genericsInfo, resolved, variableName, extendsBound);
+                if (extendsBound != null) {
+                    resolveVariableForMirror(genericsInfo, resolved, variableName, extendsBound);
+                } else {
+                    TypeMirror superBound = wt.getSuperBound();
+                    resolveVariableForMirror(genericsInfo, resolved, variableName, superBound);
+                }
             } else if (mirror instanceof DeclaredType) {
-                resolved.put(variableName, mirror);
+                DeclaredType dt = (DeclaredType) mirror;
+                List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
+                if (CollectionUtils.isNotEmpty(typeArguments) && CollectionUtils.isNotEmpty(genericsInfo)) {
+                    List<TypeMirror> resolvedArguments = new ArrayList<>(typeArguments.size());
+                    for (TypeMirror typeArgument : typeArguments) {
+                        if (typeArgument instanceof TypeVariable) {
+                            TypeVariable tv = (TypeVariable) typeArgument;
+                            String name = tv.toString();
+                            TypeMirror bound = genericsInfo.get(name);
+                            if (bound != null) {
+                                resolvedArguments.add(bound);
+                            } else {
+                                resolvedArguments.add(typeArgument);
+                            }
+                        } else {
+                            resolvedArguments.add(typeArgument);
+                        }
+                    }
+                    TypeMirror[] typeMirrors = resolvedArguments.toArray(new TypeMirror[0]);
+                    resolved.put(variableName, typeUtils.getDeclaredType((TypeElement) dt.asElement(), typeMirrors));
+                } else {
+                    resolved.put(variableName, mirror);
+                }
             } else if (mirror instanceof ArrayType) {
                 resolved.put(variableName, mirror);
             }
@@ -551,7 +592,32 @@ public class GenericUtils {
         String name = variable.toString();
         TypeMirror element = genericsInfo.get(name);
         if (element != null) {
-            resolved.put(variableName, element);
+            if (element instanceof DeclaredType) {
+                DeclaredType dt = (DeclaredType) element;
+                List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
+                for (TypeMirror typeArgument : typeArguments) {
+                    if (typeArgument instanceof TypeVariable) {
+                        TypeVariable tv = (TypeVariable) typeArgument;
+                        TypeMirror upperBound = tv.getUpperBound();
+                        if (upperBound instanceof DeclaredType) {
+                            resolved.put(variableName, upperBound);
+                            break;
+                        }
+
+                        TypeMirror lowerBound = tv.getLowerBound();
+                        if (lowerBound instanceof DeclaredType) {
+                            resolved.put(variableName, lowerBound);
+                            break;
+                        }
+                    }
+                }
+
+                if (!resolved.containsKey(variableName)) {
+                    resolved.put(variableName, element);
+                }
+            } else {
+                resolved.put(variableName, element);
+            }
         } else {
             TypeMirror upperBound = variable.getUpperBound();
             if (upperBound instanceof TypeVariable) {
@@ -636,13 +702,24 @@ public class GenericUtils {
                         current = (TypeElement) te;
                         if (CollectionUtils.isNotEmpty(superArguments)) {
                             Map<String, Object> boundTypes = typeArguments.get(child.getQualifiedName().toString());
-                            if (boundTypes == null) {
-                                boundTypes = Collections.emptyMap();
-                            }
-                            Map<String, Object> types = resolveGenericTypes(dt, current, boundTypes);
+                            if (boundTypes != null) {
+                                Map<String, Object> types = resolveGenericTypes(dt, current, boundTypes);
 
-                            String name = current.getQualifiedName().toString();
-                            typeArguments.put(name, types);
+                                String name = current.getQualifiedName().toString();
+                                typeArguments.put(name, types);
+                            } else {
+                                List<? extends TypeParameterElement> typeParameters = current.getTypeParameters();
+                                Map<String, Object> types = new LinkedHashMap<>(typeParameters.size());
+                                if (typeParameters.size() == superArguments.size()) {
+                                    Iterator<? extends TypeMirror> i = superArguments.iterator();
+                                    for (TypeParameterElement typeParameter : typeParameters) {
+                                        String n = typeParameter.getSimpleName().toString();
+                                        types.put(n, i.next());
+                                    }
+                                }
+                                String name = current.getQualifiedName().toString();
+                                typeArguments.put(name, types);
+                            }
                         }
 
                     } else {

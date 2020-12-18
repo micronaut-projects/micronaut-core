@@ -175,18 +175,11 @@ interface MyConfig {
 
     @ConfigurationProperties("child")    
     static interface ChildConfig {
-        @Executable
         URL getURL();
     }
 }
 
 ''')
-        then:
-        beanDefinition instanceof BeanDefinition
-        beanDefinition.getRequiredMethod("getURL")
-                .stringValue(Property, "name").get() == 'foo.bar.child.url'
-
-        when:
         def context = ApplicationContext.run('foo.bar.child.url': 'http://test')
         def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
 

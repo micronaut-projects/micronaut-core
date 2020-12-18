@@ -1537,6 +1537,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
+    @UsedByGeneratedCode
     protected final Stream getStreamOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
         return resolveBeanWithGenericsForField(resolutionContext, injectionPoint, (beanType, qualifier) ->
                 ((DefaultBeanContext) context).streamOfType(resolutionContext, beanType, qualifier)
@@ -1549,6 +1550,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @return The type arguments
      */
     @Internal
+    @UsedByGeneratedCode
     protected Map<String, Argument<?>[]> getTypeArgumentsMap() {
         return Collections.emptyMap();
     }

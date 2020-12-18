@@ -48,6 +48,8 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     private final MethodNode methodNode;
     private final GroovyClassElement declaringClass;
     private Map<String, ClassNode> genericsSpec = null;
+    private ClassElement declaringElement;
+    private ParameterElement[] parameters;
 
     /**
      * @param declaringClass     The declaring class
@@ -56,7 +58,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
      * @param methodNode         The {@link MethodNode}
      * @param annotationMetadata The annotation metadata
      */
-    GroovyMethodElement(GroovyClassElement declaringClass, SourceUnit sourceUnit, CompilationUnit compilationUnit, MethodNode methodNode, AnnotationMetadata annotationMetadata) {
+    public GroovyMethodElement(GroovyClassElement declaringClass, SourceUnit sourceUnit, CompilationUnit compilationUnit, MethodNode methodNode, AnnotationMetadata annotationMetadata) {
         super(sourceUnit, compilationUnit, methodNode, annotationMetadata);
         this.methodNode = methodNode;
         this.sourceUnit = sourceUnit;
@@ -158,29 +160,37 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @Override
     public ParameterElement[] getParameters() {
         Parameter[] parameters = methodNode.getParameters();
-        return Arrays.stream(parameters).map((Function<Parameter, ParameterElement>) parameter ->
-                new GroovyParameterElement(
-                        this,
-                        sourceUnit,
-                        compilationUnit,
-                        parameter,
-                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, new ExtendedParameter(methodNode, parameter))
-                )
-        ).toArray(ParameterElement[]::new);
+        if (this.parameters == null) {
+            this.parameters = Arrays.stream(parameters).map((Function<Parameter, ParameterElement>) parameter ->
+                    new GroovyParameterElement(
+                            this,
+                            sourceUnit,
+                            compilationUnit,
+                            parameter,
+                            AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, new ExtendedParameter(methodNode, parameter))
+                    )
+            ).toArray(ParameterElement[]::new);
+        }
+
+        return this.parameters;
     }
 
     @Override
     public ClassElement getDeclaringType() {
-        return toClassElement(
-                sourceUnit,
-                compilationUnit,
-                methodNode.getDeclaringClass(),
-                AstAnnotationUtils.getAnnotationMetadata(
-                        sourceUnit,
-                        compilationUnit,
-                        methodNode.getDeclaringClass()
-                )
-        );
+        if (this.declaringElement == null) {
+
+            this.declaringElement = toClassElement(
+                    sourceUnit,
+                    compilationUnit,
+                    methodNode.getDeclaringClass(),
+                    AstAnnotationUtils.getAnnotationMetadata(
+                            sourceUnit,
+                            compilationUnit,
+                            methodNode.getDeclaringClass()
+                    )
+            );
+        }
+        return this.declaringElement;
     }
 
     @Override

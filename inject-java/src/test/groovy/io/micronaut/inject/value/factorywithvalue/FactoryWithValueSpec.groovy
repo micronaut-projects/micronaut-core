@@ -59,6 +59,7 @@ class MyBean {
 ''')
         then:"the default scope is singleton"
         beanDefinition.hasAnnotation(Factory)
+        beanDefinition
     }
 
     void "test configuration injection with @Value"() {

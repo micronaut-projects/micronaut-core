@@ -64,6 +64,16 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     @Override
+    public final boolean isSuspend() {
+        return executionHandle.isSuspend();
+    }
+
+    @Override
+    public final boolean isAbstract() {
+        return executionHandle.isAbstract();
+    }
+
+    @Override
     public R proceed() throws RuntimeException {
         Interceptor<T, R> interceptor;
         if (interceptorCount == 0 || index == interceptorCount) {

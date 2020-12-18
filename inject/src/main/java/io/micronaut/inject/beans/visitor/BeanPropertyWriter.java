@@ -267,7 +267,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                     type,
                     classWriter,
                     constructor,
-                    typeElement,
+                    typeElement.getName(),
                     typeArguments,
                     loadTypeMethods
             );

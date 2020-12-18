@@ -32,10 +32,12 @@ import java.util.Map;
  * @since 1.0
  */
 @Internal
-class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
+public class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
 
     private final JavaVisitorContext visitorContext;
     private final JavaClassElement declaringClass;
+    private ClassElement typeElement;
+    private ClassElement genericTypeElement;
 
     /**
      * Default constructor.
@@ -45,25 +47,46 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      */
-    JavaParameterElement(JavaClassElement declaringClass, VariableElement element, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
+    public JavaParameterElement(JavaClassElement declaringClass, VariableElement element, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
         super(element, annotationMetadata, visitorContext);
         this.declaringClass = declaringClass;
         this.visitorContext = visitorContext;
     }
 
     @Override
+    public boolean isPrimitive() {
+        return getType().isPrimitive();
+    }
+
+    @Override
+    public boolean isArray() {
+        return getType().isArray();
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return getType().getArrayDimensions();
+    }
+
+    @Override
     @NonNull
     public ClassElement getType() {
-        TypeMirror parameterType = getNativeType().asType();
-        return mirrorToClassElement(parameterType, visitorContext);
+        if (typeElement == null) {
+            TypeMirror parameterType = getNativeType().asType();
+            this.typeElement = mirrorToClassElement(parameterType, visitorContext);
+        }
+        return typeElement;
     }
 
     @NonNull
     @Override
     public ClassElement getGenericType() {
-        TypeMirror returnType = getNativeType().asType();
-        Map<String, Map<String, TypeMirror>> declaredGenericInfo = declaringClass.getGenericTypeInfo();
-        return parameterizedClassElement(returnType, visitorContext, declaredGenericInfo);
+        if (this.genericTypeElement == null) {
+            TypeMirror returnType = getNativeType().asType();
+            Map<String, Map<String, TypeMirror>> declaredGenericInfo = declaringClass.getGenericTypeInfo();
+            this.genericTypeElement = parameterizedClassElement(returnType, visitorContext, declaredGenericInfo);
+        }
+        return this.genericTypeElement;
     }
 
     @Override

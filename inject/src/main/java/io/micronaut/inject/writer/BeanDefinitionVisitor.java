@@ -17,7 +17,10 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
 
@@ -72,9 +75,9 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      */
     void visitBeanDefinitionConstructor(AnnotationMetadata annotationMetadata,
                                         boolean requiresReflection,
-                                        Map<String, Object> argumentTypes,
+                                        Map<String, ParameterElement> argumentTypes,
                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                        Map<String, Map<String, Object>> genericTypes);
+                                        Map<String, ClassElement> genericTypes);
 
     /**
      * @return The name of the bean definition reference class.
@@ -190,14 +193,14 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param genericTypes       The generic types
      * @param isOptional         Whether the setter is optional
      */
-    void visitSetterValue(Object declaringType,
-                          Object returnType,
+    void visitSetterValue(TypedElement declaringType,
+                          ClassElement returnType,
                           AnnotationMetadata annotationMetadata,
                           boolean requiresReflection,
-                          Object fieldType,
+                          ClassElement fieldType,
                           String fieldName,
                           String setterName,
-                          Map<String, Object> genericTypes,
+                          Map<String, ClassElement> genericTypes,
                           boolean isOptional);
 
 
@@ -214,13 +217,13 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param setterArgumentMetadata The setter argument metadata
      * @param isOptional             Whether the setter is optional
      */
-    void visitSetterValue(Object declaringType,
-                          Object returnType,
+    void visitSetterValue(TypedElement declaringType,
+                          ClassElement returnType,
                           AnnotationMetadata methodMetadata,
                           boolean requiresReflection,
-                          Object valueType,
+                          ParameterElement valueType,
                           String setterName,
-                          Map<String, Object> genericTypes,
+                          Map<String, ClassElement> genericTypes,
                           AnnotationMetadata setterArgumentMetadata,
                           boolean isOptional);
 
@@ -239,13 +242,13 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         The annotation metadata
      */
-    void visitPostConstructMethod(Object declaringType,
+    void visitPostConstructMethod(TypedElement declaringType,
                                   boolean requiresReflection,
-                                  Object returnType,
+                                  ClassElement returnType,
                                   String methodName,
-                                  Map<String, Object> argumentTypes,
+                                  Map<String, ParameterElement> argumentTypes,
                                   Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                  Map<String, Map<String, Object>> genericTypes,
+                                  Map<String, ClassElement> genericTypes,
                                   AnnotationMetadata annotationMetadata);
 
     /**
@@ -263,13 +266,13 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         The annotation metadata
      */
-    void visitPreDestroyMethod(Object declaringType,
+    void visitPreDestroyMethod(TypedElement declaringType,
                                boolean requiresReflection,
-                               Object returnType,
+                               ClassElement returnType,
                                String methodName,
-                               Map<String, Object> argumentTypes,
+                               Map<String, ParameterElement> argumentTypes,
                                Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                               Map<String, Map<String, Object>> genericTypes,
+                               Map<String, ClassElement> genericTypes,
                                AnnotationMetadata annotationMetadata);
 
     /**
@@ -287,13 +290,13 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         The annotation metadata
      */
-    void visitMethodInjectionPoint(Object declaringType,
+    void visitMethodInjectionPoint(TypedElement declaringType,
                                    boolean requiresReflection,
-                                   Object returnType,
+                                   ClassElement returnType,
                                    String methodName,
-                                   Map<String, Object> argumentTypes,
+                                   Map<String, ParameterElement> argumentTypes,
                                    Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                   Map<String, Map<String, Object>> genericTypes,
+                                   Map<String, ClassElement> genericTypes,
                                    AnnotationMetadata annotationMetadata);
 
     /**
@@ -304,28 +307,24 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param returnType                 The return type of the method. Either a Class or a string representing the name
      *                                   of the type
      * @param genericReturnType          The generic return type
-     * @param returnTypeGenericTypes     The return type for generic types
      * @param methodName                 The method name
      * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap.
      *                                   Can be null or empty.
      * @param genericArgumentTypes       The generic argument types. Note: an ordered map should be used such as LinkedHashMap.
      *                                   Can be null or empty.
      * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         The annotation metadata for the method
      * @param isInterface                If the method belongs to an interface
      * @param isDefault                  If the method is a default method
      * @return The {@link ExecutableMethodWriter}.
      */
-    ExecutableMethodWriter visitExecutableMethod(Object declaringType,
-                                                 Object returnType,
-                                                 Object genericReturnType,
-                                                 Map<String, Object> returnTypeGenericTypes,
+    ExecutableMethodWriter visitExecutableMethod(TypedElement declaringType,
+                                                 ClassElement returnType,
+                                                 ClassElement genericReturnType,
                                                  String methodName,
-                                                 Map<String, Object> argumentTypes,
-                                                 Map<String, Object> genericArgumentTypes,
+                                                 Map<String, ParameterElement> argumentTypes,
+                                                 Map<String, ClassElement> genericArgumentTypes,
                                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                                 Map<String, Map<String, Object>> genericTypes,
                                                  @Nullable AnnotationMetadata annotationMetadata,
                                                  boolean isInterface,
                                                  boolean isDefault);
@@ -340,12 +339,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param annotationMetadata The annotation metadata for the field
      * @param typeArguments      The generic type arguments
      */
-    void visitFieldInjectionPoint(Object declaringType,
-                                  Object fieldType,
+    void visitFieldInjectionPoint(TypedElement declaringType,
+                                  ClassElement fieldType,
                                   String fieldName,
                                   boolean requiresReflection,
                                   @Nullable AnnotationMetadata annotationMetadata,
-                                  @Nullable Map<String, Object> typeArguments);
+                                  @Nullable Map<String, ClassElement> typeArguments);
 
     /**
      * Visits a field injection point.
@@ -358,12 +357,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param typeArguments      The generic type arguments
      * @param isOptional         Is the value optional
      */
-    void visitFieldValue(Object declaringType,
-                         Object fieldType,
+    void visitFieldValue(TypedElement declaringType,
+                         ClassElement fieldType,
                          String fieldName,
                          boolean requiresReflection,
                          @Nullable AnnotationMetadata annotationMetadata,
-                         @Nullable Map<String, Object> typeArguments,
+                         @Nullable Map<String, ClassElement> typeArguments,
                          boolean isOptional);
 
     /**
@@ -392,7 +391,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderField(
-            Object type,
+            ClassElement type,
             String field,
             AnnotationMetadata annotationMetadata,
             ConfigurationMetadataBuilder metadataBuilder,
@@ -409,7 +408,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
-            Object type,
+            ClassElement type,
             String methodName,
             AnnotationMetadata annotationMetadata,
             ConfigurationMetadataBuilder metadataBuilder,
@@ -428,10 +427,10 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      */
     void visitConfigBuilderMethod(
             String prefix,
-            Object returnType,
+            ClassElement returnType,
             String methodName,
-            Object paramType,
-            Map<String, Object> generics,
+            @Nullable ClassElement paramType,
+            Map<String, ClassElement> generics,
             String path);
 
     /**
@@ -445,7 +444,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      */
     void visitConfigBuilderDurationMethod(
             String prefix,
-            Object returnType,
+            ClassElement returnType,
             String methodName,
             String path);
 

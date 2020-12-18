@@ -22,6 +22,55 @@ import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.inject.BeanDefinition
 
 class MethodAdapterSpec extends AbstractBeanDefinitionSpec {
+    void "test method adapter with overloading"() {
+        given:
+        def context = buildContext('adapteroverloading.Test', '''
+package adapteroverloading;
+
+import io.micronaut.context.event.*;
+import io.micronaut.scheduling.annotation.Async;
+import io.reactivex.Completable;
+import javax.inject.Singleton;
+import java.util.concurrent.CompletableFuture;
+import io.micronaut.runtime.event.annotation.*;
+
+@Singleton
+public class Test {
+    boolean invoked = false;
+    boolean shutdown = false;
+    
+    public boolean getInvoked() {
+        return invoked;
+    } 
+    public boolean isShutdown() {
+        return shutdown;
+    }
+    
+    @EventListener
+    void receive(StartupEvent event) {
+        invoked = true;
+    }
+    
+    @EventListener
+    void receive(ShutdownEvent event) {
+        shutdown = true;
+    } 
+}
+
+''')
+
+        when:
+        def bean = context.getBean(context.classLoader.loadClass('adapteroverloading.Test'))
+
+        then:
+        bean.invoked
+
+        when:
+        context.close()
+
+        then:
+        bean.shutdown
+    }
 
     void  "test method adapter produces additional bean"() {
         when:"An adapter method is parsed"

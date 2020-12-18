@@ -17,6 +17,7 @@ package io.micronaut.inject.configproperties
 
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.Property
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.BeanDefinition
 
 class InheritedConfigurationReaderPrefixSpec extends AbstractBeanDefinitionSpec {
@@ -37,7 +38,8 @@ class MyBean  {
 
         expect:
         beanDefinition.getInjectedMethods()[0].name == 'setMyValue'
-        beanDefinition.getInjectedMethods()[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.getInjectedMethods()[0].getAnnotationMetadata().getValue(Property, "name", String).get() == 'endpoints.simple.my-value'
+        def metadata = beanDefinition.getInjectedMethods()[0].getAnnotationMetadata()
+        metadata.hasAnnotation(Property)
+        metadata.getValue(Property, "name", String).get() == 'endpoints.simple.my-value'
     }
 }

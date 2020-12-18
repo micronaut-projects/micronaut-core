@@ -1243,16 +1243,35 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             AnnotationValue<A2> annotationValue) {
         String annotationName = annotationValue.getAnnotationName();
         if (annotationMetadata instanceof DefaultAnnotationMetadata) {
-            final Optional<T> annotationMirror = getAnnotationMirror(annotationName);
+            T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
             final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) annotationMetadata;
-            defaultMetadata.addDeclaredAnnotation(
-                    annotationName,
-                    annotationValue.getValues()
-            );
-            annotationMirror.ifPresent(annotationType -> {
-                final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(annotationName, annotationType);
+            if (annotationMirror != null) {
+                String repeatableName = getRepeatableNameForType(annotationMirror);
+                RetentionPolicy retentionPolicy = getRetentionPolicy(annotationMirror);
+                if (repeatableName != null) {
+                    defaultMetadata.addDeclaredRepeatable(
+                            repeatableName,
+                            annotationValue,
+                            retentionPolicy
+                    );
+                } else {
+                    defaultMetadata.addDeclaredAnnotation(
+                            annotationName,
+                            annotationValue.getValues(),
+                            retentionPolicy
+                    );
+                }
+            } else {
+                defaultMetadata.addDeclaredAnnotation(
+                        annotationName,
+                        annotationValue.getValues()
+                );
+            }
+
+            if (annotationMirror != null) {
+                final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(annotationName, annotationMirror);
                 processAnnotationDefaults(
-                        annotationType,
+                        annotationMirror,
                         defaultMetadata,
                         annotationName,
                         defaultValues
@@ -1260,38 +1279,53 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 processAnnotationStereotypes(
                         defaultMetadata,
                         true,
-                        annotationType,
+                        annotationMirror,
                         annotationName,
                         DEFAULT_ANNOTATE_EXCLUDES
                 );
-            });
+            }
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
             AnnotationMetadataHierarchy hierarchy = (AnnotationMetadataHierarchy) annotationMetadata;
             AnnotationMetadata declaredMetadata = annotate(hierarchy.getDeclaredMetadata(), annotationValue);
             return hierarchy.createSibling(
                     declaredMetadata
             );
-        } else if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
-            final Optional<T> annotationMirror = getAnnotationMirror(annotationName);
-            final Map<CharSequence, Object> values = annotationValue.getValues();
-            final Map<String, Map<CharSequence, Object>> declared = new HashMap<>(1);
-            declared.put(annotationName, values);
-            final DefaultAnnotationMetadata newMetadata = new DefaultAnnotationMetadata(
-                    declared,
-                    null,
-                    null,
-                    declared,
-                    null
-            );
-            annotationMirror.ifPresent(annotationType ->
-                    processAnnotationStereotypes(
-                            newMetadata,
-                            true,
-                            annotationType,
+        } else if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata instanceof AnnotationMetadataReference) {
+            T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
+            final DefaultAnnotationMetadata newMetadata = new DefaultAnnotationMetadata();
+            if (annotationMirror != null) {
+
+                String repeatableName = getRepeatableNameForType(annotationMirror);
+                RetentionPolicy retentionPolicy = getRetentionPolicy(annotationMirror);
+                if (repeatableName != null) {
+                    newMetadata.addDeclaredRepeatable(
+                            repeatableName,
+                            annotationValue,
+                            retentionPolicy
+                    );
+                } else {
+                    newMetadata.addDeclaredAnnotation(
                             annotationName,
-                            DEFAULT_ANNOTATE_EXCLUDES
-                    )
-            );
+                            annotationValue.getValues(),
+                            retentionPolicy
+                    );
+                }
+            } else {
+                newMetadata.addDeclaredAnnotation(
+                        annotationName,
+                        annotationValue.getValues()
+                );
+            }
+
+            if (annotationMirror != null) {
+                processAnnotationStereotypes(
+                        newMetadata,
+                        true,
+                        annotationMirror,
+                        annotationName,
+                        DEFAULT_ANNOTATE_EXCLUDES
+                );
+            }
             return newMetadata;
         }
         return annotationMetadata;

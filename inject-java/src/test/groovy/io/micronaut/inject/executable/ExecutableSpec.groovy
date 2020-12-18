@@ -83,7 +83,7 @@ class MyBean {
 
         then:
         def e = thrown(IllegalArgumentException)
-        e.message == 'Invalid type [java.lang.String] for argument [Long id] of method: show'
+        e.message == 'Invalid type [java.lang.String] for argument [Long id] of method: String show(Long id)'
 
     }
 

@@ -50,6 +50,10 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     private final ExecutableElement executableElement;
     private final JavaVisitorContext visitorContext;
     private final JavaClassElement declaringClass;
+    private boolean suspend;
+    private ParameterElement[] parameters;
+    private ClassElement genericReturnType;
+    private ClassElement returnType;
 
     /**
      * @param declaringClass     The declaring class
@@ -71,13 +75,19 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     @NonNull
     @Override
     public ClassElement getGenericReturnType() {
-        return returnType(declaringClass.getGenericTypeInfo());
+        if (this.genericReturnType == null) {
+            this.genericReturnType = returnType(declaringClass.getGenericTypeInfo());
+        }
+        return this.genericReturnType;
     }
 
     @Override
     @NonNull
     public ClassElement getReturnType() {
-        return returnType(Collections.emptyMap());
+        if (this.returnType == null) {
+            this.returnType = returnType(Collections.emptyMap());
+        }
+        return this.returnType;
     }
 
     @Override
@@ -86,21 +96,31 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
+    public boolean isSuspend() {
+        getParameters();
+        return this.suspend;
+    }
+
+    @Override
     public ParameterElement[] getParameters() {
-        List<? extends VariableElement> parameters = executableElement.getParameters();
-        List<ParameterElement> elts = new ArrayList<>(parameters.size());
-        for (Iterator<? extends VariableElement> i = parameters.iterator(); i.hasNext();) {
-            VariableElement variableElement = i.next();
-            if (! i.hasNext() && isSuspend(variableElement)) {
-                continue;
+        if (this.parameters == null) {
+            List<? extends VariableElement> parameters = executableElement.getParameters();
+            List<ParameterElement> elts = new ArrayList<>(parameters.size());
+            for (Iterator<? extends VariableElement> i = parameters.iterator(); i.hasNext();) {
+                VariableElement variableElement = i.next();
+                if (! i.hasNext() && isSuspend(variableElement)) {
+                    this.suspend = true;
+                    continue;
+                }
+                AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement);
+                if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
+                    annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, "javax.annotation.Nullable", Collections.emptyMap());
+                }
+                elts.add(new JavaParameterElement(declaringClass, variableElement, annotationMetadata, visitorContext));
             }
-            AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement);
-            if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
-                annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, "javax.annotation.Nullable", Collections.emptyMap());
-            }
-            elts.add(new JavaParameterElement(declaringClass, variableElement, annotationMetadata, visitorContext));
+            this.parameters = elts.toArray(new ParameterElement[0]);
         }
-        return elts.toArray(new ParameterElement[elts.size()]);
+        return this.parameters;
     }
 
     @Override
@@ -128,7 +148,12 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         return declaringClass;
     }
 
-    private ClassElement returnType(Map<String, Map<String, TypeMirror>> info) {
+    /**
+     * The return type for the given info.
+     * @param info The info
+     * @return The return type
+     */
+    protected ClassElement returnType(Map<String, Map<String, TypeMirror>> info) {
         VariableElement varElement = CollectionUtils.last(executableElement.getParameters());
         if (isSuspend(varElement)) {
             DeclaredType dType = (DeclaredType) varElement.asType();

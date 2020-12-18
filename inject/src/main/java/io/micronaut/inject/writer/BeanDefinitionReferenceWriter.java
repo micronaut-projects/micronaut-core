@@ -84,7 +84,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     public BeanDefinitionReferenceWriter(String beanTypeName, BeanDefinitionVisitor visitor) {
         super(
                 visitor.getBeanDefinitionName() + REF_SUFFIX,
-                visitor.getOriginatingElement(),
+                visitor,
                 visitor.getAnnotationMetadata(),
                 true);
         this.beanTypeName = beanTypeName;

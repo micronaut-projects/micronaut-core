@@ -109,6 +109,13 @@ public class JavaVisitorContext implements VisitorContext {
         this.processingEnv = processingEnv;
     }
 
+    /**
+     * @return The processing environment
+     */
+    public ProcessingEnvironment getProcessingEnv() {
+        return processingEnv;
+    }
+
     @NonNull
     @Override
     public Iterable<URL> getClasspathResources(@NonNull String path) {

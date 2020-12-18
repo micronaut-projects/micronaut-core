@@ -94,6 +94,7 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties(value = "foo", includes = ["property", "parentProperty"])
 class MyProperties extends Parent {
+    @edu.umd.cs.findbugs.annotations.Nullable
     String property
     String anotherProperty
 }
@@ -171,6 +172,7 @@ import io.micronaut.context.annotation.*
 @ConfigurationProperties(value = "foo", excludes = ["anotherProperty", "anotherParentProperty"])
 class MyProperties extends Parent {
 
+    @edu.umd.cs.findbugs.annotations.Nullable
     String property
     String anotherProperty
 }
@@ -185,6 +187,7 @@ class Parent {
         beanDefinition.injectedMethods.size() == 2
         beanDefinition.injectedMethods[0].name == "setParentProperty"
         beanDefinition.injectedMethods[1].name == "setProperty"
+        beanDefinition.injectedMethods[1].arguments[0].isDeclaredNullable()
     }
 
     void "test excludes on configuration builder"() {

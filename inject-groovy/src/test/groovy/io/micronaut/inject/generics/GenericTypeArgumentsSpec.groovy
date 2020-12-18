@@ -16,16 +16,49 @@
 package io.micronaut.inject.generics
 
 import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.core.type.Argument
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
+import spock.lang.Unroll
 
 import java.util.function.Function
 
 class GenericTypeArgumentsSpec extends AbstractBeanDefinitionSpec {
 
+    @Unroll
+    void "test generic return type resolution for return type: #returnType"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test', """\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@javax.inject.Singleton
+class Test {
+
+    @Executable
+    public $returnType test() {
+        return null;
+    }
+}
+""")
+        def method = definition.getRequiredMethod("test")
+
+        expect:
+        method.getDescription(true).startsWith("$returnType" )
+
+        where:
+        returnType <<
+        ['List<Map<String, Integer>>',
+        'List<List<String>>',
+        'List<String>',
+        'Map<String, Integer>']
+    }
+
     void "test type arguments for interface"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.GenericsTest1','''\
+        BeanDefinition definition = buildBeanDefinition('test.GenericsTest1', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -52,7 +85,7 @@ class Foo {}
 
     void "test type arguments for inherited interface"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.GenericsTest2','''\
+        BeanDefinition definition = buildBeanDefinition('test.GenericsTest2', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -78,10 +111,9 @@ interface Foo extends java.util.function.Function<String, Integer> {}
     }
 
 
-
     void "test type arguments for superclass with interface"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.GenericsTest3','''\
+        BeanDefinition definition = buildBeanDefinition('test.GenericsTest3', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -108,7 +140,7 @@ abstract class Foo implements java.util.function.Function<String, Integer> {}
 
     void "test type arguments for superclass"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.GenericsTest4','''\
+        BeanDefinition definition = buildBeanDefinition('test.GenericsTest4', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -138,7 +170,7 @@ abstract class Foo<T, R> {
 
     void "test type arguments for factory"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.TestFactory$MyFunc0','''\
+        BeanDefinition definition = buildBeanDefinition('test.TestFactory$MyFunc0', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -188,7 +220,7 @@ class StatusController extends GenericController<String> {
         definition != null
         methods.size() == 1
         methods[0].getArguments()[0].type == String
-        methods[0].getReturnType().getFirstTypeVariable().get().type == String
+        methods[0].getReturnType().type == String
     }
 
     void "test replacing an impl with an interface"() {

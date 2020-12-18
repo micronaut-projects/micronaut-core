@@ -2,6 +2,7 @@ package io.micronaut.aop.compile
 
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.ExecutableMethod
 import io.reactivex.Flowable;
 
 class ExecutableFactoryMethodSpec extends AbstractTypeElementSpec {
@@ -86,14 +87,20 @@ interface RxStreamingHttpClient extends StreamingHttpClient, RxHttpClient {
     Flowable<byte[]> stream();
 }
 interface MyClient extends RxStreamingHttpClient {
-
+    byte[] blocking();
 }
 """)
 
         then:
         noExceptionThrown()
         beanDefinition != null
-        beanDefinition.getRequiredMethod("retrieve").getReturnType().getType() == Flowable.class
-        beanDefinition.getRequiredMethod("stream").getReturnType().getType() == Flowable.class
+        def retrieveMethod = beanDefinition.getRequiredMethod("retrieve")
+        def blockingMethod = beanDefinition.getRequiredMethod("blocking")
+        def streamMethod = beanDefinition.getRequiredMethod("stream")
+        retrieveMethod.returnType.type == Flowable.class
+        streamMethod.returnType.type == Flowable.class
+        retrieveMethod.returnType.typeParameters.length == 1
+        retrieveMethod.returnType.typeParameters[0].type == Object.class
+        streamMethod.returnType.typeParameters[0].type == byte[].class
     }
 }

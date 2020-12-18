@@ -39,6 +39,31 @@ public interface ClassElement extends TypedElement {
     boolean isAssignable(String type);
 
     /**
+     * Whether this element is an {@link Optional}.
+     *
+     * @return Is this element an optional
+     * @since 2.3.0
+     */
+    default boolean isOptional() {
+        return isAssignable(Optional.class);
+    }
+
+    /**
+     * This method will return the name of the underlying type automatically unwrapping in the case of an optional
+     * or wrapped representation of the type.
+     *
+     * @return Returns the canonical name of the type.
+     * @since 2.3.0
+     */
+    default String getCanonicalName() {
+        if (isOptional()) {
+            return getFirstTypeArgument().map(ClassElement::getName).orElse(Object.class.getName());
+        } else {
+            return getName();
+        }
+    }
+
+    /**
      * @return Whether this element is a record
      * @since 2.1.0
      */
@@ -221,4 +246,15 @@ public interface ClassElement extends TypedElement {
      * @throws IllegalStateException if this class element doesn't denote an array type
      */
     ClassElement fromArray();
+
+    /**
+     * Create a class element for the given simple type.
+     * @param type The type
+     * @return The class element
+     */
+    static ClassElement of(Class<?> type) {
+        return new ReflectClassElement(
+                Objects.requireNonNull(type, "Type cannot be null")
+        );
+    }
 }
