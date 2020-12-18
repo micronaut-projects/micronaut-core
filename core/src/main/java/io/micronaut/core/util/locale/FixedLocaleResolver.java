@@ -42,11 +42,13 @@ public class FixedLocaleResolver<T> implements LocaleResolver<T> {
     }
 
     @Override
+    @NonNull
     public Optional<Locale> resolve(@NonNull T context) {
         return Optional.of(locale);
     }
 
     @Override
+    @NonNull
     public Locale resolveOrDefault(@NotNull T context) {
         return resolve(context).orElseThrow(() -> new IllegalArgumentException("The fixed locale must be set"));
     }

@@ -38,7 +38,7 @@ public class CookieLocaleResolver extends HttpAbstractLocaleResolver {
     private final String cookieName;
 
     /**
-     * @param httpLocaleResolutionConfiguration Locale Resolution configuration for HTTP Requests
+     * @param httpLocaleResolutionConfiguration Locale resolution configuration
      */
     public CookieLocaleResolver(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
         super(httpLocaleResolutionConfiguration);
@@ -47,6 +47,7 @@ public class CookieLocaleResolver extends HttpAbstractLocaleResolver {
     }
 
     @Override
+    @NonNull
     public Optional<Locale> resolve(@NonNull HttpRequest<?> request) {
         return request.getCookies().get(cookieName, Locale.class);
     }

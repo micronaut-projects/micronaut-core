@@ -48,6 +48,7 @@ public class CompositeHttpLocaleResolver extends HttpAbstractLocaleResolver {
     }
 
     @Override
+    @NonNull
     public Optional<Locale> resolve(@NonNull HttpRequest<?> request) {
         return Arrays.stream(localeResolvers)
                 .map(resolver -> resolver.resolve(request))

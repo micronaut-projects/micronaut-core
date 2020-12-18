@@ -48,6 +48,7 @@ public class SessionLocaleResolver extends HttpAbstractLocaleResolver {
     }
 
     @Override
+    @NonNull
     public Optional<Locale> resolve(@NonNull HttpRequest<?> request) {
         return SessionForRequest.find(request)
                 .flatMap(session -> session.get(sessionAttribute, Locale.class));

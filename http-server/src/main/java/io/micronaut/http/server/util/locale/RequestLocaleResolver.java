@@ -26,7 +26,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * {@link HttpLocaleResolver} which resolves the Locale via {@link HttpRequest#getLocale()}.
+ * A locale resolver which resolves the locale via {@link HttpRequest#getLocale()}.
  *
  * @author Sergio del Amo
  * @author James Kleeh
@@ -39,13 +39,14 @@ public class RequestLocaleResolver extends HttpAbstractLocaleResolver {
     public static final Integer ORDER = HttpAbstractLocaleResolver.ORDER + 25;
 
     /**
-     * @param httpLocaleResolutionConfiguration Locale Resolution configuration for HTTP Requests
+     * @param httpLocaleResolutionConfiguration Locale resolution configuration
      */
     public RequestLocaleResolver(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
         super(httpLocaleResolutionConfiguration);
     }
 
     @Override
+    @NonNull
     public Optional<Locale> resolve(@NonNull HttpRequest<?> request) {
         return request.getLocale();
     }

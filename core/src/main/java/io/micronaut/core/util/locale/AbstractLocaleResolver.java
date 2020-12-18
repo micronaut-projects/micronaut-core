@@ -40,6 +40,7 @@ public abstract class AbstractLocaleResolver<T> implements LocaleResolver<T> {
     }
 
     @Override
+    @NonNull
     public Locale resolveOrDefault(@NonNull T request) {
         return resolve(request).orElse(defaultLocale);
     }

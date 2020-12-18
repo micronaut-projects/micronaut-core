@@ -36,7 +36,9 @@ public interface LocaleResolver<T> extends Ordered {
      * @param context The context to retrieve the locale from
      * @return The locale
      */
+    @NonNull
     Optional<Locale> resolve(@NonNull T context);
 
+    @NonNull
     Locale resolveOrDefault(@NonNull T context);
 }

@@ -25,11 +25,21 @@ import javax.inject.Singleton;
 import java.util.Locale;
 import java.util.Optional;
 
+/**
+ * Binds {@link java.util.Locale} arguments in controller methods using
+ * the {@link io.micronaut.core.util.LocaleResolver}.
+ *
+ * @author James Kleeh
+ * @since 2.3.0
+ */
 @Singleton
 public class LocaleArgumentBinder implements TypedRequestArgumentBinder<Locale> {
 
     private final HttpLocaleResolver localeResolver;
 
+    /**
+     * @param localeResolver The locale resolver
+     */
     public LocaleArgumentBinder(HttpLocaleResolver localeResolver) {
         this.localeResolver = localeResolver;
     }
