@@ -833,6 +833,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             s.cancel();
                                         });
                                         if (component == null) {
+                                            if (!executed) {
+                                                s.request(1);
+                                            }
                                             return;
                                         }
                                         part = new NettyPartData(dataReference, component);
