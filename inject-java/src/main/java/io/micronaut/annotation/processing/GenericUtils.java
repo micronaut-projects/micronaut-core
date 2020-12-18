@@ -57,17 +57,6 @@ public class GenericUtils {
     /**
      * Builds type argument information for the given type.
      *
-     * @param dt The declared type
-     * @return The type argument information
-     */
-    Map<String, Map<String, Object>> buildGenericTypeArgumentInfo(DeclaredType dt) {
-        Element element = dt.asElement();
-        return buildGenericTypeArgumentInfo(element, dt);
-    }
-
-    /**
-     * Builds type argument information for the given type.
-     *
      * @param element The element
      * @return The type argument information
      */
