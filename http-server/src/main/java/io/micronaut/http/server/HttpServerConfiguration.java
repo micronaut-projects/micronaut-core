@@ -767,8 +767,6 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         private String sessionAttribute;
         private String cookieName;
         private boolean header = DEFAULT_HEADER_RESOLUTION;
-
-        @NonNull
         private Locale defaultLocale = Locale.getDefault();
 
         /**

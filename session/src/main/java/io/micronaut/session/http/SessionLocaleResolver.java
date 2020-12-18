@@ -26,13 +26,21 @@ import javax.inject.Singleton;
 import java.util.Locale;
 import java.util.Optional;
 
+/**
+ * Resolves the locale from a property in a session.
+ *
+ * @author James Kleeh
+ * @since 2.3.0
+ */
 @Singleton
 @Requires(property = HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.PREFIX + ".session-attribute")
-@Requires(classes = SessionForRequest.class)
 public class SessionLocaleResolver extends HttpAbstractLocaleResolver {
 
     private final String sessionAttribute;
 
+    /**
+     * @param httpLocaleResolutionConfiguration The locale resolution configuration
+     */
     public SessionLocaleResolver(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration) {
         super(httpLocaleResolutionConfiguration);
         this.sessionAttribute = httpLocaleResolutionConfiguration.getSessionAttribute()
