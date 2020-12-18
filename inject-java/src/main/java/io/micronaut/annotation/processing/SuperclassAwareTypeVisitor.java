@@ -210,7 +210,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
         String returnType = null;
 
         if (returnTypeMirror.getKind() == TypeKind.TYPEVAR) {
-            Map<String, Object> generics = genericUtils.buildGenericTypeArgumentInfo(type.asElement())
+            Map<String, Object> generics = genericUtils.buildGenericTypeArgumentInfo(type)
                     .get(typeElement.getQualifiedName().toString());
             if (generics != null && generics.containsKey(returnTypeMirror.toString())) {
                 returnType = generics.get(returnTypeMirror.toString()).toString();

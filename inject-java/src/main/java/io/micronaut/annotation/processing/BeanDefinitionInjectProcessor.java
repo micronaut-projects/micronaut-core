@@ -954,7 +954,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             Map<String, Map<String, TypeMirror>> beanTypeArgumentsMirrors = null;
             if (returnType instanceof DeclaredType) {
                 DeclaredType dt = (DeclaredType) returnType;
-                beanTypeArguments = genericUtils.buildGenericTypeArgumentInfo(dt.asElement());
+                beanTypeArguments = genericUtils.buildGenericTypeArgumentInfo(dt);
                 beanTypeArgumentsMirrors = genericUtils.buildGenericTypeArgumentElementInfo(dt.asElement(), dt);
                 Map<String, Map<String, Object>> finalizedArguments = resolveFinalTypeArguments(beanTypeArguments);
                 beanMethodWriter.visitTypeArguments(finalizedArguments);
@@ -1303,19 +1303,18 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         String packageName = packageElement.getQualifiedName().toString();
                         String declaringClassSimpleName = concreteClass.getSimpleName().toString();
                         String beanClassName = generateAdaptedMethodClassName(method, typeElement, declaringClassSimpleName);
-                        JavaClassElement declaringClassElement = new JavaClassElement(typeElement, methodAnnotationMetadata, visitorContext);
-                        JavaMethodElement sourceMethodElement = new JavaMethodElement(
-                                concreteClassElement,
-                                method,
-                                methodAnnotationMetadata,
-                                visitorContext
-                        );
+
                         AopProxyWriter aopProxyWriter = new AopProxyWriter(
                                 packageName,
                                 beanClassName,
                                 true,
                                 false,
-                                sourceMethodElement,
+                                new JavaMethodElement(
+                                        new JavaClassElement(concreteClass, concreteClassMetadata, visitorContext),
+                                        method,
+                                        methodAnnotationMetadata,
+                                        visitorContext
+                                ),
                                 methodAnnotationMetadata,
                                 new Object[]{modelUtils.resolveTypeReference(typeToImplement)},
                                 ArrayUtils.EMPTY_OBJECT_ARRAY
@@ -1325,7 +1324,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         beanDefinitionWriters.put(elementUtils.getName(packageName + '.' + beanClassName), aopProxyWriter);
 
-                        Map<String, ClassElement> typeVariables = declaringClassElement.getTypeArguments();
+                        List<? extends TypeMirror> typeArguments = ((DeclaredType) typeElement.asType()).getTypeArguments();
+                        Map<String, TypeMirror> typeVariables = new HashMap<>(typeArguments.size());
+
+                        for (TypeMirror typeArgument : typeArguments) {
+                            typeVariables.put(typeArgument.toString(), typeArgument);
+                        }
 
                         typeToImplement.accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(typeElement, javaVisitorContext) {
                             boolean first = true;
@@ -1359,8 +1363,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
 
                                             if (typeVariables.containsKey(variableName)) {
-                                                ClassElement variableElement = typeVariables.get(variableName);
-                                                targetType = ((TypeElement) variableElement.getNativeType()).asType();
+                                                TypeMirror variableMirror = typeVariables.get(variableName);
+                                                if (variableMirror.getKind() == TypeKind.TYPEVAR) {
+                                                    TypeVariable tv2 = (TypeVariable) variableMirror;
+                                                    TypeMirror lowerBound = tv2.getLowerBound();
+                                                    if (lowerBound.getKind() == TypeKind.DECLARED) {
+                                                        targetType = lowerBound;
+                                                    } else {
+                                                        TypeMirror upperBound = tv2.getUpperBound();
+                                                        if (upperBound.getKind() == TypeKind.DECLARED) {
+                                                            targetType = upperBound;
+                                                        }
+                                                    }
+                                                }
                                                 JavaParameterElement javaParameterElement = new JavaParameterElement(
                                                         concreteClassElement,
                                                         sourceElement,
@@ -1409,6 +1424,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                             visitorContext
                                     );
                                     ExecutableElementParamInfo params = populateParameterData(typeElement.getQualifiedName().toString(), targetMethod, null);
+                                    String methodName = targetMethod.getSimpleName().toString();
                                     Map<String, ParameterElement> methodParameters = params.getParameters();
                                     Map<String, ClassElement> genericParameters = params.getGenericParameterTypes();
                                     Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
