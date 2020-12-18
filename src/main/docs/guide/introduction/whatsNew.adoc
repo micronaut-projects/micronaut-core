@@ -17,6 +17,10 @@ record Example(@Min(20) int num, String name) {
 }
 ----
 
+==== Locale Resolution
+
+A new interface api:http.server.util.HttpLocaleResolver[] has been introduced to support resolving a locale from a given request in multiple ways. A `java.util.Locale` object can now be a parameter to controller and client methods to automatically bind the locale to/from the request.
+
 ==== Google Cloud Secret Manager
 
 Thanks to a contribution by https://github.com/viniciusccarvalho[Vinicius Carvalho], Micronaut GCP supports distributed configuration via Google Cloud Secret Manager.

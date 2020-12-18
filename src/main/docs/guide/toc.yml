@@ -17,7 +17,7 @@ ioc:
   title: Inversion of Control
   beans: Defining Beans
   how: How Does it Work?
-  beanContext: The BeanContext 
+  beanContext: The BeanContext
   types: Injectable Container Types
   qualifiers: Bean Qualifiers
   scopes:
@@ -59,7 +59,7 @@ aop:
   adapterAdvice: Method Adapter Advice
   validation:
     title: Validation Advice
-  caching: 
+  caching:
     title: Cache Advice
   retry:
     title: Retry Advice
@@ -74,6 +74,7 @@ httpServer:
   routing: HTTP Routing
   binding: Simple Request Binding
   hostResolution: Host Resolution
+  localeResolution: Locale Resolution
   clientIpAddress: Client IP Address
   requestResponse: The HttpRequest and HttpResponse
   statusAnnotation: Response Status
