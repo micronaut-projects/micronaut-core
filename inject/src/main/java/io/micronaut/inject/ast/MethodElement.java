@@ -16,6 +16,8 @@
 package io.micronaut.inject.ast;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Stores data about an element that references a method.
@@ -53,5 +55,75 @@ public interface MethodElement extends MemberElement {
      */
     default @NonNull ClassElement getGenericReturnType() {
         return getReturnType();
+    }
+
+    /**
+     * Creates a {@link MethodElement} for the given parameters.
+     * @param declaredType The declaring type
+     * @param annotationMetadata The annotation metadata
+     * @param returnType The return type
+     * @param genericReturnType The generic return type
+     * @param name The name
+     * @param parameterElements The parameter elements
+     * @return The method element
+     */
+    static @NonNull MethodElement of(
+            @NonNull ClassElement declaredType,
+            @NonNull AnnotationMetadata annotationMetadata,
+            @NonNull ClassElement returnType,
+            @NonNull ClassElement genericReturnType,
+            @NonNull String name,
+            ParameterElement...parameterElements) {
+        return new MethodElement() {
+            @NotNull
+            @Override
+            public ClassElement getReturnType() {
+                return returnType;
+            }
+
+            @NotNull
+            @Override
+            public ClassElement getGenericReturnType() {
+                return genericReturnType;
+            }
+
+            @Override
+            public ParameterElement[] getParameters() {
+                return parameterElements;
+            }
+
+            @NotNull
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return annotationMetadata;
+            }
+
+            @Override
+            public ClassElement getDeclaringType() {
+                return declaredType;
+            }
+
+            @NotNull
+            @Override
+            public String getName() {
+                return name;
+            }
+
+            @Override
+            public boolean isProtected() {
+                return false;
+            }
+
+            @Override
+            public boolean isPublic() {
+                return true;
+            }
+
+            @NotNull
+            @Override
+            public Object getNativeType() {
+                throw new UnsupportedOperationException("No native method type present");
+            }
+        };
     }
 }

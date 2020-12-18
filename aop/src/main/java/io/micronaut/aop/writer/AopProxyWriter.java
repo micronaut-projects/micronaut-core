@@ -38,10 +38,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.*;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.writer.*;
 import org.objectweb.asm.AnnotationVisitor;
@@ -429,18 +426,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * Visit a abstract method that is to be implemented.
      *
      * @param declaringType              The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param returnType                 The return type of the method. Either a Class or a string representing the name of the type
-     * @param genericReturnType          The generic return type
-     * @param methodName                 The method name
+     * @param methodElement              The method element
      * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
      * @param argumentAnnotationMetadata The argument annotation metadata
      * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         metadata
      */
     public void visitIntroductionMethod(TypedElement declaringType,
-                                        ClassElement returnType,
-                                        ClassElement genericReturnType,
-                                        String methodName,
+                                        MethodElement methodElement,
                                         Map<String, ParameterElement> argumentTypes,
                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                         Map<String, ClassElement> genericTypes,
@@ -449,9 +442,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         visitAroundMethod(
                 declaringType,
-                returnType,
-                genericReturnType,
-                methodName,
+                methodElement,
                 argumentTypes,
                 genericTypes,
                 argumentAnnotationMetadata,
@@ -465,9 +456,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * Visit a method that is to be proxied.
      *
      * @param declaringType              The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param returnType                 The return type of the method. Either a Class or a string representing the name of the type
-     * @param genericReturnType          The generic return type
-     * @param methodName                 The method name
+     * @param methodElement              The method element
      * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
      * @param genericParameters          The generic argument types
      * @param argumentAnnotationMetadata The argument annotation metadata
@@ -476,9 +465,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param isDefault                  If the method is a default method
      */
     public void visitAroundMethod(TypedElement declaringType,
-                                  ClassElement returnType,
-                                  ClassElement genericReturnType,
-                                  String methodName,
+                                  MethodElement methodElement,
                                   Map<String, ParameterElement> argumentTypes,
                                   Map<String, ClassElement> genericParameters,
                                   Map<String, AnnotationMetadata> argumentAnnotationMetadata,
@@ -489,9 +476,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         visitAroundMethod(
                 declaringType,
-                returnType,
-                genericReturnType,
-                methodName,
+                methodElement,
                 argumentTypes,
                 genericParameters,
                 argumentAnnotationMetadata,
@@ -501,9 +486,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     @SuppressWarnings("ParameterNumber")
     private void visitAroundMethod(TypedElement declaringType,
-                                   ClassElement returnType,
-                                   ClassElement genericReturnType,
-                                   String methodName,
+                                   MethodElement methodElement,
                                    Map<String, ParameterElement> argumentTypes,
                                    Map<String, ClassElement> genericParameters,
                                    Map<String, AnnotationMetadata> argumentAnnotationMetadata,
@@ -512,6 +495,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                    boolean isDefault,
                                    boolean isInterface) {
 
+        String methodName = methodElement.getName();
+        ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
         List<ParameterElement> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();
         Type returnTypeObject = getTypeReference(returnType);
@@ -555,7 +540,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             ExecutableMethodWriter executableMethodWriter = beanDefinitionWriter.visitExecutableMethod(
                     declaringType,
                     returnType,
-                    genericReturnType,
+                    methodElement.getGenericReturnType(),
                     methodName,
                     argumentTypes,
                     genericParameters,

@@ -715,9 +715,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         if (isAbstract) {
                             aopProxyWriter.visitIntroductionMethod(
                                     owningTypeElement,
-                                    resolveReturnTypeForMethod(javaMethodElement),
-                                    javaMethodElement.getGenericReturnType(),
-                                    methodName,
+                                    javaMethodElement,
                                     methodParameters,
                                     parameterAnnotationMetadata,
                                     genericParameters,
@@ -734,9 +732,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             // only apply around advise to non-abstract methods of introduction advise
                             aopProxyWriter.visitAroundMethod(
                                     owningTypeElement,
-                                    resolveReturnTypeForMethod(javaMethodElement),
-                                    javaMethodElement.getGenericReturnType(),
-                                    methodName,
+                                    javaMethodElement,
                                     methodParameters,
                                     genericParameters,
                                     parameterAnnotationMetadata,
@@ -1060,9 +1056,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         aopProxyWriter.visitAroundMethod(
                                 declaringClassElement,
-                                resolveReturnTypeForMethod(advisedMethodElement),
-                                advisedMethodElement.getGenericReturnType(),
-                                methodName,
+                                advisedMethodElement,
                                 methodParameters,
                                 genericParameters,
                                 methodQualifier,
@@ -1253,9 +1247,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         addOriginatingElementIfNecessary(beanWriter, declaringClass);
                         aopProxyWriter.visitAroundMethod(
                                 declaringClassElement,
-                                resolveReturnTypeForMethod(javaMethodElement),
-                                javaMethodElement.getGenericReturnType(),
-                                method.getSimpleName().toString(),
+                                javaMethodElement,
                                 params.getParameters(),
                                 params.getGenericParameterTypes(),
                                 params.getParameterMetadata(),
@@ -1476,9 +1468,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                                     aopProxyWriter.visitAroundMethod(
                                             declaringClassElement,
-                                            resolveReturnTypeForMethod(javaMethodElement),
-                                            javaMethodElement.getGenericReturnType(),
-                                            methodName,
+                                            javaMethodElement,
                                             methodParameters,
                                             genericParameters,
                                             methodQualifier,

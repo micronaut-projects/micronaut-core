@@ -36,7 +36,6 @@ import io.micronaut.core.bind.annotation.Bindable
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.util.ArrayUtils
-import io.micronaut.core.util.CollectionUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AnnotationMetadataReference
@@ -312,8 +311,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         owningType,
                         concreteClassAnnotationMetadata
                 )
-                ClassElement returnTypeClassElement = groovyMethodElement.returnType
-                ClassElement returnTypeGenericClassElement = groovyMethodElement.genericReturnType
 
                 populateParameterData (
                         groovyMethodElement,
@@ -402,9 +399,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 if (methodNode.isAbstract()) {
                     aopProxyWriter.visitIntroductionMethod(
                             owningClassElement,
-                            returnTypeClassElement,
-                            returnTypeGenericClassElement,
-                            methodNode.name,
+                            groovyMethodElement,
                             targetMethodParamsToType,
                             targetAnnotationMetadata,
                             targetGenericParams,
@@ -413,9 +408,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 } else {
                     aopProxyWriter.visitAroundMethod(
                             owningClassElement,
-                            returnTypeClassElement,
-                            returnTypeGenericClassElement,
-                            methodNode.name,
+                            groovyMethodElement,
                             targetMethodParamsToType,
                             targetGenericParams,
                             targetAnnotationMetadata,
@@ -591,9 +584,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
                         proxyWriter.visitAroundMethod(
                                 targetMethodElement.declaringType,
-                                targetMethodElement.returnType,
-                                targetMethodElement.genericReturnType,
-                                targetBeanMethodNode.name,
+                                targetMethodElement,
                                 targetMethodParamsToType,
                                 targetGenericParams,
                                 targetAnnotationMetadata,
@@ -910,9 +901,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
                         proxyWriter.visitAroundMethod(
                                 declaringElement,
-                                methodElement.returnType,
-                                methodElement.genericReturnType,
-                                methodName,
+                                methodElement,
                                 paramsToType,
                                 genericParams,
                                 argumentAnnotationMetadata,
@@ -1022,7 +1011,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         }
     }
 
-    protected boolean isPackagePrivate(AnnotatedNode annotatedNode, int modifiers) {
+    protected static boolean isPackagePrivate(AnnotatedNode annotatedNode, int modifiers) {
         return ((!Modifier.isProtected(modifiers) && !Modifier.isPublic(modifiers) && !Modifier.isPrivate(modifiers)) || !annotatedNode.getAnnotations(makeCached(PackageScope)).isEmpty())
     }
 
@@ -1255,13 +1244,19 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         return fieldElement.genericType
                     }
                 }
-                aopWriter.visitAroundMethod(
+                MethodElement setterElement = MethodElement.of(
                         fieldElement.declaringType,
+                        fieldAnnotationMetadata,
                         PrimitiveElement.VOID,
                         PrimitiveElement.VOID,
                         getSetterName(propertyName),
+                        parameterElement
+                )
+                aopWriter.visitAroundMethod(
+                        fieldElement.declaringType,
+                        setterElement,
                         Collections.singletonMap(propertyName, parameterElement),
-                        Collections.singletonMap(propertyName, parameterElement.type.genericType),
+                        Collections.singletonMap(propertyName, parameterElement.genericType),
                         Collections.singletonMap(propertyName, parameterElement.annotationMetadata),
                         fieldAnnotationMetadata,
                         propertyNode.declaringClass.isInterface(),
@@ -1269,11 +1264,17 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 )
 
                 // also visit getter to ensure proxying
-                aopWriter.visitAroundMethod(
+                MethodElement getterElement = MethodElement.of(
                         fieldElement.declaringType,
+                        fieldAnnotationMetadata,
                         fieldElement.type,
                         fieldElement.genericType,
                         getGetterName(propertyNode),
+                        parameterElement
+                )
+                aopWriter.visitAroundMethod(
+                        fieldElement.declaringType,
+                        getterElement,
                         Collections.emptyMap(),
                         Collections.emptyMap(),
                         Collections.emptyMap(),
@@ -1581,9 +1582,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                             )
                             aopProxyWriter.visitAroundMethod(
                                     declaringElement,
-                                    groovyMethodElement.returnType,
-                                    groovyMethodElement.genericReturnType,
-                                    targetMethod.name,
+                                    groovyMethodElement,
                                     targetMethodParamsToType,
                                     targetMethodGenericParams,
                                     targetAnnotationMetadata,
