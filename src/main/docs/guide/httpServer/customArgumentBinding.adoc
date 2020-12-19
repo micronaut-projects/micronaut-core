@@ -30,22 +30,26 @@ Once the binder is created, we can annotate an argument in our controller method
 
 snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanController[tags="annotated", indent=0, title="A controller operation with this annotated binding"]
 
-<1> The parameter will be bound with the binder associated with MyBindingAnnotation. This will take precedence over the typed binder, if applicable.
+<1> The parameter will be bound with the binder associated with MyBindingAnnotation. This will take precedence over a type-based binder, if applicable.
 
 === TypedRequestArgumentBinders
 
-Argument binders that bind based on the type of the argument must implement api:http.bind.binders.TypedRequestArgumentBinder[TypedRequestArgumentBinder]. For example:
+Argument binders that bind based on the type of the argument must implement api:http.bind.binders.TypedRequestArgumentBinder[TypedRequestArgumentBinder]. For example, given this class:
+
+snippet::io.micronaut.docs.http.bind.binders.ShoppingCart[tags="class", indent=0, title="Example of POJO"]
+
+We can define a `TypedRequestArgumentBinder` for this class, as seen below:
 
 snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanTypedRequestArgumentBinder[tags="class", indent=0, title="Example of typed data binding"]
 
-<1> Override the bind method with the data type to bind, in this case MyBoundBean
-<2> After building the bound type as desired return the api:io.micronaut.core.bind.BindingResult[BindingResult]
-<3> Also override the argumentType method which is used by the ArgumentBinderRegistry.
+<1> Override the bind method with the data type to bind, in this example the ShoppingCart type
+<2> After retrieving the data (in this case, by deserializing JSON text from a cookie), return as a api:io.micronaut.core.bind.BindingResult[BindingResult]
+<3> Also override the argumentType method, which is used by the ArgumentBinderRegistry.
 
-Once the binder is created, it can be used like in the following example:
+Once the binder is created, it will be used for any controller argument of the associated type:
 
 snippet::io.micronaut.docs.http.bind.binders.MyBoundBeanController[tags="typed", indent=0, title="A controller operation with this typed binding"]
 
-<1> The parameter will be bound with no annotation.
+<1> The parameter will be bound using the custom logic defined for this type in our TypedRequestArgumentBinder
 
 

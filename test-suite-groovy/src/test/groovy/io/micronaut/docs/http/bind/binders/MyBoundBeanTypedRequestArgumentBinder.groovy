@@ -1,32 +1,40 @@
 package io.micronaut.docs.http.bind.binders
-// tag:class[]
+// tag::class[]
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
+import io.micronaut.http.cookie.Cookie
+import io.micronaut.jackson.serialize.JacksonObjectSerializer
 
 import javax.inject.Singleton
 
 @Singleton
-class MyBoundBeanTypedRequestArgumentBinder implements TypedRequestArgumentBinder<MyBoundBean> {
+class MyBoundBeanTypedRequestArgumentBinder implements TypedRequestArgumentBinder<ShoppingCart> {
 
-    @Override
-    BindingResult<MyBoundBean> bind(ArgumentConversionContext<MyBoundBean> context, HttpRequest<?> source) { //<1>
-        MyBoundBean result = new MyBoundBean()
-        result.setBindingType("TYPED")
-        result.setShoppingCartSize(source.getCookies().get("shoppingCart", Integer.class).orElse(null))
-        result.setDisplayName(source.getCookies().get("displayName").getValue())
-        String userNameBase64 = source.getHeaders().getAuthorization().orElse(null)
-        String userName = new String(Base64.getDecoder().decode(userNameBase64.substring(6)))
-                .split(":", 2)[0]
-        result.setUserName(userName)
-        result.setBody(source.getBody(String.class).orElse(null))
-        return () -> Optional.of(result) //<2>
+    private final JacksonObjectSerializer objectSerializer
+
+    MyBoundBeanTypedRequestArgumentBinder(JacksonObjectSerializer objectSerializer) {
+        this.objectSerializer = objectSerializer;
     }
 
     @Override
-    Argument<MyBoundBean> argumentType() {
-        return Argument.of(MyBoundBean.class) //<3>
+    BindingResult<ShoppingCart> bind(ArgumentConversionContext<ShoppingCart> context, HttpRequest<?> source) { //<1>
+
+        Cookie cookie = source.getCookies().get("shoppingCart")
+
+        if (cookie != null) {
+            return () -> objectSerializer.deserialize( //<2>
+                    cookie.getValue().getBytes(),
+                    ShoppingCart.class)
+        }
+
+        return Optional::empty
+    }
+
+    @Override
+    Argument<ShoppingCart> argumentType() {
+        return Argument.of(ShoppingCart.class) //<3>
     }
 }
-// end:class[]
+// end::class[]

@@ -70,17 +70,14 @@ public class MyBoundBeanControllerTest {
     @Test
     public void testTypeBinding() {
         Set<Cookie> cookieSet = new HashSet<>();
-        cookieSet.add(Cookie.of("shoppingCart", "5"));
-        cookieSet.add(Cookie.of("displayName", "John Q Micronaut"));
+        cookieSet.add(Cookie.of("shoppingCart", "{\"sessionId\": 5, \"total\": 20}"));
 
-        HttpRequest request = HttpRequest.POST("/customBinding/typed", "{\"key\":\"value\"}")
-                .cookies(cookieSet)
-                .basicAuth("munaut", "P@ssw0rd");
+        HttpRequest<?> request = HttpRequest.GET("/customBinding/typed")
+                .cookies(cookieSet);
+
         Map<String, String> body = client.toBlocking().retrieve(request, Argument.mapOf(String.class, String.class));
 
-        assertEquals("munaut", body.get("userName"));
-        assertEquals("John Q Micronaut", body.get("displayName"));
-        assertEquals("5", body.get("shoppingCartSize"));
-        assertEquals("TYPED", body.get("bindingType"));
+        assertEquals("5", body.get("sessionId"));
+        assertEquals("20", body.get("total"));
     }
 }

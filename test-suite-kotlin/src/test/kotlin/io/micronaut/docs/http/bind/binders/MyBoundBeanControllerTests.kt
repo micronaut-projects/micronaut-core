@@ -5,7 +5,6 @@ import io.kotlintest.shouldNotBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
-import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -48,17 +47,13 @@ class MyBoundBeanControllerTest: StringSpec(){
         }
 
         "test typed binding" {
-            val request: HttpRequest<*> = HttpRequest.POST("/customBinding/typed", "{\"key\":\"value\"}")
-                    .cookies(setOf(Cookie.of("shoppingCart", "5"),
-                            Cookie.of("displayName", "John Q Micronaut")))
-                    .basicAuth("munaut", "P@ssw0rd")
-            val body: Map<String, String> = client!!.toBlocking().retrieve(request, Argument.mapOf(String::class.java, String::class.java))
+            val request: HttpRequest<*> = HttpRequest.GET<Any>("/customBinding/typed")
+                    .cookies(setOf(Cookie.of("shoppingCart", "{\"sessionId\": 5, \"total\": 20}")))
+            val body: Map<String, String> = client.toBlocking().retrieve(request, Argument.mapOf(String::class.java, String::class.java))
 
             body shouldNotBe null
-            body["userName"] shouldBe "munaut"
-            body["displayName"] shouldBe "John Q Micronaut"
-            body["shoppingCartSize"] shouldBe "5"
-            body["bindingType"] shouldBe "TYPED"
+            body["sessionId"] shouldBe "5"
+            body["total"] shouldBe "20"
         }
     }
 }
