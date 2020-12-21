@@ -2008,12 +2008,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private BeanDefinitionWriter createBeanDefinitionWriterFor(TypeElement typeElement) {
             TypeMirror providerTypeParam =
                     genericUtils.interfaceGenericTypeFor(typeElement, Provider.class);
-            AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
 
-            PackageElement packageElement = elementUtils.getPackageOf(typeElement);
+            JavaClassElement classElement;
+            AnnotationMetadata annotationMetadata;
+            if (typeElement == concreteClass) {
+                classElement = concreteClassElement;
+                annotationMetadata = classElement.getAnnotationMetadata();
+            } else {
+                annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
+                classElement = new JavaClassElement(typeElement, annotationMetadata, visitorContext);
+            }
+            String packageName = classElement.getPackageName();
+            boolean isInterface = classElement.isInterface();
             String beanClassName = modelUtils.simpleBinaryNameFor(typeElement);
-
-            boolean isInterface = JavaModelUtils.isInterface(typeElement);
 
             if (configurationMetadata != null) {
                 // unfortunate we have to do this
@@ -2022,23 +2029,21 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         "prefix", String.class)
                         .orElse("");
 
-                annotationMetadata = DefaultAnnotationMetadata.mutateMember(
-                        annotationMetadata,
-                        ConfigurationReader.class.getName(),
-                        "prefix",
-                        StringUtils.isNotEmpty(existingPrefix) ? existingPrefix + "." + configurationMetadata.getName() : configurationMetadata.getName()
-                );
+                String computedPrefix = StringUtils.isNotEmpty(existingPrefix) ? existingPrefix + "." + configurationMetadata.getName() : configurationMetadata.getName();
+                annotationMetadata = classElement.annotate(ConfigurationReader.class, (builder) ->
+                        builder.member("prefix", computedPrefix)
+                ).getAnnotationMetadata();
             }
 
 
             BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(
-                    packageElement.getQualifiedName().toString(),
+                    packageName,
                     beanClassName,
                     providerTypeParam == null
                             ? elementUtils.getBinaryName(typeElement).toString()
                             : providerTypeParam.toString(),
                     isInterface,
-                    new JavaClassElement(typeElement, annotationMetadata, visitorContext),
+                    classElement,
                     annotationMetadata
             );
 

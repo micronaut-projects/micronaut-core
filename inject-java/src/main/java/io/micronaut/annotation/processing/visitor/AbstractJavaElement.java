@@ -70,8 +70,9 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         final AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
         consumer.accept(builder);
         final AnnotationValue<T> av = builder.build();
-        this.annotationMetadata = visitorContext
-                .getAnnotationUtils()
+        AnnotationUtils annotationUtils = visitorContext
+                .getAnnotationUtils();
+        this.annotationMetadata = annotationUtils
                 .newAnnotationBuilder()
                 .annotate(annotationMetadata, av);
 
@@ -90,7 +91,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         }
 
         AbstractAnnotationMetadataBuilder.addMutatedMetadata(declaringTypeName, element, annotationMetadata);
-        visitorContext.getAnnotationUtils().invalidateMetadata(element);
+        annotationUtils.invalidateMetadata(element);
         return this;
     }
 

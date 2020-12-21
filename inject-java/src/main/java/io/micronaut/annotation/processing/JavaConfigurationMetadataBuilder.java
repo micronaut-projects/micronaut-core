@@ -121,7 +121,19 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
                             break;
                         }
                     } else {
-                        break;
+                        String parentPath = pathEvaluationFunctionForMetadata(enclosingTypeMetadata).apply("");
+                        path.insert(0, parentPath + '.');
+                        prependSuperclasses(enclosingType, path);
+                        if (enclosingType.getNestingKind() == NestingKind.MEMBER) {
+                            Element el = enclosingType.getEnclosingElement();
+                            if (el instanceof TypeElement) {
+                                enclosingType = (TypeElement) el;
+                            } else {
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
                     }
                 }
             }
@@ -197,22 +209,24 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
 
     @Override
     protected AnnotationMetadata getAnnotationMetadata(TypeElement type) {
-        return annotationUtils.getAnnotationMetadata(type);
+        return annotationUtils.getDeclaredAnnotationMetadata(type);
     }
 
     private void prependSuperclasses(TypeElement declaringType, StringBuilder path) {
         if (declaringType.getKind() == ElementKind.INTERFACE) {
             DeclaredType superInterface = resolveSuperInterface(declaringType);
-            while (superInterface instanceof DeclaredType) {
+            while (superInterface != null) {
                 final TypeElement element = (TypeElement) superInterface.asElement();
-                AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(element);
+                AnnotationMetadata annotationMetadata = annotationUtils.getDeclaredAnnotationMetadata(element);
                 Optional<String> parentConfig = annotationMetadata.getValue(ConfigurationReader.class, String.class);
                 if (parentConfig.isPresent()) {
                     String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply(parentConfig.get());
                     path.insert(0, parentPath + '.');
                     superInterface = resolveSuperInterface(element);
                 } else {
-                    break;
+                    String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply("");
+                    path.insert(0, parentPath + '.');
+                    superInterface = resolveSuperInterface(element);
                 }
             }
         } else {
@@ -220,14 +234,20 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
             while (superclass instanceof DeclaredType) {
                 DeclaredType declaredType = (DeclaredType) superclass;
                 Element element = declaredType.asElement();
-                AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(element);
+                AnnotationMetadata annotationMetadata = annotationUtils.getDeclaredAnnotationMetadata(element);
                 Optional<String> parentConfig = annotationMetadata.getValue(ConfigurationReader.class, String.class);
                 if (parentConfig.isPresent()) {
                     String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply(parentConfig.get());
                     path.insert(0, parentPath + '.');
                     superclass = ((TypeElement) element).getSuperclass();
                 } else {
-                    break;
+                    if (annotationMetadata.isPresent(ConfigurationReader.class, "prefix")) {
+                        String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply("");
+                        path.insert(0, parentPath + '.');
+                        superclass = ((TypeElement) element).getSuperclass();
+                    } else {
+                        break;
+                    }
                 }
             }
         }
