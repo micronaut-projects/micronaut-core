@@ -13,7 +13,7 @@ dependencies {
     testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
     testImplementation dependencyVersion("rxjava2")
-    testImplementation "org.hibernate:hibernate-core:5.4.25.Final"
+    testImplementation "org.hibernate:hibernate-core:5.4.26.Final"
     testImplementation "junit:junit:4.13.1"
     testImplementation "com.google.testing.compile:compile-testing:0.19"
     testImplementation 'org.mongodb:mongo-java-driver:3.12.7'
@@ -28,6 +28,10 @@ dependencies {
     testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'
     testRuntimeOnly 'org.glassfish:javax.el:3.0.1-b12'
 }
+
+//compileTestJava.options.fork = true
+//compileTestJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+
 
 tasks.withType(Test) {
     forkEvery = 100

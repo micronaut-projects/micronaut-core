@@ -40,12 +40,12 @@ dependencies {
     testImplementation project(":function-client")
     testImplementation project(":function-web")
     testImplementation 'io.kotlintest:kotlintest-runner-junit5:3.4.2'
-    testImplementation 'org.zalando:logbook-netty:2.3.0'
+    testImplementation 'org.zalando:logbook-netty:2.4.1'
     testImplementation project(':tracing')
     kaptTest project(':inject-java')
     kaptTest project(':validation')
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junitVersion"
-    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.903'
+    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.920'
 }
 
 compileTestKotlin {
