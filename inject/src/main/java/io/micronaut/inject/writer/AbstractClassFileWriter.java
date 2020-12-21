@@ -704,8 +704,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @return The {@link Type}
      */
     protected static Type getTypeReference(TypedElement type) {
+        ClassElement classElement = type.getType();
         if (type.isPrimitive()) {
-            String internalName = NAME_TO_TYPE_MAP.get(type.getType().getName());
+            String internalName = NAME_TO_TYPE_MAP.get(classElement.getName());
             if (type.isArray()) {
                 StringBuilder name = new StringBuilder(internalName);
                 for (int i = 0; i < type.getArrayDimensions(); i++) {
@@ -721,7 +722,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 Class<?> t = (Class<?>) nativeType;
                 return Type.getType(t);
             } else if (type.isArray()) {
-                String internalName = type.getType().getName().replace('.', '/');
+                String internalName = classElement.getName().replace('.', '/');
                 StringBuilder name = new StringBuilder(internalName);
                 name.insert(0, "L");
                 for (int i = 0; i < type.getArrayDimensions(); i++) {
@@ -730,7 +731,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 name.append(";");
                 return Type.getObjectType(name.toString());
             } else {
-                String internalName = type.getType().getName().replace('.', '/');
+                String internalName = classElement.getName().replace('.', '/');
                 return Type.getObjectType(internalName);
             }
         }
@@ -740,37 +741,45 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param fieldType           The field type
      * @param injectMethodVisitor The {@link MethodVisitor}
      */
-    protected static void pushBoxPrimitiveIfNecessary(Object fieldType, MethodVisitor injectMethodVisitor) {
-        if (fieldType instanceof TypedElement) {
-            ClassElement type = ((TypedElement) fieldType).getType();
-            if (type.isPrimitive() && !type.isArray()) {
-                String primitiveName = type.getName();
-                final Optional<Class> pt = ClassUtils.getPrimitiveType(primitiveName);
-                Class wrapperType = pt.map(ReflectionUtils::getWrapperType).orElse(null);
-                if (wrapperType != null && wrapperType != Void.class) {
-                    Type wrapper = Type.getType(wrapperType);
-                    String sig = wrapperType.getName() + " valueOf(" + primitiveName + ")";
-                    org.objectweb.asm.commons.Method valueOfMethod = org.objectweb.asm.commons.Method.getMethod(sig);
-                    injectMethodVisitor.visitMethodInsn(INVOKESTATIC, wrapper.getInternalName(), "valueOf", valueOfMethod.getDescriptor(), false);
-                }
-            }
-        } else if (fieldType instanceof Type) {
-            final Type t = (Type) fieldType;
-            final Optional<Class> pt = ClassUtils.getPrimitiveType(t.getClassName());
-            Class wrapperType = pt.map(ReflectionUtils::getWrapperType).orElse(null);
+    protected static void pushBoxPrimitiveIfNecessary(Type fieldType, MethodVisitor injectMethodVisitor) {
+        final Optional<Class> pt = ClassUtils.getPrimitiveType(fieldType.getClassName());
+        Class<?> wrapperType = pt.map(ReflectionUtils::getWrapperType).orElse(null);
+        if (wrapperType != null && wrapperType != Void.class) {
+            Type wrapper = Type.getType(wrapperType);
+            String primitiveName = fieldType.getClassName();
+            String sig = wrapperType.getName() + " valueOf(" + primitiveName + ")";
+            org.objectweb.asm.commons.Method valueOfMethod = org.objectweb.asm.commons.Method.getMethod(sig);
+            injectMethodVisitor.visitMethodInsn(INVOKESTATIC, wrapper.getInternalName(), "valueOf", valueOfMethod.getDescriptor(), false);
+        }
+    }
+
+    /**
+     * @param fieldType           The field type
+     * @param injectMethodVisitor The {@link MethodVisitor}
+     */
+    protected static void pushBoxPrimitiveIfNecessary(Class<?> fieldType, MethodVisitor injectMethodVisitor) {
+        Class<?> wrapperType = ReflectionUtils.getWrapperType(fieldType);
+        if (wrapperType != null && wrapperType != Void.class) {
+            Type wrapper = Type.getType(wrapperType);
+            String primitiveName = fieldType.getName();
+            String sig = wrapperType.getName() + " valueOf(" + primitiveName + ")";
+            org.objectweb.asm.commons.Method valueOfMethod = org.objectweb.asm.commons.Method.getMethod(sig);
+            injectMethodVisitor.visitMethodInsn(INVOKESTATIC, wrapper.getInternalName(), "valueOf", valueOfMethod.getDescriptor(), false);
+        }
+    }
+
+    /**
+     * @param fieldType           The field type
+     * @param injectMethodVisitor The {@link MethodVisitor}
+     */
+    protected static void pushBoxPrimitiveIfNecessary(TypedElement fieldType, MethodVisitor injectMethodVisitor) {
+        ClassElement type = fieldType.getType();
+        if (type.isPrimitive() && !type.isArray()) {
+            String primitiveName = type.getName();
+            final Optional<Class> pt = ClassUtils.getPrimitiveType(primitiveName);
+            Class<?> wrapperType = pt.map(ReflectionUtils::getWrapperType).orElse(null);
             if (wrapperType != null && wrapperType != Void.class) {
                 Type wrapper = Type.getType(wrapperType);
-                String primitiveName = t.getClassName();
-                String sig = wrapperType.getName() + " valueOf(" + primitiveName + ")";
-                org.objectweb.asm.commons.Method valueOfMethod = org.objectweb.asm.commons.Method.getMethod(sig);
-                injectMethodVisitor.visitMethodInsn(INVOKESTATIC, wrapper.getInternalName(), "valueOf", valueOfMethod.getDescriptor(), false);
-            }
-        } else {
-            Class wrapperType = AbstractClassFileWriter.getWrapperType(fieldType);
-            if (wrapperType != null && wrapperType != Void.class) {
-                Class primitiveType = (Class) fieldType;
-                Type wrapper = Type.getType(wrapperType);
-                String primitiveName = primitiveType.getName();
                 String sig = wrapperType.getName() + " valueOf(" + primitiveName + ")";
                 org.objectweb.asm.commons.Method valueOfMethod = org.objectweb.asm.commons.Method.getMethod(sig);
                 injectMethodVisitor.visitMethodInsn(INVOKESTATIC, wrapper.getInternalName(), "valueOf", valueOfMethod.getDescriptor(), false);
@@ -782,56 +791,45 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param methodVisitor The {@link MethodVisitor}
      * @param type          The type
      */
-    protected static void pushCastToType(MethodVisitor methodVisitor, Object type) {
+    protected static void pushCastToType(MethodVisitor methodVisitor, Type type) {
         String internalName = getInternalNameForCast(type);
         methodVisitor.visitTypeInsn(CHECKCAST, internalName);
         Type primitiveType = null;
-        if (type instanceof TypedElement) {
-          TypedElement te = (TypedElement) type;
-          if (te.isPrimitive() && !te.isArray()) {
-              final Optional<Class> pt = ClassUtils.getPrimitiveType(te.getType().getName());
-              if (pt.isPresent()) {
-                  primitiveType = Type.getType(pt.get());
-              }
-          }
-        } else if (type instanceof Class) {
-            Class typeClass = (Class) type;
-            if (typeClass.isPrimitive()) {
-                primitiveType = Type.getType(typeClass);
-            }
-        } else if (type instanceof Type) {
-            final Optional<Class> pt = ClassUtils.getPrimitiveType(((Type) type).getClassName());
-            if (pt.isPresent()) {
-                primitiveType = Type.getType(pt.get());
-            }
+        final Optional<Class> pt = ClassUtils.getPrimitiveType(type.getClassName());
+        if (pt.isPresent()) {
+            primitiveType = Type.getType(pt.get());
         }
 
+        pushPrimitiveCastIfRequired(methodVisitor, internalName, primitiveType);
+    }
+
+    private static void pushPrimitiveCastIfRequired(MethodVisitor methodVisitor, String internalName, Type primitiveType) {
         if (primitiveType != null) {
-            org.objectweb.asm.commons.Method valueMethod = null;
+            Method valueMethod = null;
             switch (primitiveType.getSort()) {
                 case Type.BOOLEAN:
-                    valueMethod = org.objectweb.asm.commons.Method.getMethod("boolean booleanValue()");
+                    valueMethod = Method.getMethod("boolean booleanValue()");
                     break;
                 case Type.CHAR:
-                    valueMethod = org.objectweb.asm.commons.Method.getMethod("char charValue()");
+                    valueMethod = Method.getMethod("char charValue()");
                     break;
                 case Type.BYTE:
-                    valueMethod = org.objectweb.asm.commons.Method.getMethod("byte byteValue()");
+                    valueMethod = Method.getMethod("byte byteValue()");
                     break;
                 case Type.SHORT:
-                    valueMethod = org.objectweb.asm.commons.Method.getMethod("short shortValue()");
+                    valueMethod = Method.getMethod("short shortValue()");
                     break;
                 case Type.INT:
-                    valueMethod = org.objectweb.asm.commons.Method.getMethod("int intValue()");
+                    valueMethod = Method.getMethod("int intValue()");
                     break;
                 case Type.LONG:
-                    valueMethod = org.objectweb.asm.commons.Method.getMethod("long longValue()");
+                    valueMethod = Method.getMethod("long longValue()");
                     break;
                 case Type.DOUBLE:
-                    valueMethod = org.objectweb.asm.commons.Method.getMethod("double doubleValue()");
+                    valueMethod = Method.getMethod("double doubleValue()");
                     break;
                 case Type.FLOAT:
-                    valueMethod = org.objectweb.asm.commons.Method.getMethod("float floatValue()");
+                    valueMethod = Method.getMethod("float floatValue()");
                     break;
                 default:
                     // no-ip
@@ -847,18 +845,44 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param methodVisitor The {@link MethodVisitor}
      * @param type          The type
      */
-    protected static void pushReturnValue(MethodVisitor methodVisitor, Object type) {
-        Class primitiveTypeClass = null;
-        if (type instanceof Class) {
-            Class typeClass = (Class) type;
-            if (typeClass.isPrimitive()) {
-                primitiveTypeClass = typeClass;
+    protected static void pushCastToType(MethodVisitor methodVisitor, TypedElement type) {
+        String internalName = getInternalNameForCast(type);
+        methodVisitor.visitTypeInsn(CHECKCAST, internalName);
+        Type primitiveType = null;
+        if (type.isPrimitive() && !type.isArray()) {
+            final Optional<Class> pt = ClassUtils.getPrimitiveType(type.getType().getName());
+            if (pt.isPresent()) {
+                primitiveType = Type.getType(pt.get());
             }
-        } else if (type instanceof TypedElement) {
-            ClassElement ce = ((TypedElement) type).getType();
-            if (ce.isPrimitive() && !ce.isArray()) {
-                primitiveTypeClass = ClassUtils.getPrimitiveType(ce.getName()).orElse(null);
-            }
+        }
+
+        pushPrimitiveCastIfRequired(methodVisitor, internalName, primitiveType);
+    }
+
+    /**
+     * @param methodVisitor The {@link MethodVisitor}
+     * @param type          The type
+     */
+    protected static void pushCastToType(MethodVisitor methodVisitor, Class<?> type) {
+        String internalName = getInternalNameForCast(type);
+        methodVisitor.visitTypeInsn(CHECKCAST, internalName);
+        Type primitiveType = null;
+        if (type.isPrimitive()) {
+            primitiveType = Type.getType(type);
+        }
+
+        pushPrimitiveCastIfRequired(methodVisitor, internalName, primitiveType);
+    }
+
+    /**
+     * @param methodVisitor The {@link MethodVisitor}
+     * @param type          The type
+     */
+    protected static void pushReturnValue(MethodVisitor methodVisitor, TypedElement type) {
+        Class<?> primitiveTypeClass = null;
+
+        if (type.isPrimitive() && !type.isArray()) {
+            primitiveTypeClass = ClassUtils.getPrimitiveType(type.getType().getName()).orElse(null);
         }
 
         if (primitiveTypeClass == null) {
@@ -893,39 +917,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param type The type
-     * @return The class
-     */
-    protected static Class getWrapperType(Object type) {
-        if (type instanceof TypedElement) {
-          TypedElement te = (TypedElement) type;
-          if (te.isPrimitive()) {
-              Class pt = ClassUtils.getPrimitiveType(te.getType().getName()).orElse(null);
-              if (pt != null) {
-                  return ReflectionUtils.getWrapperType(pt);
-              }
-          }
-        } else if (isPrimitive(type)) {
-            return ReflectionUtils.getWrapperType((Class) type);
-        }
-        return null;
-    }
-
-    /**
-     * @param type The type
-     * @return Whether a type is primitive
-     */
-    protected static boolean isPrimitive(Object type) {
-        if (type instanceof TypedElement) {
-            return ((TypedElement) type).isPrimitive();
-        } else if (type instanceof Class) {
-            Class typeClass = (Class) type;
-            return typeClass.isPrimitive();
-        }
-        return false;
-    }
-
-    /**
      * @param methodVisitor The method visitor as {@link GeneratorAdapter}
      * @param methodName    The method name
      * @param argumentTypes The argument types
@@ -952,7 +943,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param arrayType     The array class
      * @param size          The size
      */
-    protected static void pushNewArray(GeneratorAdapter methodVisitor, Class arrayType, int size) {
+    protected static void pushNewArray(GeneratorAdapter methodVisitor, Class<?> arrayType, int size) {
         // the size of the array
         methodVisitor.push(size);
         // define the array
@@ -1121,17 +1112,74 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param argumentTypes The argument types
      * @return The method descriptor
      */
-    protected static String getMethodDescriptor(Object returnType, Collection<? extends Object> argumentTypes) {
+    protected static String getMethodDescriptor(TypedElement returnType, Collection<? extends TypedElement> argumentTypes) {
         StringBuilder builder = new StringBuilder();
         builder.append('(');
 
-        for (Object argumentType : argumentTypes) {
+        for (TypedElement argumentType : argumentTypes) {
             builder.append(getTypeDescriptor(argumentType));
         }
 
         builder.append(')');
 
         builder.append(getTypeDescriptor(returnType));
+        return builder.toString();
+    }
+
+    /**
+     * @param returnType    The return type
+     * @param argumentTypes The argument types
+     * @return The method descriptor
+     */
+    protected static String getMethodDescriptorForReturnType(Type returnType, Collection<? extends TypedElement> argumentTypes) {
+        StringBuilder builder = new StringBuilder();
+        builder.append('(');
+
+        for (TypedElement argumentType : argumentTypes) {
+            builder.append(getTypeDescriptor(argumentType));
+        }
+
+        builder.append(')');
+
+        builder.append(returnType.getDescriptor());
+        return builder.toString();
+    }
+
+    /**
+     * @param returnType    The return type
+     * @param argumentTypes The argument types
+     * @return The method descriptor
+     */
+    protected static String getMethodDescriptor(Class<?> returnType, Collection<Class<?>> argumentTypes) {
+        StringBuilder builder = new StringBuilder();
+        builder.append('(');
+
+        for (Class<?> argumentType : argumentTypes) {
+            builder.append(Type.getDescriptor(argumentType));
+        }
+
+        builder.append(')');
+
+        builder.append(Type.getDescriptor(returnType));
+        return builder.toString();
+    }
+
+    /**
+     * @param returnType    The return type
+     * @param argumentTypes The argument types
+     * @return The method descriptor
+     */
+    protected static String getMethodDescriptor(Type returnType, Collection<Type> argumentTypes) {
+        StringBuilder builder = new StringBuilder();
+        builder.append('(');
+
+        for (Type argumentType : argumentTypes) {
+            builder.append(argumentType.getDescriptor());
+        }
+
+        builder.append(')');
+
+        builder.append(returnType.getDescriptor());
         return builder.toString();
     }
 

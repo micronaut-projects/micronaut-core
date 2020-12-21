@@ -412,7 +412,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             invokeMethodVisitor.push(true);
             invokeMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, invokeTargetBlock);
 
-            pushCastToType(invokeMethodVisitor, interceptedProxyType.getClassName());
+            pushCastToType(invokeMethodVisitor, interceptedProxyType);
 
             // load arguments
             Iterator<ParameterElement> iterator = argumentTypes.iterator();
@@ -441,7 +441,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             invokeMethodVisitor.pop();
         }
 
-        pushCastToType(invokeMethodVisitor, declaringTypeObject.getClassName());
+        pushCastToType(invokeMethodVisitor, declaringTypeObject);
         boolean hasArgs = !argumentTypes.isEmpty();
         if (hasArgs) {
             int argCount = argumentTypes.size();

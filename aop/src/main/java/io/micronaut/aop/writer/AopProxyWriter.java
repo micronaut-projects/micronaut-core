@@ -500,7 +500,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         List<ParameterElement> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();
         Type returnTypeObject = getTypeReference(returnType);
-        boolean isPrimitive = isPrimitive(returnType);
+        boolean isPrimitive = returnType.isPrimitive();
         boolean isVoidReturn = isPrimitive && returnTypeObject.equals(Type.VOID_TYPE);
         final Type declaringTypeReference = getTypeReference(declaringType);
         MethodRef methodKey = new MethodRef(methodName, argumentTypeList, returnTypeObject);
@@ -614,7 +614,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             // now pass the remaining arguments from the original method
             for (int i = 0; i < argumentCount; i++) {
                 overriddenMethodGenerator.dup();
-                Object argType = argumentTypeList.get(i);
+                ParameterElement argType = argumentTypeList.get(i);
                 overriddenMethodGenerator.push(i);
                 overriddenMethodGenerator.loadArg(i);
                 pushBoxPrimitiveIfNecessary(argType, overriddenMethodGenerator);
@@ -1300,7 +1300,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 METHOD_GET_PROXY_TARGET_BEAN
 
         );
-        pushCastToType(resolveTargetMethod, targetClassFullName);
+        pushCastToType(resolveTargetMethod, getTypeReferenceForName(targetClassFullName));
         resolveTargetMethod.returnValue();
         resolveTargetMethod.visitMaxs(1, 1);
         return resolveTargetMethodDesc;

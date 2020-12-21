@@ -193,7 +193,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         pushCastToType(writeMethod, propertyType);
         final boolean hasWriteMethod = this.writeMethod != null;
         final String methodName = hasWriteMethod ? this.writeMethod.getName() : NameUtils.setterNameFor(propertyName);
-        final Object returnType = hasWriteMethod ? getTypeReference(this.writeMethod.getReturnType()) : void.class;
+        final Type returnType = hasWriteMethod ? getTypeReference(this.writeMethod.getReturnType()) : Type.VOID_TYPE;
         if (declaringElement.isInterface()) {
             writeMethod.invokeInterface(
                     beanType,
@@ -221,7 +221,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                 Object.class.getName()
         );
         readMethod.loadArg(0);
-        pushCastToType(readMethod, beanType.getClassName());
+        pushCastToType(readMethod, beanType);
         final boolean isBoolean = propertyType.getClassName().equals("boolean");
         final String methodName = this.readMethod != null ? this.readMethod.getName() : NameUtils.getterNameFor(propertyName, isBoolean);
         if (declaringElement.isInterface()) {
