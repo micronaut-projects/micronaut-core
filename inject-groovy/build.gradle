@@ -4,7 +4,7 @@ dependencies {
     api dependencyModuleVersion("groovy", "groovy")
 
 //    testImplementation 'javax.validation:validation-api:1.1.0.Final'
-    testImplementation "org.hibernate:hibernate-core:5.4.25.Final"
+    testImplementation "org.hibernate:hibernate-core:5.4.26.Final"
     testImplementation 'org.hibernate:hibernate-validator:6.1.6.Final'
     testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'
     testRuntimeOnly 'org.glassfish:javax.el:3.0.1-b12'
