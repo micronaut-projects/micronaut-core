@@ -39,6 +39,8 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Abstract class that writes generated classes to disk and provides convenience methods for building classes.
@@ -59,6 +61,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     protected static final Type TYPE_CLASS = Type.getType(Class.class);
     protected static final int DEFAULT_MAX_STACK = 13;
     protected static final Type TYPE_GENERATED = Type.getType(Generated.class);
+    protected static final Pattern ARRAY_PATTERN = Pattern.compile("(\\[\\])+$");
 
     protected static final Map<String, String> NAME_TO_TYPE_MAP = new HashMap<>();
     private static final Method METHOD_CREATE_ARGUMENT_SIMPLE = Method.getMethod(
@@ -366,7 +369,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 argumentType = getTypeReference(value);
             }
 
-
             // 1st argument: The type
             generatorAdapter.push(argumentType);
 
@@ -602,11 +604,17 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         } else if (type instanceof String) {
             String className = type.toString();
 
-            String internalName = getInternalName(className);
-            if (className.endsWith("[]")) {
-                internalName = "[L" + internalName + ";";
+            StringBuilder internalName = new StringBuilder(getInternalName(className));
+            Matcher matcher = ARRAY_PATTERN.matcher(className);
+            if (matcher.find()) {
+                internalName.append(';');
+                internalName.insert(0, 'L');
+                int dimensions = matcher.group(0).length() / 2;
+                for (int i = 0; i < dimensions; i++) {
+                    internalName.insert(0, '[');
+                }
             }
-            return Type.getObjectType(internalName);
+            return Type.getObjectType(internalName.toString());
         } else {
             throw new IllegalArgumentException("Type reference [" + type + "] should be a Class or a String representing the class name");
         }
@@ -943,11 +951,14 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         } else {
             String internalName = getInternalName(className);
             StringBuilder start = new StringBuilder(40);
-            if (className.endsWith("[]")) {
-                start.append("[L").append(internalName);
-            } else {
-                start.append('L').append(internalName);
+            Matcher matcher = ARRAY_PATTERN.matcher(className);
+            if (matcher.find()) {
+                int dimensions = matcher.group(0).length() / 2;
+                for (int i = 0; i < dimensions; i++) {
+                    start.append('[');
+                }
             }
+            start.append('L').append(internalName);
             if (genericTypes != null && genericTypes.length > 0) {
                 start.append('<');
                 for (String genericType : genericTypes) {
@@ -1235,8 +1246,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      */
     protected static String getInternalName(String className) {
         String newClassName = className.replace('.', '/');
-        if (newClassName.endsWith("[]")) {
-            return newClassName.substring(0, newClassName.length() - 2);
+        Matcher matcher = ARRAY_PATTERN.matcher(newClassName);
+        if (matcher.find()) {
+            newClassName = matcher.replaceFirst("");
         }
         return newClassName;
     }
