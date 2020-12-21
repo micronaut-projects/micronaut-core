@@ -38,6 +38,7 @@ public class JavaFieldElement extends AbstractJavaElement implements FieldElemen
     private final JavaVisitorContext visitorContext;
     private final VariableElement variableElement;
     private ClassElement declaringElement;
+    private ClassElement typeElement;
 
     /**
      * @param variableElement    The {@link VariableElement}
@@ -82,8 +83,11 @@ public class JavaFieldElement extends AbstractJavaElement implements FieldElemen
     @NonNull
     @Override
     public ClassElement getType() {
-        TypeMirror returnType = variableElement.asType();
-        return mirrorToClassElement(returnType, visitorContext);
+        if (this.typeElement == null) {
+            TypeMirror returnType = variableElement.asType();
+            this.typeElement = mirrorToClassElement(returnType, visitorContext);
+        }
+        return this.typeElement;
     }
 
     @Override
