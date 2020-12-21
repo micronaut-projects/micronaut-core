@@ -13,32 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.bind;
+package io.micronaut.core.util;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.type.Argument;
+import io.micronaut.core.order.Ordered;
 
+import java.util.Locale;
 import java.util.Optional;
 
 /**
- * A registry of {@link ClientArgumentRequestBinder} instances.
+ * Responsible for determining the current locale given a context.
  *
  * @author James Kleeh
- * @since 2.1.0
+ * @since 2.3.0
+ * @param <T> The context object which will be used to resolve the locale
  */
-@Experimental
-@BootstrapContextCompatible
-public interface HttpClientBinderRegistry {
+public interface LocaleResolver<T> extends Ordered {
 
     /**
-     * Locate an {@link ClientArgumentRequestBinder} for the given argument.
+     * Resolves the locale for the given context.
      *
-     * @param argument The argument
-     * @param <T>      The argument type
-     * @return An {@link Optional} of {@link ClientArgumentRequestBinder}
+     * @param context The context to retrieve the locale from
+     * @return The locale
      */
-    <T> Optional<ClientArgumentRequestBinder<?>> findArgumentBinder(@NonNull Argument<T> argument);
+    @NonNull
+    Optional<Locale> resolve(@NonNull T context);
 
+    @NonNull
+    Locale resolveOrDefault(@NonNull T context);
 }
