@@ -39,6 +39,15 @@ public interface ClassElement extends TypedElement {
     boolean isAssignable(String type);
 
     /**
+     * Tests whether one type is assignable to another.
+     *
+     * @param type The type to check
+     * @return {@code true} if and only if the this type is assignable to the second
+     * @since 2.3.0
+     */
+    boolean isAssignable(ClassElement type);
+
+    /**
      * Whether this element is an {@link Optional}.
      *
      * @return Is this element an optional

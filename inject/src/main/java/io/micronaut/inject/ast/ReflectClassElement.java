@@ -92,6 +92,11 @@ final class ReflectClassElement implements ClassElement {
     }
 
     @Override
+    public boolean isAssignable(ClassElement type) {
+        throw new UnsupportedOperationException("isAssignable via String is not supported by this implementation");
+    }
+
+    @Override
     public ClassElement toArray() {
         Class<?> arrayType = Array.newInstance(type, 0).getClass();
         return ClassElement.of(arrayType);

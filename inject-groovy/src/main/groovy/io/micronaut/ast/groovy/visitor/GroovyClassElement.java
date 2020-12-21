@@ -542,6 +542,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         return AstClassUtils.isSubclassOfOrImplementsInterface(classNode, type);
     }
 
+    @Override
+    public boolean isAssignable(ClassElement type) {
+        return AstClassUtils.isSubclassOfOrImplementsInterface(classNode, type.getName());
+    }
+
     private MethodNode findConcreteConstructor() {
         List<ConstructorNode> constructors = classNode.getDeclaredConstructors();
         if (CollectionUtils.isEmpty(constructors) && !classNode.isAbstract() && !classNode.isEnum()) {

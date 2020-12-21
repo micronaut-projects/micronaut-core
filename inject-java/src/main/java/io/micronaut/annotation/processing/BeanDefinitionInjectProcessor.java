@@ -341,13 +341,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         /**
-         * @return The {@link TypeElement}
-         */
-        TypeElement getConcreteClass() {
-            return concreteClass;
-        }
-
-        /**
          * @return The bean definition writers
          */
         Map<Name, BeanDefinitionVisitor> getBeanDefinitionWriters() {
@@ -364,7 +357,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 // bail out if already visited
                 return o;
             }
-            boolean isInterface = JavaModelUtils.isInterface(classElement);
+            boolean isInterface = concreteClassElement.isInterface();
             visitedTypes.add(classElementQualifiedName);
             AnnotationMetadata typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(classElement);
             this.currentClassMetadata = typeAnnotationMetadata;
@@ -405,7 +398,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
                 beanDefinitionWriters.put(classElementQualifiedName, aopProxyWriter);
                 visitIntroductionAdviceInterface(classElement, typeAnnotationMetadata, aopProxyWriter);
-
 
                 if (!isInterface) {
 
@@ -1270,206 +1262,169 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         }
 
-        private void visitAdaptedMethod(ExecutableElement method, AnnotationMetadata methodAnnotationMetadata) {
+        private void visitAdaptedMethod(ExecutableElement sourceMethod, AnnotationMetadata methodAnnotationMetadata) {
             if (methodAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
                 methodAnnotationMetadata = ((AnnotationMetadataHierarchy) methodAnnotationMetadata).getDeclaredMetadata();
             }
-            Optional<DeclaredType> targetType = methodAnnotationMetadata.getValue(Adapter.class, String.class).flatMap(s -> {
-                TypeElement typeElement = elementUtils.getTypeElement(s);
-                if (typeElement != null) {
-                    TypeMirror typeMirror = typeElement.asType();
-                    if (typeMirror instanceof DeclaredType) {
-                        return Optional.of((DeclaredType) typeMirror);
-                    }
-                }
-                return Optional.empty();
-            });
+            Optional<TypeElement> targetType = methodAnnotationMetadata.getValue(Adapter.class, String.class).flatMap(s ->
+                    Optional.ofNullable(elementUtils.getTypeElement(s))
+            );
 
             if (targetType.isPresent()) {
-                DeclaredType typeToImplement = targetType.get();
-                Element element = typeToImplement.asElement();
-                if (element instanceof TypeElement) {
-                    TypeElement typeElement = (TypeElement) element;
-                    boolean isInterface = JavaModelUtils.isInterface(element);
-                    if (isInterface) {
+                TypeElement typeElement = targetType.get();
+                boolean isInterface = JavaModelUtils.isInterface(typeElement);
+                if (isInterface) {
+                    JavaClassElement typeToImplementElement = new JavaClassElement(
+                            typeElement,
+                            annotationUtils.getAnnotationMetadata(typeElement),
+                            visitorContext
+                    );
+                    DeclaredType typeToImplement = (DeclaredType) typeElement.asType();
+                    String packageName = concreteClassElement.getPackageName();
+                    String declaringClassSimpleName = concreteClassElement.getSimpleName();
+                    String beanClassName = generateAdaptedMethodClassName(sourceMethod, typeElement, declaringClassSimpleName);
+                    JavaMethodElement sourceMethodElement = new JavaMethodElement(
+                            concreteClassElement,
+                            sourceMethod,
+                            methodAnnotationMetadata,
+                            visitorContext
+                    );
+                    AopProxyWriter aopProxyWriter = new AopProxyWriter(
+                            packageName,
+                            beanClassName,
+                            true,
+                            false,
+                            sourceMethodElement,
+                            methodAnnotationMetadata,
+                            new Object[]{modelUtils.resolveTypeReference(typeToImplement)},
+                            ArrayUtils.EMPTY_OBJECT_ARRAY
+                    );
 
-                        PackageElement packageElement = elementUtils.getPackageOf(concreteClass);
-                        String packageName = packageElement.getQualifiedName().toString();
-                        String declaringClassSimpleName = concreteClass.getSimpleName().toString();
-                        String beanClassName = generateAdaptedMethodClassName(method, typeElement, declaringClassSimpleName);
+                    aopProxyWriter.visitBeanDefinitionConstructor(methodAnnotationMetadata, false);
 
-                        AopProxyWriter aopProxyWriter = new AopProxyWriter(
-                                packageName,
-                                beanClassName,
-                                true,
-                                false,
-                                new JavaMethodElement(
-                                        new JavaClassElement(concreteClass, concreteClassMetadata, visitorContext),
-                                        method,
-                                        methodAnnotationMetadata,
-                                        visitorContext
-                                ),
-                                methodAnnotationMetadata,
-                                new Object[]{modelUtils.resolveTypeReference(typeToImplement)},
-                                ArrayUtils.EMPTY_OBJECT_ARRAY
-                        );
+                    beanDefinitionWriters.put(elementUtils.getName(packageName + '.' + beanClassName), aopProxyWriter);
 
-                        aopProxyWriter.visitBeanDefinitionConstructor(methodAnnotationMetadata, false);
+                    Map<String, ClassElement> typeVariables = typeToImplementElement.getTypeArguments();
 
-                        beanDefinitionWriters.put(elementUtils.getName(packageName + '.' + beanClassName), aopProxyWriter);
+                    AnnotationMetadata finalMethodAnnotationMetadata = methodAnnotationMetadata;
+                    typeToImplement.accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(typeElement, javaVisitorContext) {
+                        boolean first = true;
 
-                        List<? extends TypeMirror> typeArguments = ((DeclaredType) typeElement.asType()).getTypeArguments();
-                        Map<String, TypeMirror> typeVariables = new HashMap<>(typeArguments.size());
-
-                        for (TypeMirror typeArgument : typeArguments) {
-                            typeVariables.put(typeArgument.toString(), typeArgument);
-                        }
-
-                        AnnotationMetadata finalMethodAnnotationMetadata = methodAnnotationMetadata;
-                        typeToImplement.accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(typeElement, javaVisitorContext) {
-                            boolean first = true;
-
-                            @Override
-                            protected void accept(DeclaredType type, Element element, AopProxyWriter aopProxyWriter) {
-                                if (!first) {
-                                    error(method, "Interface to adapt [" + typeToImplement + "] is not a SAM type. More than one abstract method declared.");
-                                    return;
-                                }
-                                first = false;
-                                ExecutableElement targetMethod = (ExecutableElement) element;
-                                List<? extends VariableElement> targetParameters = targetMethod.getParameters();
-                                List<? extends VariableElement> sourceParameters = method.getParameters();
-
-                                int paramLen = targetParameters.size();
-                                if (paramLen == sourceParameters.size()) {
-
-                                    Map<String, Object> genericTypes = new LinkedHashMap<>();
-                                    for (int i = 0; i < paramLen; i++) {
-
-                                        VariableElement targetElement = targetParameters.get(i);
-                                        VariableElement sourceElement = sourceParameters.get(i);
-
-                                        TypeMirror targetType = targetElement.asType();
-                                        TypeMirror sourceType = sourceElement.asType();
-
-                                        if (targetType.getKind() == TypeKind.TYPEVAR) {
-                                            TypeVariable tv = (TypeVariable) targetType;
-                                            String variableName = tv.toString();
-
-
-                                            if (typeVariables.containsKey(variableName)) {
-                                                TypeMirror variableMirror = typeVariables.get(variableName);
-                                                if (variableMirror.getKind() == TypeKind.TYPEVAR) {
-                                                    TypeVariable tv2 = (TypeVariable) variableMirror;
-                                                    TypeMirror lowerBound = tv2.getLowerBound();
-                                                    if (lowerBound.getKind() == TypeKind.DECLARED) {
-                                                        targetType = lowerBound;
-                                                    } else {
-                                                        TypeMirror upperBound = tv2.getUpperBound();
-                                                        if (upperBound.getKind() == TypeKind.DECLARED) {
-                                                            targetType = upperBound;
-                                                        }
-                                                    }
-                                                }
-                                                JavaParameterElement javaParameterElement = new JavaParameterElement(
-                                                        concreteClassElement,
-                                                        sourceElement,
-                                                        AnnotationMetadata.EMPTY_METADATA,
-                                                        visitorContext
-                                                );
-                                                genericTypes.put(variableName, javaParameterElement.getType());
-                                            } else {
-                                                TypeMirror lowerBound = tv.getLowerBound();
-                                                if (lowerBound.getKind() == TypeKind.DECLARED) {
-                                                    targetType = lowerBound;
-                                                } else {
-                                                    TypeMirror upperBound = tv.getUpperBound();
-                                                    if (upperBound.getKind() == TypeKind.DECLARED) {
-                                                        targetType = upperBound;
-                                                    }
-                                                }
-                                            }
-
-                                        }
-
-                                        TypeMirror thisType = typeUtils.erasure(sourceType);
-                                        TypeMirror thatType = typeUtils.erasure(targetType);
-
-                                        if (!typeUtils.isAssignable(thisType, thatType)) {
-                                            error(method, "Cannot adapt method [" + method + "] to target method [" + targetMethod + "]. Type [" + sourceType + "] is not a subtype of type [" + targetType + "] for argument at position " + i);
-                                            return;
-                                        }
-                                    }
-
-
-                                    if (!genericTypes.isEmpty()) {
-                                        Map<String, Map<String, Object>> typeData = Collections.singletonMap(
-                                                modelUtils.resolveTypeReference(typeToImplement).toString(),
-                                                genericTypes
-                                        );
-
-                                        aopProxyWriter.visitTypeArguments(
-                                                resolveFinalTypeArguments(typeData)
-                                        );
-                                    }
-
-                                    JavaClassElement declaringClassElement = new JavaClassElement(
-                                            typeElement,
-                                            finalMethodAnnotationMetadata,
-                                            visitorContext
-                                    );
-                                    ExecutableElementParamInfo params = populateParameterData(typeElement.getQualifiedName().toString(), targetMethod, null);
-                                    Map<String, ParameterElement> methodParameters = params.getParameters();
-                                    Map<String, ClassElement> genericParameters = params.getGenericParameterTypes();
-                                    Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
-
-                                    AnnotationClassValue[] adaptedArgumentTypes = new AnnotationClassValue[paramLen];
-                                    for (int i = 0; i < adaptedArgumentTypes.length; i++) {
-                                        VariableElement ve = sourceParameters.get(i);
-                                        Object r = modelUtils.resolveTypeReference(ve.asType());
-                                        if (r instanceof Class) {
-                                            adaptedArgumentTypes[i] = new AnnotationClassValue((Class) r);
-                                        } else {
-                                            adaptedArgumentTypes[i] = new AnnotationClassValue(r.toString());
-                                        }
-                                    }
-
-                                    JavaMethodElement javaMethodElement = new JavaMethodElement(
-                                            declaringClassElement,
-                                            targetMethod,
-                                            finalMethodAnnotationMetadata,
-                                            visitorContext
-                                    );
-
-                                    AnnotationMetadata annotationMetadata = javaMethodElement.annotate(Adapter.class, (builder) -> {
-                                        AnnotationClassValue<Object> acv = new AnnotationClassValue<>(modelUtils.resolveTypeName(concreteClass.asType()));
-                                        builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, acv);
-                                        builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, method.getSimpleName().toString());
-                                        builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes);
-                                        String qualifier = concreteClassMetadata.getValue(Named.class, String.class).orElse(null);
-                                        if (StringUtils.isNotEmpty(qualifier)) {
-                                            builder.member(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier);
-                                        }
-                                    }).getAnnotationMetadata();
-
-                                    aopProxyWriter.visitAroundMethod(
-                                            declaringClassElement,
-                                            javaMethodElement,
-                                            methodParameters,
-                                            genericParameters,
-                                            methodQualifier,
-                                            annotationMetadata,
-                                            declaringClassElement.isInterface(),
-                                            targetMethod.isDefault()
-                                    );
-
-
-                                } else {
-                                    error(method, "Cannot adapt method [" + method + "] to target method [" + targetMethod + "]. Argument lengths don't match.");
-                                }
+                        @Override
+                        protected void accept(DeclaredType type, Element element, AopProxyWriter aopProxyWriter) {
+                            if (!first) {
+                                error(sourceMethod, "Interface to adapt [" + typeToImplement + "] is not a SAM type. More than one abstract method declared.");
+                                return;
                             }
-                        }, aopProxyWriter);
-                    }
+                            first = false;
+                            ExecutableElement targetMethod = (ExecutableElement) element;
+                            JavaMethodElement targetMethodElement = new JavaMethodElement(
+                                    typeToImplementElement,
+                                    targetMethod,
+                                    annotationUtils.getAnnotationMetadata(targetMethod),
+                                    visitorContext
+                            );
+
+                            ParameterElement[] mnSourceParams = sourceMethodElement.getParameters();
+                            ParameterElement[] mnTargetParams = targetMethodElement.getParameters();
+                            List<? extends VariableElement> targetParameters = targetMethod.getParameters();
+                            List<? extends VariableElement> sourceParameters = sourceMethod.getParameters();
+
+                            int paramLen = targetParameters.size();
+                            if (paramLen == sourceParameters.size()) {
+
+                                Map<String, Object> genericTypes = new LinkedHashMap<>();
+                                for (int i = 0; i < paramLen; i++) {
+
+                                    VariableElement targetElement = targetParameters.get(i);
+                                    TypeMirror targetMirror = targetElement.asType();
+                                    ClassElement targetType = mnTargetParams[i].getGenericType();
+                                    ClassElement sourceType = mnSourceParams[i].getGenericType();
+
+                                    if (targetMirror.getKind() == TypeKind.TYPEVAR) {
+                                        TypeVariable tv = (TypeVariable) targetMirror;
+                                        String variableName = tv.toString();
+
+                                        if (typeVariables.containsKey(variableName)) {
+                                            genericTypes.put(variableName, sourceType);
+                                        }
+                                    }
+
+
+                                    if (!sourceType.isAssignable(targetType.getName())) {
+                                        error(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Type [" + sourceType.getName() + "] is not a subtype of type [" + targetType.getName() + "] for argument at position " + i);
+                                        return;
+                                    }
+                                }
+
+
+                                if (!genericTypes.isEmpty()) {
+                                    Map<String, Map<String, Object>> typeData = Collections.singletonMap(
+                                            modelUtils.resolveTypeReference(typeToImplement).toString(),
+                                            genericTypes
+                                    );
+
+                                    aopProxyWriter.visitTypeArguments(
+                                            resolveFinalTypeArguments(typeData)
+                                    );
+                                }
+
+                                JavaClassElement declaringClassElement = new JavaClassElement(
+                                        typeElement,
+                                        finalMethodAnnotationMetadata,
+                                        visitorContext
+                                );
+                                ExecutableElementParamInfo params = populateParameterData(typeElement.getQualifiedName().toString(), targetMethod, null);
+                                Map<String, ParameterElement> methodParameters = params.getParameters();
+                                Map<String, ClassElement> genericParameters = params.getGenericParameterTypes();
+                                Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
+
+                                AnnotationClassValue<?>[] adaptedArgumentTypes = new AnnotationClassValue[paramLen];
+                                for (int i = 0; i < adaptedArgumentTypes.length; i++) {
+                                    VariableElement ve = sourceParameters.get(i);
+                                    Object r = modelUtils.resolveTypeReference(ve.asType());
+                                    if (r instanceof Class) {
+                                        adaptedArgumentTypes[i] = new AnnotationClassValue((Class) r);
+                                    } else {
+                                        adaptedArgumentTypes[i] = new AnnotationClassValue(r.toString());
+                                    }
+                                }
+
+                                JavaMethodElement javaMethodElement = new JavaMethodElement(
+                                        declaringClassElement,
+                                        targetMethod,
+                                        finalMethodAnnotationMetadata,
+                                        visitorContext
+                                );
+
+                                AnnotationMetadata annotationMetadata = javaMethodElement.annotate(Adapter.class, (builder) -> {
+                                    AnnotationClassValue<Object> acv = new AnnotationClassValue<>(concreteClassElement.getName());
+                                    builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, acv);
+                                    builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, sourceMethodElement.getName());
+                                    builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes);
+                                    String qualifier = concreteClassMetadata.getValue(Named.class, String.class).orElse(null);
+                                    if (StringUtils.isNotEmpty(qualifier)) {
+                                        builder.member(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier);
+                                    }
+                                }).getAnnotationMetadata();
+
+                                aopProxyWriter.visitAroundMethod(
+                                        declaringClassElement,
+                                        javaMethodElement,
+                                        methodParameters,
+                                        genericParameters,
+                                        methodQualifier,
+                                        annotationMetadata,
+                                        declaringClassElement.isInterface(),
+                                        targetMethod.isDefault()
+                                );
+
+
+                            } else {
+                                error(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Argument lengths don't match.");
+                            }
+                        }
+                    }, aopProxyWriter);
                 }
             }
         }

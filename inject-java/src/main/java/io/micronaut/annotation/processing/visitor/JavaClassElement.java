@@ -459,6 +459,22 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return false;
     }
 
+    @Override
+    public boolean isAssignable(ClassElement type) {
+        if (type.isPrimitive()) {
+            return isAssignable(type.getName());
+        } else {
+            Object nativeType = type.getNativeType();
+            if (nativeType instanceof TypeElement) {
+                Types types = visitorContext.getTypes();
+                TypeMirror thisType = types.erasure(classElement.asType());
+                TypeMirror thatType = types.erasure(((TypeElement) nativeType).asType());
+                return types.isAssignable(thisType, thatType);
+            }
+        }
+        return false;
+    }
+
     @NonNull
     @Override
     public Optional<MethodElement> getPrimaryConstructor() {
