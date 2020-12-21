@@ -89,6 +89,9 @@ public class HttpDataReference {
             long readable = readableBytes(data);
             long offset = position.getAndUpdate(p -> readable);
             int length = (int) (readable - offset);
+            if (length == 0) {
+                return null;
+            }
             component = new Component(length, offset);
             components.add(component);
         } catch (IOException e) {
@@ -127,7 +130,12 @@ public class HttpDataReference {
 
     private long readableBytes(HttpData httpData) throws IOException {
         if (httpData.isInMemory()) {
-            return httpData.getByteBuf().readableBytes();
+            ByteBuf byteBuf = httpData.getByteBuf();
+            if (byteBuf != null) {
+                return byteBuf.readableBytes();
+            } else {
+                return 0;
+            }
         } else {
             return httpData.length();
         }
