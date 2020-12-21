@@ -11,7 +11,7 @@ NOTE: At the end of processing if the result is still api:core.bind.ArgumentBind
 
 Key interfaces are:
 
-=== AnnotatedRequestArgumentBinders
+=== AnnotatedRequestArgumentBinder
 
 Argument binders that bind based on the presence of an annotation must implement api:http.bind.binders.AnnotatedRequestArgumentBinder[AnnotatedRequestArgumentBinder], and can be used by creating an annotation that is annotated with api:io.micronaut.core.bind.annotation.Bindable[@Bindable]. For example:
 
@@ -32,7 +32,7 @@ snippet::io.micronaut.docs.http.server.bind.annotation.ShoppingCartController[ta
 
 <1> The parameter will be bound with the binder associated with MyBindingAnnotation. This will take precedence over a type-based binder, if applicable.
 
-=== TypedRequestArgumentBinders
+=== TypedRequestArgumentBinder
 
 Argument binders that bind based on the type of the argument must implement api:http.bind.binders.TypedRequestArgumentBinder[TypedRequestArgumentBinder]. For example, given this class:
 
