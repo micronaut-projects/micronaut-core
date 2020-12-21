@@ -18,7 +18,6 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -119,10 +118,11 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                     continue;
                 }
                 AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement);
+                JavaParameterElement javaParameterElement = new JavaParameterElement(declaringClass, variableElement, annotationMetadata, visitorContext);
                 if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
-                    annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, "javax.annotation.Nullable", Collections.emptyMap());
+                    javaParameterElement.annotate("javax.annotation.Nullable").getAnnotationMetadata();
                 }
-                elts.add(new JavaParameterElement(declaringClass, variableElement, annotationMetadata, visitorContext));
+                elts.add(javaParameterElement);
             }
             this.parameters = elts.toArray(new ParameterElement[0]);
         }

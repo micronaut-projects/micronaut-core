@@ -42,6 +42,7 @@ interface MyInterface{
         then:
         !beanDefinition.isAbstract()
         beanDefinition != null
+        beanDefinition.hasAnnotation(IntroAnn)
         beanDefinition.getRequiredMethod("save", String, int).hasAnnotation(RuntimeAnn)
         beanDefinition.getRequiredMethod("saveTwo", String).hasAnnotation(RuntimeAnn)
     }
@@ -148,6 +149,8 @@ class Test {
                     builder.member("foo", "bar")
                     builder.member("isolating", "true")
                 }
+            } else {
+                element.annotate(IntroAnn)
             }
 
             if (element.hasStereotype(Introspected)) {
@@ -202,4 +205,7 @@ class Test {
 @Retention(RetentionPolicy.RUNTIME)
 @interface RuntimeAnn {
     String foo() default ""
+}
+@Retention(RetentionPolicy.RUNTIME)
+@interface IntroAnn {
 }
