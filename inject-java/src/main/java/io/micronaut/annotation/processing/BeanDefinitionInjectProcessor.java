@@ -1645,10 +1645,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 JavaClassElement declaringClassElement = new JavaClassElement(declaringClass, concreteClassMetadata, visitorContext);
                 JavaFieldElement javaFieldElement = new JavaFieldElement(variable, fieldAnnotationMetadata, visitorContext);
-                if (fieldAnnotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
-                    fieldAnnotationMetadata = javaFieldElement.annotate("javax.annotation.Nullable").getAnnotationMetadata();
-                }
-
                 addOriginatingElementIfNecessary(writer, declaringClass);
 
                 boolean isPrivate = javaFieldElement.isPrivate();
@@ -2172,9 +2168,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
                     }
                 };
-                if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
-                    annotationMetadata = parameterElement.annotate("javax.annotation.Nullable");
-                }
 
                 if (annotationMetadata.hasStereotype(ANN_CONSTRAINT)) {
                     params.setValidated(true);

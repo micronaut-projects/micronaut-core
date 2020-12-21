@@ -4,12 +4,18 @@ dependencies {
 
     api project(":router")
     api project(":runtime")
-    compileOnly dependencyModuleVersion("micronaut.sql", "micronaut-jdbc")
+    compileOnly dependencyModuleVersion("micronaut.sql", "micronaut-jdbc"), {
+        exclude module:'micronaut-inject'
+        exclude module:'micronaut-bom'
+    }
 
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")
-    testImplementation dependencyModuleVersion("micronaut.sql", "micronaut-jdbc-tomcat")
+    testImplementation dependencyModuleVersion("micronaut.sql", "micronaut-jdbc-tomcat"), {
+        exclude module:'micronaut-inject'
+        exclude module:'micronaut-bom'
+    }
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation dependencyVersion("h2")
     testImplementation "mysql:mysql-connector-java:8.0.22"
