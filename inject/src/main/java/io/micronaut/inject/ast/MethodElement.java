@@ -48,6 +48,15 @@ public interface MethodElement extends MemberElement {
     }
 
     /**
+     * Is the method a default method on an interfaces.
+     * @return True if it is.
+     * @since 2.3.0
+     */
+    default boolean isDefault() {
+        return false;
+    }
+
+    /**
      * The generic return type of the method.
      *
      * @return The return type of the method

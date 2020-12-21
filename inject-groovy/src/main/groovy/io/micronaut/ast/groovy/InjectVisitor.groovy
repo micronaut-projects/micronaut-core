@@ -1314,6 +1314,12 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
             boolean isProvider = providerGenericType != null
             AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)
+            GroovyClassElement groovyClassElement = new GroovyClassElement(
+                    sourceUnit,
+                    compilationUnit,
+                    classNode,
+                    annotationMetadata
+            )
 
             if (annotationMetadata.hasStereotype(Singleton)) {
                 addError("Class annotated with groovy.lang.Singleton instead of javax.inject.Singleton. Import javax.inject.Singleton to use Micronaut Dependency Injection.", classNode)
@@ -1353,13 +1359,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             visitTypeArguments(classNode, (BeanDefinitionWriter) beanWriter)
 
             beanDefinitionWriters.put(classNode, beanWriter)
-
-            GroovyClassElement groovyClassElement = new GroovyClassElement(
-                    sourceUnit,
-                    compilationUnit,
-                    classNode,
-                    annotationMetadata
-            )
 
             GroovyMethodElement constructor = groovyClassElement.getPrimaryConstructor().orElse(null) as GroovyMethodElement
 

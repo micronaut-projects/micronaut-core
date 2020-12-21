@@ -51,6 +51,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     private final JavaVisitorContext visitorContext;
     private final JavaClassElement declaringClass;
     private boolean suspend;
+    private JavaClassElement resolvedDeclaringClass;
     private ParameterElement[] parameters;
     private ClassElement genericReturnType;
     private ClassElement returnType;
@@ -70,6 +71,11 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         this.executableElement = executableElement;
         this.visitorContext = visitorContext;
         this.declaringClass = declaringClass;
+    }
+
+    @Override
+    public boolean isDefault() {
+        return executableElement.isDefault();
     }
 
     @NonNull
@@ -125,22 +131,26 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
 
     @Override
     public ClassElement getDeclaringType() {
-        Element enclosingElement = executableElement.getEnclosingElement();
-        if (enclosingElement instanceof TypeElement) {
-            TypeElement te = (TypeElement) enclosingElement;
-            if (declaringClass.getName().equals(te.getQualifiedName().toString())) {
-                return declaringClass;
+        if (resolvedDeclaringClass == null) {
+
+            Element enclosingElement = executableElement.getEnclosingElement();
+            if (enclosingElement instanceof TypeElement) {
+                TypeElement te = (TypeElement) enclosingElement;
+                if (declaringClass.getName().equals(te.getQualifiedName().toString())) {
+                    resolvedDeclaringClass = declaringClass;
+                } else {
+                    resolvedDeclaringClass = new JavaClassElement(
+                            te,
+                            visitorContext.getAnnotationUtils().getAnnotationMetadata(te),
+                            visitorContext,
+                            declaringClass.getGenericTypeInfo()
+                    );
+                }
             } else {
-                return new JavaClassElement(
-                        te,
-                        visitorContext.getAnnotationUtils().getAnnotationMetadata(te),
-                        visitorContext,
-                        declaringClass.getGenericTypeInfo()
-                );
+                return declaringClass;
             }
-        } else {
-            return declaringClass;
         }
+        return resolvedDeclaringClass;
     }
 
     @Override
