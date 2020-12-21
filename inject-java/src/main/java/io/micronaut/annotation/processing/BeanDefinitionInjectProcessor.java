@@ -668,23 +668,20 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                         docComment,
                                         annotationMetadata.stringValue(Bindable.class, "defaultValue").orElse(null)
                                 );
-                                annotationMetadata = addPropertyMetadata(
+                                addPropertyMetadata(
                                         javaMethodElement,
                                         propertyMetadata
                                 );
 
-                                final AnnotationValueBuilder<Annotation> builder = io.micronaut.core.annotation.AnnotationValue.builder(ANN_CONFIGURATION_ADVICE);
-                                if (!javaMethodElement.getReturnType().isPrimitive() && javaMethodElement.getReturnType().hasStereotype(Scope.class)) {
-                                    builder.member("bean", true);
-                                }
-                                if (typeAnnotationMetadata.hasStereotype(EachProperty.class)) {
-                                    builder.member("iterable", true);
-                                }
+                                annotationMetadata = javaMethodElement.annotate(ANN_CONFIGURATION_ADVICE, (annBuilder) -> {
+                                    if (!javaMethodElement.getReturnType().isPrimitive() && javaMethodElement.getReturnType().hasStereotype(Scope.class)) {
+                                        annBuilder.member("bean", true);
+                                    }
+                                    if (typeAnnotationMetadata.hasStereotype(EachProperty.class)) {
+                                        annBuilder.member("iterable", true);
+                                    }
 
-                                final JavaAnnotationMetadataBuilder metadataBuilder = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder();
-                                annotationMetadata = metadataBuilder.annotate(
-                                        annotationMetadata,
-                                        builder.build());
+                                }).getAnnotationMetadata();
                             }
                         }
 
