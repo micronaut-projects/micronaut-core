@@ -918,9 +918,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             if (!executorMethodAdded) {
                 getBeanWriter().visitExecutableMethod(
                         declaringElement,
-                        methodElement.returnType,
-                        methodElement.genericReturnType,
-                        methodName,
+                        methodElement,
                         paramsToType,
                         genericParams,
                         argumentAnnotationMetadata,

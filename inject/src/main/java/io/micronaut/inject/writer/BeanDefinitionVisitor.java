@@ -17,10 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.*;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
 
@@ -304,10 +301,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      *
      * @param declaringType              The declaring type of the method. Either a Class or a string representing the
      *                                   name of the type
-     * @param returnType                 The return type of the method. Either a Class or a string representing the name
-     *                                   of the type
-     * @param genericReturnType          The generic return type
-     * @param methodName                 The method name
+     * @param methodElement              The method element
      * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap.
      *                                   Can be null or empty.
      * @param genericArgumentTypes       The generic argument types. Note: an ordered map should be used such as LinkedHashMap.
@@ -319,9 +313,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @return The {@link ExecutableMethodWriter}.
      */
     ExecutableMethodWriter visitExecutableMethod(TypedElement declaringType,
-                                                 ClassElement returnType,
-                                                 ClassElement genericReturnType,
-                                                 String methodName,
+                                                 MethodElement methodElement,
                                                  Map<String, ParameterElement> argumentTypes,
                                                  Map<String, ClassElement> genericArgumentTypes,
                                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,

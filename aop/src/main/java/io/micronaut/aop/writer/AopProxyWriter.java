@@ -1110,9 +1110,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public ExecutableMethodWriter visitExecutableMethod(
             TypedElement declaringType,
-            ClassElement returnType,
-            ClassElement genericReturnType,
-            String methodName,
+            MethodElement methodElement,
             Map<String, ParameterElement> argumentTypes,
             Map<String, ClassElement> genericArgumentTypes,
             Map<String, AnnotationMetadata> argumentAnnotationMetadata,
@@ -1122,9 +1120,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitExecutableMethod(
                         declaringType,
-                        returnType,
-                        genericReturnType,
-                        methodName,
+                        methodElement,
                         argumentTypes,
                         genericArgumentTypes,
                         argumentAnnotationMetadata,

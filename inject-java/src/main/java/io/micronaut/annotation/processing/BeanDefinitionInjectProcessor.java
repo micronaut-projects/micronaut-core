@@ -1089,9 +1089,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         beanMethodWriter.visitExecutableMethod(
                                 declaringClassElement,
-                                executableMethod.getReturnType(),
-                                executableMethod.getGenericReturnType(),
-                                methodName,
+                                executableMethod,
                                 methodParameters,
                                 genericParameters,
                                 methodQualifier,
@@ -1208,9 +1206,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 addOriginatingElementIfNecessary(beanWriter, declaringClass);
                                 beanWriter.visitExecutableMethod(
                                         declaringClassElement,
-                                        javaMethodElement.getReturnType(),
-                                        javaMethodElement.getReturnType().getGenericType(),
-                                        method.getSimpleName().toString(),
+                                        javaMethodElement,
                                         params.getParameters(),
                                         params.getGenericParameterTypes(),
                                         params.getParameterMetadata(),
@@ -1245,9 +1241,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 addOriginatingElementIfNecessary(beanWriter, declaringClass);
                 beanWriter.visitExecutableMethod(
                         declaringClassElement,
-                        javaMethodElement.getReturnType(),
-                        javaMethodElement.getGenericReturnType(),
-                        method.getSimpleName().toString(),
+                        javaMethodElement,
                         params.getParameters(),
                         params.getGenericParameterTypes(),
                         params.getParameterMetadata(),

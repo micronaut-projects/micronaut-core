@@ -986,9 +986,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public ExecutableMethodWriter visitExecutableMethod(TypedElement declaringType,
-                                                        ClassElement returnType,
-                                                        ClassElement genericReturnType,
-                                                        String methodName,
+                                                        MethodElement methodElement,
                                                         Map<String, ParameterElement> argumentTypes,
                                                         Map<String, ClassElement> genericArgumentTypes,
                                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
@@ -998,9 +996,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         return visitExecutableMethod(
                 declaringType,
-                returnType,
-                genericReturnType,
-                methodName,
+                methodElement.getReturnType(),
+                methodElement.getGenericReturnType(),
+                methodElement.getName(),
                 argumentTypes,
                 genericArgumentTypes,
                 argumentAnnotationMetadata,
@@ -2365,7 +2363,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         String beanTypeInternalName = getInternalName(typeParameter);
         // visit BeanFactory interface
-        for (Class interfaceType : interfaceTypes) {
+        for (Class<?> interfaceType : interfaceTypes) {
 
             SignatureVisitor bfi = sv.visitInterface();
             bfi.visitClassType(Type.getInternalName(interfaceType));
@@ -2374,7 +2372,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             iisv.visitEnd();
             bfi.visitEnd();
         }
-//        sv.visitEnd();
         return sv.toString();
     }
 
