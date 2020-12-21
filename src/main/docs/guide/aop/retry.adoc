@@ -46,11 +46,11 @@ snippet::io.micronaut.docs.aop.retry.BookService[tags="circuit", indent=0, title
 
 The above example will retry to `findBooks` method 3 times and then open the circuit for 30 seconds, rethrowing the original exception and preventing potential downstream traffic such as HTTP requests and I/O operations flooding the system.
 
-== Bean Creation Retry
+== Factory Bean Retry
 
-As mentioned previously, `@Retryable` advice is integrated right at the container level. This is useful as it is common problem in Microservices and environments like Docker where there may be a delay in services becoming available.
+When ann:retry.annotation.Retryable[] is applied to bean factory methods, it will behave as if the annotation was placed on the type being returned. When the methods on the returned object get invoked, the retry behavior will apply at that time. Note that the bean factory method itself will *not* be retried. If you would like the functionality of creating the bean to be retried, it should be delegated to another singleton that has the ann:retry.annotation.Retryable[] annotation applied.
 
-The following snippet is taken from the Neo4j driver support and demonstrates how bean creation can be wrapped in retry support:
+For example:
 
 [source,java]
 ----
@@ -66,8 +66,7 @@ public class Neo4jDriverFactory {
 ----
 
 <1> A factory bean is created that defines methods that create beans
-<2> The `@Retryable` annotation is used to catch `ServiceUnavailableException` and retry creating the driver before failing startup.
-
+<2> The ann:retry.annotation.Retryable[] annotation is used to catch exceptions thrown from methods executed on the `Driver`.
 
 == Retry Events
 
