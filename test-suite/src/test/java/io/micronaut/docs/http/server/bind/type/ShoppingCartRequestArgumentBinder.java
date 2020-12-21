@@ -1,4 +1,4 @@
-package io.micronaut.docs.http.bind.binders;
+package io.micronaut.docs.http.server.bind.type;
 
 // tag::class[]
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -12,11 +12,11 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 @Singleton
-public class MyBoundBeanTypedRequestArgumentBinder implements TypedRequestArgumentBinder<ShoppingCart> {
+public class ShoppingCartRequestArgumentBinder implements TypedRequestArgumentBinder<ShoppingCart> {
 
     private final JacksonObjectSerializer objectSerializer;
 
-    public MyBoundBeanTypedRequestArgumentBinder(JacksonObjectSerializer objectSerializer) {
+    public ShoppingCartRequestArgumentBinder(JacksonObjectSerializer objectSerializer) {
         this.objectSerializer = objectSerializer;
     }
 

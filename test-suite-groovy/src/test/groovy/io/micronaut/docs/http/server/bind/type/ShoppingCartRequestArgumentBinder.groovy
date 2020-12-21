@@ -1,4 +1,4 @@
-package io.micronaut.docs.http.bind.binders
+package io.micronaut.docs.http.server.bind.type
 // tag::class[]
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
@@ -10,12 +10,12 @@ import io.micronaut.jackson.serialize.JacksonObjectSerializer
 import javax.inject.Singleton
 
 @Singleton
-class MyBoundBeanTypedRequestArgumentBinder implements TypedRequestArgumentBinder<ShoppingCart> {
+class ShoppingCartRequestArgumentBinder implements TypedRequestArgumentBinder<ShoppingCart> {
 
     private final JacksonObjectSerializer objectSerializer
 
-    MyBoundBeanTypedRequestArgumentBinder(JacksonObjectSerializer objectSerializer) {
-        this.objectSerializer = objectSerializer;
+    ShoppingCartRequestArgumentBinder(JacksonObjectSerializer objectSerializer) {
+        this.objectSerializer = objectSerializer
     }
 
     @Override
@@ -26,15 +26,15 @@ class MyBoundBeanTypedRequestArgumentBinder implements TypedRequestArgumentBinde
         if (cookie != null) {
             return () -> objectSerializer.deserialize( //<2>
                     cookie.getValue().getBytes(),
-                    ShoppingCart.class)
+                    ShoppingCart)
         }
 
-        return Optional::empty
+        return BindingResult.EMPTY
     }
 
     @Override
     Argument<ShoppingCart> argumentType() {
-        return Argument.of(ShoppingCart.class) //<3>
+        Argument.of(ShoppingCart) //<3>
     }
 }
 // end::class[]

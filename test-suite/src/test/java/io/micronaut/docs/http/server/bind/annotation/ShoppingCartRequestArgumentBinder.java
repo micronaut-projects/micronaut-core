@@ -1,4 +1,4 @@
-package io.micronaut.docs.http.bind.binders;
+package io.micronaut.docs.http.server.bind.annotation;
 
 // tag::class[]
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -14,19 +14,19 @@ import java.util.Map;
 import java.util.Optional;
 
 @Singleton
-public class MyAnnotatedRequestArgumentBinder implements AnnotatedRequestArgumentBinder<MyBindingAnnotation, Object> { //<1>
+public class ShoppingCartRequestArgumentBinder implements AnnotatedRequestArgumentBinder<ShoppingCart, Object> { //<1>
 
     private final ConversionService<?> conversionService;
     private final JacksonObjectSerializer objectSerializer;
 
-    public MyAnnotatedRequestArgumentBinder(ConversionService<?> conversionService, JacksonObjectSerializer objectSerializer) {
+    public ShoppingCartRequestArgumentBinder(ConversionService<?> conversionService, JacksonObjectSerializer objectSerializer) {
         this.conversionService = conversionService;
         this.objectSerializer = objectSerializer;
     }
 
     @Override
-    public Class<MyBindingAnnotation> getAnnotationType() {
-        return MyBindingAnnotation.class;
+    public Class<ShoppingCart> getAnnotationType() {
+        return ShoppingCart.class;
     }
 
     @Override
@@ -35,15 +35,13 @@ public class MyAnnotatedRequestArgumentBinder implements AnnotatedRequestArgumen
             HttpRequest<?> source) { //<2>
 
         String parameterName = context.getAnnotationMetadata()
-                .stringValue(MyBindingAnnotation.class)
+                .stringValue(ShoppingCart.class)
                 .orElse(context.getArgument().getName());
 
         Cookie cookie = source.getCookies().get("shoppingCart");
 
         if (cookie != null) {
-            Optional<Map<String, Object>> cookieValue;
-
-            cookieValue = objectSerializer.deserialize(
+            Optional<Map<String, Object>> cookieValue = objectSerializer.deserialize(
                     cookie.getValue().getBytes(),
                     Argument.mapOf(String.class, Object.class));
 
@@ -57,5 +55,4 @@ public class MyAnnotatedRequestArgumentBinder implements AnnotatedRequestArgumen
         return BindingResult.EMPTY;
     }
 }
-
 // end::class[]

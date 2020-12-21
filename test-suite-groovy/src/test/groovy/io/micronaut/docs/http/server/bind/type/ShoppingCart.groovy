@@ -1,11 +1,11 @@
-package io.micronaut.docs.http.bind.binders
+package io.micronaut.docs.http.server.bind.type
 
 // tag::class[]
 import io.micronaut.core.annotation.Introspected
 
 @Introspected
 class ShoppingCart {
-    var sessionId: String? = null
-    var total: Int? = null
+    String sessionId
+    Integer total
 }
 // end::class[]

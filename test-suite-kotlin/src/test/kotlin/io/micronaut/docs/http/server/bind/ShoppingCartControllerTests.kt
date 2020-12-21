@@ -1,4 +1,4 @@
-package io.micronaut.docs.http.bind.binders
+package io.micronaut.docs.http.server.bind
 
 import io.kotlintest.shouldBe
 import io.kotlintest.shouldNotBe
@@ -12,7 +12,7 @@ import io.micronaut.http.cookie.Cookie
 import io.micronaut.runtime.server.EmbeddedServer
 import org.junit.jupiter.api.Assertions
 
-class MyBoundBeanControllerTest: StringSpec(){
+class ShoppingCartControllerTest: StringSpec(){
 
     val embeddedServer = autoClose(
             ApplicationContext.run(EmbeddedServer::class.java)
@@ -22,24 +22,23 @@ class MyBoundBeanControllerTest: StringSpec(){
             embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
     )
 
-
     init {
         "test binding bad credentials" {
             val request: HttpRequest<*> = HttpRequest.GET<Any>("/customBinding/annotated")
-                    .cookies(setOf(Cookie.of("shoppingCart", "{}")))
+                    .cookie(Cookie.of("shoppingCart", "{}"))
 
             val responseException = Assertions.assertThrows(HttpClientResponseException::class.java) {
                 client.toBlocking().retrieve(request)
             }
 
             responseException shouldNotBe null
-            responseException.message shouldBe "Required MyBindingAnnotation [sessionId] not specified"
+            responseException.message shouldBe "Required ShoppingCart [sessionId] not specified"
 
         }
 
         "test annotation binding" {
             val request: HttpRequest<*> = HttpRequest.GET<Any>("/customBinding/annotated")
-                    .cookies(setOf(Cookie.of("shoppingCart", "{\"sessionId\":5}")))
+                    .cookie(Cookie.of("shoppingCart", "{\"sessionId\":5}"))
             val response: String = client.toBlocking().retrieve(request, String::class.java)
 
             response shouldNotBe null
@@ -48,12 +47,12 @@ class MyBoundBeanControllerTest: StringSpec(){
 
         "test typed binding" {
             val request: HttpRequest<*> = HttpRequest.GET<Any>("/customBinding/typed")
-                    .cookies(setOf(Cookie.of("shoppingCart", "{\"sessionId\": 5, \"total\": 20}")))
-            val body: Map<String, String> = client.toBlocking().retrieve(request, Argument.mapOf(String::class.java, String::class.java))
+                    .cookie(Cookie.of("shoppingCart", "{\"sessionId\": 5, \"total\": 20}"))
+            val body: Map<String, Any> = client.toBlocking().retrieve(request, Argument.mapOf(String::class.java, Any::class.java))
 
             body shouldNotBe null
             body["sessionId"] shouldBe "5"
-            body["total"] shouldBe "20"
+            body["total"] shouldBe 20
         }
     }
 }

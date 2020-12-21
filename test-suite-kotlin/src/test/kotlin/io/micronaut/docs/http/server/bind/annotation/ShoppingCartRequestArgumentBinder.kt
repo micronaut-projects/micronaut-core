@@ -1,4 +1,4 @@
-package io.micronaut.docs.http.bind.binders
+package io.micronaut.docs.http.server.bind.annotation
 // tag::class[]
 import io.micronaut.core.bind.ArgumentBinder.BindingResult
 import io.micronaut.core.convert.ArgumentConversionContext
@@ -11,24 +11,24 @@ import java.util.*
 import javax.inject.Singleton
 
 @Singleton
-class MyAnnotatedRequestArgumentBinder(
+class ShoppingCartRequestArgumentBinder(
         private val conversionService: ConversionService<*>,
         private val objectSerializer: JacksonObjectSerializer
-) : AnnotatedRequestArgumentBinder<MyBindingAnnotation, Any?> { //<1>
+) : AnnotatedRequestArgumentBinder<ShoppingCart, Any> { //<1>
 
-    override fun getAnnotationType(): Class<MyBindingAnnotation> {
-        return MyBindingAnnotation::class.java
+    override fun getAnnotationType(): Class<ShoppingCart> {
+        return ShoppingCart::class.java
     }
 
-    override fun bind(context: ArgumentConversionContext<Any?>?, source: HttpRequest<*>?): BindingResult<Any?> { //<2>
+    override fun bind(context: ArgumentConversionContext<Any>, source: HttpRequest<*>): BindingResult<Any> { //<2>
 
-        val parameterName = context?.annotationMetadata
-            ?.stringValue(MyBindingAnnotation::class.java)
-            ?.orElse(context.argument?.name)
+        val parameterName = context.annotationMetadata
+            .stringValue(ShoppingCart::class.java)
+            .orElse(context.argument.name)
 
-        val cookie = source?.cookies?.get("shoppingCart")
+        val cookie = source.cookies.get("shoppingCart")
+
         if (cookie != null) {
-
             val cookieValue: Optional<Map<String, Any>> = objectSerializer.deserialize(
                     cookie.value.toByteArray(),
                     Argument.mapOf(String::class.java, Any::class.java))

@@ -1,4 +1,4 @@
-package io.micronaut.docs.http.bind.binders
+package io.micronaut.docs.http.server.bind.annotation
 // tag::class[]
 import groovy.transform.CompileStatic
 import io.micronaut.core.convert.ArgumentConversionContext
@@ -13,12 +13,12 @@ import javax.inject.Singleton
 
 @CompileStatic
 @Singleton
-class MyAnnotatedRequestArgumentBinder implements AnnotatedRequestArgumentBinder<MyBindingAnnotation, Object> { //<1>
+class ShoppingCartRequestArgumentBinder implements AnnotatedRequestArgumentBinder<ShoppingCart, Object> { //<1>
 
     private final ConversionService<?> conversionService
     private final JacksonObjectSerializer objectSerializer
 
-    MyAnnotatedRequestArgumentBinder(
+    ShoppingCartRequestArgumentBinder(
             ConversionService<?> conversionService,
             JacksonObjectSerializer objectSerializer) {
         this.conversionService = conversionService
@@ -26,8 +26,8 @@ class MyAnnotatedRequestArgumentBinder implements AnnotatedRequestArgumentBinder
     }
 
     @Override
-    Class<MyBindingAnnotation> getAnnotationType() {
-        return MyBindingAnnotation.class
+    Class<ShoppingCart> getAnnotationType() {
+        return ShoppingCart.class
     }
 
     @Override
@@ -36,27 +36,20 @@ class MyAnnotatedRequestArgumentBinder implements AnnotatedRequestArgumentBinder
             HttpRequest<?> source) { //<2>
 
         String parameterName = context.annotationMetadata
-                .stringValue(MyBindingAnnotation)
+                .stringValue(ShoppingCart)
                 .orElse(context.argument.name)
 
         Cookie cookie = source.cookies.get("shoppingCart")
 
         if (cookie != null) {
-            Optional<Map<String, Object>> cookieValue
-
-            cookieValue = objectSerializer.deserialize(
+            Optional<Map<String, Object>> cookieValue = objectSerializer.deserialize(
                     cookie.value.bytes,
                     Argument.mapOf(String, Object))
 
-            if(cookieValue.isPresent()) {
-                Optional<Object> value = conversionService.convert(cookieValue.get().get(parameterName), context)
-
-                return new BindingResult<Object>() {
-                    @Override
-                    Optional<Object> getValue() {
-                        return value
-                    }
-                }
+            return (BindingResult) { ->
+                cookieValue.flatMap({value ->
+                    conversionService.convert(value.get(parameterName), context)
+                })
             }
         }
 
