@@ -224,6 +224,30 @@ class DefaultHttpHostSpec extends Specification {
         server.close()
     }
 
+    void "test host with port retrieved from forwarded"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
+        def request = Stub(HttpRequest) {
+            getHeaders() >> new MockHttpHeaders([
+                    "Forwarded": ["for=\"34.202.241.227\", for=10.32.108.32",
+                                  "host=\"micronaut:5000\";proto=https"],
+                    "X-Forwarded-Host": ["overridden"],
+                    "X-Forwarded-Proto": ["overridden"],
+                    "X-Forwarded-Port": ["overridden"]
+            ])
+            getUri() >> new URI("http://localhost:8080")
+        }
+
+        when:
+        String host = hostResolver.resolve(request)
+
+        then:
+        host == "https://micronaut:5000"
+
+        cleanup:
+        server.close()
+    }
+
     void "test host retrieved from x-forwarded"() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
@@ -366,6 +390,26 @@ class DefaultHttpHostSpec extends Specification {
 
         then:
         host == "http://localhost:${server.getPort()}"
+
+        cleanup:
+        server.close()
+    }
+
+    void "test multiple forwarded in the same header"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
+        def request = Stub(HttpRequest) {
+            getHeaders() >> new MockHttpHeaders([
+                    "Forwarded": ["for=192.168.0.55;proto=https;host=example.com,for=172.19.0.1;proto=http"],
+            ])
+            getUri() >> new URI("http://localhost:8080")
+        }
+
+        when:
+        String host = hostResolver.resolve(request)
+
+        then:
+        host == "https://example.com"
 
         cleanup:
         server.close()
