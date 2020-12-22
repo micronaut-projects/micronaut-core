@@ -57,28 +57,24 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @NonNull
     @Override
     public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
-        //noinspection unchecked
         return Collections.emptyList();
     }
 
     @NonNull
     @Override
     public Set<String> getAnnotationNames() {
-        //noinspection unchecked
         return Collections.emptySet();
     }
 
     @NonNull
     @Override
     public Set<String> getDeclaredAnnotationNames() {
-        //noinspection unchecked
         return Collections.emptySet();
     }
 
     @NonNull
     @Override
     public List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
-        //noinspection unchecked
         return Collections.emptyList();
     }
 
@@ -97,14 +93,12 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @NonNull
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@NonNull Class<T> annotationType) {
-        //noinspection unchecked
         return Collections.emptyList();
     }
 
     @NonNull
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@NonNull Class<T> annotationType) {
-        //noinspection unchecked
         return Collections.emptyList();
     }
 
@@ -234,14 +228,12 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @NonNull
     @Override
     public List<String> getAnnotationNamesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
-        //noinspection unchecked
         return Collections.emptyList();
     }
 
     @NonNull
     @Override
     public List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
-        //noinspection unchecked
         return Collections.emptyList();
     }
 

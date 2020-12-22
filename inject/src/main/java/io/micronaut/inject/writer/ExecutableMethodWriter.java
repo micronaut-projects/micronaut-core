@@ -25,6 +25,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import org.objectweb.asm.ClassWriter;
@@ -37,11 +38,7 @@ import org.objectweb.asm.commons.Method;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Writes out {@link io.micronaut.inject.ExecutableMethod} implementations.
@@ -163,23 +160,14 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * Write the method.
      *
      * @param declaringType              The declaring type
-     * @param returnType                 The return type
-     * @param genericReturnType          The generic return type
-     * @param methodName                 The method name
-     * @param argumentTypes              The argument types
-     * @param genericArgumentTypes       The generic argument types
-     * @param argumentAnnotationMetadata The argument annotation metadata
+     * @param methodElement              The method element
      */
     public void visitMethod(TypedElement declaringType,
-                            ClassElement returnType,
-                            ClassElement genericReturnType,
-                            String methodName,
-                            Map<String, ParameterElement> argumentTypes,
-                            Map<String, ClassElement> genericArgumentTypes,
-                            Map<String, AnnotationMetadata> argumentAnnotationMetadata) {
+                            MethodElement methodElement) {
+        String methodName = methodElement.getName();
+        List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
         Type declaringTypeObject = getTypeReference(declaringType);
         boolean hasArgs = !argumentTypes.isEmpty();
-        Collection<ParameterElement> argumentTypeClasses = hasArgs ? argumentTypes.values() : Collections.emptyList();
 
         classWriter.visit(V1_8, ACC_SYNTHETIC,
                 internalName,
@@ -245,6 +233,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         constructorWriter.push(methodName);
 
         // 3rd argument the generic return type
+        ClassElement genericReturnType = methodElement.getGenericReturnType();
         if (genericReturnType.isPrimitive() && !genericReturnType.isArray()) {
             String constantName = genericReturnType.getName().toUpperCase(Locale.ENGLISH);
 
@@ -268,19 +257,28 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
         if (hasArgs) {
             // 4th argument: the generic types
+            Map<String, ParameterElement> params = new LinkedHashMap<>(argumentTypes.size());
+            Map<String, AnnotationMetadata> anns = new LinkedHashMap<>(argumentTypes.size());
+            Map<String, ClassElement> generics = new LinkedHashMap<>(argumentTypes.size());
+            for (ParameterElement argumentType : argumentTypes) {
+                String n = argumentType.getName();
+                params.put(n, argumentType);
+                anns.put(n, argumentType.getAnnotationMetadata());
+                generics.put(n, argumentType.getGenericType());
+            }
             pushBuildArgumentsForMethod(
                     methodType.getClassName(),
                     methodType,
                     classWriter,
                     constructorWriter,
-                    argumentTypes,
-                    argumentAnnotationMetadata,
-                    genericArgumentTypes,
+                    params,
+                    anns,
+                    generics,
                     loadTypeMethods
             );
 
-            for (AnnotationMetadata value : argumentAnnotationMetadata.values()) {
-                DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value);
+            for (ParameterElement pe : argumentTypes) {
+                DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, pe.getAnnotationMetadata());
             }
             // now invoke super(..) if no arg constructor
             invokeConstructor(
@@ -349,9 +347,10 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                 invokeDescriptor
         );
 
-        buildInvokeMethod(declaringTypeObject, methodName, returnType, argumentTypeClasses, invokeMethod);
+        ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
+        buildInvokeMethod(declaringTypeObject, methodName, returnType, argumentTypes, invokeMethod);
 
-        buildResolveTargetMethod(methodName, declaringTypeObject, hasArgs, argumentTypeClasses);
+        buildResolveTargetMethod(methodName, declaringTypeObject, hasArgs, argumentTypes);
 
         for (GeneratorAdapter method : loadTypeMethods.values()) {
             method.visitMaxs(3, 1);

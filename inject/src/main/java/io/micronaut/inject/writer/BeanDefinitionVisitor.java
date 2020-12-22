@@ -299,27 +299,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
     /**
      * Visit a method that is to be made executable allow invocation of said method without reflection.
      *
-     * @param declaringType              The declaring type of the method. Either a Class or a string representing the
-     *                                   name of the type
+     * @param declaringBean              The declaring bean of the method. Note this may differ from {@link MethodElement#getDeclaringType()} in the case of the method coming from a super class or interface.
      * @param methodElement              The method element
-     * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap.
-     *                                   Can be null or empty.
-     * @param genericArgumentTypes       The generic argument types. Note: an ordered map should be used such as LinkedHashMap.
-     *                                   Can be null or empty.
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param annotationMetadata         The annotation metadata for the method
-     * @param isInterface                If the method belongs to an interface
-     * @param isDefault                  If the method is a default method
      * @return The {@link ExecutableMethodWriter}.
      */
-    ExecutableMethodWriter visitExecutableMethod(TypedElement declaringType,
-                                                 MethodElement methodElement,
-                                                 Map<String, ParameterElement> argumentTypes,
-                                                 Map<String, ClassElement> genericArgumentTypes,
-                                                 Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                                 @Nullable AnnotationMetadata annotationMetadata,
-                                                 boolean isInterface,
-                                                 boolean isDefault);
+    ExecutableMethodWriter visitExecutableMethod(TypedElement declaringBean,
+                                                 MethodElement methodElement);
 
     /**
      * Visits a field injection point.

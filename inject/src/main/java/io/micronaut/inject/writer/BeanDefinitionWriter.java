@@ -985,28 +985,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public ExecutableMethodWriter visitExecutableMethod(TypedElement declaringType,
-                                                        MethodElement methodElement,
-                                                        Map<String, ParameterElement> argumentTypes,
-                                                        Map<String, ClassElement> genericArgumentTypes,
-                                                        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                                        AnnotationMetadata annotationMetadata,
-                                                        boolean isInterface,
-                                                        boolean isDefault) {
+    public ExecutableMethodWriter visitExecutableMethod(TypedElement declaringBean,
+                                                        MethodElement methodElement) {
 
         return visitExecutableMethod(
-                declaringType,
-                methodElement.getReturnType(),
-                methodElement.getGenericReturnType(),
-                methodElement.getName(),
-                argumentTypes,
-                genericArgumentTypes,
-                argumentAnnotationMetadata,
-                annotationMetadata,
-                isInterface && !isDefault,
-                isInterface,
-                isDefault,
-                null, null
+                declaringBean,
+                methodElement,
+                null,
+                null
         );
     }
 
@@ -1015,40 +1001,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      *
      * @param declaringType                    The declaring type of the method. Either a Class or a string representing the
      *                                         name of the type
-     * @param returnType                       The return type of the method. Either a Class or a string representing the name
-     *                                         of the type
-     * @param genericReturnType                The generic return type
-     * @param methodName                       The method name
-     * @param argumentTypes                    The argument types. Note: an ordered map should be used such as LinkedHashMap.
-     *                                         Can be null or empty.
-     * @param genericArgumentTypes             The generic argument types. Note: an ordered map should be used such as LinkedHashMap.
-     *                                         Can be null or empty.
-     * @param argumentAnnotationMetadata       The argument annotation metadata
-     * @param annotationMetadata               The annotation metadata for the method
-     * @param isAbstract                       If the method abstract
-     * @param isInterface                      If the method belongs to an interface
-     * @param isDefault                        If the method is a default method
+     * @param methodElement                    The method element
      * @param interceptedProxyClassName        The intercepted proxy class name
      * @param interceptedProxyBridgeMethodName The intercepted proxy bridge method name
      * @return The {@link ExecutableMethodWriter}.
      */
     public ExecutableMethodWriter visitExecutableMethod(TypedElement declaringType,
-                                                        ClassElement returnType,
-                                                        ClassElement genericReturnType,
-                                                        String methodName,
-                                                        Map<String, ParameterElement> argumentTypes,
-                                                        Map<String, ClassElement> genericArgumentTypes,
-                                                        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                                        AnnotationMetadata annotationMetadata,
-                                                        boolean isAbstract,
-                                                        boolean isInterface,
-                                                        boolean isDefault,
+                                                        MethodElement methodElement,
                                                         String interceptedProxyClassName,
                                                         String interceptedProxyBridgeMethodName) {
 
+        AnnotationMetadata annotationMetadata = methodElement.getAnnotationMetadata();
+        String methodName = methodElement.getName();
+        List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
         String methodKey = methodName +
                 "(" +
-                argumentTypes.values().stream()
+                argumentTypes.stream()
                         .map(p -> p.getType().getName())
                         .collect(Collectors.joining(",")) +
                 ")";
@@ -1061,17 +1029,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 this.annotationMetadata,
                 annotationMetadata
         );
-        if (argumentAnnotationMetadata != null) {
-            for (AnnotationMetadata metadata : argumentAnnotationMetadata.values()) {
-                DefaultAnnotationMetadata.contributeDefaults(
-                        this.annotationMetadata,
-                        metadata
-                );
-            }
+        for (ParameterElement parameterElement : argumentTypes) {
+            DefaultAnnotationMetadata.contributeDefaults(
+                    this.annotationMetadata,
+                    parameterElement.getAnnotationMetadata()
+            );
         }
         String methodProxyShortName = "$exec" + ++methodExecutorIndex;
         String methodExecutorClassName = beanDefinitionName + "$" + methodProxyShortName;
-        ParameterElement last = CollectionUtils.last(argumentTypes.values());
+        ParameterElement last = CollectionUtils.last(argumentTypes);
         boolean isSuspend = last != null && "kotlin.coroutines.Continuation".equals(last.getType().getName());
 
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
@@ -1081,11 +1047,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             );
         }
 
+        boolean isInterface = declaringType.getType().isInterface();
         ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
                 methodExecutorClassName,
                 this.isInterface || isInterface,
-                isAbstract,
-                isDefault,
+                (isInterface && !methodElement.isDefault()) || methodElement.isAbstract(),
+                methodElement.isDefault(),
                 isSuspend,
                 this,
                 annotationMetadata,
@@ -1095,12 +1062,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         executableMethodWriter.visitMethod(
                 declaringType,
-                isSuspend ? ClassElement.of(Object.class) : returnType,
-                genericReturnType,
-                methodName,
-                argumentTypes,
-                genericArgumentTypes,
-                argumentAnnotationMetadata
+                methodElement
         );
 
         methodExecutors.put(methodKey, executableMethodWriter);

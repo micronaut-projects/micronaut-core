@@ -39,6 +39,15 @@ public interface MethodElement extends MemberElement {
     ParameterElement[] getParameters();
 
     /**
+     * If {@link #isSuspend()} returns true this method exposes the continuation parameter in addition to the other parameters of the method.
+     * @return The suspend parameters
+     * @since 2.3.0
+     */
+    default ParameterElement[] getSuspendParameters() {
+        return getParameters();
+    }
+
+    /**
      * Is the method a Kotlin suspend function.
      * @return True if it is.
      * @since 2.3.0

@@ -539,16 +539,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             BeanDefinitionWriter beanDefinitionWriter = parentWriter == null ? proxyBeanDefinitionWriter : parentWriter;
             ExecutableMethodWriter executableMethodWriter = beanDefinitionWriter.visitExecutableMethod(
                     declaringType,
-                    returnType,
-                    methodElement.getGenericReturnType(),
-                    methodName,
-                    argumentTypes,
-                    genericParameters,
-                    argumentAnnotationMetadata,
-                    annotationMetadata,
-                    isAbstract,
-                    isInterface,
-                    isDefault,
+                    methodElement,
                     interceptedProxyClassName,
                     interceptedProxyBridgeMethodName
             );
@@ -1109,24 +1100,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     @Override
     public ExecutableMethodWriter visitExecutableMethod(
-            TypedElement declaringType,
-            MethodElement methodElement,
-            Map<String, ParameterElement> argumentTypes,
-            Map<String, ClassElement> genericArgumentTypes,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            AnnotationMetadata annotationMetadata,
-            boolean isInterface,
-            boolean isDefault) {
+            TypedElement declaringBean,
+            MethodElement methodElement) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitExecutableMethod(
-                        declaringType,
-                        methodElement,
-                        argumentTypes,
-                        genericArgumentTypes,
-                        argumentAnnotationMetadata,
-                        annotationMetadata,
-                        isInterface,
-                        isDefault
+                        declaringBean,
+                        methodElement
                 )
         );
         return null;

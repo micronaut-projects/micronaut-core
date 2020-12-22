@@ -1057,17 +1057,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         if (owningType == null) {
                             throw new IllegalStateException("Owning type cannot be null");
                         }
-                        String methodName = method.getSimpleName().toString();
-
                         AnnotationMetadata annotationMetadata = new AnnotationMetadataReference(
                                 beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                 methodAnnotationMetadata
                         );
-
-                        ExecutableElementParamInfo params = populateParameterData(producedTypeName, method, finalBeanTypeArgumentsMirrors);
-                        Map<String, ParameterElement> methodParameters = params.getParameters();
-                        Map<String, ClassElement> genericParameters = params.getGenericParameterTypes();
-                        Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
 
                         JavaClassElement declaringClassElement = new JavaClassElement(producedElement, concreteClassMetadata, visitorContext);
                         JavaMethodElement executableMethod = new JavaMethodElement(
@@ -1076,6 +1069,22 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 annotationMetadata,
                                 visitorContext
                         ) {
+                            @NonNull
+                            @Override
+                            protected JavaParameterElement newParameterElement(@NonNull VariableElement variableElement, @NonNull AnnotationMetadata annotationMetadata) {
+                                return new JavaParameterElement(declaringClassElement, variableElement, annotationMetadata, visitorContext) {
+                                    @NonNull
+                                    @Override
+                                    public ClassElement getGenericType() {
+                                        if (finalBeanTypeArgumentsMirrors != null) {
+                                            return parameterizedClassElement(getNativeType().asType(), visitorContext, finalBeanTypeArgumentsMirrors);
+                                        } else {
+                                            return super.getGenericType();
+                                        }
+                                    }
+                                };
+                            }
+
                             @Override
                             @NonNull
                             public ClassElement getGenericReturnType() {
@@ -1089,13 +1098,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         beanMethodWriter.visitExecutableMethod(
                                 declaringClassElement,
-                                executableMethod,
-                                methodParameters,
-                                genericParameters,
-                                methodQualifier,
-                                annotationMetadata,
-                                declaringClassElement.isInterface(),
-                                method.isDefault()
+                                executableMethod
                         );
 
                     }
@@ -1153,7 +1156,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             JavaClassElement declaringClassElement = new JavaClassElement(declaringClass, concreteClassMetadata, visitorContext);
-            JavaMethodElement javaMethodElement = new JavaMethodElement(concreteClassElement, method, methodAnnotationMetadata, visitorContext);
             ExecutableElementParamInfo params = populateParameterData(null, method, null);
             BeanDefinitionVisitor beanWriter = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
 
@@ -1198,6 +1200,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         aroundMethodMetadata = new AnnotationMetadataHierarchy(concreteClassMetadata, methodAnnotationMetadata);
                     }
 
+                    JavaMethodElement javaMethodElement = new JavaMethodElement(concreteClassElement, method, aroundMethodMetadata, visitorContext);
                     if (modelUtils.isFinal(method)) {
                         if (methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE)) {
                             error(method, "Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.");
@@ -1206,13 +1209,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 addOriginatingElementIfNecessary(beanWriter, declaringClass);
                                 beanWriter.visitExecutableMethod(
                                         declaringClassElement,
-                                        javaMethodElement,
-                                        params.getParameters(),
-                                        params.getGenericParameterTypes(),
-                                        params.getParameterMetadata(),
-                                        aroundMethodMetadata,
-                                        declaringClassElement.isInterface(),
-                                        method.isDefault()
+                                        javaMethodElement
                                 );
                                 executableMethodVisited = true;
                             } else {
@@ -1239,15 +1236,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             if (!executableMethodVisited) {
                 addOriginatingElementIfNecessary(beanWriter, declaringClass);
+                AnnotationMetadata executableMetadata;
+                if (methodAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
+                    executableMetadata = methodAnnotationMetadata;
+                } else {
+                    executableMetadata = new AnnotationMetadataHierarchy(concreteClassMetadata, methodAnnotationMetadata);
+                }
+                JavaMethodElement javaMethodElement = new JavaMethodElement(concreteClassElement, method, executableMetadata, visitorContext);
                 beanWriter.visitExecutableMethod(
                         declaringClassElement,
-                        javaMethodElement,
-                        params.getParameters(),
-                        params.getGenericParameterTypes(),
-                        params.getParameterMetadata(),
-                        methodAnnotationMetadata,
-                        declaringClassElement.isInterface(),
-                        method.isDefault()
+                        javaMethodElement
                 );
             }
 

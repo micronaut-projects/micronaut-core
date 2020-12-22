@@ -18,6 +18,7 @@ package io.micronaut.aop.chain;
 import io.micronaut.aop.*;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.ExecutableMethod;
 
@@ -36,6 +37,7 @@ import java.lang.reflect.Method;
  * @since 1.0
  */
 @Internal
+@UsedByGeneratedCode
 public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> implements MethodInvocationContext<T, R> {
 
     private static final Object[] EMPTY_ARRAY = new Object[0];
@@ -47,6 +49,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * @param target target
      * @param executionHandle executionHandle
      */
+    @UsedByGeneratedCode
     public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle) {
         super(interceptors, target, executionHandle, EMPTY_ARRAY);
     }
@@ -59,6 +62,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * @param executionHandle executionHandle
      * @param originalParameters originalParameters
      */
+    @UsedByGeneratedCode
     public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, Object... originalParameters) {
         super(interceptors, target, executionHandle, originalParameters);
     }

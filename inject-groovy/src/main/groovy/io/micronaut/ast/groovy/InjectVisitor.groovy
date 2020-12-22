@@ -38,6 +38,7 @@ import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.util.ArrayUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.value.OptionalValues
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.annotation.AnnotationMetadataReference
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
@@ -918,13 +919,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             if (!executorMethodAdded) {
                 getBeanWriter().visitExecutableMethod(
                         declaringElement,
-                        methodElement,
-                        paramsToType,
-                        genericParams,
-                        argumentAnnotationMetadata,
-                        methodAnnotationMetadata,
-                        methodNode.declaringClass.isInterface(),
-                        false
+                        methodElement
                 )
             }
         }
@@ -1242,9 +1237,13 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         return fieldElement.genericType
                     }
                 }
+                def methodAnnotationMetadata = new AnnotationMetadataHierarchy(
+                        concreteClassAnnotationMetadata,
+                        fieldAnnotationMetadata
+                )
                 MethodElement setterElement = MethodElement.of(
                         fieldElement.declaringType,
-                        fieldAnnotationMetadata,
+                        methodAnnotationMetadata,
                         PrimitiveElement.VOID,
                         PrimitiveElement.VOID,
                         getSetterName(propertyName),
@@ -1256,19 +1255,19 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         Collections.singletonMap(propertyName, parameterElement),
                         Collections.singletonMap(propertyName, parameterElement.genericType),
                         Collections.singletonMap(propertyName, parameterElement.annotationMetadata),
-                        fieldAnnotationMetadata,
+                        methodAnnotationMetadata,
                         propertyNode.declaringClass.isInterface(),
                         false
                 )
 
                 // also visit getter to ensure proxying
+
                 MethodElement getterElement = MethodElement.of(
                         fieldElement.declaringType,
-                        fieldAnnotationMetadata,
+                        methodAnnotationMetadata,
                         fieldElement.type,
                         fieldElement.genericType,
-                        getGetterName(propertyNode),
-                        parameterElement
+                        getGetterName(propertyNode)
                 )
                 aopWriter.visitAroundMethod(
                         fieldElement.declaringType,
@@ -1276,7 +1275,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         Collections.emptyMap(),
                         Collections.emptyMap(),
                         Collections.emptyMap(),
-                        fieldAnnotationMetadata,
+                        methodAnnotationMetadata,
                         propertyNode.getDeclaringClass().isInterface(),
                         false
                 )

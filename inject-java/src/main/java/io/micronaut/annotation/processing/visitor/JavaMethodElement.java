@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -49,9 +50,9 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     private final ExecutableElement executableElement;
     private final JavaVisitorContext visitorContext;
     private final JavaClassElement declaringClass;
-    private boolean suspend;
     private JavaClassElement resolvedDeclaringClass;
     private ParameterElement[] parameters;
+    private ParameterElement continuationParameter;
     private ClassElement genericReturnType;
     private ClassElement returnType;
 
@@ -103,7 +104,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     @Override
     public boolean isSuspend() {
         getParameters();
-        return this.suspend;
+        return this.continuationParameter != null;
     }
 
     @Override
@@ -114,11 +115,11 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             for (Iterator<? extends VariableElement> i = parameters.iterator(); i.hasNext();) {
                 VariableElement variableElement = i.next();
                 if (! i.hasNext() && isSuspend(variableElement)) {
-                    this.suspend = true;
+                    this.continuationParameter = newParameterElement(variableElement, AnnotationMetadata.EMPTY_METADATA);
                     continue;
                 }
                 AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement);
-                JavaParameterElement javaParameterElement = new JavaParameterElement(declaringClass, variableElement, annotationMetadata, visitorContext);
+                JavaParameterElement javaParameterElement = newParameterElement(variableElement, annotationMetadata);
                 if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
                     javaParameterElement.annotate("javax.annotation.Nullable").getAnnotationMetadata();
                 }
@@ -127,6 +128,27 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             this.parameters = elts.toArray(new ParameterElement[0]);
         }
         return this.parameters;
+    }
+
+    @Override
+    public ParameterElement[] getSuspendParameters() {
+        ParameterElement[] parameters = getParameters();
+        if (isSuspend()) {
+            return ArrayUtils.concat(parameters, continuationParameter);
+        } else {
+            return parameters;
+        }
+    }
+
+    /**
+     * Creates a new parameter element for the given args.
+     * @param variableElement The variable element
+     * @param annotationMetadata The annotation metadata
+     * @return The parameter element
+     */
+    @NonNull
+    protected JavaParameterElement newParameterElement(@NonNull VariableElement variableElement, @NonNull AnnotationMetadata annotationMetadata) {
+        return new JavaParameterElement(declaringClass, variableElement, annotationMetadata, visitorContext);
     }
 
     @Override
