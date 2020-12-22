@@ -400,22 +400,12 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 if (methodNode.isAbstract()) {
                     aopProxyWriter.visitIntroductionMethod(
                             owningClassElement,
-                            groovyMethodElement,
-                            targetMethodParamsToType,
-                            targetAnnotationMetadata,
-                            targetGenericParams,
-                            annotationMetadata
+                            groovyMethodElement
                     )
                 } else {
                     aopProxyWriter.visitAroundMethod(
                             owningClassElement,
-                            groovyMethodElement,
-                            targetMethodParamsToType,
-                            targetGenericParams,
-                            targetAnnotationMetadata,
-                            annotationMetadata,
-                            methodNode.declaringClass.isInterface(),
-                            false
+                            groovyMethodElement
                     )
                 }
             }
@@ -553,9 +543,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 new PublicMethodVisitor(source) {
                     @Override
                     void accept(ClassNode classNode, MethodNode targetBeanMethodNode) {
-                        Map<String, ParameterElement> targetMethodParamsToType = [:]
-                        Map<String, ClassElement> targetGenericParams = [:]
-                        Map<String, AnnotationMetadata> targetAnnotationMetadata = [:]
                         AnnotationMetadata annotationMetadata
                         if (AstAnnotationUtils.isAnnotated(producedClassElement.name, methodNode)) {
                             annotationMetadata = AstAnnotationUtils.newBuilder(source, unit)
@@ -574,24 +561,9 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                 annotationMetadata
                         )
 
-                        populateParameterData(
-                                targetMethodElement,
-                                targetMethodParamsToType,
-                                targetGenericParams,
-                                targetAnnotationMetadata,
-                                false
-                        )
-
-
                         proxyWriter.visitAroundMethod(
                                 targetMethodElement.declaringType,
-                                targetMethodElement,
-                                targetMethodParamsToType,
-                                targetGenericParams,
-                                targetAnnotationMetadata,
-                                annotationMetadata,
-                                targetBeanMethodNode.declaringClass.isInterface(),
-                                false
+                                targetMethodElement
                         )
                     }
                 }.accept(returnType)
@@ -902,13 +874,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
                         proxyWriter.visitAroundMethod(
                                 declaringElement,
-                                methodElement,
-                                paramsToType,
-                                genericParams,
-                                argumentAnnotationMetadata,
-                                methodAnnotationMetadata,
-                                methodNode.declaringClass.isInterface(),
-                                false
+                                methodElement
                         )
 
                         executorMethodAdded = true
@@ -1251,13 +1217,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 )
                 aopWriter.visitAroundMethod(
                         fieldElement.declaringType,
-                        setterElement,
-                        Collections.singletonMap(propertyName, parameterElement),
-                        Collections.singletonMap(propertyName, parameterElement.genericType),
-                        Collections.singletonMap(propertyName, parameterElement.annotationMetadata),
-                        methodAnnotationMetadata,
-                        propertyNode.declaringClass.isInterface(),
-                        false
+                        setterElement
                 )
 
                 // also visit getter to ensure proxying
@@ -1271,13 +1231,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 )
                 aopWriter.visitAroundMethod(
                         fieldElement.declaringType,
-                        getterElement,
-                        Collections.emptyMap(),
-                        Collections.emptyMap(),
-                        Collections.emptyMap(),
-                        methodAnnotationMetadata,
-                        propertyNode.getDeclaringClass().isInterface(),
-                        false
+                        getterElement
                 )
             }
         }
@@ -1561,14 +1515,14 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                 adaptedArgumentTypes[j] = new AnnotationClassValue(ve.type.name)
                                 j++
                             }
-                            AnnotationMetadata annotationMetadata = groovyMethodElement.annotate(Adapter.class, { builder ->
+                            groovyMethodElement.annotate(Adapter.class, { builder ->
                                 builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(concreteClass.name))
                                 builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, method.name)
                                 builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes)
                                 if (StringUtils.isNotEmpty(qualifier)) {
                                     builder.member(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier)
                                 }
-                            }).annotationMetadata
+                            })
 
                             GroovyClassElement declaringElement = new GroovyClassElement(
                                     source,
@@ -1578,13 +1532,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                             )
                             aopProxyWriter.visitAroundMethod(
                                     declaringElement,
-                                    groovyMethodElement,
-                                    targetMethodParamsToType,
-                                    targetMethodGenericParams,
-                                    targetAnnotationMetadata,
-                                    annotationMetadata,
-                                    targetMethod.declaringClass.isInterface(),
-                                    false
+                                    groovyMethodElement
                             )
 
 

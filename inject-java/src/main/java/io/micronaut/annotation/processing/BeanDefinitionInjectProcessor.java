@@ -605,9 +605,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         JavaClassElement owningTypeElement = new JavaClassElement(owningType, typeAnnotationMetadata, visitorContext);
 
                         String methodName = method.getSimpleName().toString();
-                        Map<String, ParameterElement> methodParameters = params.getParameters();
-                        Map<String, ClassElement> genericParameters = params.getGenericParameterTypes();
-                        Map<String, AnnotationMetadata> parameterAnnotationMetadata = params.getParameterMetadata();
                         AnnotationMetadata annotationMetadata;
 
                         if (annotationUtils.isAnnotated(introductionType.getName(), method) || JavaAnnotationMetadataBuilder.hasAnnotation(method, Override.class)) {
@@ -647,7 +644,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     return;
                                 }
 
-                                if (!methodParameters.isEmpty()) {
+                                if (javaMethodElement.hasParameters()) {
                                     error(classElement, "Only zero argument getter methods are allowed on @ConfigurationProperties interfaces: " + method);
                                     return;
                                 }
@@ -696,11 +693,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         if (isAbstract) {
                             aopProxyWriter.visitIntroductionMethod(
                                     owningTypeElement,
-                                    javaMethodElement,
-                                    methodParameters,
-                                    parameterAnnotationMetadata,
-                                    genericParameters,
-                                    annotationMetadata
+                                    javaMethodElement
                             );
                         } else {
                             boolean isInterface = declaringClassElement.isInterface();
@@ -713,13 +706,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             // only apply around advise to non-abstract methods of introduction advise
                             aopProxyWriter.visitAroundMethod(
                                     owningTypeElement,
-                                    javaMethodElement,
-                                    methodParameters,
-                                    genericParameters,
-                                    parameterAnnotationMetadata,
-                                    annotationMetadata,
-                                    isInterface,
-                                    isDefault
+                                    javaMethodElement
                             );
                         }
                     }
@@ -1009,12 +996,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 concreteClassMetadata,
                                 visitorContext
                         );
-                        ExecutableElementParamInfo params = populateParameterData(null, method, null);
-
-                        Map<String, ParameterElement> methodParameters = params.getParameters();
-                        Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
-                        Map<String, ClassElement> genericParameters = params.getGenericParameterTypes();
-
                         AnnotationMetadata annotationMetadata;
                         // if the method is annotated we build metadata for the method
                         if (annotationUtils.isAnnotated(producedTypeName, method)) {
@@ -1036,13 +1017,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         aopProxyWriter.visitAroundMethod(
                                 declaringClassElement,
-                                advisedMethodElement,
-                                methodParameters,
-                                genericParameters,
-                                methodQualifier,
-                                annotationMetadata,
-                                declaringClassElement.isInterface(),
-                                method.isDefault()
+                                advisedMethodElement
                         );
                     }
                 }, proxyWriter);
@@ -1156,7 +1131,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             JavaClassElement declaringClassElement = new JavaClassElement(declaringClass, concreteClassMetadata, visitorContext);
-            ExecutableElementParamInfo params = populateParameterData(null, method, null);
             BeanDefinitionVisitor beanWriter = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
 
             // This method requires pre-processing. See Executable#processOnStartup()
@@ -1220,13 +1194,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         addOriginatingElementIfNecessary(beanWriter, declaringClass);
                         aopProxyWriter.visitAroundMethod(
                                 declaringClassElement,
-                                javaMethodElement,
-                                params.getParameters(),
-                                params.getGenericParameterTypes(),
-                                params.getParameterMetadata(),
-                                aroundMethodMetadata,
-                                declaringClassElement.isInterface(),
-                                method.isDefault()
+                                javaMethodElement
                         );
                         executableMethodVisited = true;
                     }
@@ -1363,11 +1331,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                         finalMethodAnnotationMetadata,
                                         visitorContext
                                 );
-                                ExecutableElementParamInfo params = populateParameterData(typeElement.getQualifiedName().toString(), targetMethod, null);
-                                Map<String, ParameterElement> methodParameters = params.getParameters();
-                                Map<String, ClassElement> genericParameters = params.getGenericParameterTypes();
-                                Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
-
                                 AnnotationClassValue<?>[] adaptedArgumentTypes = new AnnotationClassValue[paramLen];
                                 for (int i = 0; i < adaptedArgumentTypes.length; i++) {
                                     VariableElement ve = sourceParameters.get(i);
@@ -1399,13 +1362,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                                 aopProxyWriter.visitAroundMethod(
                                         declaringClassElement,
-                                        javaMethodElement,
-                                        methodParameters,
-                                        genericParameters,
-                                        methodQualifier,
-                                        annotationMetadata,
-                                        declaringClassElement.isInterface(),
-                                        targetMethod.isDefault()
+                                        javaMethodElement
                                 );
 
 

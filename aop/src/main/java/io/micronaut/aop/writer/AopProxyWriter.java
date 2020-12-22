@@ -425,84 +425,36 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     /**
      * Visit a abstract method that is to be implemented.
      *
-     * @param declaringType              The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param declaringBean              The declaring bean of the method.
      * @param methodElement              The method element
-     * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes               The generic types of each argument. Can be null.
-     * @param annotationMetadata         metadata
      */
-    public void visitIntroductionMethod(TypedElement declaringType,
-                                        MethodElement methodElement,
-                                        Map<String, ParameterElement> argumentTypes,
-                                        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                        Map<String, ClassElement> genericTypes,
-                                        AnnotationMetadata annotationMetadata) {
+    public void visitIntroductionMethod(TypedElement declaringBean,
+                                        MethodElement methodElement) {
 
 
         visitAroundMethod(
-                declaringType,
-                methodElement,
-                argumentTypes,
-                genericTypes,
-                argumentAnnotationMetadata,
-                annotationMetadata,
-                true,
-                false,
-                true);
+                declaringBean,
+                methodElement
+        );
     }
 
     /**
      * Visit a method that is to be proxied.
      *
-     * @param declaringType              The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param methodElement              The method element
-     * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param genericParameters          The generic argument types
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param annotationMetadata         metadata
-     * @param isInterface                If the method is in an interface
-     * @param isDefault                  If the method is a default method
-     */
-    public void visitAroundMethod(TypedElement declaringType,
-                                  MethodElement methodElement,
-                                  Map<String, ParameterElement> argumentTypes,
-                                  Map<String, ClassElement> genericParameters,
-                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                  AnnotationMetadata annotationMetadata,
-                                  boolean isInterface,
-                                  boolean isDefault) {
-
-
-        visitAroundMethod(
-                declaringType,
-                methodElement,
-                argumentTypes,
-                genericParameters,
-                argumentAnnotationMetadata,
-                annotationMetadata,
-                false, isDefault, isInterface);
-    }
-
-    @SuppressWarnings("ParameterNumber")
-    private void visitAroundMethod(TypedElement declaringType,
-                                   MethodElement methodElement,
-                                   Map<String, ParameterElement> argumentTypes,
-                                   Map<String, ClassElement> genericParameters,
-                                   Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                   AnnotationMetadata annotationMetadata,
-                                   boolean isAbstract,
-                                   boolean isDefault,
-                                   boolean isInterface) {
+     * @param beanType      The bean type.
+     * @param methodElement The method element
+     **/
+    public void visitAroundMethod(TypedElement beanType,
+                                  MethodElement methodElement) {
 
         String methodName = methodElement.getName();
         ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
-        List<ParameterElement> argumentTypeList = new ArrayList<>(argumentTypes.values());
-        int argumentCount = argumentTypes.size();
+        List<ParameterElement> argumentTypeList = Arrays.asList(methodElement.getSuspendParameters());
+        int argumentCount = argumentTypeList.size();
         Type returnTypeObject = getTypeReference(returnType);
         boolean isPrimitive = returnType.isPrimitive();
         boolean isVoidReturn = isPrimitive && returnTypeObject.equals(Type.VOID_TYPE);
-        final Type declaringTypeReference = getTypeReference(declaringType);
+        final Type declaringTypeReference = getTypeReference(beanType);
         MethodRef methodKey = new MethodRef(methodName, argumentTypeList, returnTypeObject);
 
         if (!proxiedMethodsRefSet.contains(methodKey)) {
@@ -514,7 +466,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             if (!isProxyTarget) {
                 // if the target is not being proxied then we need to generate a bridge method and executable method that knows about it
 
-                if (!isAbstract || isDefault) {
+                if (!methodElement.isAbstract() || methodElement.isDefault()) {
                     interceptedProxyClassName = proxyFullName;
                     interceptedProxyBridgeMethodName = "$$access$$" + methodName;
 
@@ -529,7 +481,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         bridgeGenerator.loadArg(i);
                     }
                     String desc = getMethodDescriptor(returnType, argumentTypeList);
-                    bridgeWriter.visitMethodInsn(INVOKESPECIAL, declaringTypeReference.getInternalName(), methodName, desc, this.isInterface && isDefault);
+                    bridgeWriter.visitMethodInsn(INVOKESPECIAL, declaringTypeReference.getInternalName(), methodName, desc, this.isInterface && methodElement.isDefault());
                     pushReturnValue(bridgeWriter, returnType);
                     bridgeWriter.visitMaxs(DEFAULT_MAX_STACK, 1);
                     bridgeWriter.visitEnd();
@@ -538,7 +490,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
             BeanDefinitionWriter beanDefinitionWriter = parentWriter == null ? proxyBeanDefinitionWriter : parentWriter;
             ExecutableMethodWriter executableMethodWriter = beanDefinitionWriter.visitExecutableMethod(
-                    declaringType,
+                    beanType,
                     methodElement,
                     interceptedProxyClassName,
                     interceptedProxyBridgeMethodName

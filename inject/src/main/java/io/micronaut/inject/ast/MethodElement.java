@@ -48,6 +48,14 @@ public interface MethodElement extends MemberElement {
     }
 
     /**
+     * Returns true if the method has parameters
+     * @return True if it does
+     */
+    default boolean hasParameters() {
+        return getParameters().length > 0;
+    }
+
+    /**
      * Is the method a Kotlin suspend function.
      * @return True if it is.
      * @since 2.3.0
