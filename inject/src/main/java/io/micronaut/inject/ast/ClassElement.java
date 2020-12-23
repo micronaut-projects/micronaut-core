@@ -18,6 +18,8 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -265,5 +267,56 @@ public interface ClassElement extends TypedElement {
         return new ReflectClassElement(
                 Objects.requireNonNull(type, "Type cannot be null")
         );
+    }
+
+    /**
+     * Create a class element for the given simple type.
+     * @param typeName The type
+     * @return The class element
+     */
+    static ClassElement of(String typeName) {
+        return new ClassElement() {
+            @Override
+            public boolean isAssignable(String type) {
+                return false;
+            }
+
+            @Override
+            public boolean isAssignable(ClassElement type) {
+                return false;
+            }
+
+            @Override
+            public ClassElement toArray() {
+                throw new UnsupportedOperationException("Cannot convert class elements produced by name to an array");
+            }
+
+            @Override
+            public ClassElement fromArray() {
+                throw new UnsupportedOperationException("Cannot convert class elements produced by from an array");
+            }
+
+            @NotNull
+            @Override
+            public String getName() {
+                return typeName;
+            }
+
+            @Override
+            public boolean isProtected() {
+                return false;
+            }
+
+            @Override
+            public boolean isPublic() {
+                return false;
+            }
+
+            @NotNull
+            @Override
+            public Object getNativeType() {
+                return typeName;
+            }
+        };
     }
 }

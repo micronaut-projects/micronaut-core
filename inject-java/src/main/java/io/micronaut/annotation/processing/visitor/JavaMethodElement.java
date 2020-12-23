@@ -131,6 +131,16 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
+    public MethodElement withNewParameters(ParameterElement... newParameters) {
+        return new JavaMethodElement(declaringClass, executableElement, getAnnotationMetadata(), visitorContext) {
+            @Override
+            public ParameterElement[] getParameters() {
+                return ArrayUtils.concat(super.getParameters(), newParameters);
+            }
+        };
+    }
+
+    @Override
     public ParameterElement[] getSuspendParameters() {
         ParameterElement[] parameters = getParameters();
         if (isSuspend()) {

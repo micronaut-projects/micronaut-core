@@ -17,7 +17,12 @@ package io.micronaut.inject.ast;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 /**
  * Stores data about an element that references a method.
@@ -37,6 +42,14 @@ public interface MethodElement extends MemberElement {
      * @return The method parameters
      */
     ParameterElement[] getParameters();
+
+    /**
+     * Takes this method element and transforms into a new method element with the given parameters appended to the existing parameters.
+     * @param newParameters The new parameters
+     * @return A new method element
+     * @since 2.3.0
+     */
+    MethodElement withNewParameters(ParameterElement...newParameters);
 
     /**
      * If {@link #isSuspend()} returns true this method exposes the continuation parameter in addition to the other parameters of the method.
@@ -84,6 +97,17 @@ public interface MethodElement extends MemberElement {
     }
 
     /**
+     * Get the method description.
+     * @param simple If simple type names are to be used
+     * @return The method description
+     */
+    default String getDescription(boolean simple) {
+        String typeString = simple ? getReturnType().getSimpleName() : getReturnType().getName();
+        String args = Arrays.stream(getParameters()).map(arg -> simple ? arg.getType().getSimpleName() : arg.getType().getName() + " " + arg.getName()).collect(Collectors.joining(","));
+        return typeString + " " + getName() + "(" + args + ")";
+    }
+
+    /**
      * Creates a {@link MethodElement} for the given parameters.
      * @param declaredType The declaring type
      * @param annotationMetadata The annotation metadata
@@ -116,6 +140,18 @@ public interface MethodElement extends MemberElement {
             @Override
             public ParameterElement[] getParameters() {
                 return parameterElements;
+            }
+
+            @Override
+            public MethodElement withNewParameters(ParameterElement... newParameters) {
+                return MethodElement.of(
+                        declaredType,
+                        annotationMetadata,
+                        returnType,
+                        genericReturnType,
+                        name,
+                        ArrayUtils.concat(parameterElements, newParameters)
+                );
             }
 
             @NotNull

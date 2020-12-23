@@ -51,32 +51,20 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
     Element getOriginatingElement();
 
     /**
-     * Visits a no arguments constructor. Either this method or
-     * {@link #visitBeanDefinitionConstructor(AnnotationMetadata, boolean, Map, Map, Map)} should be called at least
-     * once.
-     *
-     * @param annotationMetadata The annotation metadata for the constructor.
-     * @param requiresReflection Whether invoking the constructor requires reflection.
-     */
-    void visitBeanDefinitionConstructor(
-            AnnotationMetadata annotationMetadata,
-            boolean requiresReflection
-    );
-
-    /**
      * Visits the constructor used to create the bean definition.
      *
-     * @param annotationMetadata         The annotation metadata for the constructor
+     * @param constructor  The method element that represents the constructor
      * @param requiresReflection         Whether invoking the constructor requires reflection
-     * @param argumentTypes              The argument type names for each parameter
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes               The generic types for each parameter
      */
-    void visitBeanDefinitionConstructor(AnnotationMetadata annotationMetadata,
-                                        boolean requiresReflection,
-                                        Map<String, ParameterElement> argumentTypes,
-                                        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                        Map<String, ClassElement> genericTypes);
+    void visitBeanDefinitionConstructor(MethodElement constructor,
+                                        boolean requiresReflection);
+
+    /**
+     * Visits the constructor used to create the bean definition in the case where no constructor is present.
+     * This method should only be called in the class defines no constructor.
+     *
+     */
+    void visitDefaultConstructor(AnnotationMetadata annotationMetadata);
 
     /**
      * @return The name of the bean definition reference class.

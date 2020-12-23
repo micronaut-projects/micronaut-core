@@ -19,6 +19,7 @@ import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.ast.groovy.utils.ExtendedParameter;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -173,6 +174,16 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         }
 
         return this.parameters;
+    }
+
+    @Override
+    public MethodElement withNewParameters(ParameterElement... newParameters) {
+        return new GroovyMethodElement(declaringClass, sourceUnit, compilationUnit, methodNode, getAnnotationMetadata()) {
+            @Override
+            public ParameterElement[] getParameters() {
+                return ArrayUtils.concat(super.getParameters(), newParameters);
+            }
+        };
     }
 
     @Override
