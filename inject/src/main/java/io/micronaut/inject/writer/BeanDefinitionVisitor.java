@@ -228,36 +228,24 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * Visits a field injection point.
      *
      * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
-     * @param fieldType          The type of the field
-     * @param fieldName          The name of the field
+     * @param fieldElement       The field element
      * @param requiresReflection Whether accessing the field requires reflection
-     * @param annotationMetadata The annotation metadata for the field
-     * @param typeArguments      The generic type arguments
      */
     void visitFieldInjectionPoint(TypedElement declaringType,
-                                  ClassElement fieldType,
-                                  String fieldName,
-                                  boolean requiresReflection,
-                                  @Nullable AnnotationMetadata annotationMetadata,
-                                  @Nullable Map<String, ClassElement> typeArguments);
+                                  FieldElement fieldElement,
+                                  boolean requiresReflection);
 
     /**
      * Visits a field injection point.
      *
      * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
-     * @param fieldType          The type of the field
-     * @param fieldName          The name of the field
+     * @param fieldElement       The field element
      * @param requiresReflection Whether accessing the field requires reflection
-     * @param annotationMetadata The annotation metadata for the field
-     * @param typeArguments      The generic type arguments
      * @param isOptional         Is the value optional
      */
     void visitFieldValue(TypedElement declaringType,
-                         ClassElement fieldType,
-                         String fieldName,
+                         FieldElement fieldElement,
                          boolean requiresReflection,
-                         @Nullable AnnotationMetadata annotationMetadata,
-                         @Nullable Map<String, ClassElement> typeArguments,
                          boolean isOptional);
 
     /**

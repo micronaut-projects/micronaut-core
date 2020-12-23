@@ -104,7 +104,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
     private JavaConfigurationMetadataBuilder metadataBuilder;
     private Set<String> beanDefinitions;
-    private Set<String> processed = new HashSet<>();
+    private final Set<String> processed = new HashSet<>();
     private boolean processingOver;
 
     @Override
@@ -608,7 +608,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
                         JavaClassElement owningTypeElement = new JavaClassElement(owningType, typeAnnotationMetadata, visitorContext);
 
-                        String methodName = method.getSimpleName().toString();
                         AnnotationMetadata annotationMetadata;
 
                         if (annotationUtils.isAnnotated(introductionType.getName(), method) || JavaAnnotationMetadataBuilder.hasAnnotation(method, Override.class)) {
@@ -626,6 +625,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 annotationMetadata,
                                 visitorContext
                         );
+                        String methodName = javaMethodElement.getName();
 
                         if (!annotationMetadata.hasStereotype(ANN_VALIDATED) &&
                                 isDeclaredBean &&
@@ -907,7 +907,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     visitorContext
             );
 
-
             BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(beanMethod, producedElement);
             Map<String, Map<String, Object>> beanTypeArguments = null;
             Map<String, Map<String, TypeMirror>> beanTypeArgumentsMirrors = null;
@@ -918,7 +917,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 Map<String, Map<String, Object>> finalizedArguments = resolveFinalTypeArguments(beanTypeArguments);
                 beanMethodWriter.visitTypeArguments(finalizedArguments);
             }
-
 
             AnnotationMetadata methodAnnotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(
                     producedElement,
@@ -1572,21 +1570,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 if (isValue) {
                     writer.visitFieldValue(
                             declaringClassElement,
-                            javaFieldElement.getType(),
-                            javaFieldElement.getName(),
+                            javaFieldElement,
                             requiresReflection,
-                            fieldAnnotationMetadata,
-                            javaFieldElement.getGenericType().getTypeArguments(),
                             isConfigurationPropertiesType
                     );
                 } else {
                     writer.visitFieldInjectionPoint(
                             declaringClassElement,
-                            javaFieldElement.getType(),
-                            javaFieldElement.getName(),
-                            requiresReflection,
-                            fieldAnnotationMetadata,
-                            javaFieldElement.getGenericType().getTypeArguments()
+                            javaFieldElement,
+                            requiresReflection
                     );
                 }
             } else if (isConfigurationPropertiesType) {
@@ -1688,15 +1680,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     null
                             );
 
-                            fieldAnnotationMetadata = addPropertyMetadata(javaFieldElement, propertyMetadata);
+                            addPropertyMetadata(javaFieldElement, propertyMetadata);
                             writer.visitFieldValue(
                                     declaringClassElement,
-                                    javaFieldElement.getType(),
-                                    fieldName,
+                                    javaFieldElement,
                                     requiresReflection,
-                                    fieldAnnotationMetadata,
-                                    javaFieldElement.getGenericType().getTypeArguments(),
-                                    isConfigurationPropertiesType);
+                                    isConfigurationPropertiesType
+                            );
                         }
                     }
                 }

@@ -161,7 +161,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
                 superType,
                 interfaceInternalNames
         );
-        Type beanDefinitionType = getTypeReference(beanDefinitionName);
+        Type beanDefinitionType = getTypeReferenceForName(beanDefinitionName);
         writeAnnotationMetadataStaticInitializer(classWriter);
 
         GeneratorAdapter cv = startConstructor(classWriter);
@@ -207,7 +207,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
 
         // start method: Class getBeanType()
         GeneratorAdapter getBeanType = startPublicMethodZeroArgs(classWriter, Class.class, "getBeanType");
-        getBeanType.push(getTypeReference(beanTypeName));
+        getBeanType.push(getTypeReferenceForName(beanTypeName));
         getBeanType.returnValue();
         getBeanType.visitMaxs(2, 1);
 

@@ -295,9 +295,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.beanSimpleClassName = className;
         this.providedBeanClassName = providedClassName;
         this.beanDefinitionName = beanDefinitionName;
-        this.beanDefinitionType = getTypeReference(this.beanDefinitionName);
-        this.beanType = getTypeReference(beanFullClassName);
-        this.providedType = getTypeReference(providedBeanClassName);
+        this.beanDefinitionType = getTypeReferenceForName(this.beanDefinitionName);
+        this.beanType = getTypeReferenceForName(beanFullClassName);
+        this.providedType = getTypeReferenceForName(providedBeanClassName);
         this.beanDefinitionInternalName = getInternalName(this.beanDefinitionName);
         this.interfaceTypes = new TreeSet<>(Comparator.comparing(Class::getName));
         this.interfaceTypes.add(BeanFactory.class);
@@ -364,7 +364,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitSuperBeanDefinition(String name) {
-        this.superType = getTypeReference(name);
+        this.superType = getTypeReferenceForName(name);
     }
 
     @Override
@@ -633,7 +633,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     AnnotationMetadata.class.getName()
             );
             annotationMetadataMethod.loadThis();
-            annotationMetadataMethod.getStatic(getTypeReference(getBeanDefinitionReferenceClassName()), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+            annotationMetadataMethod.getStatic(getTypeReferenceForName(getBeanDefinitionReferenceClassName()), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
             annotationMetadataMethod.returnValue();
             annotationMetadataMethod.visitMaxs(1, 1);
             annotationMetadataMethod.visitEnd();
@@ -1094,11 +1094,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public void visitFieldInjectionPoint(
             TypedElement declaringType,
-            ClassElement fieldType,
-            String fieldName,
-            boolean requiresReflection,
-            AnnotationMetadata annotationMetadata,
-            @Nullable Map<String, ClassElement> typeArguments) {
+            FieldElement fieldElement,
+            boolean requiresReflection) {
         // Implementation notes.
         // This method modifies the constructor adding addInjectPoint calls for each field that is annotated with @Inject
         // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
@@ -1106,23 +1103,18 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
         visitFieldInjectionPointInternal(
                 declaringType,
-                annotationMetadata,
-                typeArguments,
+                fieldElement,
                 requiresReflection,
-                fieldType,
-                fieldName,
                 GET_BEAN_FOR_FIELD,
-                false);
+                false
+        );
     }
 
     @Override
     public void visitFieldValue(
             TypedElement declaringType,
-            ClassElement fieldType,
-            String fieldName,
+            FieldElement fieldElement,
             boolean requiresReflection,
-            AnnotationMetadata annotationMetadata,
-            @Nullable Map<String, ClassElement> typeArguments,
             boolean isOptional) {
         // Implementation notes.
         // This method modifies the constructor adding addInjectPoint calls for each field that is annotated with @Inject
@@ -1131,11 +1123,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
         visitFieldInjectionPointInternal(
                 declaringType,
-                annotationMetadata,
-                typeArguments,
+                fieldElement,
                 requiresReflection,
-                fieldType,
-                fieldName,
                 GET_VALUE_FOR_FIELD,
                 isOptional);
     }
@@ -1337,13 +1326,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void visitFieldInjectionPointInternal(
             TypedElement declaringType,
-            AnnotationMetadata annotationMetadata,
-            Map<String, ClassElement> typeArguments,
+            FieldElement fieldElement,
             boolean requiresReflection,
-            ClassElement fieldType,
-            String fieldName,
             Method methodToInvoke,
             boolean isValueOptional) {
+        AnnotationMetadata annotationMetadata = fieldElement.getAnnotationMetadata();
         DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
         // ready this
         GeneratorAdapter constructorVisitor = this.constructorVisitor;
@@ -1355,15 +1342,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         constructorVisitor.push(declaringTypeRef);
 
         // 2nd argument: The field type
-        constructorVisitor.push(getTypeReference(fieldType));
+        constructorVisitor.push(getTypeReference(fieldElement.getType()));
 
         // 3rd argument: The field name
-        constructorVisitor.push(fieldName);
+        constructorVisitor.push(fieldElement.getName());
 
         // 4th argument: The annotation metadata
         pushAnnotationMetadata(annotationMetadata, constructorVisitor);
 
         // 5th argument: The type arguments
+        Map<String, ClassElement> typeArguments = fieldElement.getGenericType().getTypeArguments();
         if (CollectionUtils.isNotEmpty(typeArguments)) {
             pushTypeArgumentElements(
                     beanDefinitionType,
@@ -1421,9 +1409,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // invoke getBeanForField
             pushInvokeMethodOnSuperClass(injectMethodVisitor, methodToInvoke);
             // cast the return value to the correct type
-            pushCastToType(injectMethodVisitor, fieldType);
+            pushCastToType(injectMethodVisitor, fieldElement.getType());
 
-            injectMethodVisitor.visitFieldInsn(PUTFIELD, declaringTypeRef.getInternalName(), fieldName, getTypeDescriptor(fieldType));
+            injectMethodVisitor.visitFieldInsn(PUTFIELD, declaringTypeRef.getInternalName(), fieldElement.getName(), getTypeDescriptor(fieldElement.getType()));
         } else {
             // if reflection is required at reflective call
             pushInjectMethodForIndex(injectMethodVisitor, injectInstanceIndex, currentFieldIndex, "injectBeanField");

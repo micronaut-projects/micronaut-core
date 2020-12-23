@@ -652,6 +652,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         }
     }
 
+
     /**
      * Returns the Type reference corresponding to the given class.
      *

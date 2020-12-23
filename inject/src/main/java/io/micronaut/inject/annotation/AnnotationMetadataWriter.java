@@ -285,7 +285,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             );
         } else if (declaredMetadata instanceof AnnotationMetadataReference) {
             final String className = ((AnnotationMetadataReference) declaredMetadata).getClassName();
-            final Type type = getTypeReference(className);
+            final Type type = getTypeReferenceForName(className);
             generatorAdapter.getStatic(type, AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
         } else {
             generatorAdapter.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
@@ -550,7 +550,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 methodVisitor.visitInsn(DUP);
                 methodVisitor.visitTypeInsn(NEW, getInternalName(acv.getName()));
                 methodVisitor.visitInsn(DUP);
-                methodVisitor.invokeConstructor(getTypeReference(acv.getName()), new Method(CONSTRUCTOR_NAME, getConstructorDescriptor()));
+                methodVisitor.invokeConstructor(getTypeReferenceForName(acv.getName()), new Method(CONSTRUCTOR_NAME, getConstructorDescriptor()));
                 methodVisitor.invokeConstructor(TYPE_ANNOTATION_CLASS_VALUE, CONSTRUCTOR_CLASS_VALUE_WITH_INSTANCE);
             } else {
                 invokeLoadClassValueMethod(declaringType, declaringClassWriter, methodVisitor, loadTypeMethods, acv);

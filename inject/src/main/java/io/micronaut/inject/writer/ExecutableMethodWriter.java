@@ -479,7 +479,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             Iterator<ParameterElement> iter = argumentTypeClasses.iterator();
             pushNewArray(getTargetMethod, Class.class, len);
             for (int i = 0; i < len; i++) {
-                Object type = iter.next();
+                ParameterElement type = iter.next();
                 pushStoreInArray(
                         getTargetMethod,
                         i,

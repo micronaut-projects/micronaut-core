@@ -1022,26 +1022,19 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                             fieldElement.annotate(Property.class.getName(), {builder  ->
                                 builder.member("name", propertyMetadata.path)
                             })
-                            fieldAnnotationMetadata = fieldElement.annotationMetadata
                         }
                         getBeanWriter().visitFieldValue(
                                 fieldElement.declaringType,
-                                fieldType,
-                                fieldName,
+                                fieldElement,
                                 requiresReflection,
-                                fieldAnnotationMetadata,
-                                fieldType.typeArguments,
                                 isConfigurationProperties
                         )
                     }
                 } else {
                     getBeanWriter().visitFieldInjectionPoint(
                             fieldElement.declaringType,
-                            fieldType,
-                            fieldName,
-                            requiresReflection,
-                            fieldAnnotationMetadata,
-                            fieldType.typeArguments
+                            fieldElement,
+                            requiresReflection
                     )
                 }
             }

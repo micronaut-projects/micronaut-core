@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -274,6 +275,7 @@ public interface ClassElement extends TypedElement {
      * @param typeName The type
      * @return The class element
      */
+    @Internal
     static ClassElement of(String typeName) {
         return new ClassElement() {
             @Override
