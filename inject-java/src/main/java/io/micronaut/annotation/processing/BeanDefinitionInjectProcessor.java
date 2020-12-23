@@ -54,7 +54,6 @@ import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
 import java.io.IOException;
-import java.lang.annotation.Annotation;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -333,8 +332,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             ExecutableElement constructor = modelUtils.concreteConstructorFor(concreteClass, annotationUtils);
             this.constructorParameterInfo = populateParameterData(
                     concreteClassElement.getName(),
-                    constructor,
-                    null);
+                    constructor
+            );
             this.isExecutableType = isAopProxyType || concreteClassMetadata.hasStereotype(Executable.class);
             boolean hasQualifier = concreteClassMetadata.hasStereotype(Qualifier.class) && !modelUtils.isAbstract(concreteClass);
             this.isDeclaredBean = isExecutableType || concreteClassMetadata.hasStereotype(Scope.class) || concreteClassMetadata.hasStereotype(DefaultScope.class) || constructorParameterInfo.getAnnotationMetadata().hasStereotype(Inject.class) || hasQualifier;
@@ -380,7 +379,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (typeAnnotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
                 AopProxyWriter aopProxyWriter = createIntroductionAdviceWriter(classElement);
                 ExecutableElement constructor = JavaModelUtils.resolveKind(classElement, ElementKind.CLASS).isPresent() ? modelUtils.concreteConstructorFor(classElement, annotationUtils) : null;
-                ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(concreteClassElement.getName(), constructor, null) : null;
+                ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(concreteClassElement.getName(), constructor) : null;
 
                 if (constructorData != null) {
                     aopProxyWriter.visitBeanDefinitionConstructor(
@@ -597,7 +596,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
                         final boolean isAbstract = modelUtils.isAbstract(method);
 
-                        ExecutableElementParamInfo params = populateParameterData(introductionType.getName(), method, null);
+                        ExecutableElementParamInfo params = populateParameterData(introductionType.getName(), method);
                         TypeElement owningType = modelUtils.classElementFor(method);
                         if (owningType == null) {
                             throw new IllegalStateException("Owning type cannot be null");
@@ -852,7 +851,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         return;
                     }
                     String docComment = elementUtils.getDocComment(method);
-                    String setterName = javaMethodElement.getName();
                     PropertyMetadata propertyMetadata = metadataBuilder.visitProperty(
                             concreteClass,
                             declaringClass,
@@ -862,7 +860,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             null
                     );
 
-                    AnnotationMetadata annotationMetadata = addPropertyMetadata(javaMethodElement, propertyMetadata);
+                    addPropertyMetadata(javaMethodElement, propertyMetadata);
 
                     boolean requiresReflection = true;
                     if (javaMethodElement.isPublic()) {
@@ -875,14 +873,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                     writer.visitSetterValue(
                             javaClassElement,
-                            javaMethodElement.getReturnType(),
-                            annotationMetadata,
+                            javaMethodElement,
                             requiresReflection,
-                            parameterElement,
-                            setterName,
-                            parameterElement.getGenericType().getTypeArguments(),
-                            parameterElement.getAnnotationMetadata(),
-                            true);
+                            true
+                    );
                 }
             }
 
@@ -902,7 +896,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return;
             }
             String producedTypeName = producedElement.getQualifiedName().toString();
-            ExecutableElementParamInfo beanMethodParams = populateParameterData(producedTypeName, beanMethod, null);
+            ExecutableElementParamInfo beanMethodParams = populateParameterData(producedTypeName, beanMethod);
 
             TypeMirror returnType = beanMethod.getReturnType();
             JavaClassElement declaringClassElement = new JavaClassElement(
@@ -945,14 +939,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     beanMethod
             );
             beanMethodWriter.visitBeanFactoryMethod(
-                    declaringClassElement,
                     concreteClassElement,
                     javaMethodElement.getReturnType(),
                     beanMethodName,
                     methodAnnotationMetadata,
                     beanMethodParameters,
-                    beanMethodParams.getParameterMetadata(),
-                    beanMethodParams.getGenericParameterTypes()
+                    beanMethodParams.getParameterMetadata()
             );
 
             if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE) && !modelUtils.isAbstract(concreteClass)) {
@@ -967,7 +959,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 ExecutableElement constructor = JavaModelUtils.isClass(returnTypeElement) ? modelUtils.concreteConstructorFor(returnTypeElement, annotationUtils) : null;
-                ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(null, constructor, null) : null;
+                ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(null, constructor) : null;
 
                 OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean.class);
                 Map<CharSequence, Boolean> finalSettings = new LinkedHashMap<>();
@@ -1098,8 +1090,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     );
                                     beanMethodWriter.visitPreDestroyMethod(
                                             destroyMethodDeclaringElement,
-                                            destroyMethodElement.getReturnType(),
-                                            destroyMethodName
+                                            destroyMethodElement,
+                                            false
                                     );
                                 } else {
                                     error(beanMethod, "@Bean method defines a preDestroy method that does not exist or is not public: " + destroyMethodName);
@@ -1349,7 +1341,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                         visitorContext
                                 );
 
-                                AnnotationMetadata annotationMetadata = javaMethodElement.annotate(Adapter.class, (builder) -> {
+                                javaMethodElement.annotate(Adapter.class, (builder) -> {
                                     AnnotationClassValue<Object> acv = new AnnotationClassValue<>(concreteClassElement.getName());
                                     builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, acv);
                                     builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, sourceMethodElement.getName());
@@ -1358,7 +1350,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     if (StringUtils.isNotEmpty(qualifier)) {
                                         builder.member(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier);
                                     }
-                                }).getAnnotationMetadata();
+                                });
 
                                 aopProxyWriter.visitAroundMethod(
                                         declaringClassElement,
@@ -1436,7 +1428,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
          * @param o      An object
          */
         void visitAnnotatedMethod(ExecutableElement method, Object o) {
-            ExecutableElementParamInfo params = populateParameterData(null, method, null);
             TypeElement declaringClass = modelUtils.classElementFor(method);
 
             if (declaringClass == null) {
@@ -1497,13 +1488,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 addOriginatingElementIfNecessary(writer, declaringClass);
                 writer.visitPostConstructMethod(
                         declaringClassElement,
-                        requiresReflection,
-                        javaMethodElement.getReturnType(),
-                        method.getSimpleName().toString(),
-                        params.getParameters(),
-                        params.getParameterMetadata(),
-                        params.getGenericParameterTypes(),
-                        annotationMetadata
+                        javaMethodElement,
+                        requiresReflection
                 );
             } else if (annotationMetadata.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
@@ -1514,26 +1500,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 addOriginatingElementIfNecessary(writer, declaringClass);
                 writer.visitPreDestroyMethod(
                         declaringClassElement,
-                        requiresReflection,
-                        javaMethodElement.getReturnType(),
-                        method.getSimpleName().toString(),
-                        params.getParameters(),
-                        params.getParameterMetadata(),
-                        params.getGenericParameterTypes(),
-                        annotationMetadata
+                        javaMethodElement,
+                        requiresReflection
                 );
             } else if (annotationMetadata.hasDeclaredStereotype(Inject.class) || annotationMetadata.hasDeclaredStereotype(ConfigurationInject.class)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
                 addOriginatingElementIfNecessary(writer, declaringClass);
                 writer.visitMethodInjectionPoint(
                         declaringClassElement,
-                        requiresReflection,
-                        javaMethodElement.getReturnType(),
-                        method.getSimpleName().toString(),
-                        params.getParameters(),
-                        params.getParameterMetadata(),
-                        params.getGenericParameterTypes(),
-                        annotationMetadata
+                        javaMethodElement,
+                        requiresReflection
                 );
             } else {
                 error("Unexpected call to visitAnnotatedMethod(%s)", method);
@@ -2067,8 +2043,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private ExecutableElementParamInfo populateParameterData(
                 @Nullable String declaringTypeName,
-                ExecutableElement element,
-                Map<String, Map<String, TypeMirror>> typeArgumentMirrors) {
+                ExecutableElement element) {
             if (element == null) {
                 return new ExecutableElementParamInfo(false, null);
             }
@@ -2107,16 +2082,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         paramElement,
                         annotationMetadata,
                         visitorContext
-                ) {
-                    @Override
-                    public ClassElement getGenericType() {
-                        if (typeArgumentMirrors != null) {
-                            return parameterizedClassElement(getNativeType().asType(), visitorContext, typeArgumentMirrors);
-                        } else {
-                            return super.getGenericType();
-                        }
-                    }
-                };
+                );
 
                 if (annotationMetadata.hasStereotype(ANN_CONSTRAINT)) {
                     params.setValidated(true);

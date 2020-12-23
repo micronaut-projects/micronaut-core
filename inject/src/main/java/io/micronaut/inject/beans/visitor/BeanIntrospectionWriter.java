@@ -312,20 +312,13 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     private void writeConstructorArguments() {
         final GeneratorAdapter getConstructorArguments = startPublicMethodZeroArgs(introspectionWriter, Argument[].class, "getConstructorArguments");
-        ParameterElement[] constructorArguments = constructor.getParameters();
-        final Map<String, ParameterElement> args = toParameterTypes(constructorArguments);
-        Map<String, AnnotationMetadata> annotationMetadataMap = new LinkedHashMap<>(args.size());
-        for (ParameterElement constructorArgument : constructorArguments) {
-            annotationMetadataMap.put(constructorArgument.getName(), constructorArgument.getAnnotationMetadata());
-        }
+        List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
         pushBuildArgumentsForMethod(
                 introspectionType.getClassName(),
                 introspectionType,
                 introspectionWriter,
                 getConstructorArguments,
-                args,
-                annotationMetadataMap,
-                toTypeArguments(constructorArguments),
+                constructorArguments,
                 localLoadTypeMethods
         );
 
@@ -344,7 +337,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 "instantiateInternal",
                 desc);
 
-        Collection<Type> argumentTypes = Arrays.stream(constructorArguments).map(pe ->
+        Collection<Type> argumentTypes = constructorArguments.stream().map(pe ->
                 getTypeReference(pe.getType())
         ).collect(Collectors.toList());
 
@@ -367,7 +360,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         }
 
         if (isConstructor) {
-            final String constructorDescriptor = getConstructorDescriptor(Arrays.asList(constructorArguments));
+            final String constructorDescriptor = getConstructorDescriptor(constructorArguments);
             instantiateInternal.invokeConstructor(beanType, new Method("<init>", constructorDescriptor));
         } else if (constructor.isStatic()) {
             final String methodDescriptor = getMethodDescriptor(beanType, argumentTypes);

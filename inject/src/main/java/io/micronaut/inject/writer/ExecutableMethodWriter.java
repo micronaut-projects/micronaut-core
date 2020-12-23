@@ -257,23 +257,12 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
         if (hasArgs) {
             // 4th argument: the generic types
-            Map<String, ParameterElement> params = new LinkedHashMap<>(argumentTypes.size());
-            Map<String, AnnotationMetadata> anns = new LinkedHashMap<>(argumentTypes.size());
-            Map<String, ClassElement> generics = new LinkedHashMap<>(argumentTypes.size());
-            for (ParameterElement argumentType : argumentTypes) {
-                String n = argumentType.getName();
-                params.put(n, argumentType);
-                anns.put(n, argumentType.getAnnotationMetadata());
-                generics.put(n, argumentType.getGenericType());
-            }
             pushBuildArgumentsForMethod(
                     methodType.getClassName(),
                     methodType,
                     classWriter,
                     constructorWriter,
-                    params,
-                    anns,
-                    generics,
+                    argumentTypes,
                     loadTypeMethods
             );
 

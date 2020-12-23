@@ -498,13 +498,11 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
             beanMethodWriter.visitBeanFactoryMethod(
                     originatingElement,
-                    originatingElement,
                     producedClassElement,
                     methodName,
                     methodAnnotationMetadata,
                     paramsToType,
-                    argumentAnnotationMetadata,
-                    paramsGenerics
+                    argumentAnnotationMetadata
             )
 
             if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
@@ -584,8 +582,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     )
                     beanMethodWriter.visitPreDestroyMethod(
                             producedClassElement as GroovyClassElement,
-                            destroyMethodElement.genericReturnType,
-                            destroyMethodName
+                            destroyMethodElement,
+                            false
                     )
                 } else {
                     addError("@Bean method defines a preDestroy method that does not exist or is not public: $destroyMethodName", methodNode )
@@ -656,13 +654,9 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         }
                         beanWriter.visitPostConstructMethod(
                                 declaringElement,
-                                requiresReflection,
-                                groovyMethodElement.returnType,
-                                methodName,
-                                paramsToType,
-                                argumentAnnotationMetadata,
-                                genericTypeMap,
-                                methodAnnotationMetadata)
+                                groovyMethodElement,
+                                requiresReflection
+                        )
                     } else if (isDeclaredBean && methodAnnotationMetadata.hasStereotype(ProcessedTypes.PRE_DESTROY)) {
                         defineBeanDefinition(concreteClass)
                         def beanWriter = getBeanWriter()
@@ -671,24 +665,16 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         }
                         beanWriter.visitPreDestroyMethod(
                                 declaringElement,
-                                requiresReflection,
-                                groovyMethodElement.returnType,
-                                methodName,
-                                paramsToType,
-                                argumentAnnotationMetadata,
-                                genericTypeMap,
-                                methodAnnotationMetadata)
+                                groovyMethodElement,
+                                requiresReflection
+                        )
                     } else if (methodAnnotationMetadata.hasStereotype(Inject.class)) {
                         defineBeanDefinition(concreteClass)
                         getBeanWriter().visitMethodInjectionPoint(
                                 declaringElement,
-                                requiresReflection,
-                                groovyMethodElement.returnType,
-                                methodName,
-                                paramsToType,
-                                argumentAnnotationMetadata,
-                                genericTypeMap,
-                                methodAnnotationMetadata)
+                                groovyMethodElement,
+                                requiresReflection
+                        )
                     }
                 }
             }
@@ -745,13 +731,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
                         getBeanWriter().visitSetterValue(
                                 groovyMethodElement.declaringType,
-                                groovyMethodElement.returnType,
-                                groovyMethodElement.annotationMetadata,
+                                groovyMethodElement,
                                 false,
-                                parameterElement,
-                                methodNode.name,
-                                parameterElement.genericType.typeArguments,
-                                parameterElement.annotationMetadata,
                                 true
                         )
                     }
@@ -1119,15 +1100,18 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         return fieldElement.genericType
                     }
                 }
-                getBeanWriter().visitMethodInjectionPoint(
+                MethodElement methodElement = MethodElement.of(
                         fieldElement.declaringType,
-                        false,
+                        fieldElement,
+                        PrimitiveElement.VOID,
                         PrimitiveElement.VOID,
                         getSetterName(propertyName),
-                        Collections.singletonMap(propertyName, parameterElement),
-                        Collections.singletonMap(propertyName, fieldAnnotationMetadata),
-                        Collections.singletonMap(propertyName, fieldElement.genericType),
-                        fieldAnnotationMetadata
+                        parameterElement
+                )
+                getBeanWriter().visitMethodInjectionPoint(
+                        fieldElement.declaringType,
+                        methodElement,
+                        false
                 )
             } else if (isValue) {
                 if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
@@ -1167,15 +1151,30 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     }
                     def setterName = GeneralUtils.getSetterName(propertyName)
 
+                    GroovyParameterElement parameterElement = new GroovyParameterElement(
+                            null,
+                            sourceUnit,
+                            compilationUnit,
+                            new Parameter(fieldNode.type, fieldNode.name),
+                            fieldAnnotationMetadata
+                    ) {
+                        @Override
+                        ClassElement getGenericType() {
+                            return fieldElement.genericType
+                        }
+                    }
+                    def methodElement = MethodElement.of(
+                            fieldElement.declaringType,
+                            fieldAnnotationMetadata,
+                            PrimitiveElement.VOID,
+                            PrimitiveElement.VOID,
+                            setterName,
+                            parameterElement
+                    )
                     getBeanWriter().visitSetterValue(
                             fieldElement.declaringType,
-                            PrimitiveElement.VOID,
-                            fieldAnnotationMetadata,
+                            methodElement,
                             false,
-                            fieldElement.type,
-                            fieldNode.name,
-                            setterName,
-                            Collections.singletonMap(fieldNode.name, fieldElement.genericField),
                             isConfigurationProperties
                     )
                 }

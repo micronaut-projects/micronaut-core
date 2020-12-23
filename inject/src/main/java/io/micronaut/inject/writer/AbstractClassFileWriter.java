@@ -386,8 +386,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param declaringClassWriter       The declaring class writer
      * @param generatorAdapter           The {@link GeneratorAdapter}
      * @param argumentTypes              The argument types
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes               The generic types
      * @param loadTypeMethods            The load type methods
      */
     protected static void pushBuildArgumentsForMethod(
@@ -395,27 +393,19 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             Type owningType,
             ClassWriter declaringClassWriter,
             GeneratorAdapter generatorAdapter,
-            Map<String, ParameterElement> argumentTypes,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            Map<String, ClassElement> genericTypes,
+            Collection<ParameterElement> argumentTypes,
             Map<String, GeneratorAdapter> loadTypeMethods) {
         int len = argumentTypes.size();
         pushNewArray(generatorAdapter, Argument.class, len);
         int i = 0;
-        for (Map.Entry<String, ParameterElement> entry : argumentTypes.entrySet()) {
+        for (ParameterElement entry : argumentTypes) {
             // the array index position
             generatorAdapter.push(i);
 
-            ClassElement classElement = genericTypes.get(entry.getKey());
-            if (classElement == null) {
-                classElement = entry.getValue().getType();
-            }
-            String argumentName = entry.getKey();
-            AnnotationMetadata annotationMetadata = argumentAnnotationMetadata.get(argumentName);
-            if (annotationMetadata == null) {
-                annotationMetadata = entry.getValue().getAnnotationMetadata();
-            }
-            Map<String, ClassElement> typeArguments = genericTypes.containsKey(argumentName) ? genericTypes.get(argumentName).getTypeArguments() : null;
+            ClassElement classElement = entry.getGenericType();
+            String argumentName = entry.getName();
+            AnnotationMetadata annotationMetadata = entry.getAnnotationMetadata();
+            Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
             pushCreateArgument(
                     declaringElementName,
                     owningType,

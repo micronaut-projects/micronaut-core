@@ -23,6 +23,7 @@ import org.objectweb.asm.Type;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
@@ -46,7 +47,8 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @deprecated Use {@link #getOriginatingElements()} instead
      */
     @Deprecated
-    @Nullable Element getOriginatingElement();
+    @Nullable
+    Element getOriginatingElement();
 
     /**
      * Visits a no arguments constructor. Either this method or
@@ -136,6 +138,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
 
     /**
      * Sets the name of the intercepted type.
+     *
      * @param typeName The type name
      */
     void setInterceptedType(String typeName);
@@ -178,50 +181,15 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
     void accept(ClassWriterOutputVisitor visitor) throws IOException;
 
     /**
-     * Visits an injection point for a field and setter pairing.
-     *
-     * @param declaringType      The declaring type
-     * @param returnType         The return type
-     * @param annotationMetadata The annotation metadata
-     * @param requiresReflection Whether the setter requires reflection
-     * @param fieldType          The field type
-     * @param fieldName          The field name
-     * @param setterName         The setter name
-     * @param genericTypes       The generic types
-     * @param isOptional         Whether the setter is optional
-     */
-    void visitSetterValue(TypedElement declaringType,
-                          ClassElement returnType,
-                          AnnotationMetadata annotationMetadata,
-                          boolean requiresReflection,
-                          ClassElement fieldType,
-                          String fieldName,
-                          String setterName,
-                          Map<String, ClassElement> genericTypes,
-                          boolean isOptional);
-
-
-    /**
      * Visits an injection point for a setter.
      *
      * @param declaringType          The declaring type
-     * @param returnType             The return type
-     * @param methodMetadata         The annotation metadata
      * @param requiresReflection     Whether the setter requires reflection
-     * @param valueType              The field type
-     * @param setterName             The setter name
-     * @param genericTypes           The generic types
-     * @param setterArgumentMetadata The setter argument metadata
      * @param isOptional             Whether the setter is optional
      */
     void visitSetterValue(TypedElement declaringType,
-                          ClassElement returnType,
-                          AnnotationMetadata methodMetadata,
+                          MethodElement methodElement,
                           boolean requiresReflection,
-                          ParameterElement valueType,
-                          String setterName,
-                          Map<String, ClassElement> genericTypes,
-                          AnnotationMetadata setterArgumentMetadata,
                           boolean isOptional);
 
     /**
@@ -229,78 +197,40 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      *
      * @param declaringType              The declaring type of the method. Either a Class or a string representing
      *                                   the name of the type
+     * @param methodElement              The method element
      * @param requiresReflection         Whether the method requires reflection
-     * @param returnType                 The return type of the method. Either a Class or a string representing the
-     *                                   name of the type
-     * @param methodName                 The method name
-     * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap.
-     *                                   Can be null or empty.
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes               The generic types of each argument. Can be null.
-     * @param annotationMetadata         The annotation metadata
      */
     void visitPostConstructMethod(TypedElement declaringType,
-                                  boolean requiresReflection,
-                                  ClassElement returnType,
-                                  String methodName,
-                                  Map<String, ParameterElement> argumentTypes,
-                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                  Map<String, ClassElement> genericTypes,
-                                  AnnotationMetadata annotationMetadata);
+                                  MethodElement methodElement,
+                                  boolean requiresReflection);
 
     /**
      * Visits a method injection point.
      *
-     * @param declaringType              The declaring type of the method. Either a Class or a string representing the
-     *                                   name of the type
-     * @param requiresReflection         Whether the method requires reflection
-     * @param returnType                 The return type of the method. Either a Class or a string representing the name
-     *                                   of the type
-     * @param methodName                 The method name
-     * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap.
-     *                                   Can be null or empty.
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes               The generic types of each argument. Can be null.
-     * @param annotationMetadata         The annotation metadata
+     * @param beanType           The bean type of the method
+     * @param methodElement      The method element
+     * @param requiresReflection Whether the method requires reflection
      */
-    void visitPreDestroyMethod(TypedElement declaringType,
-                               boolean requiresReflection,
-                               ClassElement returnType,
-                               String methodName,
-                               Map<String, ParameterElement> argumentTypes,
-                               Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                               Map<String, ClassElement> genericTypes,
-                               AnnotationMetadata annotationMetadata);
+    void visitPreDestroyMethod(TypedElement beanType,
+                               MethodElement methodElement,
+                               boolean requiresReflection);
 
     /**
      * Visits a method injection point.
      *
-     * @param declaringType              The declaring type of the method. Either a Class or a string representing the
-     *                                   name of the type
-     * @param requiresReflection         Whether the method requires reflection
-     * @param returnType                 The return type of the method. Either a Class or a string representing the name
-     *                                   of the type
-     * @param methodName                 The method name
-     * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap.
-     *                                   Can be null or empty.
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes               The generic types of each argument. Can be null.
-     * @param annotationMetadata         The annotation metadata
+     * @param beanType           The bean type of the method
+     * @param methodElement      The method element
+     * @param requiresReflection Whether the method requires reflection
      */
-    void visitMethodInjectionPoint(TypedElement declaringType,
-                                   boolean requiresReflection,
-                                   ClassElement returnType,
-                                   String methodName,
-                                   Map<String, ParameterElement> argumentTypes,
-                                   Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                   Map<String, ClassElement> genericTypes,
-                                   AnnotationMetadata annotationMetadata);
+    void visitMethodInjectionPoint(TypedElement beanType,
+                                   MethodElement methodElement,
+                                   boolean requiresReflection);
 
     /**
      * Visit a method that is to be made executable allow invocation of said method without reflection.
      *
-     * @param declaringBean              The declaring bean of the method. Note this may differ from {@link MethodElement#getDeclaringType()} in the case of the method coming from a super class or interface.
-     * @param methodElement              The method element
+     * @param declaringBean The declaring bean of the method. Note this may differ from {@link MethodElement#getDeclaringType()} in the case of the method coming from a super class or interface.
+     * @param methodElement The method element
      * @return The {@link ExecutableMethodWriter}.
      */
     ExecutableMethodWriter visitExecutableMethod(TypedElement declaringBean,
@@ -394,12 +324,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
     /**
      * Visit a configuration builder method.
      *
-     * @param prefix              The prefix used for the method
-     * @param returnType          The return type
-     * @param methodName          The method name
-     * @param paramType           The method type
-     * @param generics            The generic types of the method
-     * @param path                The property path
+     * @param prefix     The prefix used for the method
+     * @param returnType The return type
+     * @param methodName The method name
+     * @param paramType  The method type
+     * @param generics   The generic types of the method
+     * @param path       The property path
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
@@ -413,10 +343,10 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
     /**
      * Visit a configuration builder method that accepts a long and a TimeUnit.
      *
-     * @param prefix              The prefix used for the method
-     * @param returnType          The return type
-     * @param methodName          The method name
-     * @param path                The property path
+     * @param prefix     The prefix used for the method
+     * @param returnType The return type
+     * @param methodName The method name
+     * @param path       The property path
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderDurationMethod(

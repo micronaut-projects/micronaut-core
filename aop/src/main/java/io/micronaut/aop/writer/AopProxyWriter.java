@@ -30,6 +30,7 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -59,6 +60,7 @@ import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -152,7 +154,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private int beanContextArgumentIndex = -1;
     private int qualifierIndex;
     private Map<String, ParameterElement> constructorArgumentTypes;
-    private Map<String, AnnotationMetadata> constructArgumentMetadata;
     private Map<String, ClassElement> constructorGenericTypes;
     private Map<String, ParameterElement> constructorNewArgumentTypes;
     private final List<Runnable> deferredInjectionPoints = new ArrayList<>();
@@ -404,15 +405,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.constructorAnnotationMedata = annotationMetadata;
         this.constructorRequriesReflection = requiresReflection;
         this.constructorArgumentTypes = argumentTypes;
-        this.constructArgumentMetadata = argumentAnnotationMetadata;
         this.constructorGenericTypes = genericTypes;
         this.constructorNewArgumentTypes = new LinkedHashMap<>(argumentTypes);
         this.beanContextArgumentIndex = argumentTypes.size();
-        constructorNewArgumentTypes.put("$beanContext", ParameterElement.of(BeanContext.class, "beanContext"));
+        constructorNewArgumentTypes.put("$beanContext", ParameterElement.of(BeanContext.class, "$beanContext"));
         this.qualifierIndex = constructorNewArgumentTypes.size();
-        constructorNewArgumentTypes.put("$qualifier", ParameterElement.of(Qualifier.class, "qualifier"));
+        constructorNewArgumentTypes.put("$qualifier", ParameterElement.of(Qualifier.class, "$qualifier"));
         this.interceptorArgumentIndex = constructorNewArgumentTypes.size();
-        constructorNewArgumentTypes.put("$interceptors", ParameterElement.of(Interceptor[].class, "interceptors"));
+        constructorNewArgumentTypes.put("$interceptors", ParameterElement.of(Interceptor[].class, "$interceptors"));
 
     }
 
@@ -596,15 +596,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             throw new IllegalStateException("The method visitBeanDefinitionConstructor(..) should be called at least once");
         }
         Type[] interceptorTypes = getObjectTypes(this.interceptorTypes);
-        this.constructArgumentMetadata = new LinkedHashMap<>(this.constructArgumentMetadata);
-        this.constructArgumentMetadata.put("$interceptors", new DefaultAnnotationMetadata() {{
-            addDeclaredAnnotation(io.micronaut.context.annotation.Type.class.getName(), Collections.singletonMap(
-                    "value", Arrays.stream(interceptorTypes).map(t -> new AnnotationClassValue(t.getClassName())).toArray()
-            ));
-        }});
-        this.constructArgumentMetadata.put("$qualifier", new DefaultAnnotationMetadata() {{
-            addDeclaredAnnotation("javax.annotation.Nullable", Collections.emptyMap());
-        }});
+        this.constructorNewArgumentTypes.get("$interceptors").annotate(io.micronaut.context.annotation.Type.class, builder -> {
+            AnnotationClassValue<?>[] types = Arrays.stream(interceptorTypes).map(t -> new AnnotationClassValue<>(t.getClassName())).toArray(AnnotationClassValue[]::new);
+            builder.values(types);
+        });
+        this.constructorNewArgumentTypes.get("$qualifier").annotate("javax.annotation.Nullable");
+
+        Map<String, AnnotationMetadata> constructArgumentMetadata = new LinkedHashMap<>(constructorArgumentTypes.size());
+        constructorArgumentTypes.forEach((name, p) -> constructArgumentMetadata.put(name, p.getAnnotationMetadata()));
         String constructorDescriptor = getConstructorDescriptor(constructorNewArgumentTypes.values());
         ClassWriter proxyClassWriter = this.classWriter;
         this.constructorWriter = proxyClassWriter.visitMethod(
@@ -643,7 +642,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 constructorRequriesReflection,
                 constructorNewArgumentTypes,
                 constructArgumentMetadata,
-                constructorGenericTypes);
+                constructorGenericTypes
+        );
 
         GeneratorAdapter targetDefinitionGenerator = null;
         GeneratorAdapter targetTypeGenerator = null;
@@ -672,7 +672,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             targetTypeGenerator.returnValue();
         }
 
-        Class interceptedInterface = isIntroduction ? Introduced.class : Intercepted.class;
+        Class<?> interceptedInterface = isIntroduction ? Introduced.class : Intercepted.class;
         Type targetType = getTypeReference(targetClassFullName);
 
         // add the $beanLocator field
@@ -948,105 +948,53 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public void visitSetterValue(
             TypedElement declaringType,
-            ClassElement returnType,
-            AnnotationMetadata annotationMetadata,
+            MethodElement methodElement,
             boolean requiresReflection,
-            ClassElement fieldType,
-            String fieldName,
-            String setterName,
-            Map<String, ClassElement> genericTypes,
-            boolean isOptional) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterValue(
-                declaringType, returnType, annotationMetadata, requiresReflection, fieldType, fieldName, setterName, genericTypes, isOptional
-        ));
-    }
-
-    @Override
-    public void visitSetterValue(
-            TypedElement declaringType,
-            ClassElement returnType,
-            AnnotationMetadata setterMetadata,
-            boolean requiresReflection,
-            ParameterElement valueType,
-            String setterName,
-            Map<String, ClassElement> genericTypes,
-            AnnotationMetadata setterArgumentMetadata,
             boolean isOptional) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitSetterValue(
                         declaringType,
-                        returnType,
-                        setterMetadata,
+                        methodElement,
                         requiresReflection,
-                        valueType,
-                        setterName,
-                        genericTypes,
-                        setterArgumentMetadata,
-                        isOptional)
+                        isOptional
+                )
         );
     }
 
     @Override
     public void visitPostConstructMethod(
             TypedElement declaringType,
-            boolean requiresReflection,
-            ClassElement returnType,
-            String methodName,
-            Map<String, ParameterElement> argumentTypes,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            Map<String, ClassElement> genericTypes, AnnotationMetadata annotationMetadata) {
+            MethodElement methodElement,
+            boolean requiresReflection) {
         deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitPostConstructMethod(
                 declaringType,
-                requiresReflection,
-                returnType,
-                methodName,
-                argumentTypes,
-                argumentAnnotationMetadata,
-                genericTypes,
-                annotationMetadata));
+                methodElement,
+                requiresReflection
+        ));
     }
 
     @Override
     public void visitPreDestroyMethod(
             TypedElement declaringType,
-            boolean requiresReflection,
-            ClassElement returnType,
-            String methodName,
-            Map<String, ParameterElement> argumentTypes,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            Map<String, ClassElement> genericTypes, AnnotationMetadata annotationMetadata) {
+            MethodElement methodElement,
+            boolean requiresReflection) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitPreDestroyMethod(
                         declaringType,
-                        requiresReflection,
-                        returnType,
-                        methodName,
-                        argumentTypes,
-                        argumentAnnotationMetadata,
-                        genericTypes,
-                        annotationMetadata)
+                        methodElement,
+                        requiresReflection)
         );
     }
 
     @Override
-    public void visitMethodInjectionPoint(
-            TypedElement declaringType,
-            boolean requiresReflection,
-            ClassElement returnType,
-            String methodName,
-            Map<String, ParameterElement> argumentTypes,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            Map<String, ClassElement> genericTypes, AnnotationMetadata annotationMetadata) {
+    public void visitMethodInjectionPoint(TypedElement beanType,
+                                          MethodElement methodElement,
+                                          boolean requiresReflection) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitMethodInjectionPoint(
-                        declaringType,
-                        requiresReflection,
-                        returnType,
-                        methodName,
-                        argumentTypes,
-                        argumentAnnotationMetadata,
-                        genericTypes,
-                        annotationMetadata)
+                        beanType,
+                        methodElement,
+                        requiresReflection)
         );
     }
 
@@ -1374,27 +1322,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         final List<BeanDefinitionWriter.MethodVisitData> postConstructMethodVisits = parent.getPostConstructMethodVisits();
         for (BeanDefinitionWriter.MethodVisitData methodVisit : postConstructMethodVisits) {
             visitPostConstructMethod(
-                    methodVisit.getDeclaringType(),
-                    methodVisit.isRequiresReflection(),
-                    methodVisit.getReturnType(),
-                    methodVisit.getMethodName(),
-                    methodVisit.getArgumentTypes(),
-                    methodVisit.getArgumentAnnotationMetadata(),
-                    methodVisit.getGenericTypes(),
-                    methodVisit.getAnnotationMetadata()
-            );
+                    methodVisit.getBeanType(),
+                    methodVisit.getMethodElement(),
+                    methodVisit.isRequiresReflection());
         }
         final List<BeanDefinitionWriter.MethodVisitData> preDestroyMethodVisits = parent.getPreDestroyMethodVisits();
         for (BeanDefinitionWriter.MethodVisitData methodVisit : preDestroyMethodVisits) {
             visitPreDestroyMethod(
-                    methodVisit.getDeclaringType(),
-                    methodVisit.isRequiresReflection(),
-                    methodVisit.getReturnType(),
-                    methodVisit.getMethodName(),
-                    methodVisit.getArgumentTypes(),
-                    methodVisit.getArgumentAnnotationMetadata(),
-                    methodVisit.getGenericTypes(),
-                    methodVisit.getAnnotationMetadata()
+                    methodVisit.getBeanType(),
+                    methodVisit.getMethodElement(),
+                    methodVisit.isRequiresReflection()
             );
         }
     }
