@@ -53,6 +53,7 @@ import io.micronaut.inject.processing.ProcessedTypes
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
+import io.micronaut.inject.writer.OriginatingElements
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
@@ -75,7 +76,6 @@ import org.codehaus.groovy.syntax.SyntaxException
 
 import javax.inject.Inject
 import javax.inject.Named
-import javax.inject.Provider
 import javax.inject.Scope
 import java.lang.reflect.Modifier
 import java.time.Duration
@@ -465,7 +465,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     factoryMethodBeanDefinitionName,
                     producedClassElement.name,
                     producedClassElement.isInterface(),
-                    originatingElement,
+                    OriginatingElements.of(originatingElement),
                     methodAnnotationMetadata
             )
 
@@ -1261,9 +1261,22 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 addError("Micronaut beans cannot be in the default package", classNode)
                 return
             }
-            ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
-            boolean isProvider = providerGenericType != null
             AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)
+            if (configurationMetadata != null) {
+                String existingPrefix = annotationMetadata.getValue(
+                        ConfigurationReader.class,
+                        "prefix", String.class)
+                        .orElse("")
+
+                def computedPrefix = StringUtils.isNotEmpty(existingPrefix) ? existingPrefix + "." + configurationMetadata.getName() : configurationMetadata.getName()
+                annotationMetadata = DefaultAnnotationMetadata.mutateMember(
+                        annotationMetadata,
+                        ConfigurationReader.class.getName(),
+                        "prefix",
+                        computedPrefix
+                )
+            }
+
             GroovyClassElement groovyClassElement = new GroovyClassElement(
                     sourceUnit,
                     compilationUnit,
@@ -1274,38 +1287,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             if (annotationMetadata.hasStereotype(Singleton)) {
                 addError("Class annotated with groovy.lang.Singleton instead of javax.inject.Singleton. Import javax.inject.Singleton to use Micronaut Dependency Injection.", classNode)
             }
-            if (configurationMetadata != null) {
-                String existingPrefix = annotationMetadata.getValue(
-                        ConfigurationReader.class,
-                        "prefix", String.class)
-                        .orElse("")
 
-                annotationMetadata = DefaultAnnotationMetadata.mutateMember(
-                        annotationMetadata,
-                        ConfigurationReader.class.getName(),
-                        "prefix",
-                        StringUtils.isNotEmpty(existingPrefix) ? existingPrefix + "." + configurationMetadata.getName() : configurationMetadata.getName()
-                )
-            }
-            if (isProvider) {
-                beanWriter = new BeanDefinitionWriter(
-                        classNode.packageName,
-                        classNode.nameWithoutPackage,
-                        providerGenericType.name,
-                        classNode.isInterface(),
-                        originatingElement,
-                        annotationMetadata
-                )
-            } else {
-
-                beanWriter = new BeanDefinitionWriter(
-                        classNode.packageName,
-                        classNode.nameWithoutPackage,
-                        originatingElement,
-                        annotationMetadata
-                )
-            }
-
+            beanWriter = new BeanDefinitionWriter(groovyClassElement)
             visitTypeArguments(classNode, (BeanDefinitionWriter) beanWriter)
 
             beanDefinitionWriters.put(classNode, beanWriter)

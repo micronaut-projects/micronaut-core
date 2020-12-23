@@ -104,8 +104,8 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
                 .map(pathEvaluationFunction(annotationMetadata)).orElseGet( {->
             AnnotationMetadata ownerMetadata = getAnnotationMetadata(owningType)
             return ownerMetadata.stringValue(ConfigurationReader.class)
-                                .map(pathEvaluationFunction(ownerMetadata)).orElseThrow({ ->
-                new IllegalStateException("Non @ConfigurationProperties type visited")
+                                .map(pathEvaluationFunction(ownerMetadata)).orElseGet({ ->
+                pathEvaluationFunction(annotationMetadata).apply("")
             })
         })
     }

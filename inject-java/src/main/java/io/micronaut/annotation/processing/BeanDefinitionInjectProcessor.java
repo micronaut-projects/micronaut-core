@@ -43,6 +43,7 @@ import io.micronaut.inject.processing.ProcessedTypes;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
+import io.micronaut.inject.writer.OriginatingElements;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -1882,10 +1883,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
                 classElement = new JavaClassElement(typeElement, annotationMetadata, visitorContext);
             }
-            String packageName = classElement.getPackageName();
-            boolean isInterface = classElement.isInterface();
-            String beanClassName = modelUtils.simpleBinaryNameFor(typeElement);
-
             if (configurationMetadata != null) {
                 // unfortunate we have to do this
                 String existingPrefix = annotationMetadata.getValue(
@@ -1894,22 +1891,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         .orElse("");
 
                 String computedPrefix = StringUtils.isNotEmpty(existingPrefix) ? existingPrefix + "." + configurationMetadata.getName() : configurationMetadata.getName();
-                annotationMetadata = classElement.annotate(ConfigurationReader.class, (builder) ->
+                classElement.annotate(ConfigurationReader.class, (builder) ->
                         builder.member("prefix", computedPrefix)
-                ).getAnnotationMetadata();
+                );
             }
 
 
-            BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(
-                    packageName,
-                    beanClassName,
-                    providerTypeParam == null
-                            ? elementUtils.getBinaryName(typeElement).toString()
-                            : providerTypeParam.toString(),
-                    isInterface,
-                    classElement,
-                    annotationMetadata
-            );
+            BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(classElement);
 
             visitTypeArguments(typeElement, beanDefinitionWriter);
 
@@ -2031,12 +2019,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     factoryMethodBeanDefinitionName,
                     modelUtils.resolveTypeReference(producedElement).toString(),
                     isInterface,
-                    new JavaMethodElement(
+                    OriginatingElements.of(new JavaMethodElement(
                             new JavaClassElement(concreteClass, concreteClassMetadata, visitorContext),
                             method,
                             annotationMetadata,
                             visitorContext
-                    ),
+                    )),
                     annotationMetadata
             );
         }
