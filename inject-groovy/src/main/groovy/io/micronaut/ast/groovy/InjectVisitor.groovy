@@ -182,16 +182,16 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             String packageName = node.packageName
             String beanClassName = node.nameWithoutPackage
 
-            String[] aroundInterceptors = annotationMetadata
-                    .getAnnotationNamesByStereotype(AROUND_TYPE) as String[]
+            ClassElement[] aroundInterceptors = annotationMetadata
+                    .getAnnotationNamesByStereotype(AROUND_TYPE).collect { ClassElement.of(it) }
 
-            String[] introductionInterceptors = annotationMetadata
-                    .getAnnotationNamesByStereotype(Introduction.class) as String[]
+            ClassElement[] introductionInterceptors = annotationMetadata
+                    .getAnnotationNamesByStereotype(Introduction.class).collect { ClassElement.of(it) }
 
 
-            String[] interceptorTypes = ArrayUtils.concat(aroundInterceptors, introductionInterceptors)
-            String[] interfaceTypes = annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0])
-
+            ClassElement[] interceptorTypes = ArrayUtils.concat(aroundInterceptors, introductionInterceptors) as ClassElement[]
+            ClassElement[] interfaceTypes = annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0])
+                                                    .collect {ClassElement.of(it) }
 
             AopProxyWriter aopProxyWriter = new AopProxyWriter(
                     packageName,
@@ -394,7 +394,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 }
 
                 if (AstAnnotationUtils.hasStereotype(source, unit, methodNode, AROUND_TYPE)) {
-                    Object[] interceptorTypeReferences = annotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
+                    ClassElement[] interceptorTypeReferences = annotationMetadata.getAnnotationNamesByStereotype(Around)
+                                                                    .collect { ClassElement.of(it) }
                     aopProxyWriter.visitInterceptorTypes(interceptorTypeReferences)
                 }
 
@@ -513,7 +514,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     return
                 }
 
-                Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
+                ClassElement[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around)
+                                                            .collect { ClassElement.of(it) }
                 OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
                 Map<CharSequence, Object> finalSettings = [:]
                 for (key in aopSettings) {
@@ -835,9 +837,11 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         addError("Public method inherits AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.", methodNode)
                     }
                 } else {
-                    Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
+                    ClassElement[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around)
+                                                                        .collect { ClassElement.of(it) }
                     if (hasConstraints) {
-                        interceptorTypeReferences = ArrayUtils.concat(interceptorTypeReferences, "io.micronaut.validation.Validated")
+                        interceptorTypeReferences = ArrayUtils.concat(interceptorTypeReferences, ClassElement.of("io.micronaut.validation.Validated"))
+                                                            as ClassElement[]
                     }
                     OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
                     AopProxyWriter proxyWriter = resolveProxyWriter(
@@ -883,7 +887,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
     private AopProxyWriter resolveProxyWriter(
             OptionalValues<Boolean> aopSettings,
             boolean isFactoryType,
-            Object[] interceptorTypeReferences) {
+            ClassElement[] interceptorTypeReferences) {
         AopProxyWriter proxyWriter = (AopProxyWriter) aopProxyWriter
         if (proxyWriter == null) {
 
@@ -1305,7 +1309,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
 
             if (isAopProxyType) {
-                Object[] interceptorTypeReferences = annotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
+                ClassElement[] interceptorTypeReferences = annotationMetadata.getAnnotationNamesByStereotype(Around).collect { ClassElement.of(it) }
                 resolveProxyWriter(aopSettings, false, interceptorTypeReferences)
             }
 
@@ -1344,9 +1348,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         false,
                         originatingElement,
                         methodAnnotationMetadata,
-                        [typeToImplement.name] as Object[],
-                        configurationMetadataBuilder,
-                        ArrayUtils.EMPTY_OBJECT_ARRAY
+                        [new GroovyClassElement(sourceUnit, compilationUnit, typeToImplement, AnnotationMetadata.EMPTY_METADATA)] as ClassElement[],
+                        configurationMetadataBuilder
                 )
 
                 aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata)

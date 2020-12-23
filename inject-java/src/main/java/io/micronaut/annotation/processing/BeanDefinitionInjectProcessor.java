@@ -436,9 +436,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     error(classElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement);
                                     return null;
                                 }
-                                Object[] interceptorTypes = annotationUtils.getAnnotationMetadata(concreteClass)
-                                        .getAnnotationNamesByStereotype(AROUND_TYPE)
-                                        .toArray();
+                                ClassElement[] interceptorTypes = resolveInterceptorElements(concreteClassMetadata, AROUND_TYPE);
                                 resolveAopProxyWriter(
                                         beanDefinitionWriter,
                                         aopSettings,
@@ -684,10 +682,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
 
                         if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
-                            Object[] interceptorTypes = annotationMetadata
-                                    .getAnnotationNamesByStereotype(AROUND_TYPE)
-                                    .toArray();
-
+                            ClassElement[] interceptorTypes = resolveInterceptorElements(annotationMetadata, AROUND_TYPE);
                             aopProxyWriter.visitInterceptorTypes(interceptorTypes);
                         }
 
@@ -936,9 +931,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             );
 
             if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE) && !modelUtils.isAbstract(concreteClass)) {
-                Object[] interceptorTypes = methodAnnotationMetadata
-                        .getAnnotationNamesByStereotype(AROUND_TYPE)
-                        .toArray();
+                ClassElement[] interceptorTypes = resolveInterceptorElements(methodAnnotationMetadata, AROUND_TYPE);
                 TypeElement returnTypeElement = (TypeElement) ((DeclaredType) beanMethod.getReturnType()).asElement();
 
                 if (modelUtils.isFinal(returnTypeElement)) {
@@ -1132,8 +1125,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         (!isAopProxyType && methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) ||
                         (methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE) && isConcrete)) {
 
-                    Object[] interceptorTypes = methodAnnotationMetadata.getAnnotationNamesByStereotype(AROUND_TYPE)
-                            .toArray();
+                    ClassElement[] interceptorTypes = resolveInterceptorElements(methodAnnotationMetadata, AROUND_TYPE);
 
                     OptionalValues<Boolean> settings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean.class);
                     AopProxyWriter aopProxyWriter = resolveAopProxyWriter(
@@ -1232,9 +1224,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             false,
                             sourceMethodElement,
                             methodAnnotationMetadata,
-                            new Object[]{modelUtils.resolveTypeReference(typeToImplement)},
-                            metadataBuilder,
-                            ArrayUtils.EMPTY_OBJECT_ARRAY
+                            new ClassElement[]{ typeToImplementElement },
+                            metadataBuilder
                     );
 
                     aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata);
@@ -1364,7 +1355,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                                      OptionalValues<Boolean> aopSettings,
                                                      boolean isFactoryType,
                                                      MethodElement constructorElement,
-                                                     Object... interceptorTypes) {
+                                                     ClassElement... interceptorTypes) {
             String beanName = beanWriter.getBeanDefinitionName();
             Name proxyKey = createProxyKey(beanName);
             BeanDefinitionVisitor aopWriter = beanWriter instanceof AopProxyWriter ? beanWriter : beanDefinitionWriters.get(proxyKey);
@@ -1505,9 +1496,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (aopWriter instanceof AopProxyWriter) {
                 return (AopProxyWriter) aopWriter;
             } else if (isAopProxyType) {
-                Object[] interceptorTypes = annotationUtils.getAnnotationMetadata(concreteClass)
-                        .getAnnotationNamesByStereotype(AROUND_TYPE)
-                        .toArray();
+                ClassElement[] interceptorTypes = resolveInterceptorElements(concreteClassMetadata, AROUND_TYPE);
                 return resolveAopProxyWriter(
                         writer,
                         aopSettings,
@@ -1894,16 +1883,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             PackageElement packageElement = elementUtils.getPackageOf(typeElement);
             String beanClassName = modelUtils.simpleBinaryNameFor(typeElement);
-            Object[] aroundInterceptors = annotationMetadata
-                    .getAnnotationNamesByStereotype(AROUND_TYPE)
-                    .toArray();
-            Object[] introductionInterceptors = annotationMetadata
-                    .getAnnotationNamesByStereotype(Introduction.class)
-                    .toArray();
+            ClassElement[] aroundInterceptors = resolveInterceptorElements(annotationMetadata, AROUND_TYPE);
+            ClassElement[] introductionInterceptors = resolveInterceptorElements(annotationMetadata, Introduction.class.getName());
 
-            String[] interfaceTypes = annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0]);
+            ClassElement[] interfaceTypes = Arrays.stream(annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0]))
+                    .map(ClassElement::of).toArray(ClassElement[]::new);
 
-            Object[] interceptorTypes = ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
+            ClassElement[] interceptorTypes = ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
             boolean isInterface = JavaModelUtils.isInterface(typeElement);
             AopProxyWriter aopProxyWriter = new AopProxyWriter(
                     packageElement.getQualifiedName().toString(),
@@ -1917,7 +1903,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             );
 
             Set<TypeElement> additionalInterfaces = Arrays.stream(interfaceTypes)
-                    .map(elementUtils::getTypeElement)
+                    .map(ce -> elementUtils.getTypeElement(ce.getName()))
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
 
@@ -2011,6 +1997,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private boolean shouldExclude(ConfigurationMetadata configurationMetadata, String propertyName) {
             return shouldExclude(configurationMetadata.getIncludes(), configurationMetadata.getExcludes(), propertyName);
         }
+    }
+
+    private ClassElement[] resolveInterceptorElements(AnnotationMetadata annotationMetadata, String annotationName) {
+        return annotationMetadata
+                .getAnnotationNamesByStereotype(annotationName)
+                .stream().map(ClassElement::of).toArray(ClassElement[]::new);
     }
 
     private Map<String, Map<String, Object>> resolveFinalTypeArguments(Map<String, Map<String, Object>> typeArguments) {

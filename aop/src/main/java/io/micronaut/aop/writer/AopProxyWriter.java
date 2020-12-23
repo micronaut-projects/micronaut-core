@@ -16,7 +16,6 @@
 package io.micronaut.aop.writer;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.aop.HotSwappableInterceptedProxy;
 import io.micronaut.aop.Intercepted;
 import io.micronaut.aop.InterceptedProxy;
@@ -130,8 +129,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final String proxyFullName;
     private final BeanDefinitionWriter proxyBeanDefinitionWriter;
     private final String proxyInternalName;
-    private final Set<Object> interceptorTypes;
-    private final Set<Object> interfaceTypes;
+    private final Set<ClassElement> interceptorTypes;
+    private final Set<ClassElement> interfaceTypes;
     private final Type proxyType;
     private final boolean hotswap;
     private final boolean lazy;
@@ -160,22 +159,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     /**
      * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
      * <p>
-     * <p>Additional {@link Interceptor} types can be added downstream with {@link #visitInterceptorTypes(Object...)}.</p>
-     *
-     * @param parent           The parent {@link BeanDefinitionWriter}
-     * @param metadataBuilder     The configuration metadata builder
-     * @param interceptorTypes The annotation types of the {@link Interceptor} instances to be injected
-     */
-    public AopProxyWriter(BeanDefinitionWriter parent,
-                          ConfigurationMetadataBuilder<?> metadataBuilder,
-                          Object... interceptorTypes) {
-        this(parent, OptionalValues.empty(), metadataBuilder, interceptorTypes);
-    }
-
-    /**
-     * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
-     * <p>
-     * <p>Additional {@link Interceptor} types can be added downstream with {@link #visitInterceptorTypes(Object...)}.</p>
+     * <p>Additional {@link Interceptor} types can be added downstream with {@link #visitInterceptorTypes(ClassElement...)}.</p>
      *
      * @param parent           The parent {@link BeanDefinitionWriter}
      * @param settings         optional setting
@@ -185,7 +169,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public AopProxyWriter(BeanDefinitionWriter parent,
                           OptionalValues<Boolean> settings,
                           ConfigurationMetadataBuilder<?> metadataBuilder,
-                          Object... interceptorTypes) {
+                          ClassElement... interceptorTypes) {
         super(parent.getOriginatingElements());
         this.isIntroduction = false;
         this.implementInterface = true;
@@ -203,7 +187,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         String proxyShortName = NameUtils.getSimpleName(proxyFullName);
         this.proxyInternalName = getInternalName(this.proxyFullName);
         this.proxyType = getTypeReferenceForName(proxyFullName);
-        this.interceptorTypes = new HashSet<>(Arrays.asList(interceptorTypes));
+        this.interceptorTypes = new LinkedHashSet<>(Arrays.asList(interceptorTypes));
         this.interfaceTypes = Collections.emptySet();
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
                 NameUtils.getPackageName(proxyFullName),
@@ -235,9 +219,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                           boolean isInterface,
                           Element originatingElement,
                           AnnotationMetadata annotationMetadata,
-                          Object[] interfaceTypes,
+                          ClassElement[] interfaceTypes,
                           ConfigurationMetadataBuilder<?> metadataBuilder,
-                          Object... interceptorTypes) {
+                          ClassElement... interceptorTypes) {
         this(packageName, className, isInterface, true, originatingElement, annotationMetadata, interfaceTypes, metadataBuilder, interceptorTypes);
     }
 
@@ -260,9 +244,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                           boolean implementInterface,
                           Element originatingElement,
                           AnnotationMetadata annotationMetadata,
-                          Object[] interfaceTypes,
+                          ClassElement[] interfaceTypes,
                           ConfigurationMetadataBuilder<?> metadataBuilder,
-                          Object... interceptorTypes) {
+                          ClassElement... interceptorTypes) {
         super(OriginatingElements.of(originatingElement));
         this.isIntroduction = true;
         this.implementInterface = implementInterface;
@@ -281,8 +265,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyFullName = targetClassFullName + BeanDefinitionVisitor.PROXY_SUFFIX;
         this.proxyInternalName = getInternalName(this.proxyFullName);
         this.proxyType = getTypeReferenceForName(proxyFullName);
-        this.interceptorTypes = new HashSet<>(Arrays.asList(interceptorTypes));
-        this.interfaceTypes = interfaceTypes != null ? new HashSet<>(Arrays.asList(interfaceTypes)) : Collections.emptySet();
+        this.interceptorTypes = new LinkedHashSet<>(Arrays.asList(interceptorTypes));
+        this.interfaceTypes = interfaceTypes != null ? new LinkedHashSet<>(Arrays.asList(interfaceTypes)) : Collections.emptySet();
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         String proxyShortName = NameUtils.getSimpleName(proxyFullName);
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
@@ -517,7 +501,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         }
     }
 
-    private String buildMethodOverride(TypedElement returnType, String methodName, int index, List<ParameterElement> argumentTypeList, int argumentCount, boolean isVoidReturn) {
+    private void buildMethodOverride(
+            TypedElement returnType,
+            String methodName,
+            int index,
+            List<ParameterElement> argumentTypeList,
+            int argumentCount,
+            boolean isVoidReturn) {
         // override the original method
         String desc = getMethodDescriptor(returnType, argumentTypeList);
         MethodVisitor overridden = classWriter.visitMethod(ACC_PUBLIC, methodName, desc, null, null);
@@ -597,7 +587,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         }
         overriddenMethodGenerator.visitMaxs(DEFAULT_MAX_STACK, chainVar);
         overriddenMethodGenerator.visitEnd();
-        return desc;
     }
 
     /**
@@ -608,7 +597,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         if (declaredConstructor == null) {
             throw new IllegalStateException("The method visitBeanDefinitionConstructor(..) should be called at least once");
         }
-        Type[] interceptorTypes = getObjectTypes(this.interceptorTypes);
+        Type[] interceptorTypes = getTypes(this.interceptorTypes);
         interceptorParameter.annotate(io.micronaut.context.annotation.Type.class, builder -> {
             AnnotationClassValue<?>[] types = Arrays.stream(interceptorTypes).map(t -> new AnnotationClassValue<>(t.getClassName())).toArray(AnnotationClassValue[]::new);
             builder.values(types);
@@ -644,7 +633,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             for (int i = 0; i < existingArguments.length; i++) {
                 proxyConstructorGenerator.loadArg(i);
             }
-            String superConstructorDescriptor = getConstructorDescriptor(existingArguments);
+            String superConstructorDescriptor = getConstructorDescriptor(Arrays.asList(existingArguments));
             proxyConstructorGenerator.invokeConstructor(getTypeReferenceForName(targetClassFullName), new Method(CONSTRUCTOR_NAME, superConstructorDescriptor));
         }
 
@@ -1119,7 +1108,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      *
      * @param interceptorTypes types
      */
-    public void visitInterceptorTypes(Object... interceptorTypes) {
+    public void visitInterceptorTypes(ClassElement... interceptorTypes) {
         if (interceptorTypes != null) {
             this.interceptorTypes.addAll(Arrays.asList(interceptorTypes));
         }

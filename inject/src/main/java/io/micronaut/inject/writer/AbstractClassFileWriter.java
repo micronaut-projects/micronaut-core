@@ -1004,7 +1004,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         methodVisitor.push(index);
         // the type reference
         if (type.isPrimitive()) {
-            Class typeClass = ClassUtils.getPrimitiveType(type.getName()).orElse(null);
+            Class<?> typeClass = ClassUtils.getPrimitiveType(type.getName()).orElse(null);
             if (typeClass != null) {
                 if (type.isArray()) {
                     Type arrayType = Type.getType(Array.newInstance(typeClass, 0).getClass());
@@ -1031,12 +1031,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param types The types
      * @return An array with the {@link Type} of the objects
      */
-    protected Type[] getObjectTypes(Collection types) {
+    protected Type[] getTypes(Collection<ClassElement> types) {
         Type[] converted = new Type[types.size()];
-        Iterator iter = types.iterator();
+        Iterator<ClassElement> iter = types.iterator();
         for (int i = 0; i < converted.length; i++) {
-            Object type = iter.next();
-            converted[i] = getObjectType(type);
+            ClassElement type = iter.next();
+            converted[i] = getTypeReference(type);
         }
         return converted;
     }
@@ -1210,7 +1210,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param argumentTypes The argument types
      * @return The constructor descriptor
      */
-    protected static String getConstructorDescriptor(Object... argumentTypes) {
+    protected static String getConstructorDescriptor(Class<?>... argumentTypes) {
         StringBuilder builder = new StringBuilder();
         builder.append('(');
 
@@ -1281,7 +1281,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param argumentTypes The argument types
      * @return The {@link GeneratorAdapter} for the constructor
      */
-    protected GeneratorAdapter startConstructor(ClassVisitor classWriter, Object... argumentTypes) {
+    protected GeneratorAdapter startConstructor(ClassVisitor classWriter, Class<?>... argumentTypes) {
         String descriptor = getConstructorDescriptor(argumentTypes);
         return new GeneratorAdapter(classWriter.visitMethod(ACC_PUBLIC, CONSTRUCTOR_NAME, descriptor, null, null), ACC_PUBLIC, CONSTRUCTOR_NAME, descriptor);
     }
