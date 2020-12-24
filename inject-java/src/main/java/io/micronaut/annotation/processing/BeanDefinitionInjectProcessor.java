@@ -1295,7 +1295,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 }
 
                                 JavaMethodElement javaMethodElement = new JavaMethodElement(
-                                        declaringClassElement,
+                                        concreteClassElement,
                                         targetMethod,
                                         finalMethodAnnotationMetadata,
                                         visitorContext
