@@ -226,6 +226,16 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Builds a map of all the type parameters for a class, its super classes and interfaces.
+     * The resulting map contains the name of the class to the a map of the resolved generic types.
+     *
+     * @return The type arguments for this class element
+     */
+    default @NonNull Map<String, Map<String, ClassElement>> getAllTypeArguments() {
+        return Collections.emptyMap();
+    }
+
+    /**
      * @return The first type argument
      */
     default Optional<ClassElement> getFirstTypeArgument() {

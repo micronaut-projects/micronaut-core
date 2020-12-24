@@ -534,6 +534,23 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return Collections.unmodifiableMap(map);
     }
 
+    @NonNull
+    @Override
+    public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
+        Map<String, Map<String, TypeMirror>> info = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement);
+        Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>(info.size());
+        info.forEach((name, generics) -> {
+            Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
+            generics.forEach((variable, mirror) -> {
+                ClassElement classElement = mirrorToClassElement(mirror, visitorContext, info);
+                resolved.put(variable, classElement);
+            });
+            result.put(name, resolved);
+        });
+        result.put(getName(), getTypeArguments());
+        return result;
+    }
+
     /**
      * @return The generic type info for this class.
      */

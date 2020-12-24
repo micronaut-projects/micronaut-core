@@ -222,51 +222,15 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * Pushes type arguments onto the stack.
-     *
-     * @param generatorAdapter The generator adapter
-     * @param types            The type references
-     */
-    protected static void pushTypeArguments(GeneratorAdapter generatorAdapter, Map<String, Object> types) {
-        if (types == null || types.isEmpty()) {
-            generatorAdapter.visitInsn(ACONST_NULL);
-            return;
-        }
-        int len = types.size();
-        // Build calls to Argument.create(...)
-        pushNewArray(generatorAdapter, Argument.class, len);
-        int i = 0;
-        for (Map.Entry<String, Object> entry : types.entrySet()) {
-            // the array index
-            generatorAdapter.push(i);
-            String typeParameterName = entry.getKey();
-            Object value = entry.getValue();
-            if (value instanceof Map) {
-                buildArgumentWithGenerics(generatorAdapter, typeParameterName, (Map) value);
-            } else {
-                buildArgument(generatorAdapter, typeParameterName, value);
-            }
-
-            // store the type reference
-            generatorAdapter.visitInsn(AASTORE);
-            // if we are not at the end of the array duplicate array onto the stack
-            if (i != (len - 1)) {
-                generatorAdapter.visitInsn(DUP);
-            }
-            i++;
-        }
-    }
-
-    /**
      * Builds an argument instance.
      *
      * @param generatorAdapter The generator adapter.
      * @param argumentName     The argument name
      * @param objectType       The object type
      */
-    protected static void buildArgument(GeneratorAdapter generatorAdapter, String argumentName, Object objectType) {
+    protected static void buildArgument(GeneratorAdapter generatorAdapter, String argumentName, Type objectType) {
         // 1st argument: the type
-        generatorAdapter.push(getTypeReference(objectType));
+        generatorAdapter.push(objectType);
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
 
@@ -302,7 +266,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             Set<String> visitedTypes,
             Map<String, GeneratorAdapter> loadTypeMethods) {
         // 1st argument: the type
-        generatorAdapter.push(getTypeReference(typeReference));
+        generatorAdapter.push(typeReference);
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
         // 3rd argument: annotation metadata
@@ -335,48 +299,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 generatorAdapter,
                 Argument.class,
                 METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
-        );
-    }
-
-    /**
-     * This method should be replaced by the above method.
-     *
-     * @param generatorAdapter The {@link GeneratorAdapter}
-     * @param argumentName     The argument name
-     * @param nestedTypeObject The nested type object
-     */
-    static void buildArgumentWithGenerics(GeneratorAdapter generatorAdapter, String argumentName, Map nestedTypeObject) {
-        Map nestedTypes = null;
-        @SuppressWarnings("unchecked") Optional<Map.Entry> nestedEntry = nestedTypeObject.entrySet().stream().findFirst();
-        Object objectType;
-        if (nestedEntry.isPresent()) {
-            Map.Entry data = nestedEntry.get();
-            Object key = data.getKey();
-            Object map = data.getValue();
-            objectType = key;
-            if (map instanceof Map) {
-                nestedTypes = (Map) map;
-            }
-        } else {
-            throw new IllegalArgumentException("Must be a map with a single key containing the argument type and a map of generics as the value");
-        }
-
-        // 1st argument: the type
-        generatorAdapter.push(getTypeReference(objectType));
-        // 2nd argument: the name
-        generatorAdapter.push(argumentName);
-
-        // 3rd argument: generic types
-        boolean hasGenerics = nestedTypes != null && !nestedTypes.isEmpty();
-        if (hasGenerics) {
-            pushTypeArguments(generatorAdapter, nestedTypes);
-        }
-
-        // Argument.create( .. )
-        invokeInterfaceStaticMethod(
-                generatorAdapter,
-                Argument.class,
-                hasGenerics ? METHOD_CREATE_ARGUMENT_WITH_GENERICS : METHOD_CREATE_ARGUMENT_SIMPLE
         );
     }
 
@@ -502,77 +424,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * Converts a map of class elements to type arguments.
-     *
-     * @param typeArguments The type arguments
-     * @return The type arguments
-     */
-    @NotNull
-    protected Map<String, Object> toTypeArguments(@NotNull Map<String, ClassElement> typeArguments) {
-        Set<String> visitedTypes = new HashSet<>(5);
-
-        return toTypeArguments(typeArguments, visitedTypes);
-    }
-
-    @NotNull
-    private Map<String, Object> toTypeArguments(@NotNull Map<String, ClassElement> typeArguments, Set<String> visitedTypes) {
-        final LinkedHashMap<String, Object> map = new LinkedHashMap<>(typeArguments.size());
-        for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
-            final ClassElement ce = entry.getValue();
-            String className = ce.getName();
-            if (!visitedTypes.contains(entry.getKey())) {
-                visitedTypes.add(entry.getKey());
-                final Map<String, ClassElement> subArgs = ce.getTypeArguments();
-                if (CollectionUtils.isNotEmpty(subArgs)) {
-                    Map<String, Object> m = toTypeArguments(subArgs, visitedTypes);
-                    if (CollectionUtils.isNotEmpty(m)) {
-                        map.put(entry.getKey(), Collections.singletonMap(getTypeReference(ce), m));
-                    } else {
-                        map.put(entry.getKey(), Collections.singletonMap(entry.getKey(), className));
-                    }
-                } else {
-                    final Type typeReference = getTypeReference(ce);
-                    map.put(entry.getKey(), typeReference);
-                }
-            }
-        }
-
-        return map;
-    }
-
-    /**
-     * Converts a map of class elements to type arguments.
-     *
-     * @param parameters The parametesr
-     * @return The type arguments
-     */
-    @NotNull
-    protected Map<String, ClassElement> toTypeArguments(ParameterElement... parameters) {
-        final LinkedHashMap<String, ClassElement> map = new LinkedHashMap<>(parameters.length);
-        for (ParameterElement ce : parameters) {
-            final ClassElement type = ce.getGenericType();
-            map.put(ce.getName(), type);
-        }
-        return map;
-    }
-
-    /**
-     * Converts a parameters to type arguments.
-     *
-     * @param parameters The parameters
-     * @return The type arguments
-     */
-    @NotNull
-    protected Map<String, ParameterElement> toParameterTypes(ParameterElement... parameters) {
-        final LinkedHashMap<String, ParameterElement> map = new LinkedHashMap<>(parameters.length);
-        for (ParameterElement ce : parameters) {
-            map.put(ce.getName(), ce);
-        }
-
-        return map;
-    }
-
-    /**
      * Writes a method that returns a boolean value with the value supplied by the given supplier.
      *
      * @param classWriter   The class writer
@@ -639,19 +490,29 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param type The type
      * @return The descriptor for the class
      */
-    protected static String getTypeDescriptor(Object type) {
-        if (type instanceof TypedElement) {
-            return getTypeReference((TypedElement) type).getDescriptor();
-        } else if (type instanceof Class) {
-            return Type.getDescriptor((Class) type);
-        } else if (type instanceof Type) {
-            return ((Type) type).getDescriptor();
-        } else {
-            String className = type.toString();
-            return getTypeDescriptor(className, new String[0]);
-        }
+    protected static String getTypeDescriptor(TypedElement type) {
+        return getTypeReference(type).getDescriptor();
     }
 
+    /**
+     * Returns the descriptor corresponding to the given class.
+     *
+     * @param type The type
+     * @return The descriptor for the class
+     */
+    protected static String getTypeDescriptor(Class<?> type) {
+        return Type.getDescriptor(type);
+    }
+
+    /**
+     * Returns the descriptor corresponding to the given class.
+     *
+     * @param type The type
+     * @return The descriptor for the class
+     */
+    protected static String getTypeDescriptor(String type) {
+        return getTypeDescriptor(type, new String[0]);
+    }
 
     /**
      * Returns the Type reference corresponding to the given class.
@@ -663,38 +524,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     protected static Type getTypeReferenceForName(String className, String... genericTypes) {
         String referenceString = getTypeDescriptor(className, genericTypes);
         return Type.getType(referenceString);
-    }
-
-    /**
-     * Return the type reference for a class.
-     *
-     * @param type The type
-     * @return The {@link Type}
-     */
-    protected static Type getTypeReference(Object type) {
-        if (type instanceof TypedElement) {
-            return getTypeReference((TypedElement) type);
-        } else if (type instanceof Type) {
-            return (Type) type;
-        } else if (type instanceof Class) {
-            return Type.getType((Class) type);
-        } else if (type instanceof String) {
-            String className = type.toString();
-
-            StringBuilder internalName = new StringBuilder(getInternalName(className));
-            Matcher matcher = ARRAY_PATTERN.matcher(className);
-            if (matcher.find()) {
-                internalName.append(';');
-                internalName.insert(0, 'L');
-                int dimensions = matcher.group(0).length() / 2;
-                for (int i = 0; i < dimensions; i++) {
-                    internalName.insert(0, '[');
-                }
-            }
-            return Type.getObjectType(internalName.toString());
-        } else {
-            throw new IllegalArgumentException("Type reference [" + type + "] of type [" + type.getClass().getName() + "] should be a Class or a String representing the class name");
-        }
     }
 
     /**
@@ -1214,7 +1043,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         StringBuilder builder = new StringBuilder();
         builder.append('(');
 
-        for (Object argumentType : argumentTypes) {
+        for (Class<?> argumentType : argumentTypes) {
             builder.append(getTypeDescriptor(argumentType));
         }
 
@@ -1229,7 +1058,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         StringBuilder builder = new StringBuilder();
         builder.append('(');
 
-        for (Object argumentType : argList) {
+        for (ParameterElement argumentType : argList) {
             builder.append(getTypeDescriptor(argumentType));
         }
 
@@ -1443,42 +1272,42 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param type The type
      * @return the internal name for cast
      */
-    protected static String getInternalNameForCast(Object type) {
-        if (type instanceof TypedElement) {
-            final TypedElement t = (TypedElement) type;
-            ClassElement ce = t.getType();
-            if (ce.isPrimitive() && !ce.isArray()) {
+    protected static String getInternalNameForCast(TypedElement type) {
+        ClassElement ce = type.getType();
+        if (ce.isPrimitive() && !ce.isArray()) {
 
-                final Optional<Class> pt = ClassUtils.getPrimitiveType(ce.getName());
-                if (pt.isPresent()) {
-                    return Type.getInternalName(ReflectionUtils.getWrapperType(pt.get()));
-                } else {
-                    return getTypeReference(ce).getInternalName();
-                }
-            } else {
-                return getTypeReference(ce).getInternalName();
-            }
-        } else if (type instanceof Class) {
-            Class typeClass = (Class) type;
-            if (typeClass.isPrimitive()) {
-                typeClass = ReflectionUtils.getWrapperType(typeClass);
-            }
-            return Type.getInternalName(typeClass);
-        } else if (type instanceof Type) {
-            final Type t = (Type) type;
-            final Optional<Class> pt = ClassUtils.getPrimitiveType(t.getClassName());
+            final Optional<Class> pt = ClassUtils.getPrimitiveType(ce.getName());
             if (pt.isPresent()) {
                 return Type.getInternalName(ReflectionUtils.getWrapperType(pt.get()));
             } else {
-                return t.getInternalName();
+                return getTypeReference(ce).getInternalName();
             }
         } else {
-            String className = type.toString();
-            if (className.endsWith("[]")) {
-                return getTypeDescriptor(type);
-            } else {
-                return getInternalName(className);
-            }
+            return getTypeReference(ce).getInternalName();
+        }
+    }
+
+    /**
+     * @param typeClass The type
+     * @return the internal name for cast
+     */
+    protected static String getInternalNameForCast(Class<?> typeClass) {
+        if (typeClass.isPrimitive()) {
+            typeClass = ReflectionUtils.getWrapperType(typeClass);
+        }
+        return Type.getInternalName(typeClass);
+    }
+
+    /**
+     * @param type The type
+     * @return the internal name for cast
+     */
+    protected static String getInternalNameForCast(Type type) {
+        final Optional<Class> pt = ClassUtils.getPrimitiveType(type.getClassName());
+        if (pt.isPresent()) {
+            return Type.getInternalName(ReflectionUtils.getWrapperType(pt.get()));
+        } else {
+            return type.getInternalName();
         }
     }
 

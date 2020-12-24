@@ -210,7 +210,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private ConfigBuilderState currentConfigBuilderState;
     private int optionalInstanceIndex;
     private boolean preprocessMethods = false;
-    private Map<String, Map<String, Object>> typeArguments;
+    private Map<String, Map<String, ClassElement>> typeArguments;
     private List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
     private List<MethodVisitData> preDestroyMethodVisits = new ArrayList<>(2);
     private String interceptedType;
@@ -479,7 +479,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void applyConfigurationInjectionIfNecessary(MethodElement constructor) {
-        if (constructor.hasAnnotation(ConfigurationInject.class)) {
+        if (constructor.hasAnnotation(ConfigurationInject.class) || isRecordConfig(constructor)) {
 
             ParameterElement[] parameters = constructor.getParameters();
             for (ParameterElement parameter : parameters) {
@@ -500,6 +500,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 }
             }
         }
+    }
+
+    private boolean isRecordConfig(MethodElement constructor) {
+        ClassElement declaringType = constructor.getDeclaringType();
+        return declaringType.isRecord() && declaringType.hasStereotype(ConfigurationReader.class);
     }
 
     @Override
@@ -608,13 +613,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // start a new array
             pushNewArray(visitor, Object.class, totalSize);
             int i = 0;
-            for (Map.Entry<String, Map<String, Object>> entry : typeArguments.entrySet()) {
+            for (Map.Entry<String, Map<String, ClassElement>> entry : typeArguments.entrySet()) {
                 // use the property name as the key
                 String typeName = entry.getKey();
                 pushStoreStringInArray(visitor, i++, totalSize, typeName);
                 // use the property type as the value
                 pushStoreInArray(visitor, i++, totalSize, () ->
-                        pushTypeArguments(visitor, entry.getValue())
+                        pushTypeArgumentElements(
+                                beanDefinitionType,
+                                classWriter,
+                                visitor,
+                                beanDefinitionName,
+                                entry.getValue(),
+                                loadTypeMethods
+                        )
                 );
             }
             // invoke the AbstractBeanDefinition.createMap method
@@ -1082,7 +1094,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitTypeArguments(Map<String, Map<String, Object>> typeArguments) {
+    public void visitTypeArguments(Map<String, Map<String, ClassElement>> typeArguments) {
         this.typeArguments = typeArguments;
     }
 
@@ -1242,7 +1254,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildArgument(
                     injectMethodVisitor,
                     propertyName,
-                    Boolean.class
+                    Type.getType(Boolean.class)
             );
         } else {
             buildArgumentWithGenerics(

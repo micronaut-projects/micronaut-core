@@ -1084,7 +1084,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitTypeArguments(Map<String, Map<String, Object>> typeArguments) {
+    public void visitTypeArguments(Map<String, Map<String, ClassElement>> typeArguments) {
         proxyBeanDefinitionWriter.visitTypeArguments(typeArguments);
     }
 

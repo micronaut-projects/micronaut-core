@@ -210,13 +210,13 @@ class MyProperties {
         builder.configurations.size() == 1
         builder.configurations[0].name == 'foo.inner'
         builder.configurations[0].description == 'some description'
-        builder.configurations[0].type == 'test.MyProperties$InnerProperties'
+        builder.configurations[0].type == 'test.MyProperties.InnerProperties'
 
         builder.properties.size() == 1
         builder.properties[0].name == 'foo'
         builder.properties[0].path == 'foo.inner.foo'
         builder.properties[0].type == 'java.lang.String'
-        builder.properties[0].declaringType == 'test.MyProperties$InnerProperties'
+        builder.properties[0].declaringType == 'test.MyProperties.InnerProperties'
         builder.properties[0].description == 'some description'
     }
 
@@ -265,13 +265,13 @@ class MyProperties {
         builder.configurations.size() == 1
         builder.configurations[0].name == 'foo.inner.nested'
         builder.configurations[0].description == 'some description'
-        builder.configurations[0].type == 'test.MyProperties$InnerProperties$NestedProperties'
+        builder.configurations[0].type == 'test.MyProperties.InnerProperties.NestedProperties'
 
         builder.properties.size() == 1
         builder.properties[0].name == 'foo'
         builder.properties[0].path == 'foo.inner.nested.foo'
         builder.properties[0].type == 'java.lang.String'
-        builder.properties[0].declaringType == 'test.MyProperties$InnerProperties$NestedProperties'
+        builder.properties[0].declaringType == 'test.MyProperties.InnerProperties.NestedProperties'
         builder.properties[0].description == 'some description'
     }
 
@@ -395,13 +395,13 @@ class GrandParentProperties {
         builder.configurations.size() == 1
         builder.configurations[0].name == 'grand.parent.child.inner'
         builder.configurations[0].description == 'some description'
-        builder.configurations[0].type == 'test.ChildProperties$InnerProperties'
+        builder.configurations[0].type == 'test.ChildProperties.InnerProperties'
 
         builder.properties.size() == 1
         builder.properties[0].name == 'foo'
         builder.properties[0].path == 'grand.parent.child.inner.foo'
         builder.properties[0].type == 'java.lang.String'
-        builder.properties[0].declaringType == 'test.ChildProperties$InnerProperties'
+        builder.properties[0].declaringType == 'test.ChildProperties.InnerProperties'
         builder.properties[0].description == 'some description'
     }
 
@@ -453,13 +453,13 @@ class GrandParentProperties {
         builder.configurations.size() == 1
         builder.configurations[0].name == 'grand.parent.child.inner-parent.inner'
         builder.configurations[0].description == 'some description'
-        builder.configurations[0].type == 'test.ChildProperties$InnerProperties'
+        builder.configurations[0].type == 'test.ChildProperties.InnerProperties'
 
         builder.properties.size() == 1
         builder.properties[0].name == 'foo'
         builder.properties[0].path == 'grand.parent.child.inner-parent.inner.foo'
         builder.properties[0].type == 'java.lang.String'
-        builder.properties[0].declaringType == 'test.ChildProperties$InnerProperties'
+        builder.properties[0].declaringType == 'test.ChildProperties.InnerProperties'
         builder.properties[0].description == 'some description'
     }
 

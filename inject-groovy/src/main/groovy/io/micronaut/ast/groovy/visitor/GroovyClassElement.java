@@ -191,11 +191,34 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         return Collections.emptyMap();
     }
 
+    @NonNull
+    @Override
+    public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
+        Map<String, Map<String, ClassNode>> genericInfo =
+                AstGenericUtils.buildAllGenericElementInfo(classNode, new GroovyVisitorContext(sourceUnit, compilationUnit));
+        Map<String, Map<String, ClassElement>> results = new LinkedHashMap<>(genericInfo.size());
+
+        genericInfo.forEach((name, generics) -> {
+            Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
+            generics.forEach((variable, type) -> {
+                resolved.put(variable, new GroovyClassElement(sourceUnit, compilationUnit, type, AnnotationMetadata.EMPTY_METADATA));
+            });
+            results.put(name, resolved);
+        });
+        results.put(getName(), getTypeArguments());
+        return results;
+    }
+
     @Override
     public @NonNull
     Map<String, ClassElement> getTypeArguments() {
         Map<String, Map<String, ClassNode>> genericInfo = getGenericTypeInfo();
         Map<String, ClassNode> info = genericInfo.get(classNode.getName());
+        return resolveGenericMap(info);
+    }
+
+    @NonNull
+    private Map<String, ClassElement> resolveGenericMap(Map<String, ClassNode> info) {
         if (info != null) {
             Map<String, ClassElement> typeArgumentMap = new LinkedHashMap<>(info.size());
             GenericsType[] genericsTypes = classNode.getGenericsTypes();
@@ -236,7 +259,6 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         ));
                     }
                 }
-                return typeArgumentMap;
             } else if (redirectTypes != null) {
 
                 for (GenericsType gt : redirectTypes) {
@@ -257,9 +279,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         ));
                     }
                 }
-                if (CollectionUtils.isNotEmpty(typeArgumentMap)) {
-                    return typeArgumentMap;
-                }
+            }
+            if (CollectionUtils.isNotEmpty(typeArgumentMap)) {
+                return typeArgumentMap;
             }
         }
         Map<String, ClassNode> spec = AstGenericUtils.createGenericsSpec(classNode);

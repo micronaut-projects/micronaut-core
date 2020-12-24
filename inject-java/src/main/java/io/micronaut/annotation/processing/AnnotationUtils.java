@@ -289,7 +289,7 @@ public class AnnotationUtils {
      * @param element The element
      */
     @Internal
-    public void invalidateMetadata(Element element) {
+    public static void invalidateMetadata(Element element) {
         if (element != null) {
             annotationMetadataCache.remove(element);
         }

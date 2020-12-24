@@ -11,6 +11,28 @@ import io.micronaut.inject.ValidatedBeanDefinition
 
 class ImmutableConfigurationPropertiesSpec extends AbstractTypeElementSpec {
 
+    void 'test interface immutable properties'() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('interfaceprops.MyConfig$Intercepted', '''
+package interfaceprops;
+
+import io.micronaut.context.annotation.EachProperty;
+
+@EachProperty("foo.bar")
+interface MyConfig {
+    @javax.validation.constraints.NotBlank
+    String getHost();
+
+    int getPort();
+}
+
+
+''')
+        then:
+        beanDefinition instanceof ValidatedBeanDefinition
+        beanDefinition.getRequiredMethod("getHost").synthesize(Property).name() == 'foo.bar.*.host'
+        beanDefinition.getRequiredMethod("getPort").synthesize(Property).name() == 'foo.bar.*.port'
+    }
 
     void "test parse immutable configuration properties"() {
 

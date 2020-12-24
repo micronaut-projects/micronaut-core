@@ -10,7 +10,6 @@ import io.micronaut.aop.Introduction
 import io.micronaut.aop.writer.AopProxyWriter
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
-import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.ast.groovy.utils.AstGenericUtils
 import io.micronaut.ast.groovy.utils.PublicAbstractMethodVisitor
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor
@@ -285,10 +284,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
             @Override
             void accept(ClassNode classNode, MethodNode methodNode) {
-                Map<String, ParameterElement> targetMethodParamsToType = [:]
-                Map<String, ClassElement> targetGenericParams = [:]
-                Map<String, AnnotationMetadata> targetAnnotationMetadata = [:]
-
                 AnnotationMetadata annotationMetadata
                 if (AstAnnotationUtils.isAnnotated(node.name, methodNode) || AstAnnotationUtils.hasAnnotation(methodNode, Override)) {
                     annotationMetadata = AstAnnotationUtils.newBuilder(source, unit).buildForParent(node.name, node, methodNode)
@@ -312,14 +307,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         unit,
                         owningType,
                         concreteClassAnnotationMetadata
-                )
-
-                populateParameterData (
-                        groovyMethodElement,
-                        targetMethodParamsToType,
-                        targetGenericParams,
-                        targetAnnotationMetadata,
-                        false
                 )
 
                 if (!annotationMetadata.hasStereotype("io.micronaut.validation.Validated") &&
@@ -358,7 +345,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         return
                     }
 
-                    if (targetMethodParamsToType) {
+                    if (groovyMethodElement.hasParameters()) {
                         error("Only zero argument getter methods are allowed on @ConfigurationProperties interfaces: " + methodNode.name, classNode)
                         return
                     }
@@ -473,32 +460,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             )
 
             ClassNode returnType = methodNode.getReturnType()
-            Map<String, ClassNode> genericsSpec = AstGenericUtils.createGenericsSpec(returnType)
-            if (genericsSpec) {
-                Map<String, Object> boundTypes = [:]
-                GenericsType[] genericsTypes = returnType.redirect().getGenericsTypes()
-                Map<String, Map<String, Object>> typeArguments = [:]
-                for (gt in genericsTypes) {
-                    ClassNode cn = genericsSpec[gt.name]
-                    boundTypes.put(gt.name, AstGenericUtils.resolveTypeReference(cn))
-                }
-
-                typeArguments.put(AstGenericUtils.resolveTypeReference(returnType).getName(), boundTypes)
-                AstGenericUtils.populateTypeArguments(returnType, typeArguments)
-                beanMethodWriter.visitTypeArguments(finalizeTypeArguments(typeArguments))
-            }
-
-            Map<String, ParameterElement> paramsToType = [:]
-            Map<String, ClassElement> paramsGenerics = [:]
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata = [:]
-            populateParameterData(
-                    factoryMethodElement,
-                    paramsToType,
-                    paramsGenerics,
-                    argumentAnnotationMetadata,
-                    false
-            )
-
+            beanMethodWriter.visitTypeArguments(factoryMethodElement.returnType.allTypeArguments)
             beanMethodWriter.visitBeanFactoryMethod(
                     originatingElement,
                     factoryMethodElement
@@ -633,16 +595,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                             compilationUnit,
                             methodNode,
                             methodAnnotationMetadata
-                    )
-                    Map<String, ParameterElement> paramsToType = [:]
-                    Map<String, AnnotationMetadata> argumentAnnotationMetadata = [:]
-                    Map<String, ClassElement> genericTypeMap = [:]
-                    populateParameterData(
-                            groovyMethodElement,
-                            paramsToType,
-                            genericTypeMap,
-                            argumentAnnotationMetadata,
-                            false
                     )
 
                     if (isDeclaredBean && methodAnnotationMetadata.hasStereotype(ProcessedTypes.POST_CONSTRUCT)) {
@@ -792,26 +744,15 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 return
             }
 
-            Map<String, ParameterElement> paramsToType = [:]
-            Map<String, ClassElement> genericParams = [:]
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata = [:]
-            populateParameterData(
-                    methodElement,
-                    paramsToType,
-                    genericParams,
-                    argumentAnnotationMetadata,
-                    false
-            )
-
             defineBeanDefinition(concreteClass)
 
             boolean preprocess = methodAnnotationMetadata.booleanValue(Executable.class, "processOnStartup").orElse(false)
             if (preprocess) {
                 getBeanWriter().setRequiresMethodProcessing(true)
             }
-            final boolean hasConstraints = argumentAnnotationMetadata.values().stream().anyMatch({ am ->
-                InjectTransform.IS_CONSTRAINT.test(am)
-            })
+            final boolean hasConstraints = methodElement.parameters.any { am ->
+                InjectTransform.IS_CONSTRAINT.test(am.annotationMetadata)
+            }
 
             if (hasConstraints) {
                 if (!methodAnnotationMetadata.hasStereotype("io.micronaut.validation.Validated")) {
@@ -922,16 +863,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         AnnotationMetadata.EMPTY_METADATA
                 )
             } else {
-                Map<String, ParameterElement> constructorParamsToType = [:]
-                Map<String, AnnotationMetadata> constructorArgumentMetadata = [:]
-                Map<String, ClassElement> constructorGenericTypeMap = [:]
-                populateParameterData(
-                        (GroovyMethodElement) constructor,
-                        constructorParamsToType,
-                        constructorGenericTypeMap,
-                        constructorArgumentMetadata,
-                        false
-                )
                 proxyWriter.visitBeanDefinitionConstructor(
                         constructor,
                         constructor.isPrivate()
@@ -1278,8 +1209,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
 
             beanWriter = new BeanDefinitionWriter(groovyClassElement, configurationMetadataBuilder)
-            visitTypeArguments(classNode, (BeanDefinitionWriter) beanWriter)
-
+            beanWriter.visitTypeArguments(groovyClassElement.allTypeArguments)
             beanDefinitionWriters.put(classNode, beanWriter)
 
             GroovyMethodElement constructor = groovyClassElement.getPrimaryConstructor().orElse(null) as GroovyMethodElement
@@ -1356,13 +1286,13 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
                 beanDefinitionWriters.put(ClassHelper.make(packageName + '.' + beanClassName), aopProxyWriter)
 
-
-                GenericsType[] typeArguments = typeToImplement.getGenericsTypes()
-                Map<String, ClassNode> typeVariables = new HashMap<>(typeArguments?.size() ?: 1)
-
-                for (GenericsType typeArgument : typeArguments) {
-                    typeVariables.put(typeArgument.name, typeArgument.type)
-                }
+                GroovyClassElement typeToImplementElement = new GroovyClassElement(
+                        sourceUnit,
+                        compilationUnit,
+                        typeToImplement,
+                        methodAnnotationMetadata
+                )
+                Map<String, ClassElement> typeVariables = typeToImplementElement.getTypeArguments();
 
                 InjectVisitor thisVisitor = this
                 SourceUnit source = this.sourceUnit
@@ -1384,34 +1314,41 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                             return
                         }
                         first = false
+                        GroovyMethodElement targetMethodElement = new GroovyMethodElement(
+                                typeToImplementElement,
+                                sourceUnit,
+                                compilationUnit,
+                                targetMethod,
+                                AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, targetMethod)
+                        )
+                        ParameterElement[] sourceParams = sourceMethod.getParameters();
+                        ParameterElement[] targetParams = targetMethodElement.getParameters();
                         Parameter[] targetParameters = targetMethod.getParameters()
-                        Parameter[] sourceParameters = method.getParameters()
-                        Map<String, ClassNode> boundTypes = AstGenericUtils.createGenericsSpec(classNode)
-                        if (targetParameters.size() == sourceParameters.size()) {
+                        if (targetParameters.size() == sourceParams.size()) {
 
                             int i = 0
-                            Map<String, Object> genericTypes = new HashMap<>()
+                            Map<String, ClassElement> genericTypes = [:]
                             for (Parameter targetElement in targetParameters) {
 
-                                Parameter sourceElement = sourceParameters[i]
+                                ParameterElement sourceElement = sourceParams[i]
 
-                                ClassNode targetType = targetElement.getType()
-                                ClassNode sourceType = sourceElement.getType()
+                                ClassElement targetType = targetParams[i].getType()
+                                ClassElement sourceType = sourceElement.getType()
 
-                                if (targetType.isGenericsPlaceHolder()) {
-                                    GenericsType[] targetGenerics = targetType.genericsTypes
+                                if (targetElement.type.isGenericsPlaceHolder()) {
+                                    GenericsType[] targetGenerics = targetElement.type.genericsTypes
 
                                     if (targetGenerics) {
                                         String variableName = targetGenerics[0].name
                                         if (typeVariables.containsKey(variableName)) {
                                             targetType = typeVariables.get(variableName)
 
-                                            genericTypes.put(variableName, AstGenericUtils.resolveTypeReference(sourceType, boundTypes))
+                                            genericTypes.put(variableName, sourceType)
                                         }
                                     }
                                 }
 
-                                if (!AstClassUtils.isSubclassOfOrImplementsInterface(sourceType, targetType)) {
+                                if (!sourceType.isAssignable(targetType.getName())) {
                                     thisVisitor.addError("Cannot adapt method [${method.declaringClass.name}.$method.name(..)] to target method [${targetMethod.declaringClass.name}.$targetMethod.name(..)]. Argument type [" + sourceType.name + "] is not a subtype of type [$targetType.name] at position $i.", (MethodNode)method)
                                     return
                                 }
@@ -1420,22 +1357,16 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                             }
 
                             if (!genericTypes.isEmpty()) {
-                                Map<String, Map<String, Object>> typeData = Collections.<String, Map<String, Object>>singletonMap(
+                                Map<String, Map<String, ClassElement>> typeData = Collections.<String, Map<String, ClassElement>>singletonMap(
                                         typeToImplement.name,
                                         genericTypes
                                 )
                                 aopProxyWriter.visitTypeArguments(
-                                        finalizeTypeArguments(typeData)
+                                        typeData
                                 )
                             }
 
-                            Map<String, ParameterElement> targetMethodParamsToType = [:]
-                            Map<String, ClassElement> targetMethodGenericParams = [:]
-                            Map<String, AnnotationMetadata> targetAnnotationMetadata = [:]
-
                             String qualifier = concreteClassAnnotationMetadata.getValue(Named.class, String.class).orElse(null)
-
-
                             GroovyMethodElement groovyMethodElement = new GroovyMethodElement(
                                     concreteClassElement,
                                     source,
@@ -1444,15 +1375,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                     methodAnnotationMetadata
                             )
 
-                            populateParameterData(
-                                    groovyMethodElement,
-                                    targetMethodParamsToType,
-                                    targetMethodGenericParams,
-                                    targetAnnotationMetadata,
-                                    false
-                            )
-
-                            AnnotationClassValue[] adaptedArgumentTypes = new AnnotationClassValue[sourceParameters.length]
+                            AnnotationClassValue[] adaptedArgumentTypes = new AnnotationClassValue[sourceParams.length]
                             int j = 0
                             for (ParameterElement ve in sourceMethod.parameters) {
                                 adaptedArgumentTypes[j] = new AnnotationClassValue(ve.type.name)
@@ -1497,62 +1420,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
     private String generateAdaptedMethodClassName(String declaringClassSimpleName, ClassNode typeToImplement, MethodNode method) {
         String rootName = declaringClassSimpleName + '$' + typeToImplement.nameWithoutPackage + '$' + method.getName()
         return rootName + adaptedMethodIndex.incrementAndGet()
-    }
-
-    private void visitTypeArguments(ClassNode typeElement, BeanDefinitionWriter beanDefinitionWriter) {
-        Map<String, Map<String, Object>> typeArguments = AstGenericUtils.buildAllGenericTypeInfo(typeElement)
-        LinkedHashMap<String, Map<String, Object>> finalTypeArguments = finalizeTypeArguments(typeArguments)
-        beanDefinitionWriter.visitTypeArguments(
-                finalTypeArguments
-        )
-    }
-
-    private static LinkedHashMap<String, Map<String, Object>> finalizeTypeArguments(Map<String, Map<String, Object>> typeArguments) {
-        Map<String, Map<String, Object>> finalTypeArguments = new LinkedHashMap<>(typeArguments.size())
-        for (entry in typeArguments) {
-            Map<String, Object> newMap = new LinkedHashMap<>(entry.value.size())
-            for (entry2 in entry.value) {
-                def v = entry2.value
-                if (v instanceof ClassNode) {
-                    newMap.put(entry2.key, v.getName())
-                } else {
-                    newMap.put(entry2.key, v.toString())
-                }
-            }
-            finalTypeArguments.put(entry.key, newMap)
-        }
-        finalTypeArguments
-    }
-
-    private void populateParameterData(
-            GroovyMethodElement methodElement,
-            Map<String, ParameterElement> paramsToType,
-            Map<String, ClassElement> genericParams,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            boolean isConstructBinding) {
-        for (ParameterElement param in methodElement.parameters) {
-            String parameterName = param.name
-            def annotationMetadata = param.annotationMetadata
-            paramsToType.put(parameterName, param)
-            genericParams.put(parameterName, param.genericType)
-
-
-
-            if (isConstructBinding) {
-                if (!annotationMetadata.hasStereotype(io.micronaut.context.annotation.Parameter, Property, Value)) {
-                    if (!param.type.hasStereotype(Scope)) {
-                        def propertyMetadata = configurationMetadataBuilder.visitProperty(
-                                param.type.name,
-                                parameterName,
-                                null,
-                                null
-                        )
-                        annotationMetadata = addPropertyMetadata(param, propertyMetadata)
-                    }
-                }
-            }
-            argumentAnnotationMetadata.put(parameterName, annotationMetadata)
-        }
     }
 
     private void visitConfigurationBuilder(ClassElement declaringClass,

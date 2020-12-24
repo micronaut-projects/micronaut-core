@@ -204,7 +204,7 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
 
     @Override
     protected String getTypeString(TypeElement type) {
-        return modelUtils.resolveTypeReference(type).toString();
+        return modelUtils.resolveTypeReference(type.asType()).toString();
     }
 
     @Override

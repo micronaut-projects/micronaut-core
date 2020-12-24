@@ -33,6 +33,7 @@ import javax.inject.Scope;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}.
@@ -125,26 +126,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildDeclared(T element) {
-        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(element);
-        if (existing != null) {
-            return existing;
-        } else {
+        DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
 
-            DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
-
-            try {
-                AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true, true);
-                if (metadata.isEmpty()) {
-                    return AnnotationMetadata.EMPTY_METADATA;
-                }
-                return metadata;
-            } catch (RuntimeException e) {
-                if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
-                    // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
-                    return AnnotationMetadata.EMPTY_METADATA;
-                } else {
-                    throw e;
-                }
+        try {
+            AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true, true);
+            if (metadata.isEmpty()) {
+                return AnnotationMetadata.EMPTY_METADATA;
+            }
+            return metadata;
+        } catch (RuntimeException e) {
+            if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
+                // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
+                return AnnotationMetadata.EMPTY_METADATA;
+            } else {
+                throw e;
             }
         }
     }
@@ -1212,6 +1207,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
+     * Used to clear mutated metadata at the end of a compilation cycle.
+     */
+    @Internal
+    public static void clearAllMutated(String declaringType) {
+        Set<MetadataKey> keysToRemove = MUTATED_ANNOTATION_METADATA.keySet().stream().filter(mk -> mk.declaringName.equals(declaringType))
+                .collect(Collectors.toSet());
+        MUTATED_ANNOTATION_METADATA.keySet().removeAll(keysToRemove);
+    }
+
+    /**
      * Returns whether the given annotation is a mapped annotation.
      *
      * @param annotationName The annotation name
@@ -1326,7 +1331,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         DEFAULT_ANNOTATE_EXCLUDES
                 );
             }
-            return newMetadata;
+            if (annotationMetadata instanceof AnnotationMetadataReference) {
+                AnnotationMetadataReference ref = (AnnotationMetadataReference) annotationMetadata;
+                return new AnnotationMetadataHierarchy(ref, newMetadata);
+            } else {
+                return newMetadata;
+            }
         }
         return annotationMetadata;
     }

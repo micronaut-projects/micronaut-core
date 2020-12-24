@@ -16,19 +16,13 @@
 package io.micronaut.ast.groovy.utils
 
 import groovy.transform.CompileStatic
-import io.micronaut.ast.groovy.visitor.GroovyClassElement
 import io.micronaut.core.util.ArrayUtils
-import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.visitor.VisitorContext
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.GenericsType
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.tools.GenericsUtils
-
-import javax.lang.model.element.Element
-import javax.lang.model.element.TypeElement
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -54,7 +48,7 @@ class AstGenericUtils {
             } else {
 
                 classNode = classNode.redirect()
-                Map<String, ClassNode> ret = new HashMap<String, ClassNode>()
+                Map<String, ClassNode> ret = new LinkedHashMap<String, ClassNode>()
                 GenericsType[] redirectTypes = classNode.getGenericsTypes()
                 if (redirectTypes != null) {
                     for (GenericsType gt in redirectTypes) {
@@ -77,9 +71,37 @@ class AstGenericUtils {
             if (!hasGenericTypes) {
                 return Collections.emptyMap()
             } else {
-                return GenericsUtils.createGenericsSpec(classNode)
+                return createGenericsSpec(classNode, Collections.emptyMap())
             }
         }
+    }
+
+    static Map<String, ClassNode> createGenericsSpec(ClassNode current, Map<String, ClassNode> oldSpec) {
+        Map<String, ClassNode> ret = new LinkedHashMap<String, ClassNode>(oldSpec);
+        // ret contains the type specs, what we now need is the type spec for the
+        // current class. To get that we first apply the type parameters to the
+        // current class and then use the type names of the current class to reset
+        // the map. Example:
+        //   class A<V,W,X>{}
+        //   class B<T extends Number> extends A<T,Long,String> {}
+        // first we have:    T->Number
+        // we apply it to A<T,Long,String> -> A<Number,Long,String>
+        // resulting in:     V->Number,W->Long,X->String
+
+        GenericsType[] sgts = current.getGenericsTypes();
+        if (sgts != null) {
+            ClassNode[] spec = new ClassNode[sgts.length];
+            for (int i = 0; i < spec.length; i++) {
+                spec[i] = GenericsUtils.correctToGenericsSpec(ret, sgts[i]);
+            }
+            GenericsType[] newGts = current.redirect().getGenericsTypes();
+            if (newGts == null) return ret;
+            ret.clear();
+            for (int i = 0; i < spec.length; i++) {
+                ret.put(newGts[i].getName(), spec[i]);
+            }
+        }
+        return ret;
     }
 
     /**
@@ -214,46 +236,19 @@ class AstGenericUtils {
     }
 
     /**
-     * Build the generics information for the given type
-     * @param classNode The parameter type
-     * @return The generics information
-     */
-    static Map<String, Object> buildGenericTypeInfo(ClassNode classNode, Map<String, ClassNode> boundTypes) {
-
-        if (!classNode.isUsingGenerics() || !classNode.isRedirectNode()) Collections.emptyMap()
-
-        Map<String, Object> resolvedGenericTypes = [:]
-        extractPlaceholders(classNode, resolvedGenericTypes, boundTypes)
-        return resolvedGenericTypes
-    }
-
-    /**
-     * Builds all the generic information for the given type
-     * @param classNode
-     * @return
-     */
-    static Map<String, Map<String, Object>> buildAllGenericTypeInfo(ClassNode classNode) {
-        Map<String, Map<String, Object>> typeArguments = new HashMap<>()
-
-        populateTypeArguments(classNode, typeArguments)
-
-        return typeArguments
-    }
-
-    /**
      * Builds all the generic information for the given type
      * @param classNode
      * @return
      */
     static Map<String, Map<String, ClassNode>> buildAllGenericElementInfo(ClassNode classNode, VisitorContext visitorContext) {
-        Map<String, Map<String, Object>> typeArguments = new HashMap<>()
+        Map<String, Map<String, Object>> typeArguments = new LinkedHashMap<>()
 
         populateTypeArguments(classNode, typeArguments)
 
-        Map<String, Map<String, ClassNode>> elements = new HashMap<>(typeArguments.size())
+        Map<String, Map<String, ClassNode>> elements = new LinkedHashMap<>(typeArguments.size())
         for (Map.Entry<String, Map<String, Object>> entry : typeArguments.entrySet()) {
             Map<String, Object> value = entry.getValue()
-            HashMap<String, ClassNode> submap = new HashMap<>(value.size())
+            HashMap<String, ClassNode> submap = new LinkedHashMap<>(value.size())
             for (Map.Entry<String, Object> genericEntry : value.entrySet()) {
                 def v = genericEntry.getValue()
                 ClassNode te = null
@@ -380,14 +375,6 @@ class AstGenericUtils {
                 }
             })
         }
-    }
-
-
-
-    static Map<String, Object> extractPlaceholders(ClassNode cn) {
-        Map<String, Object> ret = new HashMap<String, Object>()
-        extractPlaceholders(cn, ret, Collections.emptyMap())
-        return ret
     }
 
     /**

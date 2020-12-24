@@ -53,7 +53,7 @@ import java.util.Map;
 @Internal
 class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
 
-    private static final Type TYPE_BEAN_PROPERTY = getTypeReference(AbstractBeanProperty.class);
+    private static final Type TYPE_BEAN_PROPERTY = Type.getType(AbstractBeanProperty.class);
     private static final Method METHOD_READ_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "readInternal", Object.class));
     private static final Method METHOD_WRITE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "writeInternal", Object.class, Object.class));
     private final Type propertyType;
@@ -109,7 +109,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         this.propertyName = propertyName;
         this.readOnly = isReadOnly;
         this.annotationMetadata = annotationMetadata == AnnotationMetadata.EMPTY_METADATA ? null : annotationMetadata;
-        this.type = getTypeReference(introspectionType.getClassName() + "$$" + index);
+        this.type = getTypeReference(ClassElement.of(introspectionType.getClassName() + "$$" + index));
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         if (CollectionUtils.isNotEmpty(typeArguments)) {
             this.typeArguments = typeArguments;

@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.generics
 
+import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
@@ -22,9 +23,68 @@ import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.MethodInjectionPoint
 import spock.lang.Unroll
 
+import javax.validation.ConstraintViolationException
 import java.util.function.Function
+import java.util.function.Supplier
 
 class GenericTypeArgumentsSpec extends AbstractTypeElementSpec {
+
+    void "test type arguments for exception handler"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('exceptionhandler.Test', '''\
+package exceptionhandler;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import javax.validation.ConstraintViolationException;
+
+@Context
+class Test implements ExceptionHandler<ConstraintViolationException, java.util.function.Supplier<Foo>> {
+
+    public java.util.function.Supplier<Foo> handle(String request, ConstraintViolationException e) {
+        return null;
+    }
+}
+
+interface Foo {}
+interface ExceptionHandler<T extends Throwable, R> {
+    R handle(String request, T exception);
+}
+''')
+        expect:
+        definition != null
+        def typeArgs = definition.getTypeArguments("exceptionhandler.ExceptionHandler")
+        typeArgs.size() == 2
+        typeArgs[0].type == ConstraintViolationException
+        typeArgs[1].type == Supplier
+    }
+
+    void "test type arguments for factory returning interface"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('factorygenerics.Test$MyFunc0', '''\
+package factorygenerics;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@Factory
+class Test {
+
+    @Bean
+    io.micronaut.context.event.BeanCreatedEventListener<Foo> myFunc() {
+        return (event) -> event.getBean();
+    }
+}
+
+interface Foo {}
+
+''')
+        expect:
+        definition != null
+        definition.getTypeArguments(BeanCreatedEventListener).size() == 1
+        definition.getTypeArguments(BeanCreatedEventListener)[0].type.name == 'factorygenerics.Foo'
+    }
+
     @Unroll
     void "test generic return type resolution for return type: #returnType"() {
         given:

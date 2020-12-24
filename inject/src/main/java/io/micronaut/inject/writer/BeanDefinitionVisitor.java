@@ -362,5 +362,5 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      *
      * @param typeArguments The type arguments
      */
-    void visitTypeArguments(Map<String, Map<String, Object>> typeArguments);
+    void visitTypeArguments(Map<String, Map<String, ClassElement>> typeArguments);
 }

@@ -36,10 +36,12 @@ final class DefaultOriginatingElements implements OriginatingElements {
      * @param originatingElements The elements
      */
     DefaultOriginatingElements(Element... originatingElements) {
-        this.originatingElements = new LinkedHashMap<>(originatingElements.length);
-        for (Element originatingElement : originatingElements) {
-            if (originatingElement != null) {
-                this.originatingElements.put(originatingElement.getName(), originatingElement);
+        this.originatingElements = new LinkedHashMap<>(originatingElements != null ? originatingElements.length : 5);
+        if (originatingElements != null) {
+            for (Element originatingElement : originatingElements) {
+                if (originatingElement != null) {
+                    this.originatingElements.put(originatingElement.getName(), originatingElement);
+                }
             }
         }
     }
