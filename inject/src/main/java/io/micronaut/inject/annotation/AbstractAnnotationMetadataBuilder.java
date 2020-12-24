@@ -148,15 +148,18 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      *
      * @param element The element
      * @param annotations The annotations
+     * @param includeTypeAnnotations Whether to include type level annotations in the metadata for the element
      * @return The {@link AnnotationMetadata}
      */
-    public AnnotationMetadata buildDeclared(T element, List<? extends A> annotations) {
+    public AnnotationMetadata buildDeclared(T element, List<? extends A> annotations, boolean includeTypeAnnotations) {
         if (CollectionUtils.isEmpty(annotations)) {
             return AnnotationMetadata.EMPTY_METADATA;
         }
 
         DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
-        buildInternal(element, element, annotationMetadata, false, true);
+        if (includeTypeAnnotations) {
+            buildInternal(element, element, annotationMetadata, false, true);
+        }
 
         try {
             includeAnnotations(annotationMetadata, element, true, annotations);

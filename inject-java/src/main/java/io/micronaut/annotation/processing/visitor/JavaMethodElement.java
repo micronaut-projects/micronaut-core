@@ -205,10 +205,10 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             if ((tm instanceof DeclaredType) && sameType("kotlin.Unit", (DeclaredType) tm)) {
                 return PrimitiveElement.VOID;
             } else {
-                return mirrorToClassElement(tm, visitorContext, info);
+                return mirrorToClassElement(tm, visitorContext, info, true);
             }
         }
-        return mirrorToClassElement(executableElement.getReturnType(), visitorContext, info);
+        return mirrorToClassElement(executableElement.getReturnType(), visitorContext, info, true);
     }
 
     private static boolean sameType(String type, DeclaredType dt) {

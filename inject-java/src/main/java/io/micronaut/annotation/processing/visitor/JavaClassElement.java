@@ -119,7 +119,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
                 for (Map.Entry<String, TypeMirror> entry : forType.entrySet()) {
                     TypeMirror v = entry.getValue();
-                    ClassElement ce = v != null ? mirrorToClassElement(v, visitorContext) : null;
+                    ClassElement ce = v != null ? mirrorToClassElement(v, visitorContext, Collections.emptyMap(), false) : null;
                     if (ce == null) {
                         return Collections.emptyMap();
                     } else {
@@ -220,7 +220,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
                                 BeanPropertyData beanPropertyData = new BeanPropertyData(propertyName);
                                 beanPropertyData.declaringType = JavaClassElement.this;
-                                beanPropertyData.type = mirrorToClassElement(element.asType(), visitorContext, genericTypeInfo);
+                                beanPropertyData.type = mirrorToClassElement(element.asType(), visitorContext, genericTypeInfo, true);
                                 return beanPropertyData;
                             });
                         }
@@ -279,10 +279,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                 if (classElement != null) {
                                     getterReturnType = classElement;
                                 } else {
-                                    getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo);
+                                    getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo, true);
                                 }
                             } else {
-                                getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo);
+                                getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo, true);
                             }
 
                             BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
@@ -291,7 +291,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             beanPropertyData.getter = executableElement;
                             if (beanPropertyData.setter != null) {
                                 TypeMirror typeMirror = beanPropertyData.setter.getParameters().get(0).asType();
-                                ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
+                                ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo, true);
                                 if (!setterParameterType.getName().equals(getterReturnType.getName())) {
                                     beanPropertyData.setter = null; // not a compatible setter
                                 }
@@ -299,7 +299,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         } else if (NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1) {
                             String propertyName = NameUtils.getPropertyNameForSetter(methodName);
                             TypeMirror typeMirror = executableElement.getParameters().get(0).asType();
-                            ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
+                            ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo, true);
 
                             BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
                             configureDeclaringType(declaringTypeElement, beanPropertyData);
@@ -319,8 +319,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             beanPropertyData.declaringType = mirrorToClassElement(
                                     declaringTypeElement.asType(),
                                     visitorContext,
-                                    genericTypeInfo
-                            );
+                                    genericTypeInfo,
+                                    true);
                         }
                     }
                 }, null);
@@ -527,7 +527,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         Map<String, ClassElement> map = new LinkedHashMap<>();
         while (tpi.hasNext()) {
             TypeParameterElement tpe = tpi.next();
-            ClassElement classElement = mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo);
+            ClassElement classElement = mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo, false);
             map.put(tpe.toString(), classElement);
         }
 
@@ -542,12 +542,15 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         info.forEach((name, generics) -> {
             Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
             generics.forEach((variable, mirror) -> {
-                ClassElement classElement = mirrorToClassElement(mirror, visitorContext, info);
+                ClassElement classElement = mirrorToClassElement(mirror, visitorContext, info, false);
                 resolved.put(variable, classElement);
             });
             result.put(name, resolved);
         });
-        result.put(getName(), getTypeArguments());
+        Map<String, ClassElement> typeArguments = getTypeArguments();
+        if (!typeArguments.isEmpty()) {
+            result.put(getName(), typeArguments);
+        }
         return result;
     }
 
