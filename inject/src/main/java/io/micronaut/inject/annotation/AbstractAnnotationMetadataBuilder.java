@@ -33,7 +33,6 @@ import javax.inject.Scope;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}.
@@ -1204,16 +1203,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Internal
     public static void clearMutated() {
         MUTATED_ANNOTATION_METADATA.clear();
-    }
-
-    /**
-     * Used to clear mutated metadata at the end of a compilation cycle.
-     */
-    @Internal
-    public static void clearAllMutated(String declaringType) {
-        Set<MetadataKey> keysToRemove = MUTATED_ANNOTATION_METADATA.keySet().stream().filter(mk -> mk.declaringName.equals(declaringType))
-                .collect(Collectors.toSet());
-        MUTATED_ANNOTATION_METADATA.keySet().removeAll(keysToRemove);
     }
 
     /**

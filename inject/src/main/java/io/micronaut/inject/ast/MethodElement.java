@@ -17,7 +17,6 @@ package io.micronaut.inject.ast;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import org.jetbrains.annotations.NotNull;
 
@@ -41,7 +40,7 @@ public interface MethodElement extends MemberElement {
     /**
      * @return The method parameters
      */
-    ParameterElement[] getParameters();
+    @NonNull ParameterElement[] getParameters();
 
     /**
      * Takes this method element and transforms into a new method element with the given parameters appended to the existing parameters.
@@ -49,19 +48,20 @@ public interface MethodElement extends MemberElement {
      * @return A new method element
      * @since 2.3.0
      */
-    MethodElement withNewParameters(ParameterElement...newParameters);
+    @NonNull MethodElement withNewParameters(@NonNull ParameterElement...newParameters);
 
     /**
      * If {@link #isSuspend()} returns true this method exposes the continuation parameter in addition to the other parameters of the method.
      * @return The suspend parameters
      * @since 2.3.0
      */
-    default ParameterElement[] getSuspendParameters() {
+    default @NonNull ParameterElement[] getSuspendParameters() {
         return getParameters();
     }
 
     /**
-     * Returns true if the method has parameters
+     * Returns true if the method has parameters.
+     *
      * @return True if it does
      */
     default boolean hasParameters() {
@@ -101,7 +101,7 @@ public interface MethodElement extends MemberElement {
      * @param simple If simple type names are to be used
      * @return The method description
      */
-    default String getDescription(boolean simple) {
+    default @NonNull String getDescription(boolean simple) {
         String typeString = simple ? getReturnType().getSimpleName() : getReturnType().getName();
         String args = Arrays.stream(getParameters()).map(arg -> simple ? arg.getType().getSimpleName() : arg.getType().getName() + " " + arg.getName()).collect(Collectors.joining(","));
         return typeString + " " + getName() + "(" + args + ")";

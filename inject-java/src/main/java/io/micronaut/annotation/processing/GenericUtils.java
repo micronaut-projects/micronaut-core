@@ -76,6 +76,7 @@ public class GenericUtils {
      * Builds type argument information for the given type.
      *
      * @param element The element
+     * @param declaredType The declared type
      * @return The type argument information
      */
     public Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentElementInfo(@NonNull Element element, @Nullable DeclaredType declaredType) {

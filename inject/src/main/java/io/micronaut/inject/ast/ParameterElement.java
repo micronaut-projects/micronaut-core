@@ -38,12 +38,13 @@ public interface ParameterElement extends TypedElement {
     ClassElement getType();
 
     /**
-     * Creates a parameter element for a simple type and name
+     * Creates a parameter element for a simple type and name.
+     *
      * @param type The type
      * @param name The name
      * @return The parameter element
      */
-    static ParameterElement of(Class<?> type, String name) {
+    static @NonNull ParameterElement of(@NonNull Class<?> type, @NonNull String name) {
         Objects.requireNonNull(name, "Name cannot be null");
         return new ReflectParameterElement(ClassElement.of(type), name);
     }

@@ -63,6 +63,8 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * Visits the constructor used to create the bean definition in the case where no constructor is present.
      * This method should only be called in the class defines no constructor.
      *
+     * @param annotationMetadata The annotation metadata for the constructor
+     *
      */
     void visitDefaultConstructor(AnnotationMetadata annotationMetadata);
 
@@ -172,6 +174,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * Visits an injection point for a setter.
      *
      * @param declaringType          The declaring type
+     * @param methodElement          The method element
      * @param requiresReflection     Whether the setter requires reflection
      * @param isOptional             Whether the setter is optional
      */

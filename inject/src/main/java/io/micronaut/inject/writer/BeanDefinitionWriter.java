@@ -16,7 +16,6 @@
 package io.micronaut.inject.writer;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.AbstractBeanDefinition;
 import io.micronaut.context.AbstractParametrizedBeanDefinition;
 import io.micronaut.context.BeanContext;
@@ -39,7 +38,6 @@ import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
-import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassVisitor;
@@ -55,7 +53,6 @@ import javax.inject.Provider;
 import javax.inject.Qualifier;
 import javax.inject.Scope;
 import javax.inject.Singleton;
-import javax.lang.model.element.Element;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Constructor;

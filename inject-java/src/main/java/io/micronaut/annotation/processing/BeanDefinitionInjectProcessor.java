@@ -27,7 +27,6 @@ import io.micronaut.core.annotation.*;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
@@ -1967,12 +1966,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private boolean shouldExclude(ConfigurationMetadata configurationMetadata, String propertyName) {
             return shouldExclude(configurationMetadata.getIncludes(), configurationMetadata.getExcludes(), propertyName);
         }
-    }
 
-    private ClassElement[] resolveInterceptorElements(AnnotationMetadata annotationMetadata, String annotationName) {
-        return annotationMetadata
-                .getAnnotationNamesByStereotype(annotationName)
-                .stream().map(ClassElement::of).toArray(ClassElement[]::new);
+        private ClassElement[] resolveInterceptorElements(AnnotationMetadata annotationMetadata, String annotationName) {
+            return annotationMetadata
+                    .getAnnotationNamesByStereotype(annotationName)
+                    .stream().map(ClassElement::of).toArray(ClassElement[]::new);
+        }
     }
 
     /**

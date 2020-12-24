@@ -68,12 +68,12 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     @Override
-    public final boolean isSuspend() {
+    public boolean isSuspend() {
         return executionHandle.isSuspend();
     }
 
     @Override
-    public final boolean isAbstract() {
+    public boolean isAbstract() {
         return executionHandle.isAbstract();
     }
 

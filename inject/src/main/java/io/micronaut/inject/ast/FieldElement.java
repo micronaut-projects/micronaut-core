@@ -28,5 +28,5 @@ public interface FieldElement extends TypedElement, MemberElement {
      */
     default ClassElement getGenericField() {
         return getGenericType();
-    };
+    }
 }

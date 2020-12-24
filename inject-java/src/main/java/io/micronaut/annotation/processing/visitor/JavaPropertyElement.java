@@ -72,7 +72,7 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
     @Override
     public ClassElement getGenericType() {
         Map<String, Map<String, TypeMirror>> declaredGenericInfo = declaringElement.getGenericTypeInfo();
-        return parameterizedClassElement(((TypeElement)type.getNativeType()).asType(), visitorContext, declaredGenericInfo);
+        return parameterizedClassElement(((TypeElement) type.getNativeType()).asType(), visitorContext, declaredGenericInfo);
     }
 
     @Override
