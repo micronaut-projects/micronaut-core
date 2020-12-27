@@ -22,7 +22,6 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import org.slf4j.Logger;
@@ -78,7 +77,7 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
     }
 
     private void configureLogLevels() {
-        environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX, StringConvention.RAW).forEach((loggerPrefix, levelString) -> {
+        environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX).forEach((loggerPrefix, levelString) -> {
             LogLevel newLevel = toLogLevel(levelString.toString());
             if (newLevel == null) {
                 throw new ConfigurationException("Invalid log level: '" + levelString + "' for logger: '" + loggerPrefix + "'");

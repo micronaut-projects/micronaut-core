@@ -2,6 +2,7 @@ package io.micronaut.logging
 
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
+import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import org.slf4j.LoggerFactory
 import spock.lang.Specification
@@ -37,6 +38,31 @@ class LogbackLogLevelConfigurerSpec extends Specification {
             'foo.bar2'    | Level.INFO
             'foo.bar3'    | null
             'aaa.bbb.ccc' | Level.ERROR
+
+    }
+
+    void 'test that log levels can be configured via environment variables'() {
+        given:
+            ((Logger) LoggerFactory.getLogger('foo.bar1')).setLevel(Level.DEBUG)
+            ((Logger) LoggerFactory.getLogger('foo.bar2')).setLevel(Level.DEBUG)
+
+        when:
+            ApplicationContext context = ApplicationContext.builder().build()
+            SystemLambda.withEnvironmentVariable("LOGGER_LEVELS_FOO_BAR2", "INFO")
+                    .execute(() -> {
+                        context.start()
+                    })
+
+        then:
+            ((Logger) LoggerFactory.getLogger(loggerName)).getLevel() == expectedLevel
+
+        cleanup:
+            context.close()
+
+        where:
+            loggerName    | expectedLevel
+            'foo.bar1'    | Level.DEBUG
+            'foo.bar2'    | Level.INFO
 
     }
 
