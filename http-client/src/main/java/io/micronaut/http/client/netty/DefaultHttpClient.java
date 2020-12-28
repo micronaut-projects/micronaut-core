@@ -1206,6 +1206,12 @@ public class DefaultHttpClient implements
         }
     }
 
+    /**
+     * @param parentRequest      The parent request
+     * @param request            The redirect location request
+     * @param <I>                The input type
+     * @return A {@link Publisher} with the resolved URI
+     */
     protected <I> Publisher<URI> resolveRedirectURI(io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<I> request) {
         URI requestURI = request.getUri();
         if (requestURI.getScheme() != null) {
