@@ -16,6 +16,7 @@ class LogbackLogLevelConfigurerSpec extends Specification {
             ((Logger) LoggerFactory.getLogger('foo.bar1')).setLevel(Level.DEBUG)
             ((Logger) LoggerFactory.getLogger('foo.bar2')).setLevel(Level.DEBUG)
             ((Logger) LoggerFactory.getLogger('foo.bar3')).setLevel(Level.ERROR)
+            ((Logger) LoggerFactory.getLogger('foo.barBaz')).setLevel(Level.WARN)
 
         when:
             ApplicationContext context = ApplicationContext.run(
@@ -23,6 +24,7 @@ class LogbackLogLevelConfigurerSpec extends Specification {
                             'logger.levels.aaa.bbb.ccc': 'ERROR',
                             'logger.levels.foo.bar2'   : 'INFO',
                             'logger.levels.foo.bar3'   : '',
+                            'logger.levels.foo.barBaz'   : 'INFO',
                     ]
             )
 
@@ -38,6 +40,7 @@ class LogbackLogLevelConfigurerSpec extends Specification {
             'foo.bar2'    | Level.INFO
             'foo.bar3'    | null
             'aaa.bbb.ccc' | Level.ERROR
+            'foo.barBaz'    | Level.INFO
 
     }
 
