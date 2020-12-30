@@ -32,11 +32,14 @@ import javax.inject.Inject;
 import java.io.File;
 import java.nio.charset.Charset;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * <p>A base {@link ConfigurationProperties} for servers.</p>
@@ -695,6 +698,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         private String protocolHeader;
         private String portHeader;
         private boolean portInHost = DEFAULT_PORT_IN_HOST;
+        private List<Pattern> allowedHosts = Collections.emptyList();
 
         /**
          * @return The host header name
@@ -751,6 +755,33 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          */
         public void setPortInHost(boolean portInHost) {
             this.portInHost = portInHost;
+        }
+
+        /**
+         * @return The list of hosts to validate the resolved host against.
+         */
+        public List<Pattern> getAllowedHosts() {
+            return allowedHosts;
+        }
+
+        /**
+         * @param allowedHosts The list of allowed host regex patterns. Any resolved
+         *                     host must match one of the configured hosts if the
+         *                     list is supplied. Each host is passed through
+         *                     {@link Pattern#compile(String)}.
+         */
+        public void setAllowedHosts(List<String> allowedHosts) {
+            this.allowedHosts = new ArrayList<>(allowedHosts.size());
+            for (String s: allowedHosts) {
+                this.allowedHosts.add(Pattern.compile(s));
+            }
+        }
+
+        /**
+         * @return True if any host headers have been configured
+         */
+        public boolean headersConfigured() {
+            return hostHeader != null || protocolHeader != null || portHeader != null;
         }
     }
 
