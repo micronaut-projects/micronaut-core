@@ -24,7 +24,6 @@ import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
@@ -32,7 +31,6 @@ import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
-import io.reactivex.Single
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -59,6 +57,13 @@ class ClientFilterStereotypeSpec extends Specification {
         then:
         markedClient.echoPost() == "echo Intercepted Post URL"
         markedClient.echo() == "echo Intercepted URL"
+
+        when:
+        IndirectlyMarkedClient indirectlyMarkedClient = ctx.getBean(IndirectlyMarkedClient)
+
+        then:
+        indirectlyMarkedClient.echoPost() == "echo Intercepted Post URL"
+        indirectlyMarkedClient.echo() == "echo Intercepted URL"
     }
 
     void "low-level client filter matching"() {
@@ -88,6 +93,16 @@ class ClientFilterStereotypeSpec extends Specification {
     @Client("/filters/marked")
     @MarkerStereotypeAnnotation
     static interface MarkedClient {
+        @Get("/")
+        String echo()
+
+        @Post("/")
+        String echoPost()
+    }
+
+    @Client("/filters/marked")
+    @IndirectMarkerStereotypeAnnotation
+    static interface IndirectlyMarkedClient {
         @Get("/")
         String echo()
 
