@@ -18,8 +18,6 @@ package io.micronaut.ast.groovy.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ConstructorElement;
 import org.codehaus.groovy.ast.ConstructorNode;
-import org.codehaus.groovy.control.CompilationUnit;
-import org.codehaus.groovy.control.SourceUnit;
 
 /**
  * A {@link ConstructorElement} for Groovy.

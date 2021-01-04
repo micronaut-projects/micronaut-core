@@ -160,7 +160,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 typeMirror,
                 visitorContext,
                 declaredGenericInfo,
-                true);
+                visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments());
     }
 
     /**
@@ -171,7 +171,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @return The class element
      */
     protected @NonNull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext) {
-        return mirrorToClassElement(returnType, visitorContext, Collections.emptyMap(), true);
+        return mirrorToClassElement(returnType, visitorContext, Collections.emptyMap(), visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments());
     }
 
     /**
@@ -183,7 +183,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @return The class element
      */
     protected @NonNull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {
-        return mirrorToClassElement(returnType, visitorContext, genericsInfo, true);
+        return mirrorToClassElement(returnType, visitorContext, genericsInfo, visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments());
     }
 
     /**

@@ -314,7 +314,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private final boolean isAopProxyType;
         private final OptionalValues<Boolean> aopSettings;
         private final boolean isDeclaredBean;
-        private final JavaVisitorContext visitorContext;
         private final JavaElementFactory elementFactory;
         private final ClassElement concreteClassElement;
         private final MethodElement constructorElement;
@@ -332,18 +331,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             this.concreteClass = concreteClass;
             this.concreteClassMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
             this.currentClassMetadata = concreteClassMetadata;
-            this.visitorContext = new JavaVisitorContext(
-                    processingEnv,
-                    messager,
-                    elementUtils,
-                    annotationUtils,
-                    typeUtils,
-                    modelUtils,
-                    genericUtils,
-                    filer,
-                    visitorAttributes
-            );
-            this.elementFactory = visitorContext.getElementFactory();
+            this.elementFactory = javaVisitorContext.getElementFactory();
             this.concreteClassElement = elementFactory.newClassElement(concreteClass, concreteClassMetadata);
             this.beanDefinitionWriters = new LinkedHashMap<>();
             this.isFactoryType = concreteClassMetadata.hasStereotype(Factory.class);
@@ -1028,7 +1016,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 declaringClassElement,
                                 method,
                                 annotationMetadata,
-                                visitorContext,
+                                javaVisitorContext,
                                 finalBeanTypeArgumentsMirrors
                         );
 

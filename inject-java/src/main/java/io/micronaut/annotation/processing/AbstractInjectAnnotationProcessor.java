@@ -166,7 +166,8 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     }
 
     /**
-     * Creates the visitor context
+     * Creates the visitor context.
+     *
      * @param processingEnv The processing env
      * @return The context
      */
@@ -269,7 +270,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     }
 
     private void illegalState() {
-        throw new IllegalStateException("No messager set. Ensure processing enviroment is initialized");
+        throw new IllegalStateException("No messager set. Ensure processing environment is initialized");
     }
 
     /**

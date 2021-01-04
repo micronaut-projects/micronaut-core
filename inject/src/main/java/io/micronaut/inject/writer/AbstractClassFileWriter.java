@@ -379,9 +379,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         generatorAdapter.push(argumentName);
 
         // 3rd argument: The annotation metadata
-        if (annotationMetadata == null || annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
-            generatorAdapter.visitInsn(ACONST_NULL);
-        } else {
+        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             AnnotationMetadataWriter.instantiateNewMetadata(
                     owningType,
                     declaringClassWriter,
@@ -389,6 +387,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     (DefaultAnnotationMetadata) annotationMetadata,
                     loadTypeMethods
             );
+        } else {
+            generatorAdapter.visitInsn(ACONST_NULL);
         }
 
         // 4th argument: The generic types

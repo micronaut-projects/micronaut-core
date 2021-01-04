@@ -33,9 +33,6 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
-import org.codehaus.groovy.control.CompilationUnit;
-import org.codehaus.groovy.control.SourceUnit;
-
 import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Inject;
 import java.lang.reflect.Modifier;
