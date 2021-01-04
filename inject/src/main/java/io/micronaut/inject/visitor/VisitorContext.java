@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
@@ -46,6 +47,13 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     String MICRONAUT_PROCESSING_PROJECT_DIR = "micronaut.processing.project.dir";
     String MICRONAUT_PROCESSING_GROUP = "micronaut.processing.group";
     String MICRONAUT_PROCESSING_MODULE = "micronaut.processing.module";
+
+    /**
+     * Gets the element factory for this visitor context.
+     * @return The element factory
+     * @since 2.3.0
+     */
+    @NonNull ElementFactory<?, ?, ?, ?> getElementFactory();
 
     /**
      * Allows printing informational messages.

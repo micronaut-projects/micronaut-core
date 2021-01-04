@@ -180,6 +180,18 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @param returnType The return type
      * @param visitorContext The visitor context
      * @param genericsInfo The generic information.
+     * @return The class element
+     */
+    protected @NonNull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {
+        return mirrorToClassElement(returnType, visitorContext, genericsInfo, true);
+    }
+
+    /**
+     * Obtain the ClassElement for the given mirror.
+     *
+     * @param returnType The return type
+     * @param visitorContext The visitor context
+     * @param genericsInfo The generic information.
      * @param includeTypeAnnotations Whether to include type level annotations in the metadata for the element
      * @return The class element
      */

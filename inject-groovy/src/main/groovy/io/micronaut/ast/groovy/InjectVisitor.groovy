@@ -30,9 +30,11 @@ import io.micronaut.ast.groovy.utils.PublicAbstractMethodVisitor
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor
 import io.micronaut.ast.groovy.visitor.AbstractGroovyElement
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
+import io.micronaut.ast.groovy.visitor.GroovyElementFactory
 import io.micronaut.ast.groovy.visitor.GroovyFieldElement
 import io.micronaut.ast.groovy.visitor.GroovyMethodElement
 import io.micronaut.ast.groovy.visitor.GroovyParameterElement
+import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.ConfigurationBuilder
 import io.micronaut.context.annotation.ConfigurationInject
@@ -125,6 +127,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
     final AtomicInteger adaptedMethodIndex = new AtomicInteger(0)
     final AtomicInteger factoryMethodIndex = new AtomicInteger(0)
     private final CompilationUnit compilationUnit
+    private final GroovyElementFactory elementFactory
 
     InjectVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode targetClassNode, ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder) {
         this(sourceUnit, compilationUnit, targetClassNode, null, configurationMetadataBuilder)
@@ -133,11 +136,12 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
     InjectVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode targetClassNode, Boolean configurationProperties, ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder) {
         this.compilationUnit = compilationUnit
         this.sourceUnit = sourceUnit
+        this.elementFactory = new GroovyVisitorContext(sourceUnit, compilationUnit).getElementFactory()
         this.configurationMetadataBuilder = configurationMetadataBuilder
         this.concreteClass = targetClassNode
         def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, targetClassNode)
         this.concreteClassAnnotationMetadata = annotationMetadata
-        this.originatingElement = AbstractGroovyElement.toClassElement(sourceUnit, compilationUnit, concreteClass, annotationMetadata)
+        this.originatingElement = elementFactory.newClassElement(concreteClass, annotationMetadata)
         this.concreteClassElement = originatingElement as GroovyClassElement
         this.isFactoryClass = annotationMetadata.hasStereotype(Factory)
         this.isAopProxyType = annotationMetadata.hasStereotype(AROUND_TYPE) && !targetClassNode.isAbstract()
@@ -217,9 +221,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     configurationMetadataBuilder,
                     interceptorTypes
             )
-            GroovyClassElement groovyClassElement = new GroovyClassElement(
-                    sourceUnit,
-                    compilationUnit,
+            ClassElement groovyClassElement = elementFactory.newClassElement(
                     node,
                     annotationMetadata
             )
@@ -308,7 +310,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                             typeAnnotationMetadata
                     )
                 }
-                GroovyMethodElement groovyMethodElement = new GroovyMethodElement(
+                MethodElement groovyMethodElement = new GroovyMethodElement(
                         concreteClassElement,
                         source,
                         unit,
@@ -317,9 +319,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 )
 
                 ClassNode owningType = AstGenericUtils.resolveTypeReference(methodNode.declaringClass)
-                GroovyClassElement owningClassElement = new GroovyClassElement(
-                        source,
-                        unit,
+                ClassElement owningClassElement = elementFactory.newClassElement(
                         owningType,
                         concreteClassAnnotationMetadata
                 )
@@ -337,10 +337,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     if (hasConstraint) {
                         if (annotationMetadata instanceof AnnotationMetadataReference) {
                             annotationMetadata = AstAnnotationUtils.newBuilder(source, unit).buildForParent(node.name, node, methodNode)
-                            groovyMethodElement = new GroovyMethodElement(
+                            groovyMethodElement = elementFactory.newMethodElement(
                                     concreteClassElement,
-                                    source,
-                                    unit,
                                     methodNode,
                                     annotationMetadata
                             )
@@ -438,9 +436,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         String methodName = methodNode.name
         ClassNode declaringClass = methodNode.declaringClass
         AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode)
-        def declaringElement = new GroovyClassElement(
-                sourceUnit,
-                compilationUnit,
+        def declaringElement = elementFactory.newClassElement(
                 declaringClass,
                 AnnotationMetadata.EMPTY_METADATA
         )
@@ -450,10 +446,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, methodNode.isPublic())
             }
 
-            GroovyMethodElement factoryMethodElement = new GroovyMethodElement(
+            MethodElement factoryMethodElement = elementFactory.newMethodElement(
                     concreteClassElement,
-                    sourceUnit,
-                    compilationUnit,
                     methodNode,
                     methodAnnotationMetadata
             )
@@ -604,10 +598,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         requiresReflection = true
                     }
 
-                    GroovyMethodElement groovyMethodElement = new GroovyMethodElement(
+                    MethodElement groovyMethodElement = elementFactory.newMethodElement(
                             declaringElement,
-                            sourceUnit,
-                            compilationUnit,
                             methodNode,
                             methodAnnotationMetadata
                     )
@@ -653,10 +645,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             } else if (isConfigurationProperties && isPublic) {
                 if (NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
                     String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
-                    GroovyMethodElement groovyMethodElement = new GroovyMethodElement(
+                    MethodElement groovyMethodElement = elementFactory.newMethodElement(
                             declaringElement,
-                            sourceUnit,
-                            compilationUnit,
                             methodNode,
                             methodAnnotationMetadata
                     )
@@ -744,8 +734,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             boolean isOwningClass = declaringClass == concreteClass
             boolean isParent = declaringClass != concreteClass
 
-            GroovyClassElement declaringElement = new GroovyClassElement(sourceUnit, compilationUnit, declaringClass, concreteClassAnnotationMetadata)
-            def methodElement = new GroovyMethodElement(concreteClassElement, sourceUnit, compilationUnit, methodNode, methodAnnotationMetadata)
+            ClassElement declaringElement = elementFactory.newClassElement(declaringClass, concreteClassAnnotationMetadata)
+            def methodElement = elementFactory.newMethodElement(concreteClassElement, methodNode, methodAnnotationMetadata)
             Parameter[] resolvedParameters = methodElement.parameters.collect { ParameterElement pe ->
                 if (pe.type.isPrimitive()) {
                     return (Parameter) pe.nativeType
@@ -1212,9 +1202,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 )
             }
 
-            GroovyClassElement groovyClassElement = new GroovyClassElement(
-                    sourceUnit,
-                    compilationUnit,
+            ClassElement groovyClassElement = elementFactory.newClassElement(
                     classNode,
                     annotationMetadata
             )
@@ -1293,7 +1281,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         false,
                         originatingElement,
                         methodAnnotationMetadata,
-                        [new GroovyClassElement(sourceUnit, compilationUnit, typeToImplement, AnnotationMetadata.EMPTY_METADATA)] as ClassElement[],
+                        [elementFactory.newClassElement(typeToImplement, AnnotationMetadata.EMPTY_METADATA)] as ClassElement[],
                         configurationMetadataBuilder
                 )
 
@@ -1301,9 +1289,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
                 beanDefinitionWriters.put(ClassHelper.make(packageName + '.' + beanClassName), aopProxyWriter)
 
-                GroovyClassElement typeToImplementElement = new GroovyClassElement(
-                        sourceUnit,
-                        compilationUnit,
+                ClassElement typeToImplementElement = elementFactory.newClassElement(
                         typeToImplement,
                         methodAnnotationMetadata
                 )
@@ -1312,10 +1298,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 InjectVisitor thisVisitor = this
                 SourceUnit source = this.sourceUnit
                 CompilationUnit unit = this.compilationUnit
-                GroovyMethodElement sourceMethod = new GroovyMethodElement(
+                MethodElement sourceMethod = elementFactory.newMethodElement(
                         concreteClassElement,
-                        source,
-                        unit,
                         method,
                         methodAnnotationMetadata
                 )
@@ -1405,9 +1389,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                 }
                             })
 
-                            GroovyClassElement declaringElement = new GroovyClassElement(
-                                    source,
-                                    unit,
+                            ClassElement declaringElement = elementFactory.newClassElement(
                                     targetMethod.declaringClass,
                                     AnnotationMetadata.EMPTY_METADATA
                             )

@@ -344,7 +344,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         }
 
                         JavaPropertyElement propertyElement = new JavaPropertyElement(
-                                value.declaringType == null ? this : (JavaClassElement) value.declaringType,
+                                value.declaringType == null ? this : value.declaringType,
                                 value.getter,
                                 annotationMetadata,
                                 propertyName,

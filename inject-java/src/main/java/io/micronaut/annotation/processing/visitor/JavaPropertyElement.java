@@ -25,6 +25,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -39,7 +40,7 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
     private final String name;
     private final ClassElement type;
     private final boolean readOnly;
-    private final JavaClassElement declaringElement;
+    private final ClassElement declaringElement;
     private final JavaVisitorContext visitorContext;
 
     /**
@@ -54,7 +55,7 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
      * @param visitorContext     The java visitor context
      */
     JavaPropertyElement(
-            JavaClassElement declaringElement,
+            ClassElement declaringElement,
             Element rootElement,
             AnnotationMetadata annotationMetadata,
             String name,
@@ -71,7 +72,12 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
 
     @Override
     public ClassElement getGenericType() {
-        Map<String, Map<String, TypeMirror>> declaredGenericInfo = declaringElement.getGenericTypeInfo();
+        Map<String, Map<String, TypeMirror>> declaredGenericInfo;
+        if (declaringElement instanceof JavaClassElement) {
+            declaredGenericInfo = ((JavaClassElement) declaringElement).getGenericTypeInfo();
+        } else {
+            declaredGenericInfo = Collections.emptyMap();
+        }
         return parameterizedClassElement(((TypeElement) type.getNativeType()).asType(), visitorContext, declaredGenericInfo);
     }
 

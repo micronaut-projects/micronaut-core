@@ -32,7 +32,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Internal
-public class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
+class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
 
     private final JavaVisitorContext visitorContext;
     private final JavaClassElement declaringClass;
@@ -47,7 +47,7 @@ public class JavaParameterElement extends AbstractJavaElement implements Paramet
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      */
-    public JavaParameterElement(JavaClassElement declaringClass, VariableElement element, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
+    JavaParameterElement(JavaClassElement declaringClass, VariableElement element, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
         super(element, annotationMetadata, visitorContext);
         this.declaringClass = declaringClass;
         this.visitorContext = visitorContext;

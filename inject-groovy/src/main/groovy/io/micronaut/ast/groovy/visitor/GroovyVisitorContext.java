@@ -67,6 +67,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final SourceUnit sourceUnit;
     private final MutableConvertibleValues<Object> attributes;
     private final List<String> generatedResources = new ArrayList<>();
+    private final GroovyElementFactory groovyElementFactory;
 
     /**
      * @param sourceUnit      The source unit
@@ -77,6 +78,7 @@ public class GroovyVisitorContext implements VisitorContext {
         this.errorCollector = sourceUnit.getErrorCollector();
         this.compilationUnit = compilationUnit;
         this.attributes = VISITOR_ATTRIBUTES;
+        this.groovyElementFactory = new GroovyElementFactory(this);
     }
 
     @NonNull
@@ -141,6 +143,12 @@ public class GroovyVisitorContext implements VisitorContext {
             });
         }
         return classElements.toArray(new ClassElement[0]);
+    }
+
+    @NonNull
+    @Override
+    public GroovyElementFactory getElementFactory() {
+        return groovyElementFactory;
     }
 
     @Override
@@ -266,6 +274,13 @@ public class GroovyVisitorContext implements VisitorContext {
      */
     SourceUnit getSourceUnit() {
         return sourceUnit;
+    }
+
+    /**
+     * @return The compilation unit
+     */
+    CompilationUnit getCompilationUnit() {
+        return compilationUnit;
     }
 
     /**

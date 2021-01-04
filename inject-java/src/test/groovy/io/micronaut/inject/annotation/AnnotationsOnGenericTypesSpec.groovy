@@ -77,6 +77,41 @@ class Foo {
     }
 
     @Requires({ jvm.isJava11Compatible() })
+    void 'test annotations on parameters exclude type level annotations at runtime'() {
+        given:
+        def definition = buildBeanDefinition('io.micronaut.inject.annotationgenerics.Test', '''
+package io.micronaut.inject.annotationgenerics;
+
+import io.micronaut.context.annotation.Executable;
+import javax.inject.Singleton;
+import java.util.List;
+import java.util.List;
+import javax.validation.Valid;
+
+@Singleton
+class Test {
+
+    @Executable
+    void test(@Valid Foo value) {
+    
+    }
+}
+
+@javax.inject.Singleton
+class Foo {
+
+}
+''')
+
+        def method = definition.getRequiredMethod("test", definition.beanType.classLoader.loadClass('io.micronaut.inject.annotationgenerics.Foo'))
+        def annotationMetadata = method.arguments[0].annotationMetadata
+
+        expect:"annotations on type arguments should be present"
+        annotationMetadata.hasAnnotation(Valid)
+        !annotationMetadata.hasAnnotation(Singleton)
+    }
+
+    @Requires({ jvm.isJava11Compatible() })
     void 'test annotations on type arguments return types'() {
         given:
         def definition = buildBeanDefinition('io.micronaut.inject.annotationgenerics2.Test', '''

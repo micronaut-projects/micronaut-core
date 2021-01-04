@@ -72,6 +72,7 @@ public class JavaVisitorContext implements VisitorContext {
     private final GenericUtils genericUtils;
     private final ProcessingEnvironment processingEnv;
     private final List<String> generatedResources = new ArrayList<>();
+    private final JavaElementFactory elementFactory;
     private @Nullable
     JavaFileManager standardFileManager;
 
@@ -107,6 +108,7 @@ public class JavaVisitorContext implements VisitorContext {
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.visitorAttributes = visitorAttributes;
         this.processingEnv = processingEnv;
+        this.elementFactory = new JavaElementFactory(this);
     }
 
     /**
@@ -164,6 +166,12 @@ public class JavaVisitorContext implements VisitorContext {
             return classElements.toArray(new ClassElement[0]);
         }
         return new ClassElement[0];
+    }
+
+    @NonNull
+    @Override
+    public JavaElementFactory getElementFactory() {
+        return elementFactory;
     }
 
     @Override
