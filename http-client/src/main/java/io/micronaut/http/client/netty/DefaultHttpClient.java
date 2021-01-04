@@ -737,13 +737,6 @@ public class DefaultHttpClient implements
         stop();
     }
 
-    private <I, O, E> Flowable<io.micronaut.http.HttpResponse<O>> redirectExchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-        final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
-        Publisher<URI> uriPublisher = resolveRequestURI(request, false);
-        return Flowable.fromPublisher(uriPublisher)
-                .switchMap(buildExchangePublisher(parentRequest, request, bodyType, errorType));
-    }
-
     private <T> Flowable<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, WebSocketBean<T> webSocketBean) {
         Bootstrap bootstrap = this.bootstrap.clone();
         if (webSocketBean == null) {
@@ -1209,18 +1202,33 @@ public class DefaultHttpClient implements
             // if the request URI includes a scheme then it is fully qualified so use the direct server
             return Publishers.just(requestURI);
         } else {
-            if (loadBalancer == null) {
-                return Publishers.just(new NoHostException("Request URI specifies no host to connect to"));
-            }
+            return resolveURI(request, includeContextPath);
+        }
+    }
 
-            return Publishers.map(loadBalancer.select(getLoadBalancerDiscriminator()), server -> {
-                        Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
-                        if (request instanceof MutableHttpRequest && authInfo.isPresent()) {
-                            ((MutableHttpRequest) request).getHeaders().auth(authInfo.get());
-                        }
-                        return server.resolve(includeContextPath ? prependContextPath(requestURI) : requestURI);
-                    }
-            );
+    /**
+     * @param parentRequest      The parent request
+     * @param request            The redirect location request
+     * @param <I>                The input type
+     * @return A {@link Publisher} with the resolved URI
+     */
+    protected <I> Publisher<URI> resolveRedirectURI(io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<I> request) {
+        URI requestURI = request.getUri();
+        if (requestURI.getScheme() != null) {
+            // if the request URI includes a scheme then it is fully qualified so use the direct server
+            return Publishers.just(requestURI);
+        } else {
+            if (parentRequest == null) {
+                return resolveURI(request, false);
+            } else {
+                URI parentURI = parentRequest.getUri();
+                UriBuilder uriBuilder = UriBuilder.of(requestURI)
+                        .scheme(parentURI.getScheme())
+                        .userInfo(parentURI.getUserInfo())
+                        .host(parentURI.getHost())
+                        .port(parentURI.getPort());
+                return Publishers.just(uriBuilder.build());
+            }
         }
     }
 
@@ -1749,6 +1757,22 @@ public class DefaultHttpClient implements
 
     }
 
+    private <I> Publisher<URI> resolveURI(io.micronaut.http.HttpRequest<I> request, boolean includeContextPath) {
+        URI requestURI = request.getUri();
+        if (loadBalancer == null) {
+            return Publishers.just(new NoHostException("Request URI specifies no host to connect to"));
+        }
+
+        return Publishers.map(loadBalancer.select(getLoadBalancerDiscriminator()), server -> {
+                    Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
+                    if (request instanceof MutableHttpRequest && authInfo.isPresent()) {
+                        ((MutableHttpRequest) request).getHeaders().auth(authInfo.get());
+                    }
+                    return server.resolve(includeContextPath ? prependContextPath(requestURI) : requestURI);
+                }
+        );
+    }
+
     private <I, O, E> void sendRequestThroughChannel(
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             Argument<O> bodyType,
@@ -1900,7 +1924,7 @@ public class DefaultHttpClient implements
                         try {
                             MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.GET(location);
                             setRedirectHeaders(nettyRequest, redirectRequest);
-                            redirectedExchange = Flowable.fromPublisher(resolveRequestURI(redirectRequest, false))
+                            redirectedExchange = Flowable.fromPublisher(resolveRedirectURI(parentRequest, redirectRequest))
                                     .flatMap(uri -> buildStreamExchange(parentRequest, redirectRequest, uri));
 
                             //noinspection SubscriberImplementation
@@ -2068,12 +2092,12 @@ public class DefaultHttpClient implements
                             String location = headers.get(HttpHeaderNames.LOCATION);
                             final MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.GET(location);
                             setRedirectHeaders(request, redirectRequest);
-                            Flowable<io.micronaut.http.HttpResponse<O>> redirectExchange = redirectExchange(redirectRequest, bodyType, DEFAULT_ERROR_TYPE);
+                            Flowable<io.micronaut.http.HttpResponse<O>> redirectExchange = Flowable.fromPublisher(resolveRedirectURI(request, redirectRequest))
+                                    .switchMap(buildExchangePublisher(request, redirectRequest, bodyType, errorType));
                             redirectExchange.first(io.micronaut.http.HttpResponse.notFound())
                                     .subscribe((oHttpResponse, throwable) -> {
                                         if (throwable != null) {
                                             emitter.tryOnError(throwable);
-
                                         } else {
                                             emitter.onNext(oHttpResponse);
                                             emitter.onComplete();
