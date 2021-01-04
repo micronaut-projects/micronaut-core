@@ -60,11 +60,19 @@ public class HttpUtil {
         try {
             Optional<Charset> contentTypeCharset = request
                 .getContentType()
-                .flatMap(contentType ->
-                    contentType.getParameters()
-                        .get(MediaType.CHARSET_PARAMETER)
-                        .map(Charset::forName)
-                );
+                .map(contentType -> {
+                    Optional<String> charset = contentType.getParameters().get(MediaType.CHARSET_PARAMETER);
+                    if (charset.isPresent()) {
+                        try {
+                            return Charset.forName(charset.get());
+                        } catch (Exception e) {
+                            // unsupported charset, default to UTF-8
+                            return StandardCharsets.UTF_8;
+                        }
+                    } else {
+                        return null;
+                    }
+                });
 
             if (contentTypeCharset.isPresent()) {
                 return contentTypeCharset;

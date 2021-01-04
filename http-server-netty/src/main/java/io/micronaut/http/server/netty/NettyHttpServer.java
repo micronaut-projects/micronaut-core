@@ -29,6 +29,8 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.discovery.event.ServiceReadyEvent;
+import io.micronaut.http.HttpRequestFactory;
+import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
@@ -291,6 +293,10 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     @Override
     public synchronized EmbeddedServer start() {
         if (!isRunning()) {
+            //suppress unused
+            //done here to prevent a blocking service loader in the event loop
+            final HttpRequestFactory requestFactory = HttpRequestFactory.INSTANCE;
+            final HttpResponseFactory responseFactory = HttpResponseFactory.INSTANCE;
             EventLoopGroupConfiguration workerConfig = resolveWorkerConfiguration();
             workerGroup = createWorkerEventLoopGroup(workerConfig);
             parentGroup = createParentEventLoopGroup();

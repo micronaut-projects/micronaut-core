@@ -319,7 +319,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             String annotationName = annotationElement.getQualifiedName().toString();
             if (!defaults.containsKey(annotationName)) {
 
-                Map<Element, AnnotationValue> defaultValues = new HashMap<>();
+                Map<Element, AnnotationValue> defaultValues = new LinkedHashMap<>();
                 final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
 
                 allMembers

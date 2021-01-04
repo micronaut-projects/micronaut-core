@@ -422,6 +422,14 @@ public class UploadController {
         });
     }
 
+    @Post(uri = "/receive-multipart-body-as-single", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    Single<String> multipartAsSingle(@Body io.micronaut.http.server.multipart.MultipartBody body) {
+        //This will throw an exception because it caches the first result and does not emit it until
+        //the publisher completes. By this time the data has been freed. The data is freed immediately
+        //after the onNext call to prevent memory leaks
+        return Single.fromPublisher(body).map(single -> single.getBytes() == null ? "FAIL" : "OK");
+    }
+
     public static class Data {
         String title;
 

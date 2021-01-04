@@ -26,6 +26,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import io.reactivex.Single
@@ -133,7 +134,20 @@ class ServerRedirectSpec extends Specification {
         then:
         response.status() == HttpStatus.OK
         response.body() == "The Stand"
+    }
 
+    void "test redirect with no base URL client"() {
+        given:
+        HttpClient client = HttpClient.create(null)
+        UriBuilder uriBuilder = UriBuilder.of(embeddedServer.getScheme() + "://" + embeddedServer.getHost())
+                .port(embeddedServer.getPort())
+                .path("/redirect/temporary")
+
+        expect:
+        client.toBlocking().retrieve(HttpRequest.GET(uriBuilder.build())) == 'good'
+
+        cleanup:
+        client.close()
     }
 
     @Controller("/redirect")

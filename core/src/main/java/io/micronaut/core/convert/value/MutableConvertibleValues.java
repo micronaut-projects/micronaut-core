@@ -32,7 +32,7 @@ public interface MutableConvertibleValues<V> extends ConvertibleValues<V> {
      *
      * @param key   The key
      * @param value The value
-     * @return The previous value
+     * @return This values instance
      */
     MutableConvertibleValues<V> put(CharSequence key, @Nullable V value);
 
@@ -40,7 +40,7 @@ public interface MutableConvertibleValues<V> extends ConvertibleValues<V> {
      * Remove a value for the given key.
      *
      * @param key The key
-     * @return The previous value
+     * @return This values instance
      */
     MutableConvertibleValues<V> remove(CharSequence key);
 
