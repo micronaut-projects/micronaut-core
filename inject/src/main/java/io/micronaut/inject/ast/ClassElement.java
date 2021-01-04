@@ -48,7 +48,9 @@ public interface ClassElement extends TypedElement {
      * @return {@code true} if and only if the this type is assignable to the second
      * @since 2.3.0
      */
-    boolean isAssignable(ClassElement type);
+    default boolean isAssignable(ClassElement type) {
+        return isAssignable(type.getName());
+    }
 
     /**
      * Whether this element is an {@link Optional}.

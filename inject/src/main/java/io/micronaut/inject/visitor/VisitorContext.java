@@ -87,6 +87,13 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     void warn(String message, @Nullable Element element);
 
     /**
+     * @return The visitor configuration
+     */
+    default @NonNull VisitorConfiguration getConfiguration() {
+        return VisitorConfiguration.DEFAULT;
+    }
+
+    /**
      * Visit a file within the META-INF directory.
      *
      * @param path The path to the file
@@ -119,6 +126,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Override
     @Experimental
     Optional<GeneratedFile> visitGeneratedFile(String path);
+
 
     /**
      * Obtain a set of resources from the user classpath.

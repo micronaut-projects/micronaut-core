@@ -119,7 +119,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
                 for (Map.Entry<String, TypeMirror> entry : forType.entrySet()) {
                     TypeMirror v = entry.getValue();
-                    ClassElement ce = v != null ? mirrorToClassElement(v, visitorContext, Collections.emptyMap(), false) : null;
+                    ClassElement ce = v != null ? mirrorToClassElement(v, visitorContext, Collections.emptyMap(), visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments()) : null;
                     if (ce == null) {
                         return Collections.emptyMap();
                     } else {
@@ -527,7 +527,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         Map<String, ClassElement> map = new LinkedHashMap<>();
         while (tpi.hasNext()) {
             TypeParameterElement tpe = tpi.next();
-            ClassElement classElement = mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo, false);
+            ClassElement classElement = mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo, visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments());
             map.put(tpe.toString(), classElement);
         }
 
@@ -542,7 +542,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         info.forEach((name, generics) -> {
             Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
             generics.forEach((variable, mirror) -> {
-                ClassElement classElement = mirrorToClassElement(mirror, visitorContext, info, false);
+                ClassElement classElement = mirrorToClassElement(mirror, visitorContext, info, visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments());
                 resolved.put(variable, classElement);
             });
             result.put(name, resolved);

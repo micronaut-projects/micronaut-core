@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
@@ -38,6 +39,7 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessedTypes;
+import io.micronaut.inject.visitor.VisitorConfiguration;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
@@ -111,6 +113,33 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils, annotationUtils);
         ConfigurationMetadataBuilder.setConfigurationMetadataBuilder(metadataBuilder);
         this.beanDefinitions = new LinkedHashSet<>();
+    }
+
+    @NonNull
+    @Override
+    protected JavaVisitorContext newVisitorContext(@NonNull ProcessingEnvironment processingEnv) {
+        return new JavaVisitorContext(
+                processingEnv,
+                messager,
+                elementUtils,
+                annotationUtils,
+                typeUtils,
+                modelUtils,
+                genericUtils,
+                filer,
+                visitorAttributes
+        ) {
+            @NonNull
+            @Override
+            public VisitorConfiguration getConfiguration() {
+                return new VisitorConfiguration() {
+                    @Override
+                    public boolean includeTypeLevelAnnotationsInGenericArguments() {
+                        return false;
+                    }
+                };
+            }
+        };
     }
 
     @Override

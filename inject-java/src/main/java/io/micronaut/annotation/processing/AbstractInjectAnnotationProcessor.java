@@ -153,7 +153,26 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 visitorAttributes
         );
 
-        this.javaVisitorContext = new JavaVisitorContext(
+        this.javaVisitorContext = newVisitorContext(processingEnv);
+
+        this.incremental = isIncremental(processingEnv);
+        if (incremental) {
+            final String annotations = processingEnv.getOptions().get(MICRONAUT_PROCESSING_ANNOTATIONS);
+            if (annotations != null) {
+                final String[] tokens = annotations.split(",");
+                supportedAnnotationTypes.addAll(Arrays.asList(tokens));
+            }
+        }
+    }
+
+    /**
+     * Creates the visitor context
+     * @param processingEnv The processing env
+     * @return The context
+     */
+    @NonNull
+    protected JavaVisitorContext newVisitorContext(@NonNull ProcessingEnvironment processingEnv) {
+        return new JavaVisitorContext(
                 processingEnv,
                 messager,
                 elementUtils,
@@ -164,15 +183,6 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 filer,
                 visitorAttributes
         );
-
-        this.incremental = isIncremental(processingEnv);
-        if (incremental) {
-            final String annotations = processingEnv.getOptions().get(MICRONAUT_PROCESSING_ANNOTATIONS);
-            if (annotations != null) {
-                final String[] tokens = annotations.split(",");
-                supportedAnnotationTypes.addAll(Arrays.asList(tokens));
-            }
-        }
     }
 
     /**
@@ -271,7 +281,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         final Map<String, String> options = processingEnv.getOptions();
         final String v = options.get(MICRONAUT_PROCESSING_INCREMENTAL);
         if (v != null) {
-            return Boolean.valueOf(v);
+            return Boolean.parseBoolean(v);
         }
         return false;
     }
