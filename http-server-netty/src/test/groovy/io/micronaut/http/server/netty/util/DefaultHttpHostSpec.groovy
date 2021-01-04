@@ -370,4 +370,32 @@ class DefaultHttpHostSpec extends Specification {
         cleanup:
         server.close()
     }
+
+    void "test allowed host validation"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.server.host-resolution.allowed-hosts': hosts])
+        HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
+
+        when:
+        def request = Stub(HttpRequest) {
+            getHeaders() >> new MockHttpHeaders([
+                    "Host": [host],
+            ])
+            getUri() >> new URI("http://localhost:8080")
+        }
+        String result = hostResolver.resolve(request)
+
+        then:
+        result == expected
+
+        cleanup:
+        server.close()
+
+        where:
+        host             | expected                | hosts
+        "micronaut:9000" | "http://micronaut:9000" | ['http://micronaut:900\\d']
+        "micronaut:9001" | "http://micronaut:9001" | ['http://micronaut:900\\d']
+        "micronaut:900"  | "http://localhost"      | ['http://micronaut:900\\d']
+        "micronaut:9005" | "http://localhost"      | ['http://micronaut:9000', 'http://micronaut:9001']
+    }
 }
