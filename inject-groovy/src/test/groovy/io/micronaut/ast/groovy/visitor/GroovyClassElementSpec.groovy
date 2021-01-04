@@ -25,7 +25,8 @@ import spock.lang.Issue
 class GroovyClassElementSpec extends AbstractClassElementSpec {
     @Override
     protected List<ClassElement> getClassElements() {
-        return [new GroovyClassElement(Mock(SourceUnit), null, ClassHelper.OBJECT_TYPE, null),
-                new GroovyEnumElement(Mock(SourceUnit), null, ClassHelper.Enum_Type, null)]
+        def visitorContext = new GroovyVisitorContext(Mock(SourceUnit), null)
+        return [new GroovyClassElement(visitorContext, ClassHelper.OBJECT_TYPE, null),
+                new GroovyEnumElement(visitorContext, ClassHelper.Enum_Type, null)]
     }
 }

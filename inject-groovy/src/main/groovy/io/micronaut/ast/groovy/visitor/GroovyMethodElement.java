@@ -27,7 +27,6 @@ import io.micronaut.inject.ast.ParameterElement;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
-import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -54,15 +53,14 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     /**
      * @param declaringClass     The declaring class
-     * @param sourceUnit         The source unit
-     * @param compilationUnit    The compilation unit
+     * @param visitorContext     The visitor context
      * @param methodNode         The {@link MethodNode}
      * @param annotationMetadata The annotation metadata
      */
-    public GroovyMethodElement(GroovyClassElement declaringClass, SourceUnit sourceUnit, CompilationUnit compilationUnit, MethodNode methodNode, AnnotationMetadata annotationMetadata) {
-        super(sourceUnit, compilationUnit, methodNode, annotationMetadata);
+    GroovyMethodElement(GroovyClassElement declaringClass, GroovyVisitorContext visitorContext, MethodNode methodNode, AnnotationMetadata annotationMetadata) {
+        super(visitorContext, methodNode, annotationMetadata);
         this.methodNode = methodNode;
-        this.sourceUnit = sourceUnit;
+        this.sourceUnit = visitorContext.getSourceUnit();
         this.declaringClass = declaringClass;
     }
 
@@ -155,7 +153,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @Override
     @NonNull
     public ClassElement getReturnType() {
-        return toClassElement(sourceUnit, compilationUnit, methodNode.getReturnType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode.getReturnType()));
+        return visitorContext.getElementFactory().newClassElement(methodNode.getReturnType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode.getReturnType()));
     }
 
     @Override
@@ -165,8 +163,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
             this.parameters = Arrays.stream(parameters).map((Function<Parameter, ParameterElement>) parameter ->
                     new GroovyParameterElement(
                             this,
-                            sourceUnit,
-                            compilationUnit,
+                            visitorContext,
                             parameter,
                             AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, new ExtendedParameter(methodNode, parameter))
                     )
@@ -178,7 +175,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     @Override
     public MethodElement withNewParameters(ParameterElement... newParameters) {
-        return new GroovyMethodElement(declaringClass, sourceUnit, compilationUnit, methodNode, getAnnotationMetadata()) {
+        return new GroovyMethodElement(declaringClass, visitorContext, methodNode, getAnnotationMetadata()) {
             @Override
             public ParameterElement[] getParameters() {
                 return ArrayUtils.concat(super.getParameters(), newParameters);
@@ -190,9 +187,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     public ClassElement getDeclaringType() {
         if (this.declaringElement == null) {
 
-            this.declaringElement = toClassElement(
-                    sourceUnit,
-                    compilationUnit,
+            this.declaringElement = visitorContext.getElementFactory().newClassElement(
                     methodNode.getDeclaringClass(),
                     AstAnnotationUtils.getAnnotationMetadata(
                             sourceUnit,

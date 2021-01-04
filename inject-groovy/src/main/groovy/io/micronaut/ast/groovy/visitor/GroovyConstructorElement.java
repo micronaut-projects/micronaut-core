@@ -30,12 +30,11 @@ import org.codehaus.groovy.control.SourceUnit;
 public class GroovyConstructorElement extends GroovyMethodElement implements ConstructorElement {
     /**
      * @param declaringClass     The declaring class
-     * @param sourceUnit         The source unit
-     * @param compilationUnit    The compilation unit
+     * @param visitorContext     The visitor context
      * @param methodNode         The {@link ConstructorNode}
      * @param annotationMetadata The annotation metadata
      */
-    GroovyConstructorElement(GroovyClassElement declaringClass, SourceUnit sourceUnit, CompilationUnit compilationUnit, ConstructorNode methodNode, AnnotationMetadata annotationMetadata) {
-        super(declaringClass, sourceUnit, compilationUnit, methodNode, annotationMetadata);
+    GroovyConstructorElement(GroovyClassElement declaringClass, GroovyVisitorContext visitorContext, ConstructorNode methodNode, AnnotationMetadata annotationMetadata) {
+        super(declaringClass, visitorContext, methodNode, annotationMetadata);
     }
 }

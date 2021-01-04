@@ -15,10 +15,8 @@
  */
 package io.micronaut.inject.visitor;
 
-import io.micronaut.inject.ast.ClassElement;
-
 /**
- * Allows supplying configuration to the {@link VisitorContext}
+ * Allows supplying configuration to the {@link VisitorContext}.
  *
  * @author graemerocher
  * @since 2.3.0
@@ -31,7 +29,7 @@ public interface VisitorConfiguration {
      * This configures whether to include type level annotations on generic arguments when materializing the AST nodes via
      * the {@link io.micronaut.inject.ast.Element} API.
      *
-     * <p>If {@code true} is returned then methods like {@link ClassElement#getTypeArguments()} will include annotations declared on the classes themselves within the annotation metadata for each resulting {@link ClassElement} within the generic arguments.</p>
+     * <p>If {@code true} is returned then methods like {@link io.micronaut.inject.ast.ClassElement#getTypeArguments()} will include annotations declared on the classes themselves within the annotation metadata for each resulting {@link io.micronaut.inject.ast.ClassElement} within the generic arguments.</p>
      *
      * <p>This can be undesirable in the use case where you need to differentiate annotations on the type arguments themselves vs annotations declared on the type, in which case you should return false.</p>
      *

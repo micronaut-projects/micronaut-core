@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy
 
 import edu.umd.cs.findbugs.annotations.Nullable
 import io.micronaut.ast.groovy.visitor.GroovyPackageElement
+import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 import io.micronaut.inject.writer.GeneratedFile
@@ -90,9 +91,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 PackageNode packageNode = classNode.getPackage()
                 if (AstAnnotationUtils.hasStereotype(source, unit, packageNode, Configuration)) {
                     def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, unit, packageNode)
+                    GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, unit)
                     BeanConfigurationWriter writer = new BeanConfigurationWriter(
                             classNode.packageName,
-                            new GroovyPackageElement(source, unit, packageNode, annotationMetadata),
+                            new GroovyPackageElement(visitorContext, packageNode, annotationMetadata),
                             annotationMetadata
                     )
                     try {

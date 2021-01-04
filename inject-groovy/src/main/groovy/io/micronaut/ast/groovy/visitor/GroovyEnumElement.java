@@ -36,24 +36,22 @@ import java.util.stream.Collectors;
 class GroovyEnumElement extends GroovyClassElement implements EnumElement {
 
     /**
-     * @param sourceUnit The source unit
-     * @param compilationUnit    The compilation unit
+     * @param visitorContext     The visitor context
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
      */
-    GroovyEnumElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
-        this(sourceUnit, compilationUnit, classNode, annotationMetadata, 0);
+    GroovyEnumElement(GroovyVisitorContext visitorContext, ClassNode classNode, AnnotationMetadata annotationMetadata) {
+        this(visitorContext, classNode, annotationMetadata, 0);
     }
 
     /**
-     * @param sourceUnit The source unit
-     * @param compilationUnit    The compilation unit
+     * @param visitorContext     The visitor context
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
      * @param arrayDimensions    The number of array dimensions
      */
-    GroovyEnumElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata, int arrayDimensions) {
-        super(sourceUnit, compilationUnit, classNode, annotationMetadata, null, arrayDimensions);
+    GroovyEnumElement(GroovyVisitorContext visitorContext, ClassNode classNode, AnnotationMetadata annotationMetadata, int arrayDimensions) {
+        super(visitorContext, classNode, annotationMetadata, null, arrayDimensions);
     }
 
     @Override
@@ -65,6 +63,6 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new GroovyEnumElement(sourceUnit, compilationUnit, classNode, getAnnotationMetadata(), arrayDimensions);
+        return new GroovyEnumElement(visitorContext, classNode, getAnnotationMetadata(), arrayDimensions);
     }
 }

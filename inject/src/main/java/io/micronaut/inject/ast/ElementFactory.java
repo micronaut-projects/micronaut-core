@@ -85,7 +85,7 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
             @NonNull AnnotationMetadata annotationMetadata);
 
     /**
-     * Builds a new field element for the given gield.
+     * Builds a new field element for the given field.
      *
      * @param field              The field
      * @param annotationMetadata The resolved annotation metadata

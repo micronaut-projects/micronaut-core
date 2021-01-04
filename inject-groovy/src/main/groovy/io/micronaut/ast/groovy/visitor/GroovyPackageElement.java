@@ -35,13 +35,12 @@ public class GroovyPackageElement extends AbstractGroovyElement {
     /**
      * Default constructor.
      *
-     * @param sourceUnit         The source unit
-     * @param compilationUnit    The compilation unit
+     * @param visitorContext The visitor context
      * @param packageNode      The annotated node
      * @param annotationMetadata The annotation metadata
      */
-    public GroovyPackageElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, PackageNode packageNode, AnnotationMetadata annotationMetadata) {
-        super(sourceUnit, compilationUnit, packageNode, annotationMetadata);
+    public GroovyPackageElement(GroovyVisitorContext visitorContext, PackageNode packageNode, AnnotationMetadata annotationMetadata) {
+        super(visitorContext, packageNode, annotationMetadata);
         this.packageNode = packageNode;
     }
 

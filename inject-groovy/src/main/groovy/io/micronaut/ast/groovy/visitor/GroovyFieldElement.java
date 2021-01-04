@@ -21,10 +21,10 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import org.codehaus.groovy.ast.*;
-import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+
 import java.lang.reflect.Modifier;
 
 /**
@@ -40,19 +40,17 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     private final SourceUnit sourceUnit;
 
     /**
-     * @param sourceUnit         the source unit
-     * @param compilationUnit    The compilation unit
+     * @param visitorContext     The visitor context
      * @param variable           The {@link Variable}
-     * @param annotatedNode       The annotated ndoe
+     * @param annotatedNode      The annotated ndoe
      * @param annotationMetadata The annotation medatada
      */
-    public GroovyFieldElement(
-            SourceUnit sourceUnit,
-            CompilationUnit compilationUnit,
+    GroovyFieldElement(
+            GroovyVisitorContext visitorContext,
             Variable variable, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
-        super(sourceUnit, compilationUnit, annotatedNode, annotationMetadata);
+        super(visitorContext, annotatedNode, annotationMetadata);
         this.variable = variable;
-        this.sourceUnit = sourceUnit;
+        this.sourceUnit = visitorContext.getSourceUnit();
     }
 
     @Override
@@ -62,8 +60,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
             if (cn != null) {
 
                 return new GroovyClassElement(
-                        sourceUnit,
-                        compilationUnit,
+                        visitorContext,
                         cn,
                         getAnnotationMetadata()
                 ) {
@@ -77,8 +74,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
             }
         } else {
             return new GroovyClassElement(
-                    sourceUnit,
-                    compilationUnit,
+                    visitorContext,
                     (ClassNode) getGenericType().getNativeType(),
                     getAnnotationMetadata()
             );
@@ -143,7 +139,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @NonNull
     @Override
     public ClassElement getType() {
-        return toClassElement(sourceUnit, compilationUnit, variable.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, variable.getType()));
+        return visitorContext.getElementFactory().newClassElement(variable.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, variable.getType()));
     }
 
     @Override
@@ -161,9 +157,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
             throw new IllegalStateException("Declaring class could not be established");
         }
 
-        return toClassElement(
-                sourceUnit,
-                compilationUnit,
+        return visitorContext.getElementFactory().newClassElement(
                 declaringClass,
                 AstAnnotationUtils.getAnnotationMetadata(
                         sourceUnit,

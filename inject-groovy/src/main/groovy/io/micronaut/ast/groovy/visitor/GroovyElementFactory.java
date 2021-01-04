@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.*;
 import org.codehaus.groovy.ast.*;
@@ -31,8 +32,10 @@ import org.codehaus.groovy.control.SourceUnit;
 public class GroovyElementFactory implements ElementFactory<AnnotatedNode, ClassNode, MethodNode, FieldNode> {
     private final SourceUnit sourceUnit;
     private final CompilationUnit compilationUnit;
+    private final GroovyVisitorContext visitorContext;
 
     public GroovyElementFactory(GroovyVisitorContext groovyVisitorContext) {
+        this.visitorContext =  groovyVisitorContext;
         this.sourceUnit = groovyVisitorContext.getSourceUnit();
         this.compilationUnit = groovyVisitorContext.getCompilationUnit();
     }
@@ -47,9 +50,9 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
         } else if (ClassHelper.isPrimitiveType(classNode)) {
             return PrimitiveElement.valueOf(classNode.getName());
         } else if (classNode.isEnum()) {
-            return new GroovyEnumElement(sourceUnit, compilationUnit, classNode, annotationMetadata);
+            return new GroovyEnumElement(visitorContext, classNode, annotationMetadata);
         } else {
-            return new GroovyClassElement(sourceUnit, compilationUnit, classNode, annotationMetadata);
+            return new GroovyClassElement(visitorContext, classNode, annotationMetadata);
         }
     }
 
@@ -61,8 +64,7 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
         }
         return new GroovyMethodElement(
                 (GroovyClassElement) declaringClass,
-                sourceUnit,
-                compilationUnit,
+                visitorContext,
                 method,
                 annotationMetadata
         );
@@ -79,8 +81,7 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
         }
         return new GroovyConstructorElement(
                 (GroovyClassElement) declaringClass,
-                sourceUnit,
-                compilationUnit,
+                visitorContext,
                 (ConstructorNode) constructor,
                 annotationMetadata
         );
@@ -93,8 +94,7 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
             throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
         }
         return new GroovyFieldElement(
-                sourceUnit,
-                compilationUnit,
+                visitorContext,
                 field,
                 field,
                 annotationMetadata
@@ -105,12 +105,52 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
     @Override
     public FieldElement newFieldElement(@NonNull FieldNode field, @NonNull AnnotationMetadata annotationMetadata) {
         return new GroovyFieldElement(
-                sourceUnit,
-                compilationUnit,
+                visitorContext,
                 field,
                 field,
                 annotationMetadata
         );
+    }
+
+    /**
+     * Builds a new field element for the given property.
+     *
+     * @param property              The property
+     * @param annotationMetadata The resolved annotation metadata
+     * @return The field element
+     */
+    public FieldElement newFieldElement(@NonNull PropertyNode property, @NonNull AnnotationMetadata annotationMetadata) {
+        return new GroovyFieldElement(
+                visitorContext,
+                property,
+                property,
+                annotationMetadata
+        );
+    }
+
+    /**
+     * Constructs a new {@link ParameterElement} for the given field element and metadata.
+     * @param field The field
+     * @param annotationMetadata The metadata
+     * @return The parameter element
+     */
+    public ParameterElement newParameterElement(@NonNull FieldElement field, @NonNull AnnotationMetadata annotationMetadata) {
+        if (!(field instanceof GroovyFieldElement)) {
+            throw new IllegalArgumentException("Field must be a GroovyFieldElement");
+        }
+        FieldNode fieldNode = (FieldNode) field.getNativeType();
+        return new GroovyParameterElement(
+                null,
+                visitorContext,
+                new Parameter(fieldNode.getType(), fieldNode.getName()),
+                annotationMetadata
+        ) {
+            @Nullable
+            @Override
+            public ClassElement getGenericType() {
+                return field.getGenericType();
+            }
+        };
     }
 
 }

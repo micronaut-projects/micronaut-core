@@ -39,8 +39,7 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
     /**
      * Default constructor.
      *
-     * @param sourceUnit The source unit
-     * @param compilationUnit    The compilation unit
+     * @param visitorContext The visitor context
      * @param declaringElement The declaring element
      * @param annotatedNode    The annotated node
      * @param annotationMetadata the annotation metadata
@@ -49,15 +48,14 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
      * @param nativeType the native underlying type
      */
     GroovyPropertyElement(
-            SourceUnit sourceUnit,
-            CompilationUnit compilationUnit,
+            GroovyVisitorContext visitorContext,
             GroovyClassElement declaringElement,
             AnnotatedNode annotatedNode,
             AnnotationMetadata annotationMetadata,
             String name,
             boolean readOnly,
             Object nativeType) {
-        super(sourceUnit, compilationUnit, annotatedNode, annotationMetadata);
+        super(visitorContext, annotatedNode, annotationMetadata);
         this.name = name;
         this.readOnly = readOnly;
         this.nativeType = nativeType;
