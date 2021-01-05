@@ -104,6 +104,16 @@ class HttpFilterSpec extends Specification {
         response.headers.contains("X-Matched-Filter")
     }
 
+    void "test a filter on indirect matched with filter matcher URI"() {
+        when:
+        HttpResponse response = rxClient.exchange("/indirectlymatched").blockingFirst()
+
+        then:
+        response.status == HttpStatus.OK
+        response.headers.get("X-Root-Filter") == "processed"
+        response.headers.contains("X-Matched-Filter")
+    }
+
     @Requires(property = 'spec.name', value = "HttpFilterSpec")
     @Filter("/**")
     static class RootFilter implements HttpServerFilter {
@@ -154,6 +164,12 @@ class HttpFilterSpec extends Specification {
             HttpResponse.ok()
         }
 
+        @Get("/indirectlymatched")
+        @IndirectMarkerStereotypeAnnotation
+        HttpResponse indirectlyMatched() {
+            HttpResponse.ok()
+        }
+
     }
 
 
@@ -163,4 +179,7 @@ class HttpFilterSpec extends Specification {
 
     @AliasFor(member = "methods", annotation = FilterMatcher.class)
     HttpMethod[] methods() default [];
+}
+@MarkerStereotypeAnnotation
+@interface IndirectMarkerStereotypeAnnotation {
 }
