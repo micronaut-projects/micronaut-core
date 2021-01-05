@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.inject.Inject;
@@ -456,6 +457,23 @@ public class ModelUtils {
         return declaringClass != concreteClass &&
             !packageOfDeclaringClass.getQualifiedName().equals(packageOfConcreteClass.getQualifiedName())
             && (isProtected(methodOrField) || !isPublic(methodOrField));
+    }
+
+    /**
+     * Return whether the given method or field is inherited but not public.
+     *
+     * @param concreteClass  The concrete class
+     * @param declaringClass The declaring class of the field
+     * @param methodOrField  The method or field
+     * @return True if it is inherited and not public
+     */
+    boolean isInheritedAndNotPublic(ClassElement concreteClass, ClassElement declaringClass, io.micronaut.inject.ast.Element methodOrField) {
+        String packageOfDeclaringClass = declaringClass.getPackageName();
+        String packageOfConcreteClass = concreteClass.getPackageName();
+
+        return declaringClass != concreteClass &&
+                !packageOfDeclaringClass.equals(packageOfConcreteClass)
+                && (methodOrField.isProtected() || !methodOrField.isPublic());
     }
 
     /**

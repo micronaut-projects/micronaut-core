@@ -19,7 +19,6 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.*;
-import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.lang.model.element.*;
 import javax.lang.model.element.Element;
@@ -85,7 +84,6 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
      * @param declaringClass     The declaring class
      * @param method             The method
      * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
      * @param genericTypes       The generic type info
      * @return The method element
      */
@@ -93,16 +91,12 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
             ClassElement declaringClass,
             @NonNull ExecutableElement method,
             @NonNull AnnotationMetadata annotationMetadata,
-            @NonNull VisitorContext visitorContext,
             @Nullable Map<String, Map<String, TypeMirror>> genericTypes) {
         if (!(declaringClass instanceof JavaClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a JavaClassElement");
         }
-        if (!(visitorContext instanceof JavaVisitorContext)) {
-            throw new IllegalArgumentException("VisitorContext must be a JavaVisitorContext");
-        }
         final JavaClassElement javaDeclaringClass = (JavaClassElement) declaringClass;
-        final JavaVisitorContext javaVisitorContext = (JavaVisitorContext) visitorContext;
+        final JavaVisitorContext javaVisitorContext = visitorContext;
 
         return new JavaMethodElement(
                 javaDeclaringClass,
@@ -185,6 +179,6 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         if (!(declaringClass instanceof JavaClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a JavaClassElement");
         }
-        return new JavaParameterElement((JavaClassElement) declaringClass, field, AnnotationMetadata.EMPTY_METADATA, visitorContext);
+        return new JavaParameterElement((JavaClassElement) declaringClass, field, annotationMetadata, visitorContext);
     }
 }

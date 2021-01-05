@@ -317,6 +317,11 @@ public interface ClassElement extends TypedElement {
             }
 
             @Override
+            public boolean isPackagePrivate() {
+                return false;
+            }
+
+            @Override
             public boolean isProtected() {
                 return false;
             }

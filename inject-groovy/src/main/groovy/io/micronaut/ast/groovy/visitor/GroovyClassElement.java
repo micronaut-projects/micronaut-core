@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import groovy.transform.PackageScope;
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.AstClassUtils;
@@ -527,7 +528,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public boolean isPublic() {
-        return classNode.isSyntheticPublic() || Modifier.isPublic(classNode.getModifiers());
+        return (classNode.isSyntheticPublic() || Modifier.isPublic(classNode.getModifiers())) && !isPackagePrivate();
     }
 
     @Override

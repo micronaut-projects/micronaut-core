@@ -35,7 +35,10 @@ import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
+
+import static javax.lang.model.element.Modifier.*;
 
 /**
  * An abstract class for other elements to extend from.
@@ -93,6 +96,14 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         AbstractAnnotationMetadataBuilder.addMutatedMetadata(declaringTypeName, element, annotationMetadata);
         AnnotationUtils.invalidateMetadata(element);
         return this;
+    }
+
+    @Override
+    public boolean isPackagePrivate() {
+        Set<Modifier> modifiers = element.getModifiers();
+        return !(modifiers.contains(PUBLIC)
+                || modifiers.contains(PROTECTED)
+                || modifiers.contains(PRIVATE));
     }
 
     @Override

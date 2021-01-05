@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.visitor;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import groovy.transform.CompileStatic;
+import groovy.transform.PackageScope;
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -75,6 +76,11 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
+    }
+
+    @Override
+    public boolean isPackagePrivate() {
+        return hasDeclaredAnnotation(PackageScope.class);
     }
 
     @CompileStatic

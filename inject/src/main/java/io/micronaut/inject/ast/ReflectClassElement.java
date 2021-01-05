@@ -114,6 +114,12 @@ final class ReflectClassElement implements ClassElement {
     }
 
     @Override
+    public boolean isPackagePrivate() {
+        int modifiers = type.getModifiers();
+        return !Modifier.isPublic(modifiers) && !Modifier.isProtected(modifiers) && !Modifier.isPrivate(modifiers);
+    }
+
+    @Override
     public boolean isProtected() {
         return !isPublic();
     }

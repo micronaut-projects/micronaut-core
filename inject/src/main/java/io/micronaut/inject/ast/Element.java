@@ -46,6 +46,14 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
     @NonNull String getName();
 
     /**
+     * @return True if the element is package private.
+     * @since 2.3.0
+     */
+    default boolean isPackagePrivate() {
+        return false;
+    }
+
+    /**
      * @return True if the element is protected.
      */
     boolean isProtected();

@@ -172,6 +172,11 @@ public interface MethodElement extends MemberElement {
             }
 
             @Override
+            public boolean isPackagePrivate() {
+                return false;
+            }
+
+            @Override
             public boolean isProtected() {
                 return false;
             }
