@@ -2564,6 +2564,16 @@ public class DefaultHttpClient implements
 
             @Override
             public void channelReleased(Channel ch) {
+                Duration idleTimeout = configuration.getConnectionPoolIdleTimeout().orElse(Duration.ofNanos(0));
+                if (ch.isOpen()) {
+                    ch.config().setAutoRead(true);
+                    ch.pipeline().addLast(IdlingConnectionHandler.INSTANCE);
+                    if (idleTimeout.toNanos() > 0) {
+                        ch.pipeline().addLast(HANDLER_IDLE_STATE, new IdleStateHandler(idleTimeout.toNanos(), idleTimeout.toNanos(), 0, TimeUnit.NANOSECONDS));
+                        ch.pipeline().addLast(IdleTimeoutHandler.INSTANCE);
+                    }
+                }
+
                 if (connectionTimeAliveMillis != null) {
                     boolean shouldCloseOnRelease = Boolean.TRUE.equals(ch.attr(ConnectTTLHandler.RELEASE_CHANNEL).get());
 
@@ -2577,6 +2587,19 @@ public class DefaultHttpClient implements
                     if (pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
                         pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
                     }
+                }
+            }
+
+            @Override
+            public void channelAcquired(Channel ch) throws Exception {
+                if (ch.pipeline().context(IdlingConnectionHandler.INSTANCE) != null) {
+                    ch.pipeline().remove(IdlingConnectionHandler.INSTANCE);
+                }
+                if (ch.pipeline().context(HANDLER_IDLE_STATE) != null) {
+                    ch.pipeline().remove(HANDLER_IDLE_STATE);
+                }
+                if (ch.pipeline().context(IdleTimeoutHandler.INSTANCE) != null) {
+                    ch.pipeline().remove(IdleTimeoutHandler.INSTANCE);
                 }
             }
         };
