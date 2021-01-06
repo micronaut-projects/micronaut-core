@@ -6,6 +6,7 @@ import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.ValidatedBeanDefinition
 import io.micronaut.runtime.context.env.ConfigurationAdvice
 
@@ -233,8 +234,8 @@ interface MyConfig {
 ''')
         then:
         beanDefinition instanceof BeanDefinition
-        beanDefinition.getRequiredMethod("getChild")
-                .isTrue(ConfigurationAdvice, "bean")
+        def method = beanDefinition.getRequiredMethod("getChild")
+        method.isTrue(ConfigurationAdvice, "bean")
 
         when:
         def context = ApplicationContext.run('foo.bar.child.url': 'http://test')

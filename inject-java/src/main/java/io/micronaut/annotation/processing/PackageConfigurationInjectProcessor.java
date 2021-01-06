@@ -16,7 +16,6 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaPackageElement;
-import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -86,17 +85,7 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
                 AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(packageElement);
                 BeanConfigurationWriter writer = new BeanConfigurationWriter(
                     packageName,
-                    new JavaPackageElement(packageElement, annotationMetadata, new JavaVisitorContext(
-                        processingEnv,
-                        messager,
-                        elementUtils,
-                        annotationUtils,
-                        typeUtils,
-                        modelUtils,
-                        genericUtils,
-                        filer,
-                        visitorAttributes
-                    )),
+                    new JavaPackageElement(packageElement, annotationMetadata, javaVisitorContext),
                     annotationMetadata
                 );
                 try {

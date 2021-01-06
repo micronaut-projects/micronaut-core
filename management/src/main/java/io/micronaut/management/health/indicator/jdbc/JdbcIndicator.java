@@ -29,7 +29,6 @@ import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
-import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import javax.sql.DataSource;

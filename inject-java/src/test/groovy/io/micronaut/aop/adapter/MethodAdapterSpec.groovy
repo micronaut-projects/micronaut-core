@@ -28,6 +28,95 @@ import org.atinject.tck.auto.events.SomeEvent
 
 class MethodAdapterSpec extends AbstractTypeElementSpec {
 
+    void "test method adapter with around overloading"() {
+        given:
+        def context = buildContext('adapteroverloading.Test', '''
+package adapteroverloading;
+
+import io.micronaut.context.event.*;
+import io.micronaut.scheduling.annotation.Async;
+import io.reactivex.Completable;
+import javax.inject.Singleton;
+import java.util.concurrent.CompletableFuture;
+import io.micronaut.runtime.event.annotation.*;
+
+@Singleton
+public class Test {
+    boolean invoked = false;
+    boolean shutdown = false;
+    
+    public boolean getInvoked() {
+        return invoked;
+    } 
+    public boolean isShutdown() {
+        return shutdown;
+    }
+    
+    @EventListener
+    void receive(StartupEvent event) {
+        invoked = true;
+    }
+    
+    @EventListener
+    void receive(ShutdownEvent event) {
+        shutdown = true;
+    } 
+}
+
+''')
+
+        when:
+        def bean = context.getBean(context.classLoader.loadClass('adapteroverloading.Test'))
+
+        then:
+        bean.invoked
+
+        when:
+        context.close()
+
+        then:
+        bean.shutdown
+    }
+
+    void "test method adapter with around advice"() {
+        given:
+        def context = buildContext('adapteraround.Test', '''
+package adapteraround;
+
+import io.micronaut.context.event.StartupEvent;
+import io.micronaut.scheduling.annotation.Async;
+import io.reactivex.Completable;
+import javax.inject.Singleton;
+import java.util.concurrent.CompletableFuture;
+import io.micronaut.runtime.event.annotation.*;
+
+@Singleton
+public class Test {
+
+    boolean invoked = false;
+    @EventListener
+    @Async
+    CompletableFuture<Boolean> onStartup(StartupEvent event) {
+        invoked = true;
+        return CompletableFuture.completedFuture(invoked);
+    }
+    
+    public boolean getInvoked() {
+        return invoked;
+    } 
+}
+
+''')
+
+        def bean = context.getBean(context.classLoader.loadClass('adapteraround.Test'))
+
+        expect:
+        bean.invoked
+
+        cleanup:
+        context.close()
+    }
+
     void  "test method adapter produces additional bean"() {
         when:"An adapter method is parsed"
         BeanDefinition definition = buildBeanDefinition('test.Test$ApplicationEventListener$onStartup1$Intercepted','''\

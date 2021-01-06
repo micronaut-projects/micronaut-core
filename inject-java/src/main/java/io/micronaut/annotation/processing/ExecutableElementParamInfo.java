@@ -17,10 +17,13 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ParameterElement;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Holds parameter information for a {@link javax.lang.model.element.ExecutableElement}.
@@ -29,12 +32,11 @@ import java.util.Map;
 class ExecutableElementParamInfo {
 
     private boolean validated = false;
-    private boolean requiresReflection;
-    private AnnotationMetadata metadata;
-    private Map<String, Object> parameters = new LinkedHashMap<>();
-    private Map<String, Object> genericParameters = new LinkedHashMap<>();
-    private Map<String, AnnotationMetadata> annotationMetadata = new LinkedHashMap<>();
-    private Map<String, Map<String, Object>> genericTypes = new LinkedHashMap<>();
+    private final boolean requiresReflection;
+    private final AnnotationMetadata metadata;
+    private final Map<String, ParameterElement> parameters = new LinkedHashMap<>(10);
+    private final Map<String, ClassElement> genericParameters = new LinkedHashMap<>(10);
+    private final Map<String, ClassElement> parameterTypes = new LinkedHashMap<>(10);
 
     /**
      * @param requiresReflection Whether reflection is required
@@ -48,46 +50,33 @@ class ExecutableElementParamInfo {
     /**
      * Adds a parameter to the info.
      *
-     * @param paramName The parameter name
-     * @param type      The type reference
-     * @param genericType The generic parameter type
+     * @param paramName    The parameter name
+     * @param classElement The class element
      */
-    void addParameter(String paramName, Object type, Object genericType) {
-        parameters.put(paramName, type);
-        genericParameters.put(paramName, genericType);
-    }
-
-    /**
-     * Adds annotation metadata for the given parameter.
-     *
-     * @param paramName The parameter name
-     * @param metadata  The metadata
-     */
-    void addAnnotationMetadata(String paramName, AnnotationMetadata metadata) {
-        annotationMetadata.put(paramName, metadata);
-    }
-
-    /**
-     * Adds generics info for the given parameter name.
-     *
-     * @param paramName The parameter name
-     * @param generics  The generics info
-     */
-    void addGenericTypes(String paramName, Map<String, Object> generics) {
-        genericTypes.put(paramName, generics);
+    void addParameter(String paramName, ParameterElement classElement) {
+        parameters.put(paramName, classElement);
+        parameterTypes.put(paramName, classElement.getType());
+        genericParameters.put(paramName, classElement.getGenericType());
     }
 
     /**
      * @return The parameters
      */
-    Map<String, Object> getParameters() {
+    Map<String, ParameterElement> getParameters() {
         return Collections.unmodifiableMap(parameters);
+    }
+
+    /**
+     * @return The parameter types
+     */
+    Map<String, ClassElement> getParameterTypes() {
+        return Collections.unmodifiableMap(parameterTypes);
     }
 
     /**
      * @return The generic parameters
      */
-    Map<String, Object> getGenericParameters() {
+    Map<String, ClassElement> getGenericParameterTypes() {
         return Collections.unmodifiableMap(genericParameters);
     }
 
@@ -95,14 +84,7 @@ class ExecutableElementParamInfo {
      * @return The parameter annotation metadata
      */
     Map<String, AnnotationMetadata> getParameterMetadata() {
-        return Collections.unmodifiableMap(annotationMetadata);
-    }
-
-    /**
-     * @return The generic types
-     */
-    Map<String, Map<String, Object>> getGenericTypes() {
-        return Collections.unmodifiableMap(genericTypes);
+        return getParameters().entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, (entry -> entry.getValue().getAnnotationMetadata())));
     }
 
     /**

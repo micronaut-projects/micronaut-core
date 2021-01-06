@@ -58,6 +58,11 @@ public final class PrimitiveElement implements ArrayableClassElement {
     }
 
     @Override
+    public boolean isAssignable(ClassElement type) {
+        return this.typeName.equals(type.getName());
+    }
+
+    @Override
     public boolean isArray() {
         return arrayDimensions > 0;
     }

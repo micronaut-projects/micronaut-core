@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
-import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -44,19 +43,21 @@ public class LoadedVisitor implements Ordered {
     private final String classAnnotation;
     private final String elementAnnotation;
     private final JavaVisitorContext visitorContext;
+    private final JavaElementFactory elementFactory;
     private JavaClassElement rootClassElement;
 
     /**
      * @param visitor               The {@link TypeElementVisitor}
      * @param visitorContext        The visitor context
      * @param genericUtils          The generic utils
-     * @param processingEnvironment The {@link ProcessEnvironment}
+     * @param processingEnvironment The {@link ProcessingEnvironment}
      */
     public LoadedVisitor(TypeElementVisitor visitor,
                          JavaVisitorContext visitorContext,
                          GenericUtils genericUtils,
                          ProcessingEnvironment processingEnvironment) {
         this.visitorContext = visitorContext;
+        this.elementFactory = visitorContext.getElementFactory();
         this.visitor = visitor;
         Class<? extends TypeElementVisitor> aClass = visitor.getClass();
 
@@ -124,10 +125,7 @@ public class LoadedVisitor implements Ordered {
     public @Nullable io.micronaut.inject.ast.Element visit(
             Element element, AnnotationMetadata annotationMetadata) {
         if (element instanceof VariableElement) {
-            final JavaFieldElement e = new JavaFieldElement(
-                    (VariableElement) element,
-                    annotationMetadata,
-                    visitorContext);
+            final JavaFieldElement e = elementFactory.newFieldElement((VariableElement) element, annotationMetadata);
             visitor.visitField(
                     e,
                     visitorContext
@@ -138,21 +136,14 @@ public class LoadedVisitor implements Ordered {
             if (rootClassElement != null) {
 
                 if (executableElement.getSimpleName().toString().equals("<init>")) {
-                    final JavaConstructorElement e = new JavaConstructorElement(
-                            rootClassElement,
-                            executableElement,
-                            annotationMetadata,
-                            visitorContext);
+                    final JavaConstructorElement e = elementFactory.newConstructorElement(rootClassElement, executableElement, annotationMetadata);
                     visitor.visitConstructor(
                             e,
                             visitorContext
                     );
                     return e;
                 } else {
-                    final JavaMethodElement e = new JavaMethodElement(
-                            rootClassElement,
-                            executableElement,
-                            annotationMetadata, visitorContext);
+                    final JavaMethodElement e = elementFactory.newMethodElement(rootClassElement, executableElement, annotationMetadata);
                     visitor.visitMethod(
                             e,
                             visitorContext
@@ -162,28 +153,12 @@ public class LoadedVisitor implements Ordered {
             }
         } else if (element instanceof TypeElement) {
             TypeElement typeElement = (TypeElement) element;
-            boolean isEnum = JavaModelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent();
-            if (isEnum) {
-                this.rootClassElement = new JavaEnumElement(
-                        typeElement,
-                        annotationMetadata,
-                        visitorContext);
-                visitor.visitClass(
-                        rootClassElement,
-                        visitorContext
-                );
-                return rootClassElement;
-            } else {
-                this.rootClassElement =  new JavaClassElement(
-                        typeElement,
-                        annotationMetadata,
-                        visitorContext);
-                visitor.visitClass(
-                        rootClassElement,
-                        visitorContext
-                );
-                return rootClassElement;
-            }
+            this.rootClassElement = elementFactory.newClassElement(typeElement, annotationMetadata);
+            visitor.visitClass(
+                    rootClassElement,
+                    visitorContext
+            );
+            return rootClassElement;
         }
         return null;
     }

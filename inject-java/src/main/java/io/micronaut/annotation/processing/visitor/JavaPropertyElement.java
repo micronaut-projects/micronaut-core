@@ -21,7 +21,12 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PropertyElement;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import javax.lang.model.element.ExecutableElement;
+
+import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeMirror;
+import java.util.Collections;
+import java.util.Map;
 
 /**
  * Models a {@link PropertyElement} for Java.
@@ -36,30 +41,59 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
     private final ClassElement type;
     private final boolean readOnly;
     private final ClassElement declaringElement;
+    private final JavaVisitorContext visitorContext;
 
     /**
      * Default constructor.
-     *  @param declaringElement The declaring element
-     * @param getter The element
+     *
+     * @param declaringElement   The declaring element
+     * @param rootElement        The element
      * @param annotationMetadata The annotation metadata
-     * @param name The name
-     * @param type The type
-     * @param readOnly Whether it is read only
-     * @param visitorContext The java visitor context
+     * @param name               The name
+     * @param type               The type
+     * @param readOnly           Whether it is read only
+     * @param visitorContext     The java visitor context
      */
     JavaPropertyElement(
             ClassElement declaringElement,
-            ExecutableElement getter,
+            Element rootElement,
             AnnotationMetadata annotationMetadata,
             String name,
             ClassElement type,
             boolean readOnly,
             JavaVisitorContext visitorContext) {
-        super(getter, annotationMetadata, visitorContext);
+        super(rootElement, annotationMetadata, visitorContext);
         this.name = name;
         this.type = type;
         this.readOnly = readOnly;
         this.declaringElement = declaringElement;
+        this.visitorContext = visitorContext;
+    }
+
+    @Override
+    public ClassElement getGenericType() {
+        Map<String, Map<String, TypeMirror>> declaredGenericInfo;
+        if (declaringElement instanceof JavaClassElement) {
+            declaredGenericInfo = ((JavaClassElement) declaringElement).getGenericTypeInfo();
+        } else {
+            declaredGenericInfo = Collections.emptyMap();
+        }
+        return parameterizedClassElement(((TypeElement) type.getNativeType()).asType(), visitorContext, declaredGenericInfo);
+    }
+
+    @Override
+    public boolean isPrimitive() {
+        return type.isPrimitive();
+    }
+
+    @Override
+    public boolean isArray() {
+        return type.isArray();
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return type.getArrayDimensions();
     }
 
     @Override

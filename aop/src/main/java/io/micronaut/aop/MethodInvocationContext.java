@@ -36,4 +36,14 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
      * @return The underlying method reference.
      */
     @NonNull ExecutableMethod<T, R> getExecutableMethod();
+
+    @Override
+    default boolean isSuspend() {
+        return getExecutableMethod().isSuspend();
+    }
+
+    @Override
+    default boolean isAbstract() {
+        return getExecutableMethod().isAbstract();
+    }
 }
