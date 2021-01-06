@@ -59,11 +59,18 @@ class ClientFilterStereotypeSpec extends Specification {
         markedClient.echo() == "echo Intercepted URL"
 
         when:
+        MarkedTwiceClient markedTwiceClient = ctx.getBean(MarkedTwiceClient)
+
+        then:
+        markedTwiceClient.echoPost() == "echo Intercepted Twice Post URL"
+        markedTwiceClient.echo() == "echo Intercepted Twice URL"
+
+        when:
         IndirectlyMarkedClient indirectlyMarkedClient = ctx.getBean(IndirectlyMarkedClient)
 
         then:
-        indirectlyMarkedClient.echoPost() == "echo Intercepted Post URL"
-        indirectlyMarkedClient.echo() == "echo Intercepted URL"
+        indirectlyMarkedClient.echoPost() == "echo Intercepted Twice Post URL"
+        indirectlyMarkedClient.echo() == "echo Intercepted Twice URL"
     }
 
     void "low-level client filter matching"() {
@@ -93,6 +100,17 @@ class ClientFilterStereotypeSpec extends Specification {
     @Client("/filters/marked")
     @MarkerStereotypeAnnotation
     static interface MarkedClient {
+        @Get("/")
+        String echo()
+
+        @Post("/")
+        String echoPost()
+    }
+
+    @Client("/filters/marked")
+    @AnotherMarkerStereotypeAnnotation
+    @MarkerStereotypeAnnotation
+    static interface MarkedTwiceClient {
         @Get("/")
         String echo()
 
@@ -148,13 +166,31 @@ class ClientFilterStereotypeSpec extends Specification {
         }
     }
 
+    @AnotherMarkerStereotypeAnnotation
+    @Singleton
+    static class AnotherMarkerFilter implements HttpClientFilter {
+
+        @Override
+        int getOrder() {
+            1
+        }
+
+        @Override
+        Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+            return Flowable.fromPublisher(chain.proceed(request))
+                    .map({ HttpResponse response ->
+                        HttpResponse.ok(response.body().toString() + " Twice")
+                    })
+        }
+    }
+
     @MarkerStereotypeAnnotation(methods = HttpMethod.POST)
     @Singleton
     static class MarkerPostFilter implements HttpClientFilter {
 
         @Override
         int getOrder() {
-            1
+            2
         }
 
         @Override
@@ -172,7 +208,7 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         int getOrder() {
-            2
+            3
         }
 
         @Override

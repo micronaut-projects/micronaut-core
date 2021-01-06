@@ -34,7 +34,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.reactivex.Single
 import org.reactivestreams.Publisher
@@ -104,6 +104,17 @@ class HttpFilterSpec extends Specification {
         response.headers.contains("X-Matched-Filter")
     }
 
+    void "test two filters on matched with filter matcher URI"() {
+        when:
+        HttpResponse response = rxClient.exchange("/matchedtwice").blockingFirst()
+
+        then:
+        response.status == HttpStatus.OK
+        response.headers.get("X-Root-Filter") == "processed"
+        response.headers.contains("X-Matched-Filter")
+        response.headers.contains("X-Another-Matched-Filter")
+    }
+
     void "test a filter on indirect matched with filter matcher URI"() {
         when:
         HttpResponse response = rxClient.exchange("/indirectlymatched").blockingFirst()
@@ -112,6 +123,7 @@ class HttpFilterSpec extends Specification {
         response.status == HttpStatus.OK
         response.headers.get("X-Root-Filter") == "processed"
         response.headers.contains("X-Matched-Filter")
+        response.headers.contains("X-Another-Matched-Filter")
     }
 
     @Requires(property = 'spec.name', value = "HttpFilterSpec")
@@ -143,6 +155,19 @@ class HttpFilterSpec extends Specification {
         }
     }
 
+    @Filter("/**")
+    @AnotherMarkerStereotypeAnnotation
+    @Requires(property = 'spec.name', value = "HttpFilterSpec")
+    static class AnotherMatchedFilter implements HttpServerFilter {
+
+        @Override
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            return Flowable.fromPublisher(chain.proceed(request)).doOnNext({ response ->
+                response.header("X-Another-Matched-Filter", "processed")
+            })
+        }
+    }
+
 
     @Controller
     @Requires(property = 'spec.name', value = "HttpFilterSpec")
@@ -164,6 +189,13 @@ class HttpFilterSpec extends Specification {
             HttpResponse.ok()
         }
 
+        @Get("/matchedtwice")
+        @MarkerStereotypeAnnotation
+        @AnotherMarkerStereotypeAnnotation
+        HttpResponse matchedTwice() {
+            HttpResponse.ok()
+        }
+
         @Get("/indirectlymatched")
         @IndirectMarkerStereotypeAnnotation
         HttpResponse indirectlyMatched() {
@@ -180,6 +212,13 @@ class HttpFilterSpec extends Specification {
     @AliasFor(member = "methods", annotation = FilterMatcher.class)
     HttpMethod[] methods() default [];
 }
+@FilterMatcher
+@interface AnotherMarkerStereotypeAnnotation {
+
+    @AliasFor(member = "methods", annotation = FilterMatcher.class)
+    HttpMethod[] methods() default [];
+}
 @MarkerStereotypeAnnotation
+@AnotherMarkerStereotypeAnnotation
 @interface IndirectMarkerStereotypeAnnotation {
 }

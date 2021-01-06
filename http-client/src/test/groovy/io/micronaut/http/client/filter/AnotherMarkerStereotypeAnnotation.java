@@ -15,12 +15,18 @@
  */
 package io.micronaut.http.client.filter;
 
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.annotation.FilterMatcher;
+
 import java.lang.annotation.*;
 
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.PARAMETER})
-@MarkerStereotypeAnnotation
-@AnotherMarkerStereotypeAnnotation
-public @interface IndirectMarkerStereotypeAnnotation {
+@FilterMatcher
+public @interface AnotherMarkerStereotypeAnnotation {
+
+    @AliasFor(member = "methods", annotation = FilterMatcher.class)
+    HttpMethod[] methods() default {};
 }
