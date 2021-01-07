@@ -532,7 +532,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                     if (!matches) {
                         String filterAnnotation = annotationMetadata.getAnnotationNameByStereotype(FilterMatcher.NAME).orElse(null);
                         if (filterAnnotation != null) {
-                            matches = context.getAnnotationMetadata().getAnnotationNamesByStereotype(FilterMatcher.class).contains(filterAnnotation);
+                            matches = context.getAnnotationMetadata().hasStereotype(filterAnnotation);
                         }
                     }
                     return matches;
