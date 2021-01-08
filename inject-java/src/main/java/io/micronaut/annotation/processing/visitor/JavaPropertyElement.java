@@ -23,6 +23,7 @@ import io.micronaut.inject.ast.PropertyElement;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.util.Collections;
@@ -68,6 +69,31 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
         this.readOnly = readOnly;
         this.declaringElement = declaringElement;
         this.visitorContext = visitorContext;
+    }
+
+    /**
+     * Default constructor.
+     *
+     * @param declaringElement   The declaring element
+     * @param rootElement        The element
+     * @param annotationMetadata The annotation metadata
+     * @param name               The name
+     * @param type               The type
+     * @param readOnly           Whether it is read only
+     * @param visitorContext     The java visitor context
+     * @deprecated Use {@link #JavaPropertyElement(ClassElement, Element, AnnotationMetadata, String, ClassElement, boolean, JavaVisitorContext)} instead
+     */
+    @SuppressWarnings("DeprecatedIsStillUsed") // used by openapi processor
+    @Deprecated
+    JavaPropertyElement(
+            ClassElement declaringElement,
+            ExecutableElement rootElement,
+            AnnotationMetadata annotationMetadata,
+            String name,
+            ClassElement type,
+            boolean readOnly,
+            JavaVisitorContext visitorContext) {
+        this(declaringElement, (Element) rootElement, annotationMetadata, name, type, readOnly, visitorContext);
     }
 
     @Override
