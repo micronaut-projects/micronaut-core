@@ -14,7 +14,7 @@ The `ServerFilterChain` interface contains a resolved chain of filters with the 
 
 The `proceed(..)` method returns a Reactive Streams rs:Publisher[] that emits the response that will be returned to the client. Implementors of filters can subscribe to the rs:Publisher[] and mutate the emitted api:http.MutableHttpResponse[] object to modify the response prior to returning the response to the client.
 
-To put these concepts into practise lets look at an example.
+To put these concepts into practice lets look at an example.
 
 IMPORTANT: Filters execute in the event loop therefore blocking operations must be offloaded to another thread pool.
 

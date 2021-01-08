@@ -1,7 +1,7 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    
-    api project(":inject-java")    
+
+    api project(":inject-java")
     api "com.google.testing.compile:compile-testing:0.19"
     api dependencyModuleVersion("groovy", "groovy")
     api(dependencyVersion("spock")) {
@@ -16,4 +16,10 @@ dependencies {
     testImplementation "javax.persistence:javax.persistence-api:2.2"
     testImplementation project(":runtime")
     api "com.blazebit:blaze-persistence-core-impl:1.6.0-Alpha1"
+}
+
+afterEvaluate {
+    sourcesJar {
+        from sourceSets.main.allSource
+    }
 }

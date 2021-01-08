@@ -7,3 +7,9 @@ dependencies {
         exclude module:'groovy-all'
     }
 }
+
+afterEvaluate {
+    sourcesJar {
+        from sourceSets.main.allSource
+    }
+}

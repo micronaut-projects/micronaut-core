@@ -74,14 +74,14 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     @Override
     public SourceVersion getSupportedSourceVersion() {
         SourceVersion sourceVersion = SourceVersion.latest();
-        if (sourceVersion.ordinal() <= 11) {
+        if (sourceVersion.ordinal() <= 15) {
             if (sourceVersion.ordinal() >= 8) {
                 return sourceVersion;
             } else {
                 return SourceVersion.RELEASE_8;
             }
         } else {
-            return (SourceVersion.values())[11];
+            return (SourceVersion.values())[15];
         }
     }
 
@@ -153,7 +153,27 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 visitorAttributes
         );
 
-        this.javaVisitorContext = new JavaVisitorContext(
+        this.javaVisitorContext = newVisitorContext(processingEnv);
+
+        this.incremental = isIncremental(processingEnv);
+        if (incremental) {
+            final String annotations = processingEnv.getOptions().get(MICRONAUT_PROCESSING_ANNOTATIONS);
+            if (annotations != null) {
+                final String[] tokens = annotations.split(",");
+                supportedAnnotationTypes.addAll(Arrays.asList(tokens));
+            }
+        }
+    }
+
+    /**
+     * Creates the visitor context.
+     *
+     * @param processingEnv The processing env
+     * @return The context
+     */
+    @NonNull
+    protected JavaVisitorContext newVisitorContext(@NonNull ProcessingEnvironment processingEnv) {
+        return new JavaVisitorContext(
                 processingEnv,
                 messager,
                 elementUtils,
@@ -164,15 +184,6 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 filer,
                 visitorAttributes
         );
-
-        this.incremental = isIncremental(processingEnv);
-        if (incremental) {
-            final String annotations = processingEnv.getOptions().get(MICRONAUT_PROCESSING_ANNOTATIONS);
-            if (annotations != null) {
-                final String[] tokens = annotations.split(",");
-                supportedAnnotationTypes.addAll(Arrays.asList(tokens));
-            }
-        }
     }
 
     /**
@@ -259,7 +270,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     }
 
     private void illegalState() {
-        throw new IllegalStateException("No messager set. Ensure processing enviroment is initialized");
+        throw new IllegalStateException("No messager set. Ensure processing environment is initialized");
     }
 
     /**
@@ -271,7 +282,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         final Map<String, String> options = processingEnv.getOptions();
         final String v = options.get(MICRONAUT_PROCESSING_INCREMENTAL);
         if (v != null) {
-            return Boolean.valueOf(v);
+            return Boolean.parseBoolean(v);
         }
         return false;
     }

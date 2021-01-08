@@ -17,9 +17,32 @@ package io.micronaut.inject.field.simpleinjection
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
-class FieldInjectionSpec extends Specification {
+class FieldInjectionSpec extends AbstractTypeElementSpec {
+
+    void 'test field injection generics'() {
+        given:
+        def definition = buildBeanDefinition('fieldinjection.Test', '''
+package fieldinjection;
+
+import javax.inject.*;
+
+@Singleton
+class Test {
+    @Inject
+    java.util.List<Bar> bars;   
+}
+
+class Bar {
+
+}
+''')
+        expect:
+        definition.injectedFields.first().asArgument().firstTypeVariable.get().type.name == 'fieldinjection.Bar'
+    }
 
     void "test injection via field with interface"() {
         given:

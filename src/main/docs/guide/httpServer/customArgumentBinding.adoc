@@ -1,0 +1,55 @@
+Micronaut uses an api:http.bind.binders.ArgumentBinderRegistry[ArgumentBinderRegistry] to look up api:core.bind.ArgumentBinder[ArgumentBinder]s beans
+capable of binding to the arguments in the controller methods. The default implementation will look for an annotation on
+the argument that is, itself, annotated with ann:core.bind.annotation.Bindable[]. If one exists the argument binder registry will search for an
+argument binder that supports that annotation.
+
+If no fitting annotation is found Micronaut will try to find an argument binder that supports the argument's type.
+
+An argument binder returns a api:core.bind.ArgumentBinder.BindingResult[]. The binding result gives Micronaut more information than just the value. Binding results are either satisfied or unsatisfied, and either empty or not empty. If an argument binder returns an unsatisfied result, the binder may be called again at different times in the request processing. Argument binders are initially called before the body is read and before any filters are executed. If a binder relies on any of that data and the data is not present, then an api:core.bind.ArgumentBinder.BindingResult#UNSATISFIED[] result should be returned. Returning an api:core.bind.ArgumentBinder.BindingResult#EMPTY[] or satisfied result will be the final result and the binder will not be called again for that request.
+
+NOTE: At the end of processing if the result is still api:core.bind.ArgumentBinder.BindingResult#UNSATISFIED[], it is considered api:core.bind.ArgumentBinder.BindingResult#EMPTY[].
+
+Key interfaces are:
+
+=== AnnotatedRequestArgumentBinder
+
+Argument binders that bind based on the presence of an annotation must implement api:http.bind.binders.AnnotatedRequestArgumentBinder[AnnotatedRequestArgumentBinder], and can be used by creating an annotation that is annotated with api:io.micronaut.core.bind.annotation.Bindable[@Bindable]. For example:
+
+snippet::io.micronaut.docs.http.server.bind.annotation.ShoppingCart[tags="class", indent=0, title="An example of a binding annotation"]
+
+<1> The binding annotation must itself be annotated as api:io.micronaut.core.bind.annotation.Bindable[@Bindable]
+
+snippet::io.micronaut.docs.http.server.bind.annotation.ShoppingCartRequestArgumentBinder[tags="class", indent=0, title="Example of annotated data binding"]
+
+<1> The custom argument binder must implement api:io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder[AnnotatedRequestArgumentBinder], including both the annotation type to trigger the binder (in this case, MyBindingAnnotation) and the type of the argument expected (in this case, Object)
+<2> Override the bind method with the custom argument binding logic - in this case, we are resolving the name of the annotated argument, extracting a value from a cookie with that same name, and converting that value into the argument type
+
+TIP: It is common to use api:io.micronaut.core.convert.ConversionService[ConversionService] to convert the data to the type of the argument.
+
+Once the binder is created, we can annotate an argument in our controller method, which will be bound using the custom binding logic we've specified.
+
+snippet::io.micronaut.docs.http.server.bind.annotation.ShoppingCartController[tags="method", indent=0, title="A controller operation with this annotated binding"]
+
+<1> The parameter will be bound with the binder associated with MyBindingAnnotation. This will take precedence over a type-based binder, if applicable.
+
+=== TypedRequestArgumentBinder
+
+Argument binders that bind based on the type of the argument must implement api:http.bind.binders.TypedRequestArgumentBinder[TypedRequestArgumentBinder]. For example, given this class:
+
+snippet::io.micronaut.docs.http.server.bind.type.ShoppingCart[tags="class", indent=0, title="Example of POJO"]
+
+We can define a `TypedRequestArgumentBinder` for this class, as seen below:
+
+snippet::io.micronaut.docs.http.server.bind.type.ShoppingCartRequestArgumentBinder[tags="class", indent=0, title="Example of typed data binding"]
+
+<1> Override the bind method with the data type to bind, in this example the ShoppingCart type
+<2> After retrieving the data (in this case, by deserializing JSON text from a cookie), return as a api:io.micronaut.core.bind.BindingResult[BindingResult]
+<3> Also override the argumentType method, which is used by the ArgumentBinderRegistry.
+
+Once the binder is created, it will be used for any controller argument of the associated type:
+
+snippet::io.micronaut.docs.http.server.bind.type.ShoppingCartController[tags="method", indent=0, title="A controller operation with this typed binding"]
+
+<1> The parameter will be bound using the custom logic defined for this type in our TypedRequestArgumentBinder
+
+

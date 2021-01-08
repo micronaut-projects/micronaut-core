@@ -5,7 +5,7 @@ buildscript {
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:6.0.0'
-        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.11"
+        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.15"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
@@ -148,6 +148,11 @@ ext {
                     version: javaxAnnotationApiVersion,
                     group  : 'javax.annotation',
                     name   : 'javax.annotation-api'
+            ],
+            'jakarta.annotation-api'     : [
+                    version: jakartaAnnotationApiVersion,
+                    group  : 'jakarta.annotation',
+                    name   : 'jakarta.annotation-api'
             ],
             jsr305                     : [
                     version: jsr305Version,

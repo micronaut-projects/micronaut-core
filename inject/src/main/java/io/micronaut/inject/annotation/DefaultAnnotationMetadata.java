@@ -1250,7 +1250,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (annotation != null) {
             Map<String, Map<CharSequence, Object>> annotationDefaults = this.annotationDefaultValues;
             if (annotationDefaults == null) {
-                this.annotationDefaultValues = new HashMap<>();
+                this.annotationDefaultValues = new LinkedHashMap<>();
                 annotationDefaults = this.annotationDefaultValues;
             }
 

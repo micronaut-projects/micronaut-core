@@ -27,6 +27,9 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.net.URI;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Default implementation of {@link HttpHostResolver}.
@@ -55,16 +58,38 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
     @NonNull
     @Override
     public String resolve(@Nullable HttpRequest request) {
+        String host;
         if (request != null) {
             HostResolutionConfiguration configuration = serverConfiguration.getHostResolution();
-            if (configuration != null) {
-                return getConfiguredHost(request, configuration);
+            if (configuration != null && configuration.headersConfigured()) {
+                host = getConfiguredHost(request, configuration);
             } else {
-                return getDefaultHost(request);
+                host = getDefaultHost(request);
             }
         } else {
-            return getEmbeddedHost();
+            host = getEmbeddedHost();
         }
+        return validateHost(host);
+    }
+
+    /**
+     * Validates the host transforming the host value if necessary.
+     * @param host The host
+     * @return The transformed host
+     */
+    protected @NonNull String validateHost(@NonNull String host) {
+        if (!host.equals(DEFAULT_HOST)) {
+            HostResolutionConfiguration configuration = serverConfiguration.getHostResolution();
+            if (configuration != null) {
+                List<Pattern> allowedHosts = configuration.getAllowedHosts();
+                if (!allowedHosts.isEmpty() && allowedHosts.stream()
+                        .map(pattern -> pattern.matcher(host))
+                        .noneMatch(Matcher::matches)) {
+                    return DEFAULT_HOST;
+                }
+            }
+        }
+        return host;
     }
 
     /**

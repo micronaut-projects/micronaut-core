@@ -23,7 +23,7 @@ snippet::io.micronaut.docs.streaming.HeadlineFlowController[tags="streamingWithF
 <1> A method `streamHeadlinesWithFlow` is defined that produces `application/x-json-stream`
 <2> A `Flow` is created using `flow`
 <3> This `Flow` will emit 100 messages
-<4> Emitting will happend with `emit` `suspend` function
+<4> Emitting will happen with `emit` `suspend` function
 <5> There will be a 1 second _delay_ between messages
 
 A streaming client can simply return a `Flow`, for example:

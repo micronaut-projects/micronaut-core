@@ -23,6 +23,7 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.multipart.FileUpload;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -71,8 +72,16 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     @Override
     public InputStream getInputStream() throws IOException {
         if (fileUpload.isInMemory()) {
-            return new ByteBufInputStream(fileUpload.getByteBuf(), controlRelease);
+            ByteBuf byteBuf = fileUpload.getByteBuf();
+            if (byteBuf == null) {
+                throw new IOException("The input stream has already been released");
+            }
+            return new ByteBufInputStream(byteBuf, controlRelease);
         } else {
+            File file = fileUpload.getFile();
+            if (file == null) {
+                throw new IOException("The input stream has already been released");
+            }
             return new NettyFileUploadInputStream(fileUpload, controlRelease);
         }
     }
@@ -89,6 +98,9 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     @Override
     public byte[] getBytes() throws IOException {
         ByteBuf byteBuf = fileUpload.getByteBuf();
+        if (byteBuf == null) {
+            throw new IOException("The bytes have already been released");
+        }
         try {
             return ByteBufUtil.getBytes(byteBuf);
         } finally {
@@ -110,6 +122,9 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     @Override
     public ByteBuffer getByteBuffer() throws IOException {
         ByteBuf byteBuf = fileUpload.getByteBuf();
+        if (byteBuf == null) {
+            throw new IOException("The byte buffer has already been released");
+        }
         try {
             return byteBuf.nioBuffer();
         } finally {

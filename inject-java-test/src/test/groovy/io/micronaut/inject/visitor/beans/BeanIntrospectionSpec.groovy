@@ -24,6 +24,7 @@ import spock.lang.IgnoreIf
 //import org.objectweb.asm.util.ASMifier
 //import org.objectweb.asm.util.TraceClassVisitor
 import spock.lang.Issue
+import spock.lang.Requires
 import spock.util.environment.Jvm
 
 import javax.annotation.processing.SupportedAnnotationTypes
@@ -32,11 +33,80 @@ import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
 import javax.validation.Constraint
+import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    @Requires({ jvm.isJava14Compatible() })
+    void "test annotations on generic type arguments for Java 14+ records"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(List<@Min(10) Long> value){
+}
+''')
+        when:
+        BeanProperty<?, ?> property = introspection.getRequiredProperty("value", List)
+        def genericTypeArg = property.asArgument().getTypeParameters()[0]
+
+        then:
+        property != null
+        genericTypeArg.annotationMetadata.hasAnnotation(Min)
+        genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
+    }
+
+    @Requires({ jvm.isJava11Compatible() })
+    void 'test annotations on generic type arguments'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+import java.lang.annotation.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static java.lang.annotation.ElementType.*;
+
+@io.micronaut.core.annotation.Introspected
+public class Foo {
+    private List<@Min(10) @SomeAnn Long> value;
+
+    public List<Long> getValue() {
+        return value;
+    }
+    
+    public void setValue(List<Long> value) {
+        this.value = value;
+    }
+}
+
+@Documented
+@Retention(RUNTIME)
+@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
+@interface SomeAnn {
+
+}
+''')
+        when:
+        BeanProperty<?, ?> property = introspection.getRequiredProperty("value", List)
+        def genericTypeArg = property.asArgument().getTypeParameters()[0]
+
+        then:
+        property != null
+        genericTypeArg.annotationMetadata.hasAnnotation(Min)
+        genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
+    }
+
     @IgnoreIf({ !jvm.isJava14Compatible() })
     void "test bean introspection on a Java 14+ record"() {
         given:

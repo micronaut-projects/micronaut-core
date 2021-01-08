@@ -186,7 +186,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected List<Element> buildHierarchy(Element element, boolean inheritTypeAnnotations, boolean declaredOnly) {
         if (declaredOnly) {
-            return Collections.singletonList(element);
+            List<Element> onlyDeclared = new ArrayList<>(1);
+            onlyDeclared.add(element);
+            return onlyDeclared;
         }
 
         if (element instanceof TypeElement) {
@@ -319,7 +321,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             String annotationName = annotationElement.getQualifiedName().toString();
             if (!defaults.containsKey(annotationName)) {
 
-                Map<Element, AnnotationValue> defaultValues = new HashMap<>();
+                Map<Element, AnnotationValue> defaultValues = new LinkedHashMap<>();
                 final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
 
                 allMembers

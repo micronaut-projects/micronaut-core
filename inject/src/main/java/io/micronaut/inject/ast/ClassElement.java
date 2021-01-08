@@ -15,9 +15,12 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -37,6 +40,42 @@ public interface ClassElement extends TypedElement {
      * @return {@code true} if and only if the this type is assignable to the second
      */
     boolean isAssignable(String type);
+
+    /**
+     * Tests whether one type is assignable to another.
+     *
+     * @param type The type to check
+     * @return {@code true} if and only if the this type is assignable to the second
+     * @since 2.3.0
+     */
+    default boolean isAssignable(ClassElement type) {
+        return isAssignable(type.getName());
+    }
+
+    /**
+     * Whether this element is an {@link Optional}.
+     *
+     * @return Is this element an optional
+     * @since 2.3.0
+     */
+    default boolean isOptional() {
+        return isAssignable(Optional.class);
+    }
+
+    /**
+     * This method will return the name of the underlying type automatically unwrapping in the case of an optional
+     * or wrapped representation of the type.
+     *
+     * @return Returns the canonical name of the type.
+     * @since 2.3.0
+     */
+    default String getCanonicalName() {
+        if (isOptional()) {
+            return getFirstTypeArgument().map(ClassElement::getName).orElse(Object.class.getName());
+        } else {
+            return getName();
+        }
+    }
 
     /**
      * @return Whether this element is a record
@@ -189,6 +228,16 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Builds a map of all the type parameters for a class, its super classes and interfaces.
+     * The resulting map contains the name of the class to the a map of the resolved generic types.
+     *
+     * @return The type arguments for this class element
+     */
+    default @NonNull Map<String, Map<String, ClassElement>> getAllTypeArguments() {
+        return Collections.emptyMap();
+    }
+
+    /**
      * @return The first type argument
      */
     default Optional<ClassElement> getFirstTypeArgument() {
@@ -221,4 +270,72 @@ public interface ClassElement extends TypedElement {
      * @throws IllegalStateException if this class element doesn't denote an array type
      */
     ClassElement fromArray();
+
+    /**
+     * Create a class element for the given simple type.
+     * @param type The type
+     * @return The class element
+     */
+    static ClassElement of(Class<?> type) {
+        return new ReflectClassElement(
+                Objects.requireNonNull(type, "Type cannot be null")
+        );
+    }
+
+    /**
+     * Create a class element for the given simple type.
+     * @param typeName The type
+     * @return The class element
+     */
+    @Internal
+    static ClassElement of(String typeName) {
+        return new ClassElement() {
+            @Override
+            public boolean isAssignable(String type) {
+                return false;
+            }
+
+            @Override
+            public boolean isAssignable(ClassElement type) {
+                return false;
+            }
+
+            @Override
+            public ClassElement toArray() {
+                throw new UnsupportedOperationException("Cannot convert class elements produced by name to an array");
+            }
+
+            @Override
+            public ClassElement fromArray() {
+                throw new UnsupportedOperationException("Cannot convert class elements produced by from an array");
+            }
+
+            @NotNull
+            @Override
+            public String getName() {
+                return typeName;
+            }
+
+            @Override
+            public boolean isPackagePrivate() {
+                return false;
+            }
+
+            @Override
+            public boolean isProtected() {
+                return false;
+            }
+
+            @Override
+            public boolean isPublic() {
+                return false;
+            }
+
+            @NotNull
+            @Override
+            public Object getNativeType() {
+                return typeName;
+            }
+        };
+    }
 }

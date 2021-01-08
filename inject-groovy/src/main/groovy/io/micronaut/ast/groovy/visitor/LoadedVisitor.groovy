@@ -135,25 +135,28 @@ class LoadedVisitor implements Ordered {
      */
     @Nullable Element visit(AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata, GroovyVisitorContext visitorContext) {
         switch (annotatedNode.getClass()) {
-            case FieldNode:
             case PropertyNode:
-                def e = new GroovyFieldElement(sourceUnit, compilationUnit, (Variable) annotatedNode,  annotatedNode, annotationMetadata)
+                def e = visitorContext.getElementFactory().newFieldElement((PropertyNode) annotatedNode, annotationMetadata)
+                visitor.visitField(e, visitorContext)
+                return e
+            case FieldNode:
+                def e = visitorContext.getElementFactory().newFieldElement((FieldNode) annotatedNode, annotationMetadata)
                 visitor.visitField(e, visitorContext)
                 return e
             case ConstructorNode:
-                def e = new GroovyConstructorElement((GroovyClassElement) currentClassElement, sourceUnit, compilationUnit, (ConstructorNode) annotatedNode, annotationMetadata)
+                def e = visitorContext.getElementFactory().newConstructorElement(currentClassElement, (ConstructorNode) annotatedNode, annotationMetadata)
                 visitor.visitConstructor(e, visitorContext)
                 return e
             case MethodNode:
                 if (currentClassElement != null) {
-                    def e = new GroovyMethodElement((GroovyClassElement) currentClassElement, sourceUnit, compilationUnit, (MethodNode) annotatedNode, annotationMetadata)
+                    def e = visitorContext.getElementFactory().newMethodElement(currentClassElement, (MethodNode) annotatedNode, annotationMetadata)
                     visitor.visitMethod(e, visitorContext)
                     return e
                 }
                 break
             case ClassNode:
                 ClassNode cn = (ClassNode) annotatedNode
-                currentClassElement = new GroovyClassElement(sourceUnit, compilationUnit, cn, annotationMetadata)
+                currentClassElement = visitorContext.getElementFactory().newClassElement(cn, annotationMetadata)
                 visitor.visitClass(currentClassElement, visitorContext)
                 return currentClassElement
         }

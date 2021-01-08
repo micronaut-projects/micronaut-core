@@ -17,6 +17,7 @@ package io.micronaut.upload
 
 import groovy.json.JsonSlurper
 import io.micronaut.AbstractMicronautSpec
+import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -311,4 +312,25 @@ class UploadSpec extends AbstractMicronautSpec {
         result == 'data.json: 16'
     }
 
+    void "test the error condition using a single"() {
+        given:
+        def data = '{"title":"Test"}'
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .build()
+
+        when:
+        Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-multipart-body-as-single", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                Argument.STRING,
+                Argument.mapOf(String, Object)
+        )).blockingFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.status() == HttpStatus.INTERNAL_SERVER_ERROR
+        ex.response.getBody(Map).get().message == "Internal Server Error: The bytes have already been released"
+    }
 }

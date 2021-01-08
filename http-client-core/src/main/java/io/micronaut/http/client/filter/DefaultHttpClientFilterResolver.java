@@ -85,7 +85,7 @@ public class DefaultHttpClientFilterResolver implements HttpClientFilterResolver
                     boolean matches = !annotationMetadata.hasStereotype(FilterMatcher.class);
                     String filterAnnotation = annotationMetadata.getAnnotationNameByStereotype(FilterMatcher.class).orElse(null);
                     if (filterAnnotation != null && !matches) {
-                        matches = context.getAnnotationMetadata().hasAnnotation(filterAnnotation);
+                        matches = context.getAnnotationMetadata().hasStereotype(filterAnnotation);
                     }
 
                     if (matches) {

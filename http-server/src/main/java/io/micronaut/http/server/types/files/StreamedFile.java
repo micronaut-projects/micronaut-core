@@ -118,8 +118,9 @@ public class StreamedFile implements FileCustomizableResponseType {
 
     /**
      * Sets the file to be downloaded as an attachment.
+     * The name is set in the Content-Disposition header.
      *
-     * @param attachmentName The name of the file to be attached.
+     * @param attachmentName The attachment name.
      * @return The same StreamedFile instance
      */
     public StreamedFile attach(String attachmentName) {

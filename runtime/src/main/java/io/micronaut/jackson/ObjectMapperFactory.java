@@ -17,17 +17,22 @@ package io.micronaut.jackson;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
+import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.reflect.GenericTypeUtils;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.util.StringUtils;
+
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.Optional;
@@ -119,6 +124,16 @@ public class ObjectMapperFactory {
                 Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
                 targetType.ifPresent(aClass -> module.addDeserializer(aClass, deserializer));
             }
+        }
+
+        if (hasConfiguration && jacksonConfiguration.isTrimStrings()) {
+            module.addDeserializer(String.class, new StringDeserializer() {
+                @Override
+                public String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+                    String value = super.deserialize(p, ctxt);
+                    return StringUtils.trimToNull(value);
+                }
+            });
         }
 
         for (KeyDeserializer keyDeserializer : keyDeserializers) {

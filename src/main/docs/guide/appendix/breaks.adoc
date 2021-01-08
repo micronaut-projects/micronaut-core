@@ -262,7 +262,7 @@ NOTE: This change also applies to messages in custom constraint annotations, whi
 
 === Environment Order Bugfix
 
-Environments specified through the application context builder have priority over environments deduced or supplied through the MICRONAUT_ENVIRONMENTS environment variable, or the equivalent system property. A bug in the logic however did not change the order of a specified environment if it previously was found or deduced. This issue manifested itself with `@MicronautTest(environments = "test")`. The `test` environment is already deduced for tests, so it retained the order of other deduced environments, and was able to be overriden by `MICRONAUT_ENVIRONMENTS=dev`. In Micronaut 1.x configuration for `dev` would have overridden `test`. In Micronaut 2.x `test` will override `dev`.
+Environments specified through the application context builder have priority over environments deduced or supplied through the MICRONAUT_ENVIRONMENTS environment variable, or the equivalent system property. A bug in the logic however did not change the order of a specified environment if it previously was found or deduced. This issue manifested itself with `@MicronautTest(environments = "test")`. The `test` environment is already deduced for tests, so it retained the order of other deduced environments, and was able to be overridden by `MICRONAUT_ENVIRONMENTS=dev`. In Micronaut 1.x configuration for `dev` would have overridden `test`. In Micronaut 2.x `test` will override `dev`.
 
 === Introspections and Inner Classes
 

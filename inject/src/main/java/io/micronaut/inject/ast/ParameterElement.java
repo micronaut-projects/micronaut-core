@@ -19,6 +19,8 @@ import org.jetbrains.annotations.NotNull;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+import java.util.Objects;
+
 /**
  * Represents a parameter to a method or constructor.
  *
@@ -34,4 +36,16 @@ public interface ParameterElement extends TypedElement {
     @Override
     @NonNull
     ClassElement getType();
+
+    /**
+     * Creates a parameter element for a simple type and name.
+     *
+     * @param type The type
+     * @param name The name
+     * @return The parameter element
+     */
+    static @NonNull ParameterElement of(@NonNull Class<?> type, @NonNull String name) {
+        Objects.requireNonNull(name, "Name cannot be null");
+        return new ReflectParameterElement(ClassElement.of(type), name);
+    }
 }

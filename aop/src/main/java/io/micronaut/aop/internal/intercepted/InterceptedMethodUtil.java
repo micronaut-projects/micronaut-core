@@ -38,21 +38,25 @@ public class InterceptedMethodUtil {
      * @return The {@link InterceptedMethod}
      */
     public static InterceptedMethod of(MethodInvocationContext<?, ?> context) {
-        ReturnType<?> returnType = context.getReturnType();
-        Class<?> returnTypeClass = returnType.getType();
-        if (returnTypeClass == void.class || returnTypeClass == String.class) {
-            // Micro Optimization
-            return new SynchronousInterceptedMethod(context);
-        } else if (CompletionStage.class.isAssignableFrom(returnTypeClass) || Future.class.isAssignableFrom(returnTypeClass)) {
-            return new CompletionStageInterceptedMethod(context);
-        } else if (Publishers.isConvertibleToPublisher(returnTypeClass)) {
-            return new PublisherInterceptedMethod(context);
-        } else {
+        if (context.isSuspend()) {
             KotlinInterceptedMethod kotlinInterceptedMethod = KotlinInterceptedMethod.of(context);
             if (kotlinInterceptedMethod != null) {
                 return kotlinInterceptedMethod;
             }
             return new SynchronousInterceptedMethod(context);
+        } else {
+            ReturnType<?> returnType = context.getReturnType();
+            Class<?> returnTypeClass = returnType.getType();
+            if (returnTypeClass == void.class || returnTypeClass == String.class) {
+                // Micro Optimization
+                return new SynchronousInterceptedMethod(context);
+            } else if (CompletionStage.class.isAssignableFrom(returnTypeClass) || Future.class.isAssignableFrom(returnTypeClass)) {
+                return new CompletionStageInterceptedMethod(context);
+            } else if (Publishers.isConvertibleToPublisher(returnTypeClass)) {
+                return new PublisherInterceptedMethod(context);
+            } else {
+                return new SynchronousInterceptedMethod(context);
+            }
         }
     }
 

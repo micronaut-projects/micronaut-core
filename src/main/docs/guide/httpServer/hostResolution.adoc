@@ -12,3 +12,5 @@ The default implementation will look for host information in the following place
 The behavior of which headers to pull the relevant data can be changed with the following configuration:
 
 include::{includedir}configurationProperties/io.micronaut.http.server.HttpServerConfiguration$HostResolutionConfiguration.adoc[]
+
+The above configuration also allows for an allowed host list. Configuring this list will ensure any resolved host matches one of the supplied regular expression patterns. That is useful to prevent host cache poisoning attacks and is recommended that it be configured.

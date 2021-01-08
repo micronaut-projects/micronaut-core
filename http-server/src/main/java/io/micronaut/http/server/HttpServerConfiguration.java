@@ -22,6 +22,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.server.cors.CorsOriginConfiguration;
+import io.micronaut.http.server.util.locale.HttpLocaleResolutionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.executor.ThreadSelection;
 
@@ -31,10 +32,14 @@ import javax.inject.Inject;
 import java.io.File;
 import java.nio.charset.Charset;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * <p>A base {@link ConfigurationProperties} for servers.</p>
@@ -117,6 +122,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private boolean dateHeader = DEFAULT_DATEHEADER;
     private boolean logHandledExceptions = DEFAULT_LOG_HANDLED_EXCEPTIONS;
     private HostResolutionConfiguration hostResolution;
+    private HttpLocaleResolutionConfigurationProperties localeResolution;
     private String clientAddressHeader;
     private String contextPath;
     private boolean dualProtocol = DEFAULT_DUAL_PROTOCOL;
@@ -287,6 +293,14 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
+     * @return The host resolution configuration
+     */
+    @Nullable
+    public HttpLocaleResolutionConfiguration getLocaleResolution() {
+        return localeResolution;
+    }
+
+    /**
      * @return Which header stores the original client
      */
     public String getClientAddressHeader() {
@@ -431,6 +445,13 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public void setHostResolution(HostResolutionConfiguration hostResolution) {
         this.hostResolution = hostResolution;
+    }
+
+    /**
+     * @param localeResolution The locale resolution configuration
+     */
+    public void setLocaleResolution(HttpLocaleResolutionConfigurationProperties localeResolution) {
+        this.localeResolution = localeResolution;
     }
 
     /**
@@ -677,6 +698,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         private String protocolHeader;
         private String portHeader;
         private boolean portInHost = DEFAULT_PORT_IN_HOST;
+        private List<Pattern> allowedHosts = Collections.emptyList();
 
         /**
          * @return The host header name
@@ -733,6 +755,140 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          */
         public void setPortInHost(boolean portInHost) {
             this.portInHost = portInHost;
+        }
+
+        /**
+         * @return The list of hosts to validate the resolved host against.
+         */
+        public List<Pattern> getAllowedHosts() {
+            return allowedHosts;
+        }
+
+        /**
+         * @param allowedHosts The list of allowed host regex patterns. Any resolved
+         *                     host must match one of the configured hosts if the
+         *                     list is supplied. Each host is passed through
+         *                     {@link Pattern#compile(String)}.
+         */
+        public void setAllowedHosts(List<String> allowedHosts) {
+            this.allowedHosts = new ArrayList<>(allowedHosts.size());
+            for (String s: allowedHosts) {
+                this.allowedHosts.add(Pattern.compile(s));
+            }
+        }
+
+        /**
+         * @return True if any host headers have been configured
+         */
+        public boolean headersConfigured() {
+            return hostHeader != null || protocolHeader != null || portHeader != null;
+        }
+    }
+
+    /**
+     * Configuration for locale resolution used by {@link io.micronaut.http.server.util.locale.HttpLocaleResolver}.
+     */
+    @ConfigurationProperties("locale-resolution")
+    public static class HttpLocaleResolutionConfigurationProperties implements HttpLocaleResolutionConfiguration {
+
+        public static final String PREFIX = HttpServerConfiguration.PREFIX + ".locale-resolution";
+        private static final boolean DEFAULT_HEADER_RESOLUTION = true;
+
+        private Locale fixed;
+        private String sessionAttribute;
+        private String cookieName;
+        private boolean header = DEFAULT_HEADER_RESOLUTION;
+        private Locale defaultLocale = Locale.getDefault();
+
+        /**
+         * @return The fixed locale
+         */
+        @NonNull
+        public Optional<Locale> getFixed() {
+            return Optional.ofNullable(fixed);
+        }
+
+        /**
+         * Set the language tag for the locale. Supports BCP 47 language
+         * tags (e.g. "en-US") and ISO standard (e.g "en_US").
+         *
+         * @param fixed The fixed locale
+         */
+        public void setFixed(@Nullable Locale fixed) {
+            this.fixed = fixed;
+        }
+
+        /**
+         * @return The key in the session that stores the locale
+         */
+        @Override
+        @NonNull
+        public Optional<String> getSessionAttribute() {
+            return Optional.ofNullable(sessionAttribute);
+        }
+
+        /**
+         * Sets the key in the session to look for the locale.
+         *
+         * @param sessionAttribute The session attribute key
+         */
+        public void setSessionAttribute(@Nullable String sessionAttribute) {
+            this.sessionAttribute = sessionAttribute;
+        }
+
+        /**
+         * @return The locale to be used if one cannot be resolved.
+         */
+        @Override
+        @NonNull
+        public Locale getDefaultLocale() {
+            return defaultLocale;
+        }
+
+        /**
+         * Sets the locale that will be used if the locale cannot be
+         * resolved through any means. Defaults to the system default.
+         *
+         * @param defaultLocale The default locale.
+         */
+        public void setDefaultLocale(@NonNull Locale defaultLocale) {
+            this.defaultLocale = defaultLocale;
+        }
+
+        /**
+         * @return The name of the cookie that contains the locale.
+         */
+        @Override
+        @NonNull
+        public Optional<String> getCookieName() {
+            return Optional.ofNullable(cookieName);
+        }
+
+        /**
+         * Sets the name of the cookie that is used to store the locale.
+         *
+         * @param cookieName The name of the cookie used to store the locale
+         */
+        public void setCookieName(@Nullable String cookieName) {
+            this.cookieName = cookieName;
+        }
+
+        /**
+         * @return True if the accept header should be searched for the locale.
+         */
+        @Override
+        public boolean isHeader() {
+            return header;
+        }
+
+        /**
+         * Set to true if the locale should be resolved from the `Accept-Language` header.
+         * Default value ({@value #DEFAULT_HEADER_RESOLUTION}).
+         *
+         * @param header Header resolution
+         */
+        public void setHeader(boolean header) {
+            this.header = header;
         }
     }
 }

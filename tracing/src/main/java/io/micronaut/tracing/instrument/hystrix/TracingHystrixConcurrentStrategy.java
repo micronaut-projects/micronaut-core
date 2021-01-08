@@ -28,7 +28,6 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;

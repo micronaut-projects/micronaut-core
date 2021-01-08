@@ -147,6 +147,7 @@ import java.util.concurrent.ExecutionException;
  */
 @Internal
 @Sharable
+@SuppressWarnings("FileLength")
 class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
@@ -833,6 +834,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             s.cancel();
                                         });
                                         if (component == null) {
+                                            if (!executed) {
+                                                s.request(1);
+                                            }
                                             return;
                                         }
                                         part = new NettyPartData(dataReference, component);

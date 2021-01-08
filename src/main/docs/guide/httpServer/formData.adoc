@@ -2,7 +2,7 @@ In order to make data binding model customizations consistent between form data 
 
 The advantage of this approach is that the same Jackson annotations used for customizing JSON binding can be used for form submissions too.
 
-What this means in practise is that in order to bind regular form data the only change required to the previous JSON binding code is updating the api:http.MediaType[] consumed:
+What this means in practice is that in order to bind regular form data the only change required to the previous JSON binding code is updating the api:http.MediaType[] consumed:
 
 snippet::io.micronaut.docs.server.json.PersonController[tags="class,regular,endclass", indent=0, title="Binding Form Data to POJOs"]
 

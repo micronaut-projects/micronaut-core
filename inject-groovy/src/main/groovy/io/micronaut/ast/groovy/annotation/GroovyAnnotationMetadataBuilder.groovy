@@ -296,7 +296,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             if (!defaults.containsKey(annotationName)) {
 
                 List<MethodNode> methods = new ArrayList<>(classNode.getMethods())
-                Map<? extends AnnotatedNode, Expression> defaultValues = new HashMap<>()
+                Map<? extends AnnotatedNode, Expression> defaultValues = new LinkedHashMap<>()
 
                 // TODO: Remove this branch of the code after upgrading to Groovy 3.0
                 // https://issues.apache.org/jira/browse/GROOVY-8696

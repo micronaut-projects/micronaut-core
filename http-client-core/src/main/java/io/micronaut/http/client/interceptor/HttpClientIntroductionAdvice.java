@@ -234,12 +234,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         paramMap.put(name, definedValue);
                     });
                 }
-
-                binderRegistry.findArgumentBinder((Argument<Object>) argument)
-                        .orElse(defaultBinder)
-                        .bind(ConversionContext.of(argument), uriContext, definedValue, request);
+                if (definedValue != null) {
+                    final ClientArgumentRequestBinder<Object> binder = (ClientArgumentRequestBinder<Object>) binderRegistry
+                            .findArgumentBinder((Argument<Object>) argument)
+                            .orElse(defaultBinder);
+                    binder.bind(ConversionContext.of(argument), uriContext, definedValue, request);
+                }
             }
-
 
             Object body = request.getBody().orElse(null);
 
@@ -507,7 +508,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             );
         }
 
-        return definedValue;
+        if (definedValue instanceof Optional) {
+            return ((Optional) definedValue).orElse(null);
+        } else {
+            return definedValue;
+        }
     }
 
     private Object handleBlockingCall(Class returnType, Supplier<Object> supplier) {

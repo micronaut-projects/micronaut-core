@@ -17,6 +17,7 @@ package io.micronaut.core.util;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /**
@@ -146,6 +147,110 @@ public final class StringUtils {
      */
     public static boolean isDigits(String str) {
         return isNotEmpty(str) && DIGIT_PATTERN.matcher(str).matches();
+    }
+
+    /**
+     * Parse the given {@code String} value into a {@link Locale}, accepting
+     * the {@link Locale#toString} format as well as BCP 47 language tags.
+     * @param localeValue the locale value: following either {@code Locale's}
+     * {@code toString()} format ("en", "en_UK", etc), also accepting spaces as
+     * separators (as an alternative to underscores), or BCP 47 (e.g. "en-UK")
+     * as specified by {@link Locale#forLanguageTag} on Java 7+
+     * <p>Copied from the Spring Framework while retaining all license, copyright and author information.</p>
+     * @return a corresponding {@code Locale} instance, or {@code null} if none
+     * @throws IllegalArgumentException in case of an invalid locale specification
+     * @since 2.3.0
+     * @see Locale#forLanguageTag
+     */
+    @Nullable
+    public static Locale parseLocale(String localeValue) {
+        String[] tokens = tokenizeToStringArray(localeValue, "_ ", false, false);
+        if (tokens.length == 1) {
+            validateLocalePart(localeValue);
+            Locale resolved = Locale.forLanguageTag(localeValue);
+            if (resolved.getLanguage().length() > 0) {
+                return resolved;
+            }
+        }
+        String language = (tokens.length > 0 ? tokens[0] : "");
+        String country = (tokens.length > 1 ? tokens[1] : "");
+        validateLocalePart(language);
+        validateLocalePart(country);
+
+        String variant = "";
+        if (tokens.length > 2) {
+            // There is definitely a variant, and it is everything after the country
+            // code sans the separator between the country code and the variant.
+            int endIndexOfCountryCode = localeValue.indexOf(country, language.length()) + country.length();
+            // Strip off any leading '_' and whitespace, what's left is the variant.
+            variant = trimLeadingWhitespace(localeValue.substring(endIndexOfCountryCode));
+            if (variant.startsWith("_")) {
+                variant = trimLeadingCharacter(variant, '_');
+            }
+        }
+
+        if (variant.isEmpty() && country.startsWith("#")) {
+            variant = country;
+            country = "";
+        }
+
+        return (language.length() > 0 ? new Locale(language, country, variant) : null);
+    }
+
+    /**
+     * <p>Copied from the Spring Framework while retaining all license, copyright and author information.</p>
+     */
+    private static void validateLocalePart(String localePart) {
+        for (int i = 0; i < localePart.length(); i++) {
+            char ch = localePart.charAt(i);
+            if (ch != ' ' && ch != '_' && ch != '-' && ch != '#' && !Character.isLetterOrDigit(ch)) {
+                throw new IllegalArgumentException(
+                        "Locale part \"" + localePart + "\" contains invalid characters");
+            }
+        }
+    }
+
+    /**
+     * Returns a new string without any leading whitespace.
+     *
+     * @since 2.3.0
+     * @param str The string
+     * @return The string without leading whitespace
+     */
+    public static String trimLeadingWhitespace(String str) {
+        return trimLeading(str, Character::isWhitespace);
+    }
+
+    /**
+     * Returns a new string without any leading characters that match the supplied character.
+     *
+     * @since 2.3.0
+     * @param str The string
+     * @param c The character to remove
+     * @return The string without leading characters matching the supplied character.
+     */
+    public static String trimLeadingCharacter(String str, char c) {
+        return trimLeading(str, character -> character == c);
+    }
+
+    /**
+     * Returns a new string without any leading characters that match the supplied predicate.
+     *
+     * @since 2.3.0
+     * @param str The string
+     * @param predicate The predicate to test characters against
+     * @return The string without leading characters matching the supplied predicate.
+     */
+    public static String trimLeading(String str, Predicate<Character> predicate) {
+        if (isEmpty(str)) {
+            return str;
+        }
+        for (int i = 0; i < str.length(); i++) {
+            if (!predicate.test(str.charAt(i))) {
+                return str.substring(i);
+            }
+        }
+        return str;
     }
 
     /**

@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.bind;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanIntrospection;
@@ -48,15 +49,15 @@ import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 @Internal
 public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry {
 
-    private final Map<Class<? extends Annotation>, ClientArgumentRequestBinder> byAnnotation = new LinkedHashMap<>();
-    private final Map<Integer, ClientArgumentRequestBinder> byType = new LinkedHashMap<>();
+    private final Map<Class<? extends Annotation>, ClientArgumentRequestBinder<?>> byAnnotation = new LinkedHashMap<>();
+    private final Map<Integer, ClientArgumentRequestBinder<?>> byType = new LinkedHashMap<>();
 
     /**
      * @param conversionService The conversion service
      * @param binders           The request argument binders
      */
     protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
-                                              List<ClientArgumentRequestBinder> binders) {
+                                              List<ClientArgumentRequestBinder<?>> binders) {
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> {
             value.forEachValue(request::header);
         });
@@ -68,6 +69,9 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         });
         byType.put(Argument.of(BasicAuth.class).typeHashCode(), (ClientArgumentRequestBinder<BasicAuth>) (context, uriContext, value, request) -> {
             request.basicAuth(value.getUsername(), value.getPassword());
+        });
+        byType.put(Argument.of(Locale.class).typeHashCode(), (ClientArgumentRequestBinder<Locale>) (context, uriContext, value, request) -> {
+            request.header(HttpHeaders.ACCEPT_LANGUAGE, value.toLanguageTag());
         });
         byAnnotation.put(QueryValue.class, (context, uriContext, value, request) -> {
             String parameterName = context.getAnnotationMetadata().stringValue(QueryValue.class)
@@ -115,16 +119,16 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .orElse(NameUtils.hyphenate(context.getArgument().getName()));
             request.getAttributes().put(attributeName, value);
         });
-        byAnnotation.put(Body.class, (ClientArgumentRequestBinder<Object>) (context, uriContext, value, request) -> {
+        byAnnotation.put(Body.class, (context, uriContext, value, request) -> {
             request.body(value);
         });
-        byAnnotation.put(RequestBean.class, (ClientArgumentRequestBinder<Object>) (context, uriContext, value, request) -> {
+        byAnnotation.put(RequestBean.class, (context, uriContext, value, request) -> {
             BeanIntrospection<Object> introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
             for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
                 findArgumentBinder(beanProperty.asArgument()).ifPresent(binder -> {
                     Object propertyValue = beanProperty.get(value);
                     if (propertyValue != null) {
-                        binder.bind(context.with(beanProperty.asArgument()), uriContext, propertyValue, request);
+                        ((ClientArgumentRequestBinder<Object>) binder).bind(context.with(beanProperty.asArgument()), uriContext, propertyValue, request);
                     }
                 });
             }
@@ -136,27 +140,29 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         }
 
         if (CollectionUtils.isNotEmpty(binders)) {
-            for (ClientArgumentRequestBinder binder : binders) {
+            for (ClientArgumentRequestBinder<?> binder : binders) {
                 addBinder(binder);
             }
         }
     }
 
     @Override
-    public <T> Optional<ClientArgumentRequestBinder<T>> findArgumentBinder(Argument<T> argument) {
+    public <T> Optional<ClientArgumentRequestBinder<?>> findArgumentBinder(@NonNull Argument<T> argument) {
         Optional<Class<? extends Annotation>> opt = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class);
         if (opt.isPresent()) {
             Class<? extends Annotation> annotationType = opt.get();
-            ClientArgumentRequestBinder<T> binder = byAnnotation.get(annotationType);
+            ClientArgumentRequestBinder<?> binder = byAnnotation.get(annotationType);
             return Optional.ofNullable(binder);
         } else {
-            ClientArgumentRequestBinder<T> binder = byType.get(argument.typeHashCode());
-            if (binder != null) {
-                return Optional.of(binder);
-            } else {
-                binder = byType.get(Argument.of(argument.getType()).typeHashCode());
-                return Optional.ofNullable(binder);
+            Optional<ClientArgumentRequestBinder<?>> typeBinder = findTypeBinder(argument);
+            if (typeBinder.isPresent()) {
+                return typeBinder;
             }
+            if (argument.isOptional()) {
+                Argument<?> typeArgument = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                return findTypeBinder(typeArgument);
+            }
+            return Optional.empty();
         }
     }
 
@@ -181,5 +187,13 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                 }
             }
         }
+    }
+
+    private <T> Optional<ClientArgumentRequestBinder<?>> findTypeBinder(Argument<T> argument) {
+        ClientArgumentRequestBinder<?> binder = byType.get(argument.typeHashCode());
+        if (binder != null) {
+            return Optional.of(binder);
+        }
+        return Optional.ofNullable(byType.get(Argument.of(argument.getType()).typeHashCode()));
     }
 }

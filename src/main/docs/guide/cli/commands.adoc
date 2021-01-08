@@ -47,7 +47,7 @@ testFramework: spock
 sourceLanguage: java
 ----
 
-With the above settings, the `create-bean` command will (by default) generate a Java class with an associated Spock test, under the `example` package. Commands accept arguments and these defaults can be overriden on a per-command basis.
+With the above settings, the `create-bean` command will (by default) generate a Java class with an associated Spock test, under the `example` package. Commands accept arguments and these defaults can be overridden on a per-command basis.
 
 == Base Commands
 

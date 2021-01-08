@@ -39,6 +39,6 @@ public interface HttpClientBinderRegistry {
      * @param <T>      The argument type
      * @return An {@link Optional} of {@link ClientArgumentRequestBinder}
      */
-    <T> Optional<ClientArgumentRequestBinder<T>> findArgumentBinder(@NonNull Argument<T> argument);
+    <T> Optional<ClientArgumentRequestBinder<?>> findArgumentBinder(@NonNull Argument<T> argument);
 
 }
