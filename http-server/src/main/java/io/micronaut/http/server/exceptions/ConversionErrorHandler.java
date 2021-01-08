@@ -36,7 +36,6 @@ import javax.inject.Singleton;
 @Produces
 public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorException, HttpResponse> {
 
-
     @Override
     public HttpResponse handle(HttpRequest request, ConversionErrorException exception) {
         JsonError error = new JsonError(exception.getMessage());
