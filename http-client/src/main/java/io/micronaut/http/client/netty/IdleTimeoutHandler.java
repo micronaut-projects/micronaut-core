@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -24,9 +25,13 @@ import io.netty.handler.timeout.IdleStateEvent;
 
 /**
  * This class is responsible for detecting idle timeout events, upon which the channel in the pool is closed.
+ *
+ * @author Dan Maas
+ * @since 2.2.4
  */
 @ChannelHandler.Sharable
-public final class IdleTimeoutHandler extends ChannelDuplexHandler {
+@Internal
+final class IdleTimeoutHandler extends ChannelDuplexHandler {
 
     static final ChannelInboundHandler INSTANCE = new IdleTimeoutHandler();
 

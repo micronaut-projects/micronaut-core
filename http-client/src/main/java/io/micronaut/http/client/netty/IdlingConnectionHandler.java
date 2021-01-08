@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandler;
@@ -23,9 +24,13 @@ import io.netty.util.ReferenceCountUtil;
 
 /**
  * This handler prevents reading a channel when it is not being used by the connection pool.
+ *
+ *  @author Dan Maas
+ *  @since 2.2.4
  */
 @ChannelHandler.Sharable
-public final class IdlingConnectionHandler extends ChannelInboundHandlerAdapter {
+@Internal
+final class IdlingConnectionHandler extends ChannelInboundHandlerAdapter {
 
     static final ChannelInboundHandler INSTANCE = new IdlingConnectionHandler();
 
