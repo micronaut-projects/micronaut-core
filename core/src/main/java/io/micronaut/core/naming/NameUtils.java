@@ -33,8 +33,8 @@ import java.util.stream.Collectors;
  */
 public class NameUtils {
 
-    private static final int PREFIX_LENTGH = 3;
-    private static final int IS_LENTGH = 2;
+    private static final int PREFIX_LENGTH = 3;
+    private static final int IS_LENGTH = 2;
 
     private static final Pattern DOT_UPPER = Pattern.compile("\\.[A-Z\\$]");
     private static final Pattern SERVICE_ID_REGEX = Pattern.compile("[\\p{javaLowerCase}\\d-]+");
@@ -203,8 +203,8 @@ public class NameUtils {
      */
     public static boolean isSetterName(String methodName) {
         int len = methodName.length();
-        if (len > PREFIX_LENTGH && methodName.startsWith(PREFIX_SET)) {
-            return Character.isUpperCase(methodName.charAt(PREFIX_LENTGH));
+        if (len > PREFIX_LENGTH && methodName.startsWith(PREFIX_SET)) {
+            return Character.isUpperCase(methodName.charAt(PREFIX_LENGTH));
         }
         return false;
     }
@@ -217,7 +217,7 @@ public class NameUtils {
      */
     public static String getPropertyNameForSetter(String setterName) {
         if (isSetterName(setterName)) {
-            return decapitalize(setterName.substring(PREFIX_LENTGH));
+            return decapitalize(setterName.substring(PREFIX_LENGTH));
         }
         return setterName;
     }
@@ -242,9 +242,9 @@ public class NameUtils {
     public static boolean isGetterName(String methodName) {
         int prefixLength = 0;
         if (methodName.startsWith(PREFIX_GET)) {
-            prefixLength = PREFIX_LENTGH;
+            prefixLength = PREFIX_LENGTH;
         } else if (methodName.startsWith("is")) {
-            prefixLength = IS_LENTGH;
+            prefixLength = IS_LENGTH;
         } else {
             return false;
         }
@@ -265,10 +265,10 @@ public class NameUtils {
         if (isGetterName(getterName)) {
             int prefixLength = 0;
             if (getterName.startsWith(PREFIX_GET)) {
-                prefixLength = PREFIX_LENTGH;
+                prefixLength = PREFIX_LENGTH;
             }
             if (getterName.startsWith("is")) {
-                prefixLength = IS_LENTGH;
+                prefixLength = IS_LENGTH;
             }
             return decapitalize(getterName.substring(prefixLength));
         }
