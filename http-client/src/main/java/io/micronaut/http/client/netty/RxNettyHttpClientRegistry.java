@@ -136,7 +136,8 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
     }
 
     @Override
-    public DefaultHttpClient getClient(AnnotationMetadata metadata) {
+    @NonNull
+    public DefaultHttpClient getClient(@NonNull AnnotationMetadata metadata) {
         final ClientKey key = getClientKey(metadata);
         return getClient(key, beanContext, metadata);
     }
@@ -190,7 +191,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
         return clients.computeIfAbsent(key, clientKey -> {
             DefaultHttpClient clientBean = null;
             final String clientId = clientKey.clientId;
-            final Class configurationClass = clientKey.configurationClass;
+            final Class<?> configurationClass = clientKey.configurationClass;
 
             if (clientId != null) {
                 clientBean = (DefaultHttpClient) this.beanContext
@@ -201,9 +202,9 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
                 throw new IllegalStateException("Referenced HTTP client configuration class must be an instance of HttpClientConfiguration for injection point: " + configurationClass);
             }
 
-            final String filterAnnotation = clientKey.filterAnnotation;
+            final List<String> filterAnnotations = clientKey.filterAnnotations;
             final String path = clientKey.path;
-            if (clientBean != null && path == null && configurationClass == null && filterAnnotation == null) {
+            if (clientBean != null && path == null && configurationClass == null && filterAnnotations.isEmpty()) {
                 return clientBean;
             }
 
@@ -404,8 +405,8 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
                 metadata.enumValue(Client.class, "httpVersion", HttpVersion.class).orElse(null);
         String clientId = metadata.stringValue(Client.class).orElse(null);
         String path = metadata.stringValue(Client.class, "path").orElse(null);
-        String filterAnnotation = metadata
-                .getAnnotationNameByStereotype(FilterMatcher.class).orElse(null);
+        List<String> filterAnnotation = metadata
+                .getAnnotationNamesByStereotype(FilterMatcher.class);
         final Class configurationClass =
                 metadata.classValue(Client.class, "configuration").orElse(null);
         AnnotationValue<JacksonFeatures> jacksonFeaturesAnn = metadata.findAnnotation(JacksonFeatures.class).orElse(null);
@@ -431,7 +432,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
     private static final class ClientKey {
         final HttpVersion httpVersion;
         final String clientId;
-        final String filterAnnotation;
+        final List<String> filterAnnotations;
         final String path;
         final Class<?> configurationClass;
         final AnnotationValue<JacksonFeatures> jacksonFeaturesAnn;
@@ -439,13 +440,13 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
         ClientKey(
                 HttpVersion httpVersion,
                 String clientId,
-                String filterAnnotation,
+                List<String> filterAnnotations,
                 String path,
                 Class<?> configurationClass,
                 AnnotationValue<JacksonFeatures> jacksonFeaturesAnn) {
             this.httpVersion = httpVersion;
             this.clientId = clientId;
-            this.filterAnnotation = filterAnnotation;
+            this.filterAnnotations = filterAnnotations;
             this.path = path;
             this.configurationClass = configurationClass;
             this.jacksonFeaturesAnn = jacksonFeaturesAnn;
@@ -462,7 +463,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
             ClientKey clientKey = (ClientKey) o;
             return httpVersion == clientKey.httpVersion &&
                     Objects.equals(clientId, clientKey.clientId) &&
-                    Objects.equals(filterAnnotation, clientKey.filterAnnotation) &&
+                    Objects.equals(filterAnnotations, clientKey.filterAnnotations) &&
                     Objects.equals(path, clientKey.path) &&
                     Objects.equals(configurationClass, clientKey.configurationClass) &&
                     Objects.equals(jacksonFeaturesAnn, clientKey.jacksonFeaturesAnn);
@@ -470,7 +471,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
 
         @Override
         public int hashCode() {
-            return Objects.hash(httpVersion, clientId, filterAnnotation, path, configurationClass, jacksonFeaturesAnn);
+            return Objects.hash(httpVersion, clientId, filterAnnotations, path, configurationClass, jacksonFeaturesAnn);
         }
     }
 }
