@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
+import spock.lang.Retry
 
 import java.security.MessageDigest
 
@@ -29,6 +30,7 @@ import java.security.MessageDigest
  * Any changes or additions to this test should also be done
  * in {@link StreamUploadSpec} and {@link DiskUploadSpec}
  */
+@Retry
 class MixedUploadSpec extends AbstractMicronautSpec {
 
     void "test upload FileUpload object via transferTo"() {
