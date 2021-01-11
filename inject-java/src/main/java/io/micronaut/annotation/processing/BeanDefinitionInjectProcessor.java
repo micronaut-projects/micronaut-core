@@ -1178,7 +1178,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             true,
                             false,
                             sourceMethodElement,
-                            methodAnnotationMetadata,
+                            new AnnotationMetadataHierarchy(concreteClassMetadata, methodAnnotationMetadata),
                             new ClassElement[]{typeToImplementElement},
                             metadataBuilder
                     );
@@ -1266,7 +1266,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, acv);
                                     builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, sourceMethodElement.getName());
                                     builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes);
-                                    String qualifier = concreteClassMetadata.getValue(Named.class, String.class).orElse(null);
+                                    String qualifier = concreteClassMetadata.stringValue(Named.class).orElse(null);
                                     if (StringUtils.isNotEmpty(qualifier)) {
                                         builder.member(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier);
                                     }
