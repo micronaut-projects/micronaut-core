@@ -15,6 +15,8 @@
  */
 package io.micronaut.runtime;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultApplicationContextBuilder;
@@ -26,10 +28,10 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URL;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Function;
 
@@ -164,6 +166,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     @Override
     public @NonNull Micronaut exclude(@Nullable String... configurations) {
         return (Micronaut) super.exclude(configurations);
+    }
+
+    @Override
+    public @NonNull Micronaut banner(boolean isEnabled) {
+        return (Micronaut) super.banner(isEnabled);
     }
 
     /**
