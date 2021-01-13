@@ -118,8 +118,9 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
-import io.reactivex.FlowableEmitter;
 import io.reactivex.Scheduler;
+import io.reactivex.Single;
+import io.reactivex.SingleEmitter;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Cancellable;
 import io.reactivex.functions.Function;
@@ -675,22 +676,21 @@ public class DefaultHttpClient implements
 
     @Override
     public <I> Flowable<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
-        return Flowable.fromPublisher(resolveRequestURI(request))
-                .flatMap(buildDataStreamPublisher(request));
-
+        return Single.fromPublisher(resolveRequestURI(request))
+                .flatMapPublisher(buildDataStreamPublisher(request));
     }
 
     @Override
     public <I> Flowable<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
-        return Flowable.fromPublisher(resolveRequestURI(request))
-                .flatMap(buildExchangeStreamPublisher(request));
+        return Single.fromPublisher(resolveRequestURI(request))
+                .flatMapPublisher(buildExchangeStreamPublisher(request));
     }
 
     @Override
     public <I, O> Flowable<O> jsonStream(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> type) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
-        return Flowable.fromPublisher(resolveRequestURI(request))
-                .flatMap(buildJsonStreamPublisher(parentRequest, request, type));
+        return Single.fromPublisher(resolveRequestURI(request))
+                .flatMapPublisher(buildJsonStreamPublisher(parentRequest, request, type));
     }
 
     @SuppressWarnings("unchecked")
@@ -708,15 +708,15 @@ public class DefaultHttpClient implements
     public <I, O, E> Flowable<io.micronaut.http.HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
-        return Flowable.fromPublisher(uriPublisher)
-                .switchMap(buildExchangePublisher(parentRequest, request, bodyType, errorType));
+        return Single.fromPublisher(uriPublisher)
+                .flatMapPublisher(buildExchangePublisher(parentRequest, request, bodyType, errorType));
     }
 
     @Override
     public <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, io.micronaut.http.MutableHttpRequest<?> request) {
         Publisher<URI> uriPublisher = resolveRequestURI(request);
-        return Flowable.fromPublisher(uriPublisher)
-                .switchMap(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, null));
+        return Single.fromPublisher(uriPublisher)
+                .flatMapPublisher(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, null));
     }
 
     @Override
@@ -727,8 +727,8 @@ public class DefaultHttpClient implements
         MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
 
-        return Flowable.fromPublisher(uriPublisher)
-                .switchMap(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, webSocketBean));
+        return Single.fromPublisher(uriPublisher)
+                .flatMapPublisher(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, webSocketBean));
 
     }
 
@@ -834,8 +834,8 @@ public class DefaultHttpClient implements
     protected <I> Function<URI, Flowable<io.micronaut.http.HttpResponse<ByteBuffer<?>>>> buildExchangeStreamPublisher(io.micronaut.http.HttpRequest<I> request) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return requestURI -> {
-            Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(parentRequest, request, requestURI);
-            return streamResponsePublisher.switchMap(response -> {
+            Single<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(parentRequest, request, requestURI);
+            return streamResponsePublisher.flatMapPublisher(response -> {
                 StreamedHttpResponse streamedHttpResponse = NettyHttpResponseBuilder.toStreamResponse(response);
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(streamedHttpResponse);
                 return httpContentFlowable
@@ -885,9 +885,9 @@ public class DefaultHttpClient implements
             io.micronaut.http.HttpRequest<I> request,
             io.micronaut.core.type.Argument<O> type) {
         return requestURI -> {
-            Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher =
+            Single<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher =
                     buildStreamExchange(parentRequest, request, requestURI);
-            return streamResponsePublisher.switchMap(response -> {
+            return streamResponsePublisher.flatMapPublisher(response -> {
                 if (!(response instanceof NettyStreamedHttpResponse)) {
                     throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
                 }
@@ -942,12 +942,12 @@ public class DefaultHttpClient implements
     protected <I> Function<URI, Flowable<ByteBuffer<?>>> buildDataStreamPublisher(io.micronaut.http.HttpRequest<I> request) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return requestURI -> {
-            Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(parentRequest, request, requestURI);
+            Single<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(parentRequest, request, requestURI);
             Function<HttpContent, ByteBuffer<?>> contentMapper = message -> {
                 ByteBuf byteBuf = message.content();
                 return byteBufferFactory.wrap(byteBuf);
             };
-            return streamResponsePublisher.switchMap(response -> {
+            return streamResponsePublisher.flatMapPublisher(response -> {
                 if (!(response instanceof NettyStreamedHttpResponse)) {
                     throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
                 }
@@ -982,14 +982,14 @@ public class DefaultHttpClient implements
      * @return A {@link Flowable}
      */
     @SuppressWarnings("MagicNumber")
-    protected <I> Flowable<io.micronaut.http.HttpResponse<Object>> buildStreamExchange(
+    protected <I> Single<io.micronaut.http.HttpResponse<Object>> buildStreamExchange(
             @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI) {
         SslContext sslContext = buildSslContext(requestURI);
 
         AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
-        Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = Flowable.create(emitter -> {
+        Single<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = Single.create(emitter -> {
 
             ChannelFuture channelFuture;
             try {
@@ -1042,11 +1042,11 @@ public class DefaultHttpClient implements
             Disposable disposable = buildDisposableChannel(channelFuture);
             emitter.setDisposable(disposable);
             emitter.setCancellable(disposable::dispose);
-        }, BackpressureStrategy.BUFFER);
+        });
 
         // apply filters
-        streamResponsePublisher = Flowable.fromPublisher(
-                applyFilterToResponsePublisher(parentRequest, request, requestURI, requestWrapper, streamResponsePublisher)
+        streamResponsePublisher = Single.fromPublisher(
+                applyFilterToResponsePublisher(parentRequest, request, requestURI, requestWrapper, streamResponsePublisher.toFlowable())
         );
 
         return streamResponsePublisher.subscribeOn(scheduler);
@@ -1069,7 +1069,7 @@ public class DefaultHttpClient implements
             Argument<E> errorType) {
         AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
         return requestURI -> {
-            Flowable<io.micronaut.http.HttpResponse<O>> responsePublisher = Flowable.create(emitter -> {
+            Single<io.micronaut.http.HttpResponse<O>> responsePublisher = Single.create(emitter -> {
 
                 boolean multipart = MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null));
                 if (poolMap != null && !multipart) {
@@ -1127,14 +1127,14 @@ public class DefaultHttpClient implements
                     });
                 }
 
-            }, BackpressureStrategy.ERROR);
+            });
 
             Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(
                     parentRequest,
                     request,
                     requestURI,
                     requestWrapper,
-                    responsePublisher
+                    responsePublisher.toFlowable()
             );
             Flowable<io.micronaut.http.HttpResponse<O>> finalFlowable;
             if (finalPublisher instanceof Flowable) {
@@ -1777,7 +1777,7 @@ public class DefaultHttpClient implements
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             Argument<O> bodyType,
             Argument<E> errorType,
-            FlowableEmitter<io.micronaut.http.HttpResponse<O>> emitter,
+            SingleEmitter<io.micronaut.http.HttpResponse<O>> emitter,
             Channel channel,
             ChannelPool channelPool) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         io.micronaut.http.HttpRequest<I> finalRequest = requestWrapper.get();
@@ -1830,7 +1830,7 @@ public class DefaultHttpClient implements
             io.micronaut.http.HttpRequest<?> parentRequest,
             URI requestURI,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
-            FlowableEmitter emitter,
+            SingleEmitter<HttpResponse<Object>> emitter,
             Channel channel,
             boolean failOnError) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         NettyRequestWriter requestWriter = prepareRequest(
@@ -1877,8 +1877,7 @@ public class DefaultHttpClient implements
                         log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), nettyRequest.method().name(), nettyRequest.uri());
                         traceHeaders(headers);
                     }
-                    emitter.onNext(response);
-                    emitter.onComplete();
+                    emitter.onSuccess(response);
                 }
             }
         });
@@ -1920,40 +1919,14 @@ public class DefaultHttpClient implements
 
                     if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
                         String location = headers.get(HttpHeaderNames.LOCATION);
-                        Flowable<io.micronaut.http.HttpResponse<Object>> redirectedExchange;
+                        Single<io.micronaut.http.HttpResponse<Object>> redirectedExchange;
                         try {
                             MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.GET(location);
                             setRedirectHeaders(nettyRequest, redirectRequest);
-                            redirectedExchange = Flowable.fromPublisher(resolveRedirectURI(parentRequest, redirectRequest))
+                            redirectedExchange = Single.fromPublisher(resolveRedirectURI(parentRequest, redirectRequest))
                                     .flatMap(uri -> buildStreamExchange(parentRequest, redirectRequest, uri));
 
-                            //noinspection SubscriberImplementation
-                            redirectedExchange.subscribe(new Subscriber<io.micronaut.http.HttpResponse<Object>>() {
-                                Subscription sub;
-
-                                @Override
-                                public void onSubscribe(Subscription s) {
-                                    s.request(1);
-                                    this.sub = s;
-                                }
-
-                                @Override
-                                public void onNext(io.micronaut.http.HttpResponse<Object> objectHttpResponse) {
-                                    emitter.onNext(objectHttpResponse);
-                                    sub.cancel();
-                                }
-
-                                @Override
-                                public void onError(Throwable t) {
-                                    emitter.onError(t);
-                                    sub.cancel();
-                                }
-
-                                @Override
-                                public void onComplete() {
-                                    emitter.onComplete();
-                                }
-                            });
+                            redirectedExchange.subscribe(emitter::onSuccess, emitter::onError);
                         } catch (Exception e) {
                             emitter.onError(e);
                         }
@@ -1962,8 +1935,7 @@ public class DefaultHttpClient implements
                         if (errorStatus && failOnError) {
                             emitter.onError(new HttpClientResponseException(response.getStatus().getReason(), response));
                         } else {
-                            emitter.onNext(response);
-                            emitter.onComplete();
+                            emitter.onSuccess(response);
                         }
 
                     }
@@ -2049,7 +2021,7 @@ public class DefaultHttpClient implements
             io.micronaut.http.HttpRequest<?> request,
             Channel channel,
             ChannelPool channelPool,
-            FlowableEmitter<io.micronaut.http.HttpResponse<O>> emitter,
+            SingleEmitter<io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
         final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandler<FullHttpResponse>(false) {
@@ -2092,15 +2064,14 @@ public class DefaultHttpClient implements
                             String location = headers.get(HttpHeaderNames.LOCATION);
                             final MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.GET(location);
                             setRedirectHeaders(request, redirectRequest);
-                            Flowable<io.micronaut.http.HttpResponse<O>> redirectExchange = Flowable.fromPublisher(resolveRedirectURI(request, redirectRequest))
-                                    .switchMap(buildExchangePublisher(request, redirectRequest, bodyType, errorType));
+                            Flowable<io.micronaut.http.HttpResponse<O>> redirectExchange = Single.fromPublisher(resolveRedirectURI(request, redirectRequest))
+                                    .flatMapPublisher(buildExchangePublisher(request, redirectRequest, bodyType, errorType));
                             redirectExchange.first(io.micronaut.http.HttpResponse.notFound())
                                     .subscribe((oHttpResponse, throwable) -> {
                                         if (throwable != null) {
                                             emitter.tryOnError(throwable);
                                         } else {
-                                            emitter.onNext(oHttpResponse);
-                                            emitter.onComplete();
+                                            emitter.onSuccess(oHttpResponse);
                                         }
                                     });
                             return;
@@ -2117,9 +2088,8 @@ public class DefaultHttpClient implements
 
                         if (complete.compareAndSet(false, true)) {
                             if (convertBodyWithBodyType) {
-                                emitter.onNext(response);
+                                emitter.onSuccess(response);
                                 response.onComplete();
-                                emitter.onComplete();
                             } else { // error flow
                                 try {
                                     HttpClientResponseException clientError;
@@ -2492,7 +2462,7 @@ public class DefaultHttpClient implements
     private <I> NettyRequestWriter prepareRequest(
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
-            FlowableEmitter<HttpResponse<Object>> emitter,
+            SingleEmitter<HttpResponse<Object>> emitter,
             boolean closeChannelAfterWrite) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         MediaType requestContentType = request
                 .getContentType()
@@ -2594,10 +2564,10 @@ public class DefaultHttpClient implements
 
     @Override
     public Flowable<MutableHttpResponse<?>> proxy(io.micronaut.http.HttpRequest<?> request) {
-        return Flowable.fromPublisher(resolveRequestURI(request))
-                .flatMap(requestURI -> {
+        return Single.fromPublisher(resolveRequestURI(request))
+                .flatMapPublisher(requestURI -> {
                     AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
-                    Flowable<MutableHttpResponse<Object>> proxyResponsePublisher = Flowable.create(emitter -> {
+                    Single<HttpResponse<Object>> proxyResponsePublisher = Single.create(emitter -> {
                         SslContext sslContext = buildSslContext(requestURI);
                         ChannelFuture channelFuture;
                         try {
@@ -2650,19 +2620,18 @@ public class DefaultHttpClient implements
                         Disposable disposable = buildDisposableChannel(channelFuture);
                         emitter.setDisposable(disposable);
                         emitter.setCancellable(disposable::dispose);
-                    }, BackpressureStrategy.BUFFER);
+                    });
                     // apply filters
                     //noinspection unchecked
-                    proxyResponsePublisher = Flowable.fromPublisher(
+                    return Flowable.fromPublisher(
                             applyFilterToResponsePublisher(
                                     request,
                                     requestWrapper.get(),
                                     requestURI,
                                     requestWrapper,
-                                    (Publisher) proxyResponsePublisher
+                                    proxyResponsePublisher.toFlowable()
                             )
                     );
-                    return proxyResponsePublisher;
                 });
     }
 
@@ -3068,7 +3037,7 @@ public class DefaultHttpClient implements
          * @param channelPool The channel pool
          * @param emitter     The emitter
          */
-        protected void writeAndClose(Channel channel, ChannelPool channelPool, FlowableEmitter<?> emitter) {
+        protected void writeAndClose(Channel channel, ChannelPool channelPool, SingleEmitter<?> emitter) {
             final ChannelPipeline pipeline = channel.pipeline();
             if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
                 final boolean isSecure = sslContext != null &&
@@ -3109,7 +3078,7 @@ public class DefaultHttpClient implements
             processRequestWrite(channel, channelPool, emitter, pipeline);
         }
 
-        private void processRequestWrite(Channel channel, ChannelPool channelPool, FlowableEmitter<?> emitter, ChannelPipeline pipeline) {
+        private void processRequestWrite(Channel channel, ChannelPool channelPool, SingleEmitter<?> emitter, ChannelPipeline pipeline) {
             ChannelFuture channelFuture;
             if (encoder != null && encoder.isChunked()) {
                 channel.attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).set(true);
@@ -3129,15 +3098,13 @@ public class DefaultHttpClient implements
 
         private void closeChannelIfNecessary(
                 Channel channel,
-                FlowableEmitter<?> emitter,
+                SingleEmitter<?> emitter,
                 ChannelFuture channelFuture,
                 boolean closeChannelAfterWrite) {
             channelFuture.addListener(f -> {
                 try {
                     if (!f.isSuccess()) {
-                        if (!emitter.isCancelled()) {
-                            emitter.onError(f.cause());
-                        }
+                        emitter.tryOnError(f.cause());
                     } else {
                         // reset to read mode
                         channel.read();
