@@ -42,7 +42,7 @@ import java.util.concurrent.ThreadFactory;
         NioServerSocketChannel.class,
         NioSocketChannel.class
 }, typeNames = {"sun.security.ssl.SSLContextImpl$TLSContext"},
-   accessType = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS}
+   accessType = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS, TypeHint.AccessType.ALL_PUBLIC_CONSTRUCTORS}
 )
 @BootstrapContextCompatible
 public class NettyThreadFactory {
