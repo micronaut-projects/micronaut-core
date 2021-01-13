@@ -1,0 +1,3 @@
+io.micronaut.context.JakartaProviderFactory
+io.micronaut.context.JavaxProviderFactory
+io.micronaut.context.MicronautProviderFactory

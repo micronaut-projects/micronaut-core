@@ -676,21 +676,21 @@ public class DefaultHttpClient implements
     @Override
     public <I> Flowable<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
         return Flowable.fromPublisher(resolveRequestURI(request))
-                .flatMap(buildDataStreamPublisher(request));
+                .switchMap(buildDataStreamPublisher(request));
 
     }
 
     @Override
     public <I> Flowable<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
         return Flowable.fromPublisher(resolveRequestURI(request))
-                .flatMap(buildExchangeStreamPublisher(request));
+                .switchMap(buildExchangeStreamPublisher(request));
     }
 
     @Override
     public <I, O> Flowable<O> jsonStream(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> type) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return Flowable.fromPublisher(resolveRequestURI(request))
-                .flatMap(buildJsonStreamPublisher(parentRequest, request, type));
+                .switchMap(buildJsonStreamPublisher(parentRequest, request, type));
     }
 
     @SuppressWarnings("unchecked")

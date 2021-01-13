@@ -13,27 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.provider;
+package org.atinject.javaxtck.auto.accessories;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-import org.atinject.javaxtck.auto.Drivers;
 import org.atinject.javaxtck.auto.Seat;
-import org.atinject.javaxtck.auto.Tire;
 
-import javax.inject.Named;
+import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 
 @Singleton
-public class Seats {
-    Provider<Seat> driversSeatProvider;
-    Provider<Tire> spareTireProvider;
+public class Cupholder {
 
-    Seats(@Drivers Provider<Seat> driversSeatProvider,
-          @Named("spare") Provider<Tire> spareTireProvider,
-          @Nullable Provider<NotABean> notABeanProvider) {
-        this.driversSeatProvider = driversSeatProvider;
-        this.spareTireProvider = spareTireProvider;
-        assert notABeanProvider == null;
+    public final Provider<Seat> seatProvider;
+
+    @Inject
+    public Cupholder(Provider<Seat> seatProvider) {
+        this.seatProvider = seatProvider;
     }
 }

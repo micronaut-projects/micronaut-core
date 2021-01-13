@@ -21,6 +21,7 @@ import io.micronaut.context.AbstractParametrizedBeanDefinition;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanContext;
+import io.micronaut.context.ProviderUtils;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
@@ -302,9 +303,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private static String getProvidedClassName(ClassElement classElement) {
-        if (classElement.isAssignable(Provider.class)) {
-            Iterator<ClassElement> i = classElement.getTypeArguments(Provider.class).values().iterator();
-            return i.hasNext() ? i.next().getName() : classElement.getName();
+        for (String provider: ProviderUtils.getProviders()) {
+            if (classElement.isAssignable(provider)) {
+                Iterator<ClassElement> i = classElement.getTypeArguments(provider).values().iterator();
+                return i.hasNext() ? i.next().getName() : classElement.getName();
+            }
         }
         return classElement.getName();
     }

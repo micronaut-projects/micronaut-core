@@ -24,6 +24,8 @@ import io.micronaut.aop.Adapter;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.aop.writer.AopProxyWriter;
+import io.micronaut.context.ProviderFactory;
+import io.micronaut.context.ProviderUtils;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -88,6 +90,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             "javax.inject.Inject",
             "javax.inject.Qualifier",
             "javax.inject.Singleton",
+            "jakarta.inject.Inject",
+            "jakarta.inject.Qualifier",
+            "jakarta.inject.Singleton",
             "io.micronaut.context.annotation.Bean",
             "io.micronaut.context.annotation.Replaces",
             "io.micronaut.context.annotation.Value",
@@ -261,7 +266,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     if (element instanceof TypeElement) {
                         TypeElement te = (TypeElement) element;
                         String name = te.getQualifiedName().toString();
-                        if (Provider.class.getName().equals(name)) {
+                        if (ProviderUtils.isProvider(name)) {
                             List<? extends TypeMirror> typeArguments = declaredType.getTypeArguments();
                             if (!typeArguments.isEmpty()) {
                                 beanTypeName = genericUtils.resolveTypeReference(typeArguments.get(0)).toString();

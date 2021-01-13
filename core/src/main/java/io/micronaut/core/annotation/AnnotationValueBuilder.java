@@ -424,4 +424,17 @@ public class AnnotationValueBuilder<T extends Annotation> {
         }
         return this;
     }
+
+    /**
+     * Sets the members from the provided map
+     *
+     * @param members The map of members
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> members(Map<CharSequence, Object> members) {
+        if (members != null) {
+            values.putAll(members);
+        }
+        return this;
+    }
 }
