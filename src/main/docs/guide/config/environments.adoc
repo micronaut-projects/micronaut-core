@@ -65,7 +65,7 @@ public static void main(String[] args) {
 
 == Micronaut Banner
 
-Since Micronaut 2.3 a banner it is shown when the application starts up. It is enabled by default and it will also show the Micronaut version.
+Since Micronaut 2.3 a banner is shown when the application starts up. It is enabled by default and it will also show the Micronaut version.
 
 [source,shell,subs="attributes"]
 ----
