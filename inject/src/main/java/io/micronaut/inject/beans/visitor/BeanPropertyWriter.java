@@ -207,23 +207,30 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                     // In this case we have to do the copy constructor approach
                     Map<String, BeanPropertyWriter> propertyDefinitions = beanIntrospectionWriter.getPropertyDefinitions();
                     MethodElement constructor = beanIntrospectionWriter.getConstructor();
-                    ParameterElement[] parameters = constructor.getParameters();
-                    Object[] constructorArguments = new Object[parameters.length];
-                    for (int i = 0; i < parameters.length; i++) {
-                        ParameterElement parameter = parameters[i];
-                        BeanPropertyWriter propertyWriter = propertyDefinitions.get(parameter.getName());
-                        if (propertyWriter == this) {
-                            constructorArguments[i] = this;
-                        } else if (propertyWriter != null) {
-                            MethodElement readMethod = propertyWriter.readMethod;
-                            if (readMethod != null) {
-                                if (readMethod.getGenericReturnType().isAssignable(parameter.getGenericType())) {
-                                    constructorArguments[i] = readMethod;
+                    Object[] constructorArguments = null;
+                    if (constructor != null) {
+                        ParameterElement[] parameters = constructor.getParameters();
+                        constructorArguments = new Object[parameters.length];
+                        for (int i = 0; i < parameters.length; i++) {
+                            ParameterElement parameter = parameters[i];
+                            BeanPropertyWriter propertyWriter = propertyDefinitions.get(parameter.getName());
+                            if (propertyWriter == this) {
+                                constructorArguments[i] = this;
+                            } else if (propertyWriter != null) {
+                                MethodElement readMethod = propertyWriter.readMethod;
+                                if (readMethod != null) {
+                                    if (readMethod.getGenericReturnType().isAssignable(parameter.getGenericType())) {
+                                        constructorArguments[i] = readMethod;
+                                    } else {
+                                        isMutable = false;
+                                        nonMutableMessage = "Cannot create copy of type [" + beanType.getClassName() + "]. Property of type [" + readMethod.getGenericReturnType().getName() + "] is not assignable to constructor argument [" + parameter.getName() + "]";
+                                    }
+
                                 } else {
                                     isMutable = false;
-                                    nonMutableMessage = "Cannot create copy of type [" + beanType.getClassName() + "]. Property of type [" + readMethod.getGenericReturnType().getName() + "] is not assignable to constructor argument [" + parameter.getName() + "]";
+                                    nonMutableMessage = "Cannot create copy of type [" + beanType.getClassName() + "]. Constructor contains argument [" + parameter.getName() + "] that is not a readable property";
+                                    break;
                                 }
-
                             } else {
                                 isMutable = false;
                                 nonMutableMessage = "Cannot create copy of type [" + beanType.getClassName() + "]. Constructor contains argument [" + parameter.getName() + "] that is not a readable property";
@@ -240,24 +247,31 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                         // }
                         withValueMethod.loadThis();
                         withValueMethod.invokeVirtual(type, METHOD_GET_BEAN);
-                        int len = constructorArguments.length;
-                        pushNewArray(withValueMethod, Object.class, len);
-                        Set<MethodElement> readMethods = new HashSet<>(len);
-                        for (int i = 0; i < len; i++) {
-                            Object constructorArgument = constructorArguments[i];
-                            pushStoreInArray(withValueMethod, i, len, () -> {
-                                if (constructorArgument instanceof BeanPropertyWriter) {
-                                    withValueMethod.loadArg(1);
-                                } else {
-                                    MethodElement readMethod = (MethodElement) constructorArgument;
-                                    readMethods.add(readMethod);
-                                    withValueMethod.loadArg(0);
-                                    pushCastToType(withValueMethod, beanType);
-                                    ClassElement returnType = invokeReadMethod(withValueMethod, readMethod);
-                                    pushBoxPrimitiveIfNecessary(returnType, withValueMethod);
-                                }
-                            });
+                        Set<MethodElement> readMethods;
+                        if (constructorArguments != null) {
 
+                            int len = constructorArguments.length;
+                            pushNewArray(withValueMethod, Object.class, len);
+                            readMethods = new HashSet<>(len);
+                            for (int i = 0; i < len; i++) {
+                                Object constructorArgument = constructorArguments[i];
+                                pushStoreInArray(withValueMethod, i, len, () -> {
+                                    if (constructorArgument instanceof BeanPropertyWriter) {
+                                        withValueMethod.loadArg(1);
+                                    } else {
+                                        MethodElement readMethod = (MethodElement) constructorArgument;
+                                        readMethods.add(readMethod);
+                                        withValueMethod.loadArg(0);
+                                        pushCastToType(withValueMethod, beanType);
+                                        ClassElement returnType = invokeReadMethod(withValueMethod, readMethod);
+                                        pushBoxPrimitiveIfNecessary(returnType, withValueMethod);
+                                    }
+                                });
+
+                            }
+                        } else {
+                            pushNewArray(withValueMethod, Object.class, 0);
+                            readMethods = Collections.emptySet();
                         }
 
                         withValueMethod.invokeInterface(Type.getType(BeanIntrospection.class), METHOD_INSTANTIATE);

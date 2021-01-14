@@ -127,6 +127,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     /**
      * @return The constructor.
      */
+    @Nullable
     public MethodElement getConstructor() {
         return constructor;
     }
