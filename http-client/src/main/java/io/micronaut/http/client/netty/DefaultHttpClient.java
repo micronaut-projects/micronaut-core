@@ -2564,6 +2564,17 @@ public class DefaultHttpClient implements
 
             @Override
             public void channelReleased(Channel ch) {
+                Duration idleTimeout = configuration.getConnectionPoolIdleTimeout().orElse(Duration.ofNanos(0));
+                ChannelPipeline pipeline = ch.pipeline();
+                if (ch.isOpen()) {
+                    ch.config().setAutoRead(true);
+                    pipeline.addLast(IdlingConnectionHandler.INSTANCE);
+                    if (idleTimeout.toNanos() > 0) {
+                        pipeline.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(idleTimeout.toNanos(), idleTimeout.toNanos(), 0, TimeUnit.NANOSECONDS));
+                        pipeline.addLast(IdleTimeoutHandler.INSTANCE);
+                    }
+                }
+
                 if (connectionTimeAliveMillis != null) {
                     boolean shouldCloseOnRelease = Boolean.TRUE.equals(ch.attr(ConnectTTLHandler.RELEASE_CHANNEL).get());
 
@@ -2573,10 +2584,23 @@ public class DefaultHttpClient implements
                 }
 
                 if (readTimeoutMillis != null) {
-                    ChannelPipeline pipeline = ch.pipeline();
                     if (pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
                         pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
                     }
+                }
+            }
+
+            @Override
+            public void channelAcquired(Channel ch) throws Exception {
+                ChannelPipeline pipeline = ch.pipeline();
+                if (pipeline.context(IdlingConnectionHandler.INSTANCE) != null) {
+                    pipeline.remove(IdlingConnectionHandler.INSTANCE);
+                }
+                if (pipeline.context(HANDLER_IDLE_STATE) != null) {
+                    pipeline.remove(HANDLER_IDLE_STATE);
+                }
+                if (pipeline.context(IdleTimeoutHandler.INSTANCE) != null) {
+                    pipeline.remove(IdleTimeoutHandler.INSTANCE);
                 }
             }
         };

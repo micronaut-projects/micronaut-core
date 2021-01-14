@@ -17,8 +17,7 @@ import spock.util.concurrent.PollingConditions
 import java.lang.reflect.Field
 
 @Retry
-class ConnectionTTLSpec extends Specification {
-
+class IdleTimeoutSpec extends Specification {
 
   @Shared
   @AutoCleanup
@@ -27,30 +26,37 @@ class ConnectionTTLSpec extends Specification {
   @Shared
   EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
-
-  def "should close connection according to connect-ttl"() {
+  def "should close connection according to connection-pool-idle-timeout"() {
     setup:
     ApplicationContext clientContext = ApplicationContext.run(
       'my.port':embeddedServer.getPort(),
-      'micronaut.http.client.connect-ttl':'1000ms',
+      'micronaut.http.client.connection-pool-idle-timeout':'800ms',
       'micronaut.http.client.pool.enabled':true
     )
     RxHttpClient httpClient = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockingFirst()
-    Channel ch = getQueuedChannels(httpClient).first
+    httpClient.retrieve(HttpRequest.GET('/idleTimeout/'),String).blockingFirst()
+    Deque<Channel> deque = getQueuedChannels(httpClient)
+    Channel ch1 = deque.first
 
-    then:"ensure that connection is open as connect-ttl is not reached"
-    getQueuedChannels(httpClient).size() == 1
-    ch.isOpen()
+    then:"ensure that connection is open as connection-pool-idle-timeout is not reached"
+    deque.size() == 1
+    ch1.isOpen()
+    new PollingConditions(timeout: 1).eventually {
+      !ch1.isOpen()
+    }
 
-    when:"make another request in which connect-ttl will exceed"
-    httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockingFirst()
+    when:"make another request"
+    httpClient.retrieve(HttpRequest.GET('/idleTimeout'),String).blockingFirst()
+    Channel ch2 = deque.first
 
-    then:"ensure channel is closed"
-    new PollingConditions().eventually {
-      !ch.isOpen()
+    then:"ensure channel 2 is open and channel 2 != channel 1"
+    deque.size() == 1
+    ch1 != ch2
+    ch2.isOpen()
+    new PollingConditions(timeout: 1).eventually {
+      !ch2.isOpen()
     }
 
     cleanup:
@@ -58,7 +64,7 @@ class ConnectionTTLSpec extends Specification {
     clientContext.close()
   }
 
-  def "shouldn't close connection if connect-ttl is not passed"() {
+  def "shouldn't close connection if connection-pool-idle-timeout is not passed"() {
     setup:
     ApplicationContext clientContext = ApplicationContext.run(
       'my.port':embeddedServer.getPort(),
@@ -67,18 +73,23 @@ class ConnectionTTLSpec extends Specification {
     RxHttpClient httpClient = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockingFirst()
+    httpClient.retrieve(HttpRequest.GET('/idleTimeout/'),String).blockingFirst()
     Deque<Channel> deque = getQueuedChannels(httpClient)
+    Channel ch1 = deque.first
 
-    then:"ensure that connection is open as connect-ttl is not reached"
+    then:"ensure that connection is open as connection-pool-idle-timeout is not reached"
+    deque.size() == 1
     new PollingConditions().eventually {
       deque.first.isOpen()
     }
 
     when:"make another request"
-    httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockingFirst()
+    httpClient.retrieve(HttpRequest.GET('/idleTimeout'),String).blockingFirst()
+    Channel ch2 = deque.first
 
     then:"ensure channel is still open"
+    ch1 == ch2
+    deque.size() == 1
     new PollingConditions().eventually {
       deque.first.isOpen()
     }
@@ -87,7 +98,6 @@ class ConnectionTTLSpec extends Specification {
     httpClient.close()
     clientContext.close()
   }
-
 
   Deque getQueuedChannels(RxHttpClient client) {
     AbstractChannelPoolMap poolMap = client.poolMap
@@ -97,18 +107,11 @@ class ConnectionTTLSpec extends Specification {
     return innerMap.values().first().deque
   }
 
-
-  @Controller('/connectTTL')
+  @Controller('/idleTimeout')
   static class GetController {
 
     @Get(value = "/", produces = MediaType.TEXT_PLAIN)
     String get() {
-      return "success"
-    }
-
-    @Get(value = "/slow", produces = MediaType.TEXT_PLAIN)
-    String getSlow() {
-      sleep 1100
       return "success"
     }
   }

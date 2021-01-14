@@ -59,6 +59,12 @@ public abstract class HttpClientConfiguration {
     public static final long DEFAULT_READ_IDLE_TIMEOUT_MINUTES = 5;
 
     /**
+     * The default pool idle timeout in seconds.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS = 0;
+
+    /**
      * The default shutdown timeout in millis.
      */
     @SuppressWarnings("WeakerAccess")
@@ -106,6 +112,8 @@ public abstract class HttpClientConfiguration {
     private Duration readTimeout = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS);
 
     private Duration readIdleTimeout = Duration.of(DEFAULT_READ_IDLE_TIMEOUT_MINUTES, ChronoUnit.MINUTES);
+
+    private Duration connectionPoolIdleTimeout = Duration.ofSeconds(DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS);
 
     private Duration shutdownQuietPeriod = Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS);
 
@@ -178,6 +186,7 @@ public abstract class HttpClientConfiguration {
             this.proxyType = copy.proxyType;
             this.proxyUsername = copy.proxyUsername;
             this.readIdleTimeout = copy.readIdleTimeout;
+            this.connectionPoolIdleTimeout = copy.connectionPoolIdleTimeout;
             this.readTimeout = copy.readTimeout;
             this.shutdownTimeout = copy.shutdownTimeout;
             this.shutdownQuietPeriod = copy.shutdownQuietPeriod;
@@ -355,6 +364,13 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * @return The idle timeout for connection in the client connection pool. Defaults to 0.
+     */
+    public Optional<Duration> getConnectionPoolIdleTimeout() {
+        return Optional.ofNullable(connectionPoolIdleTimeout);
+    }
+
+    /**
      * @return The default connect timeout. Defaults to Netty default.
      */
     public Optional<Duration> getConnectTimeout() {
@@ -422,6 +438,15 @@ public abstract class HttpClientConfiguration {
      */
     public void setReadIdleTimeout(@Nullable Duration readIdleTimeout) {
         this.readIdleTimeout = readIdleTimeout;
+    }
+
+    /**
+     * Sets the idle timeout for connection in the client connection pool. Defaults to 0.
+     *
+     * @param connectionPoolIdleTimeout The connection pool idle timeout
+     */
+    public void setConnectionPoolIdleTimeout(@Nullable Duration connectionPoolIdleTimeout) {
+        this.connectionPoolIdleTimeout = connectionPoolIdleTimeout;
     }
 
     /**
