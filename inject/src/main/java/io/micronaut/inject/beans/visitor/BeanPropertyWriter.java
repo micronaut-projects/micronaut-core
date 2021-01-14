@@ -54,7 +54,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private static final Type TYPE_BEAN_PROPERTY = Type.getType(AbstractBeanProperty.class);
     private static final Method METHOD_READ_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "readInternal", Object.class));
     private static final Method METHOD_WRITE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "writeInternal", Object.class, Object.class));
-    private static final Method METHOD_MUTATE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "mutateInternal", Object.class, Object.class));
+    private static final Method METHOD_WITH_VALUE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "withValueInternal", Object.class, Object.class));
     private static final Method METHOD_GET_BEAN = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanProperty.class, "getDeclaringBean"));
     private static final Method METHOD_INSTANTIATE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanIntrospection.class, "instantiate", Object[].class));
     private final Type propertyType;
@@ -190,19 +190,19 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                 if (writeMethod != null) {
                     // in the case where there is a write method we simply generate code to invoke
                     // writeInternal and returned the bean passed as the argument
-                    GeneratorAdapter mutateMethod = startPublicMethod(classWriter, METHOD_MUTATE_INTERNAL);
+                    GeneratorAdapter withValueMethod = startPublicMethod(classWriter, METHOD_WITH_VALUE_INTERNAL);
                     // generates
                     // Object mutate(Object bean, Object value) {
                     //     writeInternal(bean, value);
                     //     return bean;
                     // }
-                    mutateMethod.loadThis();
-                    mutateMethod.loadArgs();
-                    mutateMethod.invokeVirtual(type, METHOD_WRITE_INTERNAL);
-                    mutateMethod.loadArg(0);
-                    mutateMethod.returnValue();
-                    mutateMethod.visitMaxs(1, 1);
-                    mutateMethod.endMethod();
+                    withValueMethod.loadThis();
+                    withValueMethod.loadArgs();
+                    withValueMethod.invokeVirtual(type, METHOD_WRITE_INTERNAL);
+                    withValueMethod.loadArg(0);
+                    withValueMethod.returnValue();
+                    withValueMethod.visitMaxs(1, 1);
+                    withValueMethod.endMethod();
                 } else {
                     // In this case we have to do the copy constructor approach
                     Map<String, BeanPropertyWriter> propertyDefinitions = beanIntrospectionWriter.getPropertyDefinitions();
@@ -233,72 +233,72 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                     }
 
                     if (isMutable) {
-                        GeneratorAdapter mutateMethod = startPublicMethod(classWriter, METHOD_MUTATE_INTERNAL);
+                        GeneratorAdapter withValueMethod = startPublicMethod(classWriter, METHOD_WITH_VALUE_INTERNAL);
                         // generates
                         // Object mutate(Object bean, Object value) {
                         //     return getDeclaringBean().instantiate(bean.getOther(), value);
                         // }
-                        mutateMethod.loadThis();
-                        mutateMethod.invokeVirtual(type, METHOD_GET_BEAN);
+                        withValueMethod.loadThis();
+                        withValueMethod.invokeVirtual(type, METHOD_GET_BEAN);
                         int len = constructorArguments.length;
-                        pushNewArray(mutateMethod, Object.class, len);
+                        pushNewArray(withValueMethod, Object.class, len);
                         Set<MethodElement> readMethods = new HashSet<>(len);
                         for (int i = 0; i < len; i++) {
                             Object constructorArgument = constructorArguments[i];
-                            pushStoreInArray(mutateMethod, i, len, () -> {
+                            pushStoreInArray(withValueMethod, i, len, () -> {
                                 if (constructorArgument instanceof BeanPropertyWriter) {
-                                    mutateMethod.loadArg(1);
+                                    withValueMethod.loadArg(1);
                                 } else {
                                     MethodElement readMethod = (MethodElement) constructorArgument;
                                     readMethods.add(readMethod);
-                                    mutateMethod.loadArg(0);
-                                    pushCastToType(mutateMethod, beanType);
-                                    ClassElement returnType = invokeReadMethod(mutateMethod, readMethod);
-                                    pushBoxPrimitiveIfNecessary(returnType, mutateMethod);
+                                    withValueMethod.loadArg(0);
+                                    pushCastToType(withValueMethod, beanType);
+                                    ClassElement returnType = invokeReadMethod(withValueMethod, readMethod);
+                                    pushBoxPrimitiveIfNecessary(returnType, withValueMethod);
                                 }
                             });
 
                         }
 
-                        mutateMethod.invokeInterface(Type.getType(BeanIntrospection.class), METHOD_INSTANTIATE);
+                        withValueMethod.invokeInterface(Type.getType(BeanIntrospection.class), METHOD_INSTANTIATE);
                         List<BeanPropertyWriter> readWriteProps = propertyDefinitions.values().stream()
                                 .filter(bwp -> bwp.writeMethod != null && bwp.readMethod != null && !readMethods.contains(bwp.readMethod))
                                 .collect(Collectors.toList());
                         if (!readWriteProps.isEmpty()) {
-                            int beanTypeLocal = mutateMethod.newLocal(beanType);
-                            mutateMethod.storeLocal(beanTypeLocal);
+                            int beanTypeLocal = withValueMethod.newLocal(beanType);
+                            withValueMethod.storeLocal(beanTypeLocal);
                             for (BeanPropertyWriter readWriteProp : readWriteProps) {
 
                                 MethodElement writeMethod = readWriteProp.writeMethod;
                                 MethodElement readMethod = readWriteProp.readMethod;
-                                mutateMethod.loadLocal(beanTypeLocal);
-                                pushCastToType(mutateMethod, beanType);
-                                mutateMethod.loadArg(0);
-                                pushCastToType(mutateMethod, beanType);
-                                invokeReadMethod(mutateMethod, readMethod);
+                                withValueMethod.loadLocal(beanTypeLocal);
+                                pushCastToType(withValueMethod, beanType);
+                                withValueMethod.loadArg(0);
+                                pushCastToType(withValueMethod, beanType);
+                                invokeReadMethod(withValueMethod, readMethod);
                                 ClassElement writeReturnType = writeMethod.getReturnType();
                                 String methodDescriptor = getMethodDescriptor(writeReturnType, Arrays.asList(writeMethod.getParameters()));
 
                                 if (declaringElement.isInterface()) {
-                                    mutateMethod.invokeInterface(beanType, new Method(writeMethod.getName(), methodDescriptor));
+                                    withValueMethod.invokeInterface(beanType, new Method(writeMethod.getName(), methodDescriptor));
                                 } else {
-                                    mutateMethod.invokeVirtual(beanType, new Method(writeMethod.getName(), methodDescriptor));
+                                    withValueMethod.invokeVirtual(beanType, new Method(writeMethod.getName(), methodDescriptor));
                                 }
                                 if (!writeReturnType.getName().equals("void")) {
-                                    mutateMethod.pop();
+                                    withValueMethod.pop();
                                 }
                             }
-                            mutateMethod.loadLocal(beanTypeLocal);
-                            pushCastToType(mutateMethod, beanType);
+                            withValueMethod.loadLocal(beanTypeLocal);
+                            pushCastToType(withValueMethod, beanType);
                         }
-                        mutateMethod.returnValue();
-                        mutateMethod.visitMaxs(1, 1);
-                        mutateMethod.endMethod();
+                        withValueMethod.returnValue();
+                        withValueMethod.visitMaxs(1, 1);
+                        withValueMethod.endMethod();
                     }
                 }
             }
 
-            final GeneratorAdapter isWriteOnly = startPublicFinalMethodZeroArgs(classWriter, boolean.class, "isMutable");
+            final GeneratorAdapter isWriteOnly = startPublicFinalMethodZeroArgs(classWriter, boolean.class, "hasSetterOrConstructorArgument");
             isWriteOnly.push(isMutable);
             isWriteOnly.returnValue();
             isWriteOnly.visitMaxs(1, 1);
@@ -306,7 +306,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
 
             if (!isMutable) {
                 // In this case the bean cannot be mutated via either copy constructor or setter so simply throw an exception
-                GeneratorAdapter mutateMethod = startPublicMethod(classWriter, METHOD_MUTATE_INTERNAL);
+                GeneratorAdapter mutateMethod = startPublicMethod(classWriter, METHOD_WITH_VALUE_INTERNAL);
                 mutateMethod.throwException(Type.getType(UnsupportedOperationException.class), nonMutableMessage);
                 mutateMethod.visitMaxs(1, 1);
                 mutateMethod.endMethod();

@@ -117,13 +117,13 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     }
 
     @Override
-    public B mutate(@NonNull B bean, @Nullable P value) {
+    public B withValue(@NonNull B bean, @Nullable P value) {
         ArgumentUtils.requireNonNull("bean", bean);
 
         if (!beanType.isInstance(bean)) {
             throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + introspection.getBeanType());
         }
-        return mutateInternal(bean, value);
+        return withValueInternal(bean, value);
     }
 
     @Override
@@ -150,14 +150,14 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
      * Mutates a property value.
      * @param bean The bean
      * @param value The value
-     * @see BeanProperty#mutate(Object, Object)
+     * @see BeanProperty#withValue(Object, Object)
      * @return Either a copy of the bean with the copy constructor invoked or the mutated instance if it mutable
      */
     @SuppressWarnings("WeakerAccess")
     @UsedByGeneratedCode
     @Internal
-    protected B mutateInternal(B bean, P value) {
-        return BeanProperty.super.mutate(bean, value);
+    protected B withValueInternal(B bean, P value) {
+        return BeanProperty.super.withValue(bean, value);
     }
 
     /**

@@ -80,7 +80,7 @@ public class CopyMe {
 
         when:
         def property = introspection.getRequiredProperty("name", String)
-        def newInstance = property.mutate(copyMe, "Changed")
+        def newInstance = property.withValue(copyMe, "Changed")
 
         then:
         !newInstance.is(copyMe)
@@ -181,12 +181,12 @@ public record Foo(@javax.validation.constraints.NotBlank String name, int age){
         introspection.propertyNames == ['name', 'age'] as String[]
         property.hasAnnotation(NotBlank)
         property.isReadOnly()
-        property.isMutable()
+        property.hasSetterOrConstructorArgument()
         property.name == 'name'
         property.get(test) == 'test'
 
         when:"a mutation is applied"
-        def newTest = property.mutate(test, "Changed")
+        def newTest = property.withValue(test, "Changed")
 
         then:"a new instance is returned"
         !newTest.is(test)
@@ -305,10 +305,10 @@ interface GenBase<T> {
         then:
         introspection.beanProperties.first().type == String
         property.get(test) == 'test'
-        !property.isMutable()
+        !property.hasSetterOrConstructorArgument()
 
         when:
-        property.mutate(test, 'try change')
+        property.withValue(test, 'try change')
 
         then:
         def e = thrown(UnsupportedOperationException)
@@ -382,7 +382,7 @@ interface GenBase<T> {
         bp.get(test) == 5L
 
         when:
-        def returnedBean = bp.mutate(test, 10L)
+        def returnedBean = bp.withValue(test, 10L)
 
         then:
         returnedBean.is(test)
