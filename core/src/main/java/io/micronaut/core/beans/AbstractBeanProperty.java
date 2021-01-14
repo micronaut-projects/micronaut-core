@@ -128,7 +128,9 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         if (value != null && !ReflectionUtils.getWrapperType(getType()).isInstance(value)) {
             throw new IllegalArgumentException("Specified value [" + value + "] is not of the correct type: " + getType());
         }
-
+        if (value == null && isNonNull()) {
+            throw new IllegalArgumentException("Null values not supported by property: " + getName());
+        }
         writeInternal(bean, value);
     }
 

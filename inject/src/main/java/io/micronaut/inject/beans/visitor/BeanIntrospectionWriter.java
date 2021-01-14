@@ -66,7 +66,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final Type introspectionType;
     private final Type beanType;
     private final ClassWriter introspectionWriter;
-    private final List<BeanPropertyWriter> propertyDefinitions = new ArrayList<>();
+    private final Map<String, BeanPropertyWriter> propertyDefinitions = new LinkedHashMap<>();
     private final Map<String, Collection<AnnotationValueIndex>> indexes = new HashMap<>(2);
     private final Map<String, GeneratorAdapter> localLoadTypeMethods = new HashMap<>();
     private final ClassElement classElement;
@@ -115,6 +115,13 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         this.introspectionName = computeIntrospectionName(generatingType, className);
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(className);
+    }
+
+    /**
+     * @return The property definitions.
+     */
+    Map<String, BeanPropertyWriter> getPropertyDefinitions() {
+        return propertyDefinitions;
     }
 
     /**
@@ -178,7 +185,8 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 this.annotationMetadata,
                 annotationMetadata
         );
-        propertyDefinitions.add(
+        propertyDefinitions.put(
+                name,
                 new BeanPropertyWriter(
                         this,
                         type,
@@ -254,7 +262,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                     int.class);
 
             // process the properties, creating them etc.
-            for (BeanPropertyWriter propertyWriter : propertyDefinitions) {
+            for (BeanPropertyWriter propertyWriter : propertyDefinitions.values()) {
                 propertyWriter.accept(classWriterOutputVisitor);
                 final Type writerType = propertyWriter.getType();
                 constructorWriter.loadThis();

@@ -1365,6 +1365,25 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param writer        The class writer
+     * @param asmMethod     The asm method
+     * @return The {@link GeneratorAdapter}
+     * @since 2.3.0
+     */
+    protected GeneratorAdapter startPublicMethod(ClassWriter writer, Method asmMethod) {
+        String methodName = asmMethod.getName();
+        return new GeneratorAdapter(writer.visitMethod(
+                ACC_PUBLIC,
+                methodName,
+                asmMethod.getDescriptor(),
+                null,
+                null
+        ), ACC_PUBLIC,
+                methodName,
+                asmMethod.getDescriptor());
+    }
+
+    /**
+     * @param writer        The class writer
      * @param methodName    The method name
      * @param returnType    The return type
      * @param argumentTypes The argument types

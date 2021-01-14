@@ -147,7 +147,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      *
      * @param bean The bean
      * @param value The new value
-     * @return A potentially new instance of the bean with the value mutated
+     * @return Either the existing instance or the property is mutable or a newly created instance via the copy constructor pattern.
      * @throws UnsupportedOperationException if the property cannot be mutated
      * @since 2.3.0
      */
@@ -173,9 +173,16 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
                 }
             }
             if (found) {
-                return declaringBean.instantiate(values);
+                B newInstance = declaringBean.instantiate(values);
+                Collection<BeanProperty<B, Object>> beanProperties = declaringBean.getBeanProperties();
+                for (BeanProperty<B, Object> beanProperty : beanProperties) {
+                    if (beanProperty != this && beanProperty.isReadWrite()) {
+                        beanProperty.set(newInstance, beanProperty.get(bean));
+                    }
+                }
+                return newInstance;
             } else {
-                throw new UnsupportedOperationException("Cannot mutate property [" + getName() + "] that is not mutable via a setter method or constructor argument for type: " + declaringBean.getBeanType());
+                throw new UnsupportedOperationException("Cannot mutate property [" + getName() + "] that is not mutable via a setter method or constructor argument for type: " + declaringBean.getBeanType().getName());
             }
         } else {
             set(bean, value);

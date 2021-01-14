@@ -18,6 +18,7 @@ package io.micronaut.inject.beans.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -57,6 +58,9 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private static final Type TYPE_BEAN_PROPERTY = Type.getType(AbstractBeanProperty.class);
     private static final Method METHOD_READ_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "readInternal", Object.class));
     private static final Method METHOD_WRITE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "writeInternal", Object.class, Object.class));
+    private static final Method METHOD_MUTATE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanProperty.class, "mutate", Object.class, Object.class));
+    private static final Method METHOD_GET_BEAN = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanProperty.class, "getDeclaringBean"));
+    private static final Method METHOD_INSTANTIATE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanIntrospection.class, "instantiate", Object[].class));
     private final Type propertyType;
     private final String propertyName;
     private final AnnotationMetadata annotationMetadata;
@@ -65,6 +69,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private final Map<String, ClassElement> typeArguments;
     private final Type beanType;
     private final boolean readOnly;
+    private final boolean isMutable;
     private final MethodElement readMethod;
     private final MethodElement writeMethod;
     private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
@@ -111,6 +116,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         this.writeMethod = writeMethod;
         this.propertyName = propertyName;
         this.readOnly = isReadOnly;
+        this.isMutable = !readOnly || hasAssociatedConstructorArgument();
         this.annotationMetadata = annotationMetadata == AnnotationMetadata.EMPTY_METADATA ? null : annotationMetadata;
         this.type = getTypeReference(ClassElement.of(introspectionType.getClassName() + "$$" + index));
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -120,6 +126,13 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             this.typeArguments = null;
         }
 
+    }
+
+    /**
+     * @return Is this property mutable
+     */
+    public boolean isMutable() {
+        return isMutable;
     }
 
     @NonNull
@@ -174,13 +187,106 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                 isWriteOnly.endMethod();
             }
 
-            boolean isMutable = !readOnly || hasAssociatedConstructorArgument();
             // override isMutable method
+            boolean isMutable = this.isMutable;
+            String nonMutableMessage = "Cannot mutate property [" + getPropertyName() + "] that is not mutable via a setter method or constructor argument for type: " + beanType.getClassName();
+            if (isMutable) {
+                if (writeMethod != null) {
+                    // in the case where there is a write method we simply generate code to invoke
+                    // writeInternal and returned the bean passed as the argument
+                    GeneratorAdapter mutateMethod = startPublicMethod(classWriter, METHOD_MUTATE_INTERNAL);
+                    // generates
+                    // Object mutate(Object bean, Object value) {
+                    //     writeInternal(bean, value);
+                    //     return bean;
+                    // }
+                    mutateMethod.loadThis();
+                    mutateMethod.loadArgs();
+                    mutateMethod.invokeVirtual(type, METHOD_WRITE_INTERNAL);
+                    mutateMethod.loadArg(0);
+                    mutateMethod.returnValue();
+                    mutateMethod.visitMaxs(1, 1);
+                    mutateMethod.endMethod();
+                } else {
+                    // In this case we have to do the copy constructor approach
+                    Map<String, BeanPropertyWriter> propertyDefinitions = beanIntrospectionWriter.getPropertyDefinitions();
+                    MethodElement constructor = beanIntrospectionWriter.getConstructor();
+                    ParameterElement[] parameters = constructor.getParameters();
+                    Object[] constructorArguments = new Object[parameters.length];
+                    for (int i = 0; i < parameters.length; i++) {
+                        ParameterElement parameter = parameters[i];
+                        BeanPropertyWriter propertyWriter = propertyDefinitions.get(parameter.getName());
+                        if (propertyWriter == this) {
+                            constructorArguments[i] = this;
+                        } else if (propertyWriter != null) {
+                            MethodElement readMethod = propertyWriter.readMethod;
+                            if (readMethod != null) {
+                                if (readMethod.getGenericReturnType().isAssignable(parameter.getGenericType())) {
+                                    constructorArguments[i] = readMethod;
+                                } else {
+                                    isMutable = false;
+                                    nonMutableMessage = "Cannot create copy of type [" + beanType.getClassName() + "]. Property of type [" + readMethod.getGenericReturnType().getName() + "] is not assignable to constructor argument [" + parameter.getName() + "]";
+                                }
+
+                            } else {
+                                isMutable = false;
+                                nonMutableMessage = "Cannot create copy of type [" + beanType.getClassName() + "]. Constructor contains argument [" + parameter.getName() + "] that is not a readable property";
+                                break;
+                            }
+                        }
+                    }
+
+                    if (isMutable) {
+                        GeneratorAdapter mutateMethod = startPublicMethod(classWriter, METHOD_MUTATE_INTERNAL);
+                        // generates
+                        // Object mutate(Object bean, Object value) {
+                        //     return getDeclaringBean().instantiate(bean.getOther(), value);
+                        // }
+                        mutateMethod.loadThis();
+                        mutateMethod.invokeVirtual(type, METHOD_GET_BEAN);
+                        int len = constructorArguments.length;
+                        pushNewArray(mutateMethod, Object.class, len);
+                        for (int i = 0; i < len; i++) {
+                            Object constructorArgument = constructorArguments[i];
+                            pushStoreInArray(mutateMethod, i, len, () -> {
+                                if (constructorArgument instanceof BeanPropertyWriter) {
+                                    mutateMethod.loadArg(1);
+                                } else {
+                                    MethodElement readMethod = (MethodElement) constructorArgument;
+                                    mutateMethod.loadArg(0);
+                                    pushCastToType(mutateMethod, beanType);
+                                    ClassElement returnType = readMethod.getReturnType();
+                                    if (declaringElement.isInterface()) {
+                                        mutateMethod.invokeInterface(beanType, new Method(readMethod.getName(), getMethodDescriptor(returnType, Collections.emptyList())));
+                                    } else {
+                                        mutateMethod.invokeVirtual(beanType, new Method(readMethod.getName(), getMethodDescriptor(returnType, Collections.emptyList())));
+                                    }
+                                    pushBoxPrimitiveIfNecessary(returnType, mutateMethod);
+                                }
+                            });
+
+                        }
+                        mutateMethod.invokeInterface(Type.getType(BeanIntrospection.class), METHOD_INSTANTIATE);
+                        mutateMethod.returnValue();
+                        mutateMethod.visitMaxs(1, 1);
+                        mutateMethod.endMethod();
+                    }
+                }
+            }
+
             final GeneratorAdapter isWriteOnly = startPublicFinalMethodZeroArgs(classWriter, boolean.class, "isMutable");
             isWriteOnly.push(isMutable);
             isWriteOnly.returnValue();
             isWriteOnly.visitMaxs(1, 1);
             isWriteOnly.endMethod();
+
+            if (!isMutable) {
+                // In this case the bean cannot be mutated via either copy constructor or setter so simply throw an exception
+                GeneratorAdapter mutateMethod = startPublicMethod(classWriter, METHOD_MUTATE_INTERNAL);
+                mutateMethod.throwException(Type.getType(UnsupportedOperationException.class), nonMutableMessage);
+                mutateMethod.visitMaxs(1, 1);
+                mutateMethod.endMethod();
+            }
 
             for (GeneratorAdapter generator : loadTypeMethods.values()) {
                 generator.visitMaxs(3, 1);
