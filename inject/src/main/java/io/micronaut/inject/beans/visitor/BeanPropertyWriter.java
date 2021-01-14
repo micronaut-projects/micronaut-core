@@ -28,6 +28,7 @@ import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.core.beans.AbstractBeanProperty;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
@@ -70,6 +71,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private final TypedElement typeElement;
     private final ClassElement declaringElement;
     private final Type propertyGenericType;
+    private final BeanIntrospectionWriter beanIntrospectionWriter;
 
     /**
      * Default constructor.
@@ -98,6 +100,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
         super(introspectionWriter.getOriginatingElements());
+        this.beanIntrospectionWriter = introspectionWriter;
         Type introspectionType = introspectionWriter.getIntrospectionType();
         this.declaringElement = introspectionWriter.getClassElement();
         this.typeElement = typeElement;
@@ -155,7 +158,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
 
             if (readOnly) {
                 // override isReadOnly method
-                final GeneratorAdapter isReadOnly = startPublicMethodZeroArgs(classWriter, boolean.class, "isReadOnly");
+                final GeneratorAdapter isReadOnly = startPublicFinalMethodZeroArgs(classWriter, boolean.class, "isReadOnly");
                 isReadOnly.push(true);
                 isReadOnly.returnValue();
                 isReadOnly.visitMaxs(1, 1);
@@ -163,13 +166,21 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             }
 
             if (writeMethod != null && readMethod == null) {
-                // override isReadOnly method
-                final GeneratorAdapter isWriteOnly = startPublicMethodZeroArgs(classWriter, boolean.class, "isWriteOnly");
+                // override isWriteOnly method
+                final GeneratorAdapter isWriteOnly = startPublicFinalMethodZeroArgs(classWriter, boolean.class, "isWriteOnly");
                 isWriteOnly.push(true);
                 isWriteOnly.returnValue();
                 isWriteOnly.visitMaxs(1, 1);
                 isWriteOnly.endMethod();
             }
+
+            boolean isMutable = !readOnly || hasAssociatedConstructorArgument();
+            // override isMutable method
+            final GeneratorAdapter isWriteOnly = startPublicFinalMethodZeroArgs(classWriter, boolean.class, "isMutable");
+            isWriteOnly.push(isMutable);
+            isWriteOnly.returnValue();
+            isWriteOnly.visitMaxs(1, 1);
+            isWriteOnly.endMethod();
 
             for (GeneratorAdapter generator : loadTypeMethods.values()) {
                 generator.visitMaxs(3, 1);
@@ -177,6 +188,19 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             }
             classOutput.write(classWriter.toByteArray());
         }
+    }
+
+    private boolean hasAssociatedConstructorArgument() {
+        MethodElement constructor = beanIntrospectionWriter.getConstructor();
+        if (constructor != null) {
+            ParameterElement[] parameters = constructor.getParameters();
+            for (ParameterElement parameter : parameters) {
+                if (getPropertyName().equals(parameter.getName())) {
+                    return typeElement.getType().isAssignable(parameter.getGenericType());
+                }
+            }
+        }
+        return false;
     }
 
     private void writeWriteMethod() {

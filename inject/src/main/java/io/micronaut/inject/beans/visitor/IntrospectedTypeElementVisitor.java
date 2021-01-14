@@ -330,7 +330,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             writer.visitDefaultConstructor(defaultConstructor);
         }
 
-        ClassElement classElement = writer.getClassElement();
         processBeanProperties(writer, beanProperties, includes, excludes, ignored, indexedAnnotations, metadata);
 
         writers.put(writer.getBeanType().getClassName(), writer);
