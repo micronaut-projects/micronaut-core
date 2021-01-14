@@ -26,11 +26,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.*;
 import io.micronaut.core.beans.AbstractBeanProperty;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -42,9 +39,8 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Writes out {@link io.micronaut.core.beans.BeanProperty} instances to produce {@link io.micronaut.core.beans.BeanIntrospection} information.
@@ -58,7 +54,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private static final Type TYPE_BEAN_PROPERTY = Type.getType(AbstractBeanProperty.class);
     private static final Method METHOD_READ_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "readInternal", Object.class));
     private static final Method METHOD_WRITE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "writeInternal", Object.class, Object.class));
-    private static final Method METHOD_MUTATE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanProperty.class, "mutate", Object.class, Object.class));
+    private static final Method METHOD_MUTATE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "mutateInternal", Object.class, Object.class));
     private static final Method METHOD_GET_BEAN = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanProperty.class, "getDeclaringBean"));
     private static final Method METHOD_INSTANTIATE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanIntrospection.class, "instantiate", Object[].class));
     private final Type propertyType;
@@ -246,6 +242,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                         mutateMethod.invokeVirtual(type, METHOD_GET_BEAN);
                         int len = constructorArguments.length;
                         pushNewArray(mutateMethod, Object.class, len);
+                        Set<MethodElement> readMethods = new HashSet<>(len);
                         for (int i = 0; i < len; i++) {
                             Object constructorArgument = constructorArguments[i];
                             pushStoreInArray(mutateMethod, i, len, () -> {
@@ -253,20 +250,47 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                                     mutateMethod.loadArg(1);
                                 } else {
                                     MethodElement readMethod = (MethodElement) constructorArgument;
+                                    readMethods.add(readMethod);
                                     mutateMethod.loadArg(0);
                                     pushCastToType(mutateMethod, beanType);
-                                    ClassElement returnType = readMethod.getReturnType();
-                                    if (declaringElement.isInterface()) {
-                                        mutateMethod.invokeInterface(beanType, new Method(readMethod.getName(), getMethodDescriptor(returnType, Collections.emptyList())));
-                                    } else {
-                                        mutateMethod.invokeVirtual(beanType, new Method(readMethod.getName(), getMethodDescriptor(returnType, Collections.emptyList())));
-                                    }
+                                    ClassElement returnType = invokeReadMethod(mutateMethod, readMethod);
                                     pushBoxPrimitiveIfNecessary(returnType, mutateMethod);
                                 }
                             });
 
                         }
+
                         mutateMethod.invokeInterface(Type.getType(BeanIntrospection.class), METHOD_INSTANTIATE);
+                        List<BeanPropertyWriter> readWriteProps = propertyDefinitions.values().stream()
+                                .filter(bwp -> bwp.writeMethod != null && bwp.readMethod != null && !readMethods.contains(bwp.readMethod))
+                                .collect(Collectors.toList());
+                        if (!readWriteProps.isEmpty()) {
+                            int beanTypeLocal = mutateMethod.newLocal(beanType);
+                            mutateMethod.storeLocal(beanTypeLocal);
+                            for (BeanPropertyWriter readWriteProp : readWriteProps) {
+
+                                MethodElement writeMethod = readWriteProp.writeMethod;
+                                MethodElement readMethod = readWriteProp.readMethod;
+                                mutateMethod.loadLocal(beanTypeLocal);
+                                pushCastToType(mutateMethod, beanType);
+                                mutateMethod.loadArg(0);
+                                pushCastToType(mutateMethod, beanType);
+                                invokeReadMethod(mutateMethod, readMethod);
+                                ClassElement writeReturnType = writeMethod.getReturnType();
+                                String methodDescriptor = getMethodDescriptor(writeReturnType, Arrays.asList(writeMethod.getParameters()));
+
+                                if (declaringElement.isInterface()) {
+                                    mutateMethod.invokeInterface(beanType, new Method(writeMethod.getName(), methodDescriptor));
+                                } else {
+                                    mutateMethod.invokeVirtual(beanType, new Method(writeMethod.getName(), methodDescriptor));
+                                }
+                                if (!writeReturnType.getName().equals("void")) {
+                                    mutateMethod.pop();
+                                }
+                            }
+                            mutateMethod.loadLocal(beanTypeLocal);
+                            pushCastToType(mutateMethod, beanType);
+                        }
                         mutateMethod.returnValue();
                         mutateMethod.visitMaxs(1, 1);
                         mutateMethod.endMethod();
@@ -294,6 +318,17 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             }
             classOutput.write(classWriter.toByteArray());
         }
+    }
+
+    @NonNull
+    private ClassElement invokeReadMethod(GeneratorAdapter mutateMethod, MethodElement readMethod) {
+        ClassElement returnType = readMethod.getReturnType();
+        if (declaringElement.isInterface()) {
+            mutateMethod.invokeInterface(beanType, new Method(readMethod.getName(), getMethodDescriptor(returnType, Collections.emptyList())));
+        } else {
+            mutateMethod.invokeVirtual(beanType, new Method(readMethod.getName(), getMethodDescriptor(returnType, Collections.emptyList())));
+        }
+        return returnType;
     }
 
     private boolean hasAssociatedConstructorArgument() {

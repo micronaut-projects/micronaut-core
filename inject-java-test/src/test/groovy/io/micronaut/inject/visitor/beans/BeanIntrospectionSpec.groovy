@@ -38,6 +38,56 @@ import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test copy constructor via mutate method"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.CopyMe','''\
+package test;
+
+import java.net.URL;
+
+@io.micronaut.core.annotation.Introspected
+public class CopyMe {
+
+    private URL url;
+    private String name;
+    
+    CopyMe(String name) {
+        this.name = name;
+    }
+
+    public URL getUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+''')
+        when:
+        def copyMe = introspection.instantiate("Test")
+        def expectUrl = new URL("http://test.com")
+        copyMe.url = expectUrl
+
+        then:
+        copyMe.name == 'Test'
+        copyMe.url == expectUrl
+
+
+        when:
+        def property = introspection.getRequiredProperty("name", String)
+        def newInstance = property.mutate(copyMe, "Changed")
+
+        then:
+        !newInstance.is(copyMe)
+        newInstance.name == 'Changed'
+        newInstance.url == expectUrl
+    }
+
     @Requires({ jvm.isJava14Compatible() })
     void "test annotations on generic type arguments for Java 14+ records"() {
         given:

@@ -139,6 +139,8 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
     /**
      * This method will attempt to mutate a property either via setting the property if it is mutable or using a copy constructor.
      *
+     * <p>This differs from {@link #set(Object, Object)} which will throw an exception if the property does not have a setter.</p>
+     *
      * <ul>
      *     <li>If the property is read-only but can be provided via constructor argument a new instance representing a copy of the bean is returned.</li>
      *     <li>If the property is mutable then the passed instance is returned and {@link #set(Object, Object)} invoked  to mutate the property</li>
@@ -151,7 +153,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @throws UnsupportedOperationException if the property cannot be mutated
      * @since 2.3.0
      */
-    default B mutate(B bean, @Nullable T value) {
+    default B mutate(@NonNull B bean, @Nullable T value) {
         if (isReadOnly())  {
             BeanIntrospection<B> declaringBean = getDeclaringBean();
             Argument<?>[] constructorArguments = declaringBean.getConstructorArguments();

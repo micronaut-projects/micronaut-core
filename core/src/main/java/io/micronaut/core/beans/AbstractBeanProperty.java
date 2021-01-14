@@ -24,6 +24,7 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
 import java.util.Objects;
 
 /**
@@ -116,6 +117,16 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     }
 
     @Override
+    public B mutate(@NonNull B bean, @Nullable P value) {
+        ArgumentUtils.requireNonNull("bean", bean);
+
+        if (!beanType.isInstance(bean)) {
+            throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + introspection.getBeanType());
+        }
+        return mutateInternal(bean, value);
+    }
+
+    @Override
     public final void set(@NonNull B bean, @Nullable P value) {
         ArgumentUtils.requireNonNull("bean", bean);
 
@@ -132,6 +143,21 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
             throw new IllegalArgumentException("Null values not supported by property: " + getName());
         }
         writeInternal(bean, value);
+    }
+
+
+    /**
+     * Mutates a property value.
+     * @param bean The bean
+     * @param value The value
+     * @see BeanProperty#mutate(Object, Object)
+     * @return Either a copy of the bean with the copy constructor invoked or the mutated instance if it mutable
+     */
+    @SuppressWarnings("WeakerAccess")
+    @UsedByGeneratedCode
+    @Internal
+    protected B mutateInternal(B bean, P value) {
+        return BeanProperty.super.mutate(bean, value);
     }
 
     /**
