@@ -23,6 +23,8 @@ import io.micronaut.core.type.ReturnType;
 /**
  * Represents a method on a {@link BeanIntrospection}.
  *
+ * <p>A {@link BeanMethod} is created when an accessible method on a class is annotated with {@code io.micronaut.context.annotation.Executable} or an annotation stereotype annotated with that annotation</p>
+ *
  * @param <B> The bean type
  * @param <T> The return type
  * @since 2.3.0

@@ -50,8 +50,7 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached;
 @Internal
 public class GroovyClassElement extends AbstractGroovyElement implements ArrayableClassElement {
 
-    private static final Predicate<MethodNode> JUNK_METHOD_FILTER = m ->
-            {
+    private static final Predicate<MethodNode> JUNK_METHOD_FILTER = m -> {
                 String methodName = m.getName();
 
                 return !m.isStaticConstructor() &&
@@ -62,8 +61,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         !m.getReturnType().getNameWithoutPackage().equals("MetaClass") &&
                         !m.getDeclaringClass().equals(ClassHelper.GROOVY_OBJECT_TYPE) && !m.getDeclaringClass().equals(ClassHelper.OBJECT_TYPE);
             };
-    private static final Predicate<FieldNode> JUNK_FIELD_FILTER = m ->
-    {
+    private static final Predicate<FieldNode> JUNK_FIELD_FILTER = m -> {
         String fieldName = m.getName();
 
         return  !fieldName.startsWith("$") &&

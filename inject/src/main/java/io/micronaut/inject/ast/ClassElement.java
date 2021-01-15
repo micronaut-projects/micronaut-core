@@ -191,6 +191,7 @@ public interface ClassElement extends TypedElement {
      * Return the elements that match the given query.
      *
      * @param query The query to use.
+     * @param <T>  The element type
      * @return The fields
      * @since 2.3.0
      */

@@ -427,7 +427,6 @@ public class ModelUtils {
         }
     }
 
-
     /**
      * Returns whether an element is package private.
      *

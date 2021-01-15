@@ -110,7 +110,13 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
             @NonNull String annotationValue);
 
     /**
+     * Returns the {@link BeanMethod} instances for this introspection.
+     *
+     * <p>The {@link BeanMethod} instances are only those methods annotated with {@code io.micronaut.context.annotation.Executable} and hence represent a subset
+     * of the actual methods of the class and do not include any methods that are exposed as {@link BeanProperty} instances.</p>
+     *
      * @return A immutable collection of methods.
+     *
      * @since 2.3.0
      */
     @NonNull default Collection<BeanMethod<T, Object>> getBeanMethods() {

@@ -562,7 +562,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         }
                     }
                 }
-                T element = null;
+                T element;
                 switch (enclosedElementKind) {
                     case METHOD:
                         //noinspection unchecked
@@ -589,6 +589,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                 metadata
                         );
                     break;
+                    default:
+                        element = null;
                 }
 
                 if (element != null) {
@@ -616,11 +618,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             return ElementKind.CONSTRUCTOR;
         }
         throw new IllegalArgumentException("Unsupported element type for query: " + elementType);
-    }
-
-    @Override
-    public List<FieldElement> getFields(@NonNull Predicate<Set<ElementModifier>> modifierFilter) {
-        return getElements(ElementQuery.of(FieldElement.class).modifiers(modifierFilter));
     }
 
     @Override

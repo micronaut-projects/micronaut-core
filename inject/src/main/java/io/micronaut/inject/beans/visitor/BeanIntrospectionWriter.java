@@ -51,9 +51,9 @@ import java.util.stream.Collectors;
  * @since 1.1
  */
 @Internal
-class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
+final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private static final Method METHOD_ADD_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "addProperty", BeanProperty.class));
-    private static final Method METHOD_ADD_METHOD = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "addMethod", BeanMethod.class));;
+    private static final Method METHOD_ADD_METHOD = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "addMethod", BeanMethod.class));
     private static final Method METHOD_INDEX_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "indexProperty", Class.class, String.class, String.class));
     private static final String REFERENCE_SUFFIX = "$IntrospectionRef";
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
