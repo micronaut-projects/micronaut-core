@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.type;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.async.annotation.SingleResult;
@@ -38,14 +39,15 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
     /**
      * @return The type of the argument
      */
+    @NonNull
     Class<T> getType();
 
     /**
      * @return The return type as an argument
      */
-    default Argument<T> asArgument() {
+    default @NonNull Argument<T> asArgument() {
         Collection<Argument<?>> values = getTypeVariables().values();
-        return Argument.of(getType(), values.toArray(new Argument[0]));
+        return Argument.of(getType(), values.toArray(Argument.ZERO_ARGUMENTS));
     }
 
     /**

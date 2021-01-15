@@ -93,7 +93,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
 
     @NonNull
     @Override
-    public BeanIntrospection<B> getDeclaringBean() {
+    public final BeanIntrospection<B> getDeclaringBean() {
         return introspection;
     }
 

@@ -171,7 +171,7 @@ public interface ClassElement extends TypedElement {
      * @return The fields
      */
     default List<FieldElement> getFields() {
-        return getFields(modifiers -> true);
+        return getElements(ElementQuery.ALL_FIELDS);
     }
 
     /**
@@ -179,8 +179,22 @@ public interface ClassElement extends TypedElement {
      *
      * @param modifierFilter Can be used to filter fields by modifier
      * @return The fields
+     * @deprecated Use {@link #getElements(ElementQuery)} instead
      */
+    @Deprecated
     default List<FieldElement> getFields(@NonNull Predicate<Set<ElementModifier>> modifierFilter) {
+        Objects.requireNonNull(modifierFilter, "The modifier filter cannot be null");
+        return getElements(ElementQuery.ALL_FIELDS.modifiers(modifierFilter));
+    }
+
+    /**
+     * Return the elements that match the given query.
+     *
+     * @param query The query to use.
+     * @return The fields
+     * @since 2.3.0
+     */
+    default <T extends Element> List<T> getElements(@NonNull ElementQuery<T> query) {
         return Collections.emptyList();
     }
 

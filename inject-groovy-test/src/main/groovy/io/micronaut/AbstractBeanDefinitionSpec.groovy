@@ -16,12 +16,16 @@
 package io.micronaut
 
 import groovy.transform.CompileStatic
+import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
+import io.micronaut.ast.groovy.visitor.GroovyClassElement
+import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.ast.ClassElement
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
@@ -33,6 +37,10 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
+import org.codehaus.groovy.control.CompilationUnit
+import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.ErrorCollector
+import org.codehaus.groovy.control.SourceUnit
 import spock.lang.Specification
 
 /**
@@ -40,6 +48,29 @@ import spock.lang.Specification
  * @since 1.0
  */
 abstract class AbstractBeanDefinitionSpec extends Specification {
+
+    /**
+     * Builds a class element from the given source.
+     * @param source The source
+     * @return The class element
+     */
+    ClassElement buildClassElement(String source) {
+        def builder = new AstBuilder()
+        ASTNode[] nodes = builder.buildFromString(source)
+        def lastNode = nodes ? nodes[-1] : null
+        ClassNode cn = lastNode instanceof ClassNode ? lastNode : null
+        if (cn != null) {
+            def cc = new CompilerConfiguration()
+            def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
+            def compilationUnit = new CompilationUnit()
+            def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)
+            return new GroovyClassElement(
+                    new GroovyVisitorContext(sourceUnit, compilationUnit ), cn, metadata
+            )
+        } else {
+            throw new IllegalArgumentException("No class found in passed source code")
+        }
+    }
 
     @CompileStatic
     BeanDefinition buildBeanDefinition(String className, String classStr) {

@@ -25,6 +25,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.annotation.concurrent.Immutable;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -107,6 +108,14 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
     @NonNull Optional<BeanProperty<T, Object>> getIndexedProperty(
             @NonNull Class<? extends Annotation> annotationType,
             @NonNull String annotationValue);
+
+    /**
+     * @return A immutable collection of methods.
+     * @since 2.3.0
+     */
+    @NonNull default Collection<BeanMethod<T, Object>> getBeanMethods() {
+        return Collections.emptyList();
+    }
 
     /**
      * Get all the bean properties annotated for the given type.
