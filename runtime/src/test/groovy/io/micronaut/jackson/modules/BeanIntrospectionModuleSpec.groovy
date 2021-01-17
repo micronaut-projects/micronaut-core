@@ -1,5 +1,7 @@
 package io.micronaut.jackson.modules
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter
+import com.fasterxml.jackson.annotation.JsonAnySetter
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -237,6 +239,32 @@ class BeanIntrospectionModuleSpec extends Specification {
             ctx.close()
     }
 
+    void "test that JsonAnyGetter and JsonAnySetter (de-)serialization works with @Introspected"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:"json unwrapped is used"
+        def plant = new PlantWithCustomFields(name: "Rose", unmappedFields: [color: "green", hasFlowers: true])
+        def str = objectMapper.writeValueAsString(plant)
+
+        then:"The result is correct"
+        str == '{"name":"Rose","color":"green","hasFlowers":true}'
+
+        when:"deserializing"
+        def read = objectMapper.readValue(str, PlantWithCustomFields)
+
+        then:
+        read.name == plant.name
+        read.unmappedFields['color'] == 'green'
+        read.unmappedFields['hasFlowers'] == true
+
+        cleanup:
+        ctx.close()
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -306,8 +334,29 @@ class BeanIntrospectionModuleSpec extends Specification {
     static class Attributes {
         String color
         boolean hasFlowers
-
     }
+
+    @Introspected
+    static class PlantWithCustomFields {
+        String name
+
+        @JsonAnySetter
+        Map<String, Object> unmappedFields = new HashMap<>(0);
+
+        @JsonAnyGetter
+        Map<String, Object> getUnmappedFields() {
+            return unmappedFields;
+        }
+
+        void setName(String name) {
+            this.name = name
+        }
+
+        void setUnmappedFields(Map<String, Object> unmappedFields) {
+            this.unmappedFields = unmappedFields
+        }
+    }
+
         //Used for @JsonView
     static class PublicView {}
     static class AllView extends PublicView {}
