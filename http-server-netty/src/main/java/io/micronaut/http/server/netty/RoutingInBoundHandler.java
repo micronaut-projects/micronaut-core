@@ -443,6 +443,27 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         RouteMatch<?> route;
 
         final String requestMethodName = request.getMethodName();
+        MediaType contentType = request.getContentType().orElse(null);
+
+        Optional<Boolean> multipartEnabled = serverConfiguration.getMultipart().getEnabled();
+        if (contentType != null &&
+                contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) &&
+                multipartEnabled.isPresent() &&
+                !multipartEnabled.get()) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Multipart uploads have been disabled via configuration. Rejected request for URI {}, method {}, and content type {}", request.getUri(),
+                        requestMethodName, contentType);
+            }
+
+            handleStatusError(
+                    ctx,
+                    request,
+                    nettyHttpRequest,
+                    HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+                    "Content Type [" + contentType + "] not allowed");
+            return;
+        }
+
         if (routeMatch == null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("No matching route: {} {}", httpMethod, request.getUri());
@@ -452,7 +473,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             final List<UriRouteMatch<?, ?>> anyMatchingRoutes = router
                     .findAny(request.getUri().toString(), request)
                     .collect(Collectors.toList());
-            MediaType contentType = request.getContentType().orElse(null);
             final Collection<MediaType> acceptedTypes = request.accept();
             final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);
 
@@ -475,21 +495,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (CollectionUtils.isNotEmpty(acceptableContentTypes)) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", request.getUri(),
-                            requestMethodName, contentType);
-                }
-
-                handleStatusError(
-                        ctx,
-                        request,
-                        nettyHttpRequest,
-                        HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
-                        "Content Type [" + contentType + "] not allowed. Allowed types: " + acceptableContentTypes);
-                return;
-            }
-
-            if (!serverConfiguration.getMultipart().isEnabled() && contentType != null && contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE)) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Multipart uploads have been disabled via configuration. Rejected request for URI {}, method {}, and content type {}", request.getUri(),
                             requestMethodName, contentType);
                 }
 
