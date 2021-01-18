@@ -487,6 +487,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 return;
             }
 
+            if (!serverConfiguration.getMultipart().isEnabled() && contentType != null && contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE)) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Multipart uploads have been disabled via configuration. Rejected request for URI {}, method {}, and content type {}", request.getUri(),
+                            requestMethodName, contentType);
+                }
+
+                handleStatusError(
+                        ctx,
+                        request,
+                        nettyHttpRequest,
+                        HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+                        "Content Type [" + contentType + "] not allowed. Allowed types: " + acceptableContentTypes);
+                return;
+            }
+
             if (CollectionUtils.isNotEmpty(produceableContentTypes)) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", request.getUri(),
