@@ -27,6 +27,8 @@ import io.micronaut.core.util.ArgumentUtils;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.concurrent.Immutable;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Optional;
 
 /**
@@ -118,6 +120,90 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
         } else {
             final T v = get(bean);
             return ConversionService.SHARED.convert(v, type).orElse(defaultValue);
+        }
+    }
+
+    /**
+     * This method returns true if the property can be mutated either via copy constructor or bean setter.
+     *
+     * @return True if it is mutable
+     * @see #withValue(Object, Object)
+     * @since 2.3.0
+     */
+    default boolean hasSetterOrConstructorArgument() {
+        BeanIntrospection<B> declaringBean = getDeclaringBean();
+        return !isReadOnly() || Arrays.stream(declaringBean.getConstructorArguments())
+                                    .anyMatch(arg -> declaringBean.getProperty(arg.getName(), arg.getType()).isPresent());
+    }
+
+    /**
+     * This method will attempt to modify the property or if this is a immutable type using a copy constructor to return a new instance with the new value.
+     *
+     * <p>This differs from {@link #set(Object, Object)} which will throw an exception if the property does not have a setter.</p>
+     *
+     * <ul>
+     *     <li>If the property is read-only but can be provided via constructor argument a new instance representing a copy of the bean is returned.</li>
+     *     <li>If the property is mutable then the passed instance is returned and {@link #set(Object, Object)} invoked  to mutate the property</li>
+     *     <li>If there is no way for the property to be mutated then an {@link UnsupportedOperationException} is thrown</li>
+     * </ul>
+     *
+     * @param bean The bean
+     * @param value The new value
+     * @return Either the existing instance or the property is mutable or a newly created instance via the copy constructor pattern.
+     * @throws UnsupportedOperationException if the property cannot be mutated
+     * @since 2.3.0
+     */
+    default B withValue(@NonNull B bean, @Nullable T value) {
+        if (isReadOnly())  {
+            if (value == get(bean)) {
+                return bean;
+            }
+            BeanIntrospection<B> declaringBean = getDeclaringBean();
+            Argument<?>[] constructorArguments = declaringBean.getConstructorArguments();
+            Object[] values = new Object[constructorArguments.length];
+            boolean found = false;
+            for (int i = 0; i < constructorArguments.length; i++) {
+                Argument<?> constructorArgument = constructorArguments[i];
+                String argumentName = constructorArgument.getName();
+                Class<?> argumentType = constructorArgument.getType();
+                BeanProperty<B, ?> prop = declaringBean
+                        .getProperty(argumentName, argumentType).orElse(null);
+                if (prop == null) {
+                    throw new UnsupportedOperationException("Cannot create copy of type [" + declaringBean.getBeanType() + "]. Constructor contains argument [" + argumentName + "] that is not a readable property");
+                } else if (prop == this) {
+                    found = true;
+                    values[i] = value;
+                } else {
+                    values[i] = prop.get(bean);
+                }
+            }
+            if (found) {
+                B newInstance = declaringBean.instantiate(values);
+                Collection<BeanProperty<B, Object>> beanProperties = declaringBean.getBeanProperties();
+                for (BeanProperty<B, Object> beanProperty : beanProperties) {
+                    if (beanProperty != this && beanProperty.isReadWrite()) {
+                        beanProperty.set(newInstance, beanProperty.get(bean));
+                    }
+                }
+                return newInstance;
+            } else {
+                B newInstance = declaringBean.instantiate(values);
+                Collection<BeanProperty<B, Object>> beanProperties = declaringBean.getBeanProperties();
+                for (BeanProperty<B, Object> beanProperty : beanProperties) {
+                    if (beanProperty == this && beanProperty.isReadWrite()) {
+                        found = true;
+                        beanProperty.set(newInstance, beanProperty.get(bean));
+                    }
+                }
+                if (!found) {
+                    throw new UnsupportedOperationException("Cannot mutate property [" + getName() + "] that is not mutable via a setter method or constructor argument for type: " + declaringBean.getBeanType().getName());
+                } else {
+                    return newInstance;
+                }
+            }
+        } else {
+            set(bean, value);
+            return bean;
         }
     }
 

@@ -12,7 +12,6 @@ import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.TypeConverter
-import io.micronaut.core.naming.Named
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
@@ -25,7 +24,6 @@ import spock.lang.IgnoreIf
 //import org.objectweb.asm.util.TraceClassVisitor
 import spock.lang.Issue
 import spock.lang.Requires
-import spock.util.environment.Jvm
 
 import javax.annotation.processing.SupportedAnnotationTypes
 import javax.persistence.Column
@@ -39,6 +37,62 @@ import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test copy constructor via mutate method"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.CopyMe','''\
+package test;
+
+import java.net.URL;
+
+@io.micronaut.core.annotation.Introspected
+public class CopyMe {
+
+    private URL url;
+    private String name;
+    
+    CopyMe(String name) {
+        this.name = name;
+    }
+
+    public URL getUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+''')
+        when:
+        def copyMe = introspection.instantiate("Test")
+        def expectUrl = new URL("http://test.com")
+        copyMe.url = expectUrl
+
+        then:
+        copyMe.name == 'Test'
+        copyMe.url == expectUrl
+
+
+        when:
+        def property = introspection.getRequiredProperty("name", String)
+        def newInstance = property.withValue(copyMe, "Changed")
+
+        then:
+        !newInstance.is(copyMe)
+        newInstance.name == 'Changed'
+        newInstance.url == expectUrl
+
+        when:"the instance is changed with the same value"
+        def result = property.withValue(newInstance, "Changed")
+
+        then:"The existing instance is returned"
+        newInstance.is(result)
+    }
 
     @Requires({ jvm.isJava14Compatible() })
     void "test annotations on generic type arguments for Java 14+ records"() {
@@ -116,11 +170,11 @@ package test;
 import io.micronaut.core.annotation.Creator;
 
 @io.micronaut.core.annotation.Introspected
-public record Foo(@javax.validation.constraints.NotBlank String name){
+public record Foo(@javax.validation.constraints.NotBlank String name, int age){
 }
 ''')
         when:
-        def test = introspection.instantiate("test")
+        def test = introspection.instantiate("test", 20)
         def property = introspection.getRequiredProperty("name", String)
         def argument = introspection.getConstructorArguments()[0]
 
@@ -129,12 +183,21 @@ public record Foo(@javax.validation.constraints.NotBlank String name){
         argument.getAnnotationMetadata().hasAnnotation(NotBlank)
         test.name == 'test'
         test.name() == 'test'
-        introspection.propertyNames.length == 1
-        introspection.propertyNames == ['name'] as String[]
+        introspection.propertyNames.length == 2
+        introspection.propertyNames == ['name', 'age'] as String[]
         property.hasAnnotation(NotBlank)
         property.isReadOnly()
+        property.hasSetterOrConstructorArgument()
         property.name == 'name'
         property.get(test) == 'test'
+
+        when:"a mutation is applied"
+        def newTest = property.withValue(test, "Changed")
+
+        then:"a new instance is returned"
+        !newTest.is(test)
+        newTest.name() == 'Changed'
+        newTest.age() == 20
     }
 
     void "test create bean introspection for external inner class"() {
@@ -243,11 +306,19 @@ interface GenBase<T> {
 ''')
         when:
         def test = introspection.instantiate()
+        def property = introspection.getRequiredProperty("name", String)
 
         then:
         introspection.beanProperties.first().type == String
-        introspection.getRequiredProperty("name", String)
-                .get(test) == 'test'
+        property.get(test) == 'test'
+        !property.hasSetterOrConstructorArgument()
+
+        when:
+        property.withValue(test, 'try change')
+
+        then:
+        def e = thrown(UnsupportedOperationException)
+        e.message =='Cannot mutate property [name] that is not mutable via a setter method or constructor argument for type: test.Foo'
     }
 
     void "test bean introspection with property of generic superclass"() {
@@ -315,6 +386,13 @@ interface GenBase<T> {
 
         then:
         bp.get(test) == 5L
+
+        when:
+        def returnedBean = bp.withValue(test, 10L)
+
+        then:
+        returnedBean.is(test)
+        bp.get(test) == 10L
     }
 
     void "test bean introspection with property with static creator method on interface"() {

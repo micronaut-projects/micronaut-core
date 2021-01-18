@@ -18,6 +18,7 @@ package io.micronaut.inject.beans.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -25,10 +26,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.*;
 import io.micronaut.core.beans.AbstractBeanProperty;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -40,9 +39,8 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Writes out {@link io.micronaut.core.beans.BeanProperty} instances to produce {@link io.micronaut.core.beans.BeanIntrospection} information.
@@ -56,6 +54,9 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private static final Type TYPE_BEAN_PROPERTY = Type.getType(AbstractBeanProperty.class);
     private static final Method METHOD_READ_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "readInternal", Object.class));
     private static final Method METHOD_WRITE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "writeInternal", Object.class, Object.class));
+    private static final Method METHOD_WITH_VALUE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "withValueInternal", Object.class, Object.class));
+    private static final Method METHOD_GET_BEAN = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanProperty.class, "getDeclaringBean"));
+    private static final Method METHOD_INSTANTIATE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanIntrospection.class, "instantiate", Object[].class));
     private final Type propertyType;
     private final String propertyName;
     private final AnnotationMetadata annotationMetadata;
@@ -64,12 +65,14 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private final Map<String, ClassElement> typeArguments;
     private final Type beanType;
     private final boolean readOnly;
+    private final boolean isMutable;
     private final MethodElement readMethod;
     private final MethodElement writeMethod;
     private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
     private final TypedElement typeElement;
     private final ClassElement declaringElement;
     private final Type propertyGenericType;
+    private final BeanIntrospectionWriter beanIntrospectionWriter;
 
     /**
      * Default constructor.
@@ -98,6 +101,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
         super(introspectionWriter.getOriginatingElements());
+        this.beanIntrospectionWriter = introspectionWriter;
         Type introspectionType = introspectionWriter.getIntrospectionType();
         this.declaringElement = introspectionWriter.getClassElement();
         this.typeElement = typeElement;
@@ -108,6 +112,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         this.writeMethod = writeMethod;
         this.propertyName = propertyName;
         this.readOnly = isReadOnly;
+        this.isMutable = !readOnly || hasAssociatedConstructorArgument();
         this.annotationMetadata = annotationMetadata == AnnotationMetadata.EMPTY_METADATA ? null : annotationMetadata;
         this.type = getTypeReference(ClassElement.of(introspectionType.getClassName() + "$$" + index));
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -117,6 +122,13 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             this.typeArguments = null;
         }
 
+    }
+
+    /**
+     * @return Is this property mutable
+     */
+    public boolean isMutable() {
+        return isMutable;
     }
 
     @NonNull
@@ -155,7 +167,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
 
             if (readOnly) {
                 // override isReadOnly method
-                final GeneratorAdapter isReadOnly = startPublicMethodZeroArgs(classWriter, boolean.class, "isReadOnly");
+                final GeneratorAdapter isReadOnly = startPublicFinalMethodZeroArgs(classWriter, boolean.class, "isReadOnly");
                 isReadOnly.push(true);
                 isReadOnly.returnValue();
                 isReadOnly.visitMaxs(1, 1);
@@ -163,12 +175,155 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             }
 
             if (writeMethod != null && readMethod == null) {
-                // override isReadOnly method
-                final GeneratorAdapter isWriteOnly = startPublicMethodZeroArgs(classWriter, boolean.class, "isWriteOnly");
+                // override isWriteOnly method
+                final GeneratorAdapter isWriteOnly = startPublicFinalMethodZeroArgs(classWriter, boolean.class, "isWriteOnly");
                 isWriteOnly.push(true);
                 isWriteOnly.returnValue();
                 isWriteOnly.visitMaxs(1, 1);
                 isWriteOnly.endMethod();
+            }
+
+            // override isMutable method
+            boolean isMutable = this.isMutable;
+            String nonMutableMessage = "Cannot mutate property [" + getPropertyName() + "] that is not mutable via a setter method or constructor argument for type: " + beanType.getClassName();
+            if (isMutable) {
+                if (writeMethod != null) {
+                    // in the case where there is a write method we simply generate code to invoke
+                    // writeInternal and returned the bean passed as the argument
+                    GeneratorAdapter withValueMethod = startPublicMethod(classWriter, METHOD_WITH_VALUE_INTERNAL);
+                    // generates
+                    // Object mutate(Object bean, Object value) {
+                    //     writeInternal(bean, value);
+                    //     return bean;
+                    // }
+                    withValueMethod.loadThis();
+                    withValueMethod.loadArgs();
+                    withValueMethod.invokeVirtual(type, METHOD_WRITE_INTERNAL);
+                    withValueMethod.loadArg(0);
+                    withValueMethod.returnValue();
+                    withValueMethod.visitMaxs(1, 1);
+                    withValueMethod.endMethod();
+                } else {
+                    // In this case we have to do the copy constructor approach
+                    Map<String, BeanPropertyWriter> propertyDefinitions = beanIntrospectionWriter.getPropertyDefinitions();
+                    MethodElement constructor = beanIntrospectionWriter.getConstructor();
+                    Object[] constructorArguments = null;
+                    if (constructor != null) {
+                        ParameterElement[] parameters = constructor.getParameters();
+                        constructorArguments = new Object[parameters.length];
+                        for (int i = 0; i < parameters.length; i++) {
+                            ParameterElement parameter = parameters[i];
+                            BeanPropertyWriter propertyWriter = propertyDefinitions.get(parameter.getName());
+                            if (propertyWriter == this) {
+                                constructorArguments[i] = this;
+                            } else if (propertyWriter != null) {
+                                MethodElement readMethod = propertyWriter.readMethod;
+                                if (readMethod != null) {
+                                    if (readMethod.getGenericReturnType().isAssignable(parameter.getGenericType())) {
+                                        constructorArguments[i] = readMethod;
+                                    } else {
+                                        isMutable = false;
+                                        nonMutableMessage = "Cannot create copy of type [" + beanType.getClassName() + "]. Property of type [" + readMethod.getGenericReturnType().getName() + "] is not assignable to constructor argument [" + parameter.getName() + "]";
+                                    }
+
+                                } else {
+                                    isMutable = false;
+                                    nonMutableMessage = "Cannot create copy of type [" + beanType.getClassName() + "]. Constructor contains argument [" + parameter.getName() + "] that is not a readable property";
+                                    break;
+                                }
+                            } else {
+                                isMutable = false;
+                                nonMutableMessage = "Cannot create copy of type [" + beanType.getClassName() + "]. Constructor contains argument [" + parameter.getName() + "] that is not a readable property";
+                                break;
+                            }
+                        }
+                    }
+
+                    if (isMutable) {
+                        GeneratorAdapter withValueMethod = startPublicMethod(classWriter, METHOD_WITH_VALUE_INTERNAL);
+                        // generates
+                        // Object mutate(Object bean, Object value) {
+                        //     return getDeclaringBean().instantiate(bean.getOther(), value);
+                        // }
+                        withValueMethod.loadThis();
+                        withValueMethod.invokeVirtual(type, METHOD_GET_BEAN);
+                        Set<MethodElement> readMethods;
+                        if (constructorArguments != null) {
+
+                            int len = constructorArguments.length;
+                            pushNewArray(withValueMethod, Object.class, len);
+                            readMethods = new HashSet<>(len);
+                            for (int i = 0; i < len; i++) {
+                                Object constructorArgument = constructorArguments[i];
+                                pushStoreInArray(withValueMethod, i, len, () -> {
+                                    if (constructorArgument instanceof BeanPropertyWriter) {
+                                        withValueMethod.loadArg(1);
+                                    } else {
+                                        MethodElement readMethod = (MethodElement) constructorArgument;
+                                        readMethods.add(readMethod);
+                                        withValueMethod.loadArg(0);
+                                        pushCastToType(withValueMethod, beanType);
+                                        ClassElement returnType = invokeReadMethod(withValueMethod, readMethod);
+                                        pushBoxPrimitiveIfNecessary(returnType, withValueMethod);
+                                    }
+                                });
+
+                            }
+                        } else {
+                            pushNewArray(withValueMethod, Object.class, 0);
+                            readMethods = Collections.emptySet();
+                        }
+
+                        withValueMethod.invokeInterface(Type.getType(BeanIntrospection.class), METHOD_INSTANTIATE);
+                        List<BeanPropertyWriter> readWriteProps = propertyDefinitions.values().stream()
+                                .filter(bwp -> bwp.writeMethod != null && bwp.readMethod != null && !readMethods.contains(bwp.readMethod))
+                                .collect(Collectors.toList());
+                        if (!readWriteProps.isEmpty()) {
+                            int beanTypeLocal = withValueMethod.newLocal(beanType);
+                            withValueMethod.storeLocal(beanTypeLocal);
+                            for (BeanPropertyWriter readWriteProp : readWriteProps) {
+
+                                MethodElement writeMethod = readWriteProp.writeMethod;
+                                MethodElement readMethod = readWriteProp.readMethod;
+                                withValueMethod.loadLocal(beanTypeLocal);
+                                pushCastToType(withValueMethod, beanType);
+                                withValueMethod.loadArg(0);
+                                pushCastToType(withValueMethod, beanType);
+                                invokeReadMethod(withValueMethod, readMethod);
+                                ClassElement writeReturnType = writeMethod.getReturnType();
+                                String methodDescriptor = getMethodDescriptor(writeReturnType, Arrays.asList(writeMethod.getParameters()));
+
+                                if (declaringElement.isInterface()) {
+                                    withValueMethod.invokeInterface(beanType, new Method(writeMethod.getName(), methodDescriptor));
+                                } else {
+                                    withValueMethod.invokeVirtual(beanType, new Method(writeMethod.getName(), methodDescriptor));
+                                }
+                                if (!writeReturnType.getName().equals("void")) {
+                                    withValueMethod.pop();
+                                }
+                            }
+                            withValueMethod.loadLocal(beanTypeLocal);
+                            pushCastToType(withValueMethod, beanType);
+                        }
+                        withValueMethod.returnValue();
+                        withValueMethod.visitMaxs(1, 1);
+                        withValueMethod.endMethod();
+                    }
+                }
+            }
+
+            final GeneratorAdapter isWriteOnly = startPublicFinalMethodZeroArgs(classWriter, boolean.class, "hasSetterOrConstructorArgument");
+            isWriteOnly.push(isMutable);
+            isWriteOnly.returnValue();
+            isWriteOnly.visitMaxs(1, 1);
+            isWriteOnly.endMethod();
+
+            if (!isMutable) {
+                // In this case the bean cannot be mutated via either copy constructor or setter so simply throw an exception
+                GeneratorAdapter mutateMethod = startPublicMethod(classWriter, METHOD_WITH_VALUE_INTERNAL);
+                mutateMethod.throwException(Type.getType(UnsupportedOperationException.class), nonMutableMessage);
+                mutateMethod.visitMaxs(1, 1);
+                mutateMethod.endMethod();
             }
 
             for (GeneratorAdapter generator : loadTypeMethods.values()) {
@@ -177,6 +332,30 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             }
             classOutput.write(classWriter.toByteArray());
         }
+    }
+
+    @NonNull
+    private ClassElement invokeReadMethod(GeneratorAdapter mutateMethod, MethodElement readMethod) {
+        ClassElement returnType = readMethod.getReturnType();
+        if (declaringElement.isInterface()) {
+            mutateMethod.invokeInterface(beanType, new Method(readMethod.getName(), getMethodDescriptor(returnType, Collections.emptyList())));
+        } else {
+            mutateMethod.invokeVirtual(beanType, new Method(readMethod.getName(), getMethodDescriptor(returnType, Collections.emptyList())));
+        }
+        return returnType;
+    }
+
+    private boolean hasAssociatedConstructorArgument() {
+        MethodElement constructor = beanIntrospectionWriter.getConstructor();
+        if (constructor != null) {
+            ParameterElement[] parameters = constructor.getParameters();
+            for (ParameterElement parameter : parameters) {
+                if (getPropertyName().equals(parameter.getName())) {
+                    return typeElement.getType().isAssignable(parameter.getGenericType());
+                }
+            }
+        }
+        return false;
     }
 
     private void writeWriteMethod() {
