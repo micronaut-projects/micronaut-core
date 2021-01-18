@@ -32,7 +32,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     private final List<Predicate<String>> namePredicates;
     private final List<Predicate<AnnotationMetadata>> annotationPredicates;
     private final List<Predicate<Set<ElementModifier>>> modifiersPredicates;
-    private final List<Predicate<Element>> elementPredicates;
+    private final List<Predicate<T>> elementPredicates;
 
     DefaultElementQuery(Class<T> elementType) {
         this(elementType, false, false, false, false, null, null, null, null);
@@ -45,7 +45,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             boolean onlyAbstract, boolean onlyConcrete, List<Predicate<String>> namePredicates,
             List<Predicate<AnnotationMetadata>> annotationPredicates,
             List<Predicate<Set<ElementModifier>>> modifiersPredicates,
-            List<Predicate<Element>> elementPredicates) {
+            List<Predicate<T>> elementPredicates) {
         this.elementType = elementType;
         this.onlyAccessible = onlyAccessible;
         this.onlyDeclared = onlyDeclared;
@@ -107,7 +107,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     }
 
     @Override
-    public List<Predicate<Element>> getElementPredicates() {
+    public List<Predicate<T>> getElementPredicates() {
         if (elementPredicates == null) {
             return Collections.emptyList();
         }
@@ -230,9 +230,9 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
 
     @NotNull
     @Override
-    public ElementQuery<T> filter(@NotNull Predicate<Element> predicate) {
+    public ElementQuery<T> filter(@NotNull Predicate<T> predicate) {
         Objects.requireNonNull(predicate, "Predicate cannot be null");
-        List<Predicate<Element>> elementPredicates;
+        List<Predicate<T>> elementPredicates;
         if (this.elementPredicates != null) {
             elementPredicates = new ArrayList<>(this.elementPredicates);
             elementPredicates.add(predicate);

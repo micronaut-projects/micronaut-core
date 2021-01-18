@@ -104,7 +104,7 @@ public interface ElementQuery<T extends Element> {
      * @param predicate The predicate to use. Should return true to include the element.
      * @return This query
      */
-    @NonNull ElementQuery<T> filter(@NonNull Predicate<Element> predicate);
+    @NonNull ElementQuery<T> filter(@NonNull Predicate<T> predicate);
 
     /**
      * Build the query result.
@@ -174,6 +174,6 @@ public interface ElementQuery<T extends Element> {
         /**
          * @return The element predicates
          */
-        @NonNull List<Predicate<Element>> getElementPredicates();
+        @NonNull List<Predicate<T>> getElementPredicates();
     }
 }

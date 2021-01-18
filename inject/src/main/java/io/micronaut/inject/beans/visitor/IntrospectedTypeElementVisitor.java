@@ -315,7 +315,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     .onlyAccessible()
                     .modifiers((modifiers) -> !modifiers.contains(ElementModifier.STATIC))
                     .annotated((am) -> am.hasStereotype(Executable.class));
-            List<MethodElement> executableMethods = ce.getElements(query);
+            List<MethodElement> executableMethods = ce.getEnclosedElements(query);
             for (MethodElement executableMethod : executableMethods) {
                 writer.visitBeanMethod(executableMethod);
             }

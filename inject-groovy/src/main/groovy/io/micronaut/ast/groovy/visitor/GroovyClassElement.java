@@ -106,7 +106,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public <T extends Element> List<T> getElements(@NonNull ElementQuery<T> query) {
+    public <T extends Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
         Objects.requireNonNull(query, "Query cannot be null");
         ElementQuery.Result<T> result = query.result();
         boolean onlyDeclared = result.isOnlyDeclared();
@@ -115,7 +115,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         boolean onlyConcrete = result.isOnlyConcrete();
         List<Predicate<String>> namePredicates = result.getNamePredicates();
         List<Predicate<AnnotationMetadata>> annotationPredicates = result.getAnnotationPredicates();
-        List<Predicate<Element>> elementPredicates = result.getElementPredicates();
+        List<Predicate<T>> elementPredicates = result.getElementPredicates();
         List<Predicate<Set<ElementModifier>>> modifierPredicates = result.getModifierPredicates();
         List<T> elements;
         Class<T> elementType = result.getElementType();

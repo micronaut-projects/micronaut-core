@@ -100,20 +100,20 @@ interface AnotherInterface {
 }
 ''')
         when:"all methods are retrieved"
-        def allMethods = classElement.getElements(ElementQuery.ALL_METHODS)
+        def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
 
         then:"All methods, including non-accessible are returned but not overridden"
         // slightly different result to java since groovy hides private methods
         allMethods.size() == 9
 
         when:"only abstract methods are requested"
-        def abstractMethods = classElement.getElements(ElementQuery.ALL_METHODS.onlyAbstract())
+        def abstractMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAbstract())
 
         then:"The result is correct"
         abstractMethods*.name as Set == ['unimplementedItfeMethod', 'unimplementedSuperMethod', 'unimplementedMethod'] as Set
 
         when:"only concrete methods are requested"
-        def concrete = classElement.getElements(ElementQuery.ALL_METHODS.onlyConcrete().onlyAccessible())
+        def concrete = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyConcrete().onlyAccessible())
 
         then:"The result is correct"
         concrete*.name as Set == ['packagePrivateMethod', 'publicMethod', 'staticMethod', 'otherSuper', 'itfeMethod'] as Set
@@ -175,7 +175,7 @@ interface AnotherInterface {
 }
 ''')
         when:"all methods are retrieved"
-        def allMethods = classElement.getElements(ElementQuery.ALL_METHODS)
+        def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
 
         then:"All methods, including non-accessible are returned but not overridden"
         allMethods.size() == 6 // slightly different result to java since groovy hides private methods
@@ -183,7 +183,7 @@ interface AnotherInterface {
         allMethods.find { it.name == 'otherSuper'}.declaringType.simpleName == 'SuperType'
 
         when:"obtaining only the declared methods"
-        def declared = classElement.getElements(ElementQuery.of(MethodElement).onlyDeclared())
+        def declared = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyDeclared())
 
         then:"The declared are correct"
         // this method differs for Groovy because for some reason default interface methods become
@@ -191,13 +191,13 @@ interface AnotherInterface {
         declared*.name as Set == ['privateMethod', 'packagePrivateMethod', 'publicMethod', 'staticMethod', 'itfeMethod'] as Set
 
         when:"Accessible methods are retrieved"
-        def accessible = classElement.getElements(ElementQuery.of(MethodElement).onlyAccessible())
+        def accessible = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyAccessible())
 
         then:"Only accessible methods, excluding those that require reflection"
         accessible*.name as Set == ['otherSuper', 'itfeMethod', 'publicMethod', 'packagePrivateMethod', 'staticMethod'] as Set
 
         when:"static methods are resolved"
-        def staticMethods = classElement.getElements(ElementQuery.ALL_METHODS.modifiers({
+        def staticMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.modifiers({
             it.contains(ElementModifier.STATIC)
         }))
 
@@ -206,13 +206,13 @@ interface AnotherInterface {
         staticMethods.first().name == 'staticMethod'
 
         when:"All fields are retrieved"
-        def allFields = classElement.getElements(ElementQuery.ALL_FIELDS)
+        def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
 
         then:"we get everything"
         allFields.size() == 4
 
         when:"Accessible fields are retrieved"
-        def accessibleFields = classElement.getElements(ElementQuery.ALL_FIELDS.onlyAccessible())
+        def accessibleFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyAccessible())
 
         then:"we get everything"
         accessibleFields.size() == 2

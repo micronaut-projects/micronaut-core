@@ -407,7 +407,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
-    public <T extends io.micronaut.inject.ast.Element> List<T> getElements(@NonNull ElementQuery<T> query) {
+    public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
         Objects.requireNonNull(query, "Query cannot be null");
         ElementQuery.Result<T> result = query.result();
         ElementKind kind = getElementKind(result.getElementType());
@@ -512,11 +512,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         for (Element enclosedElement : enclosedElements) {
             ElementKind enclosedElementKind = enclosedElement.getKind();
             if (enclosedElementKind == kind) {
+                String elementName = enclosedElement.getSimpleName().toString();
                 if (onlyAccessible) {
                     // exclude private members
                     if (enclosedElement.getModifiers().contains(Modifier.PRIVATE)) {
                         continue;
-                    } else if (enclosedElement.getSimpleName().toString().startsWith("$")) {
+                    } else if (elementName.startsWith("$")) {
                         // exclude synthetic members or bridge methods that start with $
                         continue;
                     } else {
@@ -547,7 +548,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
                 if (!namePredicates.isEmpty()) {
                     for (Predicate<String> namePredicate : namePredicates) {
-                        if (!namePredicate.test(enclosedElement.getSimpleName().toString())) {
+                        if (!namePredicate.test(elementName)) {
                             continue elementLoop;
                         }
                     }
@@ -594,9 +595,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 }
 
                 if (element != null) {
-                    List<Predicate<io.micronaut.inject.ast.Element>> elementPredicates = result.getElementPredicates();
+                    List<Predicate<T>> elementPredicates = result.getElementPredicates();
                     if (!elementPredicates.isEmpty()) {
-                        for (Predicate<io.micronaut.inject.ast.Element> elementPredicate : elementPredicates) {
+                        for (Predicate<T> elementPredicate : elementPredicates) {
                             if (!elementPredicate.test(element)) {
                                 continue elementLoop;
                             }
