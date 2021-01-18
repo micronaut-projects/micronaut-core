@@ -507,7 +507,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         }
         List<Predicate<Set<ElementModifier>>> modifierPredicates = result.getModifierPredicates();
         List<Predicate<String>> namePredicates = result.getNamePredicates();
-
+        List<Predicate<AnnotationMetadata>> annotationPredicates = result.getAnnotationPredicates();
+        boolean hasNamePredicates = !namePredicates.isEmpty();
+        boolean hasModifierPredicates = !modifierPredicates.isEmpty();
+        boolean hasAnnotationPredicates = !annotationPredicates.isEmpty();
+        
         elementLoop:
         for (Element enclosedElement : enclosedElements) {
             ElementKind enclosedElementKind = enclosedElement.getKind();
@@ -536,7 +540,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     }
                 }
 
-                if (!modifierPredicates.isEmpty()) {
+                if (hasModifierPredicates) {
                     Set<ElementModifier> modifiers = enclosedElement
                             .getModifiers().stream().map(m -> ElementModifier.valueOf(m.name())).collect(Collectors.toSet());
                     for (Predicate<Set<ElementModifier>> modifierPredicate : modifierPredicates) {
@@ -546,7 +550,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     }
                 }
 
-                if (!namePredicates.isEmpty()) {
+                if (hasNamePredicates) {
                     for (Predicate<String> namePredicate : namePredicates) {
                         if (!namePredicate.test(elementName)) {
                             continue elementLoop;
@@ -555,8 +559,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 }
 
                 final AnnotationMetadata metadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosedElement);
-                List<Predicate<AnnotationMetadata>> annotationPredicates = result.getAnnotationPredicates();
-                if (!annotationPredicates.isEmpty()) {
+                if (hasAnnotationPredicates) {
                     for (Predicate<AnnotationMetadata> annotationPredicate : annotationPredicates) {
                         if (!annotationPredicate.test(metadata)) {
                             continue elementLoop;
