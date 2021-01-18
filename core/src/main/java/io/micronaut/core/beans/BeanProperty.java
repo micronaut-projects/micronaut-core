@@ -155,6 +155,9 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      */
     default B withValue(@NonNull B bean, @Nullable T value) {
         if (isReadOnly())  {
+            if (value == get(bean)) {
+                return bean;
+            }
             BeanIntrospection<B> declaringBean = getDeclaringBean();
             Argument<?>[] constructorArguments = declaringBean.getConstructorArguments();
             Object[] values = new Object[constructorArguments.length];
@@ -184,7 +187,19 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
                 }
                 return newInstance;
             } else {
-                throw new UnsupportedOperationException("Cannot mutate property [" + getName() + "] that is not mutable via a setter method or constructor argument for type: " + declaringBean.getBeanType().getName());
+                B newInstance = declaringBean.instantiate(values);
+                Collection<BeanProperty<B, Object>> beanProperties = declaringBean.getBeanProperties();
+                for (BeanProperty<B, Object> beanProperty : beanProperties) {
+                    if (beanProperty == this && beanProperty.isReadWrite()) {
+                        found = true;
+                        beanProperty.set(newInstance, beanProperty.get(bean));
+                    }
+                }
+                if (!found) {
+                    throw new UnsupportedOperationException("Cannot mutate property [" + getName() + "] that is not mutable via a setter method or constructor argument for type: " + declaringBean.getBeanType().getName());
+                } else {
+                    return newInstance;
+                }
             }
         } else {
             set(bean, value);

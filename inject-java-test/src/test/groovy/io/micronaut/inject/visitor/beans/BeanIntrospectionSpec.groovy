@@ -86,6 +86,12 @@ public class CopyMe {
         !newInstance.is(copyMe)
         newInstance.name == 'Changed'
         newInstance.url == expectUrl
+
+        when:"the instance is changed with the same value"
+        def result = property.withValue(newInstance, "Changed")
+
+        then:"The existing instance is returned"
+        newInstance.is(result)
     }
 
     @Requires({ jvm.isJava14Compatible() })

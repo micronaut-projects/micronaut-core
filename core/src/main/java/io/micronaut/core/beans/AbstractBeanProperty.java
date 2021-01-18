@@ -123,7 +123,11 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         if (!beanType.isInstance(bean)) {
             throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + introspection.getBeanType());
         }
-        return withValueInternal(bean, value);
+        if (value == get(bean)) {
+            return bean;
+        } else {
+            return withValueInternal(bean, value);
+        }
     }
 
     @Override
