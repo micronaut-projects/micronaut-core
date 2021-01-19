@@ -843,6 +843,9 @@ apply plugin: "io.micronaut.build.docs"
 apply plugin: "io.micronaut.build.dependency-updates"
 
 allprojects {
+
+    version project.projectVersion
+
     apply plugin: 'idea'
 
     idea {
