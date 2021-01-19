@@ -29,6 +29,11 @@ It is now possible to validate a resolved host against a list regular expression
 
 Thanks to a contribution by https://github.com/viniciusccarvalho[Vinicius Carvalho], Micronaut GCP supports distributed configuration via Google Cloud Secret Manager.
 
+==== Banner
+
+A new customizable banner is now displayed when the application starts up. See <<_micronaut_banner, Micronaut Banner>> for more information.
+
+
 === Module Upgrades
 
 TODO
