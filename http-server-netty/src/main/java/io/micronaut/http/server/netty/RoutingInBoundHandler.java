@@ -433,9 +433,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         MediaType contentType = request.getContentType().orElse(null);
         final String requestMethodName = request.getMethodName();
 
-        if (contentType != null &&
-                contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) &&
-                multipartEnabled) {
+        if (!multipartEnabled &&
+                contentType != null &&
+                contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Multipart uploads have been disabled via configuration. Rejected request for URI {}, method {}, and content type {}", request.getUri(),
                         requestMethodName, contentType);
