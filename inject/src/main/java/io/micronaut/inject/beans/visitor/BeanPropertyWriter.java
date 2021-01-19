@@ -267,7 +267,6 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                                         pushBoxPrimitiveIfNecessary(returnType, withValueMethod);
                                     }
                                 });
-
                             }
                         } else {
                             pushNewArray(withValueMethod, Object.class, 0);

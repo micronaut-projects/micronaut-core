@@ -3,9 +3,11 @@ package io.micronaut.inject.visitor
 import com.blazebit.persistence.impl.function.entity.ValuesEntity
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
+import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
+import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
@@ -19,6 +21,73 @@ class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
 
     def setup() {
         System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, IntrospectedTypeElementVisitor.name)
+    }
+
+    void "test generate bean method for introspected class"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.MethodTest', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+public class MethodTest extends SuperType implements SomeInt {
+    public boolean nonAnnotated() {
+        return true;
+    }
+    
+    @Executable
+    public String invokeMe(String str) {
+        return str;
+    }
+    
+    @Executable
+    int invokePrim(int i) {
+        return i;
+    }
+}
+
+class SuperType {
+    @Executable
+    String superMethod(String str) {
+        return str;
+    }
+    
+    @Executable
+    public String invokeMe(String str) {
+        return str;
+    }
+}
+
+interface SomeInt {
+    @Executable
+    default boolean ok() {
+        return true;
+    }
+    
+    default String getName() {
+        return "ok";
+    }
+}
+''')
+        when:
+        Collection<BeanMethod> beanMethods = introspection.getBeanMethods()
+
+        then:
+        // bizarrely Groovy doesn't support resolving default interface methods
+        beanMethods*.name as Set == ['invokeMe', 'invokePrim', 'superMethod'] as Set
+        beanMethods.every({it.annotationMetadata.hasAnnotation(Executable)})
+        beanMethods.every { it.declaringBean == introspection}
+
+        when:
+        def invokeMe = beanMethods.find { it.name == 'invokeMe' }
+        def invokePrim = beanMethods.find { it.name == 'invokePrim' }
+        def bean = introspection.instantiate()
+
+        then:
+        invokeMe.invoke(bean, "test") == 'test'
+        invokePrim.invoke(bean, 10) == 10
     }
 
     void "test generate bean introspection for interface"() {

@@ -54,6 +54,11 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     }
 
     @Override
+    public String toString() {
+        return variable.getName();
+    }
+
+    @Override
     public ClassElement getGenericField() {
         if (isPrimitive()) {
             ClassNode cn = ClassHelper.make(ClassUtils.getPrimitiveType(getType().getName()).orElse(null));

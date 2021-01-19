@@ -16,15 +16,199 @@
 package io.micronaut.visitors
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement
-import io.micronaut.http.annotation.Controller
 import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementModifier
+import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
+import io.micronaut.inject.ast.MethodElement
 import spock.lang.IgnoreIf
 import spock.util.environment.Jvm
 
 import java.util.function.Supplier
 
 class ClassElementSpec extends AbstractTypeElementSpec {
+
+    void 'test find matching methods on abstract class'() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package elementquery;
+
+abstract class Test extends SuperType implements AnotherInterface, SomeInt {
+
+    protected boolean t1;
+    private boolean t2;
+    
+    private boolean privateMethod() {
+        return true;
+    }
+    
+    boolean packagePrivateMethod() {
+        return true;
+    }
+    
+    @java.lang.Override
+    public boolean publicMethod() {
+        return true;
+    }
+    
+    static boolean staticMethod() {
+        return true;
+    }
+    
+    abstract boolean unimplementedMethod();
+}
+
+abstract class SuperType {
+    boolean s1;
+    private boolean s2;
+    private boolean privateMethod() {
+        return true;
+    }
+    
+    public boolean publicMethod() {
+        return true;
+    }
+    
+    public boolean otherSuper() {
+        return true;
+    }
+    
+    abstract boolean unimplementedSuperMethod();
+}
+
+interface SomeInt {
+    default boolean itfeMethod() {
+        return true;
+    }
+    
+    boolean publicMethod();
+}
+
+interface AnotherInterface {
+    boolean publicMethod();
+    
+    boolean unimplementedItfeMethod();
+}
+''')
+        when:"all methods are retrieved"
+        def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+
+        then:"All methods, including non-accessible are returned but not overridden"
+        allMethods.size() == 10
+
+        when:"only abstract methods are requested"
+        def abstractMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAbstract())
+
+        then:"The result is correct"
+        abstractMethods*.name as Set == ['unimplementedItfeMethod', 'unimplementedSuperMethod', 'unimplementedMethod'] as Set
+
+        when:"only concrete methods are requested"
+        def concrete = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyConcrete().onlyAccessible())
+
+        then:"The result is correct"
+        concrete*.name as Set == ['packagePrivateMethod', 'publicMethod', 'staticMethod', 'otherSuper', 'itfeMethod'] as Set
+    }
+
+    void "test find matching methods using ElementQuery"() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package elementquery;
+
+class Test extends SuperType implements AnotherInterface, SomeInt {
+
+    protected boolean t1;
+    private boolean t2;
+    
+    private boolean privateMethod() {
+        return true;
+    }
+    
+    boolean packagePrivateMethod() {
+        return true;
+    }
+    
+    public boolean publicMethod() {
+        return true;
+    }
+    
+    static boolean staticMethod() {
+        return true;
+    }
+}
+
+class SuperType {
+    boolean s1;
+    private boolean s2;
+    private boolean privateMethod() {
+        return true;
+    }
+    
+    public boolean publicMethod() {
+        return true;
+    }
+    
+    public boolean otherSuper() {
+        return true;
+    }
+}
+
+interface SomeInt {
+    default boolean itfeMethod() {
+        return true;
+    }
+    
+    boolean publicMethod();
+}
+
+interface AnotherInterface {
+    boolean publicMethod();
+}
+''')
+        when:"all methods are retrieved"
+        def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+
+        then:"All methods, including non-accessible are returned but not overridden"
+        allMethods.size() == 7
+        allMethods.find { it.name == 'publicMethod'}.declaringType.simpleName == 'Test'
+        allMethods.find { it.name == 'otherSuper'}.declaringType.simpleName == 'SuperType'
+
+        when:"obtaining only the declared methods"
+        def declared = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyDeclared())
+
+        then:"The declared are correct"
+        declared.size() == 4
+        declared*.name as Set == ['privateMethod', 'packagePrivateMethod', 'publicMethod', 'staticMethod'] as Set
+
+        when:"Accessible methods are retrieved"
+        def accessible = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyAccessible())
+
+        then:"Only accessible methods, excluding those that require reflection"
+        accessible.size() == 5
+        accessible*.name as Set == ['otherSuper', 'itfeMethod', 'publicMethod', 'packagePrivateMethod', 'staticMethod'] as Set
+
+        when:"static methods are resolved"
+        def staticMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.modifiers({
+            it.contains(ElementModifier.STATIC)
+        }))
+
+        then:"We only get statics"
+        staticMethods.size() == 1
+        staticMethods.first().name == 'staticMethod'
+
+        when:"All fields are retrieved"
+        def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+
+        then:"we get everything"
+        allFields.size() == 4
+
+        when:"Accessible fields are retrieved"
+        def accessibleFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyAccessible())
+
+        then:"we get everything"
+        accessibleFields.size() == 2
+        accessibleFields*.name as Set == ['s1', 't1'] as Set
+    }
 
     void "test visit inherited controller classes"() {
         buildBeanDefinition('test.TestController', '''
