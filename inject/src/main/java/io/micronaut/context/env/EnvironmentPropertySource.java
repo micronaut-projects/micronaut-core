@@ -66,10 +66,12 @@ public class EnvironmentPropertySource extends MapPropertySource {
         return PropertyConvention.ENVIRONMENT_VARIABLE;
     }
 
-    private static Map getEnv(@Nullable List<String> includes, @Nullable List<String> excludes) {
-        Map<String, String> env;
+    static Map getEnv(@Nullable List<String> includes, @Nullable List<String> excludes) {
+        return getEnv(new HashMap<>(System.getenv()), includes, excludes);
+    }
+
+    static Map getEnv(Map<String, String> env, @Nullable List<String> includes, @Nullable List<String> excludes) {
         if (includes != null || excludes != null) {
-            env = new HashMap<>(System.getenv());
             Iterator<String> it = env.keySet().iterator();
             while (it.hasNext()) {
                 String envVar = it.next();
@@ -80,8 +82,6 @@ public class EnvironmentPropertySource extends MapPropertySource {
                     it.remove();
                 }
             }
-        } else {
-            env = System.getenv();
         }
         return env;
     }

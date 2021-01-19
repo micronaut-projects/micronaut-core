@@ -1,0 +1,85 @@
+/*
+ * Copyright 2017-2021 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.context.env;
+
+import org.jetbrains.annotations.Nullable;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static io.micronaut.context.env.EnvironmentPropertySource.getEnv;
+
+/**
+ * A property source specific for the Kubernetes environment.
+ *
+ * It excludes Kubernetes-specific environment variables (like FOO_SERVICE_HOST, FOO_SERVICE_PORT, etc) since they would
+ * slow down application startup
+ *
+ * @author Nilson Pontello
+ * @author Álvaro Sánchez-Mariscal
+ * @since 2.3.0
+ */
+public class KubernetesEnvironmentPropertySource extends MapPropertySource {
+
+    /**
+     * The name of this property source.
+     */
+    public static final String NAME = "k8s-env";
+
+    /**
+     * Default constructor.
+     */
+    public KubernetesEnvironmentPropertySource() {
+        super(NAME, getEnv(getEnvNoK8s(), null, null));
+    }
+
+    /**
+     * Allows for control over which environment variables are included.
+     *
+     * @param includes The environment variables to include in configuration
+     * @param excludes The environment variables to exclude from configuration
+     */
+    public KubernetesEnvironmentPropertySource(@Nullable List<String> includes, @Nullable List<String> excludes) {
+        super(NAME, getEnv(getEnvNoK8s(), includes, excludes));
+    }
+
+    private static Map<String, String> getEnvNoK8s() {
+        Map<String, String> props = new HashMap<>();
+
+        for (Map.Entry<String, String> entry : System.getenv().entrySet()) {
+            // Filter out K8S boilerplate envs due to how micronaut resolve envs.
+            // https://docs.micronaut.io/latest/guide/index.html#propertySource
+            if (!entry.getKey().endsWith("80_TCP")
+                    && !entry.getKey().endsWith("_TCP_PORT")
+                    && !entry.getKey().endsWith("_TCP_PROTO")
+                    && !entry.getKey().endsWith("_TCP_ADDR")
+                    && !entry.getKey().endsWith("_UDP_PORT")
+                    && !entry.getKey().endsWith("_UDP_PROTO")
+                    && !entry.getKey().endsWith("_UDP_ADDR")
+                    && !entry.getKey().endsWith("_SERVICE_PORT")
+                    && !entry.getKey().endsWith("_SERVICE_PORT_HTTP")
+                    && !entry.getKey().endsWith("_SERVICE_HOST")
+                    && (!entry.getKey().endsWith("_PORT") && !entry.getValue().startsWith("tcp://"))
+            ) {
+                props.put(entry.getKey(), entry.getValue());
+            }
+        }
+
+        return props;
+    }
+
+}

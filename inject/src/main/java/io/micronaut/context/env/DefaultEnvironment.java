@@ -514,9 +514,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             propertySources.add(new SystemPropertiesPropertySource());
         }
         if (!this.propertySources.containsKey(EnvironmentPropertySource.NAME) && configuration.isEnvironmentPropertySource()) {
-            propertySources.add(new EnvironmentPropertySource(
-                    configuration.getEnvironmentVariableIncludes(),
-                    configuration.getEnvironmentVariableExcludes()));
+            List<String> includes = configuration.getEnvironmentVariableIncludes();
+            List<String> excludes = configuration.getEnvironmentVariableExcludes();
+            if (this.names.contains(Environment.KUBERNETES)) {
+                propertySources.add(new KubernetesEnvironmentPropertySource(includes, excludes));
+            } else {
+                propertySources.add(new EnvironmentPropertySource(includes, excludes));
+            }
         }
     }
 
