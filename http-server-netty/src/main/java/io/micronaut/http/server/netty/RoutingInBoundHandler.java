@@ -168,6 +168,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
     private final Supplier<ExecutorService> ioExecutorSupplier;
     private final String serverHeader;
+    private final boolean multipartEnabled;
     private ExecutorService ioExecutor;
 
     /**
@@ -204,6 +205,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.serverConfiguration = serverConfiguration;
         this.serverHeader = serverConfiguration.getServerHeader().orElse(null);
         this.httpContentProcessorResolver = httpContentProcessorResolver;
+        Optional<Boolean> multipartEnabled = serverConfiguration.getMultipart().getEnabled();
+        this.multipartEnabled = !multipartEnabled.isPresent() || multipartEnabled.get();
     }
 
     @Override
@@ -426,6 +429,27 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             );
             return;
         }
+
+        MediaType contentType = request.getContentType().orElse(null);
+        final String requestMethodName = request.getMethodName();
+
+        if (!multipartEnabled &&
+                contentType != null &&
+                contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE)) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Multipart uploads have been disabled via configuration. Rejected request for URI {}, method {}, and content type {}", request.getUri(),
+                        requestMethodName, contentType);
+            }
+
+            handleStatusError(
+                    ctx,
+                    request,
+                    nettyHttpRequest,
+                    HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+                    "Content Type [" + contentType + "] not allowed");
+            return;
+        }
+
         UriRouteMatch<Object, Object> routeMatch = null;
 
         List<UriRouteMatch<Object, Object>> uriRoutes = router.findAllClosest(request);
@@ -442,7 +466,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         RouteMatch<?> route;
 
-        final String requestMethodName = request.getMethodName();
         if (routeMatch == null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("No matching route: {} {}", httpMethod, request.getUri());
@@ -452,7 +475,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             final List<UriRouteMatch<?, ?>> anyMatchingRoutes = router
                     .findAny(request.getUri().toString(), request)
                     .collect(Collectors.toList());
-            MediaType contentType = request.getContentType().orElse(null);
             final Collection<MediaType> acceptedTypes = request.accept();
             final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);
 
