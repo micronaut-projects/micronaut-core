@@ -670,7 +670,7 @@ ext {
                     version:micronautJmsVersion,
                     group:'io.micronaut.jms',
                     name:'micronaut-jms',
-                    modules:['jms-core','jms-activemq-classic','jms-activemq-artemis','jms-sqs']
+                    modules:['micronaut-jms-core','micronaut-jms-activemq-classic','micronaut-jms-activemq-artemis','micronaut-jms-sqs']
             ],
     ]
 
