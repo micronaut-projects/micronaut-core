@@ -184,6 +184,23 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 this.annotationMetadata,
                 annotationMetadata
         );
+
+        MethodElement withMethod = null;
+        if (writeMethod == null) {
+
+            ElementQuery<MethodElement> elementQuery = ElementQuery.of(MethodElement.class)
+                    .onlyAccessible()
+                    .onlyDeclared()
+                    .onlyInstance()
+                    .named((n) -> n.startsWith("with") && n.equals("with" + NameUtils.capitalize(name)))
+                    .filter((methodElement -> {
+                        ParameterElement[] parameters = methodElement.getParameters();
+                        return parameters.length == 1 &&
+                                methodElement.getGenericReturnType().getName().equals(classElement.getName()) &&
+                                type.getType().isAssignable(parameters[0].getType());
+                    }));
+            withMethod = classElement.getEnclosedElement(elementQuery).orElse(null);
+        }
         propertyDefinitions.put(
                 name,
                 new BeanPropertyWriter(
@@ -194,6 +211,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                         name,
                         readMethod,
                         writeMethod,
+                        withMethod,
                         isReadOnly,
                         propertyIndex++,
                         annotationMetadata,

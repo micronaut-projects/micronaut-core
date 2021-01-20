@@ -33,19 +33,17 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     private final List<Predicate<AnnotationMetadata>> annotationPredicates;
     private final List<Predicate<Set<ElementModifier>>> modifiersPredicates;
     private final List<Predicate<T>> elementPredicates;
+    private final boolean onlyInstance;
 
     DefaultElementQuery(Class<T> elementType) {
-        this(elementType, false, false, false, false, null, null, null, null);
+        this(elementType, false, false, false, false, false, null, null, null, null);
     }
 
     DefaultElementQuery(
             Class<T> elementType,
             boolean onlyAccessible,
             boolean onlyDeclared,
-            boolean onlyAbstract, boolean onlyConcrete, List<Predicate<String>> namePredicates,
-            List<Predicate<AnnotationMetadata>> annotationPredicates,
-            List<Predicate<Set<ElementModifier>>> modifiersPredicates,
-            List<Predicate<T>> elementPredicates) {
+            boolean onlyAbstract, boolean onlyConcrete, boolean onlyInstance, List<Predicate<AnnotationMetadata>> annotationPredicates, List<Predicate<Set<ElementModifier>>> modifiersPredicates, List<Predicate<T>> elementPredicates, List<Predicate<String>> namePredicates) {
         this.elementType = elementType;
         this.onlyAccessible = onlyAccessible;
         this.onlyDeclared = onlyDeclared;
@@ -55,6 +53,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         this.annotationPredicates = annotationPredicates;
         this.modifiersPredicates = modifiersPredicates;
         this.elementPredicates = elementPredicates;
+        this.onlyInstance = onlyInstance;
     }
 
     @Override
@@ -80,6 +79,11 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     @Override
     public boolean isOnlyDeclared() {
         return onlyDeclared;
+    }
+
+    @Override
+    public boolean isOnlyInstance() {
+        return onlyInstance;
     }
 
     @Override
@@ -120,10 +124,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         return new DefaultElementQuery<>(
                 elementType, onlyAccessible,
                 true,
-                onlyAbstract, onlyConcrete, namePredicates,
-                annotationPredicates,
-                modifiersPredicates,
-                elementPredicates
+                onlyAbstract, onlyConcrete, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
         );
     }
 
@@ -133,10 +134,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         return new DefaultElementQuery<>(
                 elementType, onlyAccessible,
                 onlyDeclared,
-                onlyAbstract, true, namePredicates,
-                annotationPredicates,
-                modifiersPredicates,
-                elementPredicates
+                onlyAbstract, true, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
         );
     }
 
@@ -146,10 +144,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         return new DefaultElementQuery<>(
                 elementType, onlyAccessible,
                 onlyDeclared,
-                true, onlyConcrete, namePredicates,
-                annotationPredicates,
-                modifiersPredicates,
-                elementPredicates
+                true, onlyConcrete, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
         );
     }
 
@@ -159,10 +154,16 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         return new DefaultElementQuery<>(
                 elementType, true,
                 onlyDeclared,
-                onlyAbstract, onlyConcrete, namePredicates,
-                annotationPredicates,
-                modifiersPredicates,
-                elementPredicates
+                onlyAbstract, onlyConcrete, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
+        );
+    }
+
+    @Override
+    public ElementQuery<T> onlyInstance() {
+        return new DefaultElementQuery<>(
+                elementType, onlyAccessible,
+                onlyDeclared,
+                onlyAbstract, onlyConcrete, true, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
         );
     }
 
@@ -180,10 +181,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         return new DefaultElementQuery<>(
                 elementType, onlyAccessible,
                 onlyDeclared,
-                onlyAbstract, onlyConcrete, namePredicates,
-                annotationPredicates,
-                modifiersPredicates,
-                elementPredicates
+                onlyAbstract, onlyConcrete, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
         );
     }
 
@@ -201,10 +199,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         return new DefaultElementQuery<>(
                 elementType, onlyAccessible,
                 onlyDeclared,
-                onlyAbstract, onlyConcrete, namePredicates,
-                annotationPredicates,
-                modifiersPredicates,
-                elementPredicates
+                onlyAbstract, onlyConcrete, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
         );
     }
 
@@ -221,10 +216,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         }
         return new DefaultElementQuery<>(
                 elementType, onlyAccessible,
-                onlyDeclared, onlyAbstract, onlyConcrete, namePredicates,
-                annotationPredicates,
-                modifierPredicates,
-                elementPredicates
+                onlyDeclared, onlyAbstract, onlyConcrete, onlyInstance, annotationPredicates, modifierPredicates, elementPredicates, namePredicates
         );
     }
 
@@ -241,10 +233,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         }
         return new DefaultElementQuery<>(
                 elementType, onlyAccessible,
-                onlyDeclared, onlyAbstract, onlyConcrete, namePredicates,
-                annotationPredicates,
-                modifiersPredicates,
-                elementPredicates
+                onlyDeclared, onlyAbstract, onlyConcrete, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
         );
     }
 

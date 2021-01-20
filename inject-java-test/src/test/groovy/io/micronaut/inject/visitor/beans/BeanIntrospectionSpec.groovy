@@ -124,10 +124,12 @@ import java.net.URL;
 public class CopyMe {
 
     private URL url;
-    private String name;
+    private final String name;
+    private final String another;
     
-    CopyMe(String name) {
+    CopyMe(String name, String another) {
         this.name = name;
+        this.another = another;
     }
 
     public URL getUrl() {
@@ -137,36 +139,54 @@ public class CopyMe {
     public void setUrl(URL url) {
         this.url = url;
     }
-
+    
     public String getName() {
         return name;
+    }
+    
+    public String getAnother() {
+        return another;
+    }
+    
+    public CopyMe withAnother(String a) {
+        return this.another == a ? this : new CopyMe(this.name, a.toUpperCase());
     }
 }
 ''')
         when:
-        def copyMe = introspection.instantiate("Test")
+        def copyMe = introspection.instantiate("Test", "Another")
         def expectUrl = new URL("http://test.com")
         copyMe.url = expectUrl
 
         then:
         copyMe.name == 'Test'
+        copyMe.another == "Another"
         copyMe.url == expectUrl
 
 
         when:
         def property = introspection.getRequiredProperty("name", String)
+        def another = introspection.getRequiredProperty("another", String)
         def newInstance = property.withValue(copyMe, "Changed")
 
         then:
         !newInstance.is(copyMe)
         newInstance.name == 'Changed'
         newInstance.url == expectUrl
+        newInstance.another == "Another"
 
         when:"the instance is changed with the same value"
         def result = property.withValue(newInstance, "Changed")
 
         then:"The existing instance is returned"
         newInstance.is(result)
+
+        when:"An explicit with method is used"
+        result = another.withValue(newInstance, "changed")
+
+        then:"It was invoked"
+        !result.is(newInstance)
+        result.another == 'CHANGED'
     }
 
     @Requires({ jvm.isJava14Compatible() })

@@ -78,6 +78,12 @@ public interface ElementQuery<T extends Element> {
     @NonNull ElementQuery<T> onlyAccessible();
 
     /**
+     * Indicates to return only instance (non-static methods).
+     * @return The query
+     */
+    ElementQuery<T> onlyInstance();
+
+    /**
      * Allows filtering elements by name.
      * @param predicate The predicate to use. Should return true to include the element.
      * @return This query
@@ -155,6 +161,11 @@ public interface ElementQuery<T extends Element> {
          * @return Whether to declare only declared members
          */
         boolean isOnlyDeclared();
+
+        /**
+         * @return Whether to return only instance methods
+         */
+        boolean isOnlyInstance();
 
         /**
          * @return The name predicates

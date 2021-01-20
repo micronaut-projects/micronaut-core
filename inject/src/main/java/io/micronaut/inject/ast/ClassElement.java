@@ -200,6 +200,22 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Return the first enclosed element matching the given query.
+     *
+     * @param query The query to use.
+     * @param <T>  The element type
+     * @return The fields
+     * @since 2.3.0
+     */
+    default <T extends Element> Optional<T> getEnclosedElement(@NonNull ElementQuery<T> query) {
+        List<T> enclosedElements = getEnclosedElements(query);
+        if (!enclosedElements.isEmpty()) {
+            return Optional.of(enclosedElements.iterator().next());
+        }
+        return Optional.empty();
+    }
+
+    /**
      * @return Whether the class element is an interface
      */
     default boolean isInterface() {
