@@ -695,14 +695,14 @@ class DefaultEnvironmentSpec extends Specification {
     void "Kubernetes specific variables are excluded by default"() {
         given:
         Environment env = SystemLambda.withEnvironmentVariable("V1_SERVICE_XPTO_SERVICE_HOST", "172.20.232.70")
-                .execute(() -> {
+                .execute {
                     new DefaultEnvironment(new ApplicationContextConfiguration() {
                         @Override
                         List<String> getEnvironments() {
                             return Arrays.asList(Environment.KUBERNETES)
                         }
                     }).start()
-                })
+                }
 
         expect:
         env.propertySources.find {it.name == KubernetesEnvironmentPropertySource.NAME }

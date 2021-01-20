@@ -17,6 +17,7 @@ package io.micronaut.context.env;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,19 @@ public class KubernetesEnvironmentPropertySource extends MapPropertySource {
      */
     public static final String NAME = "k8s-env";
 
+    static final List<String> VAR_SUFFIXES = Arrays.asList(
+            "_TCP",
+            "_TCP_PORT",
+            "_TCP_PROTO",
+            "_TCP_ADDR",
+            "_UDP_PORT",
+            "_UDP_PROTO",
+            "_UDP_ADDR",
+            "_SERVICE_PORT",
+            "_SERVICE_PORT_HTTP",
+            "_SERVICE_HOST"
+    );
+
     /**
      * Default constructor.
      */
@@ -57,28 +71,10 @@ public class KubernetesEnvironmentPropertySource extends MapPropertySource {
         super(NAME, getEnv(getEnvNoK8s(), includes, excludes));
     }
 
-    private static Map<String, String> getEnvNoK8s() {
-        Map<String, String> props = new HashMap<>();
-
-        for (Map.Entry<String, String> entry : System.getenv().entrySet()) {
-            // Filter out K8S boilerplate envs due to how micronaut resolve envs.
-            // https://docs.micronaut.io/latest/guide/index.html#propertySource
-            if (!entry.getKey().endsWith("80_TCP")
-                    && !entry.getKey().endsWith("_TCP_PORT")
-                    && !entry.getKey().endsWith("_TCP_PROTO")
-                    && !entry.getKey().endsWith("_TCP_ADDR")
-                    && !entry.getKey().endsWith("_UDP_PORT")
-                    && !entry.getKey().endsWith("_UDP_PROTO")
-                    && !entry.getKey().endsWith("_UDP_ADDR")
-                    && !entry.getKey().endsWith("_SERVICE_PORT")
-                    && !entry.getKey().endsWith("_SERVICE_PORT_HTTP")
-                    && !entry.getKey().endsWith("_SERVICE_HOST")
-                    && (!entry.getKey().endsWith("_PORT") && !entry.getValue().startsWith("tcp://"))
-            ) {
-                props.put(entry.getKey(), entry.getValue());
-            }
-        }
-
+    static Map<String, String> getEnvNoK8s() {
+        Map<String, String> props = new HashMap<>(System.getenv());
+        props.entrySet().removeIf(entry -> VAR_SUFFIXES.stream().anyMatch(s -> entry.getKey().endsWith(s)));
+        props.entrySet().removeIf(entry -> entry.getKey().endsWith("_PORT") && entry.getValue().startsWith("tcp://"));
         return props;
     }
 
