@@ -15,15 +15,13 @@
  */
 package io.micronaut.context.banner;
 
-import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.core.version.VersionUtils;
 
 import java.io.PrintStream;
 
 /**
- * Default implementation of {@link Banner} that prints a the default Micronaut banner.
+ * Default implementation of {@link Banner} that prints the default Micronaut banner.
  */
-@DefaultImplementation(Banner.class)
 public class MicronautBanner implements Banner {
 
     private static final String[] MICRONAUT_BANNER = {
