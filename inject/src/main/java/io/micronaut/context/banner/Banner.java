@@ -15,9 +15,12 @@
  */
 package io.micronaut.context.banner;
 
+import io.micronaut.context.annotation.DefaultImplementation;
+
 /**
  * Print a banner programmatically.
  */
+@DefaultImplementation(MicronautBanner.class)
 public interface Banner {
 
     /**
