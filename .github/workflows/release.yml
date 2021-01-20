@@ -43,11 +43,9 @@ jobs:
         env:
           BETA: ${{ contains(steps.release_version.outputs.release_version, 'M') || contains(steps.release_version.outputs.release_version, 'RC') }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          BASE_BRANCH: ${{ env.githubBranch }}
           BRANCH: gh-pages
           FOLDER: build/docs
           VERSION: ${{ steps.release_version.outputs.release_version }}
-          TARGET_REPOSITORY: ${{ env.docsRepository }}
       - name: Checkout micronaut-core
         uses: actions/checkout@v2
         with:
