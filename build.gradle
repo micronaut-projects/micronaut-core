@@ -255,6 +255,17 @@ ext {
                     group:'io.micronaut.liquibase',
                     name:'micronaut-liquibase'
             ],
+            // TODO Deprecated: Remove in the next major version
+            'micronaut.multitenancy.old': [
+                    version:micronautOldMultitenancyVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-multitenancy'
+            ],
+            'micronaut.multitenancy': [
+                    version:micronautMultitenancyVersion,
+                    group:'io.micronaut.multitenancy',
+                    name:'micronaut-multitenancy'
+            ],
             'micronaut.netflix': [
                     version:micronautNetflixVersion,
                     group:'io.micronaut.netflix',
