@@ -54,6 +54,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private final int arrayDimensions;
     private List<PropertyElement> beanProperties;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
+    private List<? extends Element> enclosedElements;
 
     /**
      * @param classElement       The {@link TypeElement}
@@ -412,7 +413,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         ElementQuery.Result<T> result = query.result();
         ElementKind kind = getElementKind(result.getElementType());
         List<T> resultingElements = new ArrayList<>();
-        List<Element> enclosedElements = new ArrayList<>(classElement.getEnclosedElements());
+        List<Element> enclosedElements = new ArrayList<>(getDeclaredEnclosedElements());
 
         boolean onlyDeclared = result.isOnlyDeclared();
         boolean onlyAbstract = result.isOnlyAbstract();
@@ -611,6 +612,13 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             }
         }
         return Collections.unmodifiableList(resultingElements);
+    }
+
+    private List<? extends Element> getDeclaredEnclosedElements() {
+        if (this.enclosedElements == null) {
+            this.enclosedElements = classElement.getEnclosedElements();
+        }
+        return this.enclosedElements;
     }
 
     private <T extends io.micronaut.inject.ast.Element> ElementKind getElementKind(Class<T> elementType) {

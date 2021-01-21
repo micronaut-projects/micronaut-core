@@ -68,6 +68,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private final boolean isMutable;
     private final MethodElement readMethod;
     private final MethodElement writeMethod;
+    private final MethodElement withMethod;
     private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
     private final TypedElement typeElement;
     private final ClassElement declaringElement;
@@ -83,6 +84,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
      * @param propertyName The property name
      * @param readMethod The read method name
      * @param writeMethod The write method name
+     * @param withMethod The with method
      * @param isReadOnly Is the property read only
      * @param index The index for the type
      * @param annotationMetadata The annotation metadata
@@ -96,6 +98,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             @NonNull String propertyName,
             @Nullable MethodElement readMethod,
             @Nullable MethodElement writeMethod,
+            @Nullable MethodElement withMethod,
             boolean isReadOnly,
             int index,
             @Nullable AnnotationMetadata annotationMetadata,
@@ -110,6 +113,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         this.propertyGenericType = propertyGenericType;
         this.readMethod = readMethod;
         this.writeMethod = writeMethod;
+        this.withMethod = withMethod;
         this.propertyName = propertyName;
         this.readOnly = isReadOnly;
         this.isMutable = !readOnly || hasAssociatedConstructorArgument();
@@ -192,7 +196,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                     // writeInternal and returned the bean passed as the argument
                     GeneratorAdapter withValueMethod = startPublicMethod(classWriter, METHOD_WITH_VALUE_INTERNAL);
                     // generates
-                    // Object mutate(Object bean, Object value) {
+                    // Object withValueInternal(Object bean, Object value) {
                     //     writeInternal(bean, value);
                     //     return bean;
                     // }
@@ -200,6 +204,22 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                     withValueMethod.loadArgs();
                     withValueMethod.invokeVirtual(type, METHOD_WRITE_INTERNAL);
                     withValueMethod.loadArg(0);
+                    withValueMethod.returnValue();
+                    withValueMethod.visitMaxs(1, 1);
+                    withValueMethod.endMethod();
+                } else if (withMethod != null) {
+                    // in the case where there is a write method we simply generate code to invoke
+                    // writeInternal and returned the bean passed as the argument
+                    GeneratorAdapter withValueMethod = startPublicMethod(classWriter, METHOD_WITH_VALUE_INTERNAL);
+                    // generates
+                    // Object withValueInternal(Object bean, Object value) {
+                    //     return ((MyType)bean).withSomething(value);
+                    // }
+                    withValueMethod.loadArg(0);
+                    pushCastToType(withValueMethod, beanType);
+                    withValueMethod.loadArg(1);
+                    pushCastToType(withValueMethod, propertyType);
+                    invokeMethod(withValueMethod, withMethod);
                     withValueMethod.returnValue();
                     withValueMethod.visitMaxs(1, 1);
                     withValueMethod.endMethod();
@@ -242,7 +262,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                     if (isMutable) {
                         GeneratorAdapter withValueMethod = startPublicMethod(classWriter, METHOD_WITH_VALUE_INTERNAL);
                         // generates
-                        // Object mutate(Object bean, Object value) {
+                        // Object withValueInternal(Object bean, Object value) {
                         //     return getDeclaringBean().instantiate(bean.getOther(), value);
                         // }
                         withValueMethod.loadThis();
