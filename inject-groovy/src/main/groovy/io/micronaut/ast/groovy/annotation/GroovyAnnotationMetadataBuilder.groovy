@@ -405,6 +405,26 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             List converted = []
             Class arrayType = Object.class
             for (exp in le.expressions) {
+                if (exp instanceof PropertyExpression) {
+                    PropertyExpression propertyExpression = (PropertyExpression) exp
+                    Expression valueExpression = propertyExpression.getProperty()
+                    Expression objectExpression = propertyExpression.getObjectExpression()
+                    if (valueExpression instanceof ConstantExpression && objectExpression instanceof ClassExpression) {
+                        Object value = ((ConstantExpression) valueExpression).value
+                        if (value != null) {
+                            if (value instanceof CharSequence) {
+                                value = value.toString()
+                            }
+                            ClassNode enumType = ((ClassExpression) objectExpression).type
+                            if (enumType.isResolved()) {
+                                arrayType = enumType.typeClass
+                            } else {
+                                arrayType = String.class
+                            }
+                            converted.add(value)
+                        }
+                    }
+                }
                 if (exp instanceof AnnotationConstantExpression) {
                     arrayType = AnnotationValue
                     AnnotationConstantExpression ann = (AnnotationConstantExpression) exp
