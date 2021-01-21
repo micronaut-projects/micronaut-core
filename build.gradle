@@ -665,6 +665,12 @@ ext {
                 version: lombokVersion,
                 group  : 'org.projectlombok',
                 name   : 'lombok'
+            ],
+            'micronaut.jms': [
+                version: micronautJmsVersion,
+                group:   'io.micronaut.jms',
+                name:    'micronaut-jms-core',
+                modules: ['micronaut-jms-activemq-classic', 'micronaut-jms-activemq-artemis', 'micronaut-jms-sqs']
             ]
     ]
 
