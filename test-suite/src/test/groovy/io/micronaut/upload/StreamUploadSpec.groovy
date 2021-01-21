@@ -32,6 +32,7 @@ import java.security.MessageDigest
  * Any changes or additions to this test should also be done
  * in {@link DiskUploadSpec} and {@link MixedUploadSpec}
  */
+@Retry
 class StreamUploadSpec extends AbstractMicronautSpec {
 
     void "test upload FileUpload object via transferTo"() {

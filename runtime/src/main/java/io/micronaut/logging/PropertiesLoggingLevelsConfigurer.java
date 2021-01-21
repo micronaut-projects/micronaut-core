@@ -29,7 +29,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Properties logging levels configurer.
@@ -78,18 +80,24 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
     }
 
     private void configureLogLevels() {
-        environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX, StringConvention.RAW).forEach((loggerPrefix, levelString) -> {
-            LogLevel newLevel = toLogLevel(levelString.toString());
-            if (newLevel == null) {
-                throw new ConfigurationException("Invalid log level: '" + levelString + "' for logger: '" + loggerPrefix + "'");
-            }
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Setting log level '{}' for logger: '{}'", newLevel, loggerPrefix);
-            }
-            for (LoggingSystem loggingSystem : loggingSystems) {
-                loggingSystem.setLogLevel(loggerPrefix, newLevel);
-            }
-        });
+        Map<String, Object> properties = new HashMap<>(environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX));
+        // Using raw keys here allows configuring log levels for camelCase package names in application.yml
+        properties.putAll(environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX, StringConvention.RAW));
+        properties.forEach(this::configureLogLevelForPrefix);
+    }
+
+    private void configureLogLevelForPrefix(String loggerPrefix, Object levelValue) {
+        LogLevel newLevel = toLogLevel(levelValue.toString());
+        if (newLevel == null) {
+            throw new ConfigurationException("Invalid log level: '" + levelValue + "' for logger: '" + loggerPrefix + "'");
+        }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Setting log level '{}' for logger: '{}'", newLevel, loggerPrefix);
+        }
+        LOGGER.info("Setting log level '{}' for logger: '{}'", newLevel, loggerPrefix);
+        for (LoggingSystem loggingSystem : loggingSystems) {
+            loggingSystem.setLogLevel(loggerPrefix, newLevel);
+        }
     }
 
     private static LogLevel toLogLevel(String logLevel) {

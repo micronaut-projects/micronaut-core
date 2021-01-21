@@ -13,37 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.util;
+package io.micronaut.core.beans;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.core.order.Ordered;
-
-import java.util.Locale;
-import java.util.Optional;
+import io.micronaut.core.naming.Named;
+import io.micronaut.core.type.Executable;
+import io.micronaut.core.type.ReturnType;
 
 /**
- * Responsible for determining the current locale given a context.
+ * Represents a method on a {@link BeanIntrospection}.
  *
- * @author James Kleeh
+ * <p>A {@link BeanMethod} is created when an accessible method on a class is annotated with {@code io.micronaut.context.annotation.Executable} or an annotation stereotype annotated with that annotation</p>
+ *
+ * @param <B> The bean type
+ * @param <T> The return type
  * @since 2.3.0
- * @param <T> The context object which will be used to resolve the locale
  */
-public interface LocaleResolver<T> extends Ordered {
-
+public interface BeanMethod<B, T> extends Executable<B, T>, Named {
     /**
-     * Resolves the locale for the given context.
-     *
-     * @param context The context to retrieve the locale from
-     * @return The locale
+     * @return The declaring bean introspection.
      */
     @NonNull
-    Optional<Locale> resolve(@NonNull T context);
+    BeanIntrospection<B> getDeclaringBean();
 
     /**
-     * Resolves the local or returns the default locale.
-     * @param context The context
-     * @return The locale
+     * @return The return type.
      */
-    @NonNull
-    Locale resolveOrDefault(@NonNull T context);
+    @NonNull ReturnType<T> getReturnType();
 }

@@ -126,31 +126,9 @@ class Test {
         topLevel.nested().num() == 10
     }
 
-    void "test read enum constants with custom toString()"() {
-        given:
-        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('test.Test','''\
-package test;
-
-import io.micronaut.inject.annotation.*;
-
-@EnumAnn(EnumAnn.MyEnum.TWO)
-class Test {
-}
-''')
-
-        when:
-        def className = "test"
-        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
-
-        then:
-        metadata != null
-        metadata.synthesize(EnumAnn).value() == EnumAnn.MyEnum.TWO
-    }
-
-
     void "test read enum constants"() {
         given:
-        AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test", '''
 package test;
 
 import io.micronaut.context.annotation.*;
@@ -166,8 +144,109 @@ class Test {
 
         then:
         metadata != null
+        metadata.enumValue(Requires, "sdk", Requires.Sdk).get() == Requires.Sdk.JAVA
         metadata.getValue(Requires, "sdk", Requires.Sdk).get() == Requires.Sdk.JAVA
         metadata.getValue(Requires, "version").get() == "1.8"
+    }
+
+    void "test read enum constants with custom toString()"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''
+package test;
+
+import io.micronaut.inject.annotation.*;
+
+@EnumAnn(value = EnumAnn.MyEnum.TWO)
+class Test {
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.synthesize(EnumAnn).value() == EnumAnn.MyEnum.TWO
+        metadata.enumValue(EnumAnn, EnumAnn.MyEnum).get() == EnumAnn.MyEnum.TWO
+        metadata.enumValue(EnumAnn, "value", EnumAnn.MyEnum).get() == EnumAnn.MyEnum.TWO
+        metadata.enumValue(EnumAnn.name, EnumAnn.MyEnum).get() == EnumAnn.MyEnum.TWO
+        metadata.enumValue(EnumAnn.name, "value", EnumAnn.MyEnum).get() == EnumAnn.MyEnum.TWO
+    }
+
+    void "test read enum constants array"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''
+package test;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+
+@EnumAnn(value = [MyEnum.ONE, MyEnum.TWO])
+class Test {
+}
+
+@Retention(RUNTIME)
+@Target([ElementType.TYPE])
+public @interface EnumAnn {
+    MyEnum[] value();
+}
+
+enum MyEnum {
+    ONE,
+    TWO;
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata.getValues("test.EnumAnn", Object.class).get("value").get() == ["ONE", "TWO"]
+    }
+
+    void "test read enum constants array with custom tostring"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''
+package test;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+
+@EnumAnn(value = [MyEnum.ONE, MyEnum.TWO])
+class Test {
+}
+
+@Retention(RUNTIME)
+@Target([ElementType.TYPE])
+public @interface EnumAnn {
+    MyEnum[] value();
+}
+
+enum MyEnum {
+    ONE,
+    TWO;
+    
+    @Override
+    public String toString() {
+        return this == ONE ? "1" : "2";
+    }
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata.getValues("test.EnumAnn", Object.class).get("value").get() == ["ONE", "TWO"]
     }
 
     void "test read external constants"() {

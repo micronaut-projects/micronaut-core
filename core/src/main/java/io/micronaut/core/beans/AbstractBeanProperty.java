@@ -24,6 +24,7 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
 import java.util.Objects;
 
 /**
@@ -92,7 +93,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
 
     @NonNull
     @Override
-    public BeanIntrospection<B> getDeclaringBean() {
+    public final BeanIntrospection<B> getDeclaringBean() {
         return introspection;
     }
 
@@ -116,6 +117,20 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     }
 
     @Override
+    public B withValue(@NonNull B bean, @Nullable P value) {
+        ArgumentUtils.requireNonNull("bean", bean);
+
+        if (!beanType.isInstance(bean)) {
+            throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + introspection.getBeanType());
+        }
+        if (value == get(bean)) {
+            return bean;
+        } else {
+            return withValueInternal(bean, value);
+        }
+    }
+
+    @Override
     public final void set(@NonNull B bean, @Nullable P value) {
         ArgumentUtils.requireNonNull("bean", bean);
 
@@ -128,8 +143,25 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         if (value != null && !ReflectionUtils.getWrapperType(getType()).isInstance(value)) {
             throw new IllegalArgumentException("Specified value [" + value + "] is not of the correct type: " + getType());
         }
-
+        if (value == null && isNonNull()) {
+            throw new IllegalArgumentException("Null values not supported by property: " + getName());
+        }
         writeInternal(bean, value);
+    }
+
+
+    /**
+     * Mutates a property value.
+     * @param bean The bean
+     * @param value The value
+     * @see BeanProperty#withValue(Object, Object)
+     * @return Either a copy of the bean with the copy constructor invoked or the mutated instance if it mutable
+     */
+    @SuppressWarnings("WeakerAccess")
+    @UsedByGeneratedCode
+    @Internal
+    protected B withValueInternal(B bean, P value) {
+        return BeanProperty.super.withValue(bean, value);
     }
 
     /**

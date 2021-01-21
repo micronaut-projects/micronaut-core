@@ -16,6 +16,7 @@
 package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
@@ -515,7 +516,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
         private File location;
         private long maxFileSize = DEFAULT_MAX_FILE_SIZE;
-        private boolean enabled = DEFAULT_ENABLED;
+        private Boolean enabled;
         private boolean disk = DEFAULT_DISK;
         private boolean mixed = DEFAULT_MIXED;
         private long threshold = DEFAULT_THRESHOLD;
@@ -539,7 +540,18 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          */
         @Override
         public boolean isEnabled() {
-            return enabled;
+            return enabled == null ? DEFAULT_ENABLED : enabled;
+        }
+
+        /**
+         * The default multipart enabled setting is false for servlets, but effectively
+         * true for Netty. This method returns the value only if set by the user.
+         *
+         * @return The enabled setting.
+         */
+        @Internal
+        public Optional<Boolean> getEnabled() {
+            return Optional.ofNullable(enabled);
         }
 
         /**

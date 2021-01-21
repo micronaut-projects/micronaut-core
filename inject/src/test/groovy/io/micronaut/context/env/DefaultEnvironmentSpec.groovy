@@ -692,6 +692,24 @@ class DefaultEnvironmentSpec extends Specification {
         env.activeNames == ['xyz'] as Set
     }
 
+    void "Kubernetes specific variables are excluded by default"() {
+        given:
+        Environment env = SystemLambda.withEnvironmentVariable("V1_SERVICE_XPTO_SERVICE_HOST", "172.20.232.70")
+                .execute {
+                    new DefaultEnvironment(new ApplicationContextConfiguration() {
+                        @Override
+                        List<String> getEnvironments() {
+                            return Arrays.asList(Environment.KUBERNETES)
+                        }
+                    }).start()
+                }
+
+        expect:
+        env.propertySources.find {it.name == KubernetesEnvironmentPropertySource.NAME }
+        !env.propertySources.find {it.name == EnvironmentPropertySource.NAME }
+        !env.getProperty("v1-service-xpto-service-host", String).isPresent()
+    }
+
     private static Environment startEnv(String files) {
         new DefaultEnvironment({["test"]}) {
             @Override
