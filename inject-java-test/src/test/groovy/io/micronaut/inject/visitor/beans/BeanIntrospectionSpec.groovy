@@ -113,6 +113,48 @@ interface SomeInt {
         itfeMethod.invoke(bean) == true
     }
 
+    void "test custom with prefix"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('customwith.CopyMe','''\
+package customwith;
+
+import java.net.URL;
+
+@io.micronaut.core.annotation.Introspected(withPrefix="alter")
+public class CopyMe {
+
+    private final String another;
+    
+    CopyMe(String another) {
+        this.another = another;
+    }
+
+    public String getAnother() {
+        return another;
+    }
+    
+    public CopyMe alterAnother(String a) {
+        return this.another == a ? this : new CopyMe(a.toUpperCase());
+    }
+}
+''')
+
+
+        when:
+        def another = introspection.getRequiredProperty("another", String)
+        def newInstance = introspection.instantiate("test")
+
+        then:
+        newInstance.another == "test"
+
+        when:"An explicit with method is used"
+        def result = another.withValue(newInstance, "changed")
+
+        then:"It was invoked"
+        !result.is(newInstance)
+        result.another == 'CHANGED'
+    }
+
     void "test copy constructor via mutate method"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.CopyMe','''\

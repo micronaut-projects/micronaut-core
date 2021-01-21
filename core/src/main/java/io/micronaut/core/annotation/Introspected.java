@@ -133,6 +133,12 @@ public @interface Introspected {
     IndexedAnnotation[] indexed() default {};
 
     /**
+     * @return The prefix used for copy constructor invoking methods on immutable types. The default is "with".
+     * @since 2.3.0
+     */
+    String withPrefix() default "with";
+
+    /**
      * Allow pre-computed indexes for property lookups based on an annotation and a member.
      *
      * @see io.micronaut.core.beans.BeanIntrospection#getIndexedProperty(Class, String)
