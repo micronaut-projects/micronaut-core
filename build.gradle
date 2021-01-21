@@ -667,11 +667,11 @@ ext {
                 name   : 'lombok'
             ],
             'micronaut.jms': [
-                    version:micronautJmsVersion,
-                    group:'io.micronaut.jms',
-                    name:'micronaut-jms',
-                    modules:['micronaut-jms-core','micronaut-jms-activemq-classic','micronaut-jms-activemq-artemis','micronaut-jms-sqs']
-            ],
+                version: micronautJmsVersion,
+                group:   'io.micronaut.jms',
+                name:    'micronaut-jms-core',
+                modules: ['micronaut-jms-activemq-classic', 'micronaut-jms-activemq-artemis', 'micronaut-jms-sqs']
+            ]
     ]
 
     dependencyVersion = { String name ->
