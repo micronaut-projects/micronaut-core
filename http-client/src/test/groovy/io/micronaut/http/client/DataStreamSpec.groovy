@@ -209,12 +209,29 @@ class DataStreamSpec extends Specification {
         }
     }
 
+    void "test returning a data stream directly mapping to byte array"() {
+        long bodyLength
+        client.dataStream(HttpRequest.GET("/datastream/direct"))
+                .subscribe(buffer -> {
+                    bodyLength += buffer.toByteArray().length
+                })
+
+        expect:
+        new PollingConditions(timeout: 3).eventually {
+            assert bodyLength == 5000
+        }
+    }
+
     static class Book {
         String title
     }
 
     @Controller("/datastream")
     static class BookController {
+
+        @Inject
+        @Client("/")
+        RxStreamingHttpClient client
 
         @Get(uri = "/books", produces = MediaType.APPLICATION_JSON_STREAM)
         Publisher<byte[]> list() {
@@ -230,6 +247,18 @@ class DataStreamSpec extends Specification {
         @Get(uri = "/data", produces = MediaType.TEXT_PLAIN)
         byte[] data() {
             [188309,188310] as byte[]
+        }
+
+        @Get(uri = "/bigdata")
+        byte[] ok() {
+            new byte[5000]
+        }
+
+        @Get("/direct")
+        Flowable<byte[]> direct() {
+            client.dataStream(HttpRequest.GET(
+                    '/datastream/bigdata'
+            )).map(buffer -> buffer.toByteArray())
         }
 
         @Post(uri = "/upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
