@@ -6,6 +6,10 @@ Micronaut {version} includes the following changes:
 
 A new customizable banner is now displayed when the application starts up. See <<_micronaut_banner, Micronaut Banner>> for more information.
 
+==== Compatibility with GraalVM 21.0.0
+
+This release is compatible with the latest GraalVM 21.0.0 release, updating and testing all modules against the latest version of native image.
+
 ==== Improved Support for Records
 
 Java 14+ Records can now be used to define <<configurationProperties, Configuration Properties>>. By default when `@ConfigurationProperties` is used on a `record`, configuration injection is applied. For example:
