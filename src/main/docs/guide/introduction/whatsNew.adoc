@@ -75,6 +75,16 @@ Thanks to a contribution by https://github.com/viniciusccarvalho[Vinicius Carval
 
 A new https://micronaut-projects.github.io/micronaut-jms/1.0.x/guide/[Micronaut JMS module] (currently in preview) to support JMS messaging including ActiveMQ and Amazon SQS has been added with full support for GraalVM native image. See the https://micronaut-projects.github.io/micronaut-jms/1.0.x/guide/[Micronaut JMS documentation] for more information.
 
+=== Other improvements
+
+While Micronaut has always followed the https://semver.org/[Semantic Versioning] principles, our non-stable versioning didn't match the specification. For example, our snapshots were versioned as `1.2.3.BUILD-SNAPSHOT` as opposed to `1.2.3-SNAPSHOT`.
+
+Since Micronaut 2.3, all our artifacts' non-stable versions will be like:
+
+* Snapshots: `1.2.3-SNAPSHOT`.
+* Milestones: `1.2.3-M1`, `1.2.3-M2`, etc.
+* Release candidates: `1.2.3-RC1`, `1.2.3-RC2`, etc.
+
 === Module Upgrades
 
 - Micronaut Maven Plugin `1.1.2` -> `1.1.4` 
