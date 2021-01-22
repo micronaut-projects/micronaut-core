@@ -69,7 +69,7 @@ Combined with the ability to https://www.youtube.com/watch?v=X4AKGf1TlXM[Push to
 
 ==== Google Cloud Secret Manager
 
-Thanks to a contribution by https://github.com/viniciusccarvalho[Vinicius Carvalho], Micronaut GCP supports distributed configuration via Google Cloud Secret Manager.
+Thanks to a contribution by https://github.com/viniciusccarvalho[Vinicius Carvalho], https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#introduction[Micronaut GCP] supports https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#secretManager[distributed configuration via Google Cloud Secret Manager].
 
 === New Modules
 
