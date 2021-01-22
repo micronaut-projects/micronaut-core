@@ -71,6 +71,11 @@ Combined with the ability to https://www.youtube.com/watch?v=X4AKGf1TlXM[Push to
 
 Thanks to a contribution by https://github.com/viniciusccarvalho[Vinicius Carvalho], Micronaut GCP supports distributed configuration via Google Cloud Secret Manager.
 
+=== New Modules
+
+==== Micronaut JMS
+
+A new https://micronaut-projects.github.io/micronaut-jms/1.0.x/guide/[Micronaut JMS module] (currently in preview) to support JMS messaging including ActiveMQ and Amazon SQS has been added with full support for GraalVM native image. See the https://micronaut-projects.github.io/micronaut-jms/1.0.x/guide/[Micronaut JMS documentation] for more information.
 
 === Module Upgrades
 
