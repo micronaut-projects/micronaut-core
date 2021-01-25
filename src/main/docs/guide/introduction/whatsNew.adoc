@@ -75,40 +75,24 @@ Thanks to a contribution by https://github.com/viniciusccarvalho[Vinicius Carval
 
 A new https://micronaut-projects.github.io/micronaut-jms/1.0.x/guide/[Micronaut JMS module] (currently in preview) to support JMS messaging including ActiveMQ and Amazon SQS has been added with full support for GraalVM native image. See the https://micronaut-projects.github.io/micronaut-jms/1.0.x/guide/[Micronaut JMS documentation] for more information.
 
-=== Other improvements
-
-While Micronaut has always followed the https://semver.org/[Semantic Versioning] principles, our non-stable versioning didn't match the specification. For example, our snapshots were versioned as `1.2.3.BUILD-SNAPSHOT` as opposed to `1.2.3-SNAPSHOT`.
-
-Since Micronaut 2.3, all our artifacts' non-stable versions will be like:
-
-* Snapshots: `1.2.3-SNAPSHOT`.
-* Milestones: `1.2.3-M1`, `1.2.3-M2`, etc.
-* Release candidates: `1.2.3-RC1`, `1.2.3-RC2`, etc.
-
 === Module Upgrades
 
-- Micronaut Maven Plugin `1.1.2` -> `1.1.4` 
 - Micronaut XML `2.1.0` -> `2.2.1`
-- Micronaut Data `2.2.1` -> `2.2.4`
 - Micronaut Cache `2.2.0` -> `2.3.0`
-- Micronaut Security `2.2.1` -> `2.3.0`
+- Micronaut Security `2.2.2` -> `2.3.0`
 - Micronaut Spring `2.1.2` -> `3.2.0`
 - Micronaut GCP `3.3.0` -> `3.4.0`
-- Micronaut AWS `2.2.4` -> `2.3.0`
-- Micronaut OpenAPI `2.2.1` -> `2.3.0`
-- Micronaut SQL `3.3.4` -> `3.4.0`
+- Micronaut AWS `2.2.5` -> `2.3.0`
+- Micronaut OpenAPI `2.2.2` -> `2.3.0`
+- Micronaut SQL `3.3.5` -> `3.4.0`
 - Micronaut Views `2.1.0` -> `2.2.1`
 - Micronaut Test `2.2.1` -> `2.3.2`
 - Micronaut PicoCLI `3.1.0` -> `3.2.0`
 - Micronaut RabbitMQ `2.2.2` -> `2.3.2`
 - Micronaut Flyway `3.1.0` -> `3.3.0`
-- Micronaut Discovery Client `2.2.0` -> `2.2.2`
 - Micronaut Kubernetes `2.1.0` -> `2.2.0`
-- Micronaut JAX-RS `1.0.2` -> `2.0.0`
-- Micronaut R2DBC `1.0.0.M2` -> `1.0.1`
 - Micronaut Multitenancy `2.2.3` -> `3.0.0` (Group ID changed to `io.micronaut.multitenancy`)
 - Micronaut JMS (new) `1.0.0.M1`
-
 
 === Dependency Upgrades
 
