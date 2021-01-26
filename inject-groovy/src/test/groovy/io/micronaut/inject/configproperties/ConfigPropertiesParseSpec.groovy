@@ -2,6 +2,7 @@ package io.micronaut.inject.configproperties
 
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Property
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.configuration.Engine
@@ -250,4 +251,26 @@ class Parent {
         ((Engine.Builder) bean.engine3).build().manufacturer == 'Subaru'
     }
 
+    void "test name is correct with inner classes of non config props class"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition("test.Test\$TestNestedConfig", '''
+package test
+
+import io.micronaut.context.annotation.*
+
+class Test {
+
+    @ConfigurationProperties("test")
+    static class TestNestedConfig {
+        
+        String val
+    }
+
+}
+''')
+
+        then:
+        noExceptionThrown()
+        beanDefinition.injectedMethods[0].annotationMetadata.getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "test.val"
+    }
 }
