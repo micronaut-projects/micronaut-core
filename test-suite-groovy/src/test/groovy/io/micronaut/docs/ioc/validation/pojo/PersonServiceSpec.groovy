@@ -3,7 +3,7 @@ package io.micronaut.docs.ioc.validation.pojo
 import io.micronaut.docs.ioc.validation.Person
 
 // tag::imports[]
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.micronaut.validation.validator.Validator
 import spock.lang.Specification
 
@@ -41,4 +41,3 @@ class PersonServiceSpec extends Specification {
     // end::validate-service[]
 }
 // end::test[]
-

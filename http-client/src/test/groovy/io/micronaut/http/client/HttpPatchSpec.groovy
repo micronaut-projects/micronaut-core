@@ -16,10 +16,6 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
-import io.micronaut.http.client.annotation.Client
-import io.micronaut.test.annotation.MicronautTest
-import io.reactivex.Flowable
-import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -27,10 +23,10 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Header
-import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Patch
-import spock.lang.AutoCleanup
-import spock.lang.Shared
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import io.reactivex.Flowable
 import spock.lang.Specification
 
 import javax.inject.Inject
