@@ -17,15 +17,17 @@ package io.micronaut.docs.ioc.validation.pojo;
 
 // tag::imports[]
 import io.micronaut.docs.ioc.validation.Person;
-import io.micronaut.test.annotation.MicronautTest;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.micronaut.validation.validator.Validator;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 
 import javax.inject.Inject;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
 import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 // end::imports[]
 
 @MicronautTest
@@ -66,5 +68,3 @@ class PersonServiceSpec {
     }
     // end::validate-service[]
 }
-
-

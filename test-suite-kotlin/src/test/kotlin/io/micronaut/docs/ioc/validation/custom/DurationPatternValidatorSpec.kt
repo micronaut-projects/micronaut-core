@@ -1,13 +1,11 @@
 package io.micronaut.docs.ioc.validation.custom
 
-import io.micronaut.test.annotation.MicronautTest
-import org.junit.jupiter.api.Test
-
-import javax.inject.Inject
-import javax.validation.ConstraintViolationException
-
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Test
+import javax.inject.Inject
+import javax.validation.ConstraintViolationException
 
 @MicronautTest
 internal class DurationPatternValidatorSpec {

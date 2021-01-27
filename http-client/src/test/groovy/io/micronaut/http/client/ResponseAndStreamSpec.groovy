@@ -1,6 +1,5 @@
 package io.micronaut.http.client
 
-import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -11,7 +10,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 import spock.lang.Specification

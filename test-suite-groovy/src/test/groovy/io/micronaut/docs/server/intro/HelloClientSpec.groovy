@@ -17,9 +17,8 @@ package io.micronaut.docs.server.intro
 
 import io.micronaut.context.annotation.Property
 
-
 // tag::imports[]
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.Specification
 
 import javax.inject.Inject
