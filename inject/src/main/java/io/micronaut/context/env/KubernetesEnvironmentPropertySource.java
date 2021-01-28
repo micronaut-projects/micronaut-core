@@ -71,6 +71,16 @@ public class KubernetesEnvironmentPropertySource extends MapPropertySource {
         super(NAME, getEnv(getEnvNoK8s(), includes, excludes));
     }
 
+    @Override
+    public int getOrder() {
+        return EnvironmentPropertySource.POSITION;
+    }
+
+    @Override
+    public PropertyConvention getConvention() {
+        return PropertyConvention.ENVIRONMENT_VARIABLE;
+    }
+
     static Map<String, String> getEnvNoK8s() {
         Map<String, String> props = new HashMap<>(System.getenv());
         props.entrySet().removeIf(entry -> VAR_SUFFIXES.stream().anyMatch(s -> entry.getKey().endsWith(s)));
