@@ -394,11 +394,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     writeDefaultErrorResponse(ctx, nettyHttpRequest, e, nettyException);
                 }
             } else {
-                writeDefaultErrorResponse(
-                        ctx,
-                        nettyHttpRequest,
-                        cause,
-                        nettyException);
+                if (isIgnorable(cause)) {
+                    logIgnoredException(cause);
+                    ctx.read();
+                } else {
+                    writeDefaultErrorResponse(
+                            ctx,
+                            nettyHttpRequest,
+                            cause,
+                            nettyException);
+                }
             }
         }
     }
@@ -713,9 +718,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 (!bodyArgument.isPresent() || !route.isSatisfied(bodyArgument.get().getName()))) {
             httpContentProcessorResolver.resolve(request, route).subscribe(buildSubscriber(request, context, route));
         } else {
-            if (nativeRequest instanceof StreamedHttpRequest) {
-                context.read();
-            }
+            context.read();
             route = prepareRouteForExecution(route, request, skipOncePerRequest);
             route.execute();
         }
@@ -1993,15 +1996,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private void logException(Throwable cause) {
         //handling connection reset by peer exceptions
-        String message = cause.getMessage();
-        if (cause instanceof IOException && message != null && IGNORABLE_ERROR_MESSAGE.matcher(message).matches()) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Swallowed an IOException caused by client connectivity: " + cause.getMessage(), cause);
-            }
+        if (isIgnorable(cause)) {
+            logIgnoredException(cause);
         } else {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
             }
+        }
+    }
+
+    private boolean isIgnorable(Throwable cause) {
+        String message = cause.getMessage();
+        return cause instanceof IOException && message != null && IGNORABLE_ERROR_MESSAGE.matcher(message).matches();
+    }
+
+    private void logIgnoredException(Throwable cause) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Swallowed an IOException caused by client connectivity: " + cause.getMessage(), cause);
         }
     }
 
