@@ -25,4 +25,20 @@ class BeanWrapperSpec extends Specification {
         wrapper.getRequiredProperty("name", String) == 'Fred'
         wrapper.getRequiredProperty("age", Integer.class) == 10
     }
+
+    void "test setting a non null with null"() {
+        when:"A wrapper is obtained"
+        def bean = new NullabilityBean()
+        BeanWrapper<NullabilityBean> wrapper = BeanWrapper.getWrapper(bean)
+
+        then:"it is correct"
+        wrapper.bean == bean
+
+        when:
+        wrapper.setProperty("name", null)
+
+        then:
+        noExceptionThrown()
+        bean.name == null
+    }
 }
