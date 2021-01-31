@@ -339,6 +339,17 @@ public final class HttpClientSender extends Sender {
         }
 
         /**
+         * The path to use.
+         *
+         * @param path The path of the Zipkin endpoint
+         * @return This builder
+         */
+        public Builder path(String path) {
+                this.path = path;
+            return this;
+        }
+
+        /**
          * Constructs a {@link HttpClientSender}.
          *
          * @param loadBalancerResolver Resolver instance capable of resolving references to services into a concrete load-balance
