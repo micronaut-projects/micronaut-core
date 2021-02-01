@@ -3,6 +3,7 @@ package io.micronaut.inject.visitor.beans
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospector
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import javax.inject.Singleton
@@ -57,14 +58,14 @@ class BeanIntrospectorSpec extends Specification {
         BeanIntrospector.SHARED.findIntrospections(Introspected, "blah").size() == 0
     }
 
+    @PendingFeature
     void "test instantiating with a non null argument with null"() {
         BeanIntrospection<NonNullBean> introspection = BeanIntrospection.getIntrospection(NonNullBean)
 
         when:
-        NonNullBean nonNullBean = introspection.instantiate(false, [null] as Object[])
+        introspection.instantiate(false, [null] as Object[])
 
         then:
-        noExceptionThrown()
-        nonNullBean.getValue() == null
+        def ex = thrown(IllegalArgumentException)
     }
 }
