@@ -1,6 +1,7 @@
 package io.micronaut.inject.visitor.beans
 
 import io.micronaut.core.beans.BeanWrapper
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 class BeanWrapperSpec extends Specification {
@@ -25,4 +26,22 @@ class BeanWrapperSpec extends Specification {
         wrapper.getRequiredProperty("name", String) == 'Fred'
         wrapper.getRequiredProperty("age", Integer.class) == 10
     }
+
+    @PendingFeature
+    void "test setting a non null with null"() {
+        when:"A wrapper is obtained"
+        def bean = new NullabilityBean()
+        BeanWrapper<NullabilityBean> wrapper = BeanWrapper.getWrapper(bean)
+
+        then:"it is correct"
+        wrapper.bean == bean
+
+        when:
+        wrapper.setProperty("name", null)
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message == "Null values not supported by property: name"
+    }
+
 }
