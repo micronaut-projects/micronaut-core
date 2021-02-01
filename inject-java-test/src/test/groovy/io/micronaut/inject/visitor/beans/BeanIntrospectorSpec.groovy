@@ -56,4 +56,15 @@ class BeanIntrospectorSpec extends Specification {
         BeanIntrospector.SHARED.findIntrospections(Introspected, "io.micronaut.inject.visitor.beans").size() == 4
         BeanIntrospector.SHARED.findIntrospections(Introspected, "blah").size() == 0
     }
+
+    void "test instantiating with a non null argument with null"() {
+        BeanIntrospection<NonNullBean> introspection = BeanIntrospection.getIntrospection(NonNullBean)
+
+        when:
+        NonNullBean nonNullBean = introspection.instantiate(false, [null] as Object[])
+
+        then:
+        noExceptionThrown()
+        nonNullBean.getValue() == null
+    }
 }

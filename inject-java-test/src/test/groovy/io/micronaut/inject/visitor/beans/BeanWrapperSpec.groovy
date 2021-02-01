@@ -41,4 +41,5 @@ class BeanWrapperSpec extends Specification {
         noExceptionThrown()
         bean.name == null
     }
+
 }
