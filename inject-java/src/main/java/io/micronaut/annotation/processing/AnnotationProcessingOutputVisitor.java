@@ -44,9 +44,9 @@ import java.util.*;
 public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutputVisitor {
 
     private final Filer filer;
-    private final Map<String, Optional<GeneratedFile>> metaInfFiles = new HashMap<>();
-    private final Map<String, FileObject> openedFiles = new HashMap<>();
-    private final Map<String, Optional<GeneratedFile>> generatedFiles = new HashMap<>();
+    private final Map<String, Optional<GeneratedFile>> metaInfFiles = new LinkedHashMap<>();
+    private final Map<String, FileObject> openedFiles = new LinkedHashMap<>();
+    private final Map<String, Optional<GeneratedFile>> generatedFiles = new LinkedHashMap<>();
 
     /**
      * @param filer The {@link Filer} for creating new files
