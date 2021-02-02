@@ -52,6 +52,16 @@ ext {
                     name: 'micronaut-r2dbc-bom',
                     version: micronautR2DBCVersion
             ],
+            'micronaut.micrometer': [
+                    group: 'io.micronaut.micrometer',
+                    name: 'micronaut-micrometer-bom',
+                    version: micronautMicrometerVersion
+            ],
+            'micronaut.cache': [
+                    group: 'io.micronaut.cache',
+                    name: 'micronaut-cache-bom',
+                    version: micronautCacheVersion
+            ],
             //Third-party
             'netty': [
                     group: 'io.netty',
@@ -67,11 +77,6 @@ ext {
                     group: 'org.codehaus.groovy',
                     name: 'groovy-bom',
                     version: groovyVersion
-            ],
-            'micrometer': [
-                    name   : 'micrometer-bom',
-                    group  : 'io.micrometer',
-                    version: micrometerVersion
             ],
             'junit5': [
                     group  : 'org.junit',
@@ -304,31 +309,6 @@ ext {
                 version:micronautXmlVersion,
                 group:'io.micronaut.xml',
                 name:'micronaut-jackson-xml'
-            ],
-            'micronaut.micrometer': [
-                    version:micronautMicrometerVersion,
-                    group:'io.micronaut.micrometer',
-                    name:'micronaut-micrometer-core',
-                    modules:[
-                            'micronaut-micrometer-registry-appoptics',
-                            'micronaut-micrometer-registry-atlas',
-                            'micronaut-micrometer-registry-azure-monitor',
-                            'micronaut-micrometer-registry-cloudwatch',
-                            'micronaut-micrometer-registry-datadog',
-                            'micronaut-micrometer-registry-dynatrace',
-                            'micronaut-micrometer-registry-elastic',
-                            'micronaut-micrometer-registry-ganglia',
-                            'micronaut-micrometer-registry-graphite',
-                            'micronaut-micrometer-registry-humio',
-                            'micronaut-micrometer-registry-influx',
-                            'micronaut-micrometer-registry-jmx',
-                            'micronaut-micrometer-registry-kairos',
-                            'micronaut-micrometer-registry-new-relic',
-                            'micronaut-micrometer-registry-prometheus',
-                            'micronaut-micrometer-registry-signalfx',
-                            'micronaut-micrometer-registry-stackdriver',
-                            'micronaut-micrometer-registry-statsd',
-                            'micronaut-micrometer-registry-wavefront']
             ],
             'micronaut.spring': [
                     version:micronautSpringVersion,
@@ -607,11 +587,6 @@ ext {
                     version:micronautKubernetesVersion,
                     group:'io.micronaut.kubernetes',
                     name:'micronaut-kubernetes-discovery-client'
-            ],
-            'micronaut.cache': [
-                    version:micronautCacheVersion,
-                    group:'io.micronaut.cache',
-                    modules: ['micronaut-cache-caffeine', 'micronaut-cache-core', 'micronaut-cache-management', 'micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop', 'micronaut-cache-infinispan']
             ],
             'micronaut.servlet': [
                 version:micronautServletVersion,
