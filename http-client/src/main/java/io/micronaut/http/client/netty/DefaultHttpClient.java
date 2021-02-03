@@ -116,6 +116,7 @@ import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
@@ -140,6 +141,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -435,7 +437,7 @@ public class DefaultHttpClient implements
                     ChannelPool cp = entry.getValue();
                     try {
                         if (cp instanceof SimpleChannelPool) {
-                            ((SimpleChannelPool) cp).closeAsync().addListener(future -> {
+                            addServerRequestContextAwareListener(((SimpleChannelPool) cp).closeAsync(), future -> {
                                 if (!future.isSuccess()) {
                                     final Throwable cause = future.cause();
                                     if (cause != null) {
@@ -463,7 +465,7 @@ public class DefaultHttpClient implements
                         shutdownTimeout.toMillis(),
                         TimeUnit.MILLISECONDS
                 );
-                future.addListener(f -> {
+                addServerRequestContextAwareListener(future, f -> {
                     if (!f.isSuccess() && log.isErrorEnabled()) {
                         Throwable cause = f.cause();
                         log.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
@@ -829,7 +831,7 @@ public class DefaultHttpClient implements
                 }
             });
 
-            bootstrap.connect().addListener(future -> {
+            addServerRequestContextAwareListener(bootstrap.connect(), future -> {
                 if (!future.isSuccess()) {
                     emitter.onError(future.cause());
                 }
@@ -855,8 +857,8 @@ public class DefaultHttpClient implements
                             ByteBuf byteBuf = message.content();
                             if (log.isTraceEnabled()) {
                                 log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
-                                        byteBuf.readableBytes(), request.getMethodName(), request.getUri());
-                                traceBody("Response", byteBuf);
+                                            byteBuf.readableBytes(), request.getMethodName(), request.getUri());
+                                    traceBody("Response", byteBuf);
                             }
                             ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
                             NettyStreamedHttpResponse<ByteBuffer<?>> thisResponse = new NettyStreamedHttpResponse<>(
@@ -1014,8 +1016,7 @@ public class DefaultHttpClient implements
                     });
                 } else {
                     channelFuture = doConnect(request, requestURI, sslContext, true, null);
-                    channelFuture
-                            .addListener((ChannelFutureListener) f -> {
+                    addServerRequestContextAwareListener(channelFuture, (ChannelFutureListener) f -> {
                                 if (f.isSuccess()) {
                                     Channel channel = f.channel();
                                     request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
@@ -1077,9 +1078,9 @@ public class DefaultHttpClient implements
                     try {
                         ChannelPool channelPool = poolMap.get(new RequestKey(requestURI));
                         Future<Channel> channelFuture = channelPool.acquire();
-                        channelFuture.addListener(future -> {
+                        addServerRequestContextAwareListener(channelFuture, future -> {
                             if (future.isSuccess()) {
-                                Channel channel = (Channel) future.get();
+                                Channel channel = future.get();
                                 try {
                                     sendRequestThroughChannel(
                                             requestWrapper,
@@ -1106,7 +1107,7 @@ public class DefaultHttpClient implements
                 } else {
                     SslContext sslContext = buildSslContext(requestURI);
                     ChannelFuture connectionFuture = doConnect(request, requestURI, sslContext, false, null);
-                    connectionFuture.addListener(future -> {
+                    addServerRequestContextAwareListener(connectionFuture, future -> {
                         if (!future.isSuccess()) {
                             Throwable cause = future.cause();
                             emitter.onError(
@@ -1842,7 +1843,7 @@ public class DefaultHttpClient implements
         );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
         ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new SimpleChannelInboundHandler<FullHttpResponse>() {
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new SimpleChannelInboundHandlerServerRequestContextAware<FullHttpResponse>() {
             final AtomicBoolean received = new AtomicBoolean(false);
             final AtomicBoolean emitted = new AtomicBoolean(false);
 
@@ -1867,7 +1868,7 @@ public class DefaultHttpClient implements
             }
 
             @Override
-            protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) {
+            protected void channelReadWithServerRequestContext(ChannelHandlerContext ctx, FullHttpResponse msg) {
                 if (received.compareAndSet(false, true)) {
                     NettyMutableHttpResponse<Object> response = new NettyMutableHttpResponse<>(
                             msg,
@@ -1883,7 +1884,7 @@ public class DefaultHttpClient implements
                 }
             }
         });
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandler<StreamedHttpResponse>() {
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandlerServerRequestContextAware<StreamedHttpResponse>() {
 
             final AtomicBoolean received = new AtomicBoolean(false);
 
@@ -1900,7 +1901,7 @@ public class DefaultHttpClient implements
             }
 
             @Override
-            protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) {
+            protected void channelReadWithServerRequestContext(ChannelHandlerContext ctx, StreamedHttpResponse msg) {
                 if (received.compareAndSet(false, true)) {
                     HttpResponseStatus status = msg.status();
                     int statusCode = status.code();
@@ -2053,13 +2054,13 @@ public class DefaultHttpClient implements
             FlowableEmitter<io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
-        final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandler<FullHttpResponse>(false) {
+        final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandlerServerRequestContextAware<FullHttpResponse>(false) {
 
             AtomicBoolean complete = new AtomicBoolean(false);
             boolean keepAlive = true;
 
             @Override
-            protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
+            protected void channelReadWithServerRequestContext(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
                 try {
 
                     HttpResponseStatus status = fullResponse.status();
@@ -2250,7 +2251,7 @@ public class DefaultHttpClient implements
                     if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
                         Http2SettingsHandler settingsHandler = (Http2SettingsHandler) ctx.pipeline().get(HANDLER_HTTP2_SETTINGS);
                         if (settingsHandler != null) {
-                            settingsHandler.promise.addListener(future -> {
+                            addServerRequestContextAwareListener(settingsHandler.promise, future -> {
                                 if (future.isSuccess()) {
                                     pipeline.addBefore(
                                             ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
@@ -2646,8 +2647,8 @@ public class DefaultHttpClient implements
                                 });
                             } else {
                                 channelFuture = doConnect(request, requestURI, sslContext, true, null);
-                                channelFuture
-                                        .addListener((ChannelFutureListener) f -> {
+                                addServerRequestContextAwareListener(channelFuture,
+                                        (ChannelFutureListener) f -> {
                                             if (f.isSuccess()) {
                                                 Channel channel = f.channel();
                                                 request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
@@ -2689,6 +2690,67 @@ public class DefaultHttpClient implements
                     );
                     return proxyResponsePublisher;
                 });
+    }
+
+    private static <V, C extends Future<V>> Future<V> addServerRequestContextAwareListener(
+            Future<V> channelFuture, GenericFutureListener<C> listener
+    ) {
+        Optional<io.micronaut.http.HttpRequest<Object>> parentHttpRequest = ServerRequestContext.currentRequest();
+        if (parentHttpRequest.isPresent()) {
+            return channelFuture.addListener(f -> ServerRequestContext.with(parentHttpRequest.get(),
+                    (Callable<?>) () -> {
+                        listener.operationComplete((C) f);
+                        return null;
+                    }));
+        } else {
+            return channelFuture.addListener(listener);
+        }
+    }
+
+
+    @FunctionalInterface
+    interface ThrowingBiConsumer<T1, T2> {
+        void accept(T1 t1, T2 t2) throws Exception;
+    }
+
+
+    /**
+     * An extension of Netty {@link SimpleChannelInboundHandler} that wraps the channel read handler
+     * in a {@link ServerRequestContext#with(io.micronaut.http.HttpRequest, Callable)} if present during
+     * the constructor call. Thanks to that the {@link ServerRequestContext#currentRequest()} returns parent
+     * request.
+     * @param <I> the type of the inbound message
+     */
+    abstract static class SimpleChannelInboundHandlerServerRequestContextAware<I> extends SimpleChannelInboundHandler<I> {
+
+        private final ThrowingBiConsumer<ChannelHandlerContext, I> handler = ServerRequestContext.currentRequest()
+                .map(this::channelReadWithServerRequestContextInternal)
+                .orElse(this::channelReadWithServerRequestContext);
+
+        SimpleChannelInboundHandlerServerRequestContextAware() {
+        }
+
+        SimpleChannelInboundHandlerServerRequestContextAware(boolean autoRelease) {
+            super(autoRelease);
+        }
+
+        private ThrowingBiConsumer<ChannelHandlerContext, I> channelReadWithServerRequestContextInternal(
+                io.micronaut.http.HttpRequest<Object> request
+        ) {
+            return (ctx, msg) -> ServerRequestContext.with(
+                    request,
+                    (Callable<Void>) () -> {
+                        channelReadWithServerRequestContext(ctx, msg);
+                        return null;
+                    });
+        }
+
+        protected abstract void channelReadWithServerRequestContext(ChannelHandlerContext ctx, I msg) throws Exception;
+
+        @Override
+        protected final void channelRead0(ChannelHandlerContext ctx, I msg) throws Exception {
+            handler.accept(ctx, msg);
+        }
     }
 
 
@@ -2867,7 +2929,7 @@ public class DefaultHttpClient implements
                     }
                 });
 
-                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandler<ByteBuf>(false) {
+                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandlerServerRequestContextAware<ByteBuf>(false) {
 
                     @Override
                     public boolean acceptInboundMessage(Object msg) {
@@ -2875,7 +2937,7 @@ public class DefaultHttpClient implements
                     }
 
                     @Override
-                    protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
+                    protected void channelReadWithServerRequestContext(ChannelHandlerContext ctx, ByteBuf msg) {
                         try {
                             Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
                             Http2Stream http2Stream = streamKey.get();
@@ -2921,7 +2983,8 @@ public class DefaultHttpClient implements
     /**
      * Reads the first {@link Http2Settings} object and notifies a {@link io.netty.channel.ChannelPromise}.
      */
-    private static final class Http2SettingsHandler extends SimpleChannelInboundHandler<Http2Settings> {
+    private static final class Http2SettingsHandler extends
+            SimpleChannelInboundHandlerServerRequestContextAware<Http2Settings> {
         private final ChannelPromise promise;
 
         /**
@@ -2934,7 +2997,7 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, Http2Settings msg) {
+        protected void channelReadWithServerRequestContext(ChannelHandlerContext ctx, Http2Settings msg) {
             promise.setSuccess();
 
             // Only care about the first settings message
@@ -3121,7 +3184,7 @@ public class DefaultHttpClient implements
                 // since this means the HTTP/2 clear text upgrade completed, otherwise
                 // add a listener to the future that writes once the upgrade completes
                 if (settingsHandler != null) {
-                    settingsHandler.promise.addListener(future -> {
+                    addServerRequestContextAwareListener(settingsHandler.promise, future -> {
                         if (future.isSuccess()) {
                             processRequestWrite(channel, channelPool, emitter, pipeline);
                         } else {
@@ -3157,7 +3220,7 @@ public class DefaultHttpClient implements
                 FlowableEmitter<?> emitter,
                 ChannelFuture channelFuture,
                 boolean closeChannelAfterWrite) {
-            channelFuture.addListener(f -> {
+            addServerRequestContextAwareListener(channelFuture, f -> {
                 try {
                     if (!f.isSuccess()) {
                         if (!emitter.isCancelled()) {
