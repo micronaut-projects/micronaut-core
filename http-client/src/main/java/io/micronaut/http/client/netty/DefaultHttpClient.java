@@ -35,6 +35,7 @@ import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.HttpResponse;
@@ -73,6 +74,9 @@ import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.jackson.codec.JsonStreamMediaTypeCodec;
 import io.micronaut.jackson.parser.JacksonProcessor;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.scheduling.instrument.Instrumentation;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.RxWebSocketClient;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
@@ -141,7 +145,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -150,9 +153,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS;
 import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS;
+import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
@@ -201,6 +206,7 @@ public class DefaultHttpClient implements
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
+    private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
 
     /**
      * Construct a client for the given arguments.
@@ -243,6 +249,23 @@ public class DefaultHttpClient implements
      * @param socketChannelClass    The socket channel class
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
+            @Nullable io.micronaut.http.HttpVersion httpVersion,
+            @NonNull HttpClientConfiguration configuration,
+            @Nullable String contextPath,
+            @NonNull HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
+            List<HttpFilterResolver.FilterEntry<HttpClientFilter>> clientFilterEntries,
+            @Nullable ThreadFactory threadFactory,
+            @NonNull NettyClientSslBuilder nettyClientSslBuilder,
+            @NonNull MediaTypeCodecRegistry codecRegistry,
+            @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
+            @NonNull RequestBinderRegistry requestBinderRegistry,
+            @Nullable EventLoopGroup eventLoopGroup,
+            @NonNull Class<? extends SocketChannel> socketChannelClass
+    ) {
+        this(loadBalancer, httpVersion, configuration, contextPath, filterResolver, clientFilterEntries, threadFactory, nettyClientSslBuilder, codecRegistry, webSocketBeanRegistry, requestBinderRegistry, eventLoopGroup, socketChannelClass, null);
+    }
+
+    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              @Nullable io.micronaut.http.HttpVersion httpVersion,
                              @NonNull HttpClientConfiguration configuration,
                              @Nullable String contextPath,
@@ -254,7 +277,15 @@ public class DefaultHttpClient implements
                              @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
                              @NonNull RequestBinderRegistry requestBinderRegistry,
                              @Nullable EventLoopGroup eventLoopGroup,
-                             @NonNull Class<? extends SocketChannel> socketChannelClass) {
+                             @NonNull Class<? extends SocketChannel> socketChannelClass,
+                             List<InvocationInstrumenterFactory> invocationInstrumenterFactories
+            ) {
+        if (invocationInstrumenterFactories == null) {
+            // TODO invocationInstrumenterFactories must be propagated ALWAYS unless outside of the container
+            throw new UnsupportedOperationException("must not be null");
+        }
+
+        this.invocationInstrumenterFactories = invocationInstrumenterFactories;
         ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
         ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
         ArgumentUtils.requireNonNull("webSocketBeanRegistry", webSocketBeanRegistry);
@@ -2692,19 +2723,26 @@ public class DefaultHttpClient implements
                 });
     }
 
-    private static <V, C extends Future<V>> Future<V> addServerRequestContextAwareListener(
+    private <V, C extends Future<V>> Future<V> addServerRequestContextAwareListener(
             Future<V> channelFuture, GenericFutureListener<C> listener
     ) {
-        Optional<io.micronaut.http.HttpRequest<Object>> parentHttpRequest = ServerRequestContext.currentRequest();
-        if (parentHttpRequest.isPresent()) {
-            return channelFuture.addListener(f -> ServerRequestContext.with(parentHttpRequest.get(),
-                    (Callable<?>) () -> {
-                        listener.operationComplete((C) f);
-                        return null;
-                    }));
-        } else {
-            return channelFuture.addListener(listener);
+        InvocationInstrumenter instrumenter = combineFactories(invocationInstrumenterFactories);
+
+        return channelFuture.addListener(f -> {
+            try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+                listener.operationComplete((C) f);
+            }
+        });
+    }
+
+    private static @NonNull InvocationInstrumenter combineFactories(Collection<InvocationInstrumenterFactory> factories) {
+        if (CollectionUtils.isEmpty(factories)) {
+            return NOOP;
         }
+        return InvocationInstrumenter.combine(factories.stream()
+                .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList()));
     }
 
 
@@ -2721,11 +2759,9 @@ public class DefaultHttpClient implements
      * request.
      * @param <I> the type of the inbound message
      */
-    abstract static class SimpleChannelInboundHandlerServerRequestContextAware<I> extends SimpleChannelInboundHandler<I> {
+    abstract class SimpleChannelInboundHandlerServerRequestContextAware<I> extends SimpleChannelInboundHandler<I> {
 
-        private final ThrowingBiConsumer<ChannelHandlerContext, I> handler = ServerRequestContext.currentRequest()
-                .map(this::channelReadWithServerRequestContextInternal)
-                .orElse(this::channelReadWithServerRequestContext);
+        private final InvocationInstrumenter instrumenter = combineFactories(invocationInstrumenterFactories);
 
         SimpleChannelInboundHandlerServerRequestContextAware() {
         }
@@ -2734,22 +2770,13 @@ public class DefaultHttpClient implements
             super(autoRelease);
         }
 
-        private ThrowingBiConsumer<ChannelHandlerContext, I> channelReadWithServerRequestContextInternal(
-                io.micronaut.http.HttpRequest<Object> request
-        ) {
-            return (ctx, msg) -> ServerRequestContext.with(
-                    request,
-                    (Callable<Void>) () -> {
-                        channelReadWithServerRequestContext(ctx, msg);
-                        return null;
-                    });
-        }
-
         protected abstract void channelReadWithServerRequestContext(ChannelHandlerContext ctx, I msg) throws Exception;
 
         @Override
         protected final void channelRead0(ChannelHandlerContext ctx, I msg) throws Exception {
-            handler.accept(ctx, msg);
+            try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+                channelReadWithServerRequestContext(ctx, msg);
+            }
         }
     }
 
@@ -2983,7 +3010,7 @@ public class DefaultHttpClient implements
     /**
      * Reads the first {@link Http2Settings} object and notifies a {@link io.netty.channel.ChannelPromise}.
      */
-    private static final class Http2SettingsHandler extends
+    private final class Http2SettingsHandler extends
             SimpleChannelInboundHandlerServerRequestContextAware<Http2Settings> {
         private final ChannelPromise promise;
 
