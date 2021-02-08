@@ -43,7 +43,7 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    testImplementation "com.github.stefanbirkner:system-lambda:1.1.0"
+    testImplementation "com.github.stefanbirkner:system-lambda:1.2.0"
 }
 
 //compileJava.options.fork = true
