@@ -127,4 +127,12 @@ class SuspendController(
         val after = async { suspendService.requestScopedCalculation() }.await()
         "$before,$after"
     }
+
+    @Get("/keepRequestScopeAfterSuspend")
+    suspend fun keepRequestScopeAfterSuspend(): String {
+        val before = "${suspendRequestScopedService.requestId},${Thread.currentThread().id}"
+        delay(10) // suspend
+        val after = "${suspendRequestScopedService.requestId},${Thread.currentThread().id}"
+        return "$before,$after"
+    }
 }
