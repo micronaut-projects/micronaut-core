@@ -1,11 +1,10 @@
 package io.micronaut.docs.server.sse
 
-
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.sse.RxSseClient
 import io.micronaut.http.sse.Event
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 

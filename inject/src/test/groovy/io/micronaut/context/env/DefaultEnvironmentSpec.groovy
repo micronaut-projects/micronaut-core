@@ -20,6 +20,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
 
@@ -690,6 +691,41 @@ class DefaultEnvironmentSpec extends Specification {
 
         then: 'the default environment is not applied'
         env.activeNames == ['xyz'] as Set
+    }
+
+    void "Kubernetes specific variables are excluded by default"() {
+        given:
+        Environment env = SystemLambda.withEnvironmentVariable("V1_SERVICE_XPTO_SERVICE_HOST", "172.20.232.70")
+                .execute {
+                    new DefaultEnvironment(new ApplicationContextConfiguration() {
+                        @Override
+                        List<String> getEnvironments() {
+                            return Arrays.asList(Environment.KUBERNETES)
+                        }
+                    }).start()
+                }
+
+        expect:
+        env.propertySources.find {it.name == KubernetesEnvironmentPropertySource.NAME }
+        !env.propertySources.find {it.name == EnvironmentPropertySource.NAME }
+        !env.getProperty("v1-service-xpto-service-host", String).isPresent()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/4861")
+    void "In the Kubernetes environment, environment variables can be read"() {
+        given:
+        Environment env = SystemLambda.withEnvironmentVariable("MICRONAUT_SERVER_PORT", "8081")
+                .execute {
+                    new DefaultEnvironment(new ApplicationContextConfiguration() {
+                        @Override
+                        List<String> getEnvironments() {
+                            return Arrays.asList(Environment.KUBERNETES)
+                        }
+                    }).start()
+                }
+
+        expect:
+        env.getProperty("micronaut.server.port", Integer).get() == 8081
     }
 
     private static Environment startEnv(String files) {

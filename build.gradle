@@ -247,7 +247,7 @@ ext {
                     version:micronautAwsVersion,
                     group:'io.micronaut.aws',
                     name:'micronaut-function-aws-api-proxy',
-                    modules: ['micronaut-aws-common', 'micronaut-function-aws-api-proxy-test', 'micronaut-function-aws','micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver', 'micronaut-aws-parameter-store', 'micronaut-aws-sdk-v2', 'micronaut-function-client-aws']
+                    modules: ['micronaut-aws-common', 'micronaut-function-aws-api-proxy-test', 'micronaut-function-aws', 'micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver', 'micronaut-aws-parameter-store', 'micronaut-aws-sdk-v1', 'micronaut-aws-sdk-v2', 'micronaut-function-client-aws', 'micronaut-function-aws-test']
             ],
             'micronaut.kotlin': [
                     version:micronautKotlinVersion,
@@ -259,6 +259,17 @@ ext {
                     version:micronautLiquibaseVersion,
                     group:'io.micronaut.liquibase',
                     name:'micronaut-liquibase'
+            ],
+            // TODO Deprecated: Remove in the next major version
+            'micronaut.multitenancy.old': [
+                    version:micronautOldMultitenancyVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-multitenancy'
+            ],
+            'micronaut.multitenancy': [
+                    version:micronautMultitenancyVersion,
+                    group:'io.micronaut.multitenancy',
+                    name:'micronaut-multitenancy'
             ],
             'micronaut.netflix': [
                     version:micronautNetflixVersion,
@@ -654,6 +665,12 @@ ext {
                 version: lombokVersion,
                 group  : 'org.projectlombok',
                 name   : 'lombok'
+            ],
+            'micronaut.jms': [
+                version: micronautJmsVersion,
+                group:   'io.micronaut.jms',
+                name:    'micronaut-jms-core',
+                modules: ['micronaut-jms-activemq-classic', 'micronaut-jms-activemq-artemis', 'micronaut-jms-sqs']
             ]
     ]
 
@@ -848,6 +865,9 @@ apply plugin: "io.micronaut.build.docs"
 apply plugin: "io.micronaut.build.dependency-updates"
 
 allprojects {
+
+    version project.projectVersion
+
     apply plugin: 'idea'
 
     idea {

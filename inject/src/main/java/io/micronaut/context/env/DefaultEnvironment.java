@@ -82,7 +82,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
     private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList("classpath:/", "file:config/");
-
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
 
@@ -111,6 +110,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration) {
         super(configuration.getConversionService());
         this.configuration = configuration;
+        this.resourceLoader = configuration.getResourceLoader();
+
         Set<String> environments = new LinkedHashSet<>(3);
         List<String> specifiedNames = new ArrayList<>(configuration.getEnvironments());
 
@@ -140,7 +141,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if (LOG.isInfoEnabled() && !environments.isEmpty()) {
             LOG.info("Established active environments: {}", environments);
         }
-        this.resourceLoader = configuration.getResourceLoader();
         this.annotationScanner = createAnnotationScanner(classLoader);
         List<String> configLocations = configuration.getOverrideConfigLocations() == null ?
                 new ArrayList<>(DEFAULT_CONFIG_LOCATIONS) : configuration.getOverrideConfigLocations();
@@ -514,9 +514,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             propertySources.add(new SystemPropertiesPropertySource());
         }
         if (!this.propertySources.containsKey(EnvironmentPropertySource.NAME) && configuration.isEnvironmentPropertySource()) {
-            propertySources.add(new EnvironmentPropertySource(
-                    configuration.getEnvironmentVariableIncludes(),
-                    configuration.getEnvironmentVariableExcludes()));
+            List<String> includes = configuration.getEnvironmentVariableIncludes();
+            List<String> excludes = configuration.getEnvironmentVariableExcludes();
+            if (this.names.contains(Environment.KUBERNETES)) {
+                propertySources.add(new KubernetesEnvironmentPropertySource(includes, excludes));
+            } else {
+                propertySources.add(new EnvironmentPropertySource(includes, excludes));
+            }
         }
     }
 
@@ -971,6 +975,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             return false;
         }
     }
+
 
     /**
      * Helper class for handling environments and package.

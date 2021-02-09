@@ -101,4 +101,13 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     default @Nullable List<String> getOverrideConfigLocations() {
         return null;
     }
+
+    /**
+     * The banner is enabled by default.
+     *
+     * @return The banner is enabled by default
+     */
+    default boolean isBannerEnabled() {
+        return true;
+    }
 }

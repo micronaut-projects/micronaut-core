@@ -676,21 +676,32 @@ public class DefaultHttpClient implements
     @Override
     public <I> Flowable<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
         return Flowable.fromPublisher(resolveRequestURI(request))
-                .switchMap(buildDataStreamPublisher(request));
-
+                .flatMap(buildDataStreamPublisher(request))
+                .doAfterNext(buffer -> {
+                    ByteBuf byteBuf = (ByteBuf) buffer.asNativeBuffer();
+                    if (byteBuf.refCnt() > 0) {
+                        ReferenceCountUtil.safeRelease(byteBuf);
+                    }
+                });
     }
 
     @Override
     public <I> Flowable<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
         return Flowable.fromPublisher(resolveRequestURI(request))
-                .switchMap(buildExchangeStreamPublisher(request));
+                .flatMap(buildExchangeStreamPublisher(request))
+                .doAfterNext(res -> {
+                    ByteBuffer<?> buffer = res.body();
+                    if (buffer instanceof ReferenceCounted) {
+                        ((ReferenceCounted) buffer).release();
+                    }
+                });
     }
 
     @Override
     public <I, O> Flowable<O> jsonStream(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> type) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return Flowable.fromPublisher(resolveRequestURI(request))
-                .switchMap(buildJsonStreamPublisher(parentRequest, request, type));
+                .flatMap(buildJsonStreamPublisher(parentRequest, request, type));
     }
 
     @SuppressWarnings("unchecked")
@@ -854,11 +865,6 @@ public class DefaultHttpClient implements
                             );
                             thisResponse.setBody(byteBuffer);
                             return (HttpResponse<ByteBuffer<?>>) new HttpResponseWrapper<>(thisResponse);
-                        }).doAfterNext(res -> {
-                            ByteBuffer<?> buffer = res.body();
-                            if (buffer instanceof ReferenceCounted) {
-                                ((ReferenceCounted) buffer).release();
-                            }
                         });
             }).doOnTerminate(() -> {
                 final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
@@ -955,14 +961,9 @@ public class DefaultHttpClient implements
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
                 return httpContentFlowable
                         .filter(message -> !(message.content() instanceof EmptyByteBuf))
-                        .map(contentMapper)
-                        .doAfterNext(buffer -> {
-                            ByteBuf byteBuf = (ByteBuf) buffer.asNativeBuffer();
-                            if (byteBuf.refCnt() > 0) {
-                                ReferenceCountUtil.safeRelease(byteBuf);
-                            }
-                        });
-            }).doOnTerminate(() -> {
+                        .map(contentMapper);
+            })
+            .doOnTerminate(() -> {
                 final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
                 if (o instanceof Channel) {
                     final Channel c = (Channel) o;
@@ -2564,6 +2565,17 @@ public class DefaultHttpClient implements
 
             @Override
             public void channelReleased(Channel ch) {
+                Duration idleTimeout = configuration.getConnectionPoolIdleTimeout().orElse(Duration.ofNanos(0));
+                ChannelPipeline pipeline = ch.pipeline();
+                if (ch.isOpen()) {
+                    ch.config().setAutoRead(true);
+                    pipeline.addLast(IdlingConnectionHandler.INSTANCE);
+                    if (idleTimeout.toNanos() > 0) {
+                        pipeline.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(idleTimeout.toNanos(), idleTimeout.toNanos(), 0, TimeUnit.NANOSECONDS));
+                        pipeline.addLast(IdleTimeoutHandler.INSTANCE);
+                    }
+                }
+
                 if (connectionTimeAliveMillis != null) {
                     boolean shouldCloseOnRelease = Boolean.TRUE.equals(ch.attr(ConnectTTLHandler.RELEASE_CHANNEL).get());
 
@@ -2573,10 +2585,23 @@ public class DefaultHttpClient implements
                 }
 
                 if (readTimeoutMillis != null) {
-                    ChannelPipeline pipeline = ch.pipeline();
                     if (pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
                         pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
                     }
+                }
+            }
+
+            @Override
+            public void channelAcquired(Channel ch) throws Exception {
+                ChannelPipeline pipeline = ch.pipeline();
+                if (pipeline.context(IdlingConnectionHandler.INSTANCE) != null) {
+                    pipeline.remove(IdlingConnectionHandler.INSTANCE);
+                }
+                if (pipeline.context(HANDLER_IDLE_STATE) != null) {
+                    pipeline.remove(HANDLER_IDLE_STATE);
+                }
+                if (pipeline.context(IdleTimeoutHandler.INSTANCE) != null) {
+                    pipeline.remove(IdleTimeoutHandler.INSTANCE);
                 }
             }
         };

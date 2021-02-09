@@ -65,6 +65,11 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     }
 
     @Override
+    public String toString() {
+        return methodNode.toString();
+    }
+
+    @Override
     public String getName() {
         return methodNode.getName();
     }

@@ -15,9 +15,13 @@
  */
 package io.micronaut.runtime;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultApplicationContextBuilder;
+import io.micronaut.context.banner.MicronautBanner;
+import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.naming.Described;
@@ -26,10 +30,11 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import java.io.PrintStream;
 import java.net.URL;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Function;
 
@@ -40,7 +45,7 @@ import java.util.function.Function;
  * @since 1.0
  */
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
-
+    private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
 
@@ -58,9 +63,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     @Override
     public @NonNull ApplicationContext start() {
         long start = System.currentTimeMillis();
+        printBanner();
         ApplicationContext applicationContext = super.build();
 
         try {
+
             applicationContext.start();
 
             Optional<EmbeddedApplication> embeddedContainerBean = applicationContext.findBean(EmbeddedApplication.class);
@@ -164,6 +171,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     @Override
     public @NonNull Micronaut exclude(@Nullable String... configurations) {
         return (Micronaut) super.exclude(configurations);
+    }
+
+    @Override
+    public @NonNull Micronaut banner(boolean isEnabled) {
+        return (Micronaut) super.banner(isEnabled);
     }
 
     /**
@@ -317,4 +329,19 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         }
         throw new ApplicationStartupException("Error starting Micronaut server: " + exception.getMessage(), exception);
     }
+
+    private void printBanner() {
+        if (!isBannerEnabled()) {
+            return;
+        }
+        PrintStream out = System.out;
+
+        Optional<URL> resource = getResourceLoader().getResource(BANNER_NAME);
+        if (resource.isPresent()) {
+            new ResourceBanner(resource.get(), out).print();
+        } else {
+            new MicronautBanner(out).print();
+        }
+    }
+
 }

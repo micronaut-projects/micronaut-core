@@ -198,6 +198,14 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder exclude(@Nullable String... configurations);
 
     /**
+     * Whether the banner is enabled or not.
+     *
+     * @param isEnabled Whether the banner is enabled or not
+     * @return This application
+     */
+    @NonNull ApplicationContextBuilder banner(boolean isEnabled);
+
+    /**
      * Set the command line arguments.
      *
      * @param args The arguments

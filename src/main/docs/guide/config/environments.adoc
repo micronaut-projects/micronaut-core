@@ -62,3 +62,38 @@ public static void main(String[] args) {
             .start();
 }
 ----
+
+== Micronaut Banner
+
+Since Micronaut 2.3 a banner is shown when the application starts up. It is enabled by default and it will also show the Micronaut version.
+
+[source,shell,subs="attributes"]
+----
+$ ./gradlew run
+ __  __ _                                  _
+|  \/  (_) ___ _ __ ___  _ __   __ _ _   _| |_
+| |\/| | |/ __| '__/ _ \| '_ \ / _` | | | | __|
+| |  | | | (__| | | (_) | | | | (_| | |_| | |_
+|_|  |_|_|\___|_|  \___/|_| |_|\__,_|\__,_|\__|
+  Micronaut ({version})
+
+17:07:22.997 [main] INFO  io.micronaut.runtime.Micronaut - Startup completed in 611ms. Server Running: http://localhost:8080
+----
+
+If you want to customize the banner with your own Ascii Art (just plain ascii at this moment) just create the file `src/main/resources/micronaut-banner.txt`
+and it will be used instead.
+
+In case you want to disable it modify your `Application` class:
+
+[source,java]
+----
+public class Application {
+
+    public static void main(String[] args) {
+        Micronaut.build(args)
+                .banner(false) // <1>
+                .start();
+    }
+}
+----
+<1> Disable the banner

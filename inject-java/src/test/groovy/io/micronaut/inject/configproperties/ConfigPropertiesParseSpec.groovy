@@ -754,4 +754,34 @@ class Parent {
         ((Engine.Builder) bean.engine).build().manufacturer == 'Subaru'
         ((Engine.Builder) bean.getEngine2()).build().manufacturer == 'Subaru'
     }
+
+    void "test name is correct with inner classes of non config props class"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition("test.Test\$TestNestedConfig", '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+class Test {
+
+    @ConfigurationProperties("test")
+    static class TestNestedConfig {
+        private String val;
+
+        public String getVal() {
+            return val;
+        }
+
+        public void setVal(String val) {
+            this.val = val;
+        }
+    }
+
+}
+''')
+
+        then:
+        noExceptionThrown()
+        beanDefinition.injectedMethods[0].annotationMetadata.getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "test.val"
+    }
 }

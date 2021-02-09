@@ -177,4 +177,6 @@ logger:
         foo.bar: ERROR
 ----
 
+The same configuration can be achieved by setting the environment variable `LOGGER_LEVELS_FOO_BAR`. Note that there is currently no way to set log levels for unconventional prefixes such as `foo.barBaz`.
+
 Note that the ability to control log levels via config is controlled via the api:logging.LoggingSystem[] interface. Currently Micronaut ships with a single implementation that allows setting log levels for the Logback library. If another library is chosen you should provide a bean that implements this interface.

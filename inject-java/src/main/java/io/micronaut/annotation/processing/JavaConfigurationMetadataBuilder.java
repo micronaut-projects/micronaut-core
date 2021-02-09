@@ -108,7 +108,9 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
                     Optional<String> parentConfig = enclosingTypeMetadata.getValue(ConfigurationReader.class, String.class);
                     if (parentConfig.isPresent()) {
                         String parentPath = pathEvaluationFunctionForMetadata(enclosingTypeMetadata).apply(parentConfig.get());
-                        path.insert(0, parentPath + '.');
+                        if (StringUtils.isNotEmpty(parentPath)) {
+                            path.insert(0, parentPath + '.');
+                        }
                         prependSuperclasses(enclosingType, path);
                         if (enclosingType.getNestingKind() == NestingKind.MEMBER) {
                             Element el = enclosingType.getEnclosingElement();
@@ -122,7 +124,9 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
                         }
                     } else {
                         String parentPath = pathEvaluationFunctionForMetadata(enclosingTypeMetadata).apply("");
-                        path.insert(0, parentPath + '.');
+                        if (StringUtils.isNotEmpty(parentPath)) {
+                            path.insert(0, parentPath + '.');
+                        }
                         prependSuperclasses(enclosingType, path);
                         if (enclosingType.getNestingKind() == NestingKind.MEMBER) {
                             Element el = enclosingType.getEnclosingElement();
@@ -218,16 +222,12 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
             while (superInterface != null) {
                 final TypeElement element = (TypeElement) superInterface.asElement();
                 AnnotationMetadata annotationMetadata = annotationUtils.getDeclaredAnnotationMetadata(element);
-                Optional<String> parentConfig = annotationMetadata.getValue(ConfigurationReader.class, String.class);
-                if (parentConfig.isPresent()) {
-                    String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply(parentConfig.get());
+                String parentConfig = annotationMetadata.getValue(ConfigurationReader.class, String.class).orElse("");
+                String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply(parentConfig);
+                if (StringUtils.isNotEmpty(parentPath)) {
                     path.insert(0, parentPath + '.');
-                    superInterface = resolveSuperInterface(element);
-                } else {
-                    String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply("");
-                    path.insert(0, parentPath + '.');
-                    superInterface = resolveSuperInterface(element);
                 }
+                superInterface = resolveSuperInterface(element);
             }
         } else {
             TypeMirror superclass = declaringType.getSuperclass();
@@ -238,12 +238,16 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
                 Optional<String> parentConfig = annotationMetadata.getValue(ConfigurationReader.class, String.class);
                 if (parentConfig.isPresent()) {
                     String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply(parentConfig.get());
-                    path.insert(0, parentPath + '.');
+                    if (StringUtils.isNotEmpty(parentPath)) {
+                        path.insert(0, parentPath + '.');
+                    }
                     superclass = ((TypeElement) element).getSuperclass();
                 } else {
                     if (annotationMetadata.isPresent(ConfigurationReader.class, "prefix")) {
                         String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply("");
-                        path.insert(0, parentPath + '.');
+                        if (StringUtils.isNotEmpty(parentPath)) {
+                            path.insert(0, parentPath + '.');
+                        }
                         superclass = ((TypeElement) element).getSuperclass();
                     } else {
                         break;

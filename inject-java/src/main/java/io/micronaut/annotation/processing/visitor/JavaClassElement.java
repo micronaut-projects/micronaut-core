@@ -54,6 +54,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private final int arrayDimensions;
     private List<PropertyElement> beanProperties;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
+    private List<? extends Element> enclosedElements;
 
     /**
      * @param classElement       The {@link TypeElement}
@@ -407,24 +408,228 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
-    public List<FieldElement> getFields(@NonNull Predicate<Set<ElementModifier>> modifierFilter) {
-        List<FieldElement> fields = new ArrayList<>();
-        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext) {
-            @Override
-            protected boolean isAcceptable(javax.lang.model.element.Element element) {
-                final Set<ElementModifier> mods = element.getModifiers().stream().map(m -> ElementModifier.valueOf(m.name())).collect(Collectors.toSet());
-                return element.getKind() == ElementKind.FIELD && element instanceof VariableElement && modifierFilter.test(mods);
+    public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
+        Objects.requireNonNull(query, "Query cannot be null");
+        ElementQuery.Result<T> result = query.result();
+        ElementKind kind = getElementKind(result.getElementType());
+        List<T> resultingElements = new ArrayList<>();
+        List<Element> enclosedElements = new ArrayList<>(getDeclaredEnclosedElements());
+
+        boolean onlyDeclared = result.isOnlyDeclared();
+        boolean onlyAbstract = result.isOnlyAbstract();
+        boolean onlyConcrete = result.isOnlyConcrete();
+
+
+        if (!onlyDeclared) {
+            Elements elements = visitorContext.getElements();
+
+            TypeMirror superclass = classElement.getSuperclass();
+            // traverse the super class true and add elements that are not overridden
+            while (superclass instanceof DeclaredType) {
+                DeclaredType dt = (DeclaredType) superclass;
+                TypeElement element = (TypeElement) dt.asElement();
+                // reached non-accessible class like Object, Enum, Record etc.
+                if (element.getQualifiedName().toString().startsWith("java.lang.")) {
+                    break;
+                }
+                List<? extends Element> superElements = element.getEnclosedElements();
+
+                List<Element> elementsToAdd = new ArrayList<>(superElements.size());
+                superElements:
+                for (Element superElement : superElements) {
+                    ElementKind superKind = superElement.getKind();
+                    if (superKind == kind) {
+                        for (Element enclosedElement : enclosedElements) {
+                            if (elements.hides(enclosedElement, superElement)) {
+                                continue superElements;
+                            } else if (enclosedElement.getKind() == ElementKind.METHOD && superElement.getKind() == ElementKind.METHOD &&
+                                    elements.overrides((ExecutableElement) enclosedElement, (ExecutableElement) superElement, this.classElement)) {
+                                continue superElements;
+                            }
+                        }
+                        if (onlyAbstract && !superElement.getModifiers().contains(Modifier.ABSTRACT)) {
+                            continue;
+                        } else if (onlyConcrete && superElement.getModifiers().contains(Modifier.ABSTRACT)) {
+                            continue;
+                        }
+                        elementsToAdd.add(superElement);
+                    }
+                }
+                enclosedElements.addAll(elementsToAdd);
+                superclass = element.getSuperclass();
             }
 
-            @Override
-            protected void accept(DeclaredType type, Element element, Object o) {
-                final AnnotationMetadata fieldMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(element);
-                fields.add(new JavaFieldElement(JavaClassElement.this, (VariableElement) element, fieldMetadata, visitorContext));
+            if (kind == ElementKind.METHOD) {
+                // if the element kind is interfaces then we need to go through interfaces as well
+                Set<TypeElement> allInterfaces = visitorContext.getModelUtils().getAllInterfaces(this.classElement);
+                List<Element> elementsToAdd = new ArrayList<>(allInterfaces.size());
+                for (TypeElement itfe : allInterfaces) {
+                    List<? extends Element> interfaceElements = itfe.getEnclosedElements();
+                    interfaceElements:
+                    for (Element interfaceElement : interfaceElements) {
+                        if (interfaceElement.getKind() == ElementKind.METHOD) {
+                            ExecutableElement ee = (ExecutableElement) interfaceElement;
+                            if (onlyAbstract && ee.getModifiers().contains(Modifier.DEFAULT)) {
+                                continue;
+                            } else if (onlyConcrete && !ee.getModifiers().contains(Modifier.DEFAULT)) {
+                                continue;
+                            }
+
+                            for (Element enclosedElement : enclosedElements) {
+                                if (enclosedElement.getKind() == ElementKind.METHOD) {
+                                    if (elements.overrides((ExecutableElement) enclosedElement, ee, this.classElement)) {
+                                        continue interfaceElements;
+                                    }
+                                }
+                            }
+                            elementsToAdd.add(interfaceElement);
+                        }
+                    }
+                }
+                enclosedElements.addAll(elementsToAdd);
+                elementsToAdd.clear();
             }
+        }
+        boolean onlyAccessible = result.isOnlyAccessible();
+        if (kind == ElementKind.METHOD) {
+            if (onlyAbstract) {
+                if (isInterface()) {
+                    enclosedElements.removeIf((e) -> e.getModifiers().contains(Modifier.DEFAULT));
+                } else {
+                    enclosedElements.removeIf((e) -> !e.getModifiers().contains(Modifier.ABSTRACT));
+                }
+            } else if (onlyConcrete) {
+                if (isInterface()) {
+                    enclosedElements.removeIf((e) -> !e.getModifiers().contains(Modifier.DEFAULT));
+                } else {
+                    enclosedElements.removeIf((e) -> e.getModifiers().contains(Modifier.ABSTRACT));
+                }
+            }
+        }
+        List<Predicate<Set<ElementModifier>>> modifierPredicates = result.getModifierPredicates();
+        List<Predicate<String>> namePredicates = result.getNamePredicates();
+        List<Predicate<AnnotationMetadata>> annotationPredicates = result.getAnnotationPredicates();
+        boolean hasNamePredicates = !namePredicates.isEmpty();
+        boolean hasModifierPredicates = !modifierPredicates.isEmpty();
+        boolean hasAnnotationPredicates = !annotationPredicates.isEmpty();
+        
+        elementLoop:
+        for (Element enclosedElement : enclosedElements) {
+            ElementKind enclosedElementKind = enclosedElement.getKind();
+            if (enclosedElementKind == kind) {
+                String elementName = enclosedElement.getSimpleName().toString();
+                if (onlyAccessible) {
+                    // exclude private members
+                    if (enclosedElement.getModifiers().contains(Modifier.PRIVATE)) {
+                        continue;
+                    } else if (elementName.startsWith("$")) {
+                        // exclude synthetic members or bridge methods that start with $
+                        continue;
+                    } else {
+                        Element enclosingElement = enclosedElement.getEnclosingElement();
+                        // if the outer element of the enclosed element is not the current class
+                        // we need to check if it package private and within a different package so it can be excluded
+                        if (enclosingElement != this.classElement && visitorContext.getModelUtils().isPackagePrivate(enclosedElement)) {
+                            if (enclosingElement instanceof TypeElement) {
+                                Name qualifiedName = ((TypeElement) enclosingElement).getQualifiedName();
+                                String packageName = NameUtils.getPackageName(qualifiedName.toString());
+                                if (!packageName.equals(getPackageName())) {
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                }
 
-        }, null);
+                if (hasModifierPredicates) {
+                    Set<ElementModifier> modifiers = enclosedElement
+                            .getModifiers().stream().map(m -> ElementModifier.valueOf(m.name())).collect(Collectors.toSet());
+                    for (Predicate<Set<ElementModifier>> modifierPredicate : modifierPredicates) {
+                        if (!modifierPredicate.test(modifiers)) {
+                            continue elementLoop;
+                        }
+                    }
+                }
 
-        return Collections.unmodifiableList(fields);
+                if (hasNamePredicates) {
+                    for (Predicate<String> namePredicate : namePredicates) {
+                        if (!namePredicate.test(elementName)) {
+                            continue elementLoop;
+                        }
+                    }
+                }
+
+                final AnnotationMetadata metadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosedElement);
+                if (hasAnnotationPredicates) {
+                    for (Predicate<AnnotationMetadata> annotationPredicate : annotationPredicates) {
+                        if (!annotationPredicate.test(metadata)) {
+                            continue elementLoop;
+                        }
+                    }
+                }
+                T element;
+                switch (enclosedElementKind) {
+                    case METHOD:
+                        //noinspection unchecked
+                        element = (T) visitorContext.getElementFactory().newMethodElement(
+                                this,
+                                (ExecutableElement) enclosedElement,
+                                metadata,
+                                genericTypeInfo
+                        );
+                    break;
+                    case FIELD:
+                        //noinspection unchecked
+                        element = (T) visitorContext.getElementFactory().newFieldElement(
+                                this,
+                                (VariableElement) enclosedElement,
+                                metadata
+                        );
+                    break;
+                    case CONSTRUCTOR:
+                        //noinspection unchecked
+                        element = (T) visitorContext.getElementFactory().newConstructorElement(
+                                this,
+                                (ExecutableElement) enclosedElement,
+                                metadata
+                        );
+                    break;
+                    default:
+                        element = null;
+                }
+
+                if (element != null) {
+                    List<Predicate<T>> elementPredicates = result.getElementPredicates();
+                    if (!elementPredicates.isEmpty()) {
+                        for (Predicate<T> elementPredicate : elementPredicates) {
+                            if (!elementPredicate.test(element)) {
+                                continue elementLoop;
+                            }
+                        }
+                    }
+                    resultingElements.add(element);
+                }
+            }
+        }
+        return Collections.unmodifiableList(resultingElements);
+    }
+
+    private List<? extends Element> getDeclaredEnclosedElements() {
+        if (this.enclosedElements == null) {
+            this.enclosedElements = classElement.getEnclosedElements();
+        }
+        return this.enclosedElements;
+    }
+
+    private <T extends io.micronaut.inject.ast.Element> ElementKind getElementKind(Class<T> elementType) {
+        if (elementType == MethodElement.class) {
+            return ElementKind.METHOD;
+        } else if (elementType == FieldElement.class) {
+            return ElementKind.FIELD;
+        } else if (elementType == ConstructorElement.class) {
+            return ElementKind.CONSTRUCTOR;
+        }
+        throw new IllegalArgumentException("Unsupported element type for query: " + elementType);
     }
 
     @Override

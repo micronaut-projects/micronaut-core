@@ -171,7 +171,7 @@ public interface ClassElement extends TypedElement {
      * @return The fields
      */
     default List<FieldElement> getFields() {
-        return getFields(modifiers -> true);
+        return getEnclosedElements(ElementQuery.ALL_FIELDS);
     }
 
     /**
@@ -179,9 +179,40 @@ public interface ClassElement extends TypedElement {
      *
      * @param modifierFilter Can be used to filter fields by modifier
      * @return The fields
+     * @deprecated Use {@link #getEnclosedElements(ElementQuery)} instead
      */
+    @Deprecated
     default List<FieldElement> getFields(@NonNull Predicate<Set<ElementModifier>> modifierFilter) {
+        Objects.requireNonNull(modifierFilter, "The modifier filter cannot be null");
+        return getEnclosedElements(ElementQuery.ALL_FIELDS.modifiers(modifierFilter));
+    }
+
+    /**
+     * Return the elements that match the given query.
+     *
+     * @param query The query to use.
+     * @param <T>  The element type
+     * @return The fields
+     * @since 2.3.0
+     */
+    default <T extends Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
         return Collections.emptyList();
+    }
+
+    /**
+     * Return the first enclosed element matching the given query.
+     *
+     * @param query The query to use.
+     * @param <T>  The element type
+     * @return The fields
+     * @since 2.3.0
+     */
+    default <T extends Element> Optional<T> getEnclosedElement(@NonNull ElementQuery<T> query) {
+        List<T> enclosedElements = getEnclosedElements(query);
+        if (!enclosedElements.isEmpty()) {
+            return Optional.of(enclosedElements.iterator().next());
+        }
+        return Optional.empty();
     }
 
     /**

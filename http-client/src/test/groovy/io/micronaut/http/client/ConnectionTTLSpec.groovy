@@ -37,7 +37,6 @@ class ConnectionTTLSpec extends Specification {
     )
     RxHttpClient httpClient = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
 
-
     when:"make first request"
     httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockingFirst()
     Channel ch = getQueuedChannels(httpClient).first
@@ -67,7 +66,6 @@ class ConnectionTTLSpec extends Specification {
     )
     RxHttpClient httpClient = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
 
-
     when:"make first request"
     httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockingFirst()
     Deque<Channel> deque = getQueuedChannels(httpClient)
@@ -77,10 +75,10 @@ class ConnectionTTLSpec extends Specification {
       deque.first.isOpen()
     }
 
-    when:"make another request "
+    when:"make another request"
     httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockingFirst()
 
-    then:"ensure channel is closed"
+    then:"ensure channel is still open"
     new PollingConditions().eventually {
       deque.first.isOpen()
     }

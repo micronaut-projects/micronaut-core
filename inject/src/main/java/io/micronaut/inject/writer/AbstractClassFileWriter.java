@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
@@ -1365,6 +1366,25 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     /**
      * @param writer        The class writer
+     * @param asmMethod     The asm method
+     * @return The {@link GeneratorAdapter}
+     * @since 2.3.0
+     */
+    protected GeneratorAdapter startPublicMethod(ClassWriter writer, Method asmMethod) {
+        String methodName = asmMethod.getName();
+        return new GeneratorAdapter(writer.visitMethod(
+                ACC_PUBLIC,
+                methodName,
+                asmMethod.getDescriptor(),
+                null,
+                null
+        ), ACC_PUBLIC,
+                methodName,
+                asmMethod.getDescriptor());
+    }
+
+    /**
+     * @param writer        The class writer
      * @param methodName    The method name
      * @param returnType    The return type
      * @param argumentTypes The argument types
@@ -1418,4 +1438,24 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         generatorAdapter.invokeConstructor(typeToInstantiate, METHOD_DEFAULT_CONSTRUCTOR);
     }
 
+    /**
+     * Invokes the given method.
+     * @param generatorAdapter The generator adapter
+     * @param method The method to invoke
+     * @return The return type
+     */
+    protected @NonNull ClassElement invokeMethod(@NonNull GeneratorAdapter generatorAdapter, @NonNull MethodElement method) {
+        ClassElement returnType = method.getReturnType();
+        Method targetMethod = new Method(method.getName(), getMethodDescriptor(returnType, Arrays.asList(method.getParameters())));
+        ClassElement declaringElement = method.getDeclaringType();
+        Type declaringType = getTypeReference(declaringElement);
+        if (method.isStatic()) {
+            generatorAdapter.invokeStatic(declaringType, targetMethod);
+        } else if (declaringElement.isInterface()) {
+            generatorAdapter.invokeInterface(declaringType, targetMethod);
+        } else {
+            generatorAdapter.invokeVirtual(declaringType, targetMethod);
+        }
+        return returnType;
+    }
 }

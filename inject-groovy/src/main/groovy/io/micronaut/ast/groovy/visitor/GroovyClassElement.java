@@ -16,7 +16,6 @@
 package io.micronaut.ast.groovy.visitor;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
-import groovy.transform.PackageScope;
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.AstClassUtils;
@@ -28,17 +27,17 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.ast.ArrayableClassElement;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.*;
+import org.apache.groovy.ast.tools.ClassNodeUtils;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Inject;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.codehaus.groovy.ast.ClassHelper.makeCached;
 
@@ -51,6 +50,26 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached;
 @Internal
 public class GroovyClassElement extends AbstractGroovyElement implements ArrayableClassElement {
 
+    private static final Predicate<MethodNode> JUNK_METHOD_FILTER = m -> {
+                String methodName = m.getName();
+
+                return !m.isStaticConstructor() &&
+                        !methodName.startsWith("$") &&
+                        !methodName.contains("trait$") &&
+                        !methodName.startsWith("super$") &&
+                        !methodName.equals("setMetaClass") &&
+                        !m.getReturnType().getNameWithoutPackage().equals("MetaClass") &&
+                        !m.getDeclaringClass().equals(ClassHelper.GROOVY_OBJECT_TYPE) && !m.getDeclaringClass().equals(ClassHelper.OBJECT_TYPE);
+            };
+    private static final Predicate<FieldNode> JUNK_FIELD_FILTER = m -> {
+        String fieldName = m.getName();
+
+        return  !fieldName.startsWith("$") &&
+                !fieldName.startsWith("__$") &&
+                !fieldName.contains("trait$") &&
+                !fieldName.equals("metaClass") &&
+                !m.getDeclaringClass().equals(ClassHelper.GROOVY_OBJECT_TYPE) && !m.getDeclaringClass().equals(ClassHelper.OBJECT_TYPE);
+    };
     protected final ClassNode classNode;
     private final int arrayDimensions;
     private Map<String, Map<String, ClassNode>> genericInfo;
@@ -84,6 +103,168 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         if (classNode.isArray()) {
             classNode.setName(classNode.getComponentType().getName());
         }
+    }
+
+    @Override
+    public <T extends Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
+        Objects.requireNonNull(query, "Query cannot be null");
+        ElementQuery.Result<T> result = query.result();
+        boolean onlyDeclared = result.isOnlyDeclared();
+        boolean onlyAccessible = result.isOnlyAccessible();
+        boolean onlyAbstract = result.isOnlyAbstract();
+        boolean onlyConcrete = result.isOnlyConcrete();
+        List<Predicate<String>> namePredicates = result.getNamePredicates();
+        List<Predicate<AnnotationMetadata>> annotationPredicates = result.getAnnotationPredicates();
+        List<Predicate<T>> elementPredicates = result.getElementPredicates();
+        List<Predicate<Set<ElementModifier>>> modifierPredicates = result.getModifierPredicates();
+        List<T> elements;
+        Class<T> elementType = result.getElementType();
+        if (elementType == MethodElement.class) {
+
+            List<MethodNode> methods;
+            Map<String, MethodNode> declaredMethodsMap = classNode.getDeclaredMethodsMap();
+            ClassNodeUtils.addDeclaredMethodsFromInterfaces(classNode, declaredMethodsMap);
+            if (onlyDeclared) {
+                methods = classNode.getMethods()
+                        .stream().filter(JUNK_METHOD_FILTER)
+                        .collect(Collectors.toList());
+            } else {
+                methods = classNode.getAllDeclaredMethods()
+                        .stream().filter(JUNK_METHOD_FILTER)
+                        .collect(Collectors.toList());
+            }
+
+            Iterator<MethodNode> i = methods.iterator();
+            while (i.hasNext()) {
+                MethodNode methodNode = i.next();
+                if (onlyAbstract && !methodNode.isAbstract()) {
+                    i.remove();
+                    continue;
+                }
+                if (onlyConcrete && methodNode.isAbstract()) {
+                    i.remove();
+                    continue;
+                }
+                if (onlyAccessible) {
+                    if (methodNode.isPrivate()) {
+                        i.remove();
+                        continue;
+                    } else if (!methodNode.getDeclaringClass().equals(classNode)) {
+                        // inaccessible through package scope
+                        if (methodNode.isPackageScope() && !methodNode.getDeclaringClass().getPackageName().equals(getPackageName())) {
+                            i.remove();
+                            continue;
+                        }
+                    }
+                }
+                if (!modifierPredicates.isEmpty()) {
+                    Set<ElementModifier> elementModifiers = resolveModifiers(methodNode);
+                    if (!modifierPredicates.stream().allMatch(p -> p.test(elementModifiers))) {
+                        i.remove();
+                        continue;
+                    }
+                }
+
+                if (!namePredicates.isEmpty()) {
+                    if (!namePredicates.stream().allMatch(p -> p.test(methodNode.getName()))) {
+                        i.remove();
+                    }
+                }
+            }
+
+            //noinspection unchecked
+            elements = methods.stream().map(methodNode -> (T) new GroovyMethodElement(
+                    this,
+                    visitorContext,
+                    methodNode,
+                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode)
+            )).collect(Collectors.toList());
+        } else if (elementType == FieldElement.class) {
+            List<FieldNode> fields;
+            if (onlyDeclared) {
+                List<FieldNode> initialFields = classNode.getFields();
+                fields = findRelevantFields(onlyAccessible, initialFields, namePredicates, modifierPredicates);
+            } else {
+                fields = new ArrayList<>(classNode.getFields());
+                ClassNode superClass = classNode.getSuperClass();
+                while (superClass != null && !superClass.equals(ClassHelper.OBJECT_TYPE)) {
+                    fields.addAll(superClass.getFields());
+                    superClass = superClass.getSuperClass();
+                }
+                fields = findRelevantFields(onlyAccessible, fields, namePredicates, modifierPredicates);
+            }
+            //noinspection unchecked
+            elements = fields.stream().map(fieldNode -> (T) new GroovyFieldElement(
+                    visitorContext,
+                    fieldNode,
+                    fieldNode,
+                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, fieldNode)
+            )).collect(Collectors.toList());
+        } else {
+            elements = Collections.emptyList();
+        }
+        if (!elements.isEmpty()) {
+            if (!annotationPredicates.isEmpty()) {
+                elements.removeIf(e -> !annotationPredicates.stream().allMatch(p -> p.test(e.getAnnotationMetadata())));
+            }
+
+            if (!elements.isEmpty() && !elementPredicates.isEmpty()) {
+                elements.removeIf(e -> !elementPredicates.stream().allMatch(p -> p.test(e)));
+            }
+        }
+        return elements;
+    }
+
+    private List<FieldNode> findRelevantFields(boolean onlyAccessible, List<FieldNode> initialFields, List<Predicate<String>> namePredicates, List<Predicate<Set<ElementModifier>>> modifierPredicates) {
+        Stream<FieldNode> fieldStream = initialFields.stream().filter(JUNK_FIELD_FILTER);
+        if (onlyAccessible) {
+            fieldStream = fieldStream.filter(fn -> !fn.isPrivate());
+        }
+        if (!namePredicates.isEmpty()) {
+            fieldStream = fieldStream.filter(fn -> !namePredicates.stream().allMatch(p -> p.test(fn.getName())));
+        }
+        if (!modifierPredicates.isEmpty()) {
+            fieldStream = fieldStream.filter(fn -> !modifierPredicates.stream().allMatch(p -> p.test(resolveModifiers(fn))));
+        }
+        return fieldStream.collect(Collectors.toList());
+    }
+
+    private Set<ElementModifier> resolveModifiers(MethodNode methodNode) {
+        Set<ElementModifier> modifiers = new HashSet<>(5);
+        if (methodNode.isPrivate()) {
+            modifiers.add(ElementModifier.PRIVATE);
+        } else if (methodNode.isProtected()) {
+            modifiers.add(ElementModifier.PROTECTED);
+        } else if (methodNode.isPublic()) {
+            modifiers.add(ElementModifier.PUBLIC);
+        }
+        if (methodNode.isAbstract()) {
+            modifiers.add(ElementModifier.ABSTRACT);
+        } else if (methodNode.isStatic()) {
+            modifiers.add(ElementModifier.STATIC);
+        }
+        if (methodNode.isFinal()) {
+            modifiers.add(ElementModifier.FINAL);
+        }
+        return modifiers;
+    }
+
+    private Set<ElementModifier> resolveModifiers(FieldNode fieldNode) {
+        Set<ElementModifier> modifiers = new HashSet<>(5);
+        if (fieldNode.isPrivate()) {
+            modifiers.add(ElementModifier.PRIVATE);
+        } else if (fieldNode.isProtected()) {
+            modifiers.add(ElementModifier.PROTECTED);
+        } else if (fieldNode.isPublic()) {
+            modifiers.add(ElementModifier.PUBLIC);
+        }
+        if (fieldNode.isStatic()) {
+            modifiers.add(ElementModifier.STATIC);
+        }
+        if (fieldNode.isFinal()) {
+            modifiers.add(ElementModifier.FINAL);
+        }
+        return modifiers;
     }
 
     @Override
