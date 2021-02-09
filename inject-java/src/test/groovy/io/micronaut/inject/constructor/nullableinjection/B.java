@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.constructor.nullableinjection;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.inject.Inject;
 
 public class B {

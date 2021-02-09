@@ -1,6 +1,6 @@
 package io.micronaut.http.client
 
-import edu.umd.cs.findbugs.annotations.Nullable
+import io.micronaut.core.annotation.Nullable
 import groovy.transform.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.async.publisher.Publishers

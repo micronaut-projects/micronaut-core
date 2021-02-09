@@ -18,7 +18,7 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArgumentUtils;
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;

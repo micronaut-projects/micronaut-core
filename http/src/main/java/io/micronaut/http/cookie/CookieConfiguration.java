@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.cookie;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 import java.time.temporal.TemporalAmount;
 import java.util.Optional;

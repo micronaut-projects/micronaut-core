@@ -18,7 +18,7 @@ package io.micronaut.inject.property;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.core.convert.format.MapFormat;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.Map;
 

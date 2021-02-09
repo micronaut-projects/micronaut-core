@@ -15,7 +15,7 @@
  */
 package io.micronaut.validation.executable;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.MethodElement;

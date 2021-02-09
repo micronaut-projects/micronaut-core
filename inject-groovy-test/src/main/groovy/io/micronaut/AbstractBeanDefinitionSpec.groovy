@@ -97,7 +97,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         ASTNode[] nodes = new AstBuilder().buildFromString(source)
 
         ClassNode element = nodes ? nodes.find { it instanceof ClassNode && it.name == cls } : null
-        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
+        def sourceUnit = Mock(SourceUnit)
+        sourceUnit.getErrorCollector() >> new ErrorCollector(new CompilerConfiguration())
+        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(sourceUnit, null)
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
         return metadata
     }

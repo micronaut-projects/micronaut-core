@@ -21,8 +21,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
 
-import javax.annotation.concurrent.Immutable;
-
 /**
  * Stores data to be used when visiting a configuration builder method.
  *
@@ -30,7 +28,6 @@ import javax.annotation.concurrent.Immutable;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Immutable
 @Internal
 class ConfigBuilderState {
 

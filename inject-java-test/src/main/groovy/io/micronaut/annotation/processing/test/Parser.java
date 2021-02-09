@@ -15,22 +15,14 @@
  */
 package io.micronaut.annotation.processing.test;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableListMultimap;
-import com.google.testing.compile.JavaFileObjects;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.ErroneousTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.util.TreeScanner;
-import com.sun.source.util.Trees;
 
 import javax.lang.model.element.Element;
-import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
 import java.io.File;
-import java.util.Collections;
-
-import static com.google.common.base.MoreObjects.firstNonNull;
 import static java.lang.Boolean.TRUE;
 
 
@@ -47,7 +39,7 @@ public final class Parser {
 
                 @Override
                 public Boolean scan(Iterable<? extends Tree> nodes, Boolean p) {
-                    for (Tree node : firstNonNull(nodes, Collections.<Tree>emptyList())) {
+                    for (Tree node : nodes) {
                         if (isTrue(scan(node, p))) {
                             return true;
                         }
@@ -122,44 +114,4 @@ public final class Parser {
         return TRUE.equals(p);
     }
 
-    /**
-     * The diagnostic, parse trees, and {@link Trees} instance for a parse task.
-     *
-     * <p>Note: It is possible for the {@link Trees} instance contained within a {@code ParseResult}
-     * to be invalidated by a call to {@link com.sun.tools.javac.api.JavacTaskImpl#cleanup()}. Though
-     * we do not currently expose the {@link com.sun.source.util.JavacTask} used to create a {@code ParseResult} to {@code
-     * cleanup()} calls on its underlying implementation, this should be acknowledged as an
-     * implementation detail that could cause unexpected behavior when making calls to methods in
-     * {@link Trees}.
-     */
-    public static final class ParseResult {
-
-
-        private final ImmutableListMultimap<Diagnostic.Kind, Diagnostic<? extends JavaFileObject>>
-                diagnostics;
-        private final ImmutableList<? extends CompilationUnitTree> compilationUnits;
-        private final Trees trees;
-
-        ParseResult(
-                ImmutableListMultimap<Diagnostic.Kind, Diagnostic<? extends JavaFileObject>> diagnostics,
-                Iterable<? extends CompilationUnitTree> compilationUnits,
-                Trees trees) {
-            this.trees = trees;
-            this.compilationUnits = ImmutableList.copyOf(compilationUnits);
-            this.diagnostics = diagnostics;
-        }
-
-        public ImmutableListMultimap<Diagnostic.Kind, Diagnostic<? extends JavaFileObject>> diagnosticsByKind() {
-            return diagnostics;
-        }
-
-        public Iterable<? extends CompilationUnitTree> compilationUnits() {
-            return compilationUnits;
-        }
-
-        public Trees trees() {
-            return trees;
-        }
-
-    }
 }

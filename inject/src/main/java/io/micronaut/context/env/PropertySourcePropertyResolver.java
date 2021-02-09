@@ -33,8 +33,8 @@ import io.micronaut.core.value.PropertyResolver;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;

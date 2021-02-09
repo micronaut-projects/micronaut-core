@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.netty.channel;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.netty.channel.ChannelPipeline;
 
 /**

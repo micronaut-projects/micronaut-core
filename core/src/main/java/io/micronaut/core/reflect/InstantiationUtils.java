@@ -27,7 +27,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.function.Function;

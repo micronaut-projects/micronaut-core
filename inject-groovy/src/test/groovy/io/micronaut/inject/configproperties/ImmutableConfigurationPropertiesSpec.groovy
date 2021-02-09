@@ -23,7 +23,7 @@ class MyConfig {
     private int serverPort;
     
     @ConfigurationInject
-    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort, @edu.umd.cs.findbugs.annotations.Nullable String nullable) {
+    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort, @io.micronaut.core.annotation.Nullable String nullable) {
         this.host = host;
         this.serverPort = serverPort;
     }

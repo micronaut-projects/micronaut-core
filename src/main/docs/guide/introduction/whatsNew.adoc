@@ -2,88 +2,11 @@ Micronaut {version} includes the following changes:
 
 === Core Features
 
-==== Banner
+==== Core Nullability Annotations
 
-A new customizable banner is now displayed when the application starts up. See <<_micronaut_banner, Micronaut Banner>> for more information.
+With the future of JSR-305 unclear and issues with regards to the module system with existing solutions, Micronaut 2.4 replaces Spotbugs with core nullability annotations: ann:core.annotation.Nullable[] and ann:core.annotation.NotNull[].
 
-==== Compatibility with GraalVM 21.0.0
-
-This release is compatible with the latest GraalVM 21.0.0 release, updating and testing all modules against the latest version of native image.
-
-==== Improved Support for Records
-
-Java 14+ Records can now be used to define <<configurationProperties, Configuration Properties>>. By default when `@ConfigurationProperties` is used on a `record`, configuration injection is applied. For example:
-
-[source,java]
-----
-package example;
-import io.micronaut.context.annotation.*;
-import javax.validation.constraints.*;
-
-@ConfigurationProperties("example")
-record Example(@Min(20) int num, String name) {
-}
-----
-
-==== Bean Introspections Now Support Execution Handles
-
-A api:core.beans.BeanIntrospection[] can now declare methods that should generate reflection free execution handles. This feature allows calling other methods (besides setters) on introspections without using reflection.
-
-==== Improved Support for Copy Constructors and Immutable Types
-
-An immutable api:core.beans.BeanIntrospection[] (like Java Records as mentioned above) requires different handling when you need to create a new instance with a particular property modified. A typical pattern for this is to construct a new instance passing all the existing values plus the modified value (see for example https://projectlombok.org/features/With[Lombok's @With]).
-
-Micronaut's Bean Introspections now support this pattern. For example:
-
-[source,java]
-----
-val introspection = BeanIntrospection.getIntrospection(Example.java);
-Example example = introspection.instantiate(10, "Test");
-assertEquals(10, example.num());
-example = introspection.getRequiredProperty("num", int.class)
-             .withValue(example, 20);
-assertEquals(20, example.num());
-----
-
-The new `withValue` method will automatically create a new instance populating the existing properties and returning the instance.
-
-Micronaut will at compilation time compute an efficient copy-constructor approach that will only return a new instance if the value changes.
-
-=== HTTP Features
-
-==== Locale Resolution
-
-A new interface api:http.server.util.HttpLocaleResolver[] has been introduced to support resolving a locale from a given request in multiple ways. A `java.util.Locale` object can now be a parameter to controller and client methods to automatically bind the locale to/from the request. See <<localeResolution, the documentation>> for more information.
-
-==== Host Resolution
-
-It is now possible to validate a resolved host against a list regular expressions patterns. See <<hostResolution, the documentation>> for more information.
-
-=== Cloud Features
-
-==== New CI/CD Deployment Workflows for Github Actions in Launch
-
-https://micronaut.io/launch/[Micronaut Launch] has been updated to include CI/CD workflows to deploy to common container based Cloud environments including Oracle Cloud Function, Azure Container Instance and Google Cloud Run.
-
-Combined with the ability to https://www.youtube.com/watch?v=X4AKGf1TlXM[Push to Github] this makes it a breeze to setup Micronaut applications to be deployed to the Cloud.
-
-==== Google Cloud Secret Manager
-
-Thanks to a contribution by https://github.com/viniciusccarvalho[Vinicius Carvalho], https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#introduction[Micronaut GCP] supports https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#secretManager[distributed configuration via Google Cloud Secret Manager].
-
-=== Micronaut JMS
-
-A new https://micronaut-projects.github.io/micronaut-jms/1.0.x/guide/[Micronaut JMS module] (currently in preview) to support JMS messaging including ActiveMQ and Amazon SQS has been added with full support for GraalVM native image. See the https://micronaut-projects.github.io/micronaut-jms/1.0.x/guide/[Micronaut JMS documentation] for more information.
-
-=== Other improvements
-
-While Micronaut has always followed the https://semver.org/[Semantic Versioning] principles, our non-stable versioning didn't match the specification. For example, our snapshots were versioned as `1.2.3.BUILD-SNAPSHOT` as opposed to `1.2.3-SNAPSHOT`.
-
-Since Micronaut 2.3, all our artifacts' non-stable versions will be like:
-
-* Snapshots: `1.2.3-SNAPSHOT`.
-* Milestones: `1.2.3-M1`, `1.2.3-M2`, etc.
-* Release candidates: `1.2.3-RC1`, `1.2.3-RC2`, etc.
+You should use this annotations in your code, or if you prefer Spotbugs add it to your classpath as necessary.
 
 === Module Upgrades
 

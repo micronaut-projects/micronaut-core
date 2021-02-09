@@ -15,7 +15,7 @@
  */
 package io.micronaut.scheduling.instrument;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * This implementation does no instrumentation.
