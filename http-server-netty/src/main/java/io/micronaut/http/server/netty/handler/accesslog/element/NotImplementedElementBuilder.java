@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,20 +17,22 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import io.micronaut.core.order.Ordered;
 
-/**
- * Builder for LogElement.
- *
- * @author croudet
- * @since 2.0
- */
-public interface LogElementBuilder extends Ordered {
+public class NotImplementedElementBuilder implements LogElementBuilder {
 
-    /**
-     * Builds the log element for the specified token. It should return null it the token is not supported.
-     *
-     * @param token The log element marker.
-     * @param param An optional paramter.
-     * @return A LogElement or null if not supported by the builder.
-     */
-    LogElement build(String token, String param);
+    private static final String[] NOT_IMPLEMENTED = new String[] { "l", "u" };
+
+    @Override
+    public int getOrder() {
+        return Ordered.LOWEST_PRECEDENCE;
+    }
+
+    @Override
+    public LogElement build(String token, String param) {
+        for (String element: NOT_IMPLEMENTED) {
+            if (token.equals(element)) {
+                return ConstantElement.UNKNOWN;
+            }
+        }
+        return null;
+    }
 }
