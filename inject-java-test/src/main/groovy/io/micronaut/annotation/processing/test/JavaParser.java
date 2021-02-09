@@ -38,6 +38,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Utility for parsing Java code.
+ * NOTE: Forked from Google Compile Testing Project
  *
  * @author graemerocher
  * @since 1.1

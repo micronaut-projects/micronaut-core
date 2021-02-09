@@ -15,7 +15,6 @@
  */
 package io.micronaut.annotation.processing.test;
 
-import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.ErroneousTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.util.TreeScanner;
@@ -26,7 +25,11 @@ import java.io.File;
 import static java.lang.Boolean.TRUE;
 
 
-/** Methods to parse Java source files. */
+/**
+ * Methods to parse Java source files.
+ * NOTE: Forked from Google Compile Testing Project
+ *
+ **/
 @SuppressWarnings("all")
 public final class Parser {
 

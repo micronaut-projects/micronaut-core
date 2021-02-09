@@ -1,11 +1,11 @@
 /*
- * Copyright (C) 2013 Google, Inc.
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing.test;
 
 
 import javax.tools.JavaFileObject;
-import javax.tools.JavaFileObject.Kind;
 import javax.tools.SimpleJavaFileObject;
 import java.io.*;
 import java.net.URI;
@@ -32,18 +31,22 @@ import static javax.tools.JavaFileObject.Kind.SOURCE;
  *
  * @author Gregory Kick
  */
-public final class JavaFileObjects {
+final class JavaFileObjects {
     private JavaFileObjects() { }
 
     /**
      * Creates a {@link JavaFileObject} with a path corresponding to the {@code fullyQualifiedName}
      * containing the give {@code source}. The returned object will always be read-only and have the
-     * {@link Kind#SOURCE} {@linkplain JavaFileObject#getKind() kind}.
+     * {@link javax.tools.JavaFileObject.Kind#SOURCE} {@linkplain JavaFileObject#getKind() kind}.
      *
      * <p>Note that this method makes no attempt to verify that the name matches the contents of the
      * source and compilation errors may result if they do not match.
+     *
+     * @param fullyQualifiedName the fully qualified name
+     * @param source The source
+     * @return the java file object
      */
-    public static JavaFileObject forSourceString(String fullyQualifiedName, String source) {
+    static JavaFileObject forSourceString(String fullyQualifiedName, String source) {
         Objects.requireNonNull(fullyQualifiedName);
         if (fullyQualifiedName.startsWith("package ")) {
             throw new IllegalArgumentException(
@@ -66,29 +69,46 @@ public final class JavaFileObjects {
      *       "  }",
      *       "}");
      *   }</pre>
+     *
+     * @param fullyQualifiedName the fully qualified name
+     * @param lines The source
+     * @return The java file object
      */
-    public static JavaFileObject forSourceLines(String fullyQualifiedName, String... lines) {
+    static JavaFileObject forSourceLines(String fullyQualifiedName, String... lines) {
         return forSourceLines(fullyQualifiedName, Arrays.asList(lines));
     }
 
-    /** An overload of {@code #forSourceLines} that takes an {@code Iterable<String>}. */
-    public static JavaFileObject forSourceLines(String fullyQualifiedName, Iterable<String> lines) {
+    /**
+     * An overload of {@code #forSourceLines} that takes an {@code Iterable<String>}.
+     *
+     * @param fullyQualifiedName the fully qualified name
+     * @param lines The source
+     * @return The java file object
+     **/
+    static JavaFileObject forSourceLines(String fullyQualifiedName, Iterable<String> lines) {
         return forSourceString(fullyQualifiedName, String.join("\n", lines));
     }
 
+    /**
+     * in-memory source file object.
+     */
     private static final class StringSourceJavaFileObject extends SimpleJavaFileObject {
         final String source;
         final long lastModified;
 
+        /**
+         * Default constructor.
+         * @param fullyQualifiedName the fully qualified name
+         * @param source The source
+         */
         StringSourceJavaFileObject(String fullyQualifiedName, String source) {
             super(createUri(fullyQualifiedName), SOURCE);
-            // TODO(gak): check that fullyQualifiedName looks like a fully qualified class name
             this.source = source;
             this.lastModified = System.currentTimeMillis();
         }
 
-        static URI createUri(String fullyQualifiedClassName) {
-            return URI.create(fullyQualifiedClassName.replace('.','/')
+        private static URI createUri(String fullyQualifiedClassName) {
+            return URI.create(fullyQualifiedClassName.replace('.', '/')
                     + SOURCE.extension);
         }
 

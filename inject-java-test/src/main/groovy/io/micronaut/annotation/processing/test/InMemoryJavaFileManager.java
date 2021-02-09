@@ -31,6 +31,8 @@ import java.util.function.Function;
 /**
  * A file manager implementation that stores all output in memory.
  *
+ * NOTE: Forked from Google Compile Testing Project
+ *
  * @author Gregory Kick
  */
 @SuppressWarnings("all")

@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.beans
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
 
 /**

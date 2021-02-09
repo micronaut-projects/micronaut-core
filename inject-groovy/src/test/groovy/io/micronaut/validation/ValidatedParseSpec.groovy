@@ -1,6 +1,6 @@
 package io.micronaut.validation
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.aop.Around
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.ProxyBeanDefinition

@@ -1,6 +1,6 @@
 package io.micronaut.inject.generics
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
 
 class TypeArgumentsSpec extends AbstractBeanDefinitionSpec {
