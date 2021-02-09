@@ -31,7 +31,7 @@ import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
 import org.reactivestreams.Publisher;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * An HTTP client instrumentation filter that uses Open Tracing.

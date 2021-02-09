@@ -18,8 +18,7 @@ package io.micronaut.scheduling.io.watch.event;
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import javax.annotation.concurrent.Immutable;
+import io.micronaut.core.annotation.NonNull;
 import java.nio.file.Path;
 import java.nio.file.WatchEvent;
 
@@ -30,7 +29,6 @@ import java.nio.file.WatchEvent;
  * @since 1.1.0
  * @see io.micronaut.scheduling.io.watch.FileWatchConfiguration
  */
-@Immutable
 public class FileChangedEvent extends ApplicationEvent {
     private final Path path;
     private final WatchEventType eventType;

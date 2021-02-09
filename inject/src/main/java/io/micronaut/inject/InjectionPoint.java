@@ -17,7 +17,7 @@ package io.micronaut.inject;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * An injection point as a point in a class definition where dependency injection is required.

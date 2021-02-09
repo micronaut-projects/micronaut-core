@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.util.locale;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.LocaleResolver;
 import org.jetbrains.annotations.NotNull;
 

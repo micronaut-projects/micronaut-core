@@ -18,7 +18,7 @@ package io.micronaut.tracing.instrument.util;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
 /**
  * An factory interface for tracing invocation instrumentation, factory method decides if instrumentation is needed.

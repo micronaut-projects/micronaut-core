@@ -15,12 +15,11 @@
  */
 package io.micronaut.annotation.processing.test
 
-import com.google.testing.compile.JavaFileObjects
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
-import edu.umd.cs.findbugs.annotations.NonNull
-import edu.umd.cs.findbugs.annotations.Nullable
+import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.annotation.Nullable
 import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AnnotationUtils
 import io.micronaut.annotation.processing.GenericUtils

@@ -17,7 +17,7 @@ package io.micronaut.inject.value.nullablevalue;
 
 import io.micronaut.context.annotation.Value;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 

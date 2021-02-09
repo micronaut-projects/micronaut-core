@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client
 
-import edu.umd.cs.findbugs.annotations.Nullable
+import io.micronaut.core.annotation.Nullable
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse

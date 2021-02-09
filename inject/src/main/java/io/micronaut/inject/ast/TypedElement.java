@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * An element that has an underlying type.

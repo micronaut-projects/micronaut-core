@@ -15,10 +15,6 @@
  */
 package io.micronaut.core.annotation;
 
-
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
-
 /**
  * An interface for types capable of resolving {@link AnnotationMetadata}.
  *

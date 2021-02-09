@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.configuration;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.convert.format.ReadableBytes;

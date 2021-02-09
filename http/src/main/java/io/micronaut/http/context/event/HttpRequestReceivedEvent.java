@@ -18,7 +18,7 @@ package io.micronaut.http.context.event;
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.http.HttpRequest;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * An event fired when an {@link HttpRequest} is received by the server. Not that the event is fired in a

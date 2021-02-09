@@ -2,7 +2,9 @@ dependencies {
     annotationProcessor project(":inject-java")
 
     api project(":inject-java")
-    api "com.google.testing.compile:compile-testing:0.19"
+//    api "com.google.testing.compile:compile-testing:0.19", {
+//        exclude group:'com.google.truth', module:'truth'
+//    }
     api dependencyModuleVersion("groovy", "groovy")
     api(dependencyVersion("spock")) {
         exclude module:'groovy-all'

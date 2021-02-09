@@ -15,11 +15,8 @@
  */
 package io.micronaut.inject.executable
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
-import spock.lang.Ignore
-
-import java.util.function.Function
 
 class ExecutableBeanSpec extends AbstractBeanDefinitionSpec {
 

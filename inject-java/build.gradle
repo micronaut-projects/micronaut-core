@@ -8,12 +8,12 @@ dependencies {
     compileOnly "jakarta.inject:jakarta.inject-api:2.0.0"
     compileOnly dependencyVersion("validation")
 
-    testImplementation 'com.github.spotbugs:spotbugs-annotations:4.1.2'
     testImplementation project(':aop')
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
     testImplementation dependencyVersion("rxjava2")
+    testImplementation dependencyVersion("spotbugs")
     testImplementation "org.hibernate:hibernate-core:5.4.27.Final"
     testImplementation "junit:junit:4.13.1"
     testImplementation "com.google.testing.compile:compile-testing:0.19"

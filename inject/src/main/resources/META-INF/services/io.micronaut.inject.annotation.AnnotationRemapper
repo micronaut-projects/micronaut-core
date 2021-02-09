@@ -1,2 +1,3 @@
 io.micronaut.inject.annotation.internal.FindBugsRemapper
 io.micronaut.inject.annotation.internal.JakartaRemapper
+io.micronaut.inject.annotation.internal.CoreNullabilityAnnotationRemapper

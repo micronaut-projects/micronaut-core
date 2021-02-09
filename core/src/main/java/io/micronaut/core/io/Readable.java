@@ -18,7 +18,7 @@ package io.micronaut.core.io;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import javax.annotation.concurrent.Immutable;
 import java.io.*;
 import java.net.URL;

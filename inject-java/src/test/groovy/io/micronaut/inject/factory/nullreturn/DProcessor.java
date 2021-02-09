@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.factory.nullreturn;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.exceptions.DisabledBeanException;
 
