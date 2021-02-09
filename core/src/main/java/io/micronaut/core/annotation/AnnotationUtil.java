@@ -57,6 +57,7 @@ public class AnnotationUtil {
      */
     public static final List<String> STEREOTYPE_EXCLUDES = Arrays.asList(
             "javax.annotation",
+            "io.micronaut.core.annotation",
             "edu.umd.cs.findbugs.annotations"
     );
 

@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.resource;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.env.Environment;

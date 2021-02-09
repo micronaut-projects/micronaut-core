@@ -20,7 +20,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.validation.Valid;
 // end::imports[]
 

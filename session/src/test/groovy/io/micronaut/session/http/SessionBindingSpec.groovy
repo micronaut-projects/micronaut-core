@@ -17,6 +17,7 @@ package io.micronaut.session.http
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -29,7 +30,6 @@ import io.micronaut.session.annotation.SessionValue
 import io.reactivex.Flowable
 import spock.lang.Specification
 
-import javax.annotation.Nullable
 
 /**
  * @author Graeme Rocher

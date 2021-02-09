@@ -15,7 +15,7 @@
  */
 package io.micronaut.ast.groovy.annotation
 
-import edu.umd.cs.findbugs.annotations.NonNull
+import io.micronaut.core.annotation.NonNull
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter

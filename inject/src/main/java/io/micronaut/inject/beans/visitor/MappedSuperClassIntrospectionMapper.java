@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.beans.visitor;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Handle mapped super class.

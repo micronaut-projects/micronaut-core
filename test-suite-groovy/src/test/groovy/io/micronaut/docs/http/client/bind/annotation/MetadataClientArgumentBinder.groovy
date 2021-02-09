@@ -1,6 +1,6 @@
 package io.micronaut.docs.http.client.bind.annotation
 
-import edu.umd.cs.findbugs.annotations.NonNull
+import io.micronaut.core.annotation.NonNull
 
 //tag::clazz[]
 import io.micronaut.core.convert.ArgumentConversionContext

@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.type;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.async.annotation.SingleResult;

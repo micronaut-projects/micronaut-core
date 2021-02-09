@@ -15,8 +15,8 @@
  */
 package io.micronaut.annotation.processing;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
 import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;

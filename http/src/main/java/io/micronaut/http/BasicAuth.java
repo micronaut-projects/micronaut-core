@@ -15,8 +15,6 @@
  */
 package io.micronaut.http;
 
-import javax.annotation.concurrent.Immutable;
-
 /**
  * A class representing basic auth authorization header. Used in
  * declarative clients and server routes.
@@ -24,7 +22,6 @@ import javax.annotation.concurrent.Immutable;
  * @author Ashwini Mutalik Desai
  * @since 1.3.0
  */
-@Immutable
 public final class BasicAuth {
 
     private final String username;

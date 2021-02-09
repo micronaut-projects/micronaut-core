@@ -18,7 +18,7 @@ package io.micronaut.scheduling.instrument;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.util.CollectionUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 import java.util.Collection;
 import java.util.concurrent.Callable;

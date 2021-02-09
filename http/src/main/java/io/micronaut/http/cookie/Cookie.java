@@ -16,8 +16,8 @@
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.util.ArgumentUtils;
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;

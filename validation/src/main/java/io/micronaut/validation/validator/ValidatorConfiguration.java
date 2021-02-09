@@ -20,8 +20,7 @@ import io.micronaut.context.MessageSource;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import javax.annotation.concurrent.Immutable;
+import io.micronaut.core.annotation.NonNull;
 import javax.validation.ClockProvider;
 import javax.validation.TraversableResolver;
 
@@ -31,7 +30,6 @@ import javax.validation.TraversableResolver;
  * @author graemerocher
  * @since 1.2
  */
-@Immutable
 public interface ValidatorConfiguration {
 
     /**

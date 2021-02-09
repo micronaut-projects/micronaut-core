@@ -27,8 +27,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import javax.inject.Scope;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;

@@ -18,12 +18,12 @@ package io.micronaut.http.netty.channel;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.socket.SocketChannel;
 
 /**

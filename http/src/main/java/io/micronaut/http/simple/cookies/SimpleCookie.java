@@ -18,7 +18,7 @@ package io.micronaut.http.simple.cookies;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.SameSite;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.util.Objects;
 import java.util.Optional;
 

@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.util;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;

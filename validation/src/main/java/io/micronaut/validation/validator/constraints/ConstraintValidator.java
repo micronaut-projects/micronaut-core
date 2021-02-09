@@ -18,10 +18,8 @@ package io.micronaut.validation.validator.constraints;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Indexed;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.annotation.concurrent.Immutable;
-import javax.annotation.concurrent.ThreadSafe;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import javax.validation.ClockProvider;
 import javax.validation.Constraint;
 import java.lang.annotation.Annotation;
@@ -35,8 +33,6 @@ import java.lang.annotation.Annotation;
  * @param <A> The annotation type
  * @param <T> The supported validation types
  */
-@Immutable
-@ThreadSafe
 @Indexed(ConstraintValidator.class)
 @FunctionalInterface
 public interface ConstraintValidator<A extends Annotation, T> extends javax.validation.ConstraintValidator<A, T> {

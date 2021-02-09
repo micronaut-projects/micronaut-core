@@ -22,7 +22,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.util.ArrayUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Objects;

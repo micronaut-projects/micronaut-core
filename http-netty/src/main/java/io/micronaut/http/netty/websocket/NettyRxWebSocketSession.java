@@ -34,7 +34,7 @@ import io.netty.util.AttributeKey;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;

@@ -15,7 +15,7 @@
  */
 package io.micronaut.management.endpoint.loggers;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 import javax.validation.constraints.NotBlank;
 import java.util.Collection;

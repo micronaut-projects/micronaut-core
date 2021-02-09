@@ -15,7 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import groovy.transform.CompileStatic;
 import groovy.transform.PackageScope;
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
@@ -39,7 +39,7 @@ import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.function.Consumer;

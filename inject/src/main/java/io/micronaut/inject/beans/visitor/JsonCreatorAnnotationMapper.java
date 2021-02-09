@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Creator;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;

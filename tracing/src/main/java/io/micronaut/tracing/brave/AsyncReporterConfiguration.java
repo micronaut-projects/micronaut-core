@@ -22,7 +22,7 @@ import zipkin2.reporter.AsyncReporter;
 import zipkin2.reporter.ReporterMetrics;
 import zipkin2.reporter.Sender;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.inject.Inject;
 
 /**

@@ -15,12 +15,12 @@
  */
 package io.micronaut.scheduling.executor;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
 import javax.inject.Inject;
 import javax.validation.constraints.Min;

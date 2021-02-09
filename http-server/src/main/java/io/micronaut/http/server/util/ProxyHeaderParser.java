@@ -19,7 +19,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

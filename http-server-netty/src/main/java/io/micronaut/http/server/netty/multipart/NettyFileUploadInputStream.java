@@ -17,9 +17,9 @@ package io.micronaut.http.server.netty.multipart;
 
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.netty.handler.codec.http.multipart.FileUpload;
 
-import javax.annotation.Nonnull;
 import java.io.FileInputStream;
 import java.io.IOException;
 
@@ -33,7 +33,7 @@ import java.io.IOException;
 @Internal
 class NettyFileUploadInputStream extends FileInputStream {
 
-    @Nonnull
+    @NonNull
     private final FileUpload file;
     private final boolean releaseOnClose;
 
@@ -42,7 +42,7 @@ class NettyFileUploadInputStream extends FileInputStream {
      * @param releaseOnClose Whether to release the file after the stream is closed
      * @throws IOException If an error occurred getting the underlying {@link java.io.File}
      */
-    NettyFileUploadInputStream(@Nonnull FileUpload file, boolean releaseOnClose) throws IOException {
+    NettyFileUploadInputStream(@NonNull FileUpload file, boolean releaseOnClose) throws IOException {
         super(file.getFile());
         this.file = file;
         this.releaseOnClose = releaseOnClose;

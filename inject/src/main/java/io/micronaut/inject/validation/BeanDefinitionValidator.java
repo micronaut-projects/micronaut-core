@@ -21,8 +21,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.InjectionPoint;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 /**
  * Interface to integrate bean validation into the construction of beans within the {@link io.micronaut.context.BeanContext}.

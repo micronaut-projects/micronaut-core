@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop.writer;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.aop.HotSwappableInterceptedProxy;
 import io.micronaut.aop.Intercepted;
 import io.micronaut.aop.InterceptedProxy;

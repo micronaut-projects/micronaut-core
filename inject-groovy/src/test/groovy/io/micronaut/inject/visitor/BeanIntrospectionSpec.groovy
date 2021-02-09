@@ -1,7 +1,7 @@
 package io.micronaut.inject.visitor
 
 import com.blazebit.persistence.impl.function.entity.ValuesEntity
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected

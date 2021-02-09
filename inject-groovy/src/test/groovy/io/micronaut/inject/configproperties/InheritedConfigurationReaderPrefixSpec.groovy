@@ -15,9 +15,8 @@
  */
 package io.micronaut.inject.configproperties
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.Property
-import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.BeanDefinition
 
 class InheritedConfigurationReaderPrefixSpec extends AbstractBeanDefinitionSpec {

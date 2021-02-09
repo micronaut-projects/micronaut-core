@@ -20,7 +20,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.Deque;
 import java.util.Optional;
 
