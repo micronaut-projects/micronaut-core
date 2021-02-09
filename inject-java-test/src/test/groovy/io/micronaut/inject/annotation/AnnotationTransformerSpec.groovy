@@ -12,8 +12,7 @@ package test;
 @io.micronaut.inject.annotation.ToTransform
 @javax.inject.Singleton
 class Test {
-    void test(@io.micronaut.core.annotation.Nullable String test) {
-    }
+
 }
 ''')
 

@@ -47,7 +47,7 @@ class NullablePrimitiveSpec extends AbstractTypeElementSpec {
         output.contains(warning)
 
         where:
-        annotation << ['@javax.annotation.Nullable', '@io.micronaut.core.annotation.Nullable']
+        annotation << ['@javax.annotation.Nullable', '@io.micronaut.core.annotation.Nullable', '@edu.umd.cs.findbugs.annotations.Nullable']
     }
 
     @Unroll
@@ -75,7 +75,7 @@ class NullablePrimitiveSpec extends AbstractTypeElementSpec {
         !output.contains(warning)
 
         where:
-        annotation << ['@javax.annotation.Nullable', '@io.micronaut.core.annotation.Nullable']
+        annotation << ['@javax.annotation.Nullable', '@io.micronaut.core.annotation.Nullable', '@edu.umd.cs.findbugs.annotations.Nullable']
     }
 
     @Unroll
@@ -98,7 +98,7 @@ class NullablePrimitiveSpec extends AbstractTypeElementSpec {
         !output.contains(warning)
 
         where:
-        annotation << ['@javax.annotation.Nullable', '@io.micronaut.core.annotation.Nullable']
+        annotation << ['@javax.annotation.Nullable', '@io.micronaut.core.annotation.Nullable', '@edu.umd.cs.findbugs.annotations.Nullable']
     }
 
 }
