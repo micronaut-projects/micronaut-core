@@ -17,7 +17,6 @@ package io.micronaut.aop.internal.intercepted;
 
 import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.ReturnType;
 
 import java.util.concurrent.CompletionStage;
@@ -52,7 +51,7 @@ public class InterceptedMethodUtil {
                 return new SynchronousInterceptedMethod(context);
             } else if (CompletionStage.class.isAssignableFrom(returnTypeClass) || Future.class.isAssignableFrom(returnTypeClass)) {
                 return new CompletionStageInterceptedMethod(context);
-            } else if (Publishers.isConvertibleToPublisher(returnTypeClass)) {
+            } else if (PublisherInterceptedMethod.isConvertibleToPublisher(returnTypeClass)) {
                 return new PublisherInterceptedMethod(context);
             } else {
                 return new SynchronousInterceptedMethod(context);

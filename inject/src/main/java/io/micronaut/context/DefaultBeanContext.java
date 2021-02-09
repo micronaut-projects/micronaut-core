@@ -24,7 +24,6 @@ import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.*;
-import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -1595,6 +1594,9 @@ public class DefaultBeanContext implements BeanContext {
             byAnnotation.forEach((annotationType, methods) ->
                     streamOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType))
                             .forEach(processor -> {
+                                if (processor instanceof LifeCycle<?>) {
+                                    ((LifeCycle<?>) processor).start();
+                                }
                                 for (BeanDefinitionMethodReference<?, ?> method : methods) {
 
                                     BeanDefinition<?> beanDefinition = method.getBeanDefinition();
@@ -1623,8 +1625,8 @@ public class DefaultBeanContext implements BeanContext {
                                     }
                                 }
 
-                                if (processor instanceof Completable) {
-                                    ((Completable) processor).onComplete();
+                                if (processor instanceof LifeCycle<?>) {
+                                    ((LifeCycle<?>) processor).stop();
                                 }
 
                             }));
