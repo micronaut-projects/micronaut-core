@@ -15,17 +15,8 @@
  */
 package io.micronaut.context;
 
-
-import io.micronaut.core.beans.BeanIntrospectionReference;
-import io.micronaut.core.io.service.ServiceDefinition;
-import io.micronaut.core.io.service.SoftServiceLoader;
-
 import javax.inject.Provider;
 import javax.validation.constraints.NotNull;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.Supplier;
 
 /**
  * Helper methods for dealing with {@link javax.inject.Provider}.

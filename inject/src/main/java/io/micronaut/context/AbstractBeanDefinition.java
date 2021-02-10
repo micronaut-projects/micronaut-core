@@ -48,7 +48,6 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Modifier;
 import java.util.*;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -1636,7 +1635,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         } else if (Stream.class.isAssignableFrom(argumentType)) {
             return streamOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
         } else if (ProviderFactory.isProvider(argumentType)) {
-            Provider provider = getBeanProviderForMethodArgument(resolutionContext, context, injectionPoint, argument);;
+            Provider provider = getBeanProviderForMethodArgument(resolutionContext, context, injectionPoint, argument);
             if (provider != null) {
                 return ProviderFactory.createProvider(argumentType, provider::get).orElse(null);
             } else {
