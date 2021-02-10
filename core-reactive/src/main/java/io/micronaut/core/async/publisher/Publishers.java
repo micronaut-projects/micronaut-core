@@ -16,6 +16,7 @@
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
@@ -38,6 +39,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
+@TypeHint(Publishers.class)
 public class Publishers {
 
     @SuppressWarnings("ConstantName")
