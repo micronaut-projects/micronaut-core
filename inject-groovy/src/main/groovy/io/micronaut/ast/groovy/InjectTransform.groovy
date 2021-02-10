@@ -140,11 +140,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             try {
                 if (beanClassNode instanceof ClassNode) {
                     ClassNode cn = (ClassNode) beanClassNode
-                    for (ClassNode itf: cn.getInterfaces()) {
-                        if (ProviderFactory.isProvider(itf.name)) {
-                            if (itf.genericsTypes) {
-                                beanTypeName = itf.genericsTypes[0]?.type
-                            }
+                    for (Class providerClass: ProviderFactory.getProviders()) {
+                        ClassNode providerType = AstGenericUtils.resolveInterfaceGenericType(cn, providerClass)
+                        if (providerType != null) {
+                            beanTypeName = providerType.name
                             break
                         }
                     }

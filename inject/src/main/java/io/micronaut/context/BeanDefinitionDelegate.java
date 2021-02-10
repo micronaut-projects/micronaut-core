@@ -123,7 +123,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                         } else {
                             Qualifier qualifier = Qualifiers.byName(named.toString());
                             // attempt bean lookup to full argument
-                            if (ProviderFactory.isProvider(argumentType.getName())) {
+                            if (ProviderFactory.isProvider(argumentType)) {
                                 Optional<Argument<?>> genericType = argument.getFirstTypeVariable();
                                 if (genericType.isPresent()) {
                                     Class beanType = genericType.get().getType();

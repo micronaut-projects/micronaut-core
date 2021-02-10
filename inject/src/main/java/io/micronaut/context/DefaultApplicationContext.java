@@ -310,7 +310,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     Argument<?>[] arguments = candidate.getConstructor().getArguments();
                                     for (Argument<?> argument : arguments) {
                                         Class<?> argumentType;
-                                        if (ProviderFactory.isProvider(argument.getType().getName())) {
+                                        if (ProviderFactory.isProvider(argument.getType())) {
                                             argumentType = argument.getFirstTypeVariable().orElse(argument).getType();
                                         } else {
                                             argumentType = argument.getType();

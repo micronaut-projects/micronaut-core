@@ -995,7 +995,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
             return streamOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
-        } else if (ProviderFactory.isProvider(argumentType.getName())) {
+        } else if (ProviderFactory.isProvider(argumentType)) {
             Provider provider = getBeanProviderForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
             if (provider != null) {
                 return ProviderFactory.createProvider(argumentType, provider::get).orElse(null);
@@ -1437,7 +1437,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             }
         } else if (Stream.class.isAssignableFrom(beanType)) {
             return getStreamOfTypeForField(resolutionContext, context, injectionPoint);
-        } else if (ProviderFactory.isProvider(beanType.getName())) {
+        } else if (ProviderFactory.isProvider(beanType)) {
             Provider provider = getBeanProviderForField(resolutionContext, context, injectionPoint);
             if (provider != null) {
                 return ProviderFactory.createProvider(beanType, provider::get).orElse(null);
@@ -1635,7 +1635,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
             return streamOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
-        } else if (ProviderFactory.isProvider(argumentType.getName())) {
+        } else if (ProviderFactory.isProvider(argumentType)) {
             Provider provider = getBeanProviderForMethodArgument(resolutionContext, context, injectionPoint, argument);;
             if (provider != null) {
                 return ProviderFactory.createProvider(argumentType, provider::get).orElse(null);

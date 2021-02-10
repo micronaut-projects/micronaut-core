@@ -304,9 +304,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private static String getProvidedClassName(ClassElement classElement) {
-        for (String provider: ProviderFactory.getProviders()) {
-            if (classElement.isAssignable(provider)) {
-                Iterator<ClassElement> i = classElement.getTypeArguments(provider).values().iterator();
+        for (Class provider: ProviderFactory.getProviders()) {
+            String providerName = provider.getName();
+            if (classElement.isAssignable(providerName)) {
+                Iterator<ClassElement> i = classElement.getTypeArguments(providerName).values().iterator();
                 return i.hasNext() ? i.next().getName() : classElement.getName();
             }
         }
