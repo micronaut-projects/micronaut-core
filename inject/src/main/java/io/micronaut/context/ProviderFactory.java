@@ -25,6 +25,15 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+/**
+ * Utility class to convert provider instances to the
+ * requested provider type.
+ *
+ * Internal usage only.
+ *
+ * @author James Kleeh
+ * @since 2.4.0
+ */
 @Internal
 public class ProviderFactory {
 
@@ -56,11 +65,21 @@ public class ProviderFactory {
     }
 
     public static boolean isProvider(String clazz) {
-        return providers.keySet().stream().map(Class::getName).anyMatch(provider -> provider.equals(clazz));
+        for (Class provider: getProviders()) {
+            if (provider.getName().equals(clazz)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean isProvider(Class clazz) {
-        return providers.keySet().stream().anyMatch(provider -> provider.isAssignableFrom(clazz));
+        for (Class provider: getProviders()) {
+            if (provider.isAssignableFrom(clazz)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static Set<Class> getProviders() {
