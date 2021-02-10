@@ -29,6 +29,8 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.tracing.annotation.ContinueSpan
 import io.opentracing.Tracer
 import io.reactivex.Flowable
@@ -522,6 +524,7 @@ class HttpTracingSpec extends Specification {
         TracedClient tracedClient
 
         @Get("/hello/{name}")
+        @ExecuteOn(TaskExecutors.IO)
         String hello(String name) {
             spanCustomizer.activeSpan().setTag("foo", "bar")
             return name
@@ -544,6 +547,7 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/error/{name}")
+        @ExecuteOn(TaskExecutors.IO)
         String error(String name) {
             throw new RuntimeException("bad")
         }
@@ -554,12 +558,14 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/nested/{name}")
+        @ExecuteOn(TaskExecutors.IO)
         String nested(String name) {
             tracedClient.hello(name)
         }
 
         @ContinueSpan
         @Get("/continued/{name}")
+        @ExecuteOn(TaskExecutors.IO)
         String continued(String name) {
             tracedClient.continued(name)
         }
@@ -571,11 +577,13 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/nestedError/{name}")
+        @ExecuteOn(TaskExecutors.IO)
         String nestedError(String name) {
             tracedClient.error(name)
         }
 
         @Get("/customised/name")
+        @ExecuteOn(TaskExecutors.IO)
         String customisedName() {
             spanCustomizer.activeSpan().setOperationName("custom name")
             "response"
