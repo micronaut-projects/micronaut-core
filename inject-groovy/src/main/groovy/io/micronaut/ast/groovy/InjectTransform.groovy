@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy
 
+import io.micronaut.context.ProviderFactory
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
@@ -140,7 +141,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if (beanClassNode instanceof ClassNode) {
                     ClassNode cn = (ClassNode) beanClassNode
                     for (ClassNode itf: cn.getInterfaces()) {
-                        if (ProviderUtils.isProvider(itf.name)) {
+                        if (ProviderFactory.isProvider(itf.name)) {
                             if (itf.genericsTypes) {
                                 beanTypeName = itf.genericsTypes[0]?.type
                             }

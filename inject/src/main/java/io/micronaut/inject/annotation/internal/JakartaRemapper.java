@@ -1,10 +1,8 @@
 package io.micronaut.inject.annotation.internal;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.AnnotationRemapper;
 import io.micronaut.inject.visitor.VisitorContext;
 

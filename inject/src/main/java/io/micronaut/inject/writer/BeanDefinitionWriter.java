@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.context.ProviderFactory;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.AbstractBeanDefinition;
 import io.micronaut.context.AbstractParametrizedBeanDefinition;
@@ -303,7 +304,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private static String getProvidedClassName(ClassElement classElement) {
-        for (String provider: ProviderUtils.getProviders()) {
+        for (String provider: ProviderFactory.getProviders()) {
             if (classElement.isAssignable(provider)) {
                 Iterator<ClassElement> i = classElement.getTypeArguments(provider).values().iterator();
                 return i.hasNext() ? i.next().getName() : classElement.getName();

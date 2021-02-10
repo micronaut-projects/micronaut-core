@@ -48,6 +48,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -975,10 +976,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @UsedByGeneratedCode
     protected final Object getBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
         ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
-        Argument<?> argument = constructorInjectionPoint.getArguments()[argIndex];
-        if (argument instanceof DefaultArgument) {
-            argument = new EnvironmentAwareArgument((DefaultArgument) argument);
+        Argument<?> originalArgument = constructorInjectionPoint.getArguments()[argIndex];
+        Argument<?> argument;
+        if (originalArgument instanceof DefaultArgument) {
+            argument = new EnvironmentAwareArgument((DefaultArgument) originalArgument);
             instrumentAnnotationMetadata(context, argument);
+        } else {
+            argument = originalArgument;
         }
         Class argumentType = argument.getType();
         if (argumentType == BeanResolutionContext.class) {
@@ -991,9 +995,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
             return streamOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
-        } else if (ProviderUtils.isProvider(argumentType)) {
+        } else if (ProviderFactory.isProvider(argumentType.getName())) {
             Provider provider = getBeanProviderForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
-            return ProviderUtils.createProvider(argumentType, provider::get);
+            if (provider != null) {
+                return ProviderFactory.createProvider(argumentType, provider::get).orElse(null);
+            } else {
+                return null;
+            }
         } else if (Optional.class.isAssignableFrom(argumentType)) {
             return findBeanForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
         } else {
@@ -1429,9 +1437,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             }
         } else if (Stream.class.isAssignableFrom(beanType)) {
             return getStreamOfTypeForField(resolutionContext, context, injectionPoint);
-        } else if (ProviderUtils.isProvider(beanType)) {
+        } else if (ProviderFactory.isProvider(beanType.getName())) {
             Provider provider = getBeanProviderForField(resolutionContext, context, injectionPoint);
-            return ProviderUtils.createProvider(beanType, provider::get);
+            if (provider != null) {
+                return ProviderFactory.createProvider(beanType, provider::get).orElse(null);
+            } else {
+                return null;
+            }
         } else if (Optional.class.isAssignableFrom(beanType)) {
             return findBeanForField(resolutionContext, context, injectionPoint);
         } else {
@@ -1623,9 +1635,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
             return streamOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
-        } else if (ProviderUtils.isProvider(argumentType)) {
-            Provider provider = getBeanProviderForMethodArgument(resolutionContext, context, injectionPoint, argument);
-            return ProviderUtils.createProvider(argumentType, provider::get);
+        } else if (ProviderFactory.isProvider(argumentType.getName())) {
+            Provider provider = getBeanProviderForMethodArgument(resolutionContext, context, injectionPoint, argument);;
+            if (provider != null) {
+                return ProviderFactory.createProvider(argumentType, provider::get).orElse(null);
+            } else {
+                return null;
+            }
         } else if (Optional.class.isAssignableFrom(argumentType)) {
             return findBeanForMethodArgument(resolutionContext, context, injectionPoint, argument);
         } else {

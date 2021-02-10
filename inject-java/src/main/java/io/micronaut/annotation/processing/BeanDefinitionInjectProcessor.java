@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.context.ProviderFactory;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
@@ -24,7 +25,6 @@ import io.micronaut.aop.Adapter;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.aop.writer.AopProxyWriter;
-import io.micronaut.context.ProviderFactory;
 import io.micronaut.context.ProviderUtils;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
@@ -51,7 +51,10 @@ import io.micronaut.inject.writer.OriginatingElements;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
-import javax.inject.*;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Qualifier;
+import javax.inject.Scope;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.*;
 import javax.lang.model.element.Element;
@@ -266,7 +269,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     if (element instanceof TypeElement) {
                         TypeElement te = (TypeElement) element;
                         String name = te.getQualifiedName().toString();
-                        if (ProviderUtils.isProvider(name)) {
+                        if (ProviderFactory.isProvider(name)) {
                             List<? extends TypeMirror> typeArguments = declaredType.getTypeArguments();
                             if (!typeArguments.isEmpty()) {
                                 beanTypeName = genericUtils.resolveTypeReference(typeArguments.get(0)).toString();

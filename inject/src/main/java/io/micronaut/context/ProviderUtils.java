@@ -35,8 +35,6 @@ import java.util.function.Supplier;
  */
 public class ProviderUtils {
 
-    private static Map<String, ProviderFactory<?>> providerFactories;
-
     /**
      * Caches the result of provider in a thread safe manner.
      *
@@ -48,55 +46,6 @@ public class ProviderUtils {
         return new MemoizingProvider<>(delegate);
     }
 
-    public static <P, T> P createProvider(Class<P> clazz, io.micronaut.context.Provider<T> runnable) {
-        if (clazz.isAssignableFrom(runnable.getClass())) {
-            return (P) runnable;
-        }
-        ProviderFactory factory = getProviderFactories().get(clazz.getName());
-        if (factory == null) {
-            throw new RuntimeException(String.format("No provider factory present for type: %s", clazz.getName()));
-        }
-        return ((ProviderFactory<P>) factory).createProvider(runnable);
-    }
-
-    public static boolean isProvider(Class<?> clazz) {
-        return isProvider(clazz.getName());
-    }
-
-    public static boolean isProvider(String clazz) {
-        return getProviderFactories().containsKey(clazz);
-    }
-
-    public static Set<String> getProviders() {
-        return getProviderFactories().keySet();
-    }
-
-    private static Map<String, ProviderFactory<?>> getProviderFactories() {
-        Map<String, ProviderFactory<?>> factoryMap = providerFactories;
-        if (factoryMap == null) {
-            synchronized (ProviderUtils.class) { // double check
-                factoryMap = providerFactories;
-                if (factoryMap == null) {
-                    factoryMap = new HashMap<>(30);
-                    final SoftServiceLoader<ProviderFactory> services = SoftServiceLoader.load(ProviderFactory.class);
-
-                    for (ServiceDefinition<ProviderFactory> definition : services) {
-                        if (definition.isPresent()) {
-                            final ProviderFactory ref = definition.load();
-                            try {
-                                factoryMap.put(ref.getType().getName(), ref);
-                            } catch (NoClassDefFoundError e) {
-                                //ignore
-                            }
-                        }
-                    }
-
-                    providerFactories = factoryMap;
-                }
-            }
-        }
-        return factoryMap;
-    }
 
     /**
      * A lazy provider.

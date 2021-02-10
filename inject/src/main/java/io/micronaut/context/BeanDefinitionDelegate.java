@@ -123,13 +123,17 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                         } else {
                             Qualifier qualifier = Qualifiers.byName(named.toString());
                             // attempt bean lookup to full argument
-                            if (ProviderUtils.isProvider(argumentType)) {
+                            if (ProviderFactory.isProvider(argumentType.getName())) {
                                 Optional<Argument<?>> genericType = argument.getFirstTypeVariable();
                                 if (genericType.isPresent()) {
                                     Class beanType = genericType.get().getType();
                                     try {
                                         Provider provider = ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier);
-                                        fulfilled.put(argumentName, ProviderUtils.createProvider(argumentType, provider::get));
+                                        if (provider != null) {
+                                            fulfilled.put(argumentName, ProviderFactory.createProvider(argumentType, provider::get).orElse(null));
+                                        } else {
+                                            fulfilled.put(argumentName, null);
+                                        }
                                     } catch (NoSuchBeanException e) {
                                         //If the parameter is not null it will be caught by AbstractParametrizedBeanDefinition
                                     }
