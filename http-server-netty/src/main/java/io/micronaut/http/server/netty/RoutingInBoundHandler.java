@@ -365,12 +365,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 ExceptionHandler handler = exceptionHandler.get();
                 MediaType defaultResponseMediaType = MediaType.fromType(handler.getClass()).orElse(MediaType.APPLICATION_JSON_TYPE);
                 try {
-                    Publisher<MutableHttpResponse<?>> routePublisher = Flowable.fromCallable(() -> {
+                    Flowable<MutableHttpResponse<?>> routePublisher = Flowable.fromCallable(() -> {
                         Object result = handler.handle(nettyHttpRequest, cause);
                         return errorResultToResponse(result);
                     });
-
-                    filterPublisher(new AtomicReference<>(nettyHttpRequest), routePublisher, ctx.executor(), nettyException)
+                    Supplier<Flowable<? extends MutableHttpResponse<?>>> publisherSupplier = () -> routePublisher;
+                    filterPublisher(new AtomicReference<HttpRequest<?>>(nettyHttpRequest), publisherSupplier, ctx.executor(), nettyException)
                             .firstOrError()
                             .subscribe((mutableHttpResponse, throwable) -> {
                                 if (throwable != null) {
@@ -618,7 +618,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
         filterPublisher(
                 requestReference,
-                Flowable.just(finalResponse),
+                () -> Flowable.just(finalResponse),
                 ctx.channel().eventLoop(),
                 skipOncePerRequest
         ).singleOrError().subscribe((Consumer<MutableHttpResponse<?>>) mutableHttpResponse ->
@@ -1378,7 +1378,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             boolean isErrorRoute,
             boolean skipOncePerRequest) {
         // build the result emitter. This result emitter emits the response from a controller action
-        Flowable<MutableHttpResponse<?>> resultEmitter = Flowable.defer(() -> {
+        Supplier<Flowable<? extends MutableHttpResponse<?>>> resultEmitter = () -> {
             final RouteMatch<?> routeMatch;
 
             // ensure the route requirements are completely satisfied
@@ -1515,7 +1515,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
             outgoingResponse.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
             return Flowable.just(outgoingResponse);
-        });
+        };
 
         // process the publisher through the available filters
         return filterPublisher(
@@ -1927,7 +1927,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private Flowable<? extends MutableHttpResponse<?>> filterPublisher(
             AtomicReference<HttpRequest<?>> requestReference,
-            Publisher<MutableHttpResponse<?>> routePublisher,
+            Supplier<? extends Publisher<? extends MutableHttpResponse<?>>> routePublisherSupplier,
             @Nullable ExecutorService executor,
             boolean skipOncePerRequest) {
         Publisher<? extends io.micronaut.http.MutableHttpResponse<?>> finalPublisher;
@@ -1937,20 +1937,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
         if (!filters.isEmpty()) {
             // make the action executor the last filter in the chain
-            filters.add((HttpServerFilter) (req, chain) -> {
-                if (executor != null) {
-                    if (routePublisher instanceof Flowable) {
-                        return ((Flowable<MutableHttpResponse<?>>) routePublisher)
-                                .subscribeOn(Schedulers.from(executor));
-                    } else {
-                        return Flowable.fromPublisher(routePublisher)
-                                .subscribeOn(Schedulers.from(executor));
-                    }
-                } else {
-                    return routePublisher;
-                }
-            });
-
+            filters.add((HttpServerFilter) (req, chain) -> Flowable.defer(() ->
+                    applyExecutorToPublisher(Flowable.defer(routePublisherSupplier::get), executor)));
             AtomicInteger integer = new AtomicInteger();
             int len = filters.size();
             ServerFilterChain filterChain = new ServerFilterChain() {
@@ -1969,13 +1957,27 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Publisher<? extends HttpResponse<?>> resultingPublisher = httpFilter.doFilter(requestReference.get(), filterChain);
             finalPublisher = (Publisher<? extends MutableHttpResponse<?>>) resultingPublisher;
         } else {
-            finalPublisher = routePublisher;
+            finalPublisher = applyExecutorToPublisher(routePublisherSupplier.get(), executor);
         }
+        return publisherToFlowable(finalPublisher);
+    }
 
-        if (finalPublisher instanceof Flowable) {
-            return (Flowable<? extends MutableHttpResponse<?>>) finalPublisher;
+    private <T extends MutableHttpResponse<?>> Publisher<T> applyExecutorToPublisher(
+            Publisher<T> publisher,
+            @Nullable ExecutorService executor) {
+        if (executor != null) {
+            return publisherToFlowable(publisher).subscribeOn(Schedulers.from(executor));
         } else {
-            return Flowable.fromPublisher(finalPublisher);
+            return publisher;
+        }
+    }
+
+    private <T extends MutableHttpResponse<?>> Flowable<T> publisherToFlowable(
+            Publisher<T> publisher) {
+        if (publisher instanceof Flowable) {
+            return (Flowable<T>) publisher;
+        } else {
+            return Flowable.fromPublisher(publisher);
         }
     }
 
