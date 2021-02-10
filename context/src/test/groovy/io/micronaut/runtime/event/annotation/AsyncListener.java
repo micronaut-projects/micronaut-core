@@ -20,21 +20,25 @@ import io.micronaut.scheduling.annotation.Async;
 import io.reactivex.Completable;
 
 import javax.inject.Singleton;
+import java.util.concurrent.CompletableFuture;
 
 @Singleton
 public class AsyncListener {
 
-    boolean completableInvoked = false;
+    boolean invoked = false;
 
     @EventListener
     @Async
-    Completable onCompletableStartup(StartupEvent event) {
+    CompletableFuture<Boolean> onStartup(StartupEvent event) {
         try {
             Thread.currentThread().sleep(500);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        completableInvoked = true;
-        return Completable.complete();
+        invoked = true;
+        return CompletableFuture.completedFuture(invoked);
+    }
+    public boolean isInvoked() {
+        return invoked;
     }
 }

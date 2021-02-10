@@ -27,6 +27,9 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import org.reactivestreams.Publisher;
 
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+
 /**
  * The {@link Publisher} method intercept.
  *
@@ -65,6 +68,13 @@ class PublisherInterceptedMethod implements InterceptedMethod {
     @Override
     public Publisher<?> interceptResultAsPublisher(Interceptor<?, ?> from) {
         return convertToPublisher(context.proceed(from));
+    }
+
+    @Override
+    public Publisher<?> interceptResultAsPublisher(ExecutorService executorService) {
+        Objects.requireNonNull(executorService);
+        final Publisher<?> actual = interceptResultAsPublisher();
+        return (Publishers.MicronautPublisher<Object>) s -> executorService.submit(() -> actual.subscribe(s));
     }
 
     @Override

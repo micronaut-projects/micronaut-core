@@ -26,8 +26,6 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.Async;
 import io.micronaut.scheduling.exceptions.TaskExecutionException;
-import io.reactivex.Flowable;
-import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,7 +86,7 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
             switch (interceptedMethod.resultType()) {
                 case PUBLISHER:
                     return interceptedMethod.handleResult(
-                            Flowable.fromPublisher(interceptedMethod.interceptResultAsPublisher()).subscribeOn(Schedulers.from(executorService))
+                            interceptedMethod.interceptResultAsPublisher(executorService)
                     );
                 case COMPLETION_STAGE:
                     return interceptedMethod.handleResult(

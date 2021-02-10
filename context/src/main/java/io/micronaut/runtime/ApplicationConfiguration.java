@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.discovery.ServiceInstance;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -172,13 +171,13 @@ public class ApplicationConfiguration {
         }
 
         /**
-         * @return The instance availability zone. For example it's possible to configure Nexflix Ribbon to load balance between servers only in a particular zone
+         * @return The instance availability zone. For example it's possible to configure Netflix Ribbon to load balance between servers only in a particular zone
          */
         public Optional<String> getZone() {
             if (zone != null) {
                 return Optional.of(zone);
             }
-            return Optional.ofNullable(getMetadata().get(ServiceInstance.ZONE));
+            return Optional.ofNullable(getMetadata().get("zone"));
         }
 
         /**

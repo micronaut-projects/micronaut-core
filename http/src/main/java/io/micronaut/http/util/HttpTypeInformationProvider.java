@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.runtime.server;
+package io.micronaut.http.util;
 
-import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.TypeInformationProvider;
+import io.micronaut.http.HttpResponse;
 
 /**
- * Extended version of the {@link ServiceInstance} interface for the {@link EmbeddedServer}.
+ * Provide type information for HTTP response.
  *
  * @author graemerocher
- * @since 1.0
+ * @since 2.4.0
  */
-public interface EmbeddedServerInstance extends ServiceInstance {
-
-    /**
-     * @return A reference to the server
-     */
-    EmbeddedServer getEmbeddedServer();
+@Internal
+public final class HttpTypeInformationProvider implements TypeInformationProvider {
+    @Override
+    public boolean isWrapperType(Class<?> type) {
+        return type == HttpResponse.class || TypeInformationProvider.super.isWrapperType(type);
+    }
 }

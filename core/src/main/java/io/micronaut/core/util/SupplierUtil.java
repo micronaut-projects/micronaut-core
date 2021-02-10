@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.async;
+package io.micronaut.core.util;
 
+import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
@@ -22,9 +23,7 @@ import java.util.function.Supplier;
  *
  * @author James Kleeh
  * @since 1.0
- * @deprecated Use {@link io.micronaut.core.util.SupplierUtil} instead
  */
-@Deprecated
 public class SupplierUtil {
 
     /**
@@ -35,7 +34,24 @@ public class SupplierUtil {
      * @return A new supplier that will cache the result
      */
     public static <T> Supplier<T> memoized(Supplier<T> actual) {
-        return io.micronaut.core.util.SupplierUtil.memoized(actual);
+        return new Supplier<T>() {
+            Supplier<T> delegate = this::initialize;
+            boolean initialized;
+
+            @Override
+            public T get() {
+                return delegate.get();
+            }
+
+            private synchronized T initialize() {
+                if (!initialized) {
+                    T value = actual.get();
+                    delegate = () -> value;
+                    initialized = true;
+                }
+                return delegate.get();
+            }
+        };
     }
 
     /**
@@ -47,6 +63,29 @@ public class SupplierUtil {
      * @return A new supplier that will cache the result
      */
     public static <T> Supplier<T> memoizedNonEmpty(Supplier<T> actual) {
-        return io.micronaut.core.util.SupplierUtil.memoizedNonEmpty(actual);
+        return new Supplier<T>() {
+            Supplier<T> delegate = this::initialize;
+            boolean initialized;
+
+            @Override
+            public T get() {
+                return delegate.get();
+            }
+
+            private synchronized T initialize() {
+                if (!initialized) {
+                    T value = actual.get();
+                    if (value == null) {
+                        return null;
+                    }
+                    if (value instanceof Optional && !((Optional) value).isPresent()) {
+                        return value;
+                    }
+                    delegate = () -> value;
+                    initialized = true;
+                }
+                return delegate.get();
+            }
+        };
     }
 }
