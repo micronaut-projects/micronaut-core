@@ -11,3 +11,9 @@ dependencies {
     testImplementation project(":core-reactive")
     testImplementation project(":inject-java-test")
 }
+
+spotless {
+    java {
+        targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
+    }
+}
