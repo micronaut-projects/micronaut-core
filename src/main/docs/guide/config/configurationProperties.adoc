@@ -40,7 +40,6 @@ The names supplied to the includes/excludes list should be the "property" name. 
 
 When resolving properties Micronaut will use the api:io.micronaut.core.convert.ConversionService[] bean to convert properties. You can register additional converters for types not supported by Micronaut by defining beans that implement the api:io.micronaut.core.convert.TypeConverter[] interface.
 
-
 Micronaut features some built-in conversions that are useful, which are detailed below.
 
 === Duration Conversion
@@ -73,9 +72,9 @@ For example to configure the default HTTP client read timeout:
 [source,yaml]
 ----
 micronaut:
-    http:
-        client:
-            read-timeout: 15s
+  http:
+    client:
+      read-timeout: 15s
 ----
 
 === List / Array Conversion
@@ -86,13 +85,13 @@ Lists and arrays can be specified in Java properties files as comma-separated va
 [source,yaml]
 ----
 my:
-    app:
-        integers:
-            - 1
-            - 2
-        urls:
-            - http://foo.com
-            - http://bar.com
+  app:
+    integers:
+      - 1
+      - 2
+    urls:
+      - http://foo.com
+      - http://bar.com
 ----
 
 Or in Java properties file format:
@@ -118,7 +117,6 @@ For the above example configurations you can define properties to bind to with t
 [source,java]
 List<Integer> integers;
 List<URL> urls;
-
 
 === Readable Bytes
 

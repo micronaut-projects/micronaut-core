@@ -20,7 +20,6 @@ $ ./mvnw mn:run
 
 Every time you change a class Micronaut's plugin will automatically restart the server.
 
-
 === Gradle Restart
 
 Gradle automatic restart can be activated when using the Micronaut Gradle plugin simply by activating Gradle's support for continuous builds via the `-t` flag:
@@ -32,7 +31,3 @@ Gradle automatic restart can be activated when using the Micronaut Gradle plugin
 ----
 
 Every time you make a change to class or resources Gradle will recompile and restart the application.
-
-
-
-

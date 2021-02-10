@@ -17,7 +17,6 @@ If you wish to store api:session.Session[] instances in Redis you can do so with
 
 To quickly get up and running with Redis sessions you must also have the `redis-lettuce` configuration on your classpath:
 
-
 .build.gradle
 [source,groovy]
 ----
@@ -31,12 +30,12 @@ And enable Redis sessions via configuration in `application.yml`:
 [source,yaml]
 ----
 redis:
-    uri: redis://localhost:6379
+  uri: redis://localhost:6379
 micronaut:
-    session:
-        http:
-            redis:
-                enabled: true
+  session:
+    http:
+      redis:
+        enabled: true
 ----
 
 == Configuring Session Resolution
@@ -51,10 +50,10 @@ If you wish to disable either header resolution or cookie resolution you can via
 [source,yaml]
 ----
 micronaut:
-    session:
-        http:
-            cookie: false
-            header: true
+  session:
+    http:
+      cookie: false
+      header: true
 ----
 
 The above configuration enables header resolution, but disables cookie resolution. You can also configure the header or cookie names as necessary.

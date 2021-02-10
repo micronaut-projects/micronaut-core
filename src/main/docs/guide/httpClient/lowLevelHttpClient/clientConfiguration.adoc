@@ -6,9 +6,9 @@ The default HTTP client configuration is a <<configurationProperties, Configurat
 [source,yaml]
 ----
 micronaut:
-    http:
-        client:
-            read-timeout: 5s
+  http:
+    client:
+      read-timeout: 5s
 ----
 
 The above example sets of `readTimeout` property of the api:http.client.HttpClientConfiguration[] class.
@@ -21,14 +21,13 @@ If you wish to have a separate configuration per client then there a couple of o
 [source,yaml]
 ----
 micronaut:
-    http:
-        services:
-            foo:
-                urls:
-                    - http://foo1
-                    - http://foo2
-                read-timeout: 5s # <1>
-
+  http:
+    services:
+      foo:
+        urls:
+          - http://foo1
+          - http://foo2
+        read-timeout: 5s # <1>
 ----
 
 <1> The read timeout is applied to the `foo` client.
@@ -70,8 +69,8 @@ Alternatively if you are not using service discovery then you can use the `confi
 .Injecting an HTTP client
 [source,java]
 ----
-@Client(value="https://api.twitter.com/1.1",
-        configuration=TwitterHttpClientConfiguration.class)
+@Client(value = "https://api.twitter.com/1.1",
+        configuration = TwitterHttpClientConfiguration.class)
 @Inject
 RxHttpClient httpClient;
 ----
@@ -84,16 +83,15 @@ If you have a client that needs to handle a significant number of requests then 
 [source,yaml]
 ----
 micronaut:
-    http:
-        services:
-            foo:
-                urls:
-                    - http://foo1
-                    - http://foo2
-                pool:
-                    enabled: true # <1>
-                    max-connections: 50 # <2>
-
+  http:
+    services:
+      foo:
+        urls:
+          - http://foo1
+          - http://foo2
+        pool:
+          enabled: true # <1>
+          max-connections: 50 # <2>
 ----
 
 <1> Enables the pool
@@ -111,11 +109,11 @@ This common `EventLoopGroup` can be configured via the `micronaut.netty.event-lo
 [source,yaml]
 ----
 micronaut:
-    netty:
-        event-loops:
-            default:
-                num-threads: 10
-                prefer-native-transport: true
+  netty:
+    event-loops:
+      default:
+        num-threads: 10
+        prefer-native-transport: true
 ----
 
 You can also use the `micronaut.netty.event-loops` setting to configure one or more additional event loops. The following table summarizes the properties:
@@ -124,20 +122,18 @@ include::{includedir}configurationProperties/io.micronaut.http.netty.channel.Def
 
 For example, if your interactions with an HTTP client involve CPU intensive work it may be worthwhile configuring a separate `EventLoopGroup` for one or all clients.
 
-
 The following example configures an additional event loop group called "other" that uses 10 threads:
 
 .Configuring Additional Event Loops
 [source,yaml]
 ----
 micronaut:
-    netty:
-        event-loops:
-            other:
-                num-threads: 10
-                prefer-native-transport: true
+  netty:
+    event-loops:
+      other:
+        num-threads: 10
+        prefer-native-transport: true
 ----
-
 
 Once an additional event loop has been configured you can alter the HTTP client configuration to use the newly defined event loop group:
 
@@ -145,7 +141,7 @@ Once an additional event loop has been configured you can alter the HTTP client 
 [source,yaml]
 ----
 micronaut:
-    http:
-        client:
-            event-loop-group: other
+  http:
+    client:
+      event-loop-group: other
 ----

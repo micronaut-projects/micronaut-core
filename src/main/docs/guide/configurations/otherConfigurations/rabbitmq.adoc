@@ -1,4 +1,3 @@
-
 [TIP]
 .Using the CLI
 ====
@@ -7,7 +6,6 @@ If you are creating your project using the Micronaut CLI, supply the `rabbitmq` 
 $ mn create-app my-app --features rabbitmq
 ----
 ====
-
 
 To get started with RabbitMQ in Micronaut, add the following dependency:
 
@@ -20,8 +18,8 @@ For example:
 [source,yaml]
 ----
 rabbitmq:
-    uri: amqp://user:pass@host:10000/vhost
-    requestedFrameMax: 10
-    requestedChannelMax: 10
-    connectionTimeout: 5000
+  uri: amqp://user:pass@host:10000/vhost
+  requestedFrameMax: 10
+  requestedChannelMax: 10
+  connectionTimeout: 5000
 ----

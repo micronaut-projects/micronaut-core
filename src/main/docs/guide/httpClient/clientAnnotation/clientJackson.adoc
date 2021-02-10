@@ -8,8 +8,8 @@ For example, the following configuration enabled indented output for Jackson:
 [source,yaml]
 ----
 jackson:
-    serialization:
-        indentOutput: true
+  serialization:
+    indentOutput: true
 ----
 
 However, these settings apply globally and impact both how the HTTP server renders JSON and how JSON is sent from the HTTP client. Given that sometimes it useful to provide client specific Jackson settings which can be done with the ann:jackson.annotation.JacksonFeatures[] annotation on any client:
@@ -19,7 +19,9 @@ As an example, the following snippet is taken from Micronaut's native Eureka cli
 .Example of JacksonFeatures
 [source,java]
 ----
-@Client(id = EurekaClient.SERVICE_ID, path = "/eureka", configuration = EurekaConfiguration.class)
+@Client(id = EurekaClient.SERVICE_ID,
+        path = "/eureka",
+        configuration = EurekaConfiguration.class)
 @JacksonFeatures(
     enabledSerializationFeatures = WRAP_ROOT_VALUE,
     disabledSerializationFeatures = WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED,

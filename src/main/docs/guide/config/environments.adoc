@@ -32,7 +32,6 @@ Micronaut uses the following hierarchy for environment processing (lowest priori
 NOTE: This also applies to `@MicronautTest(environments = )`
 +
 
-
 == Disabling Environment Detection
 
 The automatic detection of environments can be disabled setting the `micronaut.env.deduction` system property or the `MICRONAUT_ENV_DEDUCTION` environment variable to `false`. This will prevent Micronaut from detecting current environments, while still using any environments that are specifically provided as shown above.
@@ -57,9 +56,9 @@ To set the default environments, modify your application main method:
 ----
 public static void main(String[] args) {
     Micronaut.build(args)
-            .mainClass(Application.class)
-            .defaultEnvironments("dev")
-            .start();
+             .mainClass(Application.class)
+             .defaultEnvironments("dev")
+             .start();
 }
 ----
 
@@ -91,8 +90,8 @@ public class Application {
 
     public static void main(String[] args) {
         Micronaut.build(args)
-                .banner(false) // <1>
-                .start();
+                 .banner(false) // <1>
+                 .start();
     }
 }
 ----

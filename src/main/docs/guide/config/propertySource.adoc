@@ -63,7 +63,7 @@ The basic syntax is to wrap a reference to a property in `${...}`. For example i
 [source,yaml]
 ----
 myapp:
-    endpoint: http://${micronaut.server.host}:${micronaut.server.port}/foo
+  endpoint: http://${micronaut.server.host}:${micronaut.server.port}/foo
 ----
 
 The above example embeds references to the `micronaut.server.host` and `micronaut.server.port` properties.
@@ -74,7 +74,7 @@ You can specify default values by defining a value after the `:` character. For 
 [source,yaml]
 ----
 myapp:
-    endpoint: http://${micronaut.server.host:localhost}:${micronaut.server.port:8080}/foo
+  endpoint: http://${micronaut.server.host:localhost}:${micronaut.server.port:8080}/foo
 ----
 
 The above example will default to `localhost` and port `8080` if no value is found (rather than throwing an exception). Note that if default value itself contains a `:` character, you should escape it using back ticks:
@@ -83,7 +83,7 @@ The above example will default to `localhost` and port `8080` if no value is fou
 [source,yaml]
 ----
 myapp:
-    endpoint: ${server.address:`http://localhost:8080`}/foo
+  endpoint: ${server.address:`http://localhost:8080`}/foo
 ----
 
 The above example tries to read a `server.address` property otherwise fallbacks back to `http://localhost:8080`, since the address has a `:` character we have to escape it with back ticks.
@@ -173,8 +173,8 @@ Log levels can be configured via properties defined in `application.yml` (and en
 [source,yaml]
 ----
 logger:
-    levels:
-        foo.bar: ERROR
+  levels:
+    foo.bar: ERROR
 ----
 
 The same configuration can be achieved by setting the environment variable `LOGGER_LEVELS_FOO_BAR`. Note that there is currently no way to set log levels for unconventional prefixes such as `foo.barBaz`.

@@ -8,10 +8,10 @@ For example the following configuration will configure the I/O thread pool as a 
 [source,yaml]
 ----
 micronaut:
-    executors:
-        io:
-            type: fixed
-            nThreads: 75
+  executors:
+    io:
+      type: fixed
+      nThreads: 75
 ----
 
 To use this thread pool in a ann:http.annotation.Controller[] bean you have a number of options. The simplest option is to use the ann:scheduling.annotation.ExecuteOn[] annotation which can be declared at the type or method level to indicate which configured thread pool you wish to run the method or methods of the controller on:
@@ -31,4 +31,3 @@ snippet::io.micronaut.docs.http.server.reactive.PersonController[tags="imports,c
 <1> The configured I/O executor service is injected
 <2> RxJava's `fromCallable` method is used to wrap the blocking operation
 <3> RxJava's `subscribeOn` method is used to schedule the operation on the I/O thread pool
-

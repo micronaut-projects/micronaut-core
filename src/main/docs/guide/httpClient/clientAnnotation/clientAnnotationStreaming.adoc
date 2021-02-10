@@ -17,7 +17,6 @@ snippet::io.micronaut.docs.streaming.HeadlineControllerSpec[tags="streamingClien
 <2> The `firstElement` method is used to return the first emitted item from the rx:Flowable[] as a rx:Maybe[].
 <3> The `blockingGet()` is used in the test to retrieve the result.
 
-
 === Streaming Clients and Response Types
 
 The example defined in the previous section expects the server to respond with a stream of JSON objects and the content type to be `application/x-json-stream`. For example:
@@ -40,11 +39,9 @@ The reason for this is simple, a sequence of JSON object is not, in fact, valid 
 ]
 ----
 
-
 Micronaut's client does however support streaming of both individual JSON objects via `application/x-json-stream` and also JSON arrays defined with `application/json`.
 
 If the server returns `application/json` and a non-single rs:Publisher[] is returned (such as an rx:Flowable[] or a Reactor `Flux`) then the client with stream the array elements as they become available.
-
 
 === Streaming Clients and Read Timeout
 
@@ -58,13 +55,12 @@ If you are streaming data from a server that defines a longer delay than 60 seco
 [source,yaml]
 ----
 micronaut:
-    http:
-        client:
-            read-idle-timeout: 5m
+  http:
+    client:
+      read-idle-timeout: 5m
 ----
 
 The above example sets the `readIdleTimeout` to 5 minutes.
-
 
 === Streaming Server Sent Events
 
