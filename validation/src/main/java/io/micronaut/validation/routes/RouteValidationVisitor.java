@@ -21,6 +21,7 @@ import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.RawSegment;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.Segment;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.DefaultConversionService;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.HttpMethodMapping;
@@ -54,6 +55,11 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMe
     private List<RouteValidationRule> rules = new ArrayList<>();
     private boolean skipValidation = false;
     private final DefaultPropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(null, new DefaultConversionService());
+
+    @Override
+    public boolean isEnabled() {
+        return ClassUtils.isPresent("io.micronaut.http.annotation.HttpMethodMapping", getClass().getClassLoader());
+    }
 
     @NonNull
     @Override

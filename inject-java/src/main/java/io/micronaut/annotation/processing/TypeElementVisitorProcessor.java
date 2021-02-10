@@ -230,7 +230,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     warning("TypeElementVisitor [" + definition.getName() + "] will be ignored due to loading error: " + e.getMessage());
                     continue;
                 }
-                if (visitor == null) {
+                if (visitor == null || !visitor.isEnabled()) {
                     continue;
                 }
 
