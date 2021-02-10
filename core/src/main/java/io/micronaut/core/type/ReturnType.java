@@ -16,11 +16,7 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.async.annotation.SingleResult;
-import io.micronaut.core.async.publisher.Publishers;
-
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -63,7 +59,7 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
      * @since 2.0.0
      */
     default boolean isReactive() {
-        return Publishers.isConvertibleToPublisher(getType());
+        return TypeInformation.isReactive(getType());
     }
 
     /**
@@ -71,7 +67,7 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
      * @since 2.0.0
      */
     default boolean isCompletable() {
-        return Publishers.isCompletable(getType());
+        return TypeInformation.isCompletable(getType());
     }
 
     /**
@@ -84,7 +80,7 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
         } else {
             if (isReactive()) {
                 Class<T> returnType = getType();
-                return Publishers.isSingle(returnType);
+                return TypeInformation.isSingle(returnType);
             } else {
                 return true;
             }
@@ -92,13 +88,11 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
     }
 
     /**
-     * @return Has the return type been specified to emit a single result with {@link SingleResult}.
+     * @return Has the return type been specified to emit a single result with {@code SingleResult}.
      * @since 2.0
      */
     default boolean isSpecifiedSingle() {
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-        return annotationMetadata.hasStereotype(SingleResult.class) &&
-                annotationMetadata.booleanValue(SingleResult.NAME).orElse(true);
+        return TypeInformation.isSpecifiedSingle(this);
     }
 
     /**
@@ -120,7 +114,7 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
 
     /**
      * Returns whether the return type is logically void. This includes
-     * reactive times that emit nothing (such as {@link io.micronaut.core.async.subscriber.Completable})
+     * reactive times that emit nothing (such as {@code io.micronaut.core.async.subscriber.Completable})
      * and asynchronous types that emit {@link Void}.
      *
      * @return Is the return type logically void.

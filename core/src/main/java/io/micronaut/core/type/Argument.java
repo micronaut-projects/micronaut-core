@@ -18,7 +18,6 @@ package io.micronaut.core.type;
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -251,7 +250,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      * @since 2.0.0
      */
     default boolean isReactive() {
-        return Publishers.isConvertibleToPublisher(getType());
+        return TypeInformation.isReactive(getType());
     }
 
     /**
@@ -259,7 +258,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      * @since 2.0.0
      */
     default boolean isCompletable() {
-        return Publishers.isCompletable(getType());
+        return TypeInformation.isCompletable(getType());
     }
 
     /**
@@ -288,7 +287,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
 
     /**
      * Returns whether the return type is logically void. This includes
-     * reactive times that emit nothing (such as {@link io.micronaut.core.async.subscriber.Completable})
+     * reactive times that emit nothing (such as {@code io.micronaut.core.async.subscriber.Completable})
      * and asynchronous types that emit {@link Void}.
      *
      * @return Is the return type logically void.
