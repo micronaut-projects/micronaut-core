@@ -55,8 +55,8 @@ You can then use the api:discovery.DiscoveryClient[] API to find other services 
 [source,groovy]
 ----
 DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient);
-List<String> serviceIds = Flowable.fromPublisher(discoveryClient.getServiceIds()).blockingFirst();
-List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceIds.get(0))).blockingFirst();
+List<String> serviceIds = Flowable.fromPublisher(discoveryClient.serviceIds).blockingFirst()
+List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceIds[0])).blockingFirst()
 ----
 
 ==== Creating the Namespace

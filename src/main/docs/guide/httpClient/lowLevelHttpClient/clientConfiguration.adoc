@@ -50,8 +50,8 @@ You can also simply define a bean that extends from api:http.client.HttpClientCo
 @Named("twitter")
 @Singleton
 class TwitterHttpClientConfiguration extends HttpClientConfiguration {
-   public TwitterHttpClientConfiguration(ApplicationConfiguration applicationConfiguration) {
-        super(applicationConfiguration);
+   public TwitterHttpClientConfiguration(ApplicationConfiguration configuration) {
+        super(configuration);
     }
 }
 ----
