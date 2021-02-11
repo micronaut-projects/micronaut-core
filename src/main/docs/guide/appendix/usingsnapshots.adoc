@@ -5,11 +5,11 @@ The following snippet shows how to use Micronaut `SNAPSHOT` with Gradle. The lat
 [source, groovy]
 ----
 ext {
-  micronautVersion = '2.2.0-SNAPSHOT'
+    micronautVersion = '2.4.0-SNAPSHOT'
 }
 repositories {
-  jcenter() <1>
-  maven { url "https://oss.jfrog.org/oss-snapshot-local" } // <2>
+    jcenter() <1>
+    maven { url "https://oss.jfrog.org/oss-snapshot-local" } // <2>
 }
 ----
 

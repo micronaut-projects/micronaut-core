@@ -20,16 +20,20 @@ Options:
   -x, --stacktrace   Show full stack trace when exceptions occur.
 
 Commands: # <2>
-  create-app             Creates an application
-  create-cli-app         Creates a CLI application
-  create-function-app    Creates a Cloud Function
-  create-grpc-app        Creates a gRPC application
-  create-messaging-app   Creates a messaging application
-  create-test            Creates a simple test for the projects testing framework # <3>
-  create-websocket-server  Creates a Websocket server
+  create-app               Creates an application
+  create-cli-app           Creates a CLI application
+  create-function-app      Creates a Cloud Function
+  create-grpc-app          Creates a gRPC application
+  create-messaging-app     Creates a messaging application
+  create-job               Creates a job with scheduled method
+  create-bean              Creates a singleton bean
+  create-websocket-client  Creates a Websocket client
   create-client            Creates a client interface
   create-controller        Creates a controller and associated test
-  create-bean              Creates a singleton bean
+  feature-diff             Produces the diff of an original project with an original project with
+                             additional features.
+  create-websocket-server  Creates a Websocket server
+  create-test              Creates a simple test for the project's testing framework
 ----
 
 <1> Here you can see the project generation commands lists
@@ -180,7 +184,6 @@ The `create-websocket-server` command generates a simple api:websocket.WebSocket
 $ mn create-websocket-server MyChat
 | Rendered template WebsocketServer.java to destination src/main/java/example/MyChatServer.java
 ----
-
 
 === Create-Websocket-Client
 

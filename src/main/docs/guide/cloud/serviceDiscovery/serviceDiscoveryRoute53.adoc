@@ -38,7 +38,7 @@ dependency:io.micronaut.aws:micronaut-aws-route53[]
 6. On the client side, you will need the same dependencies and less configuration options:
 
 .Sample application.yml
-[source,groovy]
+[source,yaml]
 ----
 aws:
   route53:
@@ -52,7 +52,7 @@ aws:
 You can then use the api:discovery.DiscoveryClient[] API to find other services registered via Route 53. For example:
 
 .Sample code for client
-[source,java]
+[source,groovy]
 ----
 DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient);
 List<String> serviceIds = Flowable.fromPublisher(discoveryClient.getServiceIds()).blockingFirst();
