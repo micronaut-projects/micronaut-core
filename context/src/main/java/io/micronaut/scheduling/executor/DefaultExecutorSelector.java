@@ -19,11 +19,9 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.annotation.NonBlocking;
-import io.micronaut.core.async.SupplierUtil;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.http.HttpResponse;
+import io.micronaut.core.type.TypeInformation;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskExecutors;
@@ -33,7 +31,6 @@ import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.Optional;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
@@ -80,15 +77,14 @@ public class DefaultExecutorSelector implements ExecutorSelector {
             } else if (method.hasStereotype(Blocking.class)) {
                 return Optional.of(ioExecutor.get());
             } else {
-                ReturnType returnType = method.getReturnType();
-                Class argumentType = returnType.getType();
-                if (HttpResponse.class.isAssignableFrom(argumentType)) {
+                TypeInformation<?> returnType = method.getReturnType();
+                if (returnType.isWrapperType()) {
                     Optional<Argument<?>> generic = method.getReturnType().getFirstTypeVariable();
                     if (generic.isPresent()) {
-                        argumentType = generic.get().getType();
+                        returnType = generic.get();
                     }
                 }
-                if (isNonBlocking(argumentType)) {
+                if (returnType.isAsyncOrReactive()) {
                     return Optional.empty();
                 } else {
                     return Optional.of(ioExecutor.get());
@@ -98,9 +94,5 @@ public class DefaultExecutorSelector implements ExecutorSelector {
             return Optional.of(ioExecutor.get());
         }
         return Optional.empty();
-    }
-
-    private boolean isNonBlocking(Class type) {
-        return Publishers.isConvertibleToPublisher(type) || CompletionStage.class.isAssignableFrom(type);
     }
 }
