@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.exceptions.DisabledBeanException;
@@ -29,6 +30,7 @@ import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskScheduler;
 import io.reactivex.Flowable;
 
+import javax.inject.Inject;
 import javax.inject.Provider;
 import java.net.URI;
 import java.util.Collection;
@@ -48,7 +50,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class ServiceHttpClientFactory {
 
     private final TaskScheduler taskScheduler;
-    private final Provider<RxHttpClientRegistry> clientFactory;
+    private final BeanProvider<RxHttpClientRegistry> clientFactory;
 
     /**
      * Default constructor.
@@ -58,7 +60,7 @@ public class ServiceHttpClientFactory {
      */
     public ServiceHttpClientFactory(
             TaskScheduler taskScheduler,
-            Provider<RxHttpClientRegistry> clientFactory) {
+            BeanProvider<RxHttpClientRegistry> clientFactory) {
         this.taskScheduler = taskScheduler;
         this.clientFactory = clientFactory;
     }

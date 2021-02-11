@@ -53,7 +53,6 @@ import org.codehaus.groovy.control.io.StringReaderSource
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
-import javax.inject.Provider
 import java.lang.reflect.Modifier
 
 /**

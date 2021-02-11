@@ -20,6 +20,7 @@ import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanLocator;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -32,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Named;
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.Map;
 import java.util.Optional;
@@ -53,7 +53,7 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(TaskExecutors.class);
     private final BeanLocator beanLocator;
-    private final Optional<Provider<ExecutorService>> scheduledExecutorService;
+    private final Optional<BeanProvider<ExecutorService>> scheduledExecutorService;
     private final Map<String, ExecutorService> scheduledExecutorServices = new ConcurrentHashMap<>();
 
     /**
@@ -62,7 +62,7 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
      * @param beanLocator              The bean constructor
      * @param scheduledExecutorService The scheduled executor service
      */
-    AsyncInterceptor(BeanLocator beanLocator, @Named(TaskExecutors.SCHEDULED) Optional<Provider<ExecutorService>> scheduledExecutorService) {
+    AsyncInterceptor(BeanLocator beanLocator, @Named(TaskExecutors.SCHEDULED) Optional<BeanProvider<ExecutorService>> scheduledExecutorService) {
         this.beanLocator = beanLocator;
         this.scheduledExecutorService = scheduledExecutorService;
     }

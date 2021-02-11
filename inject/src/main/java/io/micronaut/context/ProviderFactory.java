@@ -52,19 +52,35 @@ public class ProviderFactory {
         }
     }
 
+    /**
+     * Creates a provider of the requested type
+     *
+     * @param providerType The provider type class
+     * @param beanProvider The bean provider
+     * @param <P> The provider type
+     * @return An optional provider
+     */
     @NonNull
-    public static <P> Optional<P> createProvider(Class<P> providerType, @NonNull io.micronaut.context.Provider<?> provider) {
-        if (providerType == io.micronaut.context.Provider.class) {
-            return Optional.of((P) provider);
+    public static <P> Optional<P> createProvider(Class<P> providerType, @NonNull BeanProvider<?> beanProvider) {
+        if (providerType == BeanProvider.class) {
+            return Optional.of((P) beanProvider);
         }
         Function<Supplier<?>, ?> function = providers.get(providerType);
         if (function != null) {
-            return Optional.ofNullable((P) function.apply(provider::get));
+            return Optional.ofNullable((P) function.apply(beanProvider::get));
         }
         return Optional.empty();
     }
 
+    /**
+     * @param clazz A class name
+     * @return True if the class equals any of the supported
+     * provider types
+     */
     public static boolean isProvider(String clazz) {
+        if (clazz.equals(BeanProvider.class.getName())) {
+            return true;
+        }
         for (Class provider: getProviders()) {
             if (provider.getName().equals(clazz)) {
                 return true;
@@ -73,7 +89,15 @@ public class ProviderFactory {
         return false;
     }
 
+    /**
+     * @param clazz A class
+     * @return True if the class equals or extends any of the
+     * supported provider types
+     */
     public static boolean isProvider(Class clazz) {
+        if (BeanProvider.class.isAssignableFrom(clazz)) {
+            return true;
+        }
         for (Class provider: getProviders()) {
             if (provider.isAssignableFrom(clazz)) {
                 return true;
@@ -82,6 +106,9 @@ public class ProviderFactory {
         return false;
     }
 
+    /**
+     * @return The set of provider types
+     */
     public static Set<Class> getProviders() {
         return providers.keySet();
     }

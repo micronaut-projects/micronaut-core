@@ -15,17 +15,20 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.NonNull;
+
 /**
  * A provider contract.
  *
  * @param <T> The type
  * @author James Kleeh
- * @since 2.3.0
+ * @since 2.4.0
  */
-public interface Provider<T> {
+public interface BeanProvider<T> {
 
     /**
      * @return A fully-constructed and injected instance of T.
      */
+    @NonNull
     T get();
 }

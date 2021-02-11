@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.util;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
@@ -24,6 +25,8 @@ import io.micronaut.runtime.server.EmbeddedServer;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+
+import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.net.URI;
@@ -38,19 +41,30 @@ import java.util.regex.Pattern;
  * @since 1.2.0
  */
 @Singleton
-@Experimental
 public class DefaultHttpHostResolver implements HttpHostResolver {
 
     private static final String DEFAULT_HOST = "http://localhost";
-    private final Provider<EmbeddedServer> embeddedServer;
+    private final BeanProvider<EmbeddedServer> embeddedServer;
     private final HttpServerConfiguration serverConfiguration;
 
     /**
      * @param serverConfiguration The server configuration
      * @param embeddedServer The embedded server provider
      */
+    @Deprecated
     public DefaultHttpHostResolver(HttpServerConfiguration serverConfiguration,
                                    @Nullable Provider<EmbeddedServer> embeddedServer) {
+        this.serverConfiguration = serverConfiguration;
+        this.embeddedServer = embeddedServer::get;
+    }
+
+    /**
+     * @param serverConfiguration The server configuration
+     * @param embeddedServer The embedded server provider
+     */
+    @Inject
+    public DefaultHttpHostResolver(HttpServerConfiguration serverConfiguration,
+                                   @Nullable BeanProvider<EmbeddedServer> embeddedServer) {
         this.serverConfiguration = serverConfiguration;
         this.embeddedServer = embeddedServer;
     }

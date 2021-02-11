@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.codec;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.codec.CodecConfiguration;
@@ -64,7 +65,7 @@ public class TextStreamCodec implements MediaTypeCodec {
     private static final byte[] COMMENT_PREFIX = ": ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
 
-    private final Provider<MediaTypeCodecRegistry> codecRegistryProvider;
+    private final BeanProvider<MediaTypeCodecRegistry> codecRegistryProvider;
     private final ByteBufferFactory byteBufferFactory;
     private final List<MediaType> additionalTypes;
     private final Charset defaultCharset;
@@ -80,7 +81,7 @@ public class TextStreamCodec implements MediaTypeCodec {
     public TextStreamCodec(
             ApplicationConfiguration applicationConfiguration,
             ByteBufferFactory byteBufferFactory,
-            Provider<MediaTypeCodecRegistry> codecRegistryProvider,
+            BeanProvider<MediaTypeCodecRegistry> codecRegistryProvider,
             @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         this(applicationConfiguration.getDefaultCharset(), byteBufferFactory, codecRegistryProvider, codecConfiguration);
     }
@@ -94,7 +95,7 @@ public class TextStreamCodec implements MediaTypeCodec {
     protected TextStreamCodec(
             Charset defaultCharset,
             ByteBufferFactory byteBufferFactory,
-            Provider<MediaTypeCodecRegistry> codecRegistryProvider,
+            BeanProvider<MediaTypeCodecRegistry> codecRegistryProvider,
             @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         this.defaultCharset = defaultCharset;
         this.byteBufferFactory = byteBufferFactory;
