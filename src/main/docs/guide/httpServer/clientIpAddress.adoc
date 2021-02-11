@@ -2,9 +2,9 @@ You may need to resolve the originating IP address of an HTTP Request. Micronaut
 
 The default implementation will resolve the client address in the following places in order:
 
-1. The configured header
-2. The `Forwarded` header
-3. The `X-Forwarded-For` header
-4. The remote address on the request
+. The configured header
+. The `Forwarded` header
+. The `X-Forwarded-For` header
+. The remote address on the request
 
 The first priority header name can be configured with `micronaut.server.client-address-header`.
