@@ -2,38 +2,22 @@ Micronaut {version} includes the following changes:
 
 === Core Features
 
+==== Jakarta Inject
+
+The `jakarta.inject` inject annotations are now supported as an alternative to `javax.inject`. Micronaut 3 will change the default inject annotations to Jakarta, however the javax annotations will continue to be supported if added to your build explicitly.
+
+Micronaut 3 will change the bean context API to return our custom provider contract, api:context.BeanProvider[]. We suggest existing applications to change to use that interface instead of `javax.inject.Provider`, however both the `jakarta.inject.Provider` and `javax.inject.Provider` interfaces will continue to be supported.
+
 ==== Core Nullability Annotations
 
-With the future of JSR-305 unclear and issues with regards to the module system with existing solutions, Micronaut 2.4 replaces Spotbugs with core nullability annotations: ann:core.annotation.Nullable[] and ann:core.annotation.NotNull[].
+With the future of JSR-305 unclear and issues with regards to the module system with existing solutions, Micronaut 2.4 will replace usages of Spotbugs with core nullability annotations: ann:core.annotation.Nullable[] and ann:core.annotation.NotNull[].
 
-You should use this annotations in your code, or if you prefer Spotbugs add it to your classpath as necessary.
+Existing applications should switch to using these annotations. If other annotations are preferable, the dependency should be added explicitly to your build because no third party `Nullable` or `NonNull` annotations will be available transitively in the next major version.
 
 === Module Upgrades
 
-- Micronaut XML `2.1.0` -> `2.2.1`
-- Micronaut Cache `2.2.0` -> `2.3.0`
-- Micronaut Security `2.2.2` -> `2.3.0`
-- Micronaut Spring `2.1.2` -> `3.2.0`
-- Micronaut GCP `3.3.0` -> `3.4.0`
-- Micronaut AWS `2.2.5` -> `2.3.0`
-- Micronaut OpenAPI `2.2.2` -> `2.3.0`
-- Micronaut SQL `3.3.5` -> `3.4.0`
-- Micronaut Views `2.1.0` -> `2.2.1`
-- Micronaut Test `2.2.1` -> `2.3.2`
-- Micronaut PicoCLI `3.1.0` -> `3.2.0`
-- Micronaut RabbitMQ `2.2.2` -> `2.3.2`
-- Micronaut Flyway `3.1.0` -> `3.3.0`
-- Micronaut Kubernetes `2.1.0` -> `2.2.0`
-- Micronaut Multitenancy `2.2.3` -> `3.0.0` (Group ID changed to `io.micronaut.multitenancy`)
-- Micronaut JMS (new) `1.0.0.M1`
+TODO
 
 === Dependency Upgrades
 
-- PicoCLI `4.5.2` -> `4.6.1`
-- Caffeine `2.8.6` -> `2.8.8`
-- Netty `4.1.56.Final` -> `4.1.58.Final`
-- Spring `5.2.9.RELEASE` -> `5.3.1`
-- Spring Boot `2.3.4.RELEASE` -> `2.4.0`
-- GraalVM `20.3.0` -> `21.0.0`
-- Tomcat JDBC `9.0.40` -> `9.0.41`
-- Flyway `7.0.4` -> `7.4.0`
+TODO
