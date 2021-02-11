@@ -18,7 +18,10 @@ package io.micronaut.docs.config.itfce;
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.bind.annotation.Bindable;
-import javax.validation.constraints.*;
+
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.util.Optional;
 // end::imports[]
 
@@ -30,7 +33,7 @@ public interface EngineConfig {
     @NotBlank // <3>
     String getManufacturer();
 
-    @Min(1L)
+    @Min(1)
     int getCylinders();
 
     @NotNull
@@ -42,4 +45,3 @@ public interface EngineConfig {
     }
 }
 // end::class[]
-

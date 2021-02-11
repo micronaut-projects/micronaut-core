@@ -26,7 +26,7 @@ public class V8Engine implements Engine {
 
     @Override
     public String start() {
-        return "Starting V" + String.valueOf(getCylinders()) + " [rodLength=" + String.valueOf(getRodLength()) + "]";
+        return "Starting V" + getCylinders() + " [rodLength=" + getRodLength() + ']';
     }
 
     @Override

@@ -25,6 +25,7 @@ import javax.validation.ConstraintViolationException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 // end::imports[]
+
 // tag::test[]
 @MicronautTest
 class PersonServiceSpec {

@@ -28,14 +28,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import static io.micronaut.http.HttpRequest.GET;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class HeadlineControllerSpec {
 
     // tag::streamingClient[]
     @Test
-    public void testClientAnnotationStreaming() throws Exception {
-        try( EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class) ) {
+    public void testClientAnnotationStreaming() {
+        try(EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class)) {
             HeadlineClient headlineClient = embeddedServer
                                                 .getApplicationContext()
                                                 .getBean(HeadlineClient.class); // <1>
@@ -44,21 +46,21 @@ public class HeadlineControllerSpec {
 
             Headline headline = firstHeadline.blockingGet(); // <3>
 
-            assertNotNull( headline );
-            assertTrue( headline.getText().startsWith("Latest Headline") );
+            assertNotNull(headline);
+            assertTrue(headline.getText().startsWith("Latest Headline"));
         }
     }
     // end::streamingClient[]
 
-
     @Test
     public void testStreamingClient() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxStreamingHttpClient client = embeddedServer.getApplicationContext().createBean(RxStreamingHttpClient.class, embeddedServer.getURL());
-
+        RxStreamingHttpClient client = embeddedServer.getApplicationContext().createBean(
+                RxStreamingHttpClient.class, embeddedServer.getURL());
 
         // tag::streaming[]
-        Flowable<Headline> headlineStream = client.jsonStream(GET("/streaming/headlines"), Headline.class); // <1>
+        Flowable<Headline> headlineStream = client.jsonStream(
+                GET("/streaming/headlines"), Headline.class); // <1>
         CompletableFuture<Headline> future = new CompletableFuture<>(); // <2>
         headlineStream.subscribe(new Subscriber<Headline>() {
             @Override
@@ -82,15 +84,15 @@ public class HeadlineControllerSpec {
                 // no-op // <6>
             }
         });
+
         // end::streaming[]
         try {
             Headline headline = future.get(3, TimeUnit.SECONDS);
             assertTrue(headline.getText().startsWith("Latest Headline"));
-
         } catch (Throwable e) {
-            fail("Asynchronous error occurred: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+            fail("Asynchronous error occurred: " +
+                    (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
         }
-
 
         embeddedServer.stop();
         client.stop();

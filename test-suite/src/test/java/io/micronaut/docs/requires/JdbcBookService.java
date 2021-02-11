@@ -44,11 +44,11 @@ public class JdbcBookService implements BookService {
             PreparedStatement ps = connection.prepareStatement("select * from books where title = ?");
             ps.setString(1, title);
             ResultSet rs = ps.executeQuery();
-            if(rs.next()) {
+            if (rs.next()) {
                 return new Book(rs.getString("title"));
             }
         }
-        catch (SQLException ex) {
+        catch (SQLException ignored) {
             return null;
         }
         return null;

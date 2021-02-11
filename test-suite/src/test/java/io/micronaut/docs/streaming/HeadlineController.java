@@ -16,7 +16,6 @@
 package io.micronaut.docs.streaming;
 
 // tag::imports[]
-
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;

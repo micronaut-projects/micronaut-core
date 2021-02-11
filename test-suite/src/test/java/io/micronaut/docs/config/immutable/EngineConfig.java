@@ -15,12 +15,15 @@
  */
 package io.micronaut.docs.config.immutable;
 
-
 // tag::imports[]
-import io.micronaut.context.annotation.*;
-import io.micronaut.core.bind.annotation.Bindable;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.validation.constraints.*;
+import io.micronaut.context.annotation.ConfigurationInject;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.bind.annotation.Bindable;
+
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.util.Optional;
 // end::imports[]
 
@@ -35,7 +38,7 @@ public class EngineConfig {
     @ConfigurationInject // <2>
     public EngineConfig(
             @Bindable(defaultValue = "Ford") @NotBlank String manufacturer, // <3>
-            @Min(1L) int cylinders, // <4>
+            @Min(1) int cylinders, // <4>
             @NotNull CrankShaft crankShaft) {
         this.manufacturer = manufacturer;
         this.cylinders = cylinders;

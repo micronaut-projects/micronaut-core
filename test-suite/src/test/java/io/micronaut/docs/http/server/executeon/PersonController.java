@@ -15,11 +15,11 @@
  */
 package io.micronaut.docs.http.server.executeon;
 
+// tag::imports[]
 import io.micronaut.docs.http.server.reactive.PersonService;
 import io.micronaut.docs.ioc.beans.Person;
-
-// tag::imports[]
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 // end::imports[]
@@ -30,8 +30,7 @@ public class PersonController {
 
     private final PersonService personService;
 
-    PersonController(
-            PersonService personService) {
+    PersonController(PersonService personService) {
         this.personService = personService;
     }
 
@@ -42,4 +41,3 @@ public class PersonController {
     }
 }
 // end::class[]
-

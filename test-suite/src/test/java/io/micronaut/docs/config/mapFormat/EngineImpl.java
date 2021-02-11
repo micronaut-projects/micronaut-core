@@ -22,6 +22,10 @@ import java.util.Map;
 // tag::class[]
 @Singleton
 public class EngineImpl implements Engine {
+
+    @Inject
+    EngineConfig config;
+
     @Override
     public Map getSensors() {
         return config.getSensors();
@@ -29,7 +33,8 @@ public class EngineImpl implements Engine {
 
     @Override
     public String start() {
-        return "Engine Starting V" + getConfig().getCylinders() + " [sensors=" + getSensors().size() + "]";
+        return "Engine Starting V" + getConfig().getCylinders() +
+               " [sensors=" + getSensors().size() + "]";
     }
 
     public EngineConfig getConfig() {
@@ -39,8 +44,5 @@ public class EngineImpl implements Engine {
     public void setConfig(EngineConfig config) {
         this.config = config;
     }
-
-    @Inject
-    private EngineConfig config;
 }
 // end::class[]

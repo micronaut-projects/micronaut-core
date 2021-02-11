@@ -25,8 +25,9 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import static org.junit.Assert.*;
-
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class ShoppingControllerSpec {
 
@@ -43,10 +44,10 @@ public class ShoppingControllerSpec {
 
     @AfterClass
     public static void stopServer() {
-        if(server != null) {
+        if (server != null) {
             server.stop();
         }
-        if(client != null) {
+        if (client != null) {
             client.stop();
         }
     }
@@ -55,7 +56,7 @@ public class ShoppingControllerSpec {
     public void testSessionValueUsedOnReturnValue() {
         // tag::view[]
         HttpResponse<Cart> response = client.exchange(HttpRequest.GET("/shopping/cart"), Cart.class) // <1>
-                                                .blockingFirst();
+                                            .blockingFirst();
         Cart cart = response.body();
 
         assertNotNull(response.header(HttpHeaders.AUTHORIZATION_INFO)); // <2>
@@ -66,10 +67,9 @@ public class ShoppingControllerSpec {
         // tag::add[]
         String sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO); // <1>
 
-        response = client.exchange(
-                HttpRequest.POST("/shopping/cart/Apple", "")
-                        .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart.class) // <2>
-                .blockingFirst();
+        response = client.exchange(HttpRequest.POST("/shopping/cart/Apple", "")
+                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart.class) // <2>
+                         .blockingFirst();
         cart = response.body();
         // end::add[]
 
@@ -77,11 +77,12 @@ public class ShoppingControllerSpec {
         assertEquals(1, cart.getItems().size());
 
         response = client.exchange(HttpRequest.GET("/shopping/cart")
-                                                  .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart.class)
-                                                  .blockingFirst();
+                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart.class)
+                         .blockingFirst();
         cart = response.body();
 
         response.header(HttpHeaders.AUTHORIZATION_INFO);
+
         assertNotNull(cart);
         assertEquals(1, cart.getItems().size());
         assertEquals("Apple", cart.getItems().get(0));

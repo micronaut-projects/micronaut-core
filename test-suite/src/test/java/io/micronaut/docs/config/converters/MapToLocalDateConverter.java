@@ -42,7 +42,6 @@ public class MapToLocalDateConverter implements TypeConverter<Map, LocalDate> { 
                 context.reject(propertyMap, e); // <3>
                 return Optional.empty();
             }
-
         }
 
         return Optional.empty();

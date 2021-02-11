@@ -45,21 +45,20 @@ public class EmailControllerSpec {
 
     @AfterClass
     public static void stopServer() {
-        if(server != null) {
+        if (server != null) {
             server.stop();
         }
-        if(client != null) {
+        if (client != null) {
             client.stop();
         }
     }
-
 
     //tag::paramsvalidated[]
     @Test
     public void testParametersAreValidated() {
         HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class, () ->
             client.toBlocking().exchange("/email/send?subject=Hi&recipient="));
-        HttpResponse response = e.getResponse();
+        HttpResponse<?> response = e.getResponse();
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatus());
 

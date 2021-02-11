@@ -15,9 +15,9 @@
  */
 package io.micronaut.docs.config.value;
 
+// tag::imports[]
 import io.micronaut.context.annotation.Value;
 
-// tag::imports[]
 import javax.inject.Singleton;
 // end::imports[]
 
@@ -30,7 +30,7 @@ public class EngineImpl implements Engine {
 
     @Override
     public int getCylinders() {
-        return this.cylinders;
+        return cylinders;
     }
 
     @Override

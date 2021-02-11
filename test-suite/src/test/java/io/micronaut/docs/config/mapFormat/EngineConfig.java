@@ -17,14 +17,22 @@ package io.micronaut.docs.config.mapFormat;
 
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.convert.format.MapFormat;
+
 import javax.validation.constraints.Min;
 import java.util.Map;
-import io.micronaut.core.convert.format.MapFormat;
 // end::imports[]
 
 // tag::class[]
 @ConfigurationProperties("my.engine")
 public class EngineConfig {
+
+    @Min(1)
+    private int cylinders;
+
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT) //<1>
+    private Map<Integer, String> sensors;
+
     public int getCylinders() {
         return cylinders;
     }
@@ -40,10 +48,5 @@ public class EngineConfig {
     public void setSensors(Map<Integer, String> sensors) {
         this.sensors = sensors;
     }
-
-    @Min(1L)
-    private int cylinders;
-    @MapFormat(transformation = MapFormat.MapTransformation.FLAT) //<1>
-    private Map<Integer, String> sensors;
 }
 // end::class[]

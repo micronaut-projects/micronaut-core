@@ -16,13 +16,13 @@
 package io.micronaut.docs.ioc.scopes;
 
 // tag::imports[]
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.context.annotation.Requires;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 // end::imports[]
 
 /**
@@ -30,7 +30,7 @@ import java.lang.annotation.Retention;
  * @since 1.0
  */
 // tag::class[]
-@Requires(classes = Car.class ) // <1>
+@Requires(classes = Car.class) // <1>
 @Singleton // <2>
 @Documented
 @Retention(RUNTIME)

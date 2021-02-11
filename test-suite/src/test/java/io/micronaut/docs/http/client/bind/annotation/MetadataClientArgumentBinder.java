@@ -22,7 +22,6 @@ public class MetadataClientArgumentBinder implements AnnotatedClientArgumentRequ
         return Metadata.class;
     }
 
-
     @Override
     public void bind(@NotNull ArgumentConversionContext<Object> context,
                      @NonNull ClientRequestUriContext uriContext,
