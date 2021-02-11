@@ -25,7 +25,7 @@ import javax.inject.Singleton
 class TextBookFactory {
 
     @Singleton
-    @Replaces(value = TextBook.class, factory = BookFactory.class)
+    @Replaces(value = TextBook, factory = BookFactory)
     TextBook textBook() {
         new TextBook('Learning 305')
     }

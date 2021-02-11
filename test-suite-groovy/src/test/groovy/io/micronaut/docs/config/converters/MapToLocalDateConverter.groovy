@@ -30,10 +30,10 @@ import java.time.LocalDate
 class MapToLocalDateConverter implements TypeConverter<Map, LocalDate> { // <1>
     @Override
     Optional<LocalDate> convert(Map propertyMap, Class<LocalDate> targetType, ConversionContext context) {
-        Optional<Integer> day = ConversionService.SHARED.convert(propertyMap.get("day"), Integer.class)
-        Optional<Integer> month = ConversionService.SHARED.convert(propertyMap.get("month"), Integer.class)
-        Optional<Integer> year = ConversionService.SHARED.convert(propertyMap.get("year"), Integer.class)
-        if (day.isPresent() && month.isPresent() && year.isPresent()) {
+        Optional<Integer> day = ConversionService.SHARED.convert(propertyMap.day, Integer)
+        Optional<Integer> month = ConversionService.SHARED.convert(propertyMap.month, Integer)
+        Optional<Integer> year = ConversionService.SHARED.convert(propertyMap.year, Integer)
+        if (day.present && month.present && year.present) {
             try {
                 return Optional.of(LocalDate.of(year.get(), month.get(), day.get())) // <2>
             } catch (DateTimeException e) {

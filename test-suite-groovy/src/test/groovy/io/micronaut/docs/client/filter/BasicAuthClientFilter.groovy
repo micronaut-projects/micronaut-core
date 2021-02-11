@@ -29,7 +29,8 @@ import javax.inject.Singleton
 class BasicAuthClientFilter implements HttpClientFilter {
 
     @Override
-    Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+    Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request,
+                                                  ClientFilterChain chain) {
         chain.proceed(request.basicAuth("user", "pass"))
     }
 }

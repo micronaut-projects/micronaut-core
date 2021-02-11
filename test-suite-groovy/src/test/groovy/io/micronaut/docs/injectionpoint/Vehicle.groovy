@@ -20,7 +20,9 @@ import javax.inject.Singleton
 // tag::class[]
 @Singleton
 class Vehicle {
+
     private final Engine engine
+
     Vehicle(@Cylinders(6) Engine engine) {
         this.engine = engine
     }

@@ -16,12 +16,10 @@
 package io.micronaut.docs.web.router.version
 
 // tag::imports[]
-
 import io.micronaut.core.version.annotation.Version
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 // end::imports[]
-
 
 // tag::clazz[]
 @Controller("/versioned")
@@ -50,5 +48,4 @@ class VersionedController {
     String hello() {
         "hello"
     }
-
 }

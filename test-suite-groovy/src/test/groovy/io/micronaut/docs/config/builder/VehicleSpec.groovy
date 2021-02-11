@@ -34,8 +34,7 @@ class VehicleSpec extends Specification {
                 "test"
         )
 
-        Vehicle vehicle = applicationContext
-                .getBean(Vehicle)
+        Vehicle vehicle = applicationContext.getBean(Vehicle)
         println(vehicle.start())
         // end::start[]
 
@@ -45,5 +44,4 @@ class VehicleSpec extends Specification {
         cleanup:
         applicationContext.close()
     }
-
 }

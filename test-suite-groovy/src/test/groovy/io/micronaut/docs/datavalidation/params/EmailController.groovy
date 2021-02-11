@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.datavalidation.params;
-//tag::imports[]
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.validation.Validated;
+package io.micronaut.docs.datavalidation.params
 
-import javax.validation.constraints.NotBlank;
-import java.util.Collections;
+import io.micronaut.context.annotation.Requires
+//tag::imports[]
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.validation.Validated
+
+import javax.validation.constraints.NotBlank
 //end::imports[]
 
 @Requires(property = "spec.name", value = "datavalidationparams")
@@ -33,8 +33,8 @@ class EmailController {
 
     @Get("/send")
     HttpResponse send(@NotBlank String recipient, // <2>
-                             @NotBlank String subject) { // <2>
-        HttpResponse.ok(Collections.singletonMap("msg", "OK"))
+                      @NotBlank String subject) { // <2>
+        HttpResponse.ok(msg: "OK")
     }
 }
 //end::clazz[]

@@ -10,13 +10,9 @@ class ShoppingCartController {
     // tag::method[]
     @Get("/typed")
     HttpResponse<Map<String, Object>> loadCart(ShoppingCart shoppingCart) { //<1>
-        Map<String, Object> responseMap = [:]
-        responseMap.sessionId = shoppingCart.sessionId
-        responseMap.total = shoppingCart.total
-
-        return HttpResponse.ok(responseMap)
+        HttpResponse.ok(
+                sessionId: shoppingCart.sessionId,
+                total: shoppingCart.total)
     }
     // end::method[]
-
-
 }

@@ -16,8 +16,6 @@
 package io.micronaut.docs.server.intro
 
 import io.micronaut.context.annotation.Property
-
-
 // tag::imports[]
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.HttpClient
@@ -25,8 +23,10 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.Specification
+
 import javax.inject.Inject
 // end::imports[]
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -35,6 +35,7 @@ import javax.inject.Inject
 // tag::class[]
 @MicronautTest
 class HelloControllerSpec extends Specification {
+
     @Inject
     EmbeddedServer embeddedServer // <1>
 
