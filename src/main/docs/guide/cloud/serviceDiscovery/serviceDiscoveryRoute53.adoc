@@ -52,11 +52,11 @@ aws:
 You can then use the api:discovery.DiscoveryClient[] API to find other services registered via Route 53. For example:
 
 .Sample code for client
-[source,groovy]
+[source,java]
 ----
-DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient);
-List<String> serviceIds = Flowable.fromPublisher(discoveryClient.serviceIds).blockingFirst()
-List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceIds[0])).blockingFirst()
+DiscoveryClient discoveryClient = embeddedServer.getApplicationContext().getBean(DiscoveryClient.class);
+List<String> serviceIds = Flowable.fromPublisher(discoveryClient.getServiceIds()).blockingFirst();
+List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceIds.get(0))).blockingFirst();
 ----
 
 ==== Creating the Namespace

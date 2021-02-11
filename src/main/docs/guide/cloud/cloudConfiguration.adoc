@@ -113,11 +113,11 @@ The api:runtime.server.EmbeddedServerInstance[] is available through event liste
 To obtain metadata for the locally running server use an <<events,EventListener>> for the api:discovery.event.ServiceReadyEvent[]:
 
 .Obtaining Metadata for a Local Server
-[source,groovy]
+[source,java]
 ----
 @EventListener
 void onServiceStarted(ServiceReadyEvent event) {
-    ServiceInstance serviceInstance = event.source
-    ConvertibleValues<String> metadata = serviceInstance.metadata
+    ServiceInstance serviceInstance = event.getSource();
+    ConvertibleValues<String> metadata = serviceInstance.getMetadata();
 }
 ----
