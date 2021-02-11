@@ -22,7 +22,7 @@ class MyConfig1 {
     String getHost() {
         host
     }
-    MyConfig setHost(String host) {
+    MyConfig1 setHost(String host) {
         this.host = host
         this
     }
@@ -202,26 +202,26 @@ import io.micronaut.inject.configuration.Engine
 @ConfigurationProperties(value = "foo", excludes = ["engine", "engine2", "engine3"])
 class MyProperties extends Parent {
 
-    @ConfigurationBuilder(prefixes = "with") 
+    @ConfigurationBuilder(prefixes = "with")
     Engine.Builder engine = Engine.builder()
-    
+
     /*
     @ConfigurationBuilder(configurationPrefix = "two", prefixes = "with")
-    @groovy.transform.PackageScope 
+    @groovy.transform.PackageScope
     Engine.Builder engine2 = Engine.builder()
-    
+
     Engine.Builder getEngine2() {
         engine2
     }
     */
-    
+
     private Engine.Builder engine3 = Engine.builder()
-    
-    @ConfigurationBuilder(configurationPrefix = "three", prefixes = "with") 
+
+    @ConfigurationBuilder(configurationPrefix = "three", prefixes = "with")
     void setEngine3(Engine.Builder engine3) {
         this.engine3 = engine3;
-    }   
-    
+    }
+
     Engine.Builder getEngine3() {
         engine3
     }
@@ -262,7 +262,7 @@ class Test {
 
     @ConfigurationProperties("test")
     static class TestNestedConfig {
-        
+
         String val
     }
 
