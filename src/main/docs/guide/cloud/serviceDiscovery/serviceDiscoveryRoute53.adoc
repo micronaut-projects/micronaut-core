@@ -21,14 +21,14 @@ you are using
 [source,yaml]
 ----
 aws:
-    route53:
-        registration
-            enabled: true
-            aws-service-id: srv-978fs98fsdf
-            namespace: micronaut.io
+  route53:
+    registration
+    enabled: true
+    aws-service-id: srv-978fs98fsdf
+    namespace: micronaut.io
 micronaut:
-    application:
-        name: something
+  application:
+    name: something
 ----
 
 5. Make sure you have the following dependencies included in your build file:
@@ -41,12 +41,12 @@ dependency:io.micronaut.aws:micronaut-aws-route53[]
 [source,groovy]
 ----
 aws:
-    route53:
-        discovery:
-            client:
-                enabled: true
-                aws-service-id: srv-978fs98fsdf
-                namespace-id: micronaut.io
+  route53:
+    discovery:
+      client:
+        enabled: true
+        aws-service-id: srv-978fs98fsdf
+        namespace-id: micronaut.io
 ----
 
 You can then use the api:discovery.DiscoveryClient[] API to find other services registered via Route 53. For example:
@@ -61,12 +61,10 @@ List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInst
 
 ==== Creating the Namespace
 
-
 Namespaces are similar to a regular Route53 hosted zone, and they appear in the Route53 console but the console doesn't support
  modifying them. You must use the AWS-CLI at this time for any Service Discovery functionality.
 
 First decide if you are creating a public facing namespace or a private one, as the commands are different:
-
 
 .Creating Namespace
 [source,bash]
@@ -77,7 +75,6 @@ or
 
 $ aws servicediscovery create-private-dns-namespace --name micronaut.internal.io --create-request-id create-1522767790 --description adescriptionhere --vpc yourvpcID
 ----
-
 
 When you run this you will get an operation ID. You can check the status with the `get-operation` CLI command:
 
@@ -103,7 +100,7 @@ $ aws create-service --name yourservicename --create-request-id somenumber --des
 
 The `DnsRecord` type can be `A`(ipv4),`AAAA`(ipv6),`SRV`, or `CNAME`. `RoutingPolicy` can be `WEIGHTED` or `MULTIVALUE`. Keep in mind `CNAME` must use weighted routing type, `SRV` must have a valid port configured.
 
-If you want to add a health check, you can use the following syntax on the CLI: 
+If you want to add a health check, you can use the following syntax on the CLI:
 
 .Specifying a Health Check
 [source,bash]
@@ -121,7 +118,6 @@ For more help run 'aws discoveryservice create-service help'.
 
 You will get a service ID and an ARN back from this command if successful. Write that down, it's going to go into the Micronaut configuration.
 
-
 ==== Setting up the configuration in Micronaut
 
 ==== Auto Naming Registration
@@ -132,26 +128,25 @@ You will need to add the configuration to make your applications register with R
 [source,yaml]
 ----
 aws:
-    route53:
-        registration:
-            enabled: true
-            aws-service-id=<enter the service id you got after creation on aws cli>
-        discovery:
-            namespace-id=<enter the namespace id you got after creating the namespace>
+  route53:
+    registration:
+      enabled: true
+      aws-service-id=<enter the service id you got after creation on aws cli>
+    discovery:
+      namespace-id=<enter the namespace id you got after creating the namespace>
 ----
 
 ==== Discovery Client Configuration
-
 
 .Discovery Properties
 [source,yaml]
 ----
 aws:
-    route53:
-        discovery:
-            client
-                enabled: true
-                aws-service-id: <enter the service id you got after creation on aws cli>
+  route53:
+    discovery:
+      client
+      enabled: true
+      aws-service-id: <enter the service id you got after creation on aws cli>
 ----
 
 You can also call the following methods by getting the bean "Route53AutoNamingClient":
@@ -161,8 +156,8 @@ You can also call the following methods by getting the bean "Route53AutoNamingCl
 ----
 // if serviceId is null it will use property "aws.route53.discovery.client.awsServiceId"
 Publisher<List<ServiceInstance>> getInstances(String serviceId)
-// reads property "aws.route53.discovery.namespaceId" 
-Publisher<List<String>> getServiceIds() 
+// reads property "aws.route53.discovery.namespaceId"
+Publisher<List<String>> getServiceIds()
 ----
 
 ==== Integration Tests
@@ -170,13 +165,3 @@ Publisher<List<String>> getServiceIds()
 If you set the environment variable AWS_SUBNET_ID and have credentials configured in your home directory that are valid (in `~/.aws/credentials`)
 you can run the integration tests. You will still need a domain hosted on route53 as well. This test will create a t2.nano instance, a namespace, service, and register that instance to service discovery.
 When the test completes it will remove/terminate all resources it spun up.
-
-
-
-
-
-
-
-
-
-

@@ -41,7 +41,6 @@ Note that in this example, for illustration purposes we are calling `toBlocking(
 
 For example the following `@Controller` method calls another endpoint in a non-blocking manner:
 
-
 snippet::io.micronaut.docs.basics.HelloController[tags="imports, nonblocking", indent=0, title="Using the HTTP client without blocking"]
 
 <1> The method `hello` returns a rx:Maybe[] which may or may not emit an item. If an item is not emitted a 404 is returned.
@@ -67,12 +66,12 @@ To enable client-specific logging you could configure the default logger for all
 [source,xml]
 ----
 micronaut:
-    http:
-        client:
-            logger-name: mylogger
-        services:
-            otherClient:
-                logger-name: other.client
+  http:
+    client:
+      logger-name: mylogger
+    services:
+      otherClient:
+        logger-name: other.client
 ----
 
 And, then enable logging in `logback.yml`:
@@ -88,11 +87,9 @@ And, then enable logging in `logback.yml`:
 
 The previous example demonstrated using the static methods of the api:http.HttpRequest[] interface to construct a api:http.MutableHttpRequest[] instance. Like the name suggests a `MutableHttpRequest` can be mutated including the ability to add headers, customize the request body and so on. For example:
 
-
 snippet::io.micronaut.docs.basics.HelloControllerSpec[tags="headers", indent=0, title="Passing an HttpRequest to retrieve"]
 
 The above example adds an additional header called `X-My-Header` to the request before it is sent. The api:http.MutableHttpRequest[] interface has a bunch more convenience methods that make it easy to modify the request in common ways.
-
 
 ==== Reading JSON Responses
 
@@ -117,7 +114,6 @@ The above examples decodes the response into a jdk:java.util.Map[], representing
 snippet::io.micronaut.docs.basics.HelloControllerSpec[tags="jsonmaptypes", indent=0, title="Decoding the response body to a Map"]
 
 <1> The `Argument.of` method is used to return a `Map` whether the key and value are typed as `String`
-
 
 Whilst retrieving JSON as a map can be desirable, more often than not you will want to decode objects into Plain Old Java Objects (POJOs). To do that simply pass the type instead:
 

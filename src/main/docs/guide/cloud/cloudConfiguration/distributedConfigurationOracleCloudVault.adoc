@@ -122,9 +122,7 @@ public class HelloController {
 
     private Config config;
 
-    public HelloController(
-            Config config
-    ) {
+    public HelloController(Config config) {
         this.config = config;
     }
 

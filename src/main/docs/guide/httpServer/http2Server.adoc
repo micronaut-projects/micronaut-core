@@ -9,7 +9,7 @@ The first step to doing so is setting the supported HTTP version is the server c
 ----
 micronaut:
   server:
-      http-version: 2.0
+    http-version: 2.0
 ----
 
 With this configuration in place Micronaut will enable support for the `h2c` protocol (see https://http2.github.io/http2-spec/#discover-http[HTTP/2 over cleartext]) which is fine for development.
@@ -21,10 +21,10 @@ Since browsers don't support `h2c` and in general https://http2.github.io/http2-
 ----
 micronaut:
   ssl:
-      enabled: true
-      buildSelfSigned: true
+    enabled: true
+    buildSelfSigned: true
   server:
-      http-version: 2.0
+    http-version: 2.0
 ----
 
 For production, see the <<https, configuring HTTPS>> section of the documentation.
@@ -53,9 +53,9 @@ By default Micronaut's HTTP client is configured to support HTTP 1.1. To enable 
 [source,yaml]
 ----
 micronaut:
-    http:
-        client:
-            http-version: 2.0
+  http:
+    client:
+      http-version: 2.0
 ----
 
 Or by specifying the HTTP version to use when injecting the client:

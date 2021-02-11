@@ -9,16 +9,13 @@ snippet::io.micronaut.docs.server.intro.HelloControllerSpec[tags="imports,class"
 <3> The test using the `toBlocking()` method to make a blocking call
 <4> The `retrieve` method returns the response of the controller as a `String`
 
-
 In addition to a low-level client, Micronaut features a <<clientAnnotation,declarative, compile-time HTTP client>>, powered by the api:http.client.annotation.Client[] annotation.
 
 To create a client, simply create an interface annotated with `@Client`. For example:
 
-
 .src/main/java/hello/world/HelloClient.java
 
 snippet::io.micronaut.docs.server.intro.HelloClient[tags="imports,class",indent=0]
-
 
 <1> The `@Client` annotation is used with value that is a relative path to the current server
 <2> The same ann:http.annotation.Get[] annotation used on the server is used to define the client mapping
@@ -29,7 +26,6 @@ To test the `HelloClient` simply retrieve it from the api:context.ApplicationCon
 .Testing HelloClient
 
 snippet::io.micronaut.docs.server.intro.HelloClientSpec[tags="imports,class",indent=0]
-
 
 <1> The `@MicronautTest` annotation is used to define the test
 <2> The `HelloClient` is injected from the api:context.ApplicationContext[]

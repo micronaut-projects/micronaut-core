@@ -14,14 +14,14 @@ The server can also be configured to use a different named worker event loop:
 [source,yaml]
 ----
 micronaut:
-    server:
-        netty:
-            worker:
-                event-loop-group: other
+  server:
     netty:
-        event-loops:
-            other:
-                num-threads: 10
+      worker:
+        event-loop-group: other
+  netty:
+    event-loops:
+      other:
+        num-threads: 10
 ----
 
 NOTE: The default value for the number of threads is the value of the system property `io.netty.eventLoopThreads`, or if not specified, the available processors x 2.
@@ -38,13 +38,10 @@ When dealing with blocking operations, Micronaut will shift the blocking operati
 [source,yaml]
 ----
 micronaut:
-    executors:
-        io:
-           type: fixed
-           nThreads: 75
+  executors:
+    io:
+      type: fixed
+      nThreads: 75
 ----
 
 The above configuration will create a fixed thread pool with 75 threads.
-
-
-

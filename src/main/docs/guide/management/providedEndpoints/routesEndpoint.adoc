@@ -10,9 +10,9 @@ To configure the routes endpoint, supply configuration through `endpoints.routes
 [source,yaml]
 ----
 endpoints:
-    routes:
-        enabled: Boolean
-        sensitive: Boolean
+  routes:
+    enabled: Boolean
+    sensitive: Boolean
 ----
 
 == Customization

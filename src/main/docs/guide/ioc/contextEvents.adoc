@@ -10,7 +10,6 @@ snippet::io.micronaut.docs.context.events.SampleEvent,io.micronaut.docs.context.
 
 WARNING: Publishing an event is *synchronous* by default! The `publishEvent` method will not return until all listeners have been executed. Move this work off to a thread pool if it is time intensive.
 
-
 === Listening for Events
 
 To listen to an event, register a bean that implements api:context.event.ApplicationEventListener[] where the generic type is the type of event the listener should be executed for.
@@ -29,14 +28,13 @@ snippet::io.micronaut.docs.context.events.async.SampleEventListener,io.micronaut
 
 The event listener will by default run on the `scheduled` executor. You can configure this thread pool as required in `application.yml`:
 
-
 //TODO: Move YAML snippet to ExecutorServiceConfigSpec
 .Configuring Scheduled Task Thread Pool
 [source,yaml]
 ----
 micronaut:
-    executors:
-        scheduled:
-            type: scheduled
-            core-pool-size: 30
+  executors:
+    scheduled:
+      type: scheduled
+      core-pool-size: 30
 ----

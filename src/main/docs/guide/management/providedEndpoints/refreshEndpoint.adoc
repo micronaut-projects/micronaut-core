@@ -1,4 +1,3 @@
-
 The refresh endpoint will refresh the application state, causing all link:{api}/io/micronaut/runtime/context/scope/Refreshable.html[Refreshable] beans in the context to be destroyed and reinstantiated upon further requests. This is accomplished by publishing a api:runtime.context.scope.refresh.RefreshEvent[] in the Application Context.
 
 To execute the refresh endpoint, send a POST request to /refresh.
@@ -23,7 +22,7 @@ To configure the refresh endpoint, supply configuration through `endpoints.refre
 [source,yaml]
 ----
 endpoints:
-    refresh:
-        enabled: Boolean
-        sensitive: Boolean
+  refresh:
+    enabled: Boolean
+    sensitive: Boolean
 ----

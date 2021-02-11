@@ -40,7 +40,6 @@ When the `management` dependency is added to your project, the following built-i
 | `/threaddump`
 |Returns information about the current threads in the application.
 
-
 |===
 
 In addition, the following built-in endpoint(s) are provided by the `management` dependency but are not enabled by default:
@@ -59,7 +58,6 @@ In addition, the following built-in endpoint(s) are provided by the `management`
 
 |===
 
-
 WARNING: It is possible to open all endpoints for unauthenticated access defining `endpoints.all.sensitive: false` but
 this should be used with care because private and sensitive information will be exposed.
 
@@ -70,8 +68,8 @@ By default all management endpoints are exposed over the same port as the applic
 [source,yaml]
 ----
 endpoints:
-    all:
-        port: 8085
+  all:
+    port: 8085
 ----
 
 In the above example the management endpoints will be exposed only over port 8085.

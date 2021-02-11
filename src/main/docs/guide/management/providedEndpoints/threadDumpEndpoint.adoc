@@ -10,9 +10,9 @@ To configure the threaddump endpoint, supply configuration through `endpoints.th
 [source,yaml]
 ----
 endpoints:
-    threaddump:
-        enabled: Boolean
-        sensitive: Boolean
+  threaddump:
+    enabled: Boolean
+    sensitive: Boolean
 ----
 
 == Customization

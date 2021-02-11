@@ -6,13 +6,12 @@ To do this you should use the `micronaut.http.services` setting. The following i
 [source,yaml]
 ----
 micronaut:
-    http:
-        services:
-            foo:
-                urls:
-                    - http://foo1
-                    - http://foo2
-
+  http:
+    services:
+      foo:
+        urls:
+          - http://foo1
+          - http://foo2
 ----
 
 You can then inject a client with `@Client("foo")` and it will use the above configuration to load balance between the two configured servers.
@@ -27,13 +26,13 @@ Note that by default no health checking will happen to assert that the reference
 [source,yaml]
 ----
 micronaut:
-    http:
-        services:
-            foo:
-                ...
-                health-check: true # <1>
-                health-check-interval: 15s # <2>
-                health-check-uri: /health # <3>
+  http:
+    services:
+      foo:
+        ...
+        health-check: true # <1>
+        health-check-interval: 15s # <2>
+        health-check-uri: /health # <3>
 ----
 
 <1> Whether to health check the service

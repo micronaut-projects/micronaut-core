@@ -10,12 +10,12 @@ To configure the health endpoint, supply configuration through `endpoints.health
 [source,yaml]
 ----
 endpoints:
-    health:
-        enabled: Boolean
-        sensitive: Boolean
-        details-visible: String <1>
-        status:
-            http-mapping: Map<String, HttpStatus>
+  health:
+    enabled: Boolean
+    sensitive: Boolean
+    details-visible: String <1>
+    status:
+      http-mapping: Map<String, HttpStatus>
 ----
 
 <1> One of api:management.endpoint.health.DetailsVisibility[]
@@ -28,14 +28,13 @@ For example setting:
 [source,yaml]
 ----
 endpoints:
-    health:
-        details-visible: ANONYMOUS
+  health:
+    details-visible: ANONYMOUS
 ----
 
 Will expose detailed information read from the various health indicators about the health status of the application to anonymous unauthenticated users.
 
 The `endpoints.health.status.http-mapping` setting can be used to control what status codes are returned for each health status. The defaults are described in the table below:
-
 
 |===
 |Status | HTTP Code
@@ -53,19 +52,17 @@ The `endpoints.health.status.http-mapping` setting can be used to control what s
 
 You can provide custom mappings in `application.yml`:
 
-
 .Custom Health Status Codes
 [source,yaml]
 ----
 endpoints:
-    health:
-        status:
-            http-mapping:
-                DOWN: 200
+  health:
+    status:
+      http-mapping:
+        DOWN: 200
 ----
 
 The above will return api:http.HttpStatus#OK[] (200) even when the api:health.HealthStatus[] is api:health.HealthStatus#DOWN[].
-
 
 == Customization
 
@@ -96,11 +93,11 @@ A health indicator is provided that determines the health of the application bas
 [source,yaml]
 ----
 endpoints:
-    health:
-        disk-space:
-            enabled: Boolean
-            path: String #The file path used to determine the disk space
-            threshold: String | Long #The minimum amount of free space
+  health:
+    disk-space:
+      enabled: Boolean
+      path: String #The file path used to determine the disk space
+      threshold: String | Long #The minimum amount of free space
 ----
 
 The threshold can be provided as a string like "10MB" or "200KB", or the number of bytes.

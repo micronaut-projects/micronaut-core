@@ -75,7 +75,6 @@ You can then run the native image from the directory you built it to.
 $ ./hello-world
 ----
 
-
 === Understanding Micronaut and Graal
 
 Micronaut itself does not rely on reflection or dynamic classloading so works automatically with GraalVM native, however certain third party libraries used by Micronaut may require additional input about uses of reflection.
@@ -114,7 +113,6 @@ Stating with Micronaut 2.0, as the framework generates automatically the file `r
 include your own additional resources you can provide them in `src/main/graal/resource-config.json` and they will
 automatically added to the generated file.
 
-
 === Adding Additional Classes for Reflective Access
 
 To inform Micronaut of additional classes that should be included in the generated `reflect.json` file at compilation time you can either annotate a class with ann:core.annotation.Introspected[] or ann:core.annotation.TypeHint[].
@@ -124,13 +122,13 @@ The former will generate a compile time introspection as well as allowing reflec
 [source,java]
 ----
 @TypeHint(
-        value = { // <1>
-                PropertyNamingStrategy.UpperCamelCaseStrategy.class,
-                ArrayList.class,
-                LinkedHashMap.class,
-                HashSet.class
-        },
-        accessType = TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS // <2>
+    value = { // <1>
+        PropertyNamingStrategy.UpperCamelCaseStrategy.class,
+        ArrayList.class,
+        LinkedHashMap.class,
+        HashSet.class
+    },
+    accessType = TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS // <2>
 )
 ----
 

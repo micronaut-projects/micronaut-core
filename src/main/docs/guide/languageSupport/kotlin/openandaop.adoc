@@ -17,7 +17,7 @@ open class EmailController { // <1>
 
     @Get("/send")
     fun index(@NotBlank recipient: String, // <1>
-                   @NotBlank subject: String): HttpStatus {
+              @NotBlank subject: String): HttpStatus {
         return HttpStatus.OK
     }
 }

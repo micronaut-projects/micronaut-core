@@ -13,11 +13,11 @@ Normally the JSON parsing only happens if the content type is `application/json`
 [source,yaml]
 ----
 micronaut:
-    codec:
-        json:
-            additionalTypes:
-              - text/javascript
-              - ...
+  codec:
+    json:
+      additionalTypes:
+        - text/javascript
+        - ...
 ----
 
 Currently supported configuration prefixes are `json`, `json-stream`, `text`, and `text-stream`.
