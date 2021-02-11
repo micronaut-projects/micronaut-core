@@ -16,63 +16,192 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.ArrayUtils;
 
-import java.util.*;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletionStage;
+import java.util.stream.Collectors;
 
 /**
- * Abstracts how types are interpreted by the core API.
+ * Provides information about a type at runtime.
  *
  * @author graemerocher
+ * @param <T> The generic type
  * @since 2.4.0
  */
-@Internal
-final class TypeInformation {
-    private static final Collection<TypeInformationProvider> TYPE_INFORMATION_PROVIDERS;
+public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMetadataProvider, Type {
+    /**
+     * @return The type
+     */
+    @NonNull Class<T> getType();
 
-    static {
-        final ServiceLoader<TypeInformationProvider> loader = ServiceLoader.load(TypeInformationProvider.class);
-        List<TypeInformationProvider> informationProviders = new ArrayList<>(2);
-        for (TypeInformationProvider informationProvider : loader) {
-            informationProviders.add(informationProvider);
+    @Override
+    @NonNull
+    default String getTypeName() {
+        Argument<?>[] typeParameters = getTypeParameters();
+        if (ArrayUtils.isNotEmpty(typeParameters)) {
+            String typeName = getType().getTypeName();
+            return typeName +  "<" + Arrays.stream(typeParameters).map(Argument::getTypeName).collect(Collectors.joining(",")) + ">";
+        } else {
+            return getType().getTypeName();
         }
-
-        TYPE_INFORMATION_PROVIDERS = Collections.unmodifiableList(informationProviders);
     }
 
     /**
-     * Returns whether the annotation metadata specifies the type as single.
-     * @param annotationMetadata The annotation metadata provider
-     * @return True if does
+     * @return Is the return type reactive.
+     * @since 2.0.0
      */
-    static boolean isSpecifiedSingle(AnnotationMetadataProvider annotationMetadata) {
-        return TYPE_INFORMATION_PROVIDERS.stream().anyMatch(provider -> provider.isSpecifiedSingle(annotationMetadata));
+    default boolean isReactive() {
+        return RuntimeTypeInformation.isReactive(getType());
     }
 
     /**
-     * does the given type represent a type that emits a single item.
-     * @param type True if it does
-     * @return True if it is single
+     * Returns whether this type is a wrapper type that wraps the actual type such as a Optional or a Response wrapper.
+     *
+     * @return True if it is a wrapper type.
+     * @since 2.4.0
      */
-    static boolean isSingle(Class<?> type) {
-        return TYPE_INFORMATION_PROVIDERS.stream().anyMatch(provider -> provider.isSingle(type));
+    default boolean isWrapperType() {
+        return RuntimeTypeInformation.isWrapperType(getType());
     }
 
     /**
-     * does the type represent a reactive type.
-     * @param type The type
-     * @return True if it is reactive
+     * @return Is the return the return type a reactive completable type.
+     * @since 2.0.0
      */
-    static boolean isReactive(Class<?> type) {
-        return TYPE_INFORMATION_PROVIDERS.stream().anyMatch(provider -> provider.isReactive(type));
+    default boolean isCompletable() {
+        return RuntimeTypeInformation.isCompletable(getType());
     }
 
     /**
-     * does the type represent a completable type.
-     * @param type The type
-     * @return True if it is completable
+     * @return Is the return type asynchronous.
+     * @since 2.0.0
      */
-    static boolean isCompletable(Class<?> type) {
-        return TYPE_INFORMATION_PROVIDERS.stream().anyMatch(provider -> provider.isCompletable(type));
+    default boolean isAsync() {
+        Class<T> type = getType();
+        return CompletionStage.class.isAssignableFrom(type);
+    }
+
+    /**
+     * @return Is the return type either async or reactive.
+     * @since 2.0.0
+     */
+    default boolean isAsyncOrReactive() {
+        return isAsync() || isReactive();
+    }
+
+    /**
+     * @return Whether this is a container type.
+     */
+    default boolean isContainerType() {
+        return DefaultArgument.CONTAINER_TYPES.contains(getType());
+    }
+
+    /**
+     * @return Whether the argument has any type variables
+     */
+    default boolean hasTypeVariables() {
+        return !getTypeVariables().isEmpty();
+    }
+
+    /**
+     * Returns the string representation of the argument type, including generics.
+     *
+     * @param simple If true, output the simple name of types
+     * @return The type string representation
+     */
+    default String getTypeString(boolean simple) {
+        Class<T> type = getType();
+        StringBuilder returnType = new StringBuilder(simple ? type.getSimpleName() : type.getName());
+        Map<String, Argument<?>> generics = getTypeVariables();
+        if (!generics.isEmpty()) {
+            returnType
+                    .append("<")
+                    .append(generics.values()
+                            .stream()
+                            .map(arg -> arg.getTypeString(simple))
+                            .collect(Collectors.joining(", ")))
+                    .append(">");
+        }
+        return returnType.toString();
+    }
+
+    /**
+     * Returns whether the return type is logically void. This includes
+     * reactive times that emit nothing (such as {@code io.micronaut.core.async.subscriber.Completable})
+     * and asynchronous types that emit {@link Void}.
+     *
+     * @return Is the return type logically void.
+     * @since 2.0.0
+     */
+    default boolean isVoid() {
+        Class<T> javaReturnType = getType();
+        if (javaReturnType == void.class) {
+            return true;
+        } else {
+            if (isCompletable()) {
+                return true;
+            }
+            if (isReactive() || isAsync()) {
+                return getFirstTypeVariable().filter(arg -> arg.getType() == Void.class).isPresent();
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @return Is the return type {@link java.util.Optional}.
+     * @since 2.0.1
+     */
+    default boolean isOptional() {
+        Class<T> type = getType();
+        return type == Optional.class;
+    }
+
+    /**
+     * @return Has the return type been specified to emit a single result with {@code SingleResult}.
+     * @since 2.0
+     */
+    default boolean isSpecifiedSingle() {
+        return RuntimeTypeInformation.isSpecifiedSingle(this);
+    }
+
+    /**
+     * Represent this argument as a {@link ParameterizedType}.
+     * @return The {@link ParameterizedType}
+     * @since 2.0.0
+     */
+    default @NonNull ParameterizedType asParameterizedType() {
+        return new ParameterizedType() {
+            @Override
+            public Type[] getActualTypeArguments() {
+                return getTypeParameters();
+            }
+
+            @Override
+            public Type getRawType() {
+                return TypeInformation.this.getType();
+            }
+
+            @Override
+            public Type getOwnerType() {
+                return TypeInformation.this;
+            }
+
+            @Override
+            public String getTypeName() {
+                return TypeInformation.this.getTypeName();
+            }
+
+            @Override
+            public String toString() {
+                return getTypeName();
+            }
+        };
     }
 }

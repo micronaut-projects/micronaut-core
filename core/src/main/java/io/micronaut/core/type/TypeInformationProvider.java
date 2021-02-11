@@ -18,6 +18,8 @@ package io.micronaut.core.type;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.NonNull;
 
+import java.util.Optional;
+
 /**
  * Interface that implementors can hook into to control the logic of methods like {@link Argument#isReactive()}.
  *
@@ -59,5 +61,15 @@ public interface TypeInformationProvider {
      */
     default boolean isCompletable(@NonNull Class<?> type) {
         return false;
+    }
+
+    /**
+     * Does the type represent a wrapper type.
+     * @param type The type
+     * @return True if it is a wrapper type
+     * @see TypeInformation#isWrapperType()
+     */
+    default boolean isWrapperType(Class<?> type) {
+        return type == Optional.class;
     }
 }

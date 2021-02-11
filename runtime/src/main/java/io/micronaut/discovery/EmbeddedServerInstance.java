@@ -13,10 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.discovery;
+
+import io.micronaut.runtime.server.EmbeddedServer;
+
 /**
- * Interfaces for simplifying instrumentation of {@link java.util.concurrent.ExecutorService} instances.
+ * Extended version of the {@link ServiceInstance} interface for the {@link EmbeddedServer}.
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.scheduling.instrument;
+public interface EmbeddedServerInstance extends ServiceInstance {
+
+    /**
+     * @return A reference to the server
+     */
+    EmbeddedServer getEmbeddedServer();
+}
