@@ -13,7 +13,7 @@ class IntroductionSpec: AnnotationSpec() {
         // tag::test[]
         val stubExample = applicationContext.getBean(StubExample::class.java)
 
-        stubExample.number.toLong().shouldBe(10)
+        stubExample.number.shouldBe(10)
         stubExample.date.shouldBe(null)
         // end::test[]
 

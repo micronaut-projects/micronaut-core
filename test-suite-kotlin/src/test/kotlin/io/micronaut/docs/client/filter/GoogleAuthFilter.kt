@@ -19,7 +19,9 @@ import javax.inject.Provider
 @Filter(patterns = ["/google-auth/api/**"])
 class GoogleAuthFilter (
         private val authClientProvider: Provider<RxHttpClient>) : HttpClientFilter { // <1>
-    override fun doFilter(request: MutableHttpRequest<*>, chain: ClientFilterChain): Publisher<out HttpResponse<*>?> {
+
+    override fun doFilter(request: MutableHttpRequest<*>,
+                          chain: ClientFilterChain): Publisher<out HttpResponse<*>?> {
         val token = Flowable.fromCallable { encodeURI(request) }
                 .flatMap { authURI: String ->
                     authClientProvider.get().retrieve(HttpRequest.GET<Any>(authURI).header( // <2>

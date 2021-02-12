@@ -17,8 +17,8 @@ package io.micronaut.docs.config.mapFormat
 
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties
-import javax.validation.constraints.Min
 import io.micronaut.core.convert.format.MapFormat
+import javax.validation.constraints.Min
 // end::imports[]
 
 // tag::class[]
@@ -27,6 +27,7 @@ class EngineConfig {
 
     @Min(1L)
     var cylinders: Int = 0
+
     @MapFormat(transformation = MapFormat.MapTransformation.FLAT) //<1>
     var sensors: Map<Int, String>? = null
 }

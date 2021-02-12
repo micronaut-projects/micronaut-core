@@ -29,8 +29,8 @@ class MessageController {
     @Get("/hello") // <1>
     fun hello(request: HttpRequest<*>): HttpResponse<String> {
         val name = request.parameters
-                .getFirst("name")
-                .orElse("Nobody") // <2>
+                          .getFirst("name")
+                          .orElse("Nobody") // <2>
 
         return HttpResponse.ok("Hello $name!!")
                 .header("X-My-Header", "Foo") // <3>
