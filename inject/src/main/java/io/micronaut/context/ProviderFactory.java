@@ -53,7 +53,7 @@ public class ProviderFactory {
     }
 
     /**
-     * Creates a provider of the requested type
+     * Creates a provider of the requested type.
      *
      * @param providerType The provider type class
      * @param beanProvider The bean provider

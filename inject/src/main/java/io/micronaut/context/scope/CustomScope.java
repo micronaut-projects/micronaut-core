@@ -15,7 +15,6 @@
  */
 package io.micronaut.context.scope;
 
-import io.micronaut.context.BeanProvider;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Indexed;

@@ -29,10 +29,8 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.inject.ExecutionHandle;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
-
 import io.micronaut.core.annotation.NonNull;
 
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.Set;

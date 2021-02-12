@@ -30,8 +30,6 @@ import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskScheduler;
 import io.reactivex.Flowable;
 
-import javax.inject.Inject;
-import javax.inject.Provider;
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;
