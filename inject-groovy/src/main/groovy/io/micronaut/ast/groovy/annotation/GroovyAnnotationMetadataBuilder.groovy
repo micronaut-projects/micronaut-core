@@ -147,6 +147,11 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
+    protected void addWarning(@NonNull AnnotatedNode originatingElement, @NonNull String warning) {
+        AstMessageUtils.warning(sourceUnit, originatingElement, warning)
+    }
+
+    @Override
     protected boolean isMethodOrClassElement(AnnotatedNode element) {
         return element instanceof ClassNode || element instanceof MethodNode
     }

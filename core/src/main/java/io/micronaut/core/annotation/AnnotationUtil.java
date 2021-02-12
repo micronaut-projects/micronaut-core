@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.annotation;
 
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.*;

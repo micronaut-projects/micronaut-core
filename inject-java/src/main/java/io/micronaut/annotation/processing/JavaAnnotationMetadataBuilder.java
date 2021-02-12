@@ -90,6 +90,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected void addWarning(@NonNull Element originatingElement, @NonNull String warning) {
+        messager.printMessage(Diagnostic.Kind.WARNING, warning, originatingElement);
+    }
+
+    @Override
     protected String getAnnotationMemberName(Element member) {
         return member.getSimpleName().toString();
     }

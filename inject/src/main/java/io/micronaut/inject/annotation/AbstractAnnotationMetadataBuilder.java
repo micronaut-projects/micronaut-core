@@ -45,6 +45,16 @@ import java.util.function.BiConsumer;
  */
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
+    /**
+     * Names of annotations that should produce deprecation warnings.
+     */
+    @SuppressWarnings("unchecked")
+    private static final Map<String, String> DEPRECATED_ANNOTATION_NAMES = CollectionUtils.mapOf(
+            AnnotationUtil.NULLABLE, Nullable.class.getName(),
+            AnnotationUtil.NON_NULL, NonNull.class.getName(),
+            AnnotationUtil.NULLABLE, Nullable.class.getName(),
+            AnnotationUtil.NON_NULL, NonNull.class.getName()
+    );
     private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
     private static final Map<String, List<AnnotationTransformer<Annotation>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
@@ -484,6 +494,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param error              The error
      */
     protected abstract void addError(@NonNull T originatingElement, @NonNull String error);
+
+    /**
+     * Adds an warning.
+     *
+     * @param originatingElement The originating element
+     * @param warning              The warning
+     */
+    protected abstract void addWarning(@NonNull T originatingElement, @NonNull String warning);
 
     /**
      * Read the given member and value, applying conversions if necessary, and place the data in the given map.
@@ -962,6 +980,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             String annotationName = getAnnotationTypeName(annotationMirror);
             if (AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
                 continue;
+            }
+            if (DEPRECATED_ANNOTATION_NAMES.containsKey(annotationName)) {
+                addWarning(element, "Usages of deprecated annotation " + annotationName + " found. You should use " + DEPRECATED_ANNOTATION_NAMES.get(annotationName) + " instead.");
             }
 
             final T annotationType = getTypeForAnnotation(annotationMirror);

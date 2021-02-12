@@ -157,7 +157,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         annotations = annotations
                 .stream()
-                .filter(ann -> !ann.getQualifiedName().toString().equals(AnnotationUtil.KOTLIN_METADATA))
+                .filter(ann -> {
+                    final String name = ann.getQualifiedName().toString();
+                    String packageName = NameUtils.getPackageName(name);
+                    return !name.equals(AnnotationUtil.KOTLIN_METADATA) && !AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName);
+                })
                 .filter(ann ->
                         annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES) || AbstractAnnotationMetadataBuilder.isAnnotationMapped(ann.getQualifiedName().toString()))
                 .collect(Collectors.toSet());
