@@ -19,15 +19,16 @@ import io.micronaut.context.ApplicationContext;
 import org.junit.Test;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-
 public class VehicleSpec {
+
     @Test
     public void testStartVehicle() {
         // tag::start[]
-        HashMap<String, Object> properties = new HashMap<>();
+        Map<String, Object> properties = new HashMap<>();
         properties.put("my.engine.cylinders"             ,"4");
         properties.put("my.engine.manufacturer"          , "Subaru");
         properties.put("my.engine.crank-shaft.rod-length", 4);
@@ -44,5 +45,4 @@ public class VehicleSpec {
                 
         applicationContext.close();
     }
-
 }

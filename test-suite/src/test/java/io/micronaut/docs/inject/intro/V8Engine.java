@@ -20,6 +20,8 @@ import javax.inject.Singleton;
 // tag::class[]
 @Singleton// <2>
 public class V8Engine implements Engine {
+    private int cylinders = 8;
+
     @Override
     public String start() {
         return "Starting V8";
@@ -33,7 +35,5 @@ public class V8Engine implements Engine {
     public void setCylinders(int cylinders) {
         this.cylinders = cylinders;
     }
-
-    private int cylinders = 8;
 }
 // end::class[]

@@ -22,6 +22,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.reactivex.Flowable;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Optional;
@@ -31,11 +33,26 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class BookControllerSpec {
+
+    private EmbeddedServer embeddedServer;
+    private RxHttpClient client;
+
+    @Before
+    public void setup() {
+        embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        client = embeddedServer.getApplicationContext().createBean(
+                RxHttpClient.class,
+                embeddedServer.getURL());
+    }
+
+    @After
+    public void cleanup() {
+        embeddedServer.stop();
+        client.stop();
+    }
+
     @Test
     public void testPostWithURITemplate() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
-
         // tag::posturitemplate[]
         Flowable<HttpResponse<Book>> call = client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand")),
@@ -46,26 +63,14 @@ public class BookControllerSpec {
         HttpResponse<Book> response = call.blockingFirst();
         Optional<Book> message = response.getBody(Book.class); // <2>
         // check the status
-        assertEquals(
-                HttpStatus.CREATED,
-                response.getStatus() // <3>
-        );
+        assertEquals(HttpStatus.CREATED, response.getStatus()); // <3>
         // check the body
         assertTrue(message.isPresent());
-        assertEquals(
-                "The Stand",
-                message.get().getTitle()
-        );
-
-        embeddedServer.stop();
-        client.stop();
+        assertEquals("The Stand", message.get().getTitle());
     }
 
     @Test
     public void testPostFormData() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
-
         // tag::postform[]
         Flowable<HttpResponse<Book>> call = client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand"))
@@ -77,19 +82,9 @@ public class BookControllerSpec {
         HttpResponse<Book> response = call.blockingFirst();
         Optional<Book> message = response.getBody(Book.class); // <2>
         // check the status
-        assertEquals(
-                HttpStatus.CREATED,
-                response.getStatus() // <3>
-        );
+        assertEquals(HttpStatus.CREATED, response.getStatus()); // <3>
         // check the body
         assertTrue(message.isPresent());
-        assertEquals(
-                "The Stand",
-                message.get().getTitle()
-        );
-
-
-        embeddedServer.stop();
-        client.stop();
+        assertEquals("The Stand", message.get().getTitle());
     }
 }

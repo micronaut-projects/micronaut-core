@@ -15,10 +15,10 @@
  */
 package io.micronaut.docs.config.env;
 
+// tag::eachProperty[]
 import java.net.URI;
 import java.net.URISyntaxException;
 
-// tag::eachProperty[]
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
 

@@ -22,7 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.client.ProxyHttpClient;
-import io.micronaut.http.filter.*;
+import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.reactivestreams.Publisher;
@@ -31,16 +31,19 @@ import org.reactivestreams.Publisher;
 // tag::class[]
 @Filter("/proxy/**")
 public class ProxyFilter extends OncePerRequestHttpServerFilter { // <1>
+
     private final ProxyHttpClient client;
     private final EmbeddedServer embeddedServer;
 
-    public ProxyFilter(ProxyHttpClient client, EmbeddedServer embeddedServer) { // <2>
+    public ProxyFilter(ProxyHttpClient client,
+                       EmbeddedServer embeddedServer) { // <2>
         this.client = client;
         this.embeddedServer = embeddedServer;
     }
 
     @Override
-    protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+    protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request,
+                                                             ServerFilterChain chain) {
         return Publishers.map(client.proxy( // <3>
                 request.mutate() // <4>
                         .uri(b -> b // <5>

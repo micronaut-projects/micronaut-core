@@ -22,7 +22,7 @@ import javax.inject.Singleton;
 public class EngineImpl implements Engine {
     private final EngineConfig config;
 
-    public EngineImpl(EngineConfig config) {// <1>
+    public EngineImpl(EngineConfig config) { // <1>
         this.config = config;
     }
 
@@ -34,7 +34,7 @@ public class EngineImpl implements Engine {
     @Override
     public String start() {// <2>
         return getConfig().getManufacturer() + " Engine Starting V" + getConfig().getCylinders() +
-                " [rodLength=" + getConfig().getCrankShaft().getRodLength().orElse(6.0d) + "]";
+                " [rodLength=" + getConfig().getCrankShaft().getRodLength().orElse(6d) + "]";
     }
 
     public final EngineConfig getConfig() {

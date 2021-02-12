@@ -60,9 +60,9 @@ class PersonServiceSpec {
         person.setAge(10);
 
         final ConstraintViolationException exception =
-                assertThrows(ConstraintViolationException.class, () ->
-                        personService.sayHello(person) // <1>
-                );
+            assertThrows(ConstraintViolationException.class, () ->
+                personService.sayHello(person) // <1>
+            );
 
         assertEquals(2, exception.getConstraintViolations().size()); // <2>
     }
