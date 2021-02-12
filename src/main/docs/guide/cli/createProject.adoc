@@ -33,7 +33,7 @@ a|
 ----
 mn create-cli-app my-project --features
  http-client,jdbc-hikari --build maven
- --lang kotlin --test kotlintest
+ --lang kotlin --test kotest
 ----
 
 
@@ -172,14 +172,14 @@ This will include the Groovy & Spock dependencies in your project, and write the
 
 ==== Kotlin
 
-To create an app with Kotlin support (which comes with Kotlintest by default), supply the appropriate language via the `lang` flag:
+To create an app with Kotlin support (which comes with Kotest by default), supply the appropriate language via the `lang` flag:
 
 [source,bash]
 ----
 $ mn create-app my-kotlin-app --lang kotlin
 ----
 
-This will include the Kotlin & Kotlintest dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
+This will include the Kotlin & Kotest dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
 
 
 === Build Tool
