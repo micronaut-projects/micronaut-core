@@ -6,17 +6,17 @@ To enable support for Spring Cloud Configuration simply add the following config
 [source,yaml]
 ----
 micronaut:
-    application:
-        name: hello-world
-    config-client:
-        enabled: true
+  application:
+    name: hello-world
+  config-client:
+    enabled: true
 spring:
-    cloud:
-        config:
-            enabled: true
-            uri: http://localhost:8888/
-            retry-attempts: 4 # optional, number of times to retry
-            retry-delay: 2s # optional, delay between retries
+  cloud:
+    config:
+      enabled: true
+      uri: http://localhost:8888/
+      retry-attempts: 4 # optional, number of times to retry
+      retry-delay: 2s # optional, delay between retries
 ----
 
 Micronaut will use the configured `micronaut.application.name` to lookup property sources for the application from Spring Cloud config server configured via `spring.cloud.config.uri`.

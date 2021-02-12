@@ -63,7 +63,7 @@ Example:
 [source,yaml]
 ----
 jackson:
-    serializationInclusion: ALWAYS
+  serializationInclusion: ALWAYS
 ----
 
 === Features
@@ -78,18 +78,17 @@ All features can be configured with their name as the key and a boolean to indic
 |generator | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonGenerator.Feature.html[JsonGenerator.Feature]
 |======
 
-
 Example:
 
 [source,yaml]
 ----
 jackson:
-    serialization:
-        indentOutput: true
-        writeDatesAsTimestamps: false
-    deserialization:
-        useBigIntegerForInts: true
-        failOnUnknownProperties: false
+  serialization:
+    indentOutput: true
+    writeDatesAsTimestamps: false
+  deserialization:
+    useBigIntegerForInts: true
+    failOnUnknownProperties: false
 ----
 
 === Support for `@JsonView`

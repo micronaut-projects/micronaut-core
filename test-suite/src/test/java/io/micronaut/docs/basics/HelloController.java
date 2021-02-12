@@ -17,14 +17,18 @@ package io.micronaut.docs.basics;
 
 import io.micronaut.context.annotation.Requires;
 // tag::imports[]
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Status;
 import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.reactivex.Maybe;
 
 import static io.micronaut.http.HttpRequest.GET;
+import static io.micronaut.http.HttpStatus.CREATED;
+import static io.micronaut.http.MediaType.TEXT_PLAIN;
 // end::imports[]
 
 @Requires(property = "spec.name", value = "HelloControllerSpec")
@@ -58,15 +62,14 @@ public class HelloController {
     // end::json[]
 
     @Post("/greet")
-    @Status(HttpStatus.CREATED)
+    @Status(CREATED)
     Message echo(@Body Message message) {
         return message;
     }
 
-    @Post(value = "/hello", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
-    @Status(HttpStatus.CREATED)
+    @Post(value = "/hello", consumes = TEXT_PLAIN, produces = TEXT_PLAIN)
+    @Status(CREATED)
     String echoHello(@Body String message) {
         return message;
     }
-
 }

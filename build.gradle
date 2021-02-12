@@ -58,6 +58,16 @@ ext {
                     name: 'netty-bom',
                     version: nettyVersion
             ],
+            'kotlin': [
+                    group: 'org.jetbrains.kotlin',
+                    name: 'kotlin-bom',
+                    version: kotlinVersion
+            ],
+            'kotlin.coroutines': [
+                    group: 'org.jetbrains.kotlinx',
+                    name: 'kotlinx-coroutines-bom',
+                    version: kotlinCoroutinesVersion
+            ],
             'ktor': [
                     group: 'io.ktor',
                     name: 'ktor-bom',

@@ -13,9 +13,9 @@ You should then enabling versioning by setting `micronaut.router.versioning.enab
 [source,yaml]
 ----
 micronaut:
-    router:
-        versioning:
-            enabled: true
+  router:
+    versioning:
+      enabled: true
 ----
 
 By default Micronaut has 2 out-of-the-box strategies for resolving the version that are based on an HTTP header named `X-API-VERSION` or a request parameter named `api-version`, however this is configurable. A full configuration example can be seen below:
@@ -24,17 +24,17 @@ By default Micronaut has 2 out-of-the-box strategies for resolving the version t
 [source,yaml]
 ----
 micronaut:
-    router:
-        versioning:
-            enabled: true <1>
-            parameter:
-                enabled: false # <2>
-                names: 'v,api-version' # <3>
-            header:
-                enabled: true # <4>
-                names: # <5>
-                    - 'X-API-VERSION'
-                    - 'Accept-Version'
+  router:
+    versioning:
+      enabled: true <1>
+      parameter:
+        enabled: false # <2>
+        names: 'v,api-version' # <3>
+      header:
+        enabled: true # <4>
+        names: # <5>
+          - 'X-API-VERSION'
+          - 'Accept-Version'
 ----
 
 <1> Enables versioning
@@ -53,10 +53,10 @@ It is possible to supply a default version through configuration.
 [source,yaml]
 ----
 micronaut:
-    router:
-        versioning:
-            enabled: true
-            default-version: 3 <1>
+  router:
+    versioning:
+      enabled: true
+      default-version: 3 <1>
 ----
 
 <1> Sets the default version
@@ -87,20 +87,19 @@ The default behaviour for how the version is sent for each call can be configure
 
 include::{includedir}configurationProperties/io.micronaut.http.client.interceptor.configuration.DefaultClientVersioningConfiguration.adoc[]
 
-
 For example to use `Accept-Version` as the header name:
 
 .Configuring Client Versioning
 [source,yaml]
 ----
 micronaut:
-    http:
-        client:
-            versioning:
-                default:
-                    headers:
-                        - 'Accept-Version'
-                        - 'X-API-VERSION'
+  http:
+    client:
+      versioning:
+        default:
+          headers:
+            - 'Accept-Version'
+            - 'X-API-VERSION'
 ----
 
 The `default` key is used to refer to the default configuration. You can specify client specific configuration by using the value passed to `@Client` (typically the service ID). For example:
@@ -109,13 +108,13 @@ The `default` key is used to refer to the default configuration. You can specify
 [source,yaml]
 ----
 micronaut:
-    http:
-        client:
-            versioning:
-                greeting-service:
-                    headers:
-                        - 'Accept-Version'
-                        - 'X-API-VERSION'
+  http:
+    client:
+      versioning:
+        greeting-service:
+          headers:
+            - 'Accept-Version'
+            - 'X-API-VERSION'
 ----
 
 The above uses a key called `greeting-service` which can be used to configure a client annotated with `@Client('greeting-service')`.

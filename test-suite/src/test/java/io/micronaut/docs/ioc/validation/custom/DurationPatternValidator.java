@@ -19,7 +19,8 @@ package io.micronaut.docs.ioc.validation.custom;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.validation.validator.constraints.*;
+import io.micronaut.validation.validator.constraints.ConstraintValidator;
+import io.micronaut.validation.validator.constraints.ConstraintValidatorContext;
 // end::imports[]
 
 // tag::class[]

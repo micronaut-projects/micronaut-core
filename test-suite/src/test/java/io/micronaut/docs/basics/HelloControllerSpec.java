@@ -24,6 +24,8 @@ import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.reactivex.Flowable;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Collections;
@@ -37,11 +39,27 @@ import static org.junit.Assert.assertTrue;
 
 public class HelloControllerSpec {
 
+    private EmbeddedServer embeddedServer;
+    private RxHttpClient client;
+
+    @Before
+    public void setup() {
+        embeddedServer = ApplicationContext.run(
+                EmbeddedServer.class,
+                Collections.singletonMap("spec.name", getClass().getSimpleName()));
+        client = embeddedServer.getApplicationContext().createBean(
+                RxHttpClient.class,
+                embeddedServer.getURL());
+    }
+
+    @After
+    public void cleanup() {
+        embeddedServer.stop();
+        client.stop();
+    }
+
     @Test
     public void testSimpleRetrieve() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
-
         // tag::simple[]
         String uri = UriBuilder.of("/hello/{name}")
                                .expand(Collections.singletonMap("name", "John"))
@@ -50,21 +68,12 @@ public class HelloControllerSpec {
 
         String result = client.toBlocking().retrieve(uri);
 
-        assertEquals(
-                "Hello John",
-                result
-        );
+        assertEquals("Hello John", result);
         // end::simple[]
-
-        embeddedServer.stop();
-        client.stop();
     }
 
     @Test
     public void testRetrieveWithHeaders() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
-
         // tag::headers[]
         Flowable<String> response = client.retrieve(
                 GET("/hello/John")
@@ -72,30 +81,18 @@ public class HelloControllerSpec {
         );
         // end::headers[]
 
-        assertEquals(
-                "Hello John",
-                response.blockingFirst()
-        );
-
-        embeddedServer.stop();
-        client.stop();
+        assertEquals("Hello John", response.blockingFirst());
     }
 
     @Test
     public void testRetrieveWithJSON() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
-
         // tag::jsonmap[]
         Flowable<Map> response = client.retrieve(
                 GET("/greet/John"), Map.class
         );
         // end::jsonmap[]
 
-        assertEquals(
-                "Hello John",
-                response.blockingFirst().get("text")
-        );
+        assertEquals("Hello John", response.blockingFirst().get("text"));
 
         // tag::jsonmaptypes[]
         response = client.retrieve(
@@ -104,39 +101,22 @@ public class HelloControllerSpec {
         );
         // end::jsonmaptypes[]
 
-        assertEquals(
-                "Hello John",
-                response.blockingFirst().get("text")
-        );
-        embeddedServer.stop();
-        client.stop();
+        assertEquals("Hello John", response.blockingFirst().get("text"));
     }
 
     @Test
     public void testRetrieveWithPOJO() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
-
         // tag::jsonpojo[]
         Flowable<Message> response = client.retrieve(
                 GET("/greet/John"), Message.class
         );
 
-        assertEquals(
-                "Hello John",
-                response.blockingFirst().getText()
-        );
+        assertEquals("Hello John", response.blockingFirst().getText());
         // end::jsonpojo[]
-
-        embeddedServer.stop();
-        client.stop();
     }
 
     @Test
     public void testRetrieveWithPOJOResponse() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
-
         // tag::pojoresponse[]
         Flowable<HttpResponse<Message>> call = client.exchange(
                 GET("/greet/John"), Message.class // <1>
@@ -145,27 +125,15 @@ public class HelloControllerSpec {
         HttpResponse<Message> response = call.blockingFirst();
         Optional<Message> message = response.getBody(Message.class); // <2>
         // check the status
-        assertEquals(
-                HttpStatus.OK,
-                response.getStatus() // <3>
-        );
+        assertEquals(HttpStatus.OK, response.getStatus()); // <3>
         // check the body
         assertTrue(message.isPresent());
-        assertEquals(
-                "Hello John",
-                message.get().getText()
-        );
+        assertEquals("Hello John", message.get().getText());
         // end::pojoresponse[]
-
-        embeddedServer.stop();
-        client.stop();
     }
 
     @Test
     public void testPostRequestWithString() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
-
         // tag::poststring[]
         Flowable<HttpResponse<String>> call = client.exchange(
                 POST("/hello", "Hello John") // <1>
@@ -178,26 +146,14 @@ public class HelloControllerSpec {
         HttpResponse<String> response = call.blockingFirst();
         Optional<String> message = response.getBody(String.class); // <2>
         // check the status
-        assertEquals(
-                HttpStatus.CREATED,
-                response.getStatus() // <3>
-        );
+        assertEquals(HttpStatus.CREATED, response.getStatus()); // <3>
         // check the body
         assertTrue(message.isPresent());
-        assertEquals(
-                "Hello John",
-                message.get()
-        );
-
-        embeddedServer.stop();
-        client.stop();
+        assertEquals("Hello John", message.get());
     }
 
     @Test
     public void testPostRequestWithPOJO() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
-
         // tag::postpojo[]
         Flowable<HttpResponse<Message>> call = client.exchange(
                 POST("/greet", new Message("Hello John")), // <1>
@@ -208,19 +164,9 @@ public class HelloControllerSpec {
         HttpResponse<Message> response = call.blockingFirst();
         Optional<Message> message = response.getBody(Message.class); // <2>
         // check the status
-        assertEquals(
-                HttpStatus.CREATED,
-                response.getStatus() // <3>
-        );
+        assertEquals(HttpStatus.CREATED, response.getStatus()); // <3>
         // check the body
         assertTrue(message.isPresent());
-        assertEquals(
-                "Hello John",
-                message.get().getText()
-        );
-
-
-        embeddedServer.stop();
-        client.stop();
+        assertEquals("Hello John", message.get().getText());
     }
 }

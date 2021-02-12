@@ -1,4 +1,3 @@
-
 The loggers endpoint returns information about the available loggers in the application and
 permits configuring the their log level.
 
@@ -52,7 +51,6 @@ configured log level. (It's effective log level will usually be that of the root
 To update the log level of a single logger, send a POST request to the named logger URL and include
 a body providing the log level to configure.
 
-
 [source,bash]
 ----
 $ curl -i -X POST \
@@ -68,9 +66,7 @@ $ curl http://localhost:8080/loggers/ROOT
     "configuredLevel": "ERROR",
     "effectiveLevel": "ERROR"
 }
-
 ----
-
 
 == Configuration
 
@@ -80,14 +76,13 @@ To configure the loggers endpoint, supply configuration through `endpoints.logge
 [source,yaml]
 ----
 endpoints:
-    loggers:
-        enabled: Boolean
-        sensitive: Boolean
+  loggers:
+    enabled: Boolean
+    sensitive: Boolean
 ----
 
 NOTE: By default the endpoint doesn't allow to change the log level by unauthorized users (even if `sensitive` is set to
 `false`). To allow it is necessary set `endpoints.loggers.write-sensitive` to `false`.
-
 
 == Customization
 
@@ -127,4 +122,3 @@ public class CustomLoggingSystem implements LoggingSystem {
     // ...
 }
 ----
-

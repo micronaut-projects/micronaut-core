@@ -50,11 +50,12 @@ The above example defines a send method that executes asynchronously and returns
 
 Once you have defined a client class you can connect to the client socket and start sending messages:
 
-
 .Connecting a Client WebSocket
 [source,java]
 ----
-ChatClientWebSocket chatClient = webSocketClient.connect(ChatClientWebSocket.class, "/chat/football/fred").blockingFirst();
+ChatClientWebSocket chatClient = webSocketClient
+    .connect(ChatClientWebSocket.class, "/chat/football/fred")
+    .blockingFirst();
 chatClient.send("Hello World!");
 ----
 

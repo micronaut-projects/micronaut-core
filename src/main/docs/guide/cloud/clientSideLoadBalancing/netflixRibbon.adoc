@@ -23,8 +23,8 @@ Ribbon's http://netflix.github.io/ribbon/ribbon-core-javadoc/com/netflix/client/
 [source,yaml]
 ----
 ribbon:
-    VipAddress: test
-    ServerListRefreshInterval: 2000
+  VipAddress: test
+  ServerListRefreshInterval: 2000
 ----
 
 Each discovered client can also be configured under `ribbon.clients`. For example given a `@Client(id = "hello-world")` you can configure Ribbon settings with:
@@ -33,10 +33,10 @@ Each discovered client can also be configured under `ribbon.clients`. For exampl
 [source,yaml]
 ----
 ribbon:
-    clients:
-        hello-world:
-            VipAddress: test
-            ServerListRefreshInterval: 2000
+  clients:
+    hello-world:
+      VipAddress: test
+      ServerListRefreshInterval: 2000
 ----
 
 By default Micronaut registers a api:configuration.ribbon.DiscoveryClientServerList[] for each client that integrates Ribbon with Micronaut's api:discovery.DiscoveryClient[].

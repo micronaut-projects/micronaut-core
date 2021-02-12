@@ -45,8 +45,8 @@ public class BookService {
     }
 
     // tag::attempts[]
-    @Retryable( attempts = "5",
-                delay = "2s" )
+    @Retryable(attempts = "5",
+               delay = "2s")
     public Book findBook(String title) {
         // ...
     // end::attempts[]
@@ -55,8 +55,8 @@ public class BookService {
 
 
     // tag::config[]
-    @Retryable( attempts = "${book.retry.attempts:3}",
-                delay = "${book.retry.delay:1s}" )
+    @Retryable(attempts = "${book.retry.attempts:3}",
+               delay = "${book.retry.delay:1s}")
     public Book getBook(String title) {
         // ...
     // end::config[]

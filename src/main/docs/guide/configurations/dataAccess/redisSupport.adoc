@@ -10,7 +10,6 @@ $ mn create-app my-app --features redis-lettuce
 ----
 ====
 
-
 To configure the Lettuce driver you should first add the `redis-lettuce` module to your classpath:
 
 .build.gradle
@@ -25,7 +24,7 @@ You should then configure the URI of the Redis server you wish to communicate wi
 [source,yaml]
 ----
 redis:
-    uri: redis://localhost
+  uri: redis://localhost
 ----
 
 TIP: The `redis.uri` setting should be in the format as described in the https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details[Connection URIs] section of the Lettuce wiki

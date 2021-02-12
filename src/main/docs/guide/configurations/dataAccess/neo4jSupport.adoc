@@ -19,11 +19,10 @@ You should then configure the URI of the Neo4j server you wish to communicate wi
 [source,yaml]
 ----
 neo4j:
-    uri: bolt://localhost
+  uri: bolt://localhost
 ----
 
 TIP: The `neo4j.uri` setting should be in the format as described in the https://neo4j.com/docs/developer-manual/current/drivers/client-applications/#driver-connection-uris[Connection URIs] section of the Neo4j documentation
-
 
 Once you have the above configuration in place you can inject an instance of the `org.neo4j.driver.v1.Driver` bean, which features both a synchronous blocking API and a non-blocking API based on `CompletableFuture`.
 

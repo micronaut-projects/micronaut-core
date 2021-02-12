@@ -93,9 +93,7 @@ interface HelloClient {
 }
 ----
 
-
 Now let's create a controller:
-
 
 [source,bash]
 .Create a controller
@@ -106,7 +104,6 @@ mn> create-controller helloController
 mn>
 ----
 
-
 [source,groovy]
 .Micronaut Controller
 ----
@@ -115,7 +112,6 @@ package hello.world
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.HttpStatus
-
 
 @Controller("/hello")
 class HelloController {
@@ -142,7 +138,6 @@ As you can see from the output from the CLI a http://spockframework.org[Spock] t
     }
 ...
 ----
-
 
 Notice how you use Micronaut both as client and as a server to test itself.
 
@@ -172,7 +167,6 @@ The above example results in the following routes:
 
 http://gorm.grails.org[GORM] is a data access toolkit originally created as part of Grails framework. It supports multiple database types. The following table summarizes the modules needed to use GORM and links to documentation.
 
-
 .GORM Modules
 |===
 |Dependency|Description
@@ -192,8 +186,6 @@ Once you have configured a GORM implementation per the instructions linked in th
 
 http://gorm.grails.org/latest/hibernate/manual/index.html#dataServices[GORM Data Services] can also participate in dependency injection and life cycle methods:
 
-
-
 [source,groovy]
 .GORM Data Service VehicleService.groovy
 ----
@@ -202,27 +194,21 @@ abstract class VehicleService {
     @PostConstruct
     void init() {
        // do something on initialization
-
     }
 
     abstract Vehicle findVehicle(@NotBlank String name)
 
     abstract Vehicle saveVehicle(@NotBlank String name)
-
 }
 
 ----
 
 You can also define the service as an interface instead of an abstract class if you want GORM to do all of the work and you don't want to add your own behaviors.
 
-
 == Serverless Functions with Groovy
-
 
 A microservice application is just one way to use Micronaut. You can also use it for serverless functions like on AWS Lambda.
 
 With the `function-groovy` module, Micronaut features enhanced support for functions written in Groovy.
 
 See the section on <<serverlessFunctions, Serverless Functions>> for more information.
-
-

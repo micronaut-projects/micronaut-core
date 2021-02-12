@@ -10,9 +10,9 @@ To configure the info endpoint, supply configuration through `endpoints.info`.
 [source,yaml]
 ----
 endpoints:
-    info:
-        enabled: Boolean
-        sensitive: Boolean
+  info:
+    enabled: Boolean
+    sensitive: Boolean
 ----
 
 == Customization
@@ -60,7 +60,6 @@ The configuration info source can be disabled using the `endpoints.info.config.e
 === Git Info Source
 
 If a `git.properties` file is available on the classpath, the link:{api}/io/micronaut/management/endpoint/info/source/GitInfoSource.html[GitInfoSource] will expose the values in that file under the `git` key. Generating of a `git.properties` file will need to be configured as part of your build. One easy option for Gradle users is the https://plugins.gradle.org/plugin/com.gorylenko.gradle-git-properties[Gradle Git Properties Plugin]. Maven users can look at the https://github.com/git-commit-id/maven-git-commit-id-plugin[Maven Git Commit Id Plugin].
-
 
 ==== Configuration
 

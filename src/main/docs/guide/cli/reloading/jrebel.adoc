@@ -1,4 +1,4 @@
-https://zeroturnaround.com/software/jrebel/[JRebel] is a proprietary reloading solution that involves an agent library, as well as sophisticated IDE support. The JRebel documentation includes detailed steps for IDE integration and usage of the tool. In this section, we will simply show how to install and configure the agent for Maven and Gradle projects.
+https://www.jrebel.com/products/jrebel[JRebel] is a proprietary reloading solution that involves an agent library, as well as sophisticated IDE support. The JRebel documentation includes detailed steps for IDE integration and usage of the tool. In this section, we will simply show how to install and configure the agent for Maven and Gradle projects.
 
 [TIP]
 .Using the CLI
@@ -12,7 +12,7 @@ $ mn create-app my-app --features jrebel
 
 == Install/configure JRebel Agent
 
-The simplest way to install JRebel is to download the "standalone" installation package from the https://zeroturnaround.com/software/jrebel/download[JRebel download page]. Unzip the downloaded file to a convenient location within your user's directory - for example, `~/bin/jrebel`
+The simplest way to install JRebel is to download the "standalone" installation package from the https://www.jrebel.com/products/jrebel/download[JRebel download page]. Unzip the downloaded file to a convenient location within your user's directory - for example, `~/bin/jrebel`
 
 The installation directory will contain a `lib` directory containing the agent files. The appropriate agent based on your operating system, following the table below:
 
@@ -67,14 +67,10 @@ Configure the Micronaut Maven Plugin accordingly:
 ----
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-
   <!-- ... -->
-
   <build>
     <plugins>
-
       <!-- ... -->
-
       <plugin>
         <groupId>io.micronaut.build</groupId>
         <artifactId>micronaut-maven-plugin</artifactId>
@@ -87,7 +83,7 @@ Configure the Micronaut Maven Plugin accordingly:
       <plugin>
         <groupId>org.zeroturnaround</groupId>
         <artifactId>jrebel-maven-plugin</artifactId>
-        <version>1.1.8</version>
+        <version>1.1.10</version>
         <executions>
           <execution>
             <id>generate-rebel-xml</id>
@@ -98,7 +94,6 @@ Configure the Micronaut Maven Plugin accordingly:
           </execution>
         </executions>
       </plugin>
-
       <!-- ... -->
     </plugins>
   </build>

@@ -24,7 +24,6 @@ If you use `lint` as part of your build you may also need to disable the invalid
 .Configure lint within build.gradle
 [source,groovy]
 ----
-
 android {
     ...
     lintOptions {
@@ -40,7 +39,6 @@ NOTE: Micronaut `inject-java` dependency uses https://developer.android.com/stud
 == Enabling Dependency Injection
 
 Once you have configured the classpath correctly, the next step is start the link:{api}/io/micronaut/context/ApplicationContext.html[ApplicationContext].
-
 
 The following example demonstrates creating a subclass of https://developer.android.com/reference/android/app/Application.html[android.app.Application] for that purpose:
 
@@ -58,10 +56,6 @@ public class BaseApplication extends Application { // <1>
 
     private ApplicationContext ctx;
 
-    public BaseApplication() {
-        super();
-    }
-
     @Override
     public void onCreate() {
         super.onCreate();
@@ -75,7 +69,6 @@ public class BaseApplication extends Application { // <1>
         });
     }
 }
-
 ----
 
 <1> Extend the `android.app.Application` class

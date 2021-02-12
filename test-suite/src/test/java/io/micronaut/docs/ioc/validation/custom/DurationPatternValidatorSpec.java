@@ -33,9 +33,9 @@ class DurationPatternValidatorSpec {
     @Test
     void testCustomValidator() {
         final ConstraintViolationException exception =
-                assertThrows(ConstraintViolationException.class, () ->
-                        holidayService.startHoliday("Fred", "junk")   // <1>
-                );
+            assertThrows(ConstraintViolationException.class, () ->
+                holidayService.startHoliday("Fred", "junk") // <1>
+            );
 
         assertEquals("startHoliday.duration: invalid duration (junk)", exception.getMessage()); // <2>
     }

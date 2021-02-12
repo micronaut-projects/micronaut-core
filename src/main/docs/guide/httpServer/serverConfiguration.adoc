@@ -6,15 +6,15 @@ The following example shows how to tweak configuration options for the server vi
 [source,yaml]
 ----
 micronaut:
-    server:
-        maxRequestSize: 1MB
-        host: localhost # <1>
-        netty:
-           maxHeaderSize: 500KB # <2>
-           worker:
-              threads: 8 # <3>
-           childOptions:
-              autoRead: true # <4>
+  server:
+    maxRequestSize: 1MB
+    host: localhost # <1>
+    netty:
+      maxHeaderSize: 500KB # <2>
+      worker:
+        threads: 8 # <3>
+      childOptions:
+        autoRead: true # <4>
 ----
 <1> By default Micronaut will bind to all the network interfaces. Use `localhost` to bind only to loopback network interface
 <2> Maximum size for headers
@@ -48,8 +48,8 @@ Then configure the default event loop group to prefer native transports:
 [source,yaml]
 ----
 micronaut:
-    netty:
-        event-loops:
-            default:
-                prefer-native-transport: true
+  netty:
+    event-loops:
+      default:
+        prefer-native-transport: true
 ----
