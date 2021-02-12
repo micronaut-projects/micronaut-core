@@ -21,8 +21,9 @@ package io.micronaut.docs.server.sse;
  */
 // tag::class[]
 class Headline {
-    String title;
-    String description;
+
+    String title
+    String description
 
     Headline() {}
 

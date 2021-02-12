@@ -20,14 +20,12 @@ class EmailControllerSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
+    RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.URL)
 
     //tag::pojovalidated[]
     def "invoking /email/send parse parameters in a POJO and validates"() {
         when:
-        Email email = new Email()
-        email.subject = 'Hi'
-        email.recipient = ''
+        Email email = new Email(subject: 'Hi', recipient: '')
         client.toBlocking().exchange(HttpRequest.POST('/email/send', email))
 
         then:
@@ -36,9 +34,7 @@ class EmailControllerSpec extends Specification {
         response.status == HttpStatus.BAD_REQUEST
 
         when:
-        email = new Email()
-        email.subject = 'Hi'
-        email.recipient = 'me@micronaut.example'
+        email = new Email(subject: 'Hi', recipient: 'me@micronaut.example')
         response = client.toBlocking().exchange(HttpRequest.POST('/email/send', email))
 
         then:

@@ -31,7 +31,7 @@ class ProducesController {
 
     @Get // <1>
     HttpResponse index() {
-        HttpResponse.ok().body("{\"msg\":\"This is JSON\"}")
+        HttpResponse.ok().body('{"msg":"This is JSON"}')
     }
 
     @Produces(MediaType.TEXT_HTML) // <2>
@@ -42,7 +42,7 @@ class ProducesController {
 
     @Get(value = "/xml", produces = MediaType.TEXT_XML) // <3>
     String xml() {
-        return "<html><title><h1>XML</h1></title><body></body></html>"
+        "<html><title><h1>XML</h1></title><body></body></html>"
     }
 }
 //end::clazz[]

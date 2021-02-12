@@ -16,8 +16,8 @@ import static io.micronaut.http.HttpRequest.POST
 class BookControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-    @Shared @AutoCleanup RxHttpClient client = embeddedServer.getApplicationContext()
-                                                             .createBean(RxHttpClient, embeddedServer.getURL())
+    @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext
+                                                             .createBean(RxHttpClient, embeddedServer.URL)
 
     void "test post with uri template"() {
 
@@ -25,19 +25,19 @@ class BookControllerSpec extends Specification {
         // tag::posturitemplate[]
         Flowable<HttpResponse<Book>> call = client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand")),
-                Book.class
+                Book
         );
         // end::posturitemplate[]
 
         HttpResponse<Book> response = call.blockingFirst()
-        Optional<Book> message = response.getBody(Book.class) // <2>
+        Optional<Book> message = response.getBody(Book) // <2>
 
         then:
         // check the status
-        response.getStatus() == HttpStatus.CREATED // <3>
+        response.status == HttpStatus.CREATED // <3>
         // check the body
         message.isPresent()
-        message.get().getTitle() == "The Stand"
+        message.get().title == "The Stand"
     }
 
     void "test post form data"() {
@@ -47,18 +47,18 @@ class BookControllerSpec extends Specification {
         Flowable<HttpResponse<Book>> call = client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand"))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED),
-                Book.class
+                Book
         )
         // end::postform[]
 
         HttpResponse<Book> response = call.blockingFirst()
-        Optional<Book> message = response.getBody(Book.class) // <2>
+        Optional<Book> message = response.getBody(Book) // <2>
 
         then:
         // check the status
-        response.getStatus() == HttpStatus.CREATED // <3>
+        response.status == HttpStatus.CREATED // <3>
         // check the body
         message.isPresent()
-        message.get().getTitle() == "The Stand"
+        message.get().title == "The Stand"
     }
 }

@@ -16,7 +16,6 @@
 package io.micronaut.docs.aop.introduction
 
 // tag::imports[]
-
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
 
@@ -29,9 +28,9 @@ class StubIntroduction implements MethodInterceptor<Object,Object> { // <1>
 
     @Override
     Object intercept(MethodInvocationContext<Object, Object> context) {
-        return context.getValue( // <2>
-                Stub.class,
-                context.getReturnType().getType()
+        context.getValue( // <2>
+                Stub,
+                context.returnType.type
         ).orElse(null) // <3>
     }
 }

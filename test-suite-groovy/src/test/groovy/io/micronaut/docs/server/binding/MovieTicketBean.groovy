@@ -23,7 +23,6 @@ import io.micronaut.http.annotation.QueryValue
 
 import javax.annotation.Nullable
 import javax.validation.constraints.PositiveOrZero
-
 // end::imports[]
 
 // tag::class[]

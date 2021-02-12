@@ -7,15 +7,15 @@ class IntroductionSpec extends Specification {
 
     void "test StubIntroduction"() {
         given:
-        ApplicationContext applicationContext = ApplicationContext.run()
+        def applicationContext = ApplicationContext.run()
 
         // tag::test[]
         when:
-        StubExample stubExample = applicationContext.getBean(StubExample.class)
+        def stubExample = applicationContext.getBean(StubExample)
 
         then:
-        stubExample.getNumber() == 10
-        stubExample.getDate() == null
+        stubExample.number == 10
+        stubExample.date == null
         // end::test[]
 
         cleanup:

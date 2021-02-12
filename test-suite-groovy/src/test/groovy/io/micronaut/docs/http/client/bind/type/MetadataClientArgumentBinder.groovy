@@ -16,7 +16,7 @@ class MetadataClientArgumentBinder implements TypedClientArgumentRequestBinder<M
     @Override
     @NonNull
     Argument<Metadata> argumentType() {
-        return Argument.of(Metadata)
+        Argument.of(Metadata)
     }
 
     @Override
