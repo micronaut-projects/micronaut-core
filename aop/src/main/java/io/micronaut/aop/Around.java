@@ -46,6 +46,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
+@InterceptorBinding
 public @interface Around {
 
     /**
