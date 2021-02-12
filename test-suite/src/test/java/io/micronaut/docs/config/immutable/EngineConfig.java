@@ -38,7 +38,7 @@ public class EngineConfig {
     @ConfigurationInject // <2>
     public EngineConfig(
             @Bindable(defaultValue = "Ford") @NotBlank String manufacturer, // <3>
-            @Min(1) int cylinders, // <4>
+            @Min(1L) int cylinders, // <4>
             @NotNull CrankShaft crankShaft) {
         this.manufacturer = manufacturer;
         this.cylinders = cylinders;

@@ -54,7 +54,7 @@ public class EngineConfig {
     @NotBlank // <2>
     private String manufacturer = "Ford"; // <3>
 
-    @Min(1)
+    @Min(1L)
     private int cylinders;
 
     private CrankShaft crankShaft = new CrankShaft();

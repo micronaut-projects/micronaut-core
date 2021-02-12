@@ -33,7 +33,7 @@ public interface EngineConfig {
     @NotBlank // <3>
     String getManufacturer();
 
-    @Min(1)
+    @Min(1L)
     int getCylinders();
 
     @NotNull

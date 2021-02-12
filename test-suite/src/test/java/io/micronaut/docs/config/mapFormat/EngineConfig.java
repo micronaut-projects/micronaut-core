@@ -27,7 +27,7 @@ import java.util.Map;
 @ConfigurationProperties("my.engine")
 public class EngineConfig {
 
-    @Min(1)
+    @Min(1L)
     private int cylinders;
 
     @MapFormat(transformation = MapFormat.MapTransformation.FLAT) //<1>
