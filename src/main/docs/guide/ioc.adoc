@@ -1,10 +1,6 @@
-When most developers think of Inversion of Control (also known as Dependency Injection and referred to as such from this point onwards) the Spring Framework comes to mind.
+Unlike other frameworks which rely on runtime reflection and proxies, Micronaut uses compile time data to implement dependency injection.
 
-Micronaut takes inspiration from Spring, and in fact, the core developers of Micronaut are former SpringSource/Pivotal engineers now working for https://objectcomputing.com[OCI] and https://labs.oracle.com[Oracle Labs].
-
-Unlike Spring which relies exclusively on runtime reflection and proxies, Micronaut uses compile time data to implement dependency injection.
-
-This is a similar approach taken by tools such as Google's https://google.github.io/dagger/[Dagger], which is designed primarily with Android in mind. Micronaut, on the other hand, is designed for building server-side microservices and provides many of the same tools and utilities as Spring but without using reflection or caching excessive amounts of reflection metadata.
+This is a similar approach taken by tools such as Google's https://google.github.io/dagger/[Dagger], which is designed primarily with Android in mind. Micronaut, on the other hand, is designed for building server-side microservices and provides many of the same tools and utilities as other frameworks but without using reflection or caching excessive amounts of reflection metadata.
 
 The goals of the Micronaut IoC container are summarized as:
 
