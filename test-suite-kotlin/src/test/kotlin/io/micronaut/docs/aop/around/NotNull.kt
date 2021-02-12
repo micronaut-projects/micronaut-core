@@ -16,21 +16,20 @@
 package io.micronaut.docs.aop.around
 
 // tag::imports[]
-
 import io.micronaut.aop.Around
 import io.micronaut.context.annotation.Type
-
-import java.lang.annotation.Documented
-import java.lang.annotation.Retention
-
-import java.lang.annotation.RetentionPolicy.RUNTIME
-
+import kotlin.annotation.AnnotationRetention.RUNTIME
+import kotlin.annotation.AnnotationTarget.CLASS
+import kotlin.annotation.AnnotationTarget.FILE
+import kotlin.annotation.AnnotationTarget.FUNCTION
+import kotlin.annotation.AnnotationTarget.PROPERTY_GETTER
+import kotlin.annotation.AnnotationTarget.PROPERTY_SETTER
 // end::imports[]
 
 // tag::annotation[]
-@Documented
+@MustBeDocumented
 @Retention(RUNTIME) // <1>
-@Target(AnnotationTarget.CLASS, AnnotationTarget.FILE, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER) // <2>
+@Target(CLASS, FILE, FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER) // <2>
 @Around // <3>
 @Type(NotNullInterceptor::class) // <4>
 annotation class NotNull

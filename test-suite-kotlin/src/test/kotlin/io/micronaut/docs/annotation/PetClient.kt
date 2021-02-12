@@ -18,13 +18,12 @@ package io.micronaut.docs.annotation
 // tag::imports[]
 import io.micronaut.http.client.annotation.Client
 import io.reactivex.Single
-
 // end::imports[]
 
 // tag::class[]
 @Client("/pets") // <1>
 interface PetClient : PetOperations { // <2>
 
-    override fun save(name: String, age: Int): Single<Pet>  // <3>
+    override fun save(name: String, age: Int): Single<Pet> // <3>
 }
 // end::class[]

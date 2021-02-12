@@ -21,6 +21,7 @@ import java.time.LocalDate
 // tag::class[]
 @ConfigurationProperties(MyConfigurationProperties.PREFIX)
 class MyConfigurationProperties {
+
     var updatedAt: LocalDate? = null
         protected set
 

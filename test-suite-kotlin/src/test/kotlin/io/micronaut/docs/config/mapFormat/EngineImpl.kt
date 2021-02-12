@@ -21,6 +21,7 @@ import javax.inject.Singleton
 // tag::class[]
 @Singleton
 class EngineImpl : Engine {
+
     override val sensors: Map<*, *>?
         get() = config!!.sensors
 

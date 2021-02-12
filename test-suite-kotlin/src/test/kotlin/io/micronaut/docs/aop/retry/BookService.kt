@@ -19,8 +19,6 @@ import io.micronaut.retry.annotation.CircuitBreaker
 import io.micronaut.retry.annotation.Retryable
 import io.reactivex.Flowable
 
-import java.util.Collections
-
 open class BookService {
 
     // tag::simple[]
@@ -40,7 +38,8 @@ open class BookService {
     }
 
     // tag::attempts[]
-    @Retryable(attempts = "5", delay = "2s")
+    @Retryable(attempts = "5",
+               delay = "2s")
     open fun findBook(title: String): Book {
         // ...
         // end::attempts[]
@@ -48,7 +47,8 @@ open class BookService {
     }
 
     // tag::config[]
-    @Retryable(attempts = "\${book.retry.attempts:3}", delay = "\${book.retry.delay:1s}")
+    @Retryable(attempts = "\${book.retry.attempts:3}",
+               delay = "\${book.retry.delay:1s}")
     open fun getBook(title: String): Book {
         // ...
         // end::config[]

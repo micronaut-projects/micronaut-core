@@ -20,8 +20,11 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
-import io.micronaut.http.annotation.*
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.hateoas.Link
 import io.reactivex.Maybe
@@ -45,9 +48,8 @@ class PersonController {
 
     @Get("/{name}")
     operator fun get(name: String): Maybe<Person> {
-        val person = inMemoryDatastore[name]
-        return if (person != null) {
-            Maybe.just(person)
+        return if (inMemoryDatastore.containsKey(name)) {
+            Maybe.just(inMemoryDatastore[name])
         } else Maybe.empty()
     }
 
@@ -91,8 +93,8 @@ class PersonController {
 
     // tag::localError[]
     @Error
-    fun jsonError(request: HttpRequest<*>, jsonParseException: JsonParseException): HttpResponse<JsonError> { // <1>
-        val error = JsonError("Invalid JSON: " + jsonParseException.message) // <2>
+    fun jsonError(request: HttpRequest<*>, e: JsonParseException): HttpResponse<JsonError> { // <1>
+        val error = JsonError("Invalid JSON: ${e.message}") // <2>
                 .link(Link.SELF, Link.of(request.uri))
 
         return HttpResponse.status<JsonError>(HttpStatus.BAD_REQUEST, "Fix Your JSON")
@@ -108,7 +110,7 @@ class PersonController {
     // tag::globalError[]
     @Error(global = true) // <1>
     fun error(request: HttpRequest<*>, e: Throwable): HttpResponse<JsonError> {
-        val error = JsonError("Bad Things Happened: " + e.message) // <2>
+        val error = JsonError("Bad Things Happened: ${e.message}") // <2>
                 .link(Link.SELF, Link.of(request.uri))
 
         return HttpResponse.serverError<JsonError>()

@@ -28,7 +28,8 @@ import javax.inject.Singleton
 @Singleton // <2>
 class BasicAuthClientFilter : HttpClientFilter {
 
-    override fun doFilter(request: MutableHttpRequest<*>, chain: ClientFilterChain): Publisher<out HttpResponse<*>> {
+    override fun doFilter(request: MutableHttpRequest<*>,
+                          chain: ClientFilterChain): Publisher<out HttpResponse<*>> {
         return chain.proceed(request.basicAuth("user", "pass"))
     }
 }

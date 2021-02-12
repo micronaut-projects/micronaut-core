@@ -37,12 +37,8 @@ class ReactivePojoChatServerWebSocket(private val broadcaster: WebSocketBroadcas
 
     // tag::onmessage[]
     @OnMessage
-    fun onMessage(
-            topic: String,
-            username: String,
-            message: Message,
-            session: WebSocketSession): Publisher<Message> {
-
+    fun onMessage(topic: String, username: String,
+                  message: Message, session: WebSocketSession): Publisher<Message> {
         val text = "[" + username + "] " + message.text
         val newMessage = Message(text)
         return broadcaster.broadcast(newMessage, isValid(topic, session))
@@ -50,17 +46,17 @@ class ReactivePojoChatServerWebSocket(private val broadcaster: WebSocketBroadcas
     // end::onmessage[]
 
     @OnClose
-    fun onClose(
-            topic: String,
-            username: String,
-            session: WebSocketSession): Publisher<Message> {
-
+    fun onClose(topic: String, username: String,
+                session: WebSocketSession): Publisher<Message> {
         val text = "[$username] Disconnected!"
         val message = Message(text)
         return broadcaster.broadcast(message, isValid(topic, session))
     }
 
     private fun isValid(topic: String, session: WebSocketSession): Predicate<WebSocketSession> {
-        return Predicate<WebSocketSession>{ s -> s !== session && topic.equals(s.getUriVariables().get("topic", String::class.java, null), ignoreCase = true) }
+        return Predicate<WebSocketSession> {
+            it !== session && topic.equals(
+                it.uriVariables.get("topic", String::class.java, null), ignoreCase = true)
+        }
     }
 }

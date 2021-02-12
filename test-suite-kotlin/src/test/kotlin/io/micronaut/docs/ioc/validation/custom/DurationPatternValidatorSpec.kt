@@ -16,8 +16,9 @@ internal class DurationPatternValidatorSpec {
 
     @Test
     fun testCustomValidator() {
-        val exception = assertThrows(ConstraintViolationException::class.java
-        ) { holidayService.startHoliday("Fred", "junk") }   // <1>
+        val exception = assertThrows(ConstraintViolationException::class.java) {
+            holidayService.startHoliday("Fred", "junk") // <1>
+        }
 
         assertEquals("startHoliday.duration: invalid duration (junk)", exception.message) // <2>
     }
