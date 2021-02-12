@@ -11,13 +11,13 @@ class ConfigPropertiesParseSpec extends AbstractBeanDefinitionSpec {
 
     void "test configuration properties returns self"() {
             when:
-            BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
-package test
+            BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.configproperties.MyConfig1', '''
+package io.micronaut.inject.configproperties
 
 import io.micronaut.context.annotation.ConfigurationProperties
 
 @ConfigurationProperties("my")
-class MyConfig {
+class MyConfig1 {
     private String host
     String getHost() {
         host
