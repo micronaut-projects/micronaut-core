@@ -17,9 +17,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
 public @interface InterceptorBinding {
     /**
-     * When declared on an interceptor, the value of this annotation can be used to indicate the annotation the
+     * When declared on an interceptor, the value of this annotation can be used to indicate the annotation or annotations the
      * {@link MethodInterceptor} binds to at runtime.
-     * @return The annotation type.
+     *
+     * @return The annotation types the interceptor binds to.
      */
-    Class<? extends Annotation> value() default InterceptorBinding.class;
+    Class<? extends Annotation>[] value() default {};
 }
