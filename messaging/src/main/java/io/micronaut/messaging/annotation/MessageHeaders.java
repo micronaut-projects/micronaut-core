@@ -15,31 +15,36 @@
  */
 package io.micronaut.messaging.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.context.annotation.AliasFor;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from message body.
+ * This lets you declare several headers for a client class and have them always included.
+ * Example usage:
  *
- * @author Graeme Rocher
- * @since 1.0
- * @deprecated Use {@link MessageBody} instead
+ * <pre><code>
+ *{@literal @}MessageHeaders({
+ *     {@literal @}Header(name="Content-type",value="application/octet-stream"),
+ *     {@literal @}Header(name="Content-length",value="2048")
+ * })
+ * </code></pre>
+ *
+ * @author graemerocher
+ * @since 2.4.0
  */
 @Documented
-@Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
-@Bindable
-@Deprecated
-public @interface Body {
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+public @interface MessageHeaders {
 
-    /**
-     * @return A Key or qualifier within the body. For example a reference to a nested JSON attribute
+    /***
+     * @return The headers
      */
-    String value() default "";
+    @AliasFor(annotation = Headers.class, member = "value")
+    MessageHeader[] value() default {};
 }

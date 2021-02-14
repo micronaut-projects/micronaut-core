@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,31 +15,21 @@
  */
 package io.micronaut.messaging.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import io.micronaut.core.bind.annotation.Bindable;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from message body.
+ * Generic messaging meta-annotation to indicate a type that is a message producer.
  *
- * @author Graeme Rocher
- * @since 1.0
- * @deprecated Use {@link MessageBody} instead
+ * @author graemerocher
+ * @since 2.4.0
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
-@Bindable
-@Deprecated
-public @interface Body {
-
-    /**
-     * @return A Key or qualifier within the body. For example a reference to a nested JSON attribute
-     */
-    String value() default "";
+@Target({ElementType.ANNOTATION_TYPE, ElementType.METHOD})
+public @interface MessageProducer {
 }
