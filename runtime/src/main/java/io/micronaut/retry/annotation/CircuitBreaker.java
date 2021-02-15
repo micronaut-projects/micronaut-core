@@ -38,8 +38,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
-@Around
-@Type(DefaultRetryInterceptor.class)
+@Retryable
 public @interface CircuitBreaker {
 
     int MAX_RETRY_ATTEMPTS = 4;
