@@ -356,7 +356,7 @@ public final class HttpClientSender extends Sender {
         }
 
         /**
-         * The path to use.
+         * The invocation instrumenter factories to use.
          *
          * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument http client netty handlers execution with
          * @return This builder
