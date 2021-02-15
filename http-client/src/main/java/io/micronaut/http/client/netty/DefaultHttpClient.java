@@ -211,60 +211,46 @@ public class DefaultHttpClient implements
     /**
      * Construct a client for the given arguments.
      *
-     * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers
-     * @param configuration              The {@link HttpClientConfiguration} object
-     * @param contextPath                The base URI to prepend to request uris
-     * @param threadFactory              The thread factory to use for client threads
-     * @param nettyClientSslBuilder      The SSL builder
-     * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
-     * @param annotationMetadataResolver The annotation metadata resolver
-     * @param filters                    The filters to use
+     * @param loadBalancer                    The {@link LoadBalancer} to use for selecting servers
+     * @param configuration                   The {@link HttpClientConfiguration} object
+     * @param contextPath                     The base URI to prepend to request uris
+     * @param threadFactory                   The thread factory to use for client threads
+     * @param nettyClientSslBuilder           The SSL builder
+     * @param codecRegistry                   The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param annotationMetadataResolver      The annotation metadata resolver
+     * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
+     * @param filters                         The filters to use
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-                             HttpClientConfiguration configuration,
-                             @Nullable String contextPath,
-                             @Nullable ThreadFactory threadFactory,
-                             NettyClientSslBuilder nettyClientSslBuilder,
-                             MediaTypeCodecRegistry codecRegistry,
-                             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
-                             HttpClientFilter... filters) {
-        this(loadBalancer, io.micronaut.http.HttpVersion.HTTP_1_1, configuration, contextPath, new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)), null, threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel.class);
+            HttpClientConfiguration configuration,
+            @Nullable String contextPath,
+            @Nullable ThreadFactory threadFactory,
+            NettyClientSslBuilder nettyClientSslBuilder,
+            MediaTypeCodecRegistry codecRegistry,
+            @Nullable AnnotationMetadataResolver annotationMetadataResolver,
+            List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
+            HttpClientFilter... filters) {
+        this(loadBalancer, io.micronaut.http.HttpVersion.HTTP_1_1, configuration, contextPath, new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)), null, threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel.class, invocationInstrumenterFactories);
     }
 
     /**
      * Construct a client for the given arguments.
      *
-     * @param loadBalancer          The {@link LoadBalancer} to use for selecting servers
-     * @param httpVersion           The HTTP version to use. Can be null and defaults to {@link io.micronaut.http.HttpVersion#HTTP_1_1}
-     * @param configuration         The {@link HttpClientConfiguration} object
-     * @param contextPath           The base URI to prepend to request uris
-     * @param filterResolver        The http client filter resolver
-     * @param clientFilterEntries   The client filter entries
-     * @param threadFactory         The thread factory to use for client threads
-     * @param nettyClientSslBuilder The SSL builder
-     * @param codecRegistry         The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
-     * @param webSocketBeanRegistry The websocket bean registry
-     * @param requestBinderRegistry The request binder registry
-     * @param eventLoopGroup        The event loop group to use
-     * @param socketChannelClass    The socket channel class
+     * @param loadBalancer                    The {@link LoadBalancer} to use for selecting servers
+     * @param httpVersion                     The HTTP version to use. Can be null and defaults to {@link io.micronaut.http.HttpVersion#HTTP_1_1}
+     * @param configuration                   The {@link HttpClientConfiguration} object
+     * @param contextPath                     The base URI to prepend to request uris
+     * @param filterResolver                  The http client filter resolver
+     * @param clientFilterEntries             The client filter entries
+     * @param threadFactory                   The thread factory to use for client threads
+     * @param nettyClientSslBuilder           The SSL builder
+     * @param codecRegistry                   The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param webSocketBeanRegistry           The websocket bean registry
+     * @param requestBinderRegistry           The request binder registry
+     * @param eventLoopGroup                  The event loop group to use
+     * @param socketChannelClass              The socket channel class
+     * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      */
-    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-            @Nullable io.micronaut.http.HttpVersion httpVersion,
-            @NonNull HttpClientConfiguration configuration,
-            @Nullable String contextPath,
-            @NonNull HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
-            List<HttpFilterResolver.FilterEntry<HttpClientFilter>> clientFilterEntries,
-            @Nullable ThreadFactory threadFactory,
-            @NonNull NettyClientSslBuilder nettyClientSslBuilder,
-            @NonNull MediaTypeCodecRegistry codecRegistry,
-            @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
-            @NonNull RequestBinderRegistry requestBinderRegistry,
-            @Nullable EventLoopGroup eventLoopGroup,
-            @NonNull Class<? extends SocketChannel> socketChannelClass
-    ) {
-        this(loadBalancer, httpVersion, configuration, contextPath, filterResolver, clientFilterEntries, threadFactory, nettyClientSslBuilder, codecRegistry, webSocketBeanRegistry, requestBinderRegistry, eventLoopGroup, socketChannelClass, null);
-    }
-
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              @Nullable io.micronaut.http.HttpVersion httpVersion,
                              @NonNull HttpClientConfiguration configuration,
@@ -280,12 +266,6 @@ public class DefaultHttpClient implements
                              @NonNull Class<? extends SocketChannel> socketChannelClass,
                              List<InvocationInstrumenterFactory> invocationInstrumenterFactories
             ) {
-        if (invocationInstrumenterFactories == null) {
-            // TODO invocationInstrumenterFactories must be propagated ALWAYS unless outside of the container
-            throw new UnsupportedOperationException("must not be null");
-        }
-
-        this.invocationInstrumenterFactories = invocationInstrumenterFactories;
         ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
         ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
         ArgumentUtils.requireNonNull("webSocketBeanRegistry", webSocketBeanRegistry);
@@ -325,6 +305,9 @@ public class DefaultHttpClient implements
 
         Optional<Duration> connectTtl = configuration.getConnectTtl();
         this.connectionTimeAliveMillis = connectTtl.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
+
+        this.invocationInstrumenterFactories =
+                invocationInstrumenterFactories == null ? Collections.emptyList() : invocationInstrumenterFactories;
 
         HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration = configuration.getConnectionPoolConfiguration();
         // HTTP/2 defaults to keep alive connections so should we should always use a pool
@@ -408,7 +391,7 @@ public class DefaultHttpClient implements
      *
      */
     public DefaultHttpClient() {
-        this((LoadBalancer) null, new DefaultHttpClientConfiguration());
+        this(null, new DefaultHttpClientConfiguration(), Collections.emptyList());
     }
 
     /**
@@ -418,18 +401,24 @@ public class DefaultHttpClient implements
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
         this(
                 url == null ? null : LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
+                new NettyClientSslBuilder(new ResourceResolver()),
+                createDefaultMediaTypeRegistry(),
+                AnnotationMetadataResolver.DEFAULT,
+                Collections.emptyList());
     }
 
     /**
      * @param loadBalancer  The {@link LoadBalancer} to use for selecting servers
      * @param configuration The {@link HttpClientConfiguration} object
+     * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      */
-    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
+    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration, List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
         this(loadBalancer,
                 configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()),
-                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
+                createDefaultMediaTypeRegistry(),
+                AnnotationMetadataResolver.DEFAULT,
+                invocationInstrumenterFactories);
     }
 
     /**
