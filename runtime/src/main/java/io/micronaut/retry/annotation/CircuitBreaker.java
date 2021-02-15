@@ -17,10 +17,7 @@ package io.micronaut.retry.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Type;
-import io.micronaut.retry.intercept.DefaultRetryInterceptor;
 
 import javax.validation.constraints.Digits;
 import java.lang.annotation.Documented;
