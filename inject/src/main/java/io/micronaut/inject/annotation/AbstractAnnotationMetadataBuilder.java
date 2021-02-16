@@ -958,7 +958,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                     T element,
                                     boolean isDeclared,
                                     List<? extends A> annotationHierarchy) {
-        final ListIterator<? extends A> listIterator = annotationHierarchy.listIterator();
+        final ListIterator<? extends A> listIterator = new ArrayList<>(annotationHierarchy).listIterator();
         while (listIterator.hasNext()) {
             A annotationMirror = listIterator.next();
             String annotationName = getAnnotationTypeName(annotationMirror);
