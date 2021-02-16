@@ -2809,7 +2809,6 @@ public class DefaultBeanContext implements BeanContext {
             }
 
         }
-        filterProxiedTypes();
 
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans, parallelBeans);
