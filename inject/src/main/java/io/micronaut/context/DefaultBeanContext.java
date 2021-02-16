@@ -814,7 +814,7 @@ public class DefaultBeanContext implements BeanContext {
         Optional<BeanDefinition<T>> candidate = findConcreteCandidate(null, beanType, qualifier, true, false);
         if (candidate.isPresent()) {
             try (BeanResolutionContext resolutionContext = newResolutionContext(candidate.get(), null)) {
-                T createdBean = doCreateBean(resolutionContext, candidate.get(), qualifier, beanType,false, argumentValues);
+                T createdBean = doCreateBean(resolutionContext, candidate.get(), qualifier, beanType, false, argumentValues);
                 if (createdBean == null) {
                     throw new NoSuchBeanException(beanType);
                 }
@@ -905,7 +905,7 @@ public class DefaultBeanContext implements BeanContext {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Computed bean argument values: {}", argumentValues);
         }
-        T createdBean = doCreateBean(resolutionContext, definition, qualifier, beanType,false, argumentValues);
+        T createdBean = doCreateBean(resolutionContext, definition, qualifier, beanType, false, argumentValues);
         if (createdBean == null) {
             throw new NoSuchBeanException(beanType);
         }
@@ -1824,6 +1824,7 @@ public class DefaultBeanContext implements BeanContext {
      * @param resolutionContext The {@link BeanResolutionContext}
      * @param beanDefinition    The {@link BeanDefinition}
      * @param qualifier         The {@link Qualifier}
+     * @param qualifierBeanType The bean type used in the qualifier
      * @param isSingleton       Whether the bean is a singleton
      * @param argumentValues    Any argument values passed to create the bean
      * @param <T>               The bean generic type
@@ -2362,7 +2363,7 @@ public class DefaultBeanContext implements BeanContext {
                 }
                 BeanDefinition<T> proxyDefinition = (BeanDefinition<T>) findProxyBeanDefinition((Class) proxiedType, q).orElse(finalDefinition);
 
-                T createBean = doCreateBean(resolutionContext, proxyDefinition, qualifier,  beanType,false, null);
+                T createBean = doCreateBean(resolutionContext, proxyDefinition, qualifier,  beanType, false, null);
                 if (createBean instanceof Qualified) {
                     ((Qualified) createBean).$withBeanQualifier(qualifier);
                 }
@@ -2808,6 +2809,7 @@ public class DefaultBeanContext implements BeanContext {
             }
 
         }
+        filterProxiedTypes();
 
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans, parallelBeans);
