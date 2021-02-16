@@ -17,4 +17,3 @@ spotless {
         targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
     }
 }
-//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
