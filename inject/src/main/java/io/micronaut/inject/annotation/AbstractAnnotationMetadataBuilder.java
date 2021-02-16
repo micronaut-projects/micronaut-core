@@ -33,6 +33,7 @@ import javax.inject.Scope;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.*;
+import java.util.function.BiConsumer;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}.
@@ -967,121 +968,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             RetentionPolicy retentionPolicy = getRetentionPolicy(annotationType);
             Map<CharSequence, Object> annotationValues = populateAnnotationData(element, annotationMirror, annotationMetadata, isDeclared, retentionPolicy);
 
-            String repeatableName = getRepeatableName(annotationMirror);
-            String packageName = NameUtils.getPackageName(annotationName);
-            List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
-            List<AnnotationTransformer<Annotation>> annotationTransformers = ANNOTATION_TRANSFORMERS.get(annotationName);
-            boolean remapped = CollectionUtils.isNotEmpty(annotationRemappers);
-            boolean transformed = CollectionUtils.isNotEmpty(annotationTransformers);
-
-            if (repeatableName != null) {
-                if (!remapped && !transformed) {
-                    io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, annotationValues);
-                    if (isDeclared) {
-                        annotationMetadata.addDeclaredRepeatable(repeatableName, av);
-                    } else {
-                        annotationMetadata.addRepeatable(repeatableName, av);
-                    }
-                } else if (remapped) {
-                    AnnotationValue repeatableAnn = new AnnotationValue(repeatableName);
-                    VisitorContext visitorContext = createVisitorContext();
-                    io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, annotationValues);
-                    for (AnnotationRemapper annotationRemapper : annotationRemappers) {
-                        List<AnnotationValue<?>> remappedRepeatable = annotationRemapper.remap(repeatableAnn, visitorContext);
-                        List<AnnotationValue<?>> remappedValue = annotationRemapper.remap(av, visitorContext);
-                        if (CollectionUtils.isNotEmpty(remappedRepeatable)) {
-                            for (AnnotationValue<?> repeatable : remappedRepeatable) {
-                                for (AnnotationValue<?> rmv : remappedValue) {
-                                    if (isDeclared) {
-                                        annotationMetadata.addDeclaredRepeatable(repeatable.getAnnotationName(), rmv);
-                                    } else {
-                                        annotationMetadata.addRepeatable(repeatable.getAnnotationName(), rmv);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    AnnotationValue<Annotation> repeatableAnn = new AnnotationValue<>(repeatableName);
-                    VisitorContext visitorContext = createVisitorContext();
-                    io.micronaut.core.annotation.AnnotationValue<Annotation> av =
-                            new io.micronaut.core.annotation.AnnotationValue<>(annotationName, annotationValues);
-                    final List<AnnotationTransformer<Annotation>> repeatableTransformers = ANNOTATION_TRANSFORMERS.get(repeatableName);
-                    if (CollectionUtils.isNotEmpty(repeatableTransformers)) {
-                        for (AnnotationTransformer<Annotation> repeatableTransformer : repeatableTransformers) {
-                            final List<AnnotationValue<?>> transformedRepeatable = repeatableTransformer.transform(repeatableAnn, visitorContext);
-                            for (AnnotationValue<?> annotationValue : transformedRepeatable) {
-                                for (AnnotationTransformer<Annotation> transformer : annotationTransformers) {
-                                    final List<AnnotationValue<?>> tav = transformer.transform(av, visitorContext);
-                                    for (AnnotationValue<?> value : tav) {
-                                        if (isDeclared) {
-                                            annotationMetadata.addDeclaredRepeatable(annotationValue.getAnnotationName(), value);
-                                        } else {
-                                            annotationMetadata.addRepeatable(annotationValue.getAnnotationName(), value);
-                                        }
-                                    }
-                                }
-
-                            }
-                        }
-                    } else {
-                        for (AnnotationTransformer<Annotation> transformer : annotationTransformers) {
-                            final List<AnnotationValue<?>> tav = transformer.transform(av, visitorContext);
-                            for (AnnotationValue<?> value : tav) {
-                                if (isDeclared) {
-                                    annotationMetadata.addDeclaredRepeatable(repeatableName, value);
-                                } else {
-                                    annotationMetadata.addRepeatable(repeatableName, value);
-                                }
-                            }
-                        }
-                    }
-                }
+            if (isDeclared) {
+                applyTransformations(annotationMirror,
+                        annotationValues,
+                        annotationMetadata::addDeclaredRepeatable,
+                        annotationMetadata::addDeclaredAnnotation);
             } else {
-                if (!remapped && !transformed) {
-                    if (isDeclared) {
-                        annotationMetadata.addDeclaredAnnotation(annotationName, annotationValues, retentionPolicy);
-                    } else {
-                        annotationMetadata.addAnnotation(annotationName, annotationValues, retentionPolicy);
-                    }
-                } else if (remapped) {
-                    io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, annotationValues);
-                    VisitorContext visitorContext = createVisitorContext();
-                    for (AnnotationRemapper annotationRemapper : annotationRemappers) {
-                        List<AnnotationValue<?>> remappedValues = annotationRemapper.remap(av, visitorContext);
-                        if (CollectionUtils.isNotEmpty(remappedValues)) {
-                            for (AnnotationValue<?> annotationValue : remappedValues) {
-                                if (isDeclared) {
-                                    annotationMetadata.addDeclaredAnnotation(annotationValue.getAnnotationName(), annotationValue.getValues());
-                                } else {
-                                    annotationMetadata.addAnnotation(annotationValue.getAnnotationName(), annotationValue.getValues());
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    io.micronaut.core.annotation.AnnotationValue<Annotation> av =
-                            new io.micronaut.core.annotation.AnnotationValue<>(annotationName, annotationValues);
-                    VisitorContext visitorContext = createVisitorContext();
-                    for (AnnotationTransformer<Annotation> annotationTransformer : annotationTransformers) {
-                        final List<AnnotationValue<?>> transformedValues = annotationTransformer.transform(av, visitorContext);
-                        for (AnnotationValue<?> transformedValue : transformedValues) {
-                            if (isDeclared) {
-                                annotationMetadata.addDeclaredAnnotation(
-                                        transformedValue.getAnnotationName(),
-                                        transformedValue.getValues(),
-                                        transformedValue.getRetentionPolicy()
-                                );
-                            } else {
-                                annotationMetadata.addAnnotation(
-                                        transformedValue.getAnnotationName(),
-                                        transformedValue.getValues(),
-                                        transformedValue.getRetentionPolicy()
-                                );
-                            }
-                        }
-                    }
-                }
+                applyTransformations(annotationMirror,
+                        annotationValues,
+                        annotationMetadata::addRepeatable,
+                        annotationMetadata::addAnnotation);
             }
         }
         for (A annotationMirror : annotationHierarchy) {
@@ -1113,22 +1009,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     topLevel.add(annotationMirror);
 
                     Map<CharSequence, Object> data = populateAnnotationData(element, annotationMirror, metadata, isDeclared, retentionPolicy);
-
-                    String repeatableName = getRepeatableName(annotationMirror);
-
-                    if (repeatableName != null) {
-                        io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, data);
-                        if (isDeclared) {
-                            metadata.addDeclaredRepeatableStereotype(parents, repeatableName, av);
-                        } else {
-                            metadata.addRepeatableStereotype(parents, repeatableName, av);
-                        }
+                    
+                    if (isDeclared) {
+                        applyTransformations(annotationMirror, data,
+                                (string, av) -> metadata.addDeclaredRepeatableStereotype(parents, string, av),
+                                (string, values, rp) -> metadata.addDeclaredStereotype(parents, string, values, retentionPolicy));
                     } else {
-                        if (isDeclared) {
-                            metadata.addDeclaredStereotype(parents, annotationName, data, retentionPolicy);
-                        } else {
-                            metadata.addStereotype(parents, annotationName, data, retentionPolicy);
-                        }
+                        applyTransformations(annotationMirror, data,
+                                (string, av) -> metadata.addRepeatableStereotype(parents, string, av),
+                                (string, values, rp) -> metadata.addStereotype(parents, string, values, retentionPolicy));
                     }
                 }
             }
@@ -1169,6 +1058,97 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         List<String> stereoTypeParents = new ArrayList<>(parents);
         stereoTypeParents.add(annotationTypeName);
         buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared, Collections.emptyList());
+    }
+
+    private void applyTransformations(A annotationMirror,
+                                      Map<CharSequence, Object> data,
+                                      BiConsumer<String, AnnotationValue> addRepeatableAnnotation,
+                                      TriConsumer<String, Map<CharSequence, Object>, RetentionPolicy> addAnnotation) {
+        String annotationName = getAnnotationTypeName(annotationMirror);
+        String repeatableName = getRepeatableName(annotationMirror);
+        String packageName = NameUtils.getPackageName(annotationName);
+        final T annotationType = getTypeForAnnotation(annotationMirror);
+        RetentionPolicy retentionPolicy = getRetentionPolicy(annotationType);
+        List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
+        List<AnnotationTransformer<Annotation>> annotationTransformers = ANNOTATION_TRANSFORMERS.get(annotationName);
+        boolean remapped = CollectionUtils.isNotEmpty(annotationRemappers);
+        boolean transformed = CollectionUtils.isNotEmpty(annotationTransformers);
+
+        if (repeatableName != null) {
+            if (!remapped && !transformed) {
+                io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, data);
+                addRepeatableAnnotation.accept(repeatableName, av);
+            } else if (remapped) {
+                AnnotationValue repeatableAnn = new AnnotationValue(repeatableName);
+                VisitorContext visitorContext = createVisitorContext();
+                io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, data);
+                for (AnnotationRemapper annotationRemapper : annotationRemappers) {
+                    List<AnnotationValue<?>> remappedRepeatable = annotationRemapper.remap(repeatableAnn, visitorContext);
+                    List<AnnotationValue<?>> remappedValue = annotationRemapper.remap(av, visitorContext);
+                    if (CollectionUtils.isNotEmpty(remappedRepeatable)) {
+                        for (AnnotationValue<?> repeatable : remappedRepeatable) {
+                            for (AnnotationValue<?> rmv : remappedValue) {
+                                addRepeatableAnnotation.accept(repeatable.getAnnotationName(), rmv);
+                            }
+                        }
+                    }
+                }
+            } else {
+                AnnotationValue<Annotation> repeatableAnn = new AnnotationValue<>(repeatableName);
+                VisitorContext visitorContext = createVisitorContext();
+                io.micronaut.core.annotation.AnnotationValue<Annotation> av =
+                        new io.micronaut.core.annotation.AnnotationValue<>(annotationName, data);
+                final List<AnnotationTransformer<Annotation>> repeatableTransformers = ANNOTATION_TRANSFORMERS.get(repeatableName);
+                if (CollectionUtils.isNotEmpty(repeatableTransformers)) {
+                    for (AnnotationTransformer<Annotation> repeatableTransformer : repeatableTransformers) {
+                        final List<AnnotationValue<?>> transformedRepeatable = repeatableTransformer.transform(repeatableAnn, visitorContext);
+                        for (AnnotationValue<?> annotationValue : transformedRepeatable) {
+                            for (AnnotationTransformer<Annotation> transformer : annotationTransformers) {
+                                final List<AnnotationValue<?>> tav = transformer.transform(av, visitorContext);
+                                for (AnnotationValue<?> value : tav) {
+                                    addRepeatableAnnotation.accept(annotationValue.getAnnotationName(), value);
+                                }
+                            }
+
+                        }
+                    }
+                } else {
+                    for (AnnotationTransformer<Annotation> transformer : annotationTransformers) {
+                        final List<AnnotationValue<?>> tav = transformer.transform(av, visitorContext);
+                        for (AnnotationValue<?> value : tav) {
+                            addRepeatableAnnotation.accept(repeatableName, value);
+                        }
+                    }
+                }
+            }
+        } else {
+            if (!remapped && !transformed) {
+                addAnnotation.accept(annotationName, data, retentionPolicy);
+            } else if (remapped) {
+                io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, data);
+                VisitorContext visitorContext = createVisitorContext();
+                for (AnnotationRemapper annotationRemapper : annotationRemappers) {
+                    List<AnnotationValue<?>> remappedValues = annotationRemapper.remap(av, visitorContext);
+                    if (CollectionUtils.isNotEmpty(remappedValues)) {
+                        for (AnnotationValue<?> annotationValue : remappedValues) {
+                            addAnnotation.accept(annotationValue.getAnnotationName(), annotationValue.getValues(), RetentionPolicy.RUNTIME);
+                        }
+                    }
+                }
+            } else {
+                io.micronaut.core.annotation.AnnotationValue<Annotation> av =
+                        new io.micronaut.core.annotation.AnnotationValue<>(annotationName, data);
+                VisitorContext visitorContext = createVisitorContext();
+                for (AnnotationTransformer<Annotation> annotationTransformer : annotationTransformers) {
+                    final List<AnnotationValue<?>> transformedValues = annotationTransformer.transform(av, visitorContext);
+                    for (AnnotationValue<?> transformedValue : transformedValues) {
+                        addAnnotation.accept(transformedValue.getAnnotationName(),
+                                transformedValue.getValues(),
+                                transformedValue.getRetentionPolicy());
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -1364,5 +1344,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         public int hashCode() {
             return Objects.hash(declaringName, element);
         }
+    }
+
+    private static interface TriConsumer<T, U, V> {
+        void accept(T t, U u, V v);
     }
 }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.context.ProviderFactory;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.AbstractBeanDefinition;
 import io.micronaut.context.AbstractParametrizedBeanDefinition;
@@ -49,7 +50,6 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
 
-import javax.inject.Provider;
 import javax.inject.Qualifier;
 import javax.inject.Scope;
 import javax.inject.Singleton;
@@ -302,9 +302,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private static String getProvidedClassName(ClassElement classElement) {
-        if (classElement.isAssignable(Provider.class)) {
-            Iterator<ClassElement> i = classElement.getTypeArguments(Provider.class).values().iterator();
-            return i.hasNext() ? i.next().getName() : classElement.getName();
+        for (Class provider: ProviderFactory.getProviders()) {
+            String providerName = provider.getName();
+            if (classElement.isAssignable(providerName)) {
+                Iterator<ClassElement> i = classElement.getTypeArguments(providerName).values().iterator();
+                return i.hasNext() ? i.next().getName() : classElement.getName();
+            }
         }
         return classElement.getName();
     }

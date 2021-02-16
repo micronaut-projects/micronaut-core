@@ -18,6 +18,7 @@ package io.micronaut.docs.client.filter;
 //tag::class[]
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.client.RxHttpClient;
@@ -25,7 +26,6 @@ import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
-import javax.inject.Provider;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -33,9 +33,9 @@ import java.net.URLEncoder;
 @Requires(env = Environment.GOOGLE_COMPUTE)
 @Filter(patterns = "/google-auth/api/**")
 public class GoogleAuthFilter implements HttpClientFilter {
-    private final Provider<RxHttpClient> authClientProvider;
+    private final BeanProvider<RxHttpClient> authClientProvider;
 
-    public GoogleAuthFilter(Provider<RxHttpClient> httpClientProvider) { // <1>
+    public GoogleAuthFilter(BeanProvider<RxHttpClient> httpClientProvider) { // <1>
         this.authClientProvider = httpClientProvider;
     }
 

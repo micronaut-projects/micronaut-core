@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.BeanLocator;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -28,10 +29,8 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.inject.ExecutionHandle;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
-
 import io.micronaut.core.annotation.NonNull;
 
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.Set;
@@ -56,7 +55,7 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
     private static final Set<Class> RAW_BODY_TYPES = CollectionUtils.setOf(String.class, byte[].class, ByteBuffer.class);
 
     private final BeanLocator beanLocator;
-    private final Provider<NettyHttpServerConfiguration> serverConfiguration;
+    private final BeanProvider<NettyHttpServerConfiguration> serverConfiguration;
     private NettyHttpServerConfiguration nettyServerConfiguration;
 
     /**
@@ -64,7 +63,7 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
      * @param serverConfiguration The server configuration
      */
     DefaultHttpContentProcessorResolver(BeanLocator beanLocator,
-                                        Provider<NettyHttpServerConfiguration> serverConfiguration) {
+                                        BeanProvider<NettyHttpServerConfiguration> serverConfiguration) {
         this.beanLocator = beanLocator;
         this.serverConfiguration = serverConfiguration;
     }
