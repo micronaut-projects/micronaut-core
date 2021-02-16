@@ -1826,7 +1826,6 @@ public class DefaultBeanContext implements BeanContext {
      * @param resolutionContext The {@link BeanResolutionContext}
      * @param beanDefinition    The {@link BeanDefinition}
      * @param qualifier         The {@link Qualifier}
-     * @param qualifierBeanType The bean type used in the qualifier
      * @param isSingleton       Whether the bean is a singleton
      * @param argumentValues    Any argument values passed to create the bean
      * @param <T>               The bean generic type
@@ -1841,7 +1840,6 @@ public class DefaultBeanContext implements BeanContext {
                        @Nullable Map<String, Object> argumentValues) {
         return doCreateBean(resolutionContext, beanDefinition, qualifier, beanDefinition.getBeanType(), isSingleton, argumentValues);
     }
-
 
     /**
      * Execution the creation of a bean. The returned value can be null if a
