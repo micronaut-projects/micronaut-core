@@ -47,11 +47,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     /**
      * Names of annotations that should produce deprecation warnings.
+     * The key in the map is the deprecated annotation the value the replacement.
      */
     @SuppressWarnings("unchecked")
     private static final Map<String, String> DEPRECATED_ANNOTATION_NAMES = CollectionUtils.mapOf(
-            AnnotationUtil.NULLABLE, Nullable.class.getName(),
-            AnnotationUtil.NON_NULL, NonNull.class.getName(),
             AnnotationUtil.NULLABLE, Nullable.class.getName(),
             AnnotationUtil.NON_NULL, NonNull.class.getName()
     );
