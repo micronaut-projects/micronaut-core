@@ -402,11 +402,11 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
                         ReflectionUtils.getWrapperType(targetType)
                 );
                 Class<T> finalTargetType = targetType;
+                final Class[] finalTypeArguments = {constraintType, finalTargetType};
                 final Optional<ConstraintValidator> local = localValidators.entrySet().stream().filter(entry -> {
                             final ValidatorKey k = entry.getKey();
-                            return TypeArgumentQualifier.areTypesCompatible(
-                                    new Class[]{constraintType, finalTargetType},
-                                    Arrays.asList(k.constraintType, k.targetType)
+                    return TypeArgumentQualifier.areTypesCompatible(
+                            finalTypeArguments, Arrays.asList(k.constraintType, k.targetType)
                             );
                         }
                 ).map(Map.Entry::getValue).findFirst();

@@ -1094,20 +1094,34 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, data);
                 addRepeatableAnnotation.accept(repeatableName, av);
             } else if (remapped) {
-                hierarchyIterator.remove();
-                AnnotationValue repeatableAnn = new AnnotationValue(repeatableName);
+
                 VisitorContext visitorContext = createVisitorContext();
-                io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, data);
+                io.micronaut.core.annotation.AnnotationValue<?> av =
+                        new io.micronaut.core.annotation.AnnotationValue<>(annotationName, data);
+                AnnotationValue<?> repeatableAnn = AnnotationValue.builder(repeatableName)
+                        .values(av)
+                        .build();
+                boolean wasRemapped = false;
                 for (AnnotationRemapper annotationRemapper : annotationRemappers) {
                     List<AnnotationValue<?>> remappedRepeatable = annotationRemapper.remap(repeatableAnn, visitorContext);
                     List<AnnotationValue<?>> remappedValue = annotationRemapper.remap(av, visitorContext);
                     if (CollectionUtils.isNotEmpty(remappedRepeatable)) {
                         for (AnnotationValue<?> repeatable : remappedRepeatable) {
                             for (AnnotationValue<?> rmv : remappedValue) {
-                                addRepeatableAnnotation.accept(repeatable.getAnnotationName(), rmv);
+                                if (rmv == av && remappedValue.size() == 1) {
+                                    // bail, the re-mapper just returned the same annotation
+                                    addRepeatableAnnotation.accept(repeatableName, av);
+                                    break;
+                                } else {
+                                    wasRemapped = true;
+                                    addRepeatableAnnotation.accept(repeatable.getAnnotationName(), rmv);
+                                }
                             }
                         }
                     }
+                }
+                if (wasRemapped) {
+                    hierarchyIterator.remove();
                 }
             } else {
                 VisitorContext visitorContext = createVisitorContext();
@@ -1142,24 +1156,29 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             if (!remapped && !transformed) {
                 addAnnotation.accept(annotationName, data, retentionPolicy);
             } else if (remapped) {
-                io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, data);
+                io.micronaut.core.annotation.AnnotationValue<?> av = new io.micronaut.core.annotation.AnnotationValue(annotationName, data);
                 VisitorContext visitorContext = createVisitorContext();
-                hierarchyIterator.remove();
+
+                boolean wasRemapped = false;
                 for (AnnotationRemapper annotationRemapper : annotationRemappers) {
                     List<AnnotationValue<?>> remappedValues = annotationRemapper.remap(av, visitorContext);
                     if (CollectionUtils.isNotEmpty(remappedValues)) {
                         for (AnnotationValue<?> annotationValue : remappedValues) {
-                            final String transformedAnnotationName = annotationValue.getAnnotationName();
-                            addAnnotation.accept(transformedAnnotationName, annotationValue.getValues(), annotationValue.getRetentionPolicy());
-                            getAnnotationMirror(transformedAnnotationName).ifPresent(a -> processAnnotationStereotypes(
-                                    annotationMetadata,
-                                    isDeclared,
-                                    a,
-                                    transformedAnnotationName,
-                                    Collections.emptyList()
-                            ));
+                            if (annotationValue == av && remappedValues.size() == 1) {
+                                // bail, the re-mapper just returned the same annotation
+                                addAnnotation.accept(annotationName, data, retentionPolicy);
+                                break;
+                            } else {
+                                wasRemapped = true;
+                                final String transformedAnnotationName = annotationValue.getAnnotationName();
+                                addAnnotation.accept(transformedAnnotationName, annotationValue.getValues(), annotationValue.getRetentionPolicy());
+                                addTransformedStereotypes(annotationMetadata, isDeclared, transformedAnnotationName);
+                            }
                         }
                     }
+                }
+                if (wasRemapped) {
+                    hierarchyIterator.remove();
                 }
             } else {
                 io.micronaut.core.annotation.AnnotationValue<Annotation> av =
@@ -1173,15 +1192,24 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         addAnnotation.accept(transformedAnnotationName,
                                 transformedValue.getValues(),
                                 transformedValue.getRetentionPolicy());
-                        getAnnotationMirror(transformedAnnotationName).ifPresent(a -> processAnnotationStereotypes(
-                                annotationMetadata,
-                                isDeclared,
-                                a,
-                                transformedAnnotationName,
-                                Collections.emptyList()
-                        ));
+                        addTransformedStereotypes(annotationMetadata, isDeclared, transformedAnnotationName);
                     }
                 }
+            }
+        }
+    }
+
+    private void addTransformedStereotypes(DefaultAnnotationMetadata annotationMetadata, boolean isDeclared, String transformedAnnotationName) {
+        if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(transformedAnnotationName)) {
+            String packageName = NameUtils.getPackageName(transformedAnnotationName);
+            if (!AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName)) {
+                getAnnotationMirror(transformedAnnotationName).ifPresent(a -> processAnnotationStereotypes(
+                        annotationMetadata,
+                        isDeclared,
+                        a,
+                        transformedAnnotationName,
+                        Collections.emptyList()
+                ));
             }
         }
     }

@@ -1,5 +1,7 @@
 package io.micronaut.inject.beans
 
+import io.micronaut.core.annotation.Order
+import io.micronaut.core.order.Ordered
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.qualifiers.Qualifiers
 
@@ -7,6 +9,27 @@ import javax.inject.Named
 import javax.inject.Qualifier
 
 class BeanDefinitionSpec extends AbstractTypeElementSpec{
+
+    void 'test order annotation'() {
+        given:
+        def definition = buildBeanDefinition('test.TestOrder', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import io.micronaut.context.annotation.*;
+import javax.inject.*;
+
+@Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
+@Singleton
+@Order(value = 10)
+class TestOrder {
+
+}
+''')
+        expect:
+
+        definition.intValue(Order).getAsInt() == 10
+    }
 
     void 'test qualifier for named only'() {
         given:

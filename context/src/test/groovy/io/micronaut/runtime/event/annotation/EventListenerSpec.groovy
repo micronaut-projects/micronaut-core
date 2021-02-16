@@ -34,11 +34,11 @@ class EventListenerSpec extends Specification {
         then:
         t.invoked
         t.invocationCount == 1
-        g.invoked
-
         conditions.eventually {
             a.invoked
         }
+        g.invoked
+
 
         cleanup:
         ctx.close()
