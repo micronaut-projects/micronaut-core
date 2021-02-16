@@ -21,37 +21,31 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.annotation.AnnotationRemapper;
+import io.micronaut.inject.annotation.NamedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
+import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
 
 /**
- * A remapper that remaps findbugs annotations to javax.annotation which are represented internally.
+ * A transformer that remaps {@link io.micronaut.core.annotation.Nullable} to {@code javax.annotation.Nullable}.
  *
  * @author graemerocher
- * @since 1.2.0
+ * @since 2.4.0
  */
 @Internal
-public class CoreNullabilityAnnotationRemapper implements AnnotationRemapper {
+public class CoreNullableTransformer implements NamedAnnotationTransformer {
+
     @Override
-    @NonNull
-    public String getPackageName() {
-        return "io.micronaut.core.annotation";
+    public String getName() {
+        return "io.micronaut.core.annotation.Nullable";
     }
 
     @Override
-    @NonNull public List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
-        String simpleName = NameUtils.getSimpleName(annotation.getAnnotationName());
-        if ("nullable".equalsIgnoreCase(simpleName)) {
-            return Collections.singletonList(
-                    AnnotationValue.builder(AnnotationUtil.NULLABLE).build()
-            );
-        } else if ("nonnull".equalsIgnoreCase(simpleName)) {
-            return Collections.singletonList(
-                    AnnotationValue.builder(AnnotationUtil.NON_NULL).build()
-            );
-        }
-        return Collections.singletonList(annotation);
+    public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
+        return Collections.singletonList(
+                AnnotationValue.builder(AnnotationUtil.NULLABLE).build()
+        );
     }
 }
