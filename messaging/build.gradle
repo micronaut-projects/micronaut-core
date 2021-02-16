@@ -2,4 +2,9 @@ dependencies {
     annotationProcessor project(":inject-java")
     api project(":inject")
     api project(":runtime")
+
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject")
+    testImplementation project(":inject-java-test")
+    testCompileOnly project(":inject-groovy")
 }
