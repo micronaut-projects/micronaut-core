@@ -17,7 +17,6 @@ package io.micronaut.messaging.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.bind.annotation.Bindable;
 
 import java.lang.annotation.Documented;
@@ -40,6 +39,5 @@ public @interface MessageBody {
     /**
      * @return A Key or qualifier within the body. For example a reference to a nested JSON attribute
      */
-    @AliasFor(annotation = Body.class, member = "value")
     String value() default "";
 }

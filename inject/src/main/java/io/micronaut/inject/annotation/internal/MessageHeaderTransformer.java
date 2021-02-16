@@ -40,6 +40,7 @@ public class MessageHeaderTransformer implements NamedAnnotationTransformer {
     public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         final AnnotationValueBuilder<Annotation> builder = AnnotationValue.builder("io.micronaut.messaging.annotation.Header");
         annotation.stringValue().ifPresent(builder::value);
+        annotation.stringValue("name").ifPresent(n -> builder.member("name", n));
         return Collections.singletonList(
                 builder.build()
         );

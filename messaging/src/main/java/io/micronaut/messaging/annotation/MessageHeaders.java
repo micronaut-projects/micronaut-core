@@ -15,8 +15,6 @@
  */
 package io.micronaut.messaging.annotation;
 
-import io.micronaut.context.annotation.AliasFor;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -45,6 +43,5 @@ public @interface MessageHeaders {
     /***
      * @return The headers
      */
-    @AliasFor(annotation = Headers.class, member = "value")
     MessageHeader[] value() default {};
 }

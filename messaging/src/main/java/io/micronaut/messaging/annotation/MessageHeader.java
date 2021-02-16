@@ -17,7 +17,6 @@ package io.micronaut.messaging.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.bind.annotation.Bindable;
 
 import java.lang.annotation.*;
@@ -39,14 +38,12 @@ public @interface MessageHeader {
      * If used as a bound parameter, this is the header name. If used on a class level this is value and not the header name.
      * @return The name of the header, otherwise it is inferred from the parameter name
      */
-    @AliasFor(annotation = Header.class, member = "value")
     String value() default "";
 
     /**
      * If used on a class level with @Headers this is the header name and value is the value.
      * @return name of header when using with @Headers
      */
-    @AliasFor(annotation = Header.class, member = "name")
     String name() default "";
 
 }
