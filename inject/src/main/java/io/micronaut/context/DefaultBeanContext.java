@@ -120,7 +120,7 @@ public class DefaultBeanContext implements BeanContext {
     private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
     private final Map<CharSequence, Object> attributes = Collections.synchronizedMap(new HashMap<>(5));
 
-    private final Map<BeanKey, Collection<Object>> initializedObjectsByType = new ConcurrentHashMap<>(50);
+    private final Map<BeanKey, Collection> initializedObjectsByType = new ConcurrentHashMap<>(50);
     private final Map<BeanKey, Optional<BeanDefinition>> beanConcreteCandidateCache =
             new ConcurrentLinkedHashMap.Builder<BeanKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
     private final Map<Class, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Class, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
@@ -376,9 +376,7 @@ public class DefaultBeanContext implements BeanContext {
         if (beanType == null) {
             return Collections.emptyList();
         }
-        // initialize the beans
-        getBeansOfType(beanType);
-        return getActiveBeanRegistrations(beanType);
+        return getBeansOfTypeInternal(null, beanType, null);
     }
 
     @Override
@@ -399,7 +397,6 @@ public class DefaultBeanContext implements BeanContext {
         return Optional.empty();
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, String method, Class... arguments) {
         return findExecutionHandle(beanType, null, method, arguments);
@@ -750,7 +747,10 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> Collection<T> getBeansOfType(Class<T> beanType, Qualifier<T> qualifier) {
-        return getBeansOfTypeInternal(null, beanType, qualifier);
+        return getBeansOfTypeInternal(null, beanType, qualifier)
+                    .stream()
+                    .map(BeanRegistration::getBean)
+                    .collect(Collectors.toList());
     }
 
     @Override
@@ -768,7 +768,8 @@ public class DefaultBeanContext implements BeanContext {
      * @return A stream
      */
     protected <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
-        return getBeansOfTypeInternal(resolutionContext, beanType, qualifier).stream();
+        return getBeansOfTypeInternal(resolutionContext, beanType, qualifier).stream()
+                    .map(BeanRegistration::getBean);
     }
 
     @Override
@@ -1024,7 +1025,9 @@ public class DefaultBeanContext implements BeanContext {
      */
     protected @NonNull
     <T> Collection<T> getBeansOfType(@Nullable BeanResolutionContext resolutionContext, @NonNull Class<T> beanType) {
-        return getBeansOfTypeInternal(resolutionContext, beanType, null);
+        return getBeansOfTypeInternal(resolutionContext, beanType, null)
+                    .stream().map(BeanRegistration::getBean)
+                    .collect(Collectors.toList());
     }
 
     /**
@@ -1041,7 +1044,9 @@ public class DefaultBeanContext implements BeanContext {
             @Nullable BeanResolutionContext resolutionContext,
             @NonNull Class<T> beanType,
             @Nullable Qualifier<T> qualifier) {
-        return getBeansOfTypeInternal(resolutionContext, beanType, qualifier);
+        return getBeansOfTypeInternal(resolutionContext, beanType, qualifier)
+                .stream().map(BeanRegistration::getBean)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -2866,7 +2871,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @SuppressWarnings("unchecked")
-    private <T> Collection<T> getBeansOfTypeInternal(@Nullable BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+    private <T> Collection<BeanRegistration<T>> getBeansOfTypeInternal(@Nullable BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         boolean hasQualifier = qualifier != null;
         if (LOG.isDebugEnabled()) {
             if (hasQualifier) {
@@ -2880,7 +2885,8 @@ public class DefaultBeanContext implements BeanContext {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Looking up existing beans for key: {}", key);
         }
-        @SuppressWarnings("unchecked") Collection<T> existing = (Collection<T>) initializedObjectsByType.get(key);
+        @SuppressWarnings("unchecked") Collection<BeanRegistration<T>> existing =
+                (Collection<BeanRegistration<T>>) initializedObjectsByType.get(key);
         if (existing != null) {
             logResolvedExisting(beanType, qualifier, hasQualifier, existing);
             return existing;
@@ -2891,7 +2897,7 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         synchronized (singletonObjects) {
-            existing = (Collection<T>) initializedObjectsByType.get(key);
+            existing = (Collection<BeanRegistration<T>>) initializedObjectsByType.get(key);
             if (existing != null) {
                 logResolvedExisting(beanType, qualifier, hasQualifier, existing);
                 return existing;
@@ -2962,12 +2968,11 @@ public class DefaultBeanContext implements BeanContext {
                 beanRegistrations = Collections.emptySet();
             }
 
-            Collection<T> beans = Collections.emptyList();
+            Collection<BeanRegistration<T>> beans = Collections.emptyList();
             if (beanRegistrations != Collections.EMPTY_SET) {
                 Stream<BeanRegistration<T>> stream = beanRegistrations.stream();
                 if (Ordered.class.isAssignableFrom(beanType)) {
                     beans = stream
-                            .map(BeanRegistration::getBean)
                             .sorted(OrderUtil.COMPARATOR)
                             .collect(StreamUtils.toImmutableCollection());
                 } else {
@@ -2975,13 +2980,12 @@ public class DefaultBeanContext implements BeanContext {
                         stream = stream.sorted(BEAN_REGISTRATION_COMPARATOR);
                     }
                     beans = stream
-                            .map(BeanRegistration::getBean)
                             .collect(StreamUtils.toImmutableCollection());
                 }
             }
 
             if (allCandidatesAreSingleton) {
-                initializedObjectsByType.put(key, (Collection<Object>) beans);
+                initializedObjectsByType.put(key, beans);
             }
             if (LOG.isDebugEnabled() && !beans.isEmpty()) {
                 if (hasQualifier) {
@@ -2995,7 +2999,7 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private <T> void logResolvedExisting(Class<T> beanType, Qualifier<T> qualifier, boolean hasQualifier, Collection<T> existing) {
+    private <T> void logResolvedExisting(Class<T> beanType, Qualifier<T> qualifier, boolean hasQualifier, Collection<BeanRegistration<T>> existing) {
         if (LOG.isTraceEnabled()) {
             if (hasQualifier) {
                 LOG.trace("Found {} existing beans for type [{} {}]: {} ", existing.size(), qualifier, beanType.getName(), existing);
