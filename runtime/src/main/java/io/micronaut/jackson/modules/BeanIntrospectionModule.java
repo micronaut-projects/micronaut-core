@@ -404,7 +404,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                     @Override
                     public boolean canCreateFromLong() {
-                        return constructorArguments.length == 1 && (constructorArguments[0].equalsType(Argument.LONG);
+                        return constructorArguments.length == 1 && constructorArguments[0].equalsType(Argument.LONG);
                     }
 
                     @Override
