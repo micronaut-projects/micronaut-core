@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class ScheduledFixedRateSpec extends Specification {
 
-
     void 'test schedule task at fixed delay or rate '() {
         given:
         ApplicationContext beanContext = ApplicationContext.run(
@@ -65,7 +64,7 @@ class ScheduledFixedRateSpec extends Specification {
     void 'test scheduled annotation with retry'() {
         given:
         ApplicationContext beanContext = ApplicationContext.run(
-                'scheduled-test.task2.enabled':true
+                'scheduled-test.task2.enabled': true
         )
 
         PollingConditions conditions = new PollingConditions(timeout: 10)
@@ -80,9 +79,27 @@ class ScheduledFixedRateSpec extends Specification {
         }
     }
 
+    void 'test multiple schedule annotations'() {
+        given:
+        ApplicationContext beanContext = ApplicationContext.run(
+                'scheduled-test.task.enabled': true
+        )
+
+        PollingConditions conditions = new PollingConditions(timeout: 10)
+
+        when:
+        MyOtherTask myTask = beanContext.getBean(MyOtherTask)
+
+        then:
+        conditions.eventually {
+            myTask.cronEvents.get() == 2
+        }
+    }
+
     @Singleton
     @Requires(property = 'scheduled-test.task.enabled', value = 'true')
     static class MyTask {
+
         boolean wasRun = false
         boolean wasDelayedRun = false
         boolean fixedDelayWasRun = false
@@ -109,6 +126,7 @@ class ScheduledFixedRateSpec extends Specification {
         void runScheduleConfigured() {
             configuredWasRun = true
         }
+
         @Scheduled(fixedDelay = '10ms')
         void runFixedDelay() {
             fixedDelayWasRun = true
@@ -137,6 +155,19 @@ class ScheduledFixedRateSpec extends Specification {
                 throw new RuntimeException()
             }
             initialDelayWasRun = true
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'scheduled-test.task.enabled', value = 'true')
+    static class MyOtherTask {
+
+        AtomicInteger cronEvents = new AtomicInteger(0)
+
+        @Scheduled(cron = '1/3 0/1 * 1/1 * ?')
+        @Scheduled(cron = '1/4 0/1 * 1/1 * ?')
+        void runCron() {
+            cronEvents.incrementAndGet()
         }
     }
 }
