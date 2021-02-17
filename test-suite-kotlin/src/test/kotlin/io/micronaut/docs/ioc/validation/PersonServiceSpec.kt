@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import javax.inject.Inject
 import javax.validation.ConstraintViolationException
 // end::imports[]
+
 // tag::test[]
 @MicronautTest
 class PersonServiceSpec {
@@ -17,8 +18,9 @@ class PersonServiceSpec {
 
     @Test
     fun testThatNameIsValidated() {
-        val exception = assertThrows(ConstraintViolationException::class.java
-        ) { personService.sayHello("") } // <1>
+        val exception = assertThrows(ConstraintViolationException::class.java) {
+            personService.sayHello("") // <1>
+        }
 
         assertEquals("sayHello.name: must not be blank", exception.message) // <2>
     }

@@ -20,16 +20,13 @@ import io.micronaut.http.annotation.Controller
 import io.reactivex.Single
 // end::imports[]
 
-
 // tag::class[]
 @Controller("/pets")
 class PetController implements PetOperations {
 
     @Override
     Single<Pet> save(String name, int age) {
-        Pet pet = new Pet()
-        pet.setName(name)
-        pet.setAge(age)
+        Pet pet = new Pet(name: name, age: age)
         // save to database or something
         return Single.just(pet)
     }

@@ -4,29 +4,19 @@ import io.kotlintest.shouldBe
 import io.kotlintest.shouldThrow
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.AfterClass
-import org.junit.BeforeClass
-import org.junit.Test
-import org.junit.jupiter.api.Assertions
-
-import java.util.Collections
-
-import org.junit.Assert.assertEquals
 
 class EmailControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to "datavalidationparams"))
+        ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to "datavalidationparams"))
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL())
+        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
     )
 
     init {

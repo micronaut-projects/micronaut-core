@@ -16,16 +16,19 @@
 package io.micronaut.docs.basics
 
 import io.micronaut.context.annotation.Requires
-
 // tag::imports[]
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.*
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Status
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.reactivex.Maybe
 
 import static io.micronaut.http.HttpRequest.GET
+import static io.micronaut.http.HttpStatus.CREATED
+import static io.micronaut.http.MediaType.TEXT_PLAIN
 // end::imports[]
 
 @Requires(property = "spec.name", value = "HelloControllerSpec")
@@ -41,32 +44,32 @@ class HelloController {
     // tag::nonblocking[]
     @Get("/hello/{name}")
     Maybe<String> hello(String name) { // <1>
-        return httpClient.retrieve( GET("/hello/" + name) )
-                         .firstElement() // <2>
+        httpClient.retrieve( GET("/hello/" + name) )
+                  .firstElement() // <2>
     }
     // end::nonblocking[]
 
     @Get("/endpoint/hello/{name}")
     String helloEndpoint(String name) {
-        return "Hello " + name
+        "Hello $name"
     }
 
     // tag::json[]
     @Get("/greet/{name}")
     Message greet(String name) {
-        return new Message("Hello " + name)
+        new Message("Hello $name")
     }
     // end::json[]
 
     @Post("/greet")
-    @Status(HttpStatus.CREATED)
+    @Status(CREATED)
     Message echo(@Body Message message) {
-        return message
+        message
     }
 
-    @Post(value = "/hello", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
-    @Status(HttpStatus.CREATED)
+    @Post(value = "/hello", consumes = TEXT_PLAIN, produces = TEXT_PLAIN)
+    @Status(CREATED)
     String echoHello(@Body String message) {
-        return message
+        message
     }
 }

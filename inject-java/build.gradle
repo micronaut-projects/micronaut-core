@@ -15,7 +15,7 @@ dependencies {
     testImplementation dependencyVersion("rxjava2")
     testImplementation dependencyVersion("spotbugs")
     testImplementation "org.hibernate:hibernate-core:5.4.27.Final"
-    testImplementation "junit:junit:4.13.1"
+    testImplementation "junit:junit:4.13.2"
     testImplementation "com.google.testing.compile:compile-testing:0.19"
     testImplementation 'org.mongodb:mongo-java-driver:3.12.7'
     testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'

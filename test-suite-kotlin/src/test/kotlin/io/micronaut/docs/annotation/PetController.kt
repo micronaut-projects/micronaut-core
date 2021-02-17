@@ -18,9 +18,7 @@ package io.micronaut.docs.annotation
 // tag::imports[]
 import io.micronaut.http.annotation.Controller
 import io.reactivex.Single
-
 // end::imports[]
-
 
 // tag::class[]
 @Controller("/pets")

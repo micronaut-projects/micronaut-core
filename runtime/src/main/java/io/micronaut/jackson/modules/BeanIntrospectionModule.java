@@ -44,6 +44,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -66,7 +67,7 @@ import java.util.*;
 @Internal
 @Experimental
 @Singleton
-@Requires(property = JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
+@Requires(property = JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION, notEquals = StringUtils.FALSE)
 public class BeanIntrospectionModule extends SimpleModule {
 
     private static final Logger LOG = LoggerFactory.getLogger(BeanIntrospectionModule.class);
@@ -390,6 +391,33 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
 
                     @Override
+                    public boolean canCreateFromString() {
+                        return constructorArguments.length == 1 && constructorArguments[0].equalsType(Argument.STRING);
+                    }
+
+                    @Override
+                    public boolean canCreateFromInt() {
+                        return constructorArguments.length == 1 && (
+                                constructorArguments[0].equalsType(Argument.INT) ||
+                                        constructorArguments[0].equalsType(Argument.LONG));
+                    }
+
+                    @Override
+                    public boolean canCreateFromLong() {
+                        return constructorArguments.length == 1 && constructorArguments[0].equalsType(Argument.LONG);
+                    }
+
+                    @Override
+                    public boolean canCreateFromDouble() {
+                        return constructorArguments.length == 1 && constructorArguments[0].equalsType(Argument.DOUBLE);
+                    }
+
+                    @Override
+                    public boolean canCreateFromBoolean() {
+                        return constructorArguments.length == 1 && constructorArguments[0].equalsType(Argument.BOOLEAN);
+                    }
+
+                    @Override
                     public Object createUsingDefault(DeserializationContext ctxt) throws IOException {
                         return introspection.instantiate();
                     }
@@ -397,6 +425,41 @@ public class BeanIntrospectionModule extends SimpleModule {
                     @Override
                     public Object createFromObjectWith(DeserializationContext ctxt, Object[] args) throws IOException {
                         return introspection.instantiate(false, args);
+                    }
+
+                    @Override
+                    public Object createFromString(DeserializationContext ctxt, String value) throws IOException {
+                        return introspection.instantiate(false, new Object[]{ value });
+                    }
+
+                    @Override
+                    public Object createFromInt(DeserializationContext ctxt, int value) throws IOException {
+                        InstantiationException originalException;
+                        try {
+                            return introspection.instantiate(false, new Object[]{value});
+                        } catch (InstantiationException e) {
+                            originalException = e;
+                        }
+                        try {
+                            return introspection.instantiate(false, new Object[]{Long.valueOf(value)});
+                        } catch (InstantiationException e) {
+                            throw originalException;
+                        }
+                    }
+
+                    @Override
+                    public Object createFromLong(DeserializationContext ctxt, long value) throws IOException {
+                        return introspection.instantiate(false, new Object[]{ value });
+                    }
+
+                    @Override
+                    public Object createFromDouble(DeserializationContext ctxt, double value) throws IOException {
+                        return introspection.instantiate(false, new Object[]{ value });
+                    }
+
+                    @Override
+                    public Object createFromBoolean(DeserializationContext ctxt, boolean value) throws IOException {
+                        return introspection.instantiate(false, new Object[]{ value });
                     }
                 });
                 return builder;

@@ -29,7 +29,7 @@ class EngineInitializer implements BeanInitializedEventListener<EngineFactory> {
     EngineFactory onInitialized(BeanInitializingEvent<EngineFactory> event) {
         EngineFactory engineFactory = event.bean
         engineFactory.rodLength = 6.6 // <5>
-        return event.bean
+        return engineFactory
     }
 }
 // end::class[]

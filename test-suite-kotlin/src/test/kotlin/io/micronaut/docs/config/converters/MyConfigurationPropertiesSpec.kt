@@ -14,13 +14,13 @@ class MyConfigurationPropertiesSpec : AnnotationSpec() {
     @BeforeEach
     fun setup() {
         ctx = ApplicationContext.run(
-                mapOf(
-                        "myapp.updatedAt" to mapOf( // <1>
-                                "day" to 28,
-                                "month" to 10,
-                                "year" to 1982
-                        )
+            mapOf(
+                "myapp.updatedAt" to mapOf( // <1>
+                    "day" to 28,
+                    "month" to 10,
+                    "year" to 1982
                 )
+            )
         )
     }
 

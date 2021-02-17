@@ -16,12 +16,10 @@
 package io.micronaut.docs.aop.introduction
 
 // tag::imports[]
-
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
 
 import javax.inject.Singleton
-
 // end::imports[]
 
 // tag::class[]

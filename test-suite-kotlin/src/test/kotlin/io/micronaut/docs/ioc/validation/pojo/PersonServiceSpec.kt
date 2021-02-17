@@ -22,7 +22,7 @@ class PersonServiceSpec {
     @Test
     fun testThatPersonIsValidWithValidator() {
         val person = Person("", 10)
-        val constraintViolations = validator.validate(person)  // <1>
+        val constraintViolations = validator.validate(person) // <1>
 
         assertEquals(2, constraintViolations.size) // <2>
     }
@@ -35,8 +35,9 @@ class PersonServiceSpec {
     @Test
     fun testThatPersonIsValid() {
         val person = Person("", 10)
-        val exception = assertThrows(ConstraintViolationException::class.java  // <1>
-        ) { personService.sayHello(person) }
+        val exception = assertThrows(ConstraintViolationException::class.java) {
+            personService.sayHello(person) // <1>
+        }
 
         assertEquals(2, exception.constraintViolations.size) // <2>
     }

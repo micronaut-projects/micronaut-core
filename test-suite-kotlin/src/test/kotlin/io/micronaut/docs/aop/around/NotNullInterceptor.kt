@@ -16,15 +16,10 @@
 package io.micronaut.docs.aop.around
 
 // tag::imports[]
-
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
-import io.micronaut.core.type.MutableArgumentValue
-
-import javax.inject.Singleton
 import java.util.Objects
-import java.util.Optional
-
+import javax.inject.Singleton
 // end::imports[]
 
 // tag::interceptor[]
@@ -40,7 +35,7 @@ class NotNullInterceptor : MethodInterceptor<Any, Any> { // <1>
                 }
                 .findFirst() // <2>
         return if (nullParam.isPresent) {
-            throw IllegalArgumentException("Null parameter [" + nullParam.get().key + "] not allowed") // <3>
+            throw IllegalArgumentException("Null parameter [${nullParam.get().key}] not allowed") // <3>
         } else {
             context.proceed() // <4>
         }
