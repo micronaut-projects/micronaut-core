@@ -15,9 +15,12 @@
  */
 package io.micronaut.inject.method.nullableinjection;
 
+import io.micronaut.context.annotation.Requires;
+
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+@Requires(property = "spec.name", value = "SetterWithNullableSpec")
 @Singleton
 public class C {
 

@@ -37,6 +37,9 @@ class FieldDependencyMissingFailureSpec extends Specification {
 Failed to inject value for field [a] of class: io.micronaut.inject.failures.fielddependencymissing.B
 
 Path Taken: B.a'''
+
+        cleanup:
+        context.close()
     }
 }
 

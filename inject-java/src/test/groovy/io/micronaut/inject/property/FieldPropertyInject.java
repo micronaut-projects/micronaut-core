@@ -17,12 +17,14 @@ package io.micronaut.inject.property;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.format.MapFormat;
 
 import javax.inject.Singleton;
 import java.util.List;
 import java.util.Map;
 
+@Requires(property = "spec.name", value = "PropertyAnnotationSpec")
 @Singleton
 public class FieldPropertyInject {
 
