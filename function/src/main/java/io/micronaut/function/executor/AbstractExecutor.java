@@ -107,7 +107,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
      * @return The {@link ApplicationContextBuilder}
      */
     protected @NonNull ApplicationContextBuilder newApplicationContextBuilder() {
-        return ApplicationContext.build(Environment.FUNCTION);
+        return ApplicationContext.builder(Environment.FUNCTION);
     }
 
     /**
