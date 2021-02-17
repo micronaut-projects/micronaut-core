@@ -1,7 +1,6 @@
 package io.micronaut.inject.context
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.annotation.ScopeOne
 import spock.lang.Specification
 
 class EagerInitSingletonsSpec extends Specification {
@@ -13,6 +12,7 @@ class EagerInitSingletonsSpec extends Specification {
                 .start()
 
         then:
+        noExceptionThrown()
         !Pojo.instantiated
 
         cleanup:
