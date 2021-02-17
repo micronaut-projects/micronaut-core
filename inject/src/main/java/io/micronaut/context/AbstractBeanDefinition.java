@@ -975,10 +975,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @UsedByGeneratedCode
     protected final Object getBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
         ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
-        Argument<?> argument = constructorInjectionPoint.getArguments()[argIndex];
-        if (argument instanceof DefaultArgument) {
-            argument = new EnvironmentAwareArgument((DefaultArgument) argument);
+        Argument<?> originalArgument = constructorInjectionPoint.getArguments()[argIndex];
+        Argument<?> argument;
+        if (originalArgument instanceof DefaultArgument) {
+            argument = new EnvironmentAwareArgument((DefaultArgument) originalArgument);
             instrumentAnnotationMetadata(context, argument);
+        } else {
+            argument = originalArgument;
         }
         Class argumentType = argument.getType();
         if (argumentType == BeanResolutionContext.class) {
@@ -991,8 +994,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
             return streamOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
-        } else if (Provider.class.isAssignableFrom(argumentType)) {
-            return getBeanProviderForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
+        } else if (ProviderFactory.isProvider(argumentType)) {
+            Provider provider = getBeanProviderForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
+            if (provider != null) {
+                return ProviderFactory.createProvider(argumentType, provider::get).orElse(null);
+            } else {
+                return null;
+            }
         } else if (Optional.class.isAssignableFrom(argumentType)) {
             return findBeanForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
         } else {
@@ -1428,8 +1436,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             }
         } else if (Stream.class.isAssignableFrom(beanType)) {
             return getStreamOfTypeForField(resolutionContext, context, injectionPoint);
-        } else if (Provider.class.isAssignableFrom(beanType)) {
-            return getBeanProviderForField(resolutionContext, context, injectionPoint);
+        } else if (ProviderFactory.isProvider(beanType)) {
+            Provider provider = getBeanProviderForField(resolutionContext, context, injectionPoint);
+            if (provider != null) {
+                return ProviderFactory.createProvider(beanType, provider::get).orElse(null);
+            } else {
+                return null;
+            }
         } else if (Optional.class.isAssignableFrom(beanType)) {
             return findBeanForField(resolutionContext, context, injectionPoint);
         } else {
@@ -1621,8 +1634,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
             return streamOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
-        } else if (Provider.class.isAssignableFrom(argumentType)) {
-            return getBeanProviderForMethodArgument(resolutionContext, context, injectionPoint, argument);
+        } else if (ProviderFactory.isProvider(argumentType)) {
+            Provider provider = getBeanProviderForMethodArgument(resolutionContext, context, injectionPoint, argument);
+            if (provider != null) {
+                return ProviderFactory.createProvider(argumentType, provider::get).orElse(null);
+            } else {
+                return null;
+            }
         } else if (Optional.class.isAssignableFrom(argumentType)) {
             return findBeanForMethodArgument(resolutionContext, context, injectionPoint, argument);
         } else {
@@ -1931,6 +1949,14 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (object instanceof EnvironmentConfigurable && context instanceof ApplicationContext) {
             ((EnvironmentConfigurable) object).configure(((ApplicationContext) context).getEnvironment());
         }
+    }
+
+    private Argument<?> instrument(Argument<?> argument, BeanContext context) {
+        if (argument instanceof DefaultArgument) {
+            argument = new EnvironmentAwareArgument((DefaultArgument) argument);
+            instrumentAnnotationMetadata(context, argument);
+        }
+        return argument;
     }
 
     /**

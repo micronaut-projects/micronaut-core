@@ -36,7 +36,6 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
-import javax.inject.Provider;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -310,7 +309,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     Argument<?>[] arguments = candidate.getConstructor().getArguments();
                                     for (Argument<?> argument : arguments) {
                                         Class<?> argumentType;
-                                        if (Provider.class.isAssignableFrom(argument.getType())) {
+                                        if (ProviderFactory.isProvider(argument.getType())) {
                                             argumentType = argument.getFirstTypeVariable().orElse(argument).getType();
                                         } else {
                                             argumentType = argument.getType();

@@ -15,6 +15,7 @@
  */
 package io.micronaut.session;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.scheduling.TaskExecutors;
 
@@ -46,7 +47,7 @@ public class SessionConfiguration {
     private Duration maxInactiveInterval = Duration.ofMinutes(DEFAULT_MAXINACTIVEINTERVAL_MINUTES);
     private Integer maxActiveSessions;
     private boolean promptExpiration = false;
-    private Provider<ExecutorService> executorService;
+    private BeanProvider<ExecutorService> executorService;
 
     /**
      * @return The maximum number of active sessions
@@ -103,7 +104,7 @@ public class SessionConfiguration {
      */
     public Optional<ScheduledExecutorService> getExecutorService() {
         return Optional.ofNullable(executorService)
-                .map(Provider::get)
+                .map(BeanProvider::get)
                 .filter(ScheduledExecutorService.class::isInstance)
                 .map(ScheduledExecutorService.class::cast);
     }
@@ -113,8 +114,18 @@ public class SessionConfiguration {
      *
      * @param executorService The executorService
      */
-    @Inject
+    @Deprecated
     public void setExecutorService(@Nullable @Named(TaskExecutors.SCHEDULED) Provider<ExecutorService> executorService) {
+        this.executorService = executorService::get;
+    }
+
+    /**
+     * Set the executor service.
+     *
+     * @param executorService The executorService
+     */
+    @Inject
+    public void setExecutorService(@Nullable @Named(TaskExecutors.SCHEDULED) BeanProvider<ExecutorService> executorService) {
         this.executorService = executorService;
     }
 }

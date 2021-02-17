@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
@@ -88,7 +89,6 @@ import org.slf4j.LoggerFactory;
 
 import io.micronaut.core.annotation.Nullable;
 
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.io.File;
 import java.net.*;
@@ -179,7 +179,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
             StaticResourceResolver resourceResolver,
-            @javax.inject.Named(TaskExecutors.IO) Provider<ExecutorService> ioExecutor,
+            @javax.inject.Named(TaskExecutors.IO) BeanProvider<ExecutorService> ioExecutor,
             @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
             ExecutorSelector executorSelector,
             @Nullable ServerSslBuilder serverSslBuilder,
