@@ -6,6 +6,8 @@ plugins {
 
 repositories {
     mavenCentral()
+
+    //TODO remove
     jcenter()
     maven { url "https://repo.grails.org/grails/libs-releases" }
 }
