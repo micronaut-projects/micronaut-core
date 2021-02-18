@@ -85,7 +85,7 @@ class ScheduledFixedRateSpec extends Specification {
                 'scheduled-test.task.enabled': true
         )
 
-        PollingConditions conditions = new PollingConditions(timeout: 10)
+        PollingConditions conditions = new PollingConditions(timeout: 20)
 
         when:
         MyOtherTask myTask = beanContext.getBean(MyOtherTask)
