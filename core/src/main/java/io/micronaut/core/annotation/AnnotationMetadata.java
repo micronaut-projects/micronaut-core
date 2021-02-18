@@ -226,6 +226,26 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * Checks whether this object has any of the given stereotype directly declared on the object.
+     *
+     * @param annotations The annotations
+     * @return True if any of the given stereotypes are present
+     * @since 2.3.3
+     */
+    @SuppressWarnings("unchecked")
+    default boolean hasDeclaredStereotype(@Nullable String... annotations) {
+        if (ArrayUtils.isEmpty(annotations)) {
+            return false;
+        }
+        for (String annotation : annotations) {
+            if (hasDeclaredStereotype(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Return the default values for the given annotation name.
      * @param annotation The annotation name
      * @return The default values

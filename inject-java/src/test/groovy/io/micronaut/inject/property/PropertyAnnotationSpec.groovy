@@ -23,6 +23,7 @@ class PropertyAnnotationSpec extends Specification {
     void "test inject properties"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
+                'spec.name': getClass().simpleName,
                 'my.string':'foo',
                 'my.int':10,
                 'my.map.one':'one',

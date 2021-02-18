@@ -27,8 +27,7 @@ class ValidatedGetterConfigurationSpec extends Specification {
 
     void "test validated config with invalid config"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.start()
+        ApplicationContext applicationContext = ApplicationContext.run(["spec.name": getClass().simpleName], "test")
 
         when:
         ValidatedGetterConfig config = applicationContext.getBean(ValidatedGetterConfig)
@@ -44,7 +43,10 @@ class ValidatedGetterConfigurationSpec extends Specification {
 
     void "test validated config with valid config"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder()
+                .properties(["spec.name": getClass().simpleName])
+                .environments("test")
+                .build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'foo.bar.url':'http://localhost',
                 'foo.bar.name':'test'

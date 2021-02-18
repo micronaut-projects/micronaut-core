@@ -15,12 +15,14 @@
  */
 package io.micronaut.inject.value.nullablevalue;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+@Requires(property = "spec.name", value = "NullableValueSpec")
 @Singleton
 public class A {
 
