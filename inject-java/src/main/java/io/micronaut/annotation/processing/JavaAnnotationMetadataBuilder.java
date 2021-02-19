@@ -187,10 +187,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                 if (entry.getKey().getSimpleName().toString().equals("value")) {
                     Object value = entry.getValue().getValue();
                     if (value instanceof List) {
+                        String parentAnnotationName = getAnnotationTypeName(annotation);
                         for (Object val: (List<?>) value) {
                             if (val instanceof AnnotationMirror) {
                                 String name = getRepeatableName((AnnotationMirror) val);
-                                if (name != null && name.equals(getAnnotationTypeName(annotation))) {
+                                if (name != null && name.equals(parentAnnotationName)) {
                                     repeatable = true;
                                     expanded.add((AnnotationMirror) val);
                                 }
