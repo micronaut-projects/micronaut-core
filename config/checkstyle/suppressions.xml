@@ -5,14 +5,8 @@
         "https://checkstyle.org/dtds/suppressions_1_2.dtd">
 
 <suppressions>
-    <suppress checks="FileLength"
-              files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|BeanDefinitionInjectProcessor.java|AbstractBeanDefinition.java|DefaultValidator.java"/>
-    <suppress checks="DeclarationOrder"
-              files="UriTemplate.java"/>
-    <suppress checks="Header"
-              files="AnnotationClassReader.java|Attribute.java|Context.java|io[\\/]micronaut[\\/]core[\\/]util[\\/]clhm|AmazonInfo.java|DataCenterInfo.java|LeaseInfo.java|QueryStringDecoder.java|CronExpression.java|AntPathMatcher.java|io[\\/]micronaut[\\/]http[\\/]netty[\\/]stream[\\/]package-info.java" />
-    <suppress checks="[a-zA-Z0-9]*"
-              files="FlowControlHandler.java" />
-    <suppress checks="ParameterNumber"
-              files="DefaultHttpClient.java" />
+    <!-- <suppress checks="FileLength" -->
+              <!-- files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java"/> -->
+
+    <suppress checks="MissingJavadocType" files=".*doc-examples.*" />
 </suppressions>
