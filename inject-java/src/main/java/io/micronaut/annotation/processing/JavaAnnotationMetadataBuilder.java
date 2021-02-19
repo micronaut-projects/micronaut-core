@@ -180,7 +180,30 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     protected List<? extends AnnotationMirror> getAnnotationsForType(Element element) {
         List<? extends AnnotationMirror> annotationMirrors = new ArrayList<>(element.getAnnotationMirrors());
         annotationMirrors.removeIf(mirror -> getAnnotationTypeName(mirror).equals(AnnotationUtil.KOTLIN_METADATA));
-        return annotationMirrors;
+        List<AnnotationMirror> expanded = new ArrayList<>(annotationMirrors.size());
+        for (AnnotationMirror annotation: annotationMirrors) {
+            boolean repeatable = false;
+            for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry: annotation.getElementValues().entrySet()) {
+                if (entry.getKey().getSimpleName().toString().equals("value")) {
+                    Object value = entry.getValue().getValue();
+                    if (value instanceof List) {
+                        for (Object val: (List<?>) value) {
+                            if (val instanceof AnnotationMirror) {
+                                String name = getRepeatableName((AnnotationMirror) val);
+                                if (name != null && name.equals(getAnnotationTypeName(annotation))) {
+                                    repeatable = true;
+                                    expanded.add((AnnotationMirror) val);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (!repeatable) {
+                expanded.add(annotation);
+            }
+        }
+        return expanded;
     }
 
     @Override
