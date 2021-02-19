@@ -288,10 +288,11 @@ public class BeanIntrospectionModule extends SimpleModule {
                             props = new SettableBeanProperty[constructorArguments.length];
                             for (int i = 0; i < constructorArguments.length; i++) {
                                 Argument<?> argument = constructorArguments[i];
-                                final JavaType javaType = existing != null && existing.length > i ? existing[i].getType() : newType(argument, typeFactory);
+                                SettableBeanProperty existingProperty = existing != null && existing.length > i ? existing[i] : null;
+                                final JavaType javaType = existingProperty != null ? existingProperty.getType() : newType(argument, typeFactory);
                                 final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
                                 PropertyMetadata propertyMetadata = newPropertyMetadata(argument, annotationMetadata);
-                                final String simpleName = annotationMetadata.stringValue(JsonProperty.class).orElse(argument.getName());
+                                final String simpleName = existingProperty != null ? existingProperty.getName() : annotationMetadata.stringValue(JsonProperty.class).orElse(argument.getName());
                                 TypeDeserializer typeDeserializer;
                                 try {
                                     typeDeserializer = config.findTypeDeserializer(javaType);
