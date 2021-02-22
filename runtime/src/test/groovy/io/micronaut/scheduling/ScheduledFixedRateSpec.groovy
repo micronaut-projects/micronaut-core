@@ -39,17 +39,20 @@ class ScheduledFixedRateSpec extends Specification {
                 'spec.name': 'ScheduledFixedRateSpecMyTask',
         )
 
-        PollingConditions conditions = new PollingConditions(timeout: 10)
+        PollingConditions conditions = new PollingConditions(timeout: 7)
 
         when:
         MyTask myTask = beanContext.getBean(MyTask)
+        MyJavaTask myJavaTask = beanContext.getBean(MyJavaTask)
 
         then:
         !myTask.wasDelayedRun
         conditions.eventually {
             myTask.wasRun
             myTask.fixedDelayWasRun
-            beanContext.getBean(MyJavaTask).wasRun
+            myJavaTask.wasRun
+            myJavaTask.wasRun
+            myJavaTask.cronEvents.get() == 2
         }
 
         and:
@@ -58,7 +61,6 @@ class ScheduledFixedRateSpec extends Specification {
             myTask.cronEvents.get() >= 3
             myTask.cronEventsNoSeconds.get() >= 0
             myTask.wasDelayedRun
-            beanContext.getBean(MyJavaTask).wasRun
         }
 
         cleanup:
