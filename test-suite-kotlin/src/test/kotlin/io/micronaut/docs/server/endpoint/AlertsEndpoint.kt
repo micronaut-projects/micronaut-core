@@ -11,7 +11,6 @@ import io.micronaut.management.endpoint.annotation.Write
 import java.util.concurrent.CopyOnWriteArrayList
 //end::imports[]
 
-//end::clazz[]
 @Requires(property = "spec.name", value = "AlertsEndpointSpec")
 //tag::clazz[]
 @Endpoint(id = "alerts", defaultSensitive = false) // <1>

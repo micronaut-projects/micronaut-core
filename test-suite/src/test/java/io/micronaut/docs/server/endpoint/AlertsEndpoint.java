@@ -15,8 +15,8 @@
  */
 package io.micronaut.docs.server.endpoint;
 
-//tag::clazz[]
 import io.micronaut.context.annotation.Requires;
+//tag::imports[]
 import io.micronaut.http.MediaType;
 import io.micronaut.management.endpoint.annotation.Delete;
 import io.micronaut.management.endpoint.annotation.Endpoint;
@@ -26,7 +26,7 @@ import io.micronaut.management.endpoint.annotation.Write;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-//end::clazz[]
+//end::imports[]
 
 @Requires(property = "spec.name", value = "AlertsEndpointSpec")
 //tag::clazz[]

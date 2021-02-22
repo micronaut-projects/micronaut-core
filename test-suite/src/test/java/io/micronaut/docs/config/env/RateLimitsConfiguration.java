@@ -15,6 +15,7 @@
  */
 package io.micronaut.docs.config.env;
 
+// tag::clazz[]
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.order.Ordered;
@@ -52,5 +53,5 @@ public class RateLimitsConfiguration implements Ordered { // <2>
     public void setLimit(Integer limit) {
         this.limit = limit;
     }
-
 }
+// end::clazz[]
