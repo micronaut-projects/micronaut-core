@@ -1,4 +1,4 @@
-If you are using a build tool such as Maven, which does not support automatic recompilation on file changes, you may choose to use your IDE to recompile classes in combination with a reloading agent (as configured in the above sections).
+If you use a build tool such as Maven which does not support automatic recompilation on file changes, you may use your IDE to recompile classes in combination with a reloading agent (as configured in the above sections).
 
 === IntelliJ
 

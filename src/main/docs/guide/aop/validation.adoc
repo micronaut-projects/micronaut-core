@@ -1,9 +1,6 @@
-Validation advice is one of the most common advice types you are likely to want to incorporate into your application.
+Validation advice is one of the most common advice types you are likely to want to use in your application.
 
-Validation advice is built on https://beanvalidation.org/2.0/spec/[Bean Validation JSR 380].
-
-JSR 380 is a specification of the Java API for bean validation which ensures that the
-properties of a bean meet specific criteria, using `javax.validation` annotations such as `@NotNull`, `@Min`, and `@Max`.
+Validation advice is built on https://beanvalidation.org/2.0/spec/[Bean Validation JSR 380], a specification of the Java API for bean validation which ensures that the properties of a bean meet specific criteria, using `javax.validation` annotations such as `@NotNull`, `@Min`, and `@Max`.
 
 Micronaut provides native support for the `javax.validation` annotations with the `micronaut-validation` dependency:
 
