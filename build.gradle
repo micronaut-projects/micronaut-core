@@ -389,7 +389,7 @@ ext {
                     name:'neo4j-java-driver'
             ],
             oracle                      : [
-                    version: oracleDriverVersion,
+                    version: ojdbcVersion,
                     group  : 'com.oracle.database.jdbc',
                     name   : 'ojdbc8',
                     modules: ['ucp']
