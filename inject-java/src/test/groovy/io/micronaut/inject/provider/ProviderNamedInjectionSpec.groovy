@@ -37,7 +37,7 @@ class ProviderNamedInjectionSpec extends Specification {
     }
 
     void "test each bean with a nullable provider parameter"() {
-        ApplicationContext ctx = ApplicationContext.run()
+        ApplicationContext ctx = ApplicationContext.run(["spec.name": getClass().simpleName])
 
         expect:
         ctx.getBeansOfType(EachBeanProvider).size() == 2

@@ -20,19 +20,28 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.annotation.Scheduled;
 
 import javax.inject.Singleton;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
 @Singleton
+@Requires(property = "spec.name", value = "ScheduledFixedRateSpecMyTask")
 @Requires(property = "scheduled-test.task.enabled", value = StringUtils.TRUE)
 public class MyJavaTask {
     private boolean wasRun = false;
+    AtomicInteger cronEvents = new AtomicInteger(0);
 
     @Scheduled(fixedRate = "10ms")
     public void runSomething() {
         wasRun = true;
+    }
+
+    @Scheduled(cron = "1/3 0/1 * 1/1 * ?")
+    @Scheduled(cron = "1/4 0/1 * 1/1 * ?")
+    void runCron() {
+        cronEvents.incrementAndGet();
     }
 
     public boolean isWasRun() {

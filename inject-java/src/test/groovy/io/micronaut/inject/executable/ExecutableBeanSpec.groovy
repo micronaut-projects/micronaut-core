@@ -102,5 +102,29 @@ class MyBean {
         expect:
         definition == null
     }
+
+    void "test multiple executable annotations on a method"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.executable.*;
+
+@javax.inject.Singleton
+class MyBean  {
+
+    @RepeatableExecutable("a")
+    @RepeatableExecutable("b")
+    public void run() {
+        
+    }
+}
+''')
+        expect:
+        definition != null
+        definition.findMethod("run").isPresent()
+    }
 }
 

@@ -15,8 +15,11 @@
  */
 package io.micronaut.inject.failures.ctorexception;
 
+import io.micronaut.context.annotation.Requires;
+
 import javax.inject.Singleton;
 
+@Requires(property = "spec.name", value = "ConstructorExceptionSpec")
 @Singleton
 public class A {
     public A(C c) {

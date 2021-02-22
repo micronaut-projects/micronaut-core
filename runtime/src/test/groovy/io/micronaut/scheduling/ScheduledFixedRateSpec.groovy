@@ -35,20 +35,24 @@ class ScheduledFixedRateSpec extends Specification {
         given:
         ApplicationContext beanContext = ApplicationContext.run(
                 'some.configuration':'10ms',
-                'scheduled-test.task.enabled':true
+                'scheduled-test.task.enabled':true,
+                'spec.name': 'ScheduledFixedRateSpecMyTask',
         )
 
-        PollingConditions conditions = new PollingConditions(timeout: 10)
+        PollingConditions conditions = new PollingConditions(timeout: 7)
 
         when:
         MyTask myTask = beanContext.getBean(MyTask)
+        MyJavaTask myJavaTask = beanContext.getBean(MyJavaTask)
 
         then:
         !myTask.wasDelayedRun
         conditions.eventually {
             myTask.wasRun
             myTask.fixedDelayWasRun
-            beanContext.getBean(MyJavaTask).wasRun
+            myJavaTask.wasRun
+            myJavaTask.wasRun
+            myJavaTask.cronEvents.get() == 2
         }
 
         and:
@@ -57,14 +61,17 @@ class ScheduledFixedRateSpec extends Specification {
             myTask.cronEvents.get() >= 3
             myTask.cronEventsNoSeconds.get() >= 0
             myTask.wasDelayedRun
-            beanContext.getBean(MyJavaTask).wasRun
         }
+
+        cleanup:
+        beanContext.close()
     }
 
     void 'test scheduled annotation with retry'() {
         given:
         ApplicationContext beanContext = ApplicationContext.run(
-                'scheduled-test.task2.enabled': true
+                'scheduled-test.task2.enabled': true,
+                'spec.name': 'ScheduledFixedRateSpecTask2',
         )
 
         PollingConditions conditions = new PollingConditions(timeout: 10)
@@ -77,15 +84,19 @@ class ScheduledFixedRateSpec extends Specification {
             myTask.initialDelayWasRun
             myTask.attempts.get() == 2
         }
+
+        cleanup:
+        beanContext.close()
     }
 
     void 'test multiple schedule annotations'() {
         given:
         ApplicationContext beanContext = ApplicationContext.run(
-                'scheduled-test.task.enabled': true
+                'scheduled-test.task.enabled': true,
+                'spec.name': 'ScheduledFixedRateSpecMyOtherTask',
         )
 
-        PollingConditions conditions = new PollingConditions(timeout: 10)
+        PollingConditions conditions = new PollingConditions(timeout: 20)
 
         when:
         MyOtherTask myTask = beanContext.getBean(MyOtherTask)
@@ -94,9 +105,13 @@ class ScheduledFixedRateSpec extends Specification {
         conditions.eventually {
             myTask.cronEvents.get() == 2
         }
+
+        cleanup:
+        beanContext.close()
     }
 
     @Singleton
+    @Requires(property = 'spec.name', value = 'ScheduledFixedRateSpecMyTask')
     @Requires(property = 'scheduled-test.task.enabled', value = 'true')
     static class MyTask {
 
@@ -140,6 +155,7 @@ class ScheduledFixedRateSpec extends Specification {
 
     @Singleton
     @Requires(property = 'scheduled-test.task2.enabled', value = 'true')
+    @Requires(property = 'spec.name', value = 'ScheduledFixedRateSpecTask2')
     static class MyTask2 {
 
         boolean initialDelayWasRun = false
@@ -159,6 +175,7 @@ class ScheduledFixedRateSpec extends Specification {
     }
 
     @Singleton
+    @Requires(property = 'spec.name', value = 'ScheduledFixedRateSpecMyOtherTask')
     @Requires(property = 'scheduled-test.task.enabled', value = 'true')
     static class MyOtherTask {
 

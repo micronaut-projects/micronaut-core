@@ -9,7 +9,7 @@ ext {
 }
 repositories {
     mavenCentral() // <1>
-    maven { url "https://oss.sonatype.org/content/repositories/snapshots/" } // <2>
+    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" } // <2>
 }
 ----
 
@@ -37,7 +37,7 @@ In the case of Maven, edit `pom.xml`:
   <repositories>
     <repository>
       <id>sonatype-snapshots</id>
-      <url>https://oss.sonatype.org/content/repositories/snapshots/</url> <!--2-->
+      <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url> <!--2-->
     </repository>
   </repositories>
 
