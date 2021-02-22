@@ -3,30 +3,28 @@
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI, supply the `hibernate-jpa` feature to include a Hibernate JPA configuration in your project:
+If you create your project using the Micronaut CLI, supply the `hibernate-jpa` feature to include a Hibernate JPA configuration in your project:
 ----
 $ mn create-app my-app --features hibernate-jpa
 ----
 ====
 
-Micronaut features built in support for configuring a http://hibernate.org[Hibernate] / JPA `EntityManager` that builds on the <<sqlSupport, SQL DataSource support>>.
+Micronaut includes support for configuring a http://hibernate.org[Hibernate] / JPA `EntityManager` that builds on the <<sqlSupport, SQL DataSource support>>.
 
-Once you have <<sqlSupport, configured one or many DataSources>> to use Hibernate, you will need to add the `hibernate-jpa` dependency to your build configuration:
+Once you have <<sqlSupport, configured one or more DataSources>> to use Hibernate, add the `hibernate-jpa` dependency to your build:
 
 dependency:micronaut-hibernate-jpa[groupId="io.micronaut.sql"]
 
 For more information see the https://micronaut-projects.github.io/micronaut-sql/latest/guide/#hibernate[Configuring Hibernate] section of the https://github.com/micronaut-projects/micronaut-sql[Micronaut SQL libraries] project.
 
-
 ==== Using GORM for Hibernate
 
-For Groovy users and users familiar with the Grails framework, special support for http://gorm.grails.org[GORM for Hibernate] is available. To use GORM for Hibernate you *should not* include Micronaut's built in <<sqlSupport, SQL Support>> or the `hibernate-jpa` dependency since GORM itself takes responsibility for creating the `DataSource`, `SessionFactory` etc.
-
+For Groovy users and users familiar with the Grails framework, special support for http://gorm.grails.org[GORM for Hibernate] is available. To use GORM for Hibernate *do not* include Micronaut's built-in <<sqlSupport, SQL Support>> or the `hibernate-jpa` dependency since GORM itself takes responsibility for creating the `DataSource`, `SessionFactory`, etc.
 
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI, supply the `hibernate-gorm` feature to include GORM, a basic connection pool configuration, and a default H2 database driver in your project:
+If you create your project using the Micronaut CLI, supply the `hibernate-gorm` feature to include GORM, a basic connection pool configuration, and a default H2 database driver in your project:
 ----
 $ mn create-app my-app --features hibernate-gorm
 ----

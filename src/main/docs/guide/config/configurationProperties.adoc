@@ -1,19 +1,19 @@
-You can create type safe configuration by creating classes that are annotated with
+You can create type-safe configuration by creating classes that are annotated with
  ann:io.micronaut.context.annotation.ConfigurationProperties[].
 
 Micronaut will produce a reflection-free `@ConfigurationProperties` bean and will also at compile time calculate the property paths to evaluate, greatly improving the speed and efficiency of loading `@ConfigurationProperties`.
 
-An example of a configuration class can be seen below:
+For example:
 
 snippet::io.micronaut.docs.config.properties.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
 
 <1> The `@ConfigurationProperties` annotation takes the configuration prefix
-<2> You can use `javax.validation` to validate the configuration
+<2> You can use `javax.validation` annotations to validate the configuration
 <3> Default values can be assigned to the property
-<4> Static inner classes can provided nested configuration
-<5> Optional configuration values can be wrapped in a `java.util.Optional`
+<4> Static inner classes can provide nested configuration
+<5> Optional configuration values can be wrapped in `java.util.Optional`
 
-Once you have prepared a type safe configuration it can simply be injected into your objects like any other bean:
+Once you have prepared a type-safe configuration it can be injected into your beans like any other bean:
 
 snippet::io.micronaut.docs.config.properties.EngineImpl[tags="class",indent=0,title="@ConfigurationProperties Dependency Injection"]
 
@@ -32,13 +32,13 @@ For example creating a subclass of `EngineConfig` with `@ConfigurationProperties
 
 == Includes / Excludes
 
-For the cases where the configuration properties class is inheriting properties from a parent class, it may be desirable to exclude properties from the parent class. The `includes` and `excludes` members of the ann:io.micronaut.context.annotation.ConfigurationProperties[] annotation allow for that functionality. The list applies to both local properties and inherited properties.
+For the cases where the configuration properties class inherits properties from a parent class, it may be desirable to exclude properties from the parent class. The `includes` and `excludes` members of the ann:io.micronaut.context.annotation.ConfigurationProperties[] annotation allow for that functionality. The list applies to both local properties and inherited properties.
 
-The names supplied to the includes/excludes list should be the "property" name. For example if a setter method is injected, the property name is the de-capitalized setter name (`setConnectionTimeout` -> `connectionTimeout`).
+The names supplied to the includes/excludes list must be the "property" name. For example if a setter method is injected, the property name is the de-capitalized setter name (`setConnectionTimeout` -> `connectionTimeout`).
 
 == Property Type Conversion
 
-When resolving properties Micronaut will use the api:io.micronaut.core.convert.ConversionService[] bean to convert properties. You can register additional converters for types not supported by Micronaut by defining beans that implement the api:io.micronaut.core.convert.TypeConverter[] interface.
+Micronaut uses the api:io.micronaut.core.convert.ConversionService[] bean to convert values when resolving properties. You can register additional converters for types not supported by Micronaut by defining beans that implement the api:io.micronaut.core.convert.TypeConverter[] interface.
 
 Micronaut features some built-in conversions that are useful, which are detailed below.
 
@@ -62,7 +62,7 @@ Durations can be specified by appending the unit with a number. Supported units 
 
 |`10ns` | `Duration` of 10 nanoseconds
 
-|`PT15M` | Duration of 15 minutes using ISO-8601 format
+|`PT15M` | `Duration` of 15 minutes using ISO-8601 format
 
 |===
 
@@ -79,7 +79,7 @@ micronaut:
 
 === List / Array Conversion
 
-Lists and arrays can be specified in Java properties files as comma-separated values or in YAML using native YAML lists. The generic types are used to convert the values. For example in YAML:
+Lists and arrays can be specified in Java properties files as comma-separated values, or in YAML using native YAML lists. The generic types are used to convert the values. For example in YAML:
 
 .Specifying lists or arrays in YAML
 [source,yaml]
@@ -148,7 +148,7 @@ With the above in place you can set `micronaut.http.client.max-content-length` u
 
 === Formatting Dates
 
-The ann:io.micronaut.core.convert.format.Format[] annotation can be used on any setter to allow the date format to be specified when binding `java.time` date objects.
+The ann:io.micronaut.core.convert.format.Format[] annotation can be used on setters to specify the date format to use when binding `java.time` date objects.
 
 .Using `@Format` for Dates
 [source,java]
@@ -160,13 +160,13 @@ public void setMyDate(@Format("yyyy-MM-dd") LocalDate date) {
 
 == Configuration Builder
 
-Many existing frameworks and tools already use builder-style classes to construct configuration.
+Many frameworks and tools already use builder-style classes to construct configuration.
 
-To support the ability for a builder style class to be populated with configuration values, the link:{api}/io/micronaut/context/annotation/ConfigurationBuilder.html[@ConfigurationBuilder] annotation can be used. link:{api}/io/micronaut/context/annotation/ConfigurationBuilder.html[ConfigurationBuilder] can be added to a field or method in a class annotated with link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties].
+You can use the link:{api}/io/micronaut/context/annotation/ConfigurationBuilder.html[@ConfigurationBuilder] annotation to populate a builder-style class with configuration values. link:{api}/io/micronaut/context/annotation/ConfigurationBuilder.html[ConfigurationBuilder] can be applied to fields or methods in a class annotated with link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties].
 
 Since there is no consistent way to define builders in the Java world, one or more method prefixes can be specified in the annotation to support builder methods like `withXxx` or `setXxx`. If the builder methods have no prefix, assign an empty string to the parameter.
 
-A configuration prefix can also be specified to tell Micronaut where to look for configuration values. By default, the builder methods will use the configuration prefix defined at the class level link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation.
+A configuration prefix can also be specified to tell Micronaut where to look for configuration values. By default, builder methods use the configuration prefix specified in a class-level link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation.
 
 For example:
 
@@ -174,18 +174,18 @@ For example:
 snippet::io.micronaut.docs.config.builder.EngineConfig[tags="imports,class"]
 
 <1> The `@ConfigurationProperties` annotation takes the configuration prefix
-<2> The first builder can be configured without the class configuration prefix; it will inherit from the above.
+<2> The first builder can be configured without the class configuration prefix; it inherits from the above.
 <3> The second builder can be configured with the class configuration prefix + the `configurationPrefix` value.
 <4> The third builder demonstrates that the annotation can be applied to a method as well as a property.
 
-NOTE: By default, only builder methods that take a single argument are supported. To support methods with no arguments, set the `allowZeroArgs` parameter of the annotation to true.
+NOTE: By default, only single-argument builder methods are supported. For methods with no arguments, set the `allowZeroArgs` parameter of the annotation to `true`.
 
-Just like in the previous example, we can construct an `EngineImpl`. Since we are using a builder, a factory class can be used to build the engine from the builder.
+Like in the previous example, we can construct an `EngineImpl`. Since we are using a builder, we can use a factory class to build the engine from the builder.
 
 .Factory Bean
 snippet::io.micronaut.docs.config.builder.EngineFactory[tags="imports,class"]
 
-The engine that was returned can then be injected anywhere an engine is depended on.
+The engine that was returned can then be injected anywhere an engine is required.
 
 Configuration values can be supplied from one of the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] instances. For example:
 
@@ -196,9 +196,9 @@ The above example prints: `"Subaru Engine Starting V4 [rodLength=4.0, sparkPlug=
 
 == MapFormat
 
-For some use cases it may be desirable to accept a map of arbitrary configuration properties that can be supplied to a bean, especially if the bean represents a third-party API where not all of the possible configuration properties are known by the developer. For example, a datasource may accept a map of configuration properties specific to a particular database driver, allowing the user to specify any desired options in the map without coding every single property explicitly.
+For some use cases it may be desirable to accept a map of arbitrary configuration properties that can be supplied to a bean, especially if the bean represents a third-party API where not all the possible configuration properties are known. For example, a datasource may accept a map of configuration properties specific to a particular database driver, allowing the user to specify any desired options in the map without coding each property explicitly.
 
-For this purpose, the api:core.convert.format.MapFormat[] annotation allows you to bind a map to a single configuration property, and specify whether to accept a flat map of keys to values, or a nested map (where the values may be additional maps].
+For this purpose, the api:core.convert.format.MapFormat[] annotation lets you bind a map to a single configuration property, and specify whether to accept a flat map of keys to values, or a nested map (where the values may be additional maps).
 
 snippet::io.micronaut.docs.config.mapFormat.EngineConfig[tags="imports,class",indent=0,title="@MapFormat Example"]
 <1> Note the `transformation` argument to the annotation; possible values are `MapTransformation.FLAT` (for flat maps) and `MapTransformation.NESTED` (for nested maps)

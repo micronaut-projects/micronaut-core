@@ -2,9 +2,9 @@ Additional api:io.micronaut.context.env.PropertySource[] instances can be added 
 
 snippet::io.micronaut.docs.context.env.EnvironmentSpec[tags="envProps",indent=0,title="Initializing the Environment"]
 
-The link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource.of] method can be used to create a `ProperySource` from a map of values.
+The link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource.of] method can be used to create a `PropertySource` from a map of values.
 
-Alternatively one can register a link:{api}/io/micronaut/context/env/PropertySourceLoader.html[PropertySourceLoader] by creating a `META-INF/services/io.micronaut.context.env.PropertySourceLoader` containing a reference to the class name of the `PropertySourceLoader`.
+Alternatively one can register a link:{api}/io/micronaut/context/env/PropertySourceLoader.html[PropertySourceLoader] by creating a `META-INF/services/io.micronaut.context.env.PropertySourceLoader` file containing a reference to the class name of the `PropertySourceLoader`.
 
 === Included PropertySource Loaders
 
@@ -37,7 +37,7 @@ $ ./gradlew run --args="-endpoints.health.enabled=true -config.property=test"
 $ ./mvnw mn:run -Dmn.appArgs="-endpoints.health.enabled=true -config.property=test"
 ----
 
-In order for the configuration to be apart of the context, the args from the main method must be passed to the context builder. For example:
+For the configuration to be a part of the context, the args from the main method must be passed to the context builder. For example:
 
 [source,java]
 ----
@@ -53,7 +53,7 @@ public class Application {
 
 === Property Value Placeholders
 
-Micronaut includes a property placeholder syntax which can be used to reference configuration properties both within configuration values and with any Micronaut annotation (see ann:io.micronaut.context.annotation.Value[] and the section on <<valueAnnotation,Configuration Injection>>).
+Micronaut includes a property placeholder syntax to reference configuration properties both within configuration values and with any Micronaut annotation. See ann:io.micronaut.context.annotation.Value[] and the section on <<valueAnnotation,Configuration Injection>>.
 
 TIP: Programmatic usage is also possible via the api:io.micronaut.context.env.PropertyPlaceholderResolver[] interface.
 
@@ -77,7 +77,7 @@ myapp:
   endpoint: http://${micronaut.server.host:localhost}:${micronaut.server.port:8080}/foo
 ----
 
-The above example will default to `localhost` and port `8080` if no value is found (rather than throwing an exception). Note that if default value itself contains a `:` character, you should escape it using back ticks:
+The above example defaults to `localhost` and port `8080` if no value is found (rather than throwing an exception). Note that if the default value contains a `:` character, you must escape it using backticks:
 
 .Using Backticks
 [source,yaml]
@@ -86,11 +86,11 @@ myapp:
   endpoint: ${server.address:`http://localhost:8080`}/foo
 ----
 
-The above example tries to read a `server.address` property otherwise fallbacks back to `http://localhost:8080`, since the address has a `:` character we have to escape it with back ticks.
+The above example looks for a `server.address` property and defaults to `http://localhost:8080`. This default value is escaped with backticks since it has a `:` character.
 
 === Property Value Binding
 
-Note that these property references should always be in kebab case (lowercase and hyphen-separated) when placing references in code or in placeholder values. For example, you should use `micronaut.server.default-charset` and not `micronaut.server.defaultCharset`.
+Note that these property references should be in kebab case (lowercase and hyphen-separated) when placing references in code or in placeholder values. For example, use `micronaut.server.default-charset` and not `micronaut.server.defaultCharset`.
 
 Micronaut still allows specifying the latter in configuration, but normalizes the properties into kebab case form to optimize memory consumption and reduce complexity when resolving properties. The following table summarizes how properties are normalized from different sources:
 
@@ -108,9 +108,9 @@ Micronaut still allows specifying the latter in configuration, but normalizes th
 |`MY_APP_MY_STUFF` | `my.app.my.stuff`, `my.app.my-stuff`, `my.app-my.stuff`, `my.app-my-stuff`, `my-app.my.stuff`, `my-app.my-stuff`, `my-app-my.stuff`, `my-app-my-stuff`  | Environment Variable
 |===
 
-Environment variables are given special treatment to allow the definition of environment variables to be more flexible. Note that there is no way to reference an environment variable with camel-case.
+Environment variables are treated specially to allow more flexibility. Note that there is no way to reference an environment variable with camel-case.
 
-IMPORTANT: Because the number of properties generated is exponential based on the number of `_` characters in the environment variable, it is recommended to refine which, if any, environment variables are included in configuration if the number of environment variables with a large number of underscores is high.
+IMPORTANT: Because the number of properties generated is exponential based on the number of `_` characters in an environment variable, it is recommended to refine which, if any, environment variables are included in configuration if the number of environment variables with multiple underscores is high.
 
 To control how environment properties participate in configuration, call the respective methods on the `Micronaut` builder.
 
@@ -120,7 +120,7 @@ NOTE: The configuration above does not have any impact on property placeholders.
 
 === Using Random Properties
 
-You can use `random` values by using the following properties.  These can be used in configuration files as variables like the following.
+You can use `random` values by using the following properties. These can be used in configuration files as variables like the following.
 
 [source,yaml]
 ----
@@ -162,9 +162,9 @@ micronaut:
 
 === Fail Fast Property Injection
 
-For beans that inject required properties, the injection and potential failure will not occur until the bean is requested. To verify at startup that the properties exist and can be injected, the bean can be annotated with ann:io.micronaut.context.annotation.Context[]. Context scoped beans will be injected at startup time and thus will fail at startup time if any required properties are missing or could not be converted to the required type.
+For beans that inject required properties, the injection and potential failure will not occur until the bean is requested. To verify at startup that the properties exist and can be injected, the bean can be annotated with ann:io.micronaut.context.annotation.Context[]. Context-scoped beans are injected at startup, and startup fails if any required properties are missing or cannot be converted to the required type.
 
-IMPORTANT: To maintain a fast startup time, it is recommended to use this feature as sparingly as possible.
+IMPORTANT: It is recommended to use this feature sparingly to ensure fast startup.
 
 === Controlling Log Levels with Properties
 
@@ -179,4 +179,4 @@ logger:
 
 The same configuration can be achieved by setting the environment variable `LOGGER_LEVELS_FOO_BAR`. Note that there is currently no way to set log levels for unconventional prefixes such as `foo.barBaz`.
 
-Note that the ability to control log levels via config is controlled via the api:logging.LoggingSystem[] interface. Currently Micronaut ships with a single implementation that allows setting log levels for the Logback library. If another library is chosen you should provide a bean that implements this interface.
+Note that the ability to control log levels via config is controlled via the api:logging.LoggingSystem[] interface. Currently, Micronaut includes a single implementation that allows setting log levels for the Logback library. If you use another library, you should provide a bean that implements this interface.

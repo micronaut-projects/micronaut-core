@@ -1,7 +1,7 @@
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI, supply the `rabbitmq` feature to include RabbitMQ support in your project:
+If you create your project using the Micronaut CLI, supply the `rabbitmq` feature to include RabbitMQ support in your project:
 ----
 $ mn create-app my-app --features rabbitmq
 ----
