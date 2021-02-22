@@ -88,12 +88,14 @@ final class ReflectClassElement implements ClassElement {
 
     @Override
     public boolean isAssignable(String type) {
-        throw new UnsupportedOperationException("isAssignable via String is not supported by this implementation");
+        // unsupported by this impl
+        return false;
     }
 
     @Override
     public boolean isAssignable(ClassElement type) {
-        throw new UnsupportedOperationException("isAssignable via String is not supported by this implementation");
+        // unsupported by this impl
+        return false;
     }
 
     @Override

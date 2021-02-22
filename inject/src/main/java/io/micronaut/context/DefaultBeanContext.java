@@ -376,7 +376,20 @@ public class DefaultBeanContext implements BeanContext {
         if (beanType == null) {
             return Collections.emptyList();
         }
-        return getBeansOfTypeInternal(null, beanType, null);
+        return getBeanRegistrations(null, beanType, null);
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getBeanRegistration(Class<T> beanType, Qualifier<T> qualifier) {
+        return getBeanRegistration(null, beanType, qualifier);
+    }
+
+    @Override
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType, Qualifier<T> qualifier) {
+        if (beanType == null) {
+            return Collections.emptyList();
+        }
+        return getBeanRegistrations(null, beanType, null);
     }
 
     @Override
@@ -747,7 +760,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> Collection<T> getBeansOfType(Class<T> beanType, Qualifier<T> qualifier) {
-        return getBeansOfTypeInternal(null, beanType, qualifier)
+        return getBeanRegistrations(null, beanType, qualifier)
                     .stream()
                     .map(BeanRegistration::getBean)
                     .collect(Collectors.toList());
@@ -768,7 +781,7 @@ public class DefaultBeanContext implements BeanContext {
      * @return A stream
      */
     protected <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
-        return getBeansOfTypeInternal(resolutionContext, beanType, qualifier).stream()
+        return getBeanRegistrations(resolutionContext, beanType, qualifier).stream()
                     .map(BeanRegistration::getBean);
     }
 
@@ -1025,7 +1038,7 @@ public class DefaultBeanContext implements BeanContext {
      */
     protected @NonNull
     <T> Collection<T> getBeansOfType(@Nullable BeanResolutionContext resolutionContext, @NonNull Class<T> beanType) {
-        return getBeansOfTypeInternal(resolutionContext, beanType, null)
+        return getBeanRegistrations(resolutionContext, beanType, null)
                     .stream().map(BeanRegistration::getBean)
                     .collect(Collectors.toList());
     }
@@ -1044,7 +1057,7 @@ public class DefaultBeanContext implements BeanContext {
             @Nullable BeanResolutionContext resolutionContext,
             @NonNull Class<T> beanType,
             @Nullable Qualifier<T> qualifier) {
-        return getBeansOfTypeInternal(resolutionContext, beanType, qualifier)
+        return getBeanRegistrations(resolutionContext, beanType, qualifier)
                 .stream().map(BeanRegistration::getBean)
                 .collect(Collectors.toList());
     }
@@ -2870,8 +2883,33 @@ public class DefaultBeanContext implements BeanContext {
         return beanDefinitions;
     }
 
+    /**
+     * Obtains the bean registration for the given type and qualifier.
+     * @param resolutionContext The resolution context
+     * @param beanType The bean type
+     * @param qualifier The qualifier
+     * @param <T> The generic type
+     * @return A {@link BeanRegistration}
+     */
+    protected <T> BeanRegistration<T> getBeanRegistration(@Nullable BeanResolutionContext resolutionContext, @NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        final BeanDefinition<T> beanDefinition = getBeanDefinition(beanType, qualifier);
+        final T bean = getBeanInternal(resolutionContext, beanType, qualifier, true, true);
+        return new BeanRegistration<>(new BeanKey<>(beanDefinition, qualifier), beanDefinition, bean);
+    }
+
+    /**
+     * Obtains the bean registrations for the given type and qualifier.
+     * @param resolutionContext The resolution context
+     * @param beanType The bean type
+     * @param qualifier The qualifier
+     * @param <T> The generic type
+     * @return A collection of {@link BeanRegistration}
+     */
     @SuppressWarnings("unchecked")
-    private <T> Collection<BeanRegistration<T>> getBeansOfTypeInternal(@Nullable BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+    protected <T> Collection<BeanRegistration<T>> getBeanRegistrations(
+            @Nullable BeanResolutionContext resolutionContext,
+            @NonNull Class<T> beanType,
+            @Nullable Qualifier<T> qualifier) {
         boolean hasQualifier = qualifier != null;
         if (LOG.isDebugEnabled()) {
             if (hasQualifier) {

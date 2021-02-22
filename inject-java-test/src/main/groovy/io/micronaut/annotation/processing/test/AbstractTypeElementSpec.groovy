@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing.test
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
+import io.micronaut.context.Qualifier
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
 import groovy.transform.CompileStatic
@@ -149,6 +150,16 @@ class Test {
      */
     public @Nullable Reader readGenerated(@NonNull String filePath, String className, String code) throws IOException {
         return newJavaParser().readGenerated(filePath, className, code)
+    }
+
+    /**
+     * Gets a bean from the context for the given class name
+     * @param context The context
+     * @param className The class name
+     * @return The bean instance
+     */
+    Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {
+        context.getBean(context.classLoader.loadClass(className), qualifier)
     }
 
     /**
