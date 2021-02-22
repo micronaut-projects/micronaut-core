@@ -58,7 +58,7 @@ class ScheduledFixedRateSpec extends Specification {
         and:
         conditions.eventually {
             myTask.wasRun
-            myTask.cronEvents.get() >= 3
+            myTask.cronEvents.get() >= 2
             myTask.cronEventsNoSeconds.get() >= 0
             myTask.wasDelayedRun
         }

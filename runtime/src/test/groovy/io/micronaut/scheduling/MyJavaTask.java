@@ -38,8 +38,8 @@ public class MyJavaTask {
         wasRun = true;
     }
 
-    @Scheduled(cron = "1/3 0/1 * 1/1 * ?")
-    @Scheduled(cron = "1/4 0/1 * 1/1 * ?")
+    @Scheduled(fixedRate = "5s")
+    @Scheduled(fixedRate = "6s")
     void runCron() {
         cronEvents.incrementAndGet();
     }
