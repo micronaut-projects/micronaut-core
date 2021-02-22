@@ -30,11 +30,6 @@ jobs:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_PASSWORD: ${{ secrets.GPG_PASSWORD }}
           GPG_FILE: ${{ secrets.GPG_FILE }}
-          PUBLISH_IN_2_STEPS: ${{ secrets.PUBLISH_IN_2_STEPS }}
         run: |
           echo $GPG_FILE | base64 -d > secring.gpg
-          if [ -z ${PUBLISH_IN_2_STEPS+x} ]; then
-            ./gradlew publish closeAndReleaseRepository
-          else
-            ./gradlew publish && ./gradlew closeAndReleaseRepository
-          fi
+          ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository
