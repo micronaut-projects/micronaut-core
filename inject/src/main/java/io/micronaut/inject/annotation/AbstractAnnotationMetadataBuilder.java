@@ -390,7 +390,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract String getElementName(T element);
 
     /**
-     * Obtain the annotations for the given type.
+     * Obtain the annotations for the given type. This method
+     * is also responsible for unwrapping repeatable annotations.
+     *
+     * For example, {@code @Parent(value = {@Child, @Child})} should result in the two
+     * child annotations being returned from this method <b>instead</b> of the
+     * parent annotation.
      *
      * @param element The type element
      * @return The annotations

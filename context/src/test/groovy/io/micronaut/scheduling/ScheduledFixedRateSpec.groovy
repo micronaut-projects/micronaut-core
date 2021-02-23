@@ -34,39 +34,46 @@ class ScheduledFixedRateSpec extends Specification {
         given:
         ApplicationContext beanContext = ApplicationContext.run(
                 'some.configuration':'10ms',
-                'scheduled-test.task.enabled':true
+                'scheduled-test.task.enabled':true,
+                'spec.name': 'ScheduledFixedRateSpecMyTask',
         )
 
-        PollingConditions conditions = new PollingConditions(timeout: 10)
+        PollingConditions conditions = new PollingConditions(timeout: 7)
 
         when:
         MyTask myTask = beanContext.getBean(MyTask)
+        MyJavaTask myJavaTask = beanContext.getBean(MyJavaTask)
 
         then:
         !myTask.wasDelayedRun
         conditions.eventually {
             myTask.wasRun
             myTask.fixedDelayWasRun
-            beanContext.getBean(MyJavaTask).wasRun
+            myJavaTask.wasRun
+            myJavaTask.wasRun
+            myJavaTask.cronEvents.get() == 2
         }
 
         and:
         conditions.eventually {
             myTask.wasRun
-            myTask.cronEvents.get() >= 3
+            myTask.cronEvents.get() >= 2
             myTask.cronEventsNoSeconds.get() >= 0
             myTask.wasDelayedRun
-            beanContext.getBean(MyJavaTask).wasRun
         }
+
+        cleanup:
+        beanContext.close()
     }
 
     void 'test multiple schedule annotations'() {
         given:
         ApplicationContext beanContext = ApplicationContext.run(
-                'scheduled-test.task.enabled': true
+                'scheduled-test.task.enabled': true,
+                'spec.name': 'ScheduledFixedRateSpecMyOtherTask',
         )
 
-        PollingConditions conditions = new PollingConditions(timeout: 10)
+        PollingConditions conditions = new PollingConditions(timeout: 20)
 
         when:
         MyOtherTask myTask = beanContext.getBean(MyOtherTask)
@@ -75,9 +82,13 @@ class ScheduledFixedRateSpec extends Specification {
         conditions.eventually {
             myTask.cronEvents.get() == 2
         }
+
+        cleanup:
+        beanContext.close()
     }
 
     @Singleton
+    @Requires(property = 'spec.name', value = 'ScheduledFixedRateSpecMyTask')
     @Requires(property = 'scheduled-test.task.enabled', value = 'true')
     static class MyTask {
 

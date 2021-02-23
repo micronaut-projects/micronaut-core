@@ -229,7 +229,27 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     @Override
     protected List<? extends AnnotationNode> getAnnotationsForType(AnnotatedNode element) {
-        return element.getAnnotations()
+        List<AnnotationNode> annotations = element.getAnnotations()
+        List<AnnotationNode> expanded = new ArrayList<>(annotations.size())
+        for (AnnotationNode node: annotations) {
+            Expression value = node.getMember("value")
+            boolean repeatable = false
+            if (value != null && value instanceof ListExpression) {
+                for (Expression expression: ((ListExpression) value).getExpressions()) {
+                    if (expression instanceof AnnotationConstantExpression) {
+                        String name = getRepeatableNameForType(expression.type)
+                        if (name != null && name == node.classNode.name) {
+                            repeatable = true
+                            expanded.add((AnnotationNode) expression.value)
+                        }
+                    }
+                }
+            }
+            if (!repeatable) {
+                expanded.add(node)
+            }
+        }
+        return expanded
     }
 
     @Override

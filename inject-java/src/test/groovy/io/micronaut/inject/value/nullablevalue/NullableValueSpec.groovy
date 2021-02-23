@@ -23,7 +23,10 @@ class NullableValueSpec extends Specification {
     void "test value with nullable"() {
         given:
         ApplicationContext context = ApplicationContext.run(
-                ["exists.x":"fromConfig"], "test"
+                [
+                        "spec.name": getClass().simpleName,
+                        "exists.x":"fromConfig"
+                ], "test"
         )
 
         when:
