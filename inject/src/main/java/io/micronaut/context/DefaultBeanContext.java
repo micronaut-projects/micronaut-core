@@ -92,7 +92,6 @@ public class DefaultBeanContext implements BeanContext {
         }
     };
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
-    private static final String AROUND_TYPE = "io.micronaut.aop.Around";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     private static final String ADAPTER_TYPE = "io.micronaut.aop.Adapter";
     private static final String NAMED_MEMBER = "named";
@@ -2171,7 +2170,7 @@ public class DefaultBeanContext implements BeanContext {
                     // abstract class introduction
                     return (Class<T>) superclass;
                 }
-            } else if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
+            } else if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_AROUND)) {
                 Class<? super T> superclass = bt.getSuperclass();
                 if (superclass != null) {
                     return (Class<T>) superclass;
@@ -2203,7 +2202,7 @@ public class DefaultBeanContext implements BeanContext {
                     return clazz -> clazz == superclass;
                 }
             }
-            if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
+            if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_AROUND)) {
                 Class<? super T> superclass = bt.getSuperclass();
                 return clazz -> clazz == superclass || clazz == bt;
             }

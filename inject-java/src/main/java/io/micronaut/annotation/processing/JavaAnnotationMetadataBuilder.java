@@ -298,6 +298,17 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected boolean isValidationRequired(Element member) {
+        final List<? extends AnnotationMirror> annotationMirrors = member.getAnnotationMirrors();
+        for (AnnotationMirror annotationMirror : annotationMirrors) {
+            if (getAnnotationTypeName(annotationMirror).startsWith("javax.validation")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     protected Object readAnnotationValue(Element originatingElement, Element member, String memberName, Object annotationValue) {
         if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue) {
             final MetadataAnnotationValueVisitor visitor = new MetadataAnnotationValueVisitor(originatingElement);

@@ -103,6 +103,26 @@ public class AnnotationUtil {
      */
     public static final String NON_NULL = "javax.annotation.Nonnull";
 
+    /**
+     * The around annotation type.
+     */
+    public static final String ANN_AROUND = "io.micronaut.aop.Around";
+
+    /**
+     * The around annotation type.
+     */
+    public static final String ANN_INTRODUCTION = "io.micronaut.aop.Introduction";
+
+    /**
+     * Name of the interceptor binding type.
+     */
+    public static final String ANN_INTERCEPTOR_BINDING = "io.micronaut.aop.InterceptorBinding";
+
+    /**
+     * Name of the repeatable interceptor bindings type.
+     */
+    public static final String ANN_INTERCEPTOR_BINDINGS = "io.micronaut.aop.InterceptorBindingDefinitions";
+
     private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();
 

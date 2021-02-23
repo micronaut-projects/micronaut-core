@@ -41,6 +41,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.writer.BeanConfigurationWriter
+import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
 import javax.lang.model.element.Element
@@ -163,6 +164,16 @@ class Test {
     }
 
     /**
+     * Builds a {@link ApplicationContext} containing only the classes produced by the given source.
+     *
+     * @param source The source code
+     * @return The context. Should be shutdown after use
+     */
+    ApplicationContext buildContext(String source) {
+        return buildContext("test.Source" + System.currentTimeMillis(), source)
+    }
+
+    /**
      * Builds a {@link ApplicationContext} containing only the classes produced by the given class.
      *
      * @param className The class name
@@ -246,13 +257,43 @@ class Test {
         return (TypeElement) element
     }
 
-    BeanDefinition buildBeanDefinition(String className, String cls) {
+    protected BeanDefinition buildBeanDefinition(String className, String cls) {
         def beanDefName= '$' + NameUtils.getSimpleName(className) + 'Definition'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
         ClassLoader classLoader = buildClassLoader(className, cls)
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    /**
+     * Builds the bean definition for an AOP proxy bean.
+     * @param className The class name
+     * @param cls The class source
+     * @return The bean definition
+     */
+    protected BeanDefinition buildInterceptedBeanDefinition(String className, String cls) {
+        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'Definition'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    /**
+     * Builds the bean definition reference for an AOP proxy bean.
+     * @param className The class name
+     * @param cls The class source
+     * @return The bean definition
+     */
+    protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, String cls) {
+        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'DefinitionClass'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (BeanDefinitionReference)classLoader.loadClass(beanFullName).newInstance()
     }
 
     protected BeanDefinitionReference buildBeanDefinitionReference(String className, String cls) {
@@ -263,6 +304,7 @@ class Test {
         ClassLoader classLoader = buildClassLoader(className, cls)
         return (BeanDefinitionReference)classLoader.loadClass(beanFullName).newInstance()
     }
+
     protected BeanConfiguration buildBeanConfiguration(String packageName, String cls) {
         ClassLoader classLoader = buildClassLoader("${packageName}.package-info", cls)
         return (BeanConfiguration)classLoader.loadClass(packageName + '.' + BeanConfigurationWriter.CLASS_SUFFIX).newInstance()
