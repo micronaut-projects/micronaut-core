@@ -15,6 +15,7 @@
  */
 package io.micronaut.docs.config.env
 
+// tag::clazz[]
 import io.micronaut.context.annotation.EachProperty
 import io.micronaut.context.annotation.Parameter
 import io.micronaut.core.order.Ordered
@@ -31,5 +32,5 @@ class RateLimitsConfiguration
     override fun getOrder(): Int {
         return index
     }
-
 }
+// end::clazz[]
