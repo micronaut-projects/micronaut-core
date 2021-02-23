@@ -8,15 +8,15 @@ To enable distributed configuration a `src/main/resources/bootstrap.yml` configu
 [source,yaml]
 ----
 micronaut:
-    application:
-        name: hello-world
-    config-client:
-        enabled: true
+  application:
+    name: hello-world
+  config-client:
+    enabled: true
 aws:
-    client:
-        system-manager:
-            parameterstore:
-                enabled: true
+  client:
+    system-manager:
+      parameterstore:
+        enabled: true
 ----
 
 See the https://micronaut-projects.github.io/micronaut-aws/latest/guide/configurationreference.html#io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfiguration[configuration reference] for all configuration options.

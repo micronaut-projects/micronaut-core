@@ -152,7 +152,7 @@ Micronaut supports validating route arguments at compile time with the validatio
 ----
 annotationProcessor "io.micronaut:micronaut-validation" // Java only
 kapt "io.micronaut:micronaut-validation" // Kotlin only
-compile "io.micronaut:micronaut-validation"
+implementation "io.micronaut:micronaut-validation"
 ----
 
 With the correct dependency on your classpath, route arguments will automatically be checked at compile time. The compilation will fail if any of the following conditions are met:
@@ -170,7 +170,7 @@ NOTE: To disable route compile time validation, set the system property `-Dmicro
 == Routing non-standard HTTP methods
 
 It may be necessary to support a non-standard HTTP method for a client or server. Specifications like https://tools.ietf.org/html/rfc4918[RFC-4918 Webdav] require additional methods like REPORT or LOCK for example. To support that use case the @CustomHttpMethod annotation can be used.
- 
+
 .RoutingExample
 [source,java]
 ----

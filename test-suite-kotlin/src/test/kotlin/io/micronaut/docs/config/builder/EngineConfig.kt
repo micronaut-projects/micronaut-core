@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.ConfigurationProperties
 // tag::class[]
 @ConfigurationProperties("my.engine") // <1>
 internal class EngineConfig {
+
     @ConfigurationBuilder(prefixes = ["with"])  // <2>
     val builder = EngineImpl.builder()
 

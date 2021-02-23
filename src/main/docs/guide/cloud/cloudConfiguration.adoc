@@ -117,13 +117,7 @@ To obtain metadata for the locally running server use an <<events,EventListener>
 ----
 @EventListener
 void onServiceStarted(ServiceReadyEvent event) {
-    ServiceInstance serviceInstance = event.getSource()
-    ConvertibleValues<String> metadata = serviceInstance.metadata
+    ServiceInstance serviceInstance = event.getSource();
+    ConvertibleValues<String> metadata = serviceInstance.getMetadata();
 }
 ----
-
-
-
-
-
-

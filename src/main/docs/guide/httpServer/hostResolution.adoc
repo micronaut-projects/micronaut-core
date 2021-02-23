@@ -2,12 +2,12 @@ You may need to resolve the host name of the current server. Micronaut ships wit
 
 The default implementation will look for host information in the following places in order:
 
-1. The supplied configuration
-2. The `Forwarded` header
-3. The `X-Forwarded-` headers. If the `X-Forwarded-Host` header is not present, the other `X-Forwarded` headers are ignored.
-4. The `Host` header
-5. The properties on the request URI
-6. The properties on the embedded server URI
+. The supplied configuration
+. The `Forwarded` header
+. The `X-Forwarded-` headers. If the `X-Forwarded-Host` header is not present, the other `X-Forwarded` headers are ignored.
+. The `Host` header
+. The properties on the request URI
+. The properties on the embedded server URI
 
 The behavior of which headers to pull the relevant data can be changed with the following configuration:
 

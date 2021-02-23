@@ -20,10 +20,10 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.docs.context.events.SampleEventEmitterBean;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.Assert.assertEquals;
 // end::imports[]
 
 // tag::class[]
@@ -36,9 +36,8 @@ public class SampleEventListenerSpec {
             SampleEventListener listener = context.getBean(SampleEventListener.class);
             assertEquals(0, listener.getInvocationCounter());
             emitter.publishSampleEvent();
-            await().atMost(10, SECONDS).until(listener::getInvocationCounter, equalTo(1));
+            await().atMost(5, SECONDS).until(listener::getInvocationCounter, equalTo(1));
         }
     }
-
 }
 // end::class[]

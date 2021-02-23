@@ -31,7 +31,7 @@ import javax.inject.Singleton;
 public class OutOfStockExceptionHandler implements ExceptionHandler<OutOfStockException, HttpResponse> {
 
     @Override
-    public HttpResponse handle(HttpRequest request, OutOfStockException exception) {
+    public HttpResponse handle(HttpRequest request, OutOfStockException e) {
         return HttpResponse.ok(0);
     }
 }

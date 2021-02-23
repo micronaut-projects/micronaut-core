@@ -23,7 +23,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.PrimitiveElement;
 
 import javax.lang.model.element.*;
@@ -208,7 +208,8 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                 return mirrorToClassElement(tm, visitorContext, info, true);
             }
         }
-        return mirrorToClassElement(executableElement.getReturnType(), visitorContext, info, true);
+        final TypeMirror returnType = executableElement.getReturnType();
+        return mirrorToClassElement(returnType, visitorContext, info, true);
     }
 
     private static boolean sameType(String type, DeclaredType dt) {

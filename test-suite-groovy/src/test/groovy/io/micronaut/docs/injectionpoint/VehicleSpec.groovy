@@ -1,9 +1,7 @@
 package io.micronaut.docs.injectionpoint
 
 import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
-
 
 /**
  * @author Graeme Rocher
@@ -14,9 +12,9 @@ class VehicleSpec extends Specification {
     void "test start vehicle"() {
         when:
         // tag::start[]
-        BeanContext beanContext = BeanContext.run()
+        def beanContext = BeanContext.run()
         def vehicle = beanContext.getBean(Vehicle)
-        println( vehicle.start() )
+        println vehicle.start()
         // end::start[]
 
         then:
@@ -26,4 +24,3 @@ class VehicleSpec extends Specification {
         beanContext.close()
     }
 }
-

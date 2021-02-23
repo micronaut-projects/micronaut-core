@@ -15,14 +15,14 @@
  */
 package io.micronaut.docs.server.binding
 
-import io.micronaut.core.convert.format.Format;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.CookieValue;
-import io.micronaut.http.annotation.Get;
+import io.micronaut.core.convert.format.Format
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.CookieValue
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 
 import javax.annotation.Nullable
-import java.time.ZonedDateTime;
+import java.time.ZonedDateTime
 
 @Controller("/binding")
 class BindingController {
@@ -49,7 +49,8 @@ class BindingController {
 
     // tag::cookieMultiple[]
     @Get("/cookieMultiple")
-    List<String> cookieMultiple(@CookieValue("myCookieA") String myCookieA, @CookieValue("myCookieB") String myCookieB) {
+    List<String> cookieMultiple(@CookieValue("myCookieA") String myCookieA,
+                                @CookieValue("myCookieB") String myCookieB) {
         // ...
         // end::cookieMultiple[]
         [myCookieA, myCookieB]

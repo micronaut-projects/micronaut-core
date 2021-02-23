@@ -17,7 +17,7 @@ package io.micronaut.inject.factory.nullreturn;
 
 import io.micronaut.context.annotation.EachBean;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @EachBean(D.class)

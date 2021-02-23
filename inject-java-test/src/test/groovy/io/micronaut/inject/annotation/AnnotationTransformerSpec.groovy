@@ -18,7 +18,7 @@ class Test {
 
         expect:"The original annotation wasn't retained"
         !definition.hasAnnotation(ToTransform)
-        definition.hasAnnotation('test.Test')
+        definition.hasAnnotation('test.ToTransformOther')
     }
 
 

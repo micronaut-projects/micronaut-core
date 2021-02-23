@@ -21,7 +21,6 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.server.exceptions.ExceptionHandler
-
 import javax.inject.Singleton
 
 //tag::clazz[]
@@ -29,9 +28,9 @@ import javax.inject.Singleton
 @Singleton
 @Requirements(
 //end::clazz[]
-        Requires(property = "spec.name", value = "ExceptionHandlerSpec"),
+    Requires(property = "spec.name", value = "ExceptionHandlerSpec"),
 //tag::clazz[]
-        Requires(classes = [OutOfStockException::class, ExceptionHandler::class])
+    Requires(classes = [OutOfStockException::class, ExceptionHandler::class])
 )
 class OutOfStockExceptionHandler : ExceptionHandler<OutOfStockException, HttpResponse<*>> {
 

@@ -28,7 +28,7 @@ class MessageController {
 
     @Get("/hello") // <1>
     HttpResponse<String> hello(HttpRequest<?> request) {
-        String name = request.getParameters()
+        String name = request.parameters
                              .getFirst("name")
                              .orElse("Nobody") // <2>
 

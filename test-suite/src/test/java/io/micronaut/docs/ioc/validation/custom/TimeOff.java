@@ -16,11 +16,13 @@
 package io.micronaut.docs.ioc.validation.custom;
 
 // tag::imports[]
-import java.lang.annotation.*;
+import java.lang.annotation.Retention;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 // end::imports[]
 
 // tag::class[]
-@Retention(RetentionPolicy.RUNTIME)
+@Retention(RUNTIME)
 public @interface TimeOff {
     @DurationPattern
     String duration();

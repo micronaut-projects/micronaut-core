@@ -17,17 +17,22 @@ package io.micronaut.docs.netty;
 
 // tag::imports[]
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.event.*;
+import io.micronaut.context.event.BeanCreatedEvent;
+import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import org.zalando.logbook.Logbook;
-import org.zalando.logbook.netty.*;
+import org.zalando.logbook.netty.LogbookClientHandler;
+import org.zalando.logbook.netty.LogbookServerHandler;
+
 import javax.inject.Singleton;
 // end::imports[]
 
 // tag::class[]
 @Requires(beans = Logbook.class)
 @Singleton
-public class LogbookPipelineCustomizer implements BeanCreatedEventListener<ChannelPipelineCustomizer> { // <1>
+public class LogbookPipelineCustomizer
+        implements BeanCreatedEventListener<ChannelPipelineCustomizer> { // <1>
+
     private final Logbook logbook;
 
     public LogbookPipelineCustomizer(Logbook logbook) {

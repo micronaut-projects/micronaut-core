@@ -3,28 +3,20 @@ package io.micronaut.docs.basics
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpRequest.POST
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
-import org.junit.Test
-
-import java.util.Optional
-
-import io.micronaut.http.HttpRequest.POST
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 
 class BookControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java)
+        ApplicationContext.run(EmbeddedServer::class.java)
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
     )
 
     init {

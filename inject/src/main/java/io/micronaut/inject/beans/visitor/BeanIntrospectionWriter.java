@@ -18,6 +18,7 @@ package io.micronaut.inject.beans.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.beans.*;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -35,8 +36,8 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -184,6 +185,23 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 this.annotationMetadata,
                 annotationMetadata
         );
+
+        MethodElement withMethod = null;
+        if (writeMethod == null) {
+            final String prefix = this.annotationMetadata.stringValue(Introspected.class, "withPrefix").orElse("with");
+            ElementQuery<MethodElement> elementQuery = ElementQuery.of(MethodElement.class)
+                    .onlyAccessible()
+                    .onlyDeclared()
+                    .onlyInstance()
+                    .named((n) -> n.startsWith(prefix) && n.equals(prefix + NameUtils.capitalize(name)))
+                    .filter((methodElement -> {
+                        ParameterElement[] parameters = methodElement.getParameters();
+                        return parameters.length == 1 &&
+                                methodElement.getGenericReturnType().getName().equals(classElement.getName()) &&
+                                type.getType().isAssignable(parameters[0].getType());
+                    }));
+            withMethod = classElement.getEnclosedElement(elementQuery).orElse(null);
+        }
         propertyDefinitions.put(
                 name,
                 new BeanPropertyWriter(
@@ -194,6 +212,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                         name,
                         readMethod,
                         writeMethod,
+                        withMethod,
                         isReadOnly,
                         propertyIndex++,
                         annotationMetadata,

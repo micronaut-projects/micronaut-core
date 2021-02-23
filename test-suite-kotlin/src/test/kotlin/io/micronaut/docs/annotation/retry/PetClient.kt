@@ -29,4 +29,3 @@ interface PetClient : PetOperations {
     override fun save(name: String, age: Int): Single<Pet>
 }
 // end::class[]
-

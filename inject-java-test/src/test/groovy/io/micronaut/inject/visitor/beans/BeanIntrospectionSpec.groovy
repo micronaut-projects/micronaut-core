@@ -113,6 +113,48 @@ interface SomeInt {
         itfeMethod.invoke(bean) == true
     }
 
+    void "test custom with prefix"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('customwith.CopyMe','''\
+package customwith;
+
+import java.net.URL;
+
+@io.micronaut.core.annotation.Introspected(withPrefix="alter")
+public class CopyMe {
+
+    private final String another;
+    
+    CopyMe(String another) {
+        this.another = another;
+    }
+
+    public String getAnother() {
+        return another;
+    }
+    
+    public CopyMe alterAnother(String a) {
+        return this.another == a ? this : new CopyMe(a.toUpperCase());
+    }
+}
+''')
+
+
+        when:
+        def another = introspection.getRequiredProperty("another", String)
+        def newInstance = introspection.instantiate("test")
+
+        then:
+        newInstance.another == "test"
+
+        when:"An explicit with method is used"
+        def result = another.withValue(newInstance, "changed")
+
+        then:"It was invoked"
+        !result.is(newInstance)
+        result.another == 'CHANGED'
+    }
+
     void "test copy constructor via mutate method"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.CopyMe','''\
@@ -124,10 +166,12 @@ import java.net.URL;
 public class CopyMe {
 
     private URL url;
-    private String name;
+    private final String name;
+    private final String another;
     
-    CopyMe(String name) {
+    CopyMe(String name, String another) {
         this.name = name;
+        this.another = another;
     }
 
     public URL getUrl() {
@@ -137,36 +181,54 @@ public class CopyMe {
     public void setUrl(URL url) {
         this.url = url;
     }
-
+    
     public String getName() {
         return name;
+    }
+    
+    public String getAnother() {
+        return another;
+    }
+    
+    public CopyMe withAnother(String a) {
+        return this.another == a ? this : new CopyMe(this.name, a.toUpperCase());
     }
 }
 ''')
         when:
-        def copyMe = introspection.instantiate("Test")
+        def copyMe = introspection.instantiate("Test", "Another")
         def expectUrl = new URL("http://test.com")
         copyMe.url = expectUrl
 
         then:
         copyMe.name == 'Test'
+        copyMe.another == "Another"
         copyMe.url == expectUrl
 
 
         when:
         def property = introspection.getRequiredProperty("name", String)
+        def another = introspection.getRequiredProperty("another", String)
         def newInstance = property.withValue(copyMe, "Changed")
 
         then:
         !newInstance.is(copyMe)
         newInstance.name == 'Changed'
         newInstance.url == expectUrl
+        newInstance.another == "Another"
 
         when:"the instance is changed with the same value"
         def result = property.withValue(newInstance, "Changed")
 
         then:"The existing instance is returned"
         newInstance.is(result)
+
+        when:"An explicit with method is used"
+        result = another.withValue(newInstance, "changed")
+
+        then:"It was invoked"
+        !result.is(newInstance)
+        result.another == 'CHANGED'
     }
 
     @Requires({ jvm.isJava14Compatible() })
@@ -2348,6 +2410,37 @@ class Test extends SuperClass implements IEmail {
         introspection.getIndexedProperties(Constraint).size() == 1
     }
 
+    void "test introspection with single leading lowercase character"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test {
+
+    private final String xForwardedFor;
+    
+    Test(String xForwardedFor) {
+        this.xForwardedFor = xForwardedFor;
+    }
+    
+    public String getXForwardedFor() {
+        return xForwardedFor;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def obj = introspection.instantiate("localhost")
+
+        then:
+        noExceptionThrown()
+        introspection.getProperty("XForwardedFor", String).get().get(obj) == "localhost"
+    }
 
     @Override
     protected JavaParser newJavaParser() {

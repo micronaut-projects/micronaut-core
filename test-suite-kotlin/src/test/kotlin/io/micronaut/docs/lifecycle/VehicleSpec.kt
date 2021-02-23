@@ -18,7 +18,7 @@ class VehicleSpec: StringSpec() {
             // end::start[]
 
             vehicle.engine.javaClass shouldBe V8Engine::class.java
-            (vehicle.engine as V8Engine).isIntialized shouldBe true
+            (vehicle.engine as V8Engine).initialized shouldBe true
 
             context.close()
         }

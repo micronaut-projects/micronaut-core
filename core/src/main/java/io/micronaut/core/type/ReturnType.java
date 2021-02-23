@@ -15,17 +15,11 @@
  */
 package io.micronaut.core.type;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.async.annotation.SingleResult;
-import io.micronaut.core.async.publisher.Publishers;
-
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.CompletionStage;
 
 /**
  * Models a return type of an {@link Executable} method in Micronaut.
@@ -34,13 +28,7 @@ import java.util.concurrent.CompletionStage;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataProvider {
-
-    /**
-     * @return The type of the argument
-     */
-    @NonNull
-    Class<T> getType();
+public interface ReturnType<T> extends TypeInformation<T>, AnnotationMetadataProvider {
 
     /**
      * @return The return type as an argument
@@ -59,22 +47,6 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
     }
 
     /**
-     * @return Is the return type reactive.
-     * @since 2.0.0
-     */
-    default boolean isReactive() {
-        return Publishers.isConvertibleToPublisher(getType());
-    }
-
-    /**
-     * @return Is the return the return type a reactive completable type.
-     * @since 2.0.0
-     */
-    default boolean isCompletable() {
-        return Publishers.isCompletable(getType());
-    }
-
-    /**
      * @return Is the return type a single result or multiple results
      * @since 2.0
      */
@@ -84,70 +56,11 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
         } else {
             if (isReactive()) {
                 Class<T> returnType = getType();
-                return Publishers.isSingle(returnType);
+                return RuntimeTypeInformation.isSingle(returnType);
             } else {
                 return true;
             }
         }
-    }
-
-    /**
-     * @return Has the return type been specified to emit a single result with {@link SingleResult}.
-     * @since 2.0
-     */
-    default boolean isSpecifiedSingle() {
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-        return annotationMetadata.hasStereotype(SingleResult.class) &&
-                annotationMetadata.booleanValue(SingleResult.NAME).orElse(true);
-    }
-
-    /**
-     * @return Is the return type asynchronous.
-     * @since 2.0.0
-     */
-    default boolean isAsync() {
-        Class<T> type = getType();
-        return CompletionStage.class.isAssignableFrom(type);
-    }
-
-    /**
-     * @return Is the return type either async or reactive.
-     * @since 2.0.0
-     */
-    default boolean isAsyncOrReactive() {
-        return isAsync() || isReactive();
-    }
-
-    /**
-     * Returns whether the return type is logically void. This includes
-     * reactive times that emit nothing (such as {@link io.micronaut.core.async.subscriber.Completable})
-     * and asynchronous types that emit {@link Void}.
-     *
-     * @return Is the return type logically void.
-     * @since 2.0.0
-     */
-    default boolean isVoid() {
-        Class<T> javaReturnType = getType();
-        if (javaReturnType == void.class) {
-            return true;
-        } else {
-            if (isCompletable()) {
-                return true;
-            }
-            if (isReactive() || isAsync()) {
-                return getFirstTypeVariable().filter(arg -> arg.getType() == Void.class).isPresent();
-            }
-        }
-        return false;
-    }
-
-    /**
-     * @return Is the return type {@link java.util.Optional}.
-     * @since 2.0.1
-     */
-    default boolean isOptional() {
-        Class<T> type = getType();
-        return type == Optional.class;
     }
 
     /**

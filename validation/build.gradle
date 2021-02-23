@@ -2,12 +2,14 @@ dependencies {
     annotationProcessor project(":inject-java")
     
     api project(":inject")
-    api project(":http")
+    api project(":core-reactive")
     api dependencyVersion("validation")
 
+    compileOnly project(":http")
     compileOnly dependencyVersion("gorm")
     compileOnly project(":http-server")
-    
+
+    testImplementation dependencyVersion("spotbugs")
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject")
     testImplementation project(":http-server-netty")

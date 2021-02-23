@@ -40,8 +40,8 @@ You can enable a Server Sent Event stream to feed into the https://github.com/Ne
 [source,yaml]
 ----
 hystrix:
-    stream:
-        enabled: true
+  stream:
+    enabled: true
 ----
 
 This exposes a `/hystrix.stream` endpoint with the format the https://github.com/Netflix-Skunkworks/hystrix-dashboard[Hystrix Dashboard] expects.

@@ -16,16 +16,15 @@
 package io.micronaut.docs.ioc.scopes
 
 // tag::imports[]
-
 import io.micronaut.context.annotation.Requires
 import javax.inject.Singleton
-
+import kotlin.annotation.AnnotationRetention.RUNTIME
 // end::imports[]
 
 // tag::class[]
 @Requires(classes = [Car::class]) // <1>
 @Singleton // <2>
 @MustBeDocumented
-@Retention(AnnotationRetention.RUNTIME)
+@Retention(RUNTIME)
 annotation class Driver
 // end::class[]

@@ -23,10 +23,10 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 // end::imports[]
 
 // tag::class[]
@@ -45,16 +45,16 @@ public class IssuesControllerTest {
 
     @AfterClass // <2>
     public static void stopServer() {
-        if(server != null) {
+        if (server != null) {
             server.stop();
         }
-        if(client != null) {
+        if (client != null) {
             client.stop();
         }
     }
 
     @Test
-    public void testIssue() throws Exception {
+    public void testIssue() {
         String body = client.toBlocking().retrieve("/issues/12"); // <3>
 
         assertNotNull(body);
@@ -63,7 +63,7 @@ public class IssuesControllerTest {
 
     @Test
     public void testShowWithInvalidInteger() {
-        HttpClientResponseException e =Assertions.assertThrows(HttpClientResponseException.class, () ->
+        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
                 client.toBlocking().exchange("/issues/hello"));
 
         assertEquals(400, e.getStatus().getCode()); // <5>
@@ -71,7 +71,7 @@ public class IssuesControllerTest {
 
     @Test
     public void testIssueWithoutNumber() {
-        HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class, () ->
+        HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () ->
                 client.toBlocking().exchange("/issues/"));
 
         assertEquals(404, e.getStatus().getCode()); // <6>

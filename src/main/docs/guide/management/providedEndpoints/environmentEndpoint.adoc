@@ -10,9 +10,9 @@ To configure the environment endpoint, supply configuration through `endpoints.e
 [source,yaml]
 ----
 endpoints:
-    env:
-        enabled: Boolean    # default: true
-        sensitive: Boolean  # default: true
+  env:
+    enabled: Boolean    # default: true
+    sensitive: Boolean  # default: true
 ----
 
 == Getting information about the environment

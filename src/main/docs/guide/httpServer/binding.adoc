@@ -69,8 +69,8 @@ snippet::io.micronaut.docs.server.binding.MovieTicketBean[tags="class", indent=0
 
 Bean class has to be introspected with `@Introspected`. It can be one of:
 
-1. Mutable Bean class with setters and getters
-2. Immutable Bean class with getters and all argument constructor (or `@Creator` annotation on a constructor or static method).
+. Mutable Bean class with setters and getters
+. Immutable Bean class with getters and all argument constructor (or `@Creator` annotation on a constructor or static method).
 Arguments of constructor have to match field names so object can be constructed without reflection.
 
 WARNING: Since Java does not retain argument names in the byte code, you have to compile code with `-parameters` in case you want to use Immutable Bean class from another Jar.
@@ -117,10 +117,9 @@ Some parameters are recognized by their type instead of their annotation. The fo
 
 Micronaut will try to populate method arguments in the following order:
 
-1. URI variables like `/{id}`.
-2. If the request is a `GET` request from query parameters (ie. `?foo=bar`).
-3. If there is a `@Body` and request allows the body, bind the body to it.
-4. if the request can have a body and no `@Body` is defined then try parse the body (either JSON or form data) and
+. URI variables like `/{id}`.
+. If the request is a `GET` request from query parameters (ie. `?foo=bar`).
+. If there is a `@Body` and request allows the body, bind the body to it.
+. if the request can have a body and no `@Body` is defined then try parse the body (either JSON or form data) and
 bind the method arguments from the body.
-5. Finally, if the method arguments cannot be populated return `400 BAD REQUEST`.
-
+. Finally, if the method arguments cannot be populated return `400 BAD REQUEST`.

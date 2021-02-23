@@ -1,20 +1,20 @@
-Micronaut milestone and stable releases are distributed to https://bintray.com/micronaut[Bintray].
+Micronaut milestone and stable releases are distributed to Maven Central.
 
-The following snippet shows how to use Micronaut `SNAPSHOT` with Gradle. The latest snapshot will always be the next patch version plus 1 with `-SNAPSHOT` appended. For example if the latest release is "1.0.1", the current snapshot would be "1.0.2-SNAPSHOT".
+The following snippet shows how to use Micronaut `SNAPSHOT` versions with Gradle. The latest snapshot will always be the next patch version plus 1 with `-SNAPSHOT` appended. For example if the latest release is "1.0.1", the current snapshot would be "1.0.2-SNAPSHOT".
 
 [source, groovy]
 ----
 ext {
-  micronautVersion = '2.2.0-SNAPSHOT'
+    micronautVersion = '2.4.0-SNAPSHOT'
 }
 repositories {
-  jcenter() <1>
-  maven { url "https://oss.jfrog.org/oss-snapshot-local" } // <2>
+    mavenCentral() // <1>
+    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" } // <2>
 }
 ----
 
-<1> Micronaut releases are available on JCenter and Maven Central
-<2> Micronaut snapshots are available on JFrog OSS
+<1> Micronaut releases are available on Maven Central
+<2> Micronaut snapshots are available on Sonatype OSS Snapshots
 
 In the case of Maven, edit `pom.xml`:
 
@@ -26,22 +26,18 @@ In the case of Maven, edit `pom.xml`:
   <parent>
     <groupId>io.micronaut</groupId>
     <artifactId>micronaut-parent</artifactId>
-    <version>2.2.0-SNAPSHOT</version>
+    <version>2.4.0-SNAPSHOT</version>
   </parent>
 
   <properties>
-    <micronaut.version>2.2.0-SNAPSHOT</micronaut.version> <!--1-->
+    <micronaut.version>2.4.0-SNAPSHOT</micronaut.version> <!--1-->
     ...
   </properties>
 
   <repositories>
     <repository>
-      <id>jcenter.bintray.com</id>
-      <url>https://jcenter.bintray.com</url> <!--2-->
-    </repository>
-    <repository>
-      <id>jfrog-snapshots</id>
-      <url>https://oss.jfrog.org/oss-snapshot-local</url> <!--3-->
+      <id>sonatype-snapshots</id>
+      <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url> <!--2-->
     </repository>
   </repositories>
 
@@ -50,5 +46,6 @@ In the case of Maven, edit `pom.xml`:
 
 ----
 <1> Set the snapshot version.
-<2> Micronaut releases are available on JCenter and Maven Central
-<3> Micronaut snapshots are available on JFrog OSS Snapshots
+<2> Micronaut snapshots are available on Sonatype OSS Snapshots
+
+NOTE: Previously snapshots were published to Bintray, however due to JFrog shutting the service down, snapshots are now being published to Sonatype.

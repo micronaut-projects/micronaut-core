@@ -16,7 +16,7 @@
 package io.micronaut.docs.sse
 
 import io.micronaut.docs.streaming.Headline
-import io.micronaut.http.MediaType
+import io.micronaut.http.MediaType.TEXT_EVENT_STREAM
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.sse.Event
@@ -24,22 +24,22 @@ import io.reactivex.BackpressureStrategy
 import io.reactivex.Flowable
 
 import java.time.ZonedDateTime
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeUnit.SECONDS
 
 @Controller("/streaming/sse")
 class HeadlineController {
 
     // tag::streaming[]
-    @Get(value = "/headlines", processes = [MediaType.TEXT_EVENT_STREAM]) // <1>
+    @Get(value = "/headlines", processes = [TEXT_EVENT_STREAM]) // <1>
     internal fun streamHeadlines(): Flowable<Event<Headline>> {
-        return Flowable.create<Event<Headline>>( {  // <2>
-            emitter ->
+        return Flowable.create<Event<Headline>>( { emitter -> // <2>
             val headline = Headline()
-            headline.text = "Latest Headline at " + ZonedDateTime.now()
+            headline.text = "Latest Headline at ${ZonedDateTime.now()}"
             emitter.onNext(Event.of(headline))
             emitter.onComplete()
-        }, BackpressureStrategy.BUFFER).repeat(100) // <3>
-                .delay(1, TimeUnit.SECONDS) // <4>
+        }, BackpressureStrategy.BUFFER)
+            .repeat(100) // <3>
+            .delay(1, SECONDS) // <4>
     }
     // end::streaming[]
 }

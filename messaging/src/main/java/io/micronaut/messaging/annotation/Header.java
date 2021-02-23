@@ -29,12 +29,14 @@ import java.lang.annotation.*;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use {@link MessageHeader} instead
  */
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.PARAMETER, ElementType.TYPE, ElementType.METHOD}) // this can be either type or param
 @Repeatable(value = Headers.class)
 @Bindable
+@Deprecated
 public @interface Header {
 
     /**

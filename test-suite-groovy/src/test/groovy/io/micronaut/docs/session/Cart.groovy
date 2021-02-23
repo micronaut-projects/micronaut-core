@@ -19,6 +19,5 @@ package io.micronaut.docs.session
  * @since 1.0
  */
 class Cart {
-
-    List<String> items = new ArrayList<>();
+    List<String> items = []
 }

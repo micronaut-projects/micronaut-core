@@ -11,14 +11,15 @@ import io.micronaut.http.client.HttpClient
 
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
-
 // end::imports[]
+
 // tag::multipartBodyImports[]
 import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.http.client.multipart.MultipartBody
 import org.reactivestreams.Publisher
 // end::multipartBodyImports[]
+
 // tag::controllerImports[]
 import io.micronaut.http.annotation.Controller
 // end::controllerImports[]
@@ -27,7 +28,6 @@ import io.micronaut.http.annotation.Controller
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
 // end::spockImports[]
 
 // tag::class[]
@@ -45,7 +45,7 @@ class MultipartFileUploadSpec extends Specification {
     @AutoCleanup
     HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
-    static final File uploadDir = File.createTempDir()
+    private static final File uploadDir = File.createTempDir()
 
     void setupSpec() {
         uploadDir.mkdir()
@@ -84,11 +84,10 @@ class MultipartFileUploadSpec extends Specification {
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
 
                 // tag::request[]
-                HttpRequest.POST("/multipart/upload", requestBody)       // <1>
-                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE) // <2>
+                HttpRequest.POST("/multipart/upload", requestBody)      // <1>
+                           .contentType(MediaType.MULTIPART_FORM_DATA_TYPE) // <2>
                 // end::request[]
-                        .accept(MediaType.TEXT_PLAIN_TYPE),
-
+                           .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
         HttpResponse<String> response = flowable.blockingFirst()
@@ -110,8 +109,8 @@ class MultipartFileUploadSpec extends Specification {
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/multipart/upload", requestBody)
-                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
-                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                           .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                           .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
         HttpResponse<String> response = flowable.blockingFirst()
@@ -155,8 +154,8 @@ class MultipartFileUploadSpec extends Specification {
 
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/multipart/complete-file-upload", requestBody)
-                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
-                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                           .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                           .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
         HttpResponse<String> response = flowable.blockingFirst()
@@ -167,7 +166,6 @@ class MultipartFileUploadSpec extends Specification {
         body == "Uploaded 9 bytes. File size: 9"
         newFile.exists()
         newFile.text == file.text
-
     }
 
     void "test upload InputStream"() {
@@ -196,7 +194,6 @@ class MultipartFileUploadSpec extends Specification {
         body == "Uploaded ${file.length()} bytes. File size: ${file.length()}"
         newFile.exists()
         newFile.text == file.text
-
     }
 
     void "test upload InputStream without ContentType"() {
@@ -213,8 +210,8 @@ class MultipartFileUploadSpec extends Specification {
 
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/multipart/complete-file-upload", requestBody)
-                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
-                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                           .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                           .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
         HttpResponse<String> response = flowable.blockingFirst()
@@ -225,13 +222,11 @@ class MultipartFileUploadSpec extends Specification {
         body == "Uploaded ${file.length()} bytes. File size: ${file.length()}"
         newFile.exists()
         newFile.text == file.text
-
     }
 
     @Controller('/multipart')
     @Produces(MediaType.TEXT_PLAIN)
     static class MultipartController {
-
 
         @Post(value = '/upload', consumes = MediaType.MULTIPART_FORM_DATA)
         HttpResponse<String> upload(byte[] data) {
@@ -242,8 +237,8 @@ class MultipartFileUploadSpec extends Specification {
         Publisher<HttpResponse> completeFileUpload(CompletedFileUpload data, String title) {
             File newFile = new File(uploadDir, title + ".txt")
             newFile.createNewFile()
-            newFile.append(data.getInputStream())
-            return Flowable.just(HttpResponse.ok("Uploaded ${newFile.length()} bytes. File size: ${data.getSize()}"))
+            newFile.append(data.inputStream)
+            return Flowable.just(HttpResponse.ok("Uploaded ${newFile.length()} bytes. File size: $data.size"))
         }
 
         @Post(value = '/stream-file-upload', consumes = MediaType.MULTIPART_FORM_DATA)
@@ -253,6 +248,5 @@ class MultipartFileUploadSpec extends Specification {
                         HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened")
             })
         }
-
     }
 }

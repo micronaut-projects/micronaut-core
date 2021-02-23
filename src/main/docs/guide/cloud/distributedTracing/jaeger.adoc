@@ -43,8 +43,8 @@ Then you need to enable Jaeger tracing in your configuration (potentially only y
 [source,yaml]
 ----
 tracing:
-    jaeger:
-        enabled: true
+  jaeger:
+    enabled: true
 ----
 
 By default Jaeger will be configured to send traces to a locally running Jaeger agent.
@@ -62,16 +62,16 @@ Below is an example of customizing JaegerConfiguration configuration:
 [source,yaml]
 ----
 tracing:
-    jaeger:
-        enabled: true
-        sampler:
-            probability: 0.5
-        sender:
-            agentHost: foo
-            agentPort: 5775
-        reporter:
-            flushInterval: 2000
-            maxQueueSize: 200
+  jaeger:
+    enabled: true
+    sampler:
+      probability: 0.5
+    sender:
+      agentHost: foo
+      agentPort: 5775
+    reporter:
+      flushInterval: 2000
+      maxQueueSize: 200
 ----
 
 You can also optionally dependency inject common configuration classes into api:tracing.jaeger.JaegerConfiguration[] such as `io.jaegertracing.Configuration.SamplerConfiguration` just by defining them as beans. See the API for api:tracing.jaeger.JaegerConfiguration[] for available injection points.

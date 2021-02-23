@@ -26,8 +26,8 @@ import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
@@ -87,6 +87,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected void addError(@NonNull Element originatingElement, @NonNull String error) {
         messager.printMessage(Diagnostic.Kind.ERROR, error, originatingElement);
+    }
+
+    @Override
+    protected void addWarning(@NonNull Element originatingElement, @NonNull String warning) {
+        messager.printMessage(Diagnostic.Kind.WARNING, warning, originatingElement);
     }
 
     @Override
@@ -180,7 +185,31 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     protected List<? extends AnnotationMirror> getAnnotationsForType(Element element) {
         List<? extends AnnotationMirror> annotationMirrors = new ArrayList<>(element.getAnnotationMirrors());
         annotationMirrors.removeIf(mirror -> getAnnotationTypeName(mirror).equals(AnnotationUtil.KOTLIN_METADATA));
-        return annotationMirrors;
+        List<AnnotationMirror> expanded = new ArrayList<>(annotationMirrors.size());
+        for (AnnotationMirror annotation: annotationMirrors) {
+            boolean repeatable = false;
+            for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry: annotation.getElementValues().entrySet()) {
+                if (entry.getKey().getSimpleName().toString().equals("value")) {
+                    Object value = entry.getValue().getValue();
+                    if (value instanceof List) {
+                        String parentAnnotationName = getAnnotationTypeName(annotation);
+                        for (Object val: (List<?>) value) {
+                            if (val instanceof AnnotationMirror) {
+                                String name = getRepeatableName((AnnotationMirror) val);
+                                if (name != null && name.equals(parentAnnotationName)) {
+                                    repeatable = true;
+                                    expanded.add((AnnotationMirror) val);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (!repeatable) {
+                expanded.add(annotation);
+            }
+        }
+        return expanded;
     }
 
     @Override

@@ -67,7 +67,7 @@ public class IntrospectionSpec extends TestCase {
         Vehicle vehicle = introspection.instantiate("Subaru", "WRX", 2);
         assertEquals("Subaru", vehicle.getMake());
         assertEquals("WRX", vehicle.getModel());
-        assertEquals(2, vehicle.getAxels());
+        assertEquals(2, vehicle.getAxles());
     }
 
     public void testBusiness() {

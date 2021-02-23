@@ -30,4 +30,3 @@ public interface PetClient extends PetOperations {
     Single<Pet> save(String name, int age);
 }
 // end::class[]
-

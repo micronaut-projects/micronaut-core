@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.annotation;
 
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.*;
@@ -57,6 +58,8 @@ public class AnnotationUtil {
      */
     public static final List<String> STEREOTYPE_EXCLUDES = Arrays.asList(
             "javax.annotation",
+            "java.lang.annotation",
+            "io.micronaut.core.annotation",
             "edu.umd.cs.findbugs.annotations"
     );
 

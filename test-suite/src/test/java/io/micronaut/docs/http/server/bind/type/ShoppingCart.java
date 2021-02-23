@@ -1,9 +1,11 @@
 package io.micronaut.docs.http.server.bind.type;
+
 // tag::class[]
 import io.micronaut.core.annotation.Introspected;
 
 @Introspected
 public class ShoppingCart {
+
     private String sessionId;
     private Integer total;
 

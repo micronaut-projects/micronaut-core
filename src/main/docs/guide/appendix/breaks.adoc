@@ -51,8 +51,8 @@ The method on the loggers endpoint to modify logging is now sensitive by default
 [source,yaml]
 ----
 endpoints:
-    loggers:
-        write-sensitive: false
+  loggers:
+    write-sensitive: false
 ----
 
 === Server Side Content Negotiation May Require Test Changes
@@ -137,13 +137,12 @@ HTTP clients declared with `micronaut.http.services` (see <<serviceDiscoveryManu
 [source,yaml]
 ----
 micronaut:
-    http:
-        services:
-            foo:
-                urls:
-                    - http://foo1
-                    - http://foo2
-
+  http:
+    services:
+      foo:
+        urls:
+          - http://foo1
+          - http://foo2
 ----
 
 You can no longer inject an HTTP client with `@Named("foo")`:
@@ -179,10 +178,10 @@ For example if you created a bean with `@EachProperty("cars")`, then specified t
 [source,yaml]
 ----
 cars:
-    ford:
-        cylinders: 8
-    subaru:
-        cylinders: 4
+  ford:
+    cylinders: 8
+  subaru:
+    cylinders: 4
 ----
 
 Requesting a single instance of that bean would result in the "ford" instance being injected. Because that behavior is surprising and inconsistent with other types of beans, that is no longer the case and a `NonUniqueBeanException` will be thrown.

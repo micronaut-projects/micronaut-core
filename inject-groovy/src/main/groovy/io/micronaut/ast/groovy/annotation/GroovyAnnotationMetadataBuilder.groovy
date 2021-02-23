@@ -15,7 +15,7 @@
  */
 package io.micronaut.ast.groovy.annotation
 
-import edu.umd.cs.findbugs.annotations.NonNull
+import io.micronaut.core.annotation.NonNull
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
@@ -147,6 +147,11 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
+    protected void addWarning(@NonNull AnnotatedNode originatingElement, @NonNull String warning) {
+        AstMessageUtils.warning(sourceUnit, originatingElement, warning)
+    }
+
+    @Override
     protected boolean isMethodOrClassElement(AnnotatedNode element) {
         return element instanceof ClassNode || element instanceof MethodNode
     }
@@ -224,7 +229,27 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     @Override
     protected List<? extends AnnotationNode> getAnnotationsForType(AnnotatedNode element) {
-        return element.getAnnotations()
+        List<AnnotationNode> annotations = element.getAnnotations()
+        List<AnnotationNode> expanded = new ArrayList<>(annotations.size())
+        for (AnnotationNode node: annotations) {
+            Expression value = node.getMember("value")
+            boolean repeatable = false
+            if (value != null && value instanceof ListExpression) {
+                for (Expression expression: ((ListExpression) value).getExpressions()) {
+                    if (expression instanceof AnnotationConstantExpression) {
+                        String name = getRepeatableNameForType(expression.type)
+                        if (name != null && name == node.classNode.name) {
+                            repeatable = true
+                            expanded.add((AnnotationNode) expression.value)
+                        }
+                    }
+                }
+            }
+            if (!repeatable) {
+                expanded.add(node)
+            }
+        }
+        return expanded
     }
 
     @Override

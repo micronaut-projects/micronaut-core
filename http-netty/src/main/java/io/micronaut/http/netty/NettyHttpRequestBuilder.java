@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.netty;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.netty.buffer.ByteBuf;

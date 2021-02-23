@@ -39,8 +39,8 @@ Then you need to enable ZipKin tracing in your configuration (potentially only y
 [source,yaml]
 ----
 tracing:
-    zipkin:
-        enabled: true
+  zipkin:
+    enabled: true
 ----
 
 TIP: Or alternatively if you have the Micronaut CLI installed you can configure Zipkin when creating your service with: `mn create-app hello-world --features tracing-zipkin`
@@ -53,10 +53,10 @@ In order to send spans you need to configure a Zipkin sender. You can configure 
 [source,yaml]
 ----
 tracing:
-    zipkin:
-        enabled: true
-        http:
-            url: http://localhost:9411
+  zipkin:
+    enabled: true
+    http:
+      url: http://localhost:9411
 ----
 
 It is unlikely that sending spans to localhost will be suitable for production deployment so you generally will want to configure the location of one or many Zipkin servers for production:
@@ -65,12 +65,12 @@ It is unlikely that sending spans to localhost will be suitable for production d
 [source,yaml]
 ----
 tracing:
-    zipkin:
-        enabled: true
-        http:
-            urls:
-                - http://foo:9411
-                - http://bar:9411
+  zipkin:
+    enabled: true
+    http:
+      urls:
+        - http://foo:9411
+        - http://bar:9411
 ----
 
 TIP: In production, setting `TRACING_ZIPKIN_HTTP_URLS` environment variable with a comma separated list of URLs will also work.
@@ -87,12 +87,11 @@ Below is an example of customizing Zipkin configuration:
 [source,yaml]
 ----
 tracing:
-    zipkin:
-        enabled: true
-        traceId128Bit: true
-        sampler:
-            probability: 1
+  zipkin:
+    enabled: true
+    traceId128Bit: true
+    sampler:
+      probability: 1
 ----
 
 You can also optionally dependency inject common configuration classes into api:tracing.brave.BraveTracerConfiguration[] such as `brave.sampler.Sampler` just by defining them as beans. See the API for api:tracing.brave.BraveTracerConfiguration[] for available injection points.
-

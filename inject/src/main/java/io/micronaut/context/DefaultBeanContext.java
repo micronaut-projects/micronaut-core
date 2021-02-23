@@ -24,7 +24,6 @@ import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.*;
-import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -51,8 +50,8 @@ import io.micronaut.inject.validation.BeanDefinitionValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 import javax.inject.Provider;
 import javax.inject.Scope;
@@ -814,7 +813,7 @@ public class DefaultBeanContext implements BeanContext {
         Optional<BeanDefinition<T>> candidate = findConcreteCandidate(null, beanType, qualifier, true, false);
         if (candidate.isPresent()) {
             try (BeanResolutionContext resolutionContext = newResolutionContext(candidate.get(), null)) {
-                T createdBean = doCreateBean(resolutionContext, candidate.get(), qualifier, false, argumentValues);
+                T createdBean = doCreateBean(resolutionContext, candidate.get(), qualifier, beanType, false, argumentValues);
                 if (createdBean == null) {
                     throw new NoSuchBeanException(beanType);
                 }
@@ -905,7 +904,7 @@ public class DefaultBeanContext implements BeanContext {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Computed bean argument values: {}", argumentValues);
         }
-        T createdBean = doCreateBean(resolutionContext, definition, qualifier, false, argumentValues);
+        T createdBean = doCreateBean(resolutionContext, definition, qualifier, beanType, false, argumentValues);
         if (createdBean == null) {
             throw new NoSuchBeanException(beanType);
         }
@@ -981,7 +980,7 @@ public class DefaultBeanContext implements BeanContext {
         if (concreteCandidate.isPresent()) {
             BeanDefinition<T> candidate = concreteCandidate.get();
             try (BeanResolutionContext context = newResolutionContext(candidate, resolutionContext)) {
-                T createBean = doCreateBean(context, candidate, qualifier, false, null);
+                T createBean = doCreateBean(context, candidate, qualifier, beanType, false, null);
                 if (createBean == null) {
                     throw new NoSuchBeanException(beanType);
                 }
@@ -1595,6 +1594,9 @@ public class DefaultBeanContext implements BeanContext {
             byAnnotation.forEach((annotationType, methods) ->
                     streamOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType))
                             .forEach(processor -> {
+                                if (processor instanceof LifeCycle<?>) {
+                                    ((LifeCycle<?>) processor).start();
+                                }
                                 for (BeanDefinitionMethodReference<?, ?> method : methods) {
 
                                     BeanDefinition<?> beanDefinition = method.getBeanDefinition();
@@ -1623,8 +1625,8 @@ public class DefaultBeanContext implements BeanContext {
                                     }
                                 }
 
-                                if (processor instanceof Completable) {
-                                    ((Completable) processor).onComplete();
+                                if (processor instanceof LifeCycle<?>) {
+                                    ((LifeCycle<?>) processor).stop();
                                 }
 
                             }));
@@ -1821,9 +1823,34 @@ public class DefaultBeanContext implements BeanContext {
      * Execution the creation of a bean. The returned value can be null if a
      * factory method returned null.
      *
+     * @deprecated Use {@link #doCreateBean(BeanResolutionContext, BeanDefinition, Qualifier, Class, boolean, Map)} instead.
+     *
      * @param resolutionContext The {@link BeanResolutionContext}
      * @param beanDefinition    The {@link BeanDefinition}
      * @param qualifier         The {@link Qualifier}
+     * @param isSingleton       Whether the bean is a singleton
+     * @param argumentValues    Any argument values passed to create the bean
+     * @param <T>               The bean generic type
+     * @return The created bean
+     */
+    @Nullable
+    @Deprecated
+    protected <T> T doCreateBean(@NonNull BeanResolutionContext resolutionContext,
+                       @NonNull BeanDefinition<T> beanDefinition,
+                       @Nullable Qualifier<T> qualifier,
+                       boolean isSingleton,
+                       @Nullable Map<String, Object> argumentValues) {
+        return doCreateBean(resolutionContext, beanDefinition, qualifier, beanDefinition.getBeanType(), isSingleton, argumentValues);
+    }
+
+    /**
+     * Execution the creation of a bean. The returned value can be null if a
+     * factory method returned null.
+     *
+     * @param resolutionContext The {@link BeanResolutionContext}
+     * @param beanDefinition    The {@link BeanDefinition}
+     * @param qualifier         The {@link Qualifier}
+     * @param qualifierBeanType The bean type used in the qualifier
      * @param isSingleton       Whether the bean is a singleton
      * @param argumentValues    Any argument values passed to create the bean
      * @param <T>               The bean generic type
@@ -1833,6 +1860,7 @@ public class DefaultBeanContext implements BeanContext {
     <T> T doCreateBean(@NonNull BeanResolutionContext resolutionContext,
                        @NonNull BeanDefinition<T> beanDefinition,
                        @Nullable Qualifier<T> qualifier,
+                       @Nullable Class<T> qualifierBeanType,
                        boolean isSingleton,
                        @Nullable Map<String, Object> argumentValues) {
         if (argumentValues == null) {
@@ -1843,12 +1871,12 @@ public class DefaultBeanContext implements BeanContext {
         if (isSingleton) {
             BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanDefinition, declaredQualifier));
             if (beanRegistration != null) {
-                if (qualifier == null || qualifier.reduce(beanType, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
+                if (qualifier == null || qualifier.reduce(qualifierBeanType, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
                     return beanRegistration.bean;
                 }
             } else if (qualifier != null) {
                 beanRegistration = singletonObjects.get(new BeanKey(beanDefinition, null));
-                if (beanRegistration != null && qualifier.reduce(beanType, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
+                if (beanRegistration != null && qualifier.reduce(qualifierBeanType, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
                     return beanRegistration.bean;
                 }
             }
@@ -2361,7 +2389,7 @@ public class DefaultBeanContext implements BeanContext {
                 }
                 BeanDefinition<T> proxyDefinition = (BeanDefinition<T>) findProxyBeanDefinition((Class) proxiedType, q).orElse(finalDefinition);
 
-                T createBean = doCreateBean(resolutionContext, proxyDefinition, qualifier, false, null);
+                T createBean = doCreateBean(resolutionContext, proxyDefinition, qualifier,  beanType, false, null);
                 if (createBean instanceof Qualified) {
                     ((Qualified) createBean).$withBeanQualifier(qualifier);
                 }
@@ -2403,7 +2431,7 @@ public class DefaultBeanContext implements BeanContext {
                         new ParametrizedProvider() {
                             @Override
                             public Object get(Map argumentValues) {
-                                Object createBean = doCreateBean(resolutionContext, finalDefinition, qualifier, false, argumentValues);
+                                Object createBean = doCreateBean(resolutionContext, finalDefinition, qualifier, beanType, false, argumentValues);
                                 if (createBean == null && throwNoSuchBean) {
                                     throw new NoSuchBeanException(finalDefinition.getBeanType(), qualifier);
                                 }
@@ -2421,7 +2449,7 @@ public class DefaultBeanContext implements BeanContext {
                         }
                 );
             } else {
-                T createBean = doCreateBean(resolutionContext, definition, qualifier, false, null);
+                T createBean = doCreateBean(resolutionContext, definition, qualifier, beanType, false, null);
                 if (createBean == null && throwNoSuchBean) {
                     throw new NoSuchBeanException(definition.getBeanType(), qualifier);
                 }
@@ -2676,7 +2704,7 @@ public class DefaultBeanContext implements BeanContext {
             registerSingletonBean(definition, beanType, reg.bean, qualifier, true);
             return reg.bean;
         } else {
-            T createdBean = doCreateBean(resolutionContext, definition, qualifier, true, null);
+            T createdBean = doCreateBean(resolutionContext, definition, qualifier, beanType, true, null);
             registerSingletonBean(definition, beanType, createdBean, qualifier, true);
             return createdBean;
         }
@@ -2815,7 +2843,7 @@ public class DefaultBeanContext implements BeanContext {
     private boolean isEagerInit(BeanDefinitionReference beanDefinitionReference) {
         return beanDefinitionReference.isContextScope() ||
                 (eagerInitSingletons && beanDefinitionReference.isSingleton()) ||
-                (eagerInitStereotypesPresent && beanDefinitionReference.getAnnotationMetadata().hasStereotype(eagerInitStereotypes));
+                (eagerInitStereotypesPresent && beanDefinitionReference.getAnnotationMetadata().hasDeclaredStereotype(eagerInitStereotypes));
     }
 
     @NonNull
@@ -3019,7 +3047,7 @@ public class DefaultBeanContext implements BeanContext {
                                 throw new IllegalStateException("Singleton not present for key: " + key);
                             }
                         } else {
-                            bean = doCreateBean(context, candidate, qualifier, true, null);
+                            bean = doCreateBean(context, candidate, qualifier, beanType, true, null);
                             registerSingletonBean(candidate, beanType, bean, qualifier, singleCandidate);
                         }
                     }

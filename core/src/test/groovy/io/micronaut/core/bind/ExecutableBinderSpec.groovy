@@ -22,7 +22,6 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.Executable
 import spock.lang.Specification
 
-import javax.annotation.Nullable
 
 class ExecutableBinderSpec extends Specification {
 

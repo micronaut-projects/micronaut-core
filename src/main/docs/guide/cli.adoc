@@ -50,7 +50,8 @@ Usage: mn create-app [-hivVx] [--list-features] [-b=BUILD-TOOL] [--jdk=<javaVers
                      [-t=TEST] [-f=FEATURE[,FEATURE...]]... [NAME]
 Creates an application
       [NAME]               The name of the application to create.
-  -b, --build=BUILD-TOOL   Which build tool to configure. Possible values: gradle, maven.
+  -b, --build=BUILD-TOOL   Which build tool to configure. Possible values: gradle, gradle_kotlin,
+                             maven.
   -f, --features=FEATURE[,FEATURE...]
   -h, --help               Show this help message and exit.
   -i, --inplace            Create a service using the current directory
@@ -58,7 +59,7 @@ Creates an application
                            The JDK version the project should target
   -l, --lang=LANG          Which language to use. Possible values: java, groovy, kotlin.
       --list-features      Output the available features and their descriptions
-  -t, --test=TEST          Which test framework to use. Possible values: junit, spock, kotlintest.
+  -t, --test=TEST          Which test framework to use. Possible values: junit, spock, kotest.
 ----
 
 A list of available features can be viewed using the `--list-features` flag on any of the create commands.

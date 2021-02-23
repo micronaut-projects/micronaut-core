@@ -15,8 +15,6 @@
  */
 package io.micronaut.core.annotation;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -222,6 +220,26 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return True if the annotation is present
      */
     default boolean hasDeclaredStereotype(@Nullable String annotation) {
+        return false;
+    }
+
+    /**
+     * Checks whether this object has any of the given stereotype directly declared on the object.
+     *
+     * @param annotations The annotations
+     * @return True if any of the given stereotypes are present
+     * @since 2.3.3
+     */
+    @SuppressWarnings("unchecked")
+    default boolean hasDeclaredStereotype(@Nullable String... annotations) {
+        if (ArrayUtils.isEmpty(annotations)) {
+            return false;
+        }
+        for (String annotation : annotations) {
+            if (hasDeclaredStereotype(annotation)) {
+                return true;
+            }
+        }
         return false;
     }
 

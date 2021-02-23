@@ -23,7 +23,11 @@ import org.junit.Test;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
@@ -38,7 +42,6 @@ public class EachPropertyTest {
                 CollectionUtils.mapOf(
                         "test.datasource.one.url", "jdbc:mysql://localhost/one",
                         "test.datasource.two.url", "jdbc:mysql://localhost/two")
-
         ));
         // end::config[]
 
@@ -73,8 +76,8 @@ public class EachPropertyTest {
                 2,
                 beansOfType.size()
         );
-        assertEquals(1000L, beansOfType.get(0).getLimit().longValue());
-        assertEquals(5000L, beansOfType.get(1).getLimit().longValue());
+        assertEquals(1000, beansOfType.get(0).getLimit().intValue());
+        assertEquals(5000, beansOfType.get(1).getLimit().intValue());
 
         applicationContext.close();
     }

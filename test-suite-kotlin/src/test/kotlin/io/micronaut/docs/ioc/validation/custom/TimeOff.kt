@@ -15,8 +15,12 @@
  */
 package io.micronaut.docs.ioc.validation.custom
 
+// tag::imports[]
+import kotlin.annotation.AnnotationRetention.RUNTIME
+// end::imports[]
+
 // tag::class[]
-@Retention(AnnotationRetention.RUNTIME)
+@Retention(RUNTIME)
 annotation class TimeOff(
     @DurationPattern val duration: String
 )

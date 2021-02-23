@@ -23,7 +23,7 @@ import io.micronaut.inject.ast.FieldElement;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.control.SourceUnit;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 import java.lang.reflect.Modifier;
 

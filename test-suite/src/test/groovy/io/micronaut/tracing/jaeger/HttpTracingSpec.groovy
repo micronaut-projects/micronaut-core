@@ -29,6 +29,8 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.tracing.annotation.ContinueSpan
 import io.opentracing.Tracer
 import io.reactivex.Flowable
@@ -74,6 +76,33 @@ class HttpTracingSpec extends Specification {
             span != null
             span.tags.get("foo") == 'bar'
             span.tags.get('http.path') == '/traced/hello/John'
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
+        }
+    }
+
+    void "test basic http tracing - blocking controller method"() {
+
+        when:
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+        then:
+        context.containsBean(JaegerTracer)
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/blocking/hello/John', String)
+        PollingConditions conditions = new PollingConditions()
+
+        then:
+        response
+        conditions.eventually {
+            reporter.spans.size() == 2
+            def span = reporter.spans.find { it.operationName == 'GET /traced/blocking/hello/{name}' }
+            span != null
+            span.tags.get("foo") == 'bar'
+            span.tags.get('http.path') == '/traced/blocking/hello/John'
             nrOfStartedSpans > 0
             nrOfFinishedSpans == nrOfStartedSpans
         }
@@ -157,6 +186,39 @@ class HttpTracingSpec extends Specification {
             serverSpan.tags.get('http.method') == 'GET'
             serverSpan.tags.get('error') == 'Internal Server Error'
             serverSpan.operationName == 'GET /traced/error/{name}'
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
+        }
+    }
+
+    void "test basic http trace error - blocking controller method"() {
+        given:
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
+
+        when:
+        client.toBlocking().exchange('/traced/blocking/error/John', String)
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        def response = e.response
+        response
+        conditions.eventually {
+            reporter.spans.size() == 2
+            def span = reporter.spans.find { it.tags.containsKey('http.client') }
+            span.tags.get('http.path') == '/traced/blocking/error/John'
+            span.tags.get('http.status_code') == 500
+            span.tags.get('http.method') == 'GET'
+            span.tags.get('error') == 'Internal Server Error: bad'
+            span.operationName == 'GET /traced/blocking/error/John'
+            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            serverSpan.tags.get('http.path') == '/traced/blocking/error/John'
+            serverSpan.tags.get('http.status_code') == 500
+            serverSpan.tags.get('http.method') == 'GET'
+            serverSpan.tags.get('error') == 'Internal Server Error'
+            serverSpan.operationName == 'GET /traced/blocking/error/{name}'
             nrOfStartedSpans > 0
             nrOfFinishedSpans == nrOfStartedSpans
         }
@@ -308,6 +370,52 @@ class HttpTracingSpec extends Specification {
         client.close()
     }
 
+    void "tested continue http tracing - blocking controller method"() {
+        given:
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/blocking/continued/John', String)
+
+        then:
+        response
+        conditions.eventually {
+            reporter.spans.size() == 4
+            reporter.spans.find {
+                it.operationName == 'GET /traced/blocking/hello/{name}' &&
+                        it.tags.get('foo') == 'bar' &&
+                        it.tags.get('http.path') == '/traced/blocking/hello/John' &&
+                        it.tags.get('http.server')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/blocking/hello/{name}' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/blocking/hello/John' &&
+                        it.tags.get('http.client')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/blocking/continued/{name}' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/blocking/continued/John' &&
+                        it.tags.get('http.server')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/blocking/continued/John' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/blocking/continued/John' &&
+                        it.tags.get('http.client')
+            } != null
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
+        }
+
+        cleanup:
+        client.close()
+    }
+
     void "tested continue http tracing - rx"() {
         given:
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
@@ -400,6 +508,52 @@ class HttpTracingSpec extends Specification {
         client.close()
     }
 
+    void "tested nested http tracing - blocking controller method"() {
+        given:
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/blocking/nested/John', String)
+
+        then:
+        response
+        conditions.eventually {
+            reporter.spans.size() == 4
+            reporter.spans.find {
+                it.operationName == 'GET /traced/blocking/hello/{name}' &&
+                        it.tags.get('foo') == 'bar' &&
+                        it.tags.get('http.path') == '/traced/blocking/hello/John' &&
+                        it.tags.get('http.server')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/blocking/hello/{name}' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/blocking/hello/John' &&
+                        it.tags.get('http.client')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/blocking/nested/{name}' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/blocking/nested/John' &&
+                        it.tags.get('http.server')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/blocking/nested/John' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/blocking/nested/John' &&
+                        it.tags.get('http.client')
+            } != null
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
+        }
+
+        cleanup:
+        client.close()
+    }
+
     void "tested nested http error tracing"() {
         given:
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
@@ -440,6 +594,55 @@ class HttpTracingSpec extends Specification {
             reporter.spans.find {
                 it.operationName == 'GET /traced/nestedError/John' &&
                         it.tags.get('http.path') == '/traced/nestedError/John' &&
+                        it.tags.get('http.status_code') == 500 &&
+                        it.tags.get('error') &&
+                        it.tags.get('http.client')
+            } != null
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
+        }
+    }
+
+    void "tested nested http error tracing - blocking controller method"() {
+        given:
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
+
+        when:
+        client.toBlocking().exchange('/traced/blocking/nestedError/John', String)
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex != null
+        conditions.eventually {
+            reporter.spans.size() == 4
+            reporter.spans.find {
+                it.operationName == 'GET /traced/blocking/error/{name}' &&
+                        it.tags.containsKey('error') &&
+                        it.tags.get('http.path') == '/traced/blocking/error/John' &&
+                        it.tags.get('http.status_code') == 500 &&
+                        it.tags.get('http.server')
+
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/blocking/error/{name}' &&
+                        it.tags.get('http.path') == '/traced/blocking/error/John' &&
+                        it.tags.get('http.status_code') == 500 &&
+                        it.tags.get('error') == 'Internal Server Error: bad' &&
+                        it.tags.get('http.client')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/blocking/nestedError/{name}' &&
+                        it.tags.containsKey('error') &&
+                        it.tags.get('http.path') == '/traced/blocking/nestedError/John' &&
+                        it.tags.get('http.status_code') == 500 &&
+                        it.tags.get('http.server')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/blocking/nestedError/John' &&
+                        it.tags.get('http.path') == '/traced/blocking/nestedError/John' &&
                         it.tags.get('http.status_code') == 500 &&
                         it.tags.get('error') &&
                         it.tags.get('http.client')
@@ -492,6 +695,27 @@ class HttpTracingSpec extends Specification {
         client.close()
     }
 
+    void "tested customising span name - blocking controller method"() {
+        given:
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
+
+        when:
+        client.toBlocking().exchange('/traced/blocking/customised/name', String)
+
+        then:
+        conditions.eventually {
+            reporter.spans.any { it.operationName == "custom name" }
+            nrOfStartedSpans > 0
+            nrOfFinishedSpans == nrOfStartedSpans
+        }
+
+        cleanup:
+        client.close()
+    }
+
     ApplicationContext buildContext() {
         def reporter = new InMemoryReporter()
         def metricsFactory = new InMemoryMetricsFactory()
@@ -527,6 +751,13 @@ class HttpTracingSpec extends Specification {
             return name
         }
 
+        @Get("/blocking/hello/{name}")
+        @ExecuteOn(TaskExecutors.IO)
+        String blockingHello(String name) {
+            spanCustomizer.activeSpan().setTag("foo", "bar")
+            return name
+        }
+
         @Get("/response-rx/{name}")
         HttpResponse<Publisher<String>> responseRx(String name) {
             return HttpResponse.ok(Publishers.map(Flowable.fromCallable({ ->
@@ -548,6 +779,12 @@ class HttpTracingSpec extends Specification {
             throw new RuntimeException("bad")
         }
 
+        @Get("/blocking/error/{name}")
+        @ExecuteOn(TaskExecutors.IO)
+        String blockingError(String name) {
+            throw new RuntimeException("bad")
+        }
+
         @Get("/rxError/{name}")
         Single<String> rxError(String name) {
             Single.defer { Single.just(error(name)) }
@@ -558,10 +795,23 @@ class HttpTracingSpec extends Specification {
             tracedClient.hello(name)
         }
 
+        @Get("/blocking/nested/{name}")
+        @ExecuteOn(TaskExecutors.IO)
+        String blockingNested(String name) {
+            tracedClient.blockingHello(name)
+        }
+
         @ContinueSpan
         @Get("/continued/{name}")
         String continued(String name) {
             tracedClient.continued(name)
+        }
+
+        @ContinueSpan
+        @Get("/blocking/continued/{name}")
+        @ExecuteOn(TaskExecutors.IO)
+        String blockingContinued(String name) {
+            tracedClient.blockingContinued(name)
         }
 
         @ContinueSpan
@@ -575,8 +825,21 @@ class HttpTracingSpec extends Specification {
             tracedClient.error(name)
         }
 
+        @Get("/blocking/nestedError/{name}")
+        @ExecuteOn(TaskExecutors.IO)
+        String blockingNestedError(String name) {
+            tracedClient.blockingError(name)
+        }
+
         @Get("/customised/name")
         String customisedName() {
+            spanCustomizer.activeSpan().setOperationName("custom name")
+            "response"
+        }
+
+        @Get("/blocking/customised/name")
+        @ExecuteOn(TaskExecutors.IO)
+        String blockingCustomisedName() {
             spanCustomizer.activeSpan().setOperationName("custom name")
             "response"
         }
@@ -625,11 +888,20 @@ class HttpTracingSpec extends Specification {
         @Get("/hello/{name}")
         String hello(String name)
 
+        @Get("/blocking/hello/{name}")
+        String blockingHello(String name)
+
         @Get("/error/{name}")
         String error(String name)
 
+        @Get("/blocking/error/{name}")
+        String blockingError(String name)
+
         @Get("/hello/{name}")
         String continued(String name)
+
+        @Get("/blocking/hello/{name}")
+        String blockingContinued(String name)
 
         @Get("/hello/{name}")
         Single<String> continuedRx(String name)

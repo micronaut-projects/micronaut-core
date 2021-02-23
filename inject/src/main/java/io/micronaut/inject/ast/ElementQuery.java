@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 
 import java.util.List;
@@ -76,6 +76,12 @@ public interface ElementQuery<T extends Element> {
      * @return This query
      */
     @NonNull ElementQuery<T> onlyAccessible();
+
+    /**
+     * Indicates to return only instance (non-static methods).
+     * @return The query
+     */
+    ElementQuery<T> onlyInstance();
 
     /**
      * Allows filtering elements by name.
@@ -155,6 +161,11 @@ public interface ElementQuery<T extends Element> {
          * @return Whether to declare only declared members
          */
         boolean isOnlyDeclared();
+
+        /**
+         * @return Whether to return only instance methods
+         */
+        boolean isOnlyInstance();
 
         /**
          * @return The name predicates

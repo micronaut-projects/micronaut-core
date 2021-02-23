@@ -15,11 +15,8 @@
  */
 package io.micronaut.inject.executable
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
-import spock.lang.Ignore
-
-import java.util.function.Function
 
 class ExecutableBeanSpec extends AbstractBeanDefinitionSpec {
 
@@ -66,5 +63,39 @@ class MyBean {
 
         expect:
         definition == null
+    }
+
+    void "test multiple executable annotations on a method"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
+package test
+
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
+import io.micronaut.inject.executable.*
+
+@javax.inject.Singleton
+class MyBean  {
+
+    @RepeatableExecutables([
+        @RepeatableExecutable("a"),
+        @RepeatableExecutable("b")
+    ])
+    void run() {
+        
+    }
+    
+       
+    @RepeatableExecutable("a")
+    @RepeatableExecutable("b")
+    void run2() {
+        
+    }
+}
+''')
+        expect:
+        definition != null
+        definition.findMethod("run2").isPresent()
+        definition.findMethod("run").isPresent()
     }
 }

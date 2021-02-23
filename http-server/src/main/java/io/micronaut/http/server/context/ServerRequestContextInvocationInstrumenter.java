@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.context;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.scheduling.instrument.Instrumentation;

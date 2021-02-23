@@ -15,8 +15,8 @@
  */
 package io.micronaut.context;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
@@ -123,12 +123,17 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                         } else {
                             Qualifier qualifier = Qualifiers.byName(named.toString());
                             // attempt bean lookup to full argument
-                            if (Provider.class.isAssignableFrom(argumentType)) {
+                            if (ProviderFactory.isProvider(argumentType)) {
                                 Optional<Argument<?>> genericType = argument.getFirstTypeVariable();
                                 if (genericType.isPresent()) {
                                     Class beanType = genericType.get().getType();
                                     try {
-                                        fulfilled.put(argumentName, ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier));
+                                        Provider provider = ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier);
+                                        if (provider != null) {
+                                            fulfilled.put(argumentName, ProviderFactory.createProvider(argumentType, provider::get).orElse(null));
+                                        } else {
+                                            fulfilled.put(argumentName, null);
+                                        }
                                     } catch (NoSuchBeanException e) {
                                         //If the parameter is not null it will be caught by AbstractParametrizedBeanDefinition
                                     }

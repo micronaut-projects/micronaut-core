@@ -57,7 +57,7 @@ class Test2 {}
 
     void "test factory that returns null"() {
         given:
-        BeanContext beanContext = ApplicationContext.run()
+        BeanContext beanContext = ApplicationContext.run(["spec.name": getClass().simpleName])
         NullableFactory factory = beanContext.getBean(NullableFactory)
 
         when:
@@ -124,7 +124,7 @@ class Test2 {}
 
     void "test it works as expected nested resolution"() {
         given:
-        BeanContext beanContext = ApplicationContext.run()
+        BeanContext beanContext = ApplicationContext.run(["spec.name": getClass().simpleName])
         NullableFactory factory = beanContext.getBean(NullableFactory)
 
         expect:
@@ -141,7 +141,7 @@ class Test2 {}
 
     void "test each bean on a class with null factory"() {
         given:
-        BeanContext beanContext = ApplicationContext.run()
+        BeanContext beanContext = ApplicationContext.run(["spec.name": getClass().simpleName])
 
         expect:
         beanContext.getBeansOfType(DProcessor).size() == 1

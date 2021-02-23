@@ -20,7 +20,7 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.type.TypeFactory;
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.TypeHint;
@@ -62,7 +62,7 @@ public class JacksonConfiguration {
     public static final String PROPERTY_USE_BEAN_INTROSPECTION = "jackson.bean-introspection-module";
 
     private boolean moduleScan = true;
-    private boolean beanIntrospectionModule = false;
+    private boolean beanIntrospectionModule = true;
     private String dateFormat;
     private Locale locale;
     private TimeZone timeZone;

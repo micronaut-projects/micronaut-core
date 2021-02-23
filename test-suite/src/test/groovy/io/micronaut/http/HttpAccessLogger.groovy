@@ -15,40 +15,24 @@
  */
 package io.micronaut.http
 
-import io.micronaut.context.annotation.Property
-import io.micronaut.core.convert.format.Format
-import io.micronaut.core.type.Argument
-import io.micronaut.http.*
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.QueryValue
-import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http2.Http2AccessLoggerSpec.MemoryAppender
-import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.session.Session
-import io.micronaut.session.annotation.SessionValue
-import io.micronaut.test.annotation.MicronautTest
-import io.reactivex.Completable
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.reactivex.functions.Consumer
-import spock.lang.Issue
-import spock.lang.Specification
-import spock.util.concurrent.PollingConditions
-
-import javax.annotation.Nullable
-import javax.inject.Inject
-
-import org.slf4j.LoggerFactory
-
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
+import io.micronaut.context.annotation.Property
+import io.micronaut.core.type.Argument
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.session.Session
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import io.reactivex.Flowable
+import org.slf4j.LoggerFactory
+import spock.lang.Specification
 
-import java.time.LocalDate
+import javax.inject.Inject
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit

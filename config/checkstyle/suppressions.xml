@@ -15,4 +15,8 @@
               files="FlowControlHandler.java" />
     <suppress checks="ParameterNumber"
               files="DefaultHttpClient.java" />
+    <!-- <suppress checks="FileLength" -->
+    <!-- files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java"/> -->
+
+    <suppress checks="MissingJavadocType" files=".*doc-examples.*" />
 </suppressions>

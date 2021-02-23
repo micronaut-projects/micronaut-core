@@ -1,6 +1,5 @@
 Customizing the request headers deserves special mention as there are several ways that can be accomplished.
 
-
 == Populating Headers Using Configuration
 
 The ann:http.annotation.Header[] annotation can be declared at the type level and is repeatable such that it is possible to drive the request headers sent via configuration using annotation metadata.
@@ -17,8 +16,8 @@ In your application configuration you then set the following in `application.yml
 [source,yaml]
 ----
 pet:
-    client:
-        id: foo
+  client:
+    id: foo
 ----
 
 Alternatively you can supply a `PET_CLIENT_ID` environment variable and the value will be populated.

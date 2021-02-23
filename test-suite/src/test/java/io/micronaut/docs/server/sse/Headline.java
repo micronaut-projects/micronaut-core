@@ -21,10 +21,11 @@ package io.micronaut.docs.server.sse;
  */
 // tag::class[]
 public class Headline {
+
     private String title;
     private String description;
 
-    public Headline() { }
+    public Headline() {}
 
     public Headline(String title, String description) {
         this.title = title;

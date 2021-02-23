@@ -32,7 +32,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class BindHttpClientExceptionBodySpec {
 
@@ -53,10 +56,10 @@ public class BindHttpClientExceptionBodySpec {
 
     @AfterClass
     public static void stopServer() {
-        if(server != null) {
+        if (server != null) {
             server.stop();
         }
-        if(client != null) {
+        if (client != null) {
             client.stop();
         }
     }
@@ -88,10 +91,10 @@ public class BindHttpClientExceptionBodySpec {
                     Argument.of(OtherError.class)); // <2>
         } catch (HttpClientResponseException e) {
             assertEquals(HttpStatus.UNAUTHORIZED, e.getResponse().getStatus());
-            Optional<OtherError> jsonError = e.getResponse().getBody(OtherError.class);
 
+            Optional<OtherError> jsonError = e.getResponse().getBody(OtherError.class);
             assertNotNull(jsonError);
-            assertTrue(!jsonError.isPresent());
+            assertFalse(jsonError.isPresent());
         }
     }
 

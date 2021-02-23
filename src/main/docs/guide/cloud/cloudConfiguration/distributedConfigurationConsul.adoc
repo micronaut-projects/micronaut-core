@@ -29,13 +29,13 @@ To enable distributed configuration, similar to Spring Boot and Grails, you need
 [source,yaml]
 ----
 micronaut:
-    application:
-        name: hello-world
-    config-client:
-        enabled: true
+  application:
+    name: hello-world
+  config-client:
+    enabled: true
 consul:
-    client:
-        defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
+  client:
+    defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
 ----
 
 Once you have enabled distributed configuration you need to store the configuration you wish to share in Consul's Key/Value store.
@@ -95,9 +95,9 @@ For example, to configure JSON:
 [source,yaml]
 ----
 consul:
-    client:
-        config:
-            format: JSON
+  client:
+    config:
+      format: JSON
 ----
 
 Now write your configuration in JSON format to Consul:
@@ -123,7 +123,7 @@ In this case each key in consul represents a file with an extension. For example
 [source,yaml]
 ----
 consul:
-    client:
-        config:
-            format: FILE
+  client:
+    config:
+      format: FILE
 ----

@@ -35,8 +35,6 @@ public class SampleEventListenerSpec {
             emitter.publishSampleEvent();
             assertEquals(1, listener.getInvocationCounter());
         }
-
     }
-
 }
 // end::class[]

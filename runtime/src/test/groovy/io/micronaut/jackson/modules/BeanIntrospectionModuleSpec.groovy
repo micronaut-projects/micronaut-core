@@ -6,22 +6,31 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonUnwrapped
 import com.fasterxml.jackson.annotation.JsonView
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.PropertyNamingStrategy
+import com.fasterxml.jackson.databind.annotation.JsonNaming
 import groovy.transform.EqualsAndHashCode
+import groovy.transform.PackageScope
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.jackson.JacksonConfiguration
 import io.micronaut.jackson.modules.testcase.EmailTemplate
 import io.micronaut.jackson.modules.testcase.Notification
+import io.micronaut.jackson.modules.wrappers.BooleanWrapper
+import io.micronaut.jackson.modules.wrappers.DoubleWrapper
+import io.micronaut.jackson.modules.wrappers.IntWrapper
+import io.micronaut.jackson.modules.wrappers.IntegerWrapper
+import io.micronaut.jackson.modules.wrappers.LongWrapper
+import io.micronaut.jackson.modules.wrappers.StringWrapper
 import spock.lang.Specification
+
+import java.beans.ConstructorProperties
 
 class BeanIntrospectionModuleSpec extends Specification {
 
     void "Bean introspection works with a bean without JsonInclude annotations"() {
         given:
-        ApplicationContext ctx = ApplicationContext.run(
-                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
-        )
+        ApplicationContext ctx = ApplicationContext.run()
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
         when:
@@ -40,7 +49,6 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "Bean introspection works with a bean without JsonInclude annotations - serializationInclusion ALWAYS"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
-                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true,
                 'jackson.serializationInclusion':'ALWAYS'
         )
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
@@ -61,7 +69,6 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "Bean introspection works with JsonInclude.Include.NON_NULL"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
-                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true,
                 'jackson.serializationInclusion':'ALWAYS'
         )
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
@@ -82,7 +89,6 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "Bean introspection works with JsonInclude.Include.ALWAYS"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
-                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true,
                 'jackson.serializationInclusion':'ALWAYS'
         )
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
@@ -102,9 +108,7 @@ class BeanIntrospectionModuleSpec extends Specification {
 
     void "test that introspected serialization works"() {
         given:
-        ApplicationContext ctx = ApplicationContext.run(
-                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
-        )
+        ApplicationContext ctx = ApplicationContext.run()
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
         when:"json unwrapped is used"
@@ -163,9 +167,7 @@ class BeanIntrospectionModuleSpec extends Specification {
 
     void "test that introspected serialization of errors works"() {
         given:
-        ApplicationContext ctx = ApplicationContext.run(
-                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
-        )
+        ApplicationContext ctx = ApplicationContext.run()
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
         when:
@@ -193,9 +195,7 @@ class BeanIntrospectionModuleSpec extends Specification {
 
     void "test that introspected serialization works for JsonCreator.Mode.DELEGATING"() {
         given:
-        ApplicationContext ctx = ApplicationContext.run(
-                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
-        )
+        ApplicationContext ctx = ApplicationContext.run()
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
         when:
@@ -219,22 +219,86 @@ class BeanIntrospectionModuleSpec extends Specification {
     }
 
     def "should deserialize field with hierarchy"() {
-        given:
-            ApplicationContext ctx = ApplicationContext.run(
-                    (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
-            )
-            ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
         when:
-            def notif = """
+        def notif = """
 {"id":586387198220282880, "template":{"templateType":"email","textTemplate":"Ahoj"}}
 """
-            def value = objectMapper.readValue(notif, Notification.class)
+        def value = objectMapper.readValue(notif, Notification.class)
+
         then:
-            value.getTemplate() instanceof EmailTemplate
+        value.getTemplate() instanceof EmailTemplate
 
         cleanup:
-            ctx.close()
+        ctx.close()
+    }
+
+    void "test deserializing from basic types"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        def wrapper = objectMapper.readValue("\"string\"", StringWrapper)
+
+        then:
+        noExceptionThrown()
+        wrapper.value == "string"
+
+        when:
+        wrapper = objectMapper.readValue("32", IntWrapper)
+
+        then:
+        noExceptionThrown()
+        wrapper.value == 32I
+
+        when:
+        wrapper = objectMapper.readValue("32", IntegerWrapper)
+
+        then:
+        noExceptionThrown()
+        wrapper.value == 32I
+
+        when:
+        wrapper = objectMapper.readValue("32", LongWrapper)
+
+        then:
+        noExceptionThrown()
+        wrapper.value == 32L
+
+        when:
+        wrapper = objectMapper.readValue("false", BooleanWrapper)
+
+        then:
+        noExceptionThrown()
+        !wrapper.value
+
+        when:
+        wrapper = objectMapper.readValue("23.23", DoubleWrapper)
+
+        then:
+        noExceptionThrown()
+        wrapper.value == 23.23D
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test deserializing with a json naming strategy"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        NamingStrategy instance = objectMapper.readValue("{ \"FooBar\": \"bad\" }", NamingStrategy)
+
+        then:
+        instance.fooBar == "bad"
+
+        cleanup:
+        ctx.close()
     }
 
     @Introspected
@@ -312,4 +376,16 @@ class BeanIntrospectionModuleSpec extends Specification {
     static class PublicView {}
     static class AllView extends PublicView {}
 
+    @Introspected
+    @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
+    static class NamingStrategy {
+
+        @PackageScope
+        final String fooBar
+
+        @ConstructorProperties(["fooBar"])
+        NamingStrategy(String fooBar) {
+            this.fooBar = fooBar
+        }
+    }
 }

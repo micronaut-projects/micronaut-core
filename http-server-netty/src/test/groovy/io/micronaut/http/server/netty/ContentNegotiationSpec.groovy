@@ -16,13 +16,15 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.server.netty.binding.FormDataBindingSpec.FormController.Person
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.Specification
 import spock.lang.Unroll
 
 import javax.inject.Inject
 
-import static io.micronaut.http.server.netty.ContentNegotiationSpec.NegotiatingController.*
+import static io.micronaut.http.server.netty.ContentNegotiationSpec.NegotiatingController.JSON
+import static io.micronaut.http.server.netty.ContentNegotiationSpec.NegotiatingController.TEXT
+import static io.micronaut.http.server.netty.ContentNegotiationSpec.NegotiatingController.XML
 
 @MicronautTest
 class ContentNegotiationSpec extends Specification {
@@ -30,7 +32,6 @@ class ContentNegotiationSpec extends Specification {
     @Inject
     @Client("/")
     RxHttpClient client
-
 
     @Unroll
     void "test ACCEPT header content negotiation #header"() {

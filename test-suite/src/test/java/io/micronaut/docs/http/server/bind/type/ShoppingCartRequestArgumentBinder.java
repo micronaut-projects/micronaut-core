@@ -12,7 +12,8 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 @Singleton
-public class ShoppingCartRequestArgumentBinder implements TypedRequestArgumentBinder<ShoppingCart> {
+public class ShoppingCartRequestArgumentBinder
+        implements TypedRequestArgumentBinder<ShoppingCart> {
 
     private final JacksonObjectSerializer objectSerializer;
 
@@ -21,16 +22,17 @@ public class ShoppingCartRequestArgumentBinder implements TypedRequestArgumentBi
     }
 
     @Override
-    public BindingResult<ShoppingCart> bind(ArgumentConversionContext<ShoppingCart> context, HttpRequest<?> source) { //<1>
-        Cookie cookie = source.getCookies().get("shoppingCart");
+    public BindingResult<ShoppingCart> bind(ArgumentConversionContext<ShoppingCart> context,
+                                            HttpRequest<?> source) { //<1>
 
-        if (cookie != null) {
-            return () -> objectSerializer.deserialize( //<2>
-                    cookie.getValue().getBytes(),
-                    ShoppingCart.class);
+        Cookie cookie = source.getCookies().get("shoppingCart");
+        if (cookie == null) {
+            return Optional::empty;
         }
 
-        return Optional::empty;
+        return () -> objectSerializer.deserialize( //<2>
+                cookie.getValue().getBytes(),
+                ShoppingCart.class);
     }
 
     @Override

@@ -6,15 +6,15 @@ To enable support for Vault Configuration simply add the following configuration
 [source,yaml]
 ----
 micronaut:
-    application:
-        name: hello-world
-    config-client:
-        enabled: true
+  application:
+    name: hello-world
+  config-client:
+    enabled: true
 
 vault:
-    client:
-        config:
-            enabled: true
+  client:
+    config:
+      enabled: true
 ----
 
 See the https://micronaut-projects.github.io/micronaut-discovery-client/latest/guide/configurationreference.html#io.micronaut.discovery.vault.config.VaultClientConfiguration[configuration reference] for all configuration options.

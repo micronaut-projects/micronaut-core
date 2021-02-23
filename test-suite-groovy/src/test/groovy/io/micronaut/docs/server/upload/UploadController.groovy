@@ -17,31 +17,34 @@ package io.micronaut.docs.server.upload
 
 // tag::class[]
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.multipart.StreamingFileUpload
 import io.reactivex.Single
 import org.reactivestreams.Publisher
 
+import static io.micronaut.http.HttpStatus.CONFLICT
+import static io.micronaut.http.MediaType.MULTIPART_FORM_DATA
+import static io.micronaut.http.MediaType.TEXT_PLAIN
+
 @Controller("/upload")
 class UploadController {
 
-    @Post(value = "/", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN) // <1>
+    @Post(value = "/", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
     Single<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
+
         File tempFile = File.createTempFile(file.filename, "temp")
         Publisher<Boolean> uploadPublisher = file.transferTo(tempFile) // <3>
+
         Single.fromPublisher(uploadPublisher)  // <4>
             .map({ success ->
                 if (success) {
                     HttpResponse.ok("Uploaded")
                 } else {
-                    HttpResponse.<String>status(HttpStatus.CONFLICT)
+                    HttpResponse.<String>status(CONFLICT)
                             .body("Upload Failed")
                 }
             })
     }
-
 }
 // end::class[]

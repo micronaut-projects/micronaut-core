@@ -7,12 +7,12 @@ To enable and configure the access logger, in `application.yml` set:
 [source,yaml]
 ----
 micronaut:
-    server:
-        netty:
-           access-logger:
-              enabled: true # Enables the access logger
-              logger-name: my-access-logger # A logger name, optional, default is `HTTP_ACCESS_LOGGER`
-              log-format: common # A log format, optional, default is Common Log Format
+  server:
+    netty:
+      access-logger:
+        enabled: true # Enables the access logger
+        logger-name: my-access-logger # A logger name, optional, default is `HTTP_ACCESS_LOGGER`
+        log-format: common # A log format, optional, default is Common Log Format
 ----
 
 ==== Logback Configuration
@@ -22,8 +22,8 @@ For instance using the default logger name for logback:
 
 .Logback configuration
 [source,xml]
-----        
-<appender 
+----
+<appender
     name="httpAccessLogAppender"
     class="ch.qos.logback.core.rolling.RollingFileAppender">
     <append>true</append>
@@ -38,7 +38,7 @@ For instance using the default logger name for logback:
         <charset>UTF-8</charset>
         <pattern>%msg%n</pattern>
     </encoder>
-        <immediateFlush>true</immediateFlush>
+    <immediateFlush>true</immediateFlush>
 </appender>
 
 <logger name="HTTP_ACCESS_LOGGER" additivity="false" level="info">
@@ -51,7 +51,7 @@ The pattern should only have the message marker as other elements will be proces
 ==== Log Format
 
 The syntax is based on http://httpd.apache.org/docs/current/mod/mod_log_config.html[Apache httpd log format].
- 
+
 Here are the supported markers:
 
 * *%a* - Remote IP address

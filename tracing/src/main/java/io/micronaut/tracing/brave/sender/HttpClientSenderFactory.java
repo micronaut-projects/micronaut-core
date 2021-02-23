@@ -33,6 +33,7 @@ import javax.inject.Singleton;
 @Factory
 @Requires(beans = BraveTracerConfiguration.HttpClientSenderConfiguration.class)
 public class HttpClientSenderFactory {
+
     private final BraveTracerConfiguration.HttpClientSenderConfiguration configuration;
 
     /**

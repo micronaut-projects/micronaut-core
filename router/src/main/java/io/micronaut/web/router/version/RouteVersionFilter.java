@@ -15,18 +15,17 @@
  */
 package io.micronaut.web.router.version;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.UriRouteMatch;
-import io.micronaut.web.router.filter.RouteMatchFilter;
 import io.micronaut.web.router.version.resolution.RequestVersionResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.List;
 import java.util.Objects;
@@ -41,7 +40,7 @@ import java.util.function.Predicate;
  */
 @Singleton
 @Requires(beans = RoutesVersioningConfiguration.class)
-public class RouteVersionFilter implements RouteMatchFilter {
+public class RouteVersionFilter implements VersionRouteMatchFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(RouteVersionFilter.class);
 

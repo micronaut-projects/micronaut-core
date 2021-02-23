@@ -24,19 +24,19 @@ class EachBeanTest extends Specification {
     ))
     // end::config[]
 
-    
     void "test each bean"() {
         // tag::beans[]
         when:
-        Collection<DataSource> beansOfType = applicationContext.getBeansOfType(DataSource.class)
+        Collection<DataSource> beansOfType = applicationContext.getBeansOfType(DataSource)
         assertEquals(2, beansOfType.size()) // <1>
 
         DataSource firstConfig = applicationContext.getBean(
-                DataSource.class,
+                DataSource,
                 Qualifiers.byName("one") // <2>
         )
         // end::beans[]
+
         then:
-        firstConfig != null
+        firstConfig
     }
 }

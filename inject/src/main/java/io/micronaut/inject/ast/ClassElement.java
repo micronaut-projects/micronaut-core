@@ -18,7 +18,7 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArgumentUtils;
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -197,6 +197,22 @@ public interface ClassElement extends TypedElement {
      */
     default <T extends Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
         return Collections.emptyList();
+    }
+
+    /**
+     * Return the first enclosed element matching the given query.
+     *
+     * @param query The query to use.
+     * @param <T>  The element type
+     * @return The fields
+     * @since 2.3.0
+     */
+    default <T extends Element> Optional<T> getEnclosedElement(@NonNull ElementQuery<T> query) {
+        List<T> enclosedElements = getEnclosedElements(query);
+        if (!enclosedElements.isEmpty()) {
+            return Optional.of(enclosedElements.iterator().next());
+        }
+        return Optional.empty();
     }
 
     /**
