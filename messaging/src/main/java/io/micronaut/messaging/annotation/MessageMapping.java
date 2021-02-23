@@ -32,7 +32,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.ANNOTATION_TYPE})
+@Target({ElementType.ANNOTATION_TYPE, ElementType.METHOD})
 @EntryPoint
 public @interface MessageMapping {
 

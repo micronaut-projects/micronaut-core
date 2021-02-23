@@ -19,27 +19,32 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.core.bind.annotation.Bindable;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from message body.
+ * <p>An annotation that can be applied to method argument to indicate that the method argument is bound from a message header.</p>
  *
  * @author Graeme Rocher
- * @since 1.0
- * @deprecated Use {@link MessageBody} instead
+ * @since 2.4.0
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
+@Target({ElementType.PARAMETER, ElementType.TYPE, ElementType.METHOD}) // this can be either type or param
+@Repeatable(value = MessageHeaders.class)
 @Bindable
-@Deprecated
-public @interface Body {
+public @interface MessageHeader {
 
     /**
-     * @return A Key or qualifier within the body. For example a reference to a nested JSON attribute
+     * If used as a bound parameter, this is the header name. If used on a class level this is value and not the header name.
+     * @return The name of the header, otherwise it is inferred from the parameter name
      */
     String value() default "";
+
+    /**
+     * If used on a class level with @Headers this is the header name and value is the value.
+     * @return name of header when using with @Headers
+     */
+    String name() default "";
+
 }
+

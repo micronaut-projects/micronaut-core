@@ -29,14 +29,12 @@ import java.lang.annotation.Target;
  *
  * @author Graeme Rocher
  * @since 1.0
- * @deprecated Use {@link MessageBody} instead
  */
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.PARAMETER})
 @Bindable
-@Deprecated
-public @interface Body {
+public @interface MessageBody {
 
     /**
      * @return A Key or qualifier within the body. For example a reference to a nested JSON attribute
