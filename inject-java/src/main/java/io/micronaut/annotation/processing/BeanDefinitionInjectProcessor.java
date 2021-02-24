@@ -15,7 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.*;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.ProviderFactory;
 import io.micronaut.core.annotation.NonNull;
@@ -23,9 +23,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
 import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
-import io.micronaut.aop.Adapter;
-import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.Introduction;
 import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
@@ -86,8 +83,8 @@ import static javax.lang.model.element.ElementKind.*;
 @SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS})
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
-    private static final String AROUND_TYPE = "io.micronaut.aop.Around";
-    private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
+    private static final String AROUND_TYPE = AnnotationUtil.ANN_AROUND;
+    private static final String INTRODUCTION_TYPE = AnnotationUtil.ANN_INTRODUCTION;
     private static final String[] ANNOTATION_STEREOTYPES = new String[]{
             ProcessedTypes.POST_CONSTRUCT,
             ProcessedTypes.PRE_DESTROY,
@@ -836,7 +833,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private boolean hasAroundStereotype(AnnotationMetadata annotationMetadata) {
-            return (annotationMetadata.hasStereotype(AROUND_TYPE)) || annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+            if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
+                return true;
+            } else if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+                return annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class)
+                        .stream().anyMatch(av ->
+                                av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND
+                        );
+            }
+
+            return false;
         }
 
         private boolean isExecutableThroughType(
@@ -1173,7 +1179,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private boolean hasDeclaredAroundAdvice(AnnotationMetadata annotationMetadata) {
-            return annotationMetadata.hasDeclaredStereotype(AROUND_TYPE) || annotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+            if (annotationMetadata.hasDeclaredStereotype(AROUND_TYPE)) {
+                return true;
+            } else if (annotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+                return annotationMetadata.getDeclaredAnnotationValuesByType(InterceptorBinding.class)
+                        .stream().anyMatch(av ->
+                                av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND
+                        );
+            }
+
+            return false;
         }
 
         private void visitAdaptedMethod(ExecutableElement sourceMethod, AnnotationMetadata methodAnnotationMetadata) {

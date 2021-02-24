@@ -21,6 +21,7 @@ import groovy.transform.PackageScope
 import io.micronaut.aop.Adapter
 import io.micronaut.aop.Around
 import io.micronaut.aop.Interceptor
+import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.InterceptorKind
 import io.micronaut.aop.Introduction
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil
@@ -178,7 +179,17 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
     }
 
     static boolean hasAroundStereotype(AnnotationMetadata annotationMetadata) {
-        annotationMetadata.hasStereotype(AROUND_TYPE) || annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)
+        if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
+            return true
+        } else {
+            if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+                annotationMetadata.getAnnotationValuesByType(InterceptorBinding)
+                    .stream().anyMatch{ av ->
+                    InterceptorKind.AROUND == av.enumValue("kind", InterceptorKind).orElse(null)
+                }
+            }
+        }
+        return false
     }
 
     BeanDefinitionVisitor getBeanWriter() {
@@ -825,7 +836,14 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
     }
 
     static boolean hasDeclaredAroundStereotype(AnnotationMetadata methodAnnotationMetadata) {
-        methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE) || methodAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)
+        if (methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE)) {
+            return true
+        } else if (methodAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+            methodAnnotationMetadata.getDeclaredAnnotationValuesByType(InterceptorBinding)
+                    .stream().anyMatch { av ->
+                InterceptorKind.AROUND == av.enumValue("kind", InterceptorKind).orElse(null)
+            }
+        }
     }
 
     @CompileDynamic
