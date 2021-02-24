@@ -134,6 +134,12 @@ class NameUtilsSpec extends Specification {
         "Title" | "title"
         "T"     | "t"
         "TiTLE" | "tiTLE"
+        "aBCD"  | "aBCD"
+        "ABCD"  | "ABCD"
+        "aBC"   | "aBC"
+        "ABC"   | "ABC"
+        "AB"    | "AB"
+        "ABc"   | "aBc"
     }
 
     void "test decapitalize returns same ref"() {

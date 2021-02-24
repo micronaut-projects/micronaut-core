@@ -2439,7 +2439,7 @@ class Test {
 
         then:
         noExceptionThrown()
-        introspection.getProperty("XForwardedFor", String).get().get(obj) == "localhost"
+        introspection.getProperty("xForwardedFor", String).get().get(obj) == "localhost"
     }
 
     @Override
