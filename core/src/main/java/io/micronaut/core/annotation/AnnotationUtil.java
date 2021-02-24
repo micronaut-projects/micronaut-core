@@ -74,6 +74,11 @@ public class AnnotationUtil {
     public static final AnnotatedElement[] ZERO_ANNOTATED_ELEMENTS = new AnnotatedElement[0];
 
     /**
+     * Constant indicating an zero annotation values.
+     */
+    public static final AnnotationValue<?>[] ZERO_ANNOTATION_VALUES = new AnnotationValue[0];
+
+    /**
      * An empty re-usable element.
      */
     public static final AnnotatedElement EMPTY_ANNOTATED_ELEMENT = new AnnotatedElement() {
@@ -117,6 +122,11 @@ public class AnnotationUtil {
      * Name of the interceptor binding type.
      */
     public static final String ANN_INTERCEPTOR_BINDING = "io.micronaut.aop.InterceptorBinding";
+
+    /**
+     * Name of the interceptor binding qualifier type.
+     */
+    public static final String ANN_INTERCEPTOR_BINDING_QUALIFIER = "io.micronaut.inject.qualifiers.InterceptorBindingQualifier";
 
     /**
      * Name of the repeatable interceptor bindings type.

@@ -20,9 +20,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
 import io.micronaut.context.exceptions.*;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -38,8 +36,6 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Scope;
@@ -1126,7 +1122,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     /**
-     * Obtains all bean definitions for a constructor argument at the given index
+     * Obtains all bean definitions for a constructor argument at the given index.
      * <p>
      * @param resolutionContext         The resolution context
      * @param context                   The context
@@ -2197,6 +2193,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     qualifierType
             );
         } else {
+            if (hasMetadata && annotationMetadata.hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)) {
+                return Qualifiers.byInterceptorBinding(annotationMetadata);
+            }
             Class<?>[] byType = hasMetadata ? annotationMetadata.hasDeclaredAnnotation(Type.class) ? annotationMetadata.classValues(Type.class) : null : null;
             if (byType != null) {
                 return Qualifiers.byType(byType);

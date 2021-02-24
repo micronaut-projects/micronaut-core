@@ -16,9 +16,9 @@
 package io.micronaut.docs.aop.introduction
 
 // tag::imports[]
+import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.Introduction
 import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Type
 import kotlin.annotation.AnnotationRetention.RUNTIME
 import kotlin.annotation.AnnotationTarget.ANNOTATION_CLASS
 import kotlin.annotation.AnnotationTarget.CLASS
@@ -30,7 +30,7 @@ import kotlin.annotation.AnnotationTarget.PROPERTY_SETTER
 
 // tag::class[]
 @Introduction // <1>
-@Type(StubIntroduction::class) // <2>
+@InterceptorBinding(interceptorType = StubIntroduction::class) // <2>
 @Bean // <3>
 @MustBeDocumented
 @Retention(RUNTIME)

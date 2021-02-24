@@ -17,7 +17,7 @@ package io.micronaut.docs.aop.around;
 
 // tag::imports[]
 import io.micronaut.aop.Around;
-import io.micronaut.context.annotation.Type;
+import io.micronaut.aop.InterceptorBinding;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
@@ -33,7 +33,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME) // <1>
 @Target({TYPE, METHOD}) // <2>
 @Around // <3>
-@Type(NotNullInterceptor.class) // <4>
+@InterceptorBinding // <4>
 public @interface NotNull {
 }
 // end::annotation[]

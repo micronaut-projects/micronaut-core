@@ -37,6 +37,7 @@ import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.inject.ast.ClassElement
@@ -49,6 +50,7 @@ import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
+import java.lang.annotation.Annotation
 
 /**
  * Base class to extend from to allow compilation of Java sources
@@ -282,6 +284,15 @@ class Test {
     }
 
     /**
+     * Retrieve additional annotation mappers to apply
+     * @param annotationName The annotation name
+     * @return The mappers for the annotation
+     */
+    protected List<AnnotationMapper<? extends Annotation>> getLocalAnnotationMappers(@NonNull String annotationName) {
+        return Collections.emptyList()
+    }
+
+    /**
      * Builds the bean definition reference for an AOP proxy bean.
      * @param className The class name
      * @param cls The class source
@@ -348,14 +359,38 @@ class Test {
     }
 
     @CompileStatic
-    private static JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
+    private JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
         def env = JavacProcessingEnvironment.instance(new Context())
         def elements = JavacElements.instance(new Context())
         ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
         GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
         AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, genericUtils, env.filer) {
+            @Override
+            JavaAnnotationMetadataBuilder newAnnotationBuilder() {
+                return super.newAnnotationBuilder()
+            }
         }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, modelUtils)
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, modelUtils) {
+            @Override
+            protected List<AnnotationMapper<? extends Annotation>> getAnnotationMappers(@NonNull String annotationName) {
+                def loadedMappers = super.getAnnotationMappers(annotationName)
+                def localMappers = getLocalAnnotationMappers(annotationName)
+                if (localMappers) {
+                    def newList = []
+                    if (loadedMappers) {
+                        newList.addAll(loadedMappers)
+                    }
+                    newList.addAll(localMappers)
+                    return newList
+                } else {
+                    if (localMappers) {
+                        return loadedMappers
+                    } else {
+                        return Collections.emptyList()
+                    }
+                }
+            }
+        }
         return builder
     }
 }

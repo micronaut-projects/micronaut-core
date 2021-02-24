@@ -138,7 +138,7 @@ interface MyBean  {
         beanDefinition != null
         ApplicationEventListener.class.isAssignableFrom(beanDefinition.beanType)
         beanDefinition.injectedFields.size() == 0
-        beanDefinition.executableMethods.size() == 2
+        beanDefinition.executableMethods.size() == 3
         beanDefinition.findMethod("getBar").isPresent()
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
 

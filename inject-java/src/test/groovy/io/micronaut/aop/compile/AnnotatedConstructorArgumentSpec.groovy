@@ -15,9 +15,12 @@
  */
 package io.micronaut.aop.compile
 
+import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.simple.Mutating
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Type
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
@@ -65,7 +68,11 @@ class MyBean {
         beanDefinition.constructor.arguments[1].name == '$beanContext'
         beanDefinition.constructor.arguments[2].name == '$qualifier'
         beanDefinition.constructor.arguments[3].name == '$interceptors'
-        beanDefinition.constructor.arguments[3].synthesize(Type.class).value()[0] == Mutating
+        beanDefinition.constructor.arguments[3]
+                .annotationMetadata
+                .getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)
+                .getAnnotations(AnnotationMetadata.VALUE_MEMBER, InterceptorBinding)[0]
+                .stringValue().get() == Mutating.name
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')
@@ -116,7 +123,11 @@ class MyBean {
         beanDefinition.constructor.arguments[1].name == '$beanContext'
         beanDefinition.constructor.arguments[2].name == '$qualifier'
         beanDefinition.constructor.arguments[3].name == '$interceptors'
-        beanDefinition.constructor.arguments[3].synthesize(Type.class).value()[0] == Mutating
+        beanDefinition.constructor.arguments[3]
+                .annotationMetadata
+                .getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)
+                .getAnnotations(AnnotationMetadata.VALUE_MEMBER, InterceptorBinding)[0]
+                .stringValue().get() == Mutating.name
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')

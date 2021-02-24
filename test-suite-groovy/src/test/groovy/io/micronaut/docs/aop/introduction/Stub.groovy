@@ -15,10 +15,11 @@
  */
 package io.micronaut.docs.aop.introduction
 
+import io.micronaut.aop.InterceptorBinding
+
 // tag::imports[]
 import io.micronaut.aop.Introduction
 import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Type
 
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
@@ -32,7 +33,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME
 
 // tag::class[]
 @Introduction // <1>
-@Type(StubIntroduction) // <2>
+@InterceptorBinding(interceptorType = StubIntroduction) // <2>
 @Bean // <3>
 @Documented
 @Retention(RUNTIME)

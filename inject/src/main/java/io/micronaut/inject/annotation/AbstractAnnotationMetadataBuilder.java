@@ -1057,7 +1057,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         }
                     }
                     if (lastParent != null && interceptorBinding == null) {
-                        if (AnnotationUtil.ANN_AROUND.equals(annotationName)) {
+                        if (AnnotationUtil.ANN_AROUND.equals(annotationName) || AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
                             interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
                                     .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
                                     .member("kind", "AROUND");

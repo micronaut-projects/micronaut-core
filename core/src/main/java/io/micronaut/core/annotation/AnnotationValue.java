@@ -828,6 +828,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return Collections.singletonList((AnnotationValue) v);
         } else if (v instanceof AnnotationValue[]) {
             return Arrays.asList((AnnotationValue[]) v);
+        } else if (v instanceof Collection) {
+            final Iterator<?> i = ((Collection<?>) v).iterator();
+            if (i.hasNext()) {
+                final Object o = i.next();
+                if (o instanceof AnnotationValue) {
+                    return new ArrayList<>((Collection<? extends AnnotationValue<T>>) v);
+                }
+            }
         }
         return Collections.emptyList();
     }

@@ -29,7 +29,7 @@ import java.util.Objects;
  * @since 2.3
  */
 @Internal
-final class ReflectClassElement implements ClassElement {
+class ReflectClassElement implements ClassElement {
     private final Class<?> type;
 
     /**
@@ -84,6 +84,11 @@ final class ReflectClassElement implements ClassElement {
             type = type.getComponentType();
         }
         return i;
+    }
+
+    @Override
+    public boolean isAssignable(Class<?> type) {
+        return type.isAssignableFrom(this.type);
     }
 
     @Override
