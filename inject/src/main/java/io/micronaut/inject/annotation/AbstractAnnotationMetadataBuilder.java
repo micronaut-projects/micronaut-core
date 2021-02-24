@@ -1074,6 +1074,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     topLevel.add(annotationMirror);
 
                     Map<CharSequence, Object> data = populateAnnotationData(element, annotationMirror, metadata, isDeclared, retentionPolicy);
+                    if (interceptorBinding != null && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
+                        interceptorBinding.members(data);
+                        continue;
+                    }
                     if (Type.class.getName().equals(annotationName)) {
                         final Object o = data.get(AnnotationMetadata.VALUE_MEMBER);
                         if (o instanceof AnnotationClassValue) {
