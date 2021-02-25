@@ -34,6 +34,14 @@ import java.util.function.Function;
 @Internal
 interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
     /**
+     * @return Environment metadata always has property expressions.
+     */
+    @Override
+    default boolean hasPropertyExpressions() {
+        return true;
+    }
+
+    /**
      * Retrieve the enum value and optionally map its value.
      * @param annotation The annotation
      * @param member The member

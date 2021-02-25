@@ -35,4 +35,11 @@ public interface EnvironmentConfigurable {
     default void configure(Environment environment) {
         // no-op
     }
+
+    /**
+     * @return Whether any environment specific property expressions exist in the object.
+     */
+    default boolean hasPropertyExpressions() {
+        return true;
+    }
 }

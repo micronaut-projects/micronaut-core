@@ -68,9 +68,18 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
         if (!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
             this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
         } else {
-            this.annotationMetadata = new ConstructorAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+            if (annotationMetadata.hasPropertyExpressions()) {
+                this.annotationMetadata = new ConstructorAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+            } else {
+                this.annotationMetadata = annotationMetadata;
+            }
         }
         this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;
+    }
+
+    @Override
+    public final boolean hasPropertyExpressions() {
+        return annotationMetadata.hasPropertyExpressions();
     }
 
     @Override

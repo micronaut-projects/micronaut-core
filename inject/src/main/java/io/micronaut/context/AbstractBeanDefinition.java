@@ -134,7 +134,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         this.addRequiredComponents(arguments);
     }
 
-
     /**
      * Constructs a bean for the given type.
      *
@@ -169,6 +168,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.addRequiredComponents(arguments);
+    }
+
+    @Override
+    public final boolean hasPropertyExpressions() {
+        return getAnnotationMetadata().hasPropertyExpressions();
     }
 
     @Override
@@ -1821,9 +1825,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private AnnotationMetadata initializeAnnotationMetadata() {
         AnnotationMetadata annotationMetadata = resolveAnnotationMetadata();
         if (annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
-            // we make a copy of the result of annotation metadata which is normally a reference
-            // to the class metadata
-            return new BeanAnnotationMetadata(annotationMetadata);
+            if (annotationMetadata.hasPropertyExpressions()) {
+                // we make a copy of the result of annotation metadata which is normally a reference
+                // to the class metadata
+                return new BeanAnnotationMetadata(annotationMetadata);
+            } else {
+                return annotationMetadata;
+            }
         } else {
             return AnnotationMetadata.EMPTY_METADATA;
         }
@@ -2113,8 +2121,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private Argument<?> resolveArgument(BeanContext context, int argIndex, Argument<?>[] arguments) {
         Argument<?> argument = arguments[argIndex];
         if (argument instanceof DefaultArgument) {
-            argument = new EnvironmentAwareArgument<>((DefaultArgument) argument);
-            instrumentAnnotationMetadata(context, argument);
+            if (argument.getAnnotationMetadata().hasPropertyExpressions()) {
+                argument = new EnvironmentAwareArgument<>((DefaultArgument) argument);
+                instrumentAnnotationMetadata(context, argument);
+            }
         }
         return argument;
     }
@@ -2254,16 +2264,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private void instrumentAnnotationMetadata(BeanContext context, Object object) {
         if (object instanceof EnvironmentConfigurable && context instanceof ApplicationContext) {
-            ((EnvironmentConfigurable) object).configure(((ApplicationContext) context).getEnvironment());
+            final EnvironmentConfigurable ec = (EnvironmentConfigurable) object;
+            if (ec.hasPropertyExpressions()) {
+                ec.configure(((ApplicationContext) context).getEnvironment());
+            }
         }
-    }
-
-    private Argument<?> instrument(Argument<?> argument, BeanContext context) {
-        if (argument instanceof DefaultArgument) {
-            argument = new EnvironmentAwareArgument((DefaultArgument) argument);
-            instrumentAnnotationMetadata(context, argument);
-        }
-        return argument;
     }
 
     /**
