@@ -27,11 +27,11 @@ record Example(@Min(20) int num, String name) {
 
 ==== Bean Introspections Now Support Execution Handles
 
-A api:core.beans.BeanIntrospection[] can now declare methods that should generate reflection free execution handles. This feature allows calling other methods (besides setters) on introspections without using reflection.
+A api:core.beans.BeanIntrospection[] can now declare methods that should generate reflection-free execution handles. This feature allows calling other methods (besides setters) on introspections without using reflection.
 
 ==== Improved Support for Copy Constructors and Immutable Types
 
-An immutable api:core.beans.BeanIntrospection[] (like Java Records as mentioned above) requires different handling when you need to create a new instance with a particular property modified. A typical pattern for this is to construct a new instance passing all the existing values plus the modified value (see for example https://projectlombok.org/features/With[Lombok's @With]).
+An immutable api:core.beans.BeanIntrospection[] (like Java Records as mentioned above) requires different handling when you need to create a new instance with a particular property modified. A typical pattern for this is to construct a new instance passing all existing values plus the modified value (see for example https://projectlombok.org/features/With[Lombok's @With]).
 
 Micronaut's Bean Introspections now support this pattern. For example:
 
@@ -45,9 +45,9 @@ example = introspection.getRequiredProperty("num", int.class)
 assertEquals(20, example.num());
 ----
 
-The new `withValue` method will automatically create a new instance populating the existing properties and returning the instance.
+The new `withValue` method automatically creates a new instance, populating the existing properties and returning the instance.
 
-Micronaut will at compilation time compute an efficient copy-constructor approach that will only return a new instance if the value changes.
+Micronaut computes at compile time an efficient copy-constructor approach that only returns a new instance if the value changes.
 
 === HTTP Features
 
@@ -57,15 +57,15 @@ A new interface api:http.server.util.HttpLocaleResolver[] has been introduced to
 
 ==== Host Resolution
 
-It is now possible to validate a resolved host against a list regular expressions patterns. See <<hostResolution, the documentation>> for more information.
+It is now possible to validate a resolved host against a list of regular expressions patterns. See <<hostResolution, the documentation>> for more information.
 
 === Cloud Features
 
 ==== New CI/CD Deployment Workflows for Github Actions in Launch
 
-https://micronaut.io/launch/[Micronaut Launch] has been updated to include CI/CD workflows to deploy to common container based Cloud environments including Oracle Cloud Function, Azure Container Instance and Google Cloud Run.
+https://micronaut.io/launch/[Micronaut Launch] has been updated to include CI/CD workflows to deploy to common container-based Cloud environments including Oracle Cloud Function, Azure Container Instance and Google Cloud Run.
 
-Combined with the ability to https://www.youtube.com/watch?v=X4AKGf1TlXM[Push to Github] this makes it a breeze to setup Micronaut applications to be deployed to the Cloud.
+Combined with the ability to https://www.youtube.com/watch?v=X4AKGf1TlXM[Push to Github] this makes it a breeze to set up Micronaut applications to be deployed to the Cloud.
 
 ==== Google Cloud Secret Manager
 

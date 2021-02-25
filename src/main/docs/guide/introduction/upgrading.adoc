@@ -2,7 +2,7 @@ This section covers the steps required to upgrade a Micronaut 2.0 application to
 
 === New Group IDs
 
-Some dependencies have new Maven Group IDs so you may need to update your dependency. The following table summarizes changes to group IDs:
+Some dependencies have new Maven Group IDs, so you may need to update them. The following table summarizes changes to group IDs:
 
 .Updated Maven Group IDs
 |===
@@ -15,7 +15,7 @@ Some dependencies have new Maven Group IDs so you may need to update your depend
 
 === Mandatory upgrade for Netty tcnative
 
-Due to a new https://github.com/netty/netty/pull/10407[SSL default value introduced in Netty 4.1.52], if you are using tcnative you need to update it to at least `2.0.33.Final`.
+Due to a new https://github.com/netty/netty/pull/10407[SSL default value introduced in Netty 4.1.52], if you use tcnative you need to update it to at least `2.0.33.Final`.
 
 === Other Breaking Changes
 

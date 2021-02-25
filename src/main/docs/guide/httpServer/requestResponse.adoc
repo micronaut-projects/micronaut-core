@@ -1,6 +1,6 @@
-If you need more control over request processing then you can instead write a method that receives the complete api:io.micronaut.http.HttpRequest[].
+If you need more control over request processing you can write a method that receives the complete api:io.micronaut.http.HttpRequest[].
 
-In fact, there are several higher level interfaces that can be bound to method parameters of controllers. These include:
+In fact, there are several higher-level interfaces that can be bound to controller method parameters. These include:
 
 .Bindable Micronaut Interfaces
 |===
@@ -19,12 +19,12 @@ In fact, there are several higher level interfaces that can be bound to method p
 |`String hello(HttpParameters params)`
 
 |api:io.micronaut.http.cookie.Cookies[]
-|All the Cookies present in the request
+|All Cookies present in the request
 |`String hello(Cookies cookies)`
 |===
 
 IMPORTANT: The api:io.micronaut.http.HttpRequest[] should be declared parametrized with a concrete generic type if the request body is needed, e.g. `HttpRequest<MyClass> request`. The body may not be available from the request otherwise.
- 
+
 In addition, for full control over the emitted HTTP response you can use the static factory methods of the api:io.micronaut.http.HttpResponse[] class which return a api:io.micronaut.http.MutableHttpResponse[].
 
 The following example implements the previous `MessageController` example using the api:io.micronaut.http.HttpRequest[] and api:io.micronaut.http.HttpResponse[] objects:
@@ -32,8 +32,8 @@ The following example implements the previous `MessageController` example using 
 snippet::io.micronaut.docs.server.request.MessageController[tags="imports,class", indent=0, title="Request and Response Example"]
 
 <1> The method is mapped to the URI `/hello` and accepts a api:io.micronaut.http.HttpRequest[]
-<2> The api:http.HttpRequest[] is used to obtain the value of a query parameter called `name`.
-<3> The api:http.HttpResponse.ok(T)[] method is used to return a api:http.MutableHttpResponse[] with a text body. A header called `X-My-Header` is also added to the response object.
+<2> The api:http.HttpRequest[] is used to obtain the value of a query parameter named `name`.
+<3> The api:http.HttpResponse.ok(T)[] method returns a api:http.MutableHttpResponse[] with a text body. A header named `X-My-Header` is also added to the response.
 
 api:io.micronaut.http.HttpRequest[] is also available from static context via api:io.micronaut.http.context.ServerRequestContext[].
 
