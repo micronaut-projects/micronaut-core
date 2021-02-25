@@ -1,4 +1,4 @@
-Creating a project is the primary usage of the CLI. There primary command for creating a new project is `create-app`. That will create a standard server application that communicates over HTTP. For other types of applications, see the documentation below.
+Creating a project is the primary usage of the CLI. The primary command for creating a new project is `create-app`, which creates a standard server application that communicates over HTTP. For other types of application, see the documentation below.
 
 .Micronaut CLI Project Creation Commands
 [cols="1,2,2,4"]
@@ -35,7 +35,6 @@ mn create-cli-app my-project --features
  http-client,jdbc-hikari --build maven
  --lang kotlin --test kotest
 ----
-
 
 |`create-function-app`
 |Creates a Micronaut serverless function, using AWS by default.
@@ -84,11 +83,9 @@ mn create-grpc-app my-grpc-app
 
 |===
 
-
 == Create Command Flags
 
-The create-* commands will generate a basic Micronaut project, with optional flags to specify features, language, test framework, and build tool. All projects except functions will include a default `Application` class for starting the application.
-
+The create-* commands generate a basic Micronaut project, with optional flags to specify features, language, test framework, and build tool. All projects except functions include a default `Application` class for starting the application.
 
 .Flags
 [cols="2,3,3"]
@@ -142,7 +139,7 @@ $ ./mvnw mn:run
 
 === Language/Test Features
 
-By default, the create commands will generate a Java application, with JUnit configured as the test framework. All of the options chosen and features applied are stored as properties in the `micronaut-cli.yml` file, as shown below:
+By default, the create commands generate a Java application, with JUnit configured as the test framework. All the options chosen and features applied are stored as properties in the `micronaut-cli.yml` file, as shown below:
 
 .micronaut-cli.yml
 [source,yaml]
@@ -155,50 +152,44 @@ buildTool: gradle
 features: [annotation-api, app-name, application, gradle, http-client, java, junit, logback, netty-server, shade, yaml]
 ----
 
-Some commands rely on the data in this file in order to determine if they should be executable. For example, the `create-kafka-listener` command requires `kafka` to be one of the features in the list.
+Some commands rely on the data in this file to determine if they should be executable. For example, the `create-kafka-listener` command requires `kafka` to be one of the features in the list.
 
-NOTE: The values in `micronaut-cli.yml` are used by the CLI for code generation purposes. After a project has been generated, you can edit these values to change the project defaults, however you will still need to supply the required dependencies and/or configuration in order to use your chosen language/framework. E.g, you could edit the `testFramework` property to `spock` to cause the CLI to generate Spock tests when running commands (such as `create-controller`), but you will still need to add the Spock dependency to your project.
+NOTE: The values in `micronaut-cli.yml` are used by the CLI for code generation. After a project is generated, you can edit these values to change the project defaults, however you must supply the required dependencies and/or configuration to use your chosen language/framework. For example, you could change the `testFramework` property to `spock` to cause the CLI to generate Spock tests when running commands (such as `create-controller`), but you need to add the Spock dependency to your build.
 
 ==== Groovy
 
-To create an app with Groovy support (which comes with Spock by default), supply the appropriate language via the `lang` flag:
+To create an app with Groovy support (which uses Spock by default), supply the appropriate language via the `lang` flag:
 
 [source,bash]
 ----
 $ mn create-app my-groovy-app --lang groovy
 ----
 
-This will include the Groovy & Spock dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
+This includes the Groovy and Spock dependencies in your project, and writes the appropriates values in `micronaut-cli.yml`.
 
 ==== Kotlin
 
-To create an app with Kotlin support (which comes with Kotest by default), supply the appropriate language via the `lang` flag:
+To create an app with Kotlin support (which uses Kotest by default), supply the appropriate language via the `lang` flag:
 
 [source,bash]
 ----
 $ mn create-app my-kotlin-app --lang kotlin
 ----
 
-This will include the Kotlin & Kotest dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
-
+This includes the Kotlin and Kotest dependencies in your project, and writes the appropriates values in `micronaut-cli.yml`.
 
 === Build Tool
 
-By default `create-app` will create a Gradle project, with a `build.gradle` file at the root of the project directory. To create an app using the Maven build tool, supply the appropriate option via the `build` flag:
+By default, `create-app` creates a Gradle project, with a `build.gradle` file in the project root directory. To create an app using the Maven build tool, supply the appropriate option via the `build` flag:
 
 [source,bash]
 ----
 $ mn create-app my-maven-app --build maven
 ----
 
-
 == Create-Cli-App
 
-The `create-cli-app` command will generate a <<commandLineApps,Micronaut command line application>> project,
-with optional flags to specify language, test framework, features, profile, and build tool.
-By default the project will have the `picocli` feature to support command line option parsing.
-The project will include a `*Command` class (based on the project name - e.g., `hello-world` will generate `HelloWorldCommand`),
-and an associated test which will instantiate the command and verify that it can parse command line options.
+The `create-cli-app` command generates a <<commandLineApps,Micronaut command line application>> project, with optional flags to specify language, test framework, features, profile, and build tool. By default, the project includes the `picocli` feature to support command line option parsing. The project will include a `*Command` class (based on the project name, e.g. `hello-world` generates `HelloWorldCommand`), and an associated test which instantiates the command and verifies that it can parse command line options.
 
 Once created, the application can be started using the `*Command` class, or the appropriate build tool task.
 
@@ -216,10 +207,10 @@ $ ./mvnw mn:run
 
 == Create Function App
 
-The `create-function-app` command will generate a <<serverlessFunctions,Micronaut function>> project, optimized for serverless environments, with optional flags to specify language, test framework, features and build tool. The project will include a `*Function` class (based on the project name - e.g., `hello-world` will generate `HelloWorldFunction`), and an associated test which will instantiate the function and verify that it can receive requests.
+The `create-function-app` command generates a <<serverlessFunctions,Micronaut function>> project, optimized for serverless environments, with optional flags to specify language, test framework, features, and build tool. The project will include a `*Function` class (based on the project name, e.g. `hello-world` generates `HelloWorldFunction`), and an associated test which instantiates the function and verifies that it can receive requests.
 
-TIP: Currently AWS Lambda, Micronaut Azure, and Google Cloud are the supported cloud providers for Micronaut functions. To use other providers, add one in the features: `--features azure-function` or `--features google-cloud-function`.
+TIP: Currently, AWS Lambda, Micronaut Azure, and Google Cloud are the supported cloud providers for Micronaut functions. To use other providers, add one in the features: `--features azure-function` or `--features google-cloud-function`.
 
 == Contribute
 
-The CLI's source code is at https://github.com/micronaut-projects/micronaut-starter. Information about how to contribute and other resources are there.
+The CLI source code is at https://github.com/micronaut-projects/micronaut-starter. Information about how to contribute and other resources are there.

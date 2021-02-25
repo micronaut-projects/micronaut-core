@@ -1,9 +1,9 @@
-https://www.jrebel.com/products/jrebel[JRebel] is a proprietary reloading solution that involves an agent library, as well as sophisticated IDE support. The JRebel documentation includes detailed steps for IDE integration and usage of the tool. In this section, we will simply show how to install and configure the agent for Maven and Gradle projects.
+https://www.jrebel.com/products/jrebel[JRebel] is a proprietary reloading solution that involves an agent library, as well as sophisticated IDE support. The JRebel documentation includes detailed steps for IDE integration and usage. In this section, we show how to install and configure the agent for Maven and Gradle projects.
 
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI, supply the `jrebel` feature to preconfigure JRebel reloading in your project. Please note that you will still need to install JRebel and supply the correct path to the agent in the `gradle.properties` file (for Gradle) or `pom.xml` (for Maven). The steps necessary are described below.
+If you create your project using the Micronaut CLI, supply the `jrebel` feature to preconfigure JRebel reloading in your project. Note that you need to install JRebel and supply the correct path to the agent in the `gradle.properties` file (for Gradle) or `pom.xml` (for Maven). The necessary steps are described below.
 
 ----
 $ mn create-app my-app --features jrebel
@@ -12,9 +12,9 @@ $ mn create-app my-app --features jrebel
 
 == Install/configure JRebel Agent
 
-The simplest way to install JRebel is to download the "standalone" installation package from the https://www.jrebel.com/products/jrebel/download[JRebel download page]. Unzip the downloaded file to a convenient location within your user's directory - for example, `~/bin/jrebel`
+The simplest way to install JRebel is to download the "standalone" installation package from the https://www.jrebel.com/products/jrebel/download[JRebel download page]. Unzip the downloaded file to a convenient location, for example `~/bin/jrebel`
 
-The installation directory will contain a `lib` directory containing the agent files. The appropriate agent based on your operating system, following the table below:
+The installation directory contains a `lib` directory with the agent files. For the appropriate agent based on your operating system, see the table below:
 
 .JRebel Agent
 |===
