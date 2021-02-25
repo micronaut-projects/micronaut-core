@@ -33,6 +33,11 @@ import java.util.*;
 final class EmptyAnnotationMetadata implements AnnotationMetadata {
 
     @Override
+    public boolean hasPropertyExpressions() {
+        return false;
+    }
+
+    @Override
     public <E extends Enum> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }

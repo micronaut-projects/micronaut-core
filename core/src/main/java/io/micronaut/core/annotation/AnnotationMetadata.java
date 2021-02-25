@@ -64,6 +64,18 @@ public interface AnnotationMetadata extends AnnotationSource {
     String CLASS_NAME_SUFFIX = "$$AnnotationMetadata";
 
     /**
+     * Does the metadata contain any property expressions like {@code ${foo.bar}}. Note
+     * this by default returns {@code true} as previous versions of Micronaut must assume metadata
+     * is present. The compilation time this is computed in order to decide whether to instrument
+     * annotation metadata with environment specific logic.
+     *
+     * @return True if property expressions are present
+     */
+    default boolean hasPropertyExpressions() {
+        return true;
+    }
+
+    /**
      * Resolve all of the annotation names that feature the given stereotype.
      *
      * @param stereotype The annotation names

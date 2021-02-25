@@ -136,7 +136,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildDeclared(T element) {
-        DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
 
         try {
             AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true, true);
@@ -167,7 +167,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return AnnotationMetadata.EMPTY_METADATA;
         }
 
-        DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
         if (includeTypeAnnotations) {
             buildInternal(element, element, annotationMetadata, false, true);
         }
@@ -200,7 +200,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return existing;
         } else {
 
-            DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+            DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
 
             try {
                 AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, false, false);
@@ -243,7 +243,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return existing;
         } else {
 
-            DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+            DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
 
             try {
                 AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true, false);
@@ -290,7 +290,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (existing != null) {
             return existing;
         } else {
-            DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+            DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
             return buildInternal(null, element, annotationMetadata, false, false);
         }
     }
@@ -329,10 +329,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             if (declaredMetadata instanceof DefaultAnnotationMetadata) {
                 annotationMetadata = ((DefaultAnnotationMetadata) declaredMetadata).clone();
             } else {
-                annotationMetadata = new DefaultAnnotationMetadata();
+                annotationMetadata = new MutableAnnotationMetadata();
             }
         } else {
-            annotationMetadata = new DefaultAnnotationMetadata();
+            annotationMetadata = new MutableAnnotationMetadata();
         }
         return buildInternal(parent, element, annotationMetadata, false, false);
     }
@@ -353,7 +353,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             // ugly, but will have to do
             annotationMetadata = ((DefaultAnnotationMetadata) existing).clone();
         } else {
-            annotationMetadata = new DefaultAnnotationMetadata();
+            annotationMetadata = new MutableAnnotationMetadata();
         }
         return buildInternal(parent, element, annotationMetadata, inheritTypeAnnotations, false);
     }
@@ -1417,7 +1417,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             );
         } else if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata instanceof AnnotationMetadataReference) {
             T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
-            final DefaultAnnotationMetadata newMetadata = new DefaultAnnotationMetadata();
+            final DefaultAnnotationMetadata newMetadata = new MutableAnnotationMetadata();
             if (annotationMirror != null) {
 
                 String repeatableName = getRepeatableNameForType(annotationMirror);
