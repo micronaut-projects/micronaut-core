@@ -90,6 +90,11 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
     }
 
     @Override
+    public final boolean hasPropertyExpressions() {
+        return annotationMetadata.hasPropertyExpressions();
+    }
+
+    @Override
     public String toString() {
         String text = Argument.toString(getArguments());
         return declaringType.getSimpleName() + "." + methodName + "(" + text + ")";

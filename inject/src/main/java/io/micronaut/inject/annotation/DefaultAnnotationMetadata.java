@@ -28,6 +28,7 @@ import io.micronaut.core.value.OptionalValues;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.RetentionPolicy;
@@ -95,12 +96,14 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     // The following fields are used only at compile time, and
     private Map<String, String> repeated = null;
     private Set<String> sourceRetentionAnnotations;
+    private final boolean hasPropertyExpressions;
 
     /**
      * Constructs empty annotation metadata.
      */
     @Internal
     protected DefaultAnnotationMetadata() {
+        hasPropertyExpressions = true;
     }
 
     /**
@@ -120,12 +123,40 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
             @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
             @Nullable Map<String, List<String>> annotationsByStereotype) {
+        this(declaredAnnotations, declaredStereotypes, allStereotypes, allAnnotations, annotationsByStereotype, true);
+    }
+
+    /**
+     * This constructor is designed to be used by compile time produced subclasses.
+     *
+     * @param declaredAnnotations     The directly declared annotations
+     * @param declaredStereotypes     The directly declared stereotypes
+     * @param allStereotypes          All of the stereotypes
+     * @param allAnnotations          All of the annotations
+     * @param annotationsByStereotype The annotations by stereotype
+     * @param hasPropertyExpressions  Whether property expressions exist in the metadata
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public DefaultAnnotationMetadata(
+            @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
+            @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
+            @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
+            @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
+            @Nullable Map<String, List<String>> annotationsByStereotype,
+            boolean hasPropertyExpressions) {
         super(declaredAnnotations, allAnnotations);
         this.declaredAnnotations = declaredAnnotations;
         this.declaredStereotypes = declaredStereotypes;
         this.allStereotypes = allStereotypes;
         this.allAnnotations = allAnnotations;
         this.annotationsByStereotype = annotationsByStereotype;
+        this.hasPropertyExpressions = hasPropertyExpressions;
+    }
+
+    @Override
+    public boolean hasPropertyExpressions() {
+        return hasPropertyExpressions;
     }
 
     /**
@@ -1202,7 +1233,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param values     The values
      */
     @SuppressWarnings("WeakerAccess")
-    protected final void addAnnotation(String annotation, Map<CharSequence, Object> values) {
+    protected void addAnnotation(String annotation, Map<CharSequence, Object> values) {
         addAnnotation(annotation, values, RetentionPolicy.RUNTIME);
     }
 
@@ -1216,7 +1247,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param retentionPolicy The retention policy
      */
     @SuppressWarnings("WeakerAccess")
-    protected final void addAnnotation(String annotation, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
+    protected void addAnnotation(String annotation, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         if (annotation != null) {
             String repeatedName = getRepeatedName(annotation);
             Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
@@ -1315,7 +1346,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param annotationName  The annotation name
      * @param annotationValue The annotation value
      */
-    protected final void addRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue) {
+    protected void addRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue) {
         addRepeatable(annotationName, annotationValue, annotationValue.getRetentionPolicy());
     }
 
@@ -1326,7 +1357,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param annotationValue The annotation value
      * @param retentionPolicy The retention policy
      */
-    protected final void addRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
+    protected void addRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
         if (StringUtils.isNotEmpty(annotationName) && annotationValue != null) {
             Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
 
@@ -1379,7 +1410,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param annotationName  The annotation name
      * @param annotationValue The annotation value
      */
-    protected final void addDeclaredRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue) {
+    protected void addDeclaredRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue) {
         addDeclaredRepeatable(annotationName, annotationValue, annotationValue.getRetentionPolicy());
     }
 
@@ -1390,7 +1421,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param annotationValue The annotation value
      * @param retentionPolicy The retention policy
      */
-    protected final void addDeclaredRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
+    protected void addDeclaredRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
         if (StringUtils.isNotEmpty(annotationName) && annotationValue != null) {
             Map<String, Map<CharSequence, Object>> allAnnotations = getDeclaredAnnotationsInternal();
 
@@ -1882,9 +1913,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
         }
         if (!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
-            return new DefaultAnnotationMetadata() {{
-                addDeclaredAnnotation(annotationName, members);
-            }};
+            MutableAnnotationMetadata mutableAnnotationMetadata = new MutableAnnotationMetadata();
+            mutableAnnotationMetadata.addDeclaredAnnotation(annotationName, members);
+            return mutableAnnotationMetadata;
         } else {
             DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) annotationMetadata;
 

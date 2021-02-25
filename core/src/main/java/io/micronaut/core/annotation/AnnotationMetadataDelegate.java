@@ -36,6 +36,11 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
+    default boolean hasPropertyExpressions() {
+        return getAnnotationMetadata().hasPropertyExpressions();
+    }
+
+    @Override
     default boolean hasSimpleDeclaredAnnotation(@Nullable String annotation) {
         return getAnnotationMetadata().hasSimpleDeclaredAnnotation(annotation);
     }
