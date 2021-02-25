@@ -31,6 +31,5 @@ import kotlin.annotation.AnnotationTarget.PROPERTY_SETTER
 @Retention(RUNTIME) // <1>
 @Target(CLASS, FILE, FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER) // <2>
 @Around // <3>
-@InterceptorBinding // <4>
 annotation class NotNull
 // end::annotation[]

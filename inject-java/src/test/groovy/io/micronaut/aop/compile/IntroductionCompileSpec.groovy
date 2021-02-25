@@ -25,12 +25,11 @@ interface MyBean {
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Introduction
-@InterceptorBinding
 @interface TestAnn {
 }
 
 @Singleton
-@InterceptorBinding(value = TestAnn.class)
+@InterceptorBinding(TestAnn.class)
 class StubIntroduction implements Interceptor {
     int invoked = 0;
     @Override

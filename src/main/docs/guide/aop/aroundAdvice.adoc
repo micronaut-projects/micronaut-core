@@ -10,7 +10,6 @@ snippet::io.micronaut.docs.aop.around.NotNull[tags="imports,annotation", indent=
 <1> The retention policy of the annotation should be `RUNTIME`
 <2> Generally you want to be able to apply advice at the class or method level so the target types are `TYPE` and `METHOD`
 <3> The ann:aop.Around[] annotation is added to tell Micronaut that the annotation is Around advice
-<4> The ann:aop.InterceptorBinding[] annotation is used to indicate that this annotation should trigger AOP advice
 
 The next step to defining Around advice is to implement a api:aop.MethodInterceptor[]. For example the following interceptor disallows parameters with `null` values:
 

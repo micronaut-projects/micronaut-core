@@ -33,7 +33,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME) // <1>
 @Target({TYPE, METHOD}) // <2>
 @Around // <3>
-@InterceptorBinding // <4>
 public @interface NotNull {
 }
 // end::annotation[]

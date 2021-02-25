@@ -205,6 +205,64 @@ class AnotherInterceptor implements Interceptor {
         context.close()
     }
 
+    void 'test annotation with just around'() {
+        given:
+        ApplicationContext context = buildContext('''
+package justaround;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import javax.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Singleton
+@TestAnn
+class MyBean {
+    void test() {
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn {
+}
+
+@Singleton
+@InterceptorBinding(TestAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+@Singleton
+class AnotherInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+''')
+        def instance = getBean(context, 'justaround.MyBean')
+        def interceptor = getBean(context, 'justaround.TestInterceptor')
+        def anotherInterceptor = getBean(context, 'justaround.AnotherInterceptor')
+        instance.test()
+
+        expect:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked
+        !anotherInterceptor.invoked
+
+        cleanup:
+        context.close()
+    }
+
     void 'test byte[] return compile'() {
         given:
         ApplicationContext context = buildContext('''

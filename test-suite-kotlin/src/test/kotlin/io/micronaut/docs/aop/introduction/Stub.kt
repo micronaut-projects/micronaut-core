@@ -16,7 +16,6 @@
 package io.micronaut.docs.aop.introduction
 
 // tag::imports[]
-import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.Introduction
 import io.micronaut.context.annotation.Bean
 import kotlin.annotation.AnnotationRetention.RUNTIME
@@ -30,8 +29,7 @@ import kotlin.annotation.AnnotationTarget.PROPERTY_SETTER
 
 // tag::class[]
 @Introduction // <1>
-@InterceptorBinding // <2>
-@Bean // <3>
+@Bean // <2>
 @MustBeDocumented
 @Retention(RUNTIME)
 @Target(CLASS, FILE, ANNOTATION_CLASS, FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
