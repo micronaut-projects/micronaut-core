@@ -15,6 +15,9 @@
  */
 package io.micronaut.docs.aop.introduction
 
+import io.micronaut.aop.InterceptorBinding
+import io.micronaut.aop.InterceptorKind
+
 // tag::imports[]
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
@@ -24,14 +27,15 @@ import javax.inject.Singleton
 
 // tag::class[]
 @Singleton
-class StubIntroduction implements MethodInterceptor<Object,Object> { // <1>
+@InterceptorBinding(value = Stub.class, kind = InterceptorKind.INTRODUCTION) // <1>
+class StubIntroduction implements MethodInterceptor<Object,Object> { // <2>
 
     @Override
     Object intercept(MethodInvocationContext<Object, Object> context) {
-        context.getValue( // <2>
+        context.getValue( // <3>
                 Stub,
                 context.returnType.type
-        ).orElse(null) // <3>
+        ).orElse(null) // <4>
     }
 }
 // end::class[]

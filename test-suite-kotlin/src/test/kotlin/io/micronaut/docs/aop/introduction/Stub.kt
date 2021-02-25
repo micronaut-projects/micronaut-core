@@ -30,7 +30,7 @@ import kotlin.annotation.AnnotationTarget.PROPERTY_SETTER
 
 // tag::class[]
 @Introduction // <1>
-@InterceptorBinding(interceptorType = StubIntroduction::class) // <2>
+@InterceptorBinding // <2>
 @Bean // <3>
 @MustBeDocumented
 @Retention(RUNTIME)

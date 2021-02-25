@@ -25,7 +25,7 @@ interface MyBean {
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Introduction
-@InterceptorBinding(interceptorType = StubIntroduction.class)
+@InterceptorBinding
 @interface TestAnn {
 }
 
