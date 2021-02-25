@@ -50,10 +50,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * The key in the map is the deprecated annotation the value the replacement.
      */
     @SuppressWarnings("unchecked")
-    private static final Map<String, String> DEPRECATED_ANNOTATION_NAMES = CollectionUtils.mapOf(
-            AnnotationUtil.NULLABLE, Nullable.class.getName(),
-            AnnotationUtil.NON_NULL, NonNull.class.getName()
-    );
+    private static final Map<String, String> DEPRECATED_ANNOTATION_NAMES = Collections.emptyMap();
     private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
     private static final Map<String, List<AnnotationTransformer<Annotation>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
@@ -1046,7 +1043,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     topLevel.add(annotationMirror);
 
                     Map<CharSequence, Object> data = populateAnnotationData(element, annotationMirror, metadata, isDeclared, retentionPolicy);
-                    
+
                     if (isDeclared) {
                         applyTransformations(listIterator, metadata, isDeclared, annotationMirror, data,
                                 (string, av) -> metadata.addDeclaredRepeatableStereotype(parents, string, av),
