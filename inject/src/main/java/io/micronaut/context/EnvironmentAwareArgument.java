@@ -48,6 +48,11 @@ class EnvironmentAwareArgument<T> extends DefaultArgument<T> implements Environm
     }
 
     @Override
+    public boolean hasPropertyExpressions() {
+        return annotationMetadata.hasPropertyExpressions();
+    }
+
+    @Override
     public void configure(Environment environment) {
         this.environment = environment;
     }
