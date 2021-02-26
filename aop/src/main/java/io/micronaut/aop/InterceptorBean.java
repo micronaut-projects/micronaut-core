@@ -15,10 +15,10 @@
  */
 package io.micronaut.aop;
 
-import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Bean;
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.context.annotation.DefaultScope;
 
+import javax.inject.Singleton;
 import java.lang.annotation.*;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -32,16 +32,16 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE, ElementType.TYPE})
+@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
 @Bean
+@DefaultScope(Singleton.class)
 public @interface InterceptorBean {
     /**
-     * The value of this annotation can be used to indicate the annotation the
+     * The value of this annotation can be used to indicate the annotations the
      * {@link MethodInterceptor} binds to at runtime.
      *
      * @return The annotation type the interceptor binds to.
      */
-    @AliasFor(annotation = InterceptorBinding.class, member = AnnotationMetadata.VALUE_MEMBER)
-    Class<? extends Annotation> value();
+    Class<? extends Annotation>[] value();
 }
 

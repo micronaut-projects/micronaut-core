@@ -29,6 +29,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -354,11 +355,11 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
                         // does the annotation metadata of the interceptor definition contain
                         // @InterceptorBinding(SomeAnnotation.class) ?
                         final boolean isApplicationByBinding = annotationValue.stringValue()
-                                .map(annotationName -> beanRegistration.getBeanDefinition()
-                                        .getAnnotationMetadata()
-                                        .stringValue(InterceptorBinding.class)
-                                        .map(annotationName::equals)
-                                        .orElse(false)).orElse(false);
+                                .map(annotationName -> InterceptorBindingQualifier.resolveInterceptorValues(beanRegistration
+                                        .getBeanDefinition()
+                                        .getAnnotationMetadata())
+                                        .contains(annotationName))
+                                .orElse(false);
                         return isApplicableByType || isApplicationByBinding;
                     })).sorted(OrderUtil.COMPARATOR)
                     .map(BeanRegistration::getBean)

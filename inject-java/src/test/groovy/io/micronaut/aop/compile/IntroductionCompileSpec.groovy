@@ -28,8 +28,7 @@ interface MyBean {
 @interface TestAnn {
 }
 
-@Singleton
-@InterceptorBinding(TestAnn.class)
+@InterceptorBean(TestAnn.class)
 class StubIntroduction implements Interceptor {
     int invoked = 0;
     @Override

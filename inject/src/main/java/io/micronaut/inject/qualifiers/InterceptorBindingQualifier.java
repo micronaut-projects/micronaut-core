@@ -23,9 +23,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -38,7 +40,7 @@ import java.util.stream.Stream;
  * @since 2.4.0
  */
 @Internal
-final class InterceptorBindingQualifier<T> implements Qualifier<T> {
+public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
 
     private final Set<String> supportedAnnotationNames;
     private final Set<Class<?>> supportedInterceptorTypes;
@@ -60,15 +62,14 @@ final class InterceptorBindingQualifier<T> implements Qualifier<T> {
 
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate -> supportedInterceptorTypes.contains(candidate.getBeanType()) ||
-                candidate.getAnnotationMetadata()
-                    .findAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)
-                    .map(av -> av.getAnnotations(AnnotationMetadata.VALUE_MEMBER).stream())
-                    .orElse(Stream.empty())
-                    .anyMatch(av ->
-                        av.stringValue().map(supportedAnnotationNames::contains)
-                            .orElse(false)
-                    ));
+        return candidates.filter(candidate -> {
+            if (supportedInterceptorTypes.contains(candidate.getBeanType())) {
+                return true;
+            }
+            List<String> annotationNames = new ArrayList<>(resolveInterceptorValues(candidate.getAnnotationMetadata()));
+            annotationNames.retainAll(supportedAnnotationNames);
+            return !annotationNames.isEmpty();
+        });
     }
 
     @Override
@@ -86,5 +87,20 @@ final class InterceptorBindingQualifier<T> implements Qualifier<T> {
     @Override
     public int hashCode() {
         return Objects.hash(supportedAnnotationNames, supportedInterceptorTypes);
+    }
+
+    public static List<String> resolveInterceptorValues(AnnotationMetadata annotationMetadata) {
+        AnnotationValue<?> bindings = annotationMetadata
+                .getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+        if (bindings != null) {
+            return bindings.getAnnotations(AnnotationMetadata.VALUE_MEMBER)
+                    .stream()
+                    .map(AnnotationValue::stringValue)
+                    .filter(Optional::isPresent)
+                    .map(Optional::get)
+                    .collect(Collectors.toList());
+        } else {
+            return Collections.emptyList();
+        }
     }
 }
