@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.failures.ctorcirculardependency;
+package io.micronaut.runtime.server;
 
-import io.micronaut.context.annotation.Requires;
-
-import javax.inject.Singleton;
-
-@Requires(property = "spec.name", value = "ConstructorCircularDependencyFailureSpec")
-@Singleton
-public class A {
-    public A(C c) {}
+/**
+ * @deprecated Use {@link io.micronaut.discovery.EmbeddedServerInstance} instead.
+ * @author graemerocher
+ */
+@Deprecated
+public interface EmbeddedServerInstance extends io.micronaut.discovery.EmbeddedServerInstance {
 }

@@ -3,10 +3,12 @@ package io.micronaut.inject.provider;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Requires;
 
 import javax.inject.Provider;
 
 
+@Requires(property = "spec.name", value = "ProviderNamedInjectionSpec")
 @EachBean(BeanNumber.class)
 public class ErrorEachBeanProvider {
 

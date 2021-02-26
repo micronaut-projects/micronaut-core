@@ -1,11 +1,11 @@
 buildscript {
     repositories {
-        maven { url "https://dl.bintray.com/micronaut/core-releases-local" }
+        mavenCentral()
         maven { url "https://repo.grails.org/grails/core" }
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:6.0.0'
-        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.15"
+        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:3.0.2"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
@@ -389,7 +389,7 @@ ext {
                     name:'neo4j-java-driver'
             ],
             oracle                      : [
-                    version: oracleDriverVersion,
+                    version: ojdbcVersion,
                     group  : 'com.oracle.database.jdbc',
                     name   : 'ojdbc8',
                     modules: ['ucp']
@@ -616,7 +616,7 @@ ext {
             'micronaut.kubernetes': [
                     version:micronautKubernetesVersion,
                     group:'io.micronaut.kubernetes',
-                    name:'micronaut-kubernetes-discovery-client'
+                    modules:['micronaut-kubernetes-discovery-client', 'micronaut-kubernetes-client', 'micronaut-kubernetes-client-processor']
             ],
             'micronaut.cache': [
                     version:micronautCacheVersion,
@@ -766,13 +766,12 @@ subprojects { Project subproject ->
 
     group projectGroupId
 
-    apply plugin: "io.micronaut.build.common"
+    apply plugin: "io.micronaut.build.internal.common"
     if (!subproject.name.startsWith('test-') &&
             !subproject.name.startsWith('inject-test-') &&
             !subproject.toString().contains('benchmarks')) {
-        apply plugin: "io.micronaut.build.dependency-updates"
-        apply plugin: "io.micronaut.build.publishing"
-        bintray.pkg.version.gpg.sign = false
+        apply plugin: "io.micronaut.build.internal.dependency-updates"
+        apply plugin: "io.micronaut.build.internal.publishing"
     }
 
     micronautBuild {
@@ -877,8 +876,8 @@ subprojects { Project subproject ->
         }
     }
 }
-apply plugin: "io.micronaut.build.docs"
-apply plugin: "io.micronaut.build.dependency-updates"
+apply plugin: "io.micronaut.build.internal.docs"
+apply plugin: "io.micronaut.build.internal.dependency-updates"
 
 allprojects {
 

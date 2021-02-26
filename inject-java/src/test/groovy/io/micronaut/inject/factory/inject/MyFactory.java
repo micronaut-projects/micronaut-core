@@ -17,9 +17,11 @@ package io.micronaut.inject.factory.inject;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Requires;
 
 import javax.inject.Inject;
 
+@Requires(property = "spec.name", value = "InjectExistingFactorySpec")
 @Factory
 public class MyFactory {
 

@@ -1,11 +1,12 @@
 plugins {
     id 'java'
     id 'java-library'
-    id 'maven-publish'
 }
 
 repositories {
     mavenCentral()
+
+    //TODO remove
     jcenter()
     maven { url "https://repo.grails.org/grails/libs-releases" }
 }
@@ -71,18 +72,18 @@ dependencies {
     }
 }
 
-publishing {
-    publications {
-        maven(MavenPublication) {
-            groupId = 'io.micronaut.internal'
-            artifactId = 'micronaut-bom-check'
-            version = project.version
-            from components.java
-        }
-    }
-}
+//publishing {
+//    publications {
+//        maven(MavenPublication) {
+//            groupId = 'io.micronaut.internal'
+//            artifactId = 'micronaut-bom-check'
+//            version = project.version
+//            from components.java
+//        }
+//    }
+//}
 
-publish.enabled = false
+//publish.enabled = false
 
 task validateMicronautBom {
     doLast {

@@ -15,10 +15,13 @@
  */
 package io.micronaut.inject.failures.postconstruct;
 
+import io.micronaut.context.annotation.Requires;
+
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+@Requires(property = "spec.name", value = "PostConstructExceptionSpec")
 @Singleton
 public class B {
 

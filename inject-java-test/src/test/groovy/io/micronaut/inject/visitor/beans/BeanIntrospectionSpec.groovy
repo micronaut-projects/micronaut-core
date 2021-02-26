@@ -2410,6 +2410,37 @@ class Test extends SuperClass implements IEmail {
         introspection.getIndexedProperties(Constraint).size() == 1
     }
 
+    void "test introspection with single leading lowercase character"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test {
+
+    private final String xForwardedFor;
+    
+    Test(String xForwardedFor) {
+        this.xForwardedFor = xForwardedFor;
+    }
+    
+    public String getXForwardedFor() {
+        return xForwardedFor;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def obj = introspection.instantiate("localhost")
+
+        then:
+        noExceptionThrown()
+        introspection.getProperty("XForwardedFor", String).get().get(obj) == "localhost"
+    }
 
     @Override
     protected JavaParser newJavaParser() {
