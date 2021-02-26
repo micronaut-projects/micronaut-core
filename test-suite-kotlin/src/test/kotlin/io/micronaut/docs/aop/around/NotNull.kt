@@ -17,7 +17,6 @@ package io.micronaut.docs.aop.around
 
 // tag::imports[]
 import io.micronaut.aop.Around
-import io.micronaut.aop.InterceptorBinding
 import kotlin.annotation.AnnotationRetention.RUNTIME
 import kotlin.annotation.AnnotationTarget.CLASS
 import kotlin.annotation.AnnotationTarget.FILE
