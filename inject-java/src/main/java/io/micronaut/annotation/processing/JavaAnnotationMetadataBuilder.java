@@ -42,6 +42,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -319,6 +320,33 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                 annotationValues.put(memberName, resolvedValue);
             }
         }
+    }
+
+    @Override
+    protected boolean isValidationRequired(Element member) {
+        final List<? extends AnnotationMirror> annotationMirrors = member.getAnnotationMirrors();
+        return isValidationRequired(annotationMirrors);
+    }
+
+    private boolean isValidationRequired(List<? extends AnnotationMirror> annotationMirrors) {
+        for (AnnotationMirror annotationMirror : annotationMirrors) {
+            final String annotationName = getAnnotationTypeName(annotationMirror);
+            if (annotationName.startsWith("javax.validation")) {
+                return true;
+            } else if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
+                final Element element = getAnnotationMirror(annotationName).orElse(null);
+                if (element != null) {
+                    final List<? extends AnnotationMirror> childMirrors = element.getAnnotationMirrors()
+                            .stream()
+                            .filter(ann -> !getAnnotationTypeName(ann).equals(annotationName))
+                            .collect(Collectors.toList());
+                    if (isValidationRequired(childMirrors)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     @Override

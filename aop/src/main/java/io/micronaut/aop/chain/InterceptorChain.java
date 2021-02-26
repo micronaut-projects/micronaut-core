@@ -15,29 +15,28 @@
  */
 package io.micronaut.aop.chain;
 
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.context.BeanRegistration;
+import io.micronaut.core.annotation.*;
 import io.micronaut.aop.*;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.context.annotation.Type;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -53,6 +52,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     protected static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
+    private static final Interceptor[] ZERO_INTERCEPTORS = new Interceptor[0];
 
     protected final Interceptor<B, R>[] interceptors;
     protected final B target;
@@ -242,6 +242,48 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
+    public static Interceptor[] resolveAroundInterceptors(
+            @Nullable BeanContext beanContext,
+            ExecutableMethod<?, ?> method,
+            List<BeanRegistration<Interceptor<?, ?>>> interceptors) {
+        return resolveInterceptors(beanContext, method, interceptors, InterceptorKind.AROUND);
+    }
+
+
+    /**
+     * Resolves the {@link Introduction} interceptors for a method.
+     *
+     * @param beanContext bean context passed in
+     * @param method The method
+     * @param interceptors The array of interceptors
+     * @return The filtered array of interceptors
+     */
+    @SuppressWarnings("WeakerAccess")
+    @Internal
+    @UsedByGeneratedCode
+    public static Interceptor[] resolveIntroductionInterceptors(
+            @Nullable BeanContext beanContext,
+            ExecutableMethod<?, ?> method,
+            List<BeanRegistration<Interceptor<?, ?>>> interceptors) {
+        final Interceptor[] introductionInterceptors = resolveInterceptors(beanContext, method, interceptors, InterceptorKind.INTRODUCTION);
+        final Interceptor[] aroundInterceptors = resolveInterceptors(beanContext, method, interceptors, InterceptorKind.AROUND);
+        return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
+    }
+
+    /**
+     * Resolves the {@link Around} interceptors for a method.
+     *
+     * @param beanContext bean context passed in
+     * @param method The method
+     * @param interceptors The array of interceptors
+     * @return The filtered array of interceptors
+     * @deprecated Replaced by {@link #resolveAroundInterceptors(BeanContext, ExecutableMethod, List)}
+     */
+    // IMPLEMENTATION NOTE: This method is deprecated but should not be removed as it would break binary compatibility
+    @SuppressWarnings("WeakerAccess")
+    @Internal
+    @UsedByGeneratedCode
+    @Deprecated
     public static Interceptor[] resolveAroundInterceptors(@Nullable BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
         return resolveInterceptorsInternal(method, Around.class, interceptors, beanContext != null ? beanContext.getClassLoader() : InterceptorChain.class.getClassLoader());
@@ -256,8 +298,10 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
      * @param interceptors The array of interceptors
      * @return The filtered array of interceptors
      */
+    // IMPLEMENTATION NOTE: This method is deprecated but should not be removed as it would break binary compatibility
     @Internal
     @UsedByGeneratedCode
+    @Deprecated
     public static Interceptor[] resolveIntroductionInterceptors(@Nullable BeanContext beanContext,
                                                                 ExecutableMethod<?, ?> method,
                                                                 Interceptor... interceptors) {
@@ -273,6 +317,62 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         }
         Interceptor[] aroundInterceptors = resolveAroundInterceptors(beanContext, method, interceptors);
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
+    }
+
+    @NonNull
+    private static Interceptor[] resolveInterceptors(
+            BeanContext beanContext,
+            ExecutableMethod<?, ?> method,
+            List<BeanRegistration<Interceptor<?, ?>>> interceptors,
+            InterceptorKind interceptorKind) {
+        if (interceptors.isEmpty()) {
+            if (interceptorKind == InterceptorKind.INTRODUCTION) {
+                if (method.hasStereotype(Adapter.class)) {
+                    return new Interceptor[] { new AdapterIntroduction(beanContext, method) };
+                } else {
+                    throw new IllegalStateException("At least one @Introduction method interceptor required, but missing. Check if your @Introduction stereotype annotation is marked with @Retention(RUNTIME) and @Type(..) with the interceptor type. Otherwise do not load @Introduction beans if their interceptor definitions are missing!");
+
+                }
+            } else {
+                return ZERO_INTERCEPTORS;
+            }
+        } else {
+            instrumentAnnotationMetadata(beanContext, method);
+            final List<AnnotationValue<InterceptorBinding>> applicableBindings
+                    = method.getAnnotationValuesByType(InterceptorBinding.class)
+                    .stream()
+                    .filter(ann ->
+                            ann.enumValue("kind", InterceptorKind.class)
+                                    .orElse(InterceptorKind.AROUND) == interceptorKind)
+                    .collect(Collectors.toList());
+            final Interceptor[] resolvedInterceptors = interceptors.stream()
+                    .filter(beanRegistration -> applicableBindings.stream().anyMatch(annotationValue -> {
+                        // does the annotation metadata contain @InterceptorBinding(interceptorType=SomeInterceptor.class)
+                        // that matches the list of interceptors ?
+                        final boolean isApplicableByType = annotationValue.classValue("interceptorType")
+                                .map(t -> t.isInstance(beanRegistration.getBean())).orElse(false);
+
+                        // does the annotation metadata of the interceptor definition contain
+                        // @InterceptorBinding(SomeAnnotation.class) ?
+                        final boolean isApplicationByBinding = annotationValue.stringValue()
+                                .map(annotationName -> InterceptorBindingQualifier.resolveInterceptorValues(beanRegistration
+                                        .getBeanDefinition()
+                                        .getAnnotationMetadata())
+                                        .contains(annotationName))
+                                .orElse(false);
+                        return isApplicableByType || isApplicationByBinding;
+                    })).sorted(OrderUtil.COMPARATOR)
+                    .map(BeanRegistration::getBean)
+                    .toArray(Interceptor[]::new);
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Resolved {} {} interceptors out of a possible {} for method: {} - {}", resolvedInterceptors.length, interceptorKind, interceptors.size(), method.getDeclaringType(), method.getDescription(true));
+                for (int i = 0; i < resolvedInterceptors.length; i++) {
+                    Interceptor resolvedInterceptor = resolvedInterceptors[i];
+                    LOG.trace("Interceptor {} - {}", i, resolvedInterceptor);
+                }
+            }
+            return resolvedInterceptors;
+        }
     }
 
     private static void instrumentAnnotationMetadata(BeanContext beanContext, ExecutableMethod<?, ?> method) {

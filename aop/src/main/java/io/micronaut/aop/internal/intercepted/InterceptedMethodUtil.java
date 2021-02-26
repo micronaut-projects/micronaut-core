@@ -16,9 +16,14 @@
 package io.micronaut.aop.internal.intercepted;
 
 import io.micronaut.aop.InterceptedMethod;
+import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.ReturnType;
 
+import java.lang.annotation.Annotation;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Future;
 
@@ -28,6 +33,7 @@ import java.util.concurrent.Future;
  * @author Denis Stepanov
  * @since 2.1.0
  */
+@Internal
 public class InterceptedMethodUtil {
 
     /**
@@ -59,4 +65,27 @@ public class InterceptedMethodUtil {
         }
     }
 
+    /**
+     * Resolve interceptor binding annotations from the metadata.
+     * @param annotationMetadata The annotation metadata
+     * @param interceptorKind The interceptor kind
+     * @return the annotation values
+     */
+    public static io.micronaut.core.annotation.AnnotationValue<?>[] resolveInterceptorBinding(
+            AnnotationMetadata annotationMetadata,
+            InterceptorKind interceptorKind) {
+        final io.micronaut.core.annotation.AnnotationValue<Annotation> interceptorBindings
+                = annotationMetadata.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+        if (interceptorBindings != null) {
+            return interceptorBindings.getAnnotations(AnnotationMetadata.VALUE_MEMBER)
+                    .stream()
+                    .filter(av -> {
+                        final InterceptorKind kind = av.enumValue("kind", InterceptorKind.class)
+                                .orElse(InterceptorKind.AROUND);
+                        return kind == interceptorKind;
+                    })
+                    .toArray(io.micronaut.core.annotation.AnnotationValue[]::new);
+        }
+        return AnnotationUtil.ZERO_ANNOTATION_VALUES;
+    }
 }

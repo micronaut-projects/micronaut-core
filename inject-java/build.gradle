@@ -10,6 +10,7 @@ dependencies {
 
     testImplementation project(':aop')
     testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject-java-test")
     testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
     testImplementation dependencyVersion("rxjava2")

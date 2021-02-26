@@ -2,25 +2,28 @@ The most common type of advice you may want to apply is "Around" advice, which e
 
 == Writing Around Advice
 
-The first step to defining Around advice is to implement a link:{api}/io/micronaut/aop/MethodInterceptor.html[MethodInterceptor]. For example the following interceptor disallows parameters with `null` values:
 
-snippet::io.micronaut.docs.aop.around.NotNullInterceptor[tags="imports,interceptor", indent=0, title="MethodInterceptor Example"]
-
-<1> An interceptor implements the link:{api}/io/micronaut/aop/MethodInterceptor.html[MethodInterceptor] interface
-<2> The passed link:{api}/io/micronaut/aop/MethodInvocationContext.html[MethodInvocationContext] is used to find the first parameter that is `null`
-<3> If a `null` parameter is found an exception is thrown
-<4> Otherwise link:{api}/io/micronaut/aop/InvocationContext.html#proceed--[proceed()] is called to proceed with the method invocation.
-
-NOTE: Micronaut AOP interceptors use no reflection which improves performance and reducing stack trace sizes, thus improving debugging.
-
-To put the new `MethodInterceptor` to work the next step is to define an annotation that will trigger the `MethodInterceptor`:
+The first step is to define an annotation that will trigger a api:aop.MethodInterceptor[]:
 
 snippet::io.micronaut.docs.aop.around.NotNull[tags="imports,annotation", indent=0, title="Around Advice Annotation Example"]
 
 <1> The retention policy of the annotation should be `RUNTIME`
 <2> Generally you want to be able to apply advice at the class or method level so the target types are `TYPE` and `METHOD`
-<3> The link:{api}/io/micronaut/aop/Around.html[Around] annotation is added to tell Micronaut that the annotation is Around advice
-<4> The link:{api}/io/micronaut/context/annotation/Type.html[@Type] annotation is used to configure which type implements the advice (in this case the previously defined `NotNullInterceptor`)
+<3> The ann:aop.Around[] annotation is added to tell Micronaut that the annotation is Around advice
+
+The next step to defining Around advice is to implement a api:aop.MethodInterceptor[]. For example the following interceptor disallows parameters with `null` values:
+
+snippet::io.micronaut.docs.aop.around.NotNullInterceptor[tags="imports,interceptor", indent=0, title="MethodInterceptor Example"]
+
+<1> The ann:aop.InterceptorBean[] annotation is used to indicate what annotation the interceptor is associated with. Note that the `javax.inject.Singleton` annotation is optional, and a new interceptor would be created for each instance (prototype scope).
+<2> An interceptor implements the api:aop.MethodInterceptor[] interface.
+<3> The passed link:{api}/io/micronaut/aop/MethodInvocationContext.html[MethodInvocationContext] is used to find the first parameter that is `null`
+<4> If a `null` parameter is found an exception is thrown
+<5> Otherwise link:{api}/io/micronaut/aop/InvocationContext.html#proceed--[proceed()] is called to proceed with the method invocation.
+
+NOTE: Micronaut AOP interceptors use no reflection which improves performance and reducing stack trace sizes, thus improving debugging.
+
+To put the new `MethodInterceptor` to work the
 
 With the interceptor and annotation implemented you can then simply apply the annotation to the target classes:
 

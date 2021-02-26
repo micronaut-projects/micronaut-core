@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.aop.around;
+package io.micronaut.aop;
 
-// tag::imports[]
-import io.micronaut.aop.Around;
-import java.lang.annotation.*;
-import static java.lang.annotation.ElementType.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-// end::imports[]
 
-// tag::annotation[]
+/**
+ * Repeatable wrapper for {@link InterceptorBinding}.
+ *
+ * @author graemerocher
+ * @since 2.4.0
+ * @see InterceptorBinding
+ */
 @Documented
-@Retention(RUNTIME) // <1>
-@Target({TYPE, METHOD}) // <2>
-@Around // <3>
-public @interface NotNull {
+@Retention(RUNTIME)
+@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
+public @interface InterceptorBindingDefinitions {
+    /**
+     * @return The interceptor binding definitions.
+     */
+    InterceptorBinding[] value();
 }
-// end::annotation[]

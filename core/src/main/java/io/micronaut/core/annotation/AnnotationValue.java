@@ -828,6 +828,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return Collections.singletonList((AnnotationValue) v);
         } else if (v instanceof AnnotationValue[]) {
             return Arrays.asList((AnnotationValue[]) v);
+        } else if (v instanceof Collection) {
+            final Iterator<?> i = ((Collection<?>) v).iterator();
+            if (i.hasNext()) {
+                final Object o = i.next();
+                if (o instanceof AnnotationValue) {
+                    return new ArrayList<>((Collection<? extends AnnotationValue<T>>) v);
+                }
+            }
         }
         return Collections.emptyList();
     }
@@ -897,6 +905,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     public static <T extends Annotation> AnnotationValueBuilder<T> builder(String annotationName) {
         return new AnnotationValueBuilder<>(annotationName);
+    }
+
+    /**
+     * Start building a new annotation for the given name.
+     *
+     * @param annotationName The annotation name
+     * @param retentionPolicy The retention policy
+     * @param <T>            The annotation type
+     * @return The builder
+     * @since 2.4.0
+     */
+    public static <T extends Annotation> AnnotationValueBuilder<T> builder(String annotationName, RetentionPolicy retentionPolicy) {
+        return new AnnotationValueBuilder<>(annotationName, retentionPolicy);
     }
 
     /**

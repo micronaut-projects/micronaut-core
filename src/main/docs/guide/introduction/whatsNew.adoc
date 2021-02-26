@@ -14,6 +14,20 @@ With the future of JSR-305 unclear and issues with regards to the module system 
 
 Existing applications should switch to using these annotations. If other annotations are preferable, the dependency should be added explicitly to your build because no third party `Nullable` or `NonNull` annotations will be available transitively in the next major version.
 
+==== Improvements to Interceptor Binding
+
+Micronaut's support for AOP interceptors has been improved allowing interceptors to be attached to any annotation through the use of api:inject.annotation.AnnotationMapper[] instances. It is also now possible to bind multiple api:aop.MethodInterceptor[] instances to a single annotation instead of there being a 1-to-1 mapping between annotation and interceptor.
+
+From 2.4.x onwards the recommending way to define AOP advise is to use the ann:aop.InterceptorBinding[] annotation on the annotation you wish to trigger AOP advise:
+
+snippet::io.micronaut.docs.aop.around.NotNull[tags="imports,annotation", indent=0, title="Around Advice Annotation Example"]
+
+Then use ann:aop.InterceptorBinding[] again on the api:aop.MethodInterceptor[] you wish to bind to the above advise:
+
+snippet::io.micronaut.docs.aop.around.NotNullInterceptor[tags="imports,interceptor", indent=0, title="MethodInterceptor Example"]
+
+Multiple api:aop.MethodInterceptor[] types can bind to a single advise annotation.
+
 === Cloud Features
 
 ==== Easier Configuration of Oracle Cloud Autonomous Database

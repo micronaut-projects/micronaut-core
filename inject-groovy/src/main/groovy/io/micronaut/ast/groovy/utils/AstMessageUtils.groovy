@@ -41,9 +41,13 @@ class AstMessageUtils {
      */
     static void warning(final SourceUnit sourceUnit, final ASTNode node, final String message) {
         final String sample = sourceUnit.getSample(node.getLineNumber(), node.getColumnNumber(), new Janitor())
-        System.err.println("""WARNING: $message
+        if (sample) {
+            System.err.println("""WARNING: $message
 
 $sample""")
+        } else {
+            System.err.println("WARNING: $message")
+        }
     }
 
     static void error(SourceUnit sourceUnit, ASTNode expr, String errorMessage) {

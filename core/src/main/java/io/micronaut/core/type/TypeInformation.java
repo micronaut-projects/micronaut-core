@@ -204,4 +204,12 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
             }
         };
     }
+
+    /**
+     * @return Is the type an array.
+     * @since 2.4.0
+     */
+    default boolean isArray() {
+        return getType().isArray();
+    }
 }

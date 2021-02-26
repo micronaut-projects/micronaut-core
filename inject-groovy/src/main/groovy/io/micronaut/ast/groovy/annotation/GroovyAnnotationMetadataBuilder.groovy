@@ -103,6 +103,17 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
+    protected boolean isValidationRequired(AnnotatedNode member) {
+        if (member != null) {
+            def annotations = member.getAnnotations()
+            if (annotations) {
+                return annotations.any { it.classNode.name.startsWith("javax.validation") }
+            }
+        }
+        return false
+    }
+
+    @Override
     protected AnnotatedNode getAnnotationMember(AnnotatedNode originatingElement, CharSequence member) {
         if (originatingElement instanceof ClassNode) {
             def methods = ((ClassNode) originatingElement).getMethods(member.toString())

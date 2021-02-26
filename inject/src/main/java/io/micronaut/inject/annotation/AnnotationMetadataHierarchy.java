@@ -337,7 +337,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@NonNull Class<T> annotationType) {
         return Arrays.stream(hierarchy)
-                .flatMap(am -> am.getDeclaredAnnotationValuesByType(annotationType).stream())
+                .flatMap(am -> am.getAnnotationValuesByType(annotationType).stream())
                 .distinct()
                 .collect(Collectors.toList());
     }

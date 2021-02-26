@@ -102,6 +102,7 @@ public interface BeanDefinitionRegistry {
      */
     @NonNull <T> Optional<BeanRegistration<T>> findBeanRegistration(@NonNull T bean);
 
+
     /**
      * Obtain a {@link BeanDefinition} for the given type.
      *
@@ -176,6 +177,30 @@ public interface BeanDefinitionRegistry {
      * @return The beans
      */
     @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Class<T> beanType);
+
+    /**
+     * Find and if necessary initialize {@link javax.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
+     * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
+     *
+     * @param beanType The bean type
+     * @param qualifier The qualifier
+     * @param <T>      The concrete type
+     * @return The beans
+     * @since 2.4.0
+     */
+    @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Class<T> beanType, @NonNull Qualifier<T> qualifier);
+
+    /**
+     * Find a bean registration for the given bean type and optional qualifier.
+     *
+     * @param beanType The bean type
+     * @param qualifier The qualifier
+     * @param <T>      The concrete type
+     * @return The bean registration
+     * @throws NoSuchBeanException if the bean doesn't exist
+     * @since 2.4.0
+     */
+    @NonNull <T> BeanRegistration<T> getBeanRegistration(@NonNull Class<T> beanType, @NonNull Qualifier<T> qualifier);
 
     /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
