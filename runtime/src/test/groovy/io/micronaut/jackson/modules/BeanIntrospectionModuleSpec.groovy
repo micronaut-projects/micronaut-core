@@ -301,6 +301,21 @@ class BeanIntrospectionModuleSpec extends Specification {
         ctx.close()
     }
 
+    void "test deserializing from a list"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        ListWrapper instance = objectMapper.readValue("[\"bad\"]", ListWrapper)
+
+        then:
+        instance.value == ["bad"]
+
+        cleanup:
+        ctx.close()
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -386,6 +401,16 @@ class BeanIntrospectionModuleSpec extends Specification {
         @ConstructorProperties(["fooBar"])
         NamingStrategy(String fooBar) {
             this.fooBar = fooBar
+        }
+    }
+
+    @Introspected
+    static class ListWrapper {
+        final List<String> value;
+
+        @JsonCreator
+        public ListWrapper(List<String> value) {
+            this.value = value;
         }
     }
 }
