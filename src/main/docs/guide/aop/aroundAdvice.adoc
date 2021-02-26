@@ -10,13 +10,12 @@ snippet::io.micronaut.docs.aop.around.NotNull[tags="imports,annotation", indent=
 <1> The retention policy of the annotation should be `RUNTIME`
 <2> Generally you want to be able to apply advice at the class or method level so the target types are `TYPE` and `METHOD`
 <3> The ann:aop.Around[] annotation is added to tell Micronaut that the annotation is Around advice
-<4> The ann:aop.InterceptorBinding[] annotation is used to indicate that this annotation should trigger AOP advice
 
 The next step to defining Around advice is to implement a api:aop.MethodInterceptor[]. For example the following interceptor disallows parameters with `null` values:
 
 snippet::io.micronaut.docs.aop.around.NotNullInterceptor[tags="imports,interceptor", indent=0, title="MethodInterceptor Example"]
 
-<1> The ann:aop.InterceptorBinding[] annotation is used to indicate what annotation the interceptor is associated with.
+<1> The ann:aop.InterceptorBean[] annotation is used to indicate what annotation the interceptor is associated with. Note that the `javax.inject.Singleton` annotation is optional, and a new interceptor would be created for each instance (prototype scope).
 <2> An interceptor implements the api:aop.MethodInterceptor[] interface.
 <3> The passed link:{api}/io/micronaut/aop/MethodInvocationContext.html[MethodInvocationContext] is used to find the first parameter that is `null`
 <4> If a `null` parameter is found an exception is thrown

@@ -376,6 +376,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private boolean isDeclaredBean(@Nullable MethodElement constructor, boolean hasQualifier) {
             return isExecutableType ||
+                    concreteClassElement.hasDeclaredStereotype(Bean.class) ||
                     concreteClassMetadata.hasStereotype(Scope.class) ||
                     concreteClassMetadata.hasStereotype(DefaultScope.class) ||
                     (constructor != null && constructor.hasStereotype(Inject.class)) || hasQualifier;

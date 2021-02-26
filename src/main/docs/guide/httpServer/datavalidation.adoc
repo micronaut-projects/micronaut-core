@@ -20,7 +20,7 @@ If you want your own `ExceptionHandler` to handle the constraint exceptions, you
 
 Often, you may want to use POJOs as controller method parameters.
 
-snippet::io.micronaut.docs.datavalidation.pogo.Email[]
+snippet::io.micronaut.docs.datavalidation.pogo.Email[tags="clazz", indent=0]
 
 <1> You can use `javax.validation` annotations in your POJOs.
 

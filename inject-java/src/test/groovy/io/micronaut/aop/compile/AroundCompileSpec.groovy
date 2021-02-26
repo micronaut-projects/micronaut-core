@@ -42,8 +42,7 @@ class MyBean {
 @interface TestAnn {
 }
 
-@Singleton
-@InterceptorBinding(TestAnn.class)
+@InterceptorBean(TestAnn.class)
 class TestInterceptor implements Interceptor {
     boolean invoked = false;
     @Override
@@ -92,18 +91,17 @@ class MyBean {
 
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
-@InterceptorBinding
+@Around
 @interface TestAnn {
 }
 
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
-@InterceptorBinding
+@Around
 @interface TestAnn2 {
 }
 
-@Singleton
-@InterceptorBinding(TestAnn.class)
+@InterceptorBean(TestAnn.class)
 class TestInterceptor implements Interceptor {
     boolean invoked = false;
     @Override
@@ -113,8 +111,7 @@ class TestInterceptor implements Interceptor {
     }
 } 
 
-@Singleton
-@InterceptorBinding(TestAnn2.class)
+@InterceptorBean(TestAnn2.class)
 class AnotherInterceptor implements Interceptor {
     boolean invoked = false;
     @Override
@@ -166,12 +163,11 @@ class MyBean {
 
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
-@InterceptorBinding
+@Around
 @interface TestAnn {
 }
 
-@Singleton
-@InterceptorBinding(TestAnn.class)
+@InterceptorBean(TestAnn.class)
 class TestInterceptor implements Interceptor {
     boolean invoked = false;
     @Override
@@ -194,6 +190,63 @@ class AnotherInterceptor implements Interceptor {
         def instance = getBean(context, 'annbinding1.MyBean')
         def interceptor = getBean(context, 'annbinding1.TestInterceptor')
         def anotherInterceptor = getBean(context, 'annbinding1.AnotherInterceptor')
+        instance.test()
+
+        expect:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked
+        !anotherInterceptor.invoked
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test annotation with just around'() {
+        given:
+        ApplicationContext context = buildContext('''
+package justaround;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import javax.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Singleton
+@TestAnn
+class MyBean {
+    void test() {
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn {
+}
+
+@InterceptorBean(TestAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+@Singleton
+class AnotherInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+''')
+        def instance = getBean(context, 'justaround.MyBean')
+        def interceptor = getBean(context, 'justaround.TestInterceptor')
+        def anotherInterceptor = getBean(context, 'justaround.AnotherInterceptor')
         instance.test()
 
         expect:"the interceptor was invoked"
@@ -272,6 +325,201 @@ class MyBean {
         beanDefinition.interceptedType.name == 'test.MyBean'
         ref in AdvisedBeanType
         ref.interceptedType.name == 'test.MyBean'
+    }
+
+    void 'test multiple annotations on a single method'() {
+        given:
+        ApplicationContext context = buildContext('''
+package annbinding2;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import javax.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.simple.*;
+
+@Singleton
+class MyBean {
+    @TestAnn
+    @TestAnn2
+    void test() {
+        
+    }
+    
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn {
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn2 {
+}
+
+@InterceptorBean(TestAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+@InterceptorBean(TestAnn2.class)
+class AnotherInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+''')
+        def instance = getBean(context, 'annbinding2.MyBean')
+        def interceptor = getBean(context, 'annbinding2.TestInterceptor')
+        def anotherInterceptor = getBean(context, 'annbinding2.AnotherInterceptor')
+
+        when:
+        instance.test()
+
+        then:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked
+        anotherInterceptor.invoked
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test multiple annotations on an interceptor and method'() {
+        given:
+        ApplicationContext context = buildContext('''
+package annbinding2;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import javax.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.simple.*;
+
+@Singleton
+class MyBean {
+
+    @TestAnn
+    @TestAnn2
+    void test() {
+        
+    }
+    
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn {
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn2 {
+}
+
+
+@InterceptorBean({ TestAnn.class, TestAnn2.class })
+class TestInterceptor implements Interceptor {
+    long count = 0;
+    @Override
+    public Object intercept(InvocationContext context) {
+        count++;
+        return context.proceed();
+    }
+}
+''')
+        def instance = getBean(context, 'annbinding2.MyBean')
+        def interceptor = getBean(context, 'annbinding2.TestInterceptor')
+
+        when:
+        instance.test()
+
+        then:
+        interceptor.count == 1
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test multiple annotations on an interceptor'() {
+        given:
+        ApplicationContext context = buildContext('''
+package annbinding2;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import javax.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.simple.*;
+
+@Singleton
+class MyBean {
+
+    @TestAnn
+    void test() {
+        
+    }
+    
+    @TestAnn2
+    void test2() {
+        
+    }
+    
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn {
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn2 {
+}
+
+
+@InterceptorBean({ TestAnn.class, TestAnn2.class })
+class TestInterceptor implements Interceptor {
+    long count = 0;
+    @Override
+    public Object intercept(InvocationContext context) {
+        count++;
+        return context.proceed();
+    }
+}
+''')
+        def instance = getBean(context, 'annbinding2.MyBean')
+        def interceptor = getBean(context, 'annbinding2.TestInterceptor')
+
+        when:
+        instance.test()
+
+        then:
+        interceptor.count == 1
+
+        when:
+        instance.test2()
+
+        then:
+        interceptor.count == 2
+
+        cleanup:
+        context.close()
     }
 
     static class NamedTestAnnMapper implements NamedAnnotationMapper {

@@ -39,18 +39,12 @@ jobs:
         run: ./gradlew dependencyUpdates check --parallel --continue
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
-      - name: Publish Test Report
-        if: failure()
-        uses: scacap/action-surefire-report@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          report_paths: '**/build/test-results/test/TEST-*.xml'
-      - name: Publish to JFrog OSS
+      - name: Publish to Sonatype Snapshots
         if: success() && github.event_name == 'push' && matrix.java == '8'
         env:
-          BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
-          BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
-        run: ./gradlew publish docs --no-daemon
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+        run: ./gradlew publishToSonatype docs --no-daemon
       - name: Determine docs target repository
         uses: haya14busa/action-cond@v1
         id: docs_target
@@ -64,6 +58,5 @@ jobs:
         env:
           TARGET_REPOSITORY: ${{ steps.docs_target.outputs.value }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          BASE_BRANCH: ${{ env.githubBranch }}
           BRANCH: gh-pages
           FOLDER: build/docs

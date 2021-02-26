@@ -16,16 +16,14 @@
 package io.micronaut.docs.aop.around
 
 // tag::imports[]
-import io.micronaut.aop.InterceptorBinding
+import io.micronaut.aop.InterceptorBean
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
 import java.util.Objects
-import javax.inject.Singleton
 // end::imports[]
 
 // tag::interceptor[]
-@Singleton
-@InterceptorBinding(NotNull::class) // <1>
+@InterceptorBean(NotNull::class) // <1>
 class NotNullInterceptor : MethodInterceptor<Any, Any> { // <2>
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any {
         val nullParam = context.parameters

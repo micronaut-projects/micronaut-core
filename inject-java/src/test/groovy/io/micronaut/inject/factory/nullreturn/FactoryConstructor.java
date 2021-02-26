@@ -16,7 +16,9 @@
 package io.micronaut.inject.factory.nullreturn;
 
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Requires;
 
+@Requires(property = "spec.name", value = "NullReturnFactorySpec")
 @Factory
 public class FactoryConstructor {
 

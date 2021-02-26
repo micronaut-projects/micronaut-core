@@ -6,7 +6,10 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonUnwrapped
 import com.fasterxml.jackson.annotation.JsonView
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.PropertyNamingStrategy
+import com.fasterxml.jackson.databind.annotation.JsonNaming
 import groovy.transform.EqualsAndHashCode
+import groovy.transform.PackageScope
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.hateoas.JsonError
@@ -20,6 +23,8 @@ import io.micronaut.jackson.modules.wrappers.IntegerWrapper
 import io.micronaut.jackson.modules.wrappers.LongWrapper
 import io.micronaut.jackson.modules.wrappers.StringWrapper
 import spock.lang.Specification
+
+import java.beans.ConstructorProperties
 
 class BeanIntrospectionModuleSpec extends Specification {
 
@@ -281,6 +286,21 @@ class BeanIntrospectionModuleSpec extends Specification {
         ctx.close()
     }
 
+    void "test deserializing with a json naming strategy"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        NamingStrategy instance = objectMapper.readValue("{ \"FooBar\": \"bad\" }", NamingStrategy)
+
+        then:
+        instance.fooBar == "bad"
+
+        cleanup:
+        ctx.close()
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -356,4 +376,16 @@ class BeanIntrospectionModuleSpec extends Specification {
     static class PublicView {}
     static class AllView extends PublicView {}
 
+    @Introspected
+    @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
+    static class NamingStrategy {
+
+        @PackageScope
+        final String fooBar
+
+        @ConstructorProperties(["fooBar"])
+        NamingStrategy(String fooBar) {
+            this.fooBar = fooBar
+        }
+    }
 }

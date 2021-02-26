@@ -391,7 +391,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract String getElementName(T element);
 
     /**
-     * Obtain the annotations for the given type.
+     * Obtain the annotations for the given type. This method
+     * is also responsible for unwrapping repeatable annotations.
+     *
+     * For example, {@code @Parent(value = {@Child, @Child})} should result in the two
+     * child annotations being returned from this method <b>instead</b> of the
+     * parent annotation.
      *
      * @param element The type element
      * @return The annotations
@@ -899,27 +904,50 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 if (v != null) {
                     Optional<T> annotationMirror = getAnnotationMirror(aliasedAnnotationName);
                     RetentionPolicy retentionPolicy = RetentionPolicy.RUNTIME;
+                    String repeatableName = null;
                     if (annotationMirror.isPresent()) {
                         final T annotationTypeMirror = annotationMirror.get();
                         final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(aliasedAnnotationName, annotationTypeMirror);
                         processAnnotationDefaults(originatingElement, metadata, aliasedAnnotationName, defaultValues);
                         retentionPolicy = getRetentionPolicy(annotationTypeMirror);
+                        repeatableName = getRepeatableNameForType(annotationTypeMirror);
                     }
 
                     if (isDeclared) {
-                        metadata.addDeclaredStereotype(
-                                Collections.emptyList(),
-                                aliasedAnnotationName,
-                                Collections.singletonMap(aliasedMemberName, v),
-                                retentionPolicy
-                        );
+                        if (StringUtils.isNotEmpty(repeatableName)) {
+                            metadata.addDeclaredRepeatableStereotype(
+                                    parentAnnotations,
+                                    repeatableName,
+                                    AnnotationValue.builder(aliasedAnnotationName, retentionPolicy)
+                                        .members(Collections.singletonMap(aliasedMemberName, v))
+                                        .build()
+                            );
+                        } else {
+                            metadata.addDeclaredStereotype(
+                                    Collections.emptyList(),
+                                    aliasedAnnotationName,
+                                    Collections.singletonMap(aliasedMemberName, v),
+                                    retentionPolicy
+                            );
+                        }
                     } else {
-                        metadata.addStereotype(
-                                Collections.emptyList(),
-                                aliasedAnnotationName,
-                                Collections.singletonMap(aliasedMemberName, v),
-                                retentionPolicy
-                        );
+                        if (StringUtils.isNotEmpty(repeatableName)) {
+                            metadata.addRepeatableStereotype(
+                                    parentAnnotations,
+                                    repeatableName,
+                                    AnnotationValue.builder(aliasedAnnotationName, retentionPolicy)
+                                            .members(Collections.singletonMap(aliasedMemberName, v))
+                                            .build()
+                            );
+                        } else {
+
+                            metadata.addStereotype(
+                                    Collections.emptyList(),
+                                    aliasedAnnotationName,
+                                    Collections.singletonMap(aliasedMemberName, v),
+                                    retentionPolicy
+                            );
+                        }
                     }
 
                     annotationMirror.ifPresent(annMirror -> processAnnotationStereotype(

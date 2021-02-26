@@ -16,11 +16,13 @@
 package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.net.URL;
 
+@Requires(property = "spec.name", value = "ValidatedGetterConfigurationSpec")
 @ConfigurationProperties("foo.bar")
 public class ValidatedGetterConfig {
 

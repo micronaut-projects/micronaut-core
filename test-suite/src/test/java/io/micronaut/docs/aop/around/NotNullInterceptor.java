@@ -16,20 +16,18 @@
 package io.micronaut.docs.aop.around;
 
 // tag::imports[]
-import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.type.MutableArgumentValue;
 
-import javax.inject.Singleton;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 // end::imports[]
 
 // tag::interceptor[]
-@Singleton
-@InterceptorBinding(NotNull.class) // <1>
+@InterceptorBean(NotNull.class) // <1>
 public class NotNullInterceptor implements MethodInterceptor<Object, Object> { // <2>
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {

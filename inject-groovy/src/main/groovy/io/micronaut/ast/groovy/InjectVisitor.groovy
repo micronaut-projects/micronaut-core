@@ -172,7 +172,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         } else if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean, Scope)) {
             defineBeanDefinition(concreteClass)
         }
-        this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasStereotype(Scope.class) || annotationMetadata.hasStereotype(DefaultScope.class) || concreteClass.declaredConstructors.any {
+        this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasStereotype(Scope.class) || annotationMetadata.hasStereotype(DefaultScope.class) || annotationMetadata.hasDeclaredStereotype(Bean) ||concreteClass.declaredConstructors.any {
             AnnotationMetadata constructorMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, it)
             constructorMetadata.hasStereotype(Inject)
         }

@@ -11,8 +11,7 @@ You start off by defining an annotation that will power the introduction advice.
 snippet::io.micronaut.docs.aop.introduction.Stub[tags="imports,class", indent=0, title="Introduction Advice Annotation Example"]
 
 <1> The introduction advice is annotated with api:aop.Introduction[]
-<2> The api:aop.InterceptorBinding[] annotation is used to refer to the implementor of the advice. In this case `StubIntroduction`
-<3> The api:context.annotation.Bean[] annotation is added so that all types annotated with `@Stub` become beans
+<2> The api:context.annotation.Bean[] annotation is added so that all types annotated with `@Stub` become beans
 
 The `StubIntroduction` class referred to in the previous example must then implement the api:aop.MethodInterceptor[] interface, just like around advice.
 
@@ -20,9 +19,10 @@ The following is an example implementation:
 
 snippet::io.micronaut.docs.aop.introduction.StubIntroduction[tags="imports,class", indent=0, title="StubIntroduction"]
 
-<1> The class is annotated with `@Singleton` and implements the api:aop.MethodInterceptor[] interface
-<2> The value of the `@Stub` annotation is read from the context and an attempt made to convert the value to the return type
-<3> Otherwise `null` is returned
+<1> The api:aop.InterceptorBean[] annotation is used to associate the interceptor with the `@Stub` annotation
+<2> The class is annotated with `@Singleton` and implements the api:aop.MethodInterceptor[] interface
+<3> The value of the `@Stub` annotation is read from the context and an attempt made to convert the value to the return type
+<4> Otherwise `null` is returned
 
 To now use this introduction advice in an application you simply annotate your abstract classes or interfaces with `@Stub`:
 

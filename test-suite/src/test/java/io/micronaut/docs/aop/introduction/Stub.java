@@ -32,8 +32,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 // tag::class[]
 @Introduction // <1>
-@InterceptorBinding(interceptorType = StubIntroduction.class) // <2>
-@Bean // <3>
+@Bean // <2>
 @Documented
 @Retention(RUNTIME)
 @Target({TYPE, ANNOTATION_TYPE, METHOD})

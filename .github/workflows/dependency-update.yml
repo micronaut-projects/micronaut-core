@@ -6,7 +6,7 @@
 name: Update Dependencies
 on:
   schedule:
-    - cron: '0 4 * * MON-FRI'
+    - cron: '0 4 * * SUN'
 jobs:
   dependency-updates:
     runs-on: ubuntu-latest
@@ -36,5 +36,4 @@ jobs:
           title: 'Dependency upgrades'
           body: Upgrades dependencies to their latest versions
           labels: "type: dependency-upgrade"
-          base: ${{ env.githubBranch }}
           branch: dependency-updates
