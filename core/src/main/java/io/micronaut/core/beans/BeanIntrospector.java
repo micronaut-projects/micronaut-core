@@ -95,4 +95,8 @@ public interface BeanIntrospector {
     default @NonNull <T> BeanIntrospection<T> getIntrospection(@NonNull Class<T> beanType) {
         return findIntrospection(beanType).orElseThrow(() -> new IntrospectionException("No bean introspection available for type [" + beanType + "]. Ensure the class is annotated with io.micronaut.core.annotation.Introspected"));
     }
+
+    default void useClassLoader(ClassLoader classLoader) {
+        throw new UnsupportedOperationException("Replacing the classloader is not supported");
+    }
 }
