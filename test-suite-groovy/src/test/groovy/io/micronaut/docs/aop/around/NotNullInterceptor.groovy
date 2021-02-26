@@ -15,9 +15,8 @@
  */
 package io.micronaut.docs.aop.around
 
-import io.micronaut.aop.InterceptorBinding
-
 // tag::imports[]
+import io.micronaut.aop.InterceptorBean
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.core.type.MutableArgumentValue
@@ -27,7 +26,7 @@ import javax.inject.Singleton
 
 // tag::interceptor[]
 @Singleton
-@InterceptorBinding(NotNull) // <1>
+@InterceptorBean(NotNull) // <1>
 class NotNullInterceptor implements MethodInterceptor<Object, Object> { // <2>
     @Override
     Object intercept(MethodInvocationContext<Object, Object> context) {

@@ -19,7 +19,7 @@ The following is an example implementation:
 
 snippet::io.micronaut.docs.aop.introduction.StubIntroduction[tags="imports,class", indent=0, title="StubIntroduction"]
 
-<1> The api:aop.InterceptorBinding[] annotation is used to associate the interceptor with the `@Stub` annotation
+<1> The api:aop.InterceptorBean[] annotation is used to associate the interceptor with the `@Stub` annotation
 <2> The class is annotated with `@Singleton` and implements the api:aop.MethodInterceptor[] interface
 <3> The value of the `@Stub` annotation is read from the context and an attempt made to convert the value to the return type
 <4> Otherwise `null` is returned

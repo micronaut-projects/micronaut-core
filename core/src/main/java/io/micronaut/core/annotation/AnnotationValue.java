@@ -910,6 +910,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     /**
      * Start building a new annotation for the given name.
      *
+     * @param annotationName The annotation name
+     * @param retentionPolicy The retention policy
+     * @param <T>            The annotation type
+     * @return The builder
+     * @since 2.4.0
+     */
+    public static <T extends Annotation> AnnotationValueBuilder<T> builder(String annotationName, RetentionPolicy retentionPolicy) {
+        return new AnnotationValueBuilder<>(annotationName, retentionPolicy);
+    }
+
+    /**
+     * Start building a new annotation for the given name.
+     *
      * @param annotation The annotation name
      * @param <T>        The annotation type
      * @return The builder

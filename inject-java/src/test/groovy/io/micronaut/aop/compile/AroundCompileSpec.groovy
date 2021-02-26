@@ -228,8 +228,8 @@ class MyBean {
 @interface TestAnn {
 }
 
+@InterceptorBean(TestAnn.class)
 @Singleton
-@InterceptorBinding(TestAnn.class)
 class TestInterceptor implements Interceptor {
     boolean invoked = false;
     @Override
