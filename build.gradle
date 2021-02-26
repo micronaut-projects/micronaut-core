@@ -616,7 +616,7 @@ ext {
             'micronaut.kubernetes': [
                     version:micronautKubernetesVersion,
                     group:'io.micronaut.kubernetes',
-                    name:'micronaut-kubernetes-discovery-client'
+                    modules:['micronaut-kubernetes-discovery-client', 'micronaut-kubernetes-client', 'micronaut-kubernetes-client-processor']
             ],
             'micronaut.cache': [
                     version:micronautCacheVersion,
