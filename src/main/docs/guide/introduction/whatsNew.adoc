@@ -24,6 +24,12 @@ A new `micronaut-oraclecloud-atp` has been added that makes it easier to https:/
 
 A new `micronaut-oraclecloud-micrometer` module has been added that adds support for https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/#micrometer[exporting Micrometer metrics to Oracle Cloud].
 
+==== Official Kubernetes Client
+
+With the new `micronaut-kubernetes-client` module you can now inject apis objects from the https://github.com/kubernetes-client/java[official Kubernetes Java SDK] as regular beans.
+
+In Micronaut 3 this new module will be used as primary kubernetes client, making the current one deprecated.
+
 === Module Upgrades
 
 * Micronaut Oracle Cloud `1.1.1` -> `1.2.1`
