@@ -403,8 +403,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     this.currentClassMetadata = typeAnnotationMetadata;
                 }
             }
+            // don't process inner class unless this is the visitor for it
+            final Name qualifiedName = concreteClass.getQualifiedName();
+            boolean isTypeConcreteClass = qualifiedName.equals(classElementQualifiedName);
 
-            if (typeAnnotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
+            if (typeAnnotationMetadata.hasStereotype(INTRODUCTION_TYPE) && isTypeConcreteClass) {
                 AopProxyWriter aopProxyWriter = createIntroductionAdviceWriter(concreteClassElement);
 
                 if (constructorElement != null) {
@@ -431,12 +434,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             } else {
                 Element enclosingElement = classElement.getEnclosingElement();
-                // don't process inner class unless this is the visitor for it
-                final Name qualifiedName = concreteClass.getQualifiedName();
-                if (!JavaModelUtils.isClass(enclosingElement) ||
-                        qualifiedName.equals(classElementQualifiedName)) {
-
-                    if (qualifiedName.equals(classElementQualifiedName)) {
+                if (!JavaModelUtils.isClass(enclosingElement) || isTypeConcreteClass) {
+                    if (isTypeConcreteClass) {
                         if (isDeclaredBean) {
                             // we know this class has supported annotations so we need a beandef writer for it
                             PackageElement packageElement = elementUtils.getPackageOf(classElement);
