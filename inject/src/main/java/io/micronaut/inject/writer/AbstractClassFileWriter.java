@@ -554,7 +554,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             } else {
                 String internalName = type.getType().getName().replace('.', '/');
                 if (internalName.isEmpty()) {
-                    return Type.getObjectType("java/lang/Object");
+                    return Type.getType(Object.class);
                 }
                 if (type.isArray()) {
                     StringBuilder name = new StringBuilder(internalName);
