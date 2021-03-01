@@ -29,6 +29,7 @@ dependencies {
     testImplementation 'io.micronaut.xml:micronaut-jackson-xml:2.2.1', {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-http'
+        exclude group: 'com.fasterxml.jackson.core'
     }
 
     // following 3 dependencies needed for Http2PostTest
