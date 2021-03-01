@@ -1,4 +1,4 @@
-Endpoints respond to `GET` ("read"), `POST` ("write") and `DELETE` ("delete") requests. To return a response from an endpoint, annotate its public method/s with one of following annotations:
+Endpoints respond to `GET` ("read"), `POST` ("write") and `DELETE` ("delete") requests. To return a response from an endpoint, annotate its public method(s) with one of the following annotations:
 
 .Endpoint Method Annotations
 |===
@@ -17,7 +17,7 @@ Endpoints respond to `GET` ("read"), `POST` ("write") and `DELETE` ("delete") re
 
 == Read Methods
 
-Annotating a method with the api:management.endpoint.annotation.Read[] annotation will cause it to respond to `GET` requests.
+Annotating a method with the api:management.endpoint.annotation.Read[] annotation causes it to respond to `GET` requests.
 
 snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, readImport, endpointClassBegin, currentDate, simpleRead, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
@@ -45,10 +45,9 @@ $ curl -X GET localhost:8080/date/the_date_is
 the_date_is: Fri May 11 19:24:21 CDT
 ----
 
-
 == Write Methods
 
-Annotating a method with the api:management.endpoint.Write[] annotation will cause it to respond to `POST` requests.
+Annotating a method with the api:management.endpoint.Write[] annotation causes it to respond to `POST` requests.
 
 snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, writeImport, mediaTypeImport, endpointClassBegin, currentDate, simpleWrite, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
@@ -74,10 +73,9 @@ $ curl -X POST http://localhost:65013/message -H 'Content-Type: application/x-ww
 Message updated
 ----
 
-
 == Delete Methods
 
-Annotating a method with the api:management.endpoint.Delete[] annotation will cause it to respond to `DELETE` requests.
+Annotating a method with the api:management.endpoint.Delete[] annotation causes it to respond to `DELETE` requests.
 
 snippet::io.micronaut.docs.server.endpoint.MessageEndpoint[tags="endpointImport, deleteImport, endpointClassBegin, message, simpleDelete, endpointClassEnd", indent=0, title="MessageEndpoint"]
 

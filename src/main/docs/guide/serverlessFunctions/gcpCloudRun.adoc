@@ -14,21 +14,21 @@ $ unzip example.zip -d example
 ----
 ====
 
-With JIB setup to deploy your application to Google Container Registry you can simple run:
+With JIB setup to deploy your application to Google Container Registry, run:
 
 [source, bash]
 ----
 $ ./gradlew jib
 ----
 
-You are now ready to deploy your application :
+You are now ready to deploy your application:
 
 [source, bash]
 ----
 $ gcloud run deploy --image gcr.io/[PROJECT ID]/example --platform=managed --allow-unauthenticated
 ----
 
-Where `[PROJECT ID]` is replaced for your project ID. You should be asked to specify a region and see output like the following:
+Where `[PROJECT ID]` is your project ID. You will be asked to specify a region and will see output like the following:
 
 [source]
 ----
