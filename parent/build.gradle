@@ -17,6 +17,7 @@ ext.extraPomInfo = {
         'maven.compiler.parameters'('true')
         'project.build.sourceEncoding'('UTF-8')
         'project.reporting.outputEncoding'('UTF-8')
+        'exec.executable'('java')
 
         "micronaut.version"(projectVersion)
         'micronaut-maven-plugin.version'(micronautMavenPluginVersion)
@@ -125,7 +126,6 @@ ext.extraPomInfo = {
                     artifactId "exec-maven-plugin"
                     delegate.version '${exec-maven-plugin.version}'
                     delegate.configuration {
-                        executable("java")
                         arguments {
                             argument("-classpath")
                             classpath()
