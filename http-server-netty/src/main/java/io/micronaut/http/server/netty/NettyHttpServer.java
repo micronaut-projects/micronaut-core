@@ -520,10 +520,15 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         try {
             if (shutdownParent) {
                 EventLoopGroupConfiguration parent = serverConfiguration.getParent();
-                long quietPeriod = parent.getShutdownQuietPeriod().toMillis();
-                long timeout = parent.getShutdownTimeout().toMillis();
-                parentGroup.shutdownGracefully(quietPeriod, timeout, TimeUnit.MILLISECONDS)
+                if (parent != null) {
+                    long quietPeriod = parent.getShutdownQuietPeriod().toMillis();
+                    long timeout = parent.getShutdownTimeout().toMillis();
+                    parentGroup.shutdownGracefully(quietPeriod, timeout, TimeUnit.MILLISECONDS)
                         .addListener(this::logShutdownErrorIfNecessary);
+                } else {
+                    parentGroup.shutdownGracefully()
+                            .addListener(this::logShutdownErrorIfNecessary);
+                }
             }
             if (shutdownWorker) {
                 workerGroup.shutdownGracefully()
