@@ -8,9 +8,9 @@ The following example serves to illustrate this:
 
 snippet::io.micronaut.docs.annotation.headers.PetClient[tags="class", indent=0, title="Defining Headers via Configuration"]
 
-The above example defines a ann:http.annotation.Header[] annotation on the `PetClient` interface that reads a property using property placeholder configuration called `pet.client.id`.
+The above example defines a ann:http.annotation.Header[] annotation on the `PetClient` interface that reads the `pet.client.id` property using property placeholder configuration.
 
-In your application configuration you then set the following in `application.yml` to populate the value:
+Then set the following in `application.yml` to populate the value:
 
 .Configuring Headers in YAML
 [source,yaml]
@@ -22,8 +22,8 @@ pet:
 
 Alternatively you can supply a `PET_CLIENT_ID` environment variable and the value will be populated.
 
-== Populating Headers using an Client Filter
+== Populating Headers using a Client Filter
 
-Alternatively if you need the ability to dynamically populate headers an alternative is to use a <<clientFilter, Client Filter>>.
+Alternatively, to dynamically populate headers, another option is to use a <<clientFilter, Client Filter>>.
 
 For more information on writing client filters see the <<clientFilter, Client Filters>> section of the guide.

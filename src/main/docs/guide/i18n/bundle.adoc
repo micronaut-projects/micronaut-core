@@ -18,4 +18,4 @@ You can use api:context.i18n.ResourceBundleMessageSource[], an implementation of
 
 snippet::io.micronaut.docs.i18n.I18nSpec[tags="test",indent=0,title="ResourceBundleMessageSource Example"]
 
-WARNING: You should not instantiate a new `ResourceBundleMessageSource` each time you retrieve a message. Instantiate it once, maybe in a `javax.inject.Singleton`, and reuse it.
+WARNING: Do not instantiate a new `ResourceBundleMessageSource` each time you retrieve a message. Instantiate it once, for example in a `javax.inject.Singleton`, and reuse it.

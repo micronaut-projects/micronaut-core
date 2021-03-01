@@ -1,11 +1,10 @@
 When operating Microservices in production it can be challenging to troubleshoot interactions between Microservices in a distributed architecture.
 
-To solve this problem a way to visualize interactions between Microservices in a distributed manner can be critical. Currently, there are various distributed tracing solutions, the most popular of which are https://zipkin.io[Zipkin] and https://www.jaegertracing.io/[Jaeger] both of which provide different levels of support for the http://opentracing.io[Open Tracing] API.
+To solve this problem, a way to visualize interactions between Microservices in a distributed manner can be critical. Currently there are various distributed tracing solutions, the most popular of which are https://zipkin.io[Zipkin] and https://www.jaegertracing.io/[Jaeger], both of which provide different levels of support for the http://opentracing.io[Open Tracing] API.
 
 Micronaut features integration with both Zipkin and Jaeger (via the Open Tracing API).
 
-
-To enable tracing you should add the `tracing` module to your `build.gradle` or `pom.xml` file:
+To enable tracing, add the `tracing` module to your build:
 
 dependency:micronaut-tracing[]
 
@@ -15,9 +14,9 @@ The pkg:tracing.annotation[] package contains annotations that can be declared o
 
 The available annotations are:
 
-* The ann:tracing.annotation.NewSpan[] annotation will create a new span, wrapping the method call or reactive type.
-* The ann:tracing.annotation.ContinueSpan[] annotation will continue an existing span, wrapping the method call or reactive type.
-* The ann:tracing.annotation.SpanTag[] annotation can be used on method arguments to include the value of each argument within a Span's tags. When you use `@SpanTag` on a method argument, you need either to annotate the method with `@NewSpan` or `@ContinueSpan`.
+* The ann:tracing.annotation.NewSpan[] annotation creates a new span, wrapping the method call or reactive type.
+* The ann:tracing.annotation.ContinueSpan[] annotation continues an existing span, wrapping the method call or reactive type.
+* The ann:tracing.annotation.SpanTag[] annotation can be used on method arguments to include the value of the argument within a Span's tags. When you use `@SpanTag` on an argument, you need either to annotate the method with `@NewSpan` or `@ContinueSpan`.
 
 The following snippet presents an example of using the annotations:
 
@@ -39,10 +38,9 @@ class HelloService {
 }
 ----
 
-
-<1> The ann:tracing.annotation.NewSpan[] annotation is used to start a new span
-<2> You can use ann:tracing.annotation.SpanTag[] to include arguments of methods as tags for the span
-<3> The ann:tracing.annotation.ContinueSpan[] annotation can be used to continue as existing span and incorporate additional tags using `@SpanTag`
+<1> The ann:tracing.annotation.NewSpan[] annotation starts a new span
+<2> Use ann:tracing.annotation.SpanTag[] to include method arguments as tags for the span
+<3> Use the ann:tracing.annotation.ContinueSpan[] annotation to continue an existing span and incorporate additional tags using `@SpanTag`
 
 === Tracing Instrumentation
 
@@ -52,6 +50,6 @@ These instrumentations are found in the pkg:tracing.instrument[] package and inc
 
 == Tracing Beans
 
-If the Tracing annotations and existing instrumentations are not enough, Micronaut's tracing integration registers a `io.opentracing.Tracer` bean that can be injected into any class and exposes the Open Tracing API.
+If the Tracing annotations and existing instrumentations are not sufficient, Micronaut's tracing integration registers a `io.opentracing.Tracer` bean which exposes the Open Tracing API and can be dependency-injected as needed.
 
-Depending on the implementation you choose there are also additional beans. For example for Zipkin `brave.Tracing` and `brave.SpanCustomizer` beans are available too.
+Depending on the implementation you choose, there are also additional beans. For example for Zipkin `brave.Tracing` and `brave.SpanCustomizer` beans are available too.

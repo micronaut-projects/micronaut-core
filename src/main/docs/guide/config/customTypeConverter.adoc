@@ -1,4 +1,4 @@
-Micronaut features a built in type conversion mechanism that is extensible. To add additional type converters you register beans of type api:core.convert.TypeConverter[].
+Micronaut includes an extensible type conversion mechanism. To add additional type converters you register beans of type api:core.convert.TypeConverter[].
 
 The following example shows how to use one of the built-in converters (Map to an Object) or create your own.
 
@@ -6,21 +6,18 @@ Consider the following api:context.annotation.ConfigurationProperties[]:
 
 snippet::io.micronaut.docs.config.converters.MyConfigurationProperties[tags="class", indent=0]
 
-The type `MyConfigurationProperties` features a property called `updatedAt` which is of type jdk:java.time.LocalDate[].
+The type `MyConfigurationProperties` has a property named `updatedAt` of type jdk:java.time.LocalDate[].
 
-Now let's say you want to allow binding to this property from a map via configuration:
+To bind this property from a map via configuration:
 
 snippet::io.micronaut.docs.config.converters.MyConfigurationPropertiesSpec[tags="runContext", indent=0]
 
 <1> Note how we match the `myapp` prefix and `updatedAt` property name in our `MyConfigurationProperties` class above
 
-This won't work by default, since there is no built in conversion from `Map` to `LocalDate`. To resolve this you can define a custom api:core.convert.TypeConverter[]:
+This won't work by default, since there is no built-in conversion from `Map` to `LocalDate`. To resolve this, define a custom api:core.convert.TypeConverter[]:
 
 snippet::io.micronaut.docs.config.converters.MapToLocalDateConverter[tags="imports,class", indent=0]
 
-<1> The class implements api:core.convert.TypeConverter[] which takes two generic arguments. The type you are converting from and the type you are converting to
-<2> The implementation delegate to the default shared conversion service to convert the parts of the map that make the day, month and year into a `LocalDate`
-<3> If an exception occurs you can call `reject(..)` which propagates additional information to the container if something goes wrong during binding
-
-
-
+<1> The class implements api:core.convert.TypeConverter[] which has two generic arguments, the type you are converting from, and the type you are converting to
+<2> The implementation delegates to the default shared conversion service to convert the values from the Map used to create a `LocalDate`
+<3> If an exception occurs during binding, call `reject(..)` which propagates additional information to the container

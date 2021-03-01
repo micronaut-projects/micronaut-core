@@ -1,6 +1,6 @@
 === Global Configuration for All Clients
 
-The default HTTP client configuration is a <<configurationProperties, Configuration Properties>> called api:http.client.DefaultHttpClientConfiguration[] that allows configuring the default behaviour for all HTTP clients. For example, in `application.yml`:
+The default HTTP client configuration is a <<configurationProperties, Configuration Properties>> named api:http.client.DefaultHttpClientConfiguration[] that allows configuring the default behaviour for all HTTP clients. For example, in `application.yml`:
 
 .Altering default HTTP client configuration
 [source,yaml]
@@ -11,11 +11,11 @@ micronaut:
       read-timeout: 5s
 ----
 
-The above example sets of `readTimeout` property of the api:http.client.HttpClientConfiguration[] class.
+The above example sets the `readTimeout` property of the api:http.client.HttpClientConfiguration[] class.
 
 === Client Specific Configuration
 
-If you wish to have a separate configuration per client then there a couple of options. You can configure <<serviceDiscoveryManual, Service Discovery>> manually in `application.yml` and apply per-client configuration:
+To have separate configuration per-client, there are a couple of options. You can configure <<serviceDiscoveryManual, Service Discovery>> manually in `application.yml` and apply per-client configuration:
 
 .Manually configuring HTTP services
 [source,yaml]
@@ -32,9 +32,9 @@ micronaut:
 
 <1> The read timeout is applied to the `foo` client.
 
-WARN: This client configuration can be used in conjunction with the `@Client` annotation, either by injecting an `HttpClient` directly or use on a client interface. In any case, all other attributes on the annotation *will be ignored* other than the service id.
+WARN: This client configuration can be used in conjunction with the `@Client` annotation, either by injecting an `HttpClient` directly or use on a client interface. In any case, all other attributes on the annotation *will be ignored* except the service id.
 
-Then simply inject the named client configuration:
+Then, inject the named client configuration:
 
 .Injecting an HTTP client
 [source,java]
@@ -42,7 +42,7 @@ Then simply inject the named client configuration:
 @Client("foo") @Inject RxHttpClient httpClient;
 ----
 
-You can also simply define a bean that extends from api:http.client.HttpClientConfiguration[] and ensuring that the `javax.inject.Named` annotation is used to name it appropriately:
+You can also define a bean that extends from api:http.client.HttpClientConfiguration[] and ensure that the `javax.inject.Named` annotation names it appropriately:
 
 .Defining an HTTP client configuration bean
 [source,java]
@@ -56,7 +56,7 @@ class TwitterHttpClientConfiguration extends HttpClientConfiguration {
 }
 ----
 
-This configuration will then be picked up if you inject a service called `twitter` using `@Client` using <<serviceDiscovery, Service Discovery>>:
+This configuration will be picked up if you inject a service named `twitter` with `@Client` using <<serviceDiscovery, Service Discovery>>:
 
 .Injecting an HTTP client
 [source,java]
@@ -64,7 +64,7 @@ This configuration will then be picked up if you inject a service called `twitte
 @Client("twitter") @Inject RxHttpClient httpClient;
 ----
 
-Alternatively if you are not using service discovery then you can use the `configuration` member of `@Client` to refer to a specific type:
+Alternatively, if you don't use service discovery you can use the `configuration` member of `@Client` to refer to a specific type:
 
 .Injecting an HTTP client
 [source,java]
@@ -77,7 +77,7 @@ RxHttpClient httpClient;
 
 === Using HTTP Client Connection Pooling
 
-If you have a client that needs to handle a significant number of requests then you can benefit from enabling HTTP client connection pooling. The following configuration will enable pooling for the `foo` client:
+A client that handles a significant number of requests will benefit from enabling HTTP client connection pooling. The following configuration enables pooling for the `foo` client:
 
 .Manually configuring HTTP services
 [source,yaml]
@@ -97,13 +97,13 @@ micronaut:
 <1> Enables the pool
 <2> Sets the maximum number of connections in the pool
 
-See the API for link:{api}/io/micronaut/http/client/HttpClientConfiguration.ConnectionPoolConfiguration.html[ConnectionPoolConfiguration] for details on available options to configure the pool.
+See the API for link:{api}/io/micronaut/http/client/HttpClientConfiguration.ConnectionPoolConfiguration.html[ConnectionPoolConfiguration] for details on available pool configuration options.
 
 === Configuring Event Loop Groups
 
-By default Micronaut will share a common Netty `EventLoopGroup` for worker threads and all HTTP clients threads.
+By default, Micronaut shares a common Netty `EventLoopGroup` for worker threads and all HTTP client threads.
 
-This common `EventLoopGroup` can be configured via the `micronaut.netty.event-loops.default` property:
+This `EventLoopGroup` can be configured via the `micronaut.netty.event-loops.default` property:
 
 .Configuring The Default Event Loop
 [source,yaml]
@@ -120,9 +120,9 @@ You can also use the `micronaut.netty.event-loops` setting to configure one or m
 
 include::{includedir}configurationProperties/io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration.adoc[]
 
-For example, if your interactions with an HTTP client involve CPU intensive work it may be worthwhile configuring a separate `EventLoopGroup` for one or all clients.
+For example, if your interactions with an HTTP client involve CPU-intensive work, it may be worthwhile configuring a separate `EventLoopGroup` for one or all clients.
 
-The following example configures an additional event loop group called "other" that uses 10 threads:
+The following example configures an additional event loop group called "other" with 10 threads:
 
 .Configuring Additional Event Loops
 [source,yaml]
@@ -135,7 +135,7 @@ micronaut:
         prefer-native-transport: true
 ----
 
-Once an additional event loop has been configured you can alter the HTTP client configuration to use the newly defined event loop group:
+Once an additional event loop has been configured you can alter the HTTP client configuration to use it:
 
 .Altering the Event Loop Group used by Clients
 [source,yaml]

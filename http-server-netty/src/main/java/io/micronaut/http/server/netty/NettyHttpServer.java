@@ -97,6 +97,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
@@ -439,8 +440,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         String configName = workerConfig != null ? workerConfig.getName() : EventLoopGroupConfiguration.DEFAULT;
         return eventLoopGroupRegistry.getEventLoopGroup(configName)
                 .orElseGet(() -> {
-                    LOG.warn("The configuration for 'micronaut.server.netty.worker.event-loop-groups.{}' is deprecated. " +
-                        "Use 'micronaut.netty.event-loops' configuration instead.", configName);
+                    LOG.warn("The configuration for 'micronaut.server.netty.worker.{}' is deprecated. " +
+                        "Use 'micronaut.netty.event-loops.default' configuration instead.", configName);
                     final EventLoopGroup newGroup = newEventLoopGroup(workerConfig);
                     shutdownWorker = true;
                     return newGroup;
@@ -518,8 +519,16 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private void stopInternal() {
         try {
             if (shutdownParent) {
-                parentGroup.shutdownGracefully()
+                EventLoopGroupConfiguration parent = serverConfiguration.getParent();
+                if (parent != null) {
+                    long quietPeriod = parent.getShutdownQuietPeriod().toMillis();
+                    long timeout = parent.getShutdownTimeout().toMillis();
+                    parentGroup.shutdownGracefully(quietPeriod, timeout, TimeUnit.MILLISECONDS)
                         .addListener(this::logShutdownErrorIfNecessary);
+                } else {
+                    parentGroup.shutdownGracefully()
+                            .addListener(this::logShutdownErrorIfNecessary);
+                }
             }
             if (shutdownWorker) {
                 workerGroup.shutdownGracefully()

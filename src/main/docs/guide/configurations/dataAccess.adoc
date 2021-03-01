@@ -1,20 +1,20 @@
-The table summarizes the configuration modules and the dependencies you should add to your build to enable them.
+This table summarizes the configuration modules and dependencies to add to your build to enable them:
 
 .Data Access Configuration Modules
 |===
 |Dependency|Description
 
 |`io.micronaut.sql:micronaut-jdbc-dbcp`
-|Configures SQL jdk:javax.sql.DataSource[] instances using https://commons.apache.org/proper/commons-dbcp/[Commons DBCP]
+|Configures SQL jdk:javax.sql.DataSource[]s using https://commons.apache.org/proper/commons-dbcp/[Commons DBCP]
 
 |`io.micronaut.sql:micronaut-jdbc-hikari`
-|Configures SQL jdk:javax.sql.DataSource[] instances using https://brettwooldridge.github.io/HikariCP/[Hikari Connection Pool]
+|Configures SQL jdk:javax.sql.DataSource[]s using https://brettwooldridge.github.io/HikariCP/[Hikari Connection Pool]
 
 |`io.micronaut.sql:micronaut-jdbc-tomcat`
-|Configures SQL jdk:javax.sql.DataSource[] instances using https://tomcat.apache.org/tomcat-7.0-doc/jdbc-pool.html[Tomcat Connection Pool]
+|Configures SQL jdk:javax.sql.DataSource[]s using https://tomcat.apache.org/tomcat-7.0-doc/jdbc-pool.html[Tomcat Connection Pool]
 
 |`io.micronaut.sql:micronaut-hibernate-jpa`
-|Configures Hibernate/JPA EntityManagerFactory beans
+|Configures Hibernate/JPA `EntityManagerFactory` beans
 
 |`io.micronaut.groovy:micronaut-hibernate-gorm`
 |Configures http://gorm.grails.org/latest/hibernate/manual[GORM for Hibernate] for Groovy applications
@@ -45,7 +45,7 @@ The table summarizes the configuration modules and the dependencies you should a
 
 |===
 
-For example, to add support for MongoDB you define the following dependency:
+For example, to add support for MongoDB, add the following dependency:
 
 .build.gradle
 [source,groovy]
@@ -55,6 +55,6 @@ compile "io.micronaut.mongodb:micronaut-mongo-reactive"
 
 For Groovy users, Micronaut provides special support for http://gorm.grails.org[GORM].
 
-WARNING: For GORM for Hibernate you should not have both the `hibernate-jpa` and `hibernate-gorm` dependency.
+WARNING: With GORM for Hibernate you cannot have both the `hibernate-jpa` and `hibernate-gorm` dependencies.
 
 The following sections go into more detail about configuration options and the exposed beans for each implementation.

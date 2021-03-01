@@ -1,5 +1,5 @@
-Service Discovery enables the ability for Microservices to find each other without necessarily knowing the physical location or IP address of associated services.
+Service Discovery enables Microservices to find each other without knowing the physical location or IP address of associated services.
 
-Micronaut provides integration with different tools and libraries. Check
+Micronaut integrates with multiple tools and libraries. See
 https://micronaut-projects.github.io/micronaut-discovery-client/latest/guide/[Micronaut Service Discovery documentation]
 for more details.

@@ -425,7 +425,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         } else {
                             type = gt.getType();
                         }
-                        AnnotationMetadata annotationMetadata = resolveAnnotationMetadata(cn);
+                        AnnotationMetadata annotationMetadata = resolveAnnotationMetadata(type);
                         typeArgumentMap.put(redirectType.getName(), new GroovyClassElement(
                                 visitorContext,
                                 type,
