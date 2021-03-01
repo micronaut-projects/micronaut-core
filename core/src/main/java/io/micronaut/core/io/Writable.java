@@ -48,7 +48,7 @@ public interface Writable extends Streamable {
      */
     @Override
     default void writeTo(OutputStream outputStream) throws IOException {
-        writeTo(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+        writeTo(outputStream, null);
     }
 
     /**
