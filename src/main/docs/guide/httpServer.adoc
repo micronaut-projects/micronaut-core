@@ -1,14 +1,14 @@
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI's `create-app` command, the `http-server` dependency is included by default.
+If you create your project using the Micronaut CLI `create-app` command, the `http-server` dependency is included by default.
 ====
 
 Micronaut includes both non-blocking HTTP server and client APIs based on https://netty.io[Netty].
 
 The design of the HTTP server in Micronaut is optimized for interchanging messages between Microservices, typically in JSON, and is not intended as a full server-side MVC framework. For example, there is currently no support for server-side views or features typical of a traditional server-side MVC framework.
 
-The goal of the HTTP server is to make it as easy as possible to expose APIs that can be consumed by HTTP clients, whatever language they may be written in. To use the HTTP server you must have the `http-server-netty` dependency on your classpath.
+The goal of the HTTP server is to make it as easy as possible to expose APIs to be consumed by HTTP clients, regardless of the language they are written in. To use the HTTP server you need the `http-server-netty` dependency in your build:
 
 dependency:micronaut-http-server-netty[]
 
@@ -17,7 +17,5 @@ A "Hello World" server application can be seen below:
 snippet::io.micronaut.docs.server.intro.HelloController[tags="imports,class"]
 
 <1> The class is defined as a controller with the link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotation mapped to the path `/hello`
-<2> The method will respond to a GET request to `/hello` and returns a response with a `text/plain` content type
-<3> By defining method called `index`, by convention the method is exposed via the `/hello` URI
-
-
+<2> The method responds to a GET requests to `/hello` and returns a response with a `text/plain` content type
+<3> By defining a method named `index`, by convention the method is exposed via the `/hello` URI

@@ -22,11 +22,11 @@ From 2.4.x onwards the recommending way to define AOP advise is to use the ann:a
 
 snippet::io.micronaut.docs.aop.around.NotNull[tags="imports,annotation", indent=0, title="Around Advice Annotation Example"]
 
-Then use ann:aop.InterceptorBinding[] again on the api:aop.MethodInterceptor[] you wish to bind to the above advise:
+Then use ann:aop.InterceptorBean[] on the api:aop.MethodInterceptor[] you wish to bind to the above advise:
 
 snippet::io.micronaut.docs.aop.around.NotNullInterceptor[tags="imports,interceptor", indent=0, title="MethodInterceptor Example"]
 
-Multiple api:aop.MethodInterceptor[] types can bind to a single advise annotation.
+Multiple api:aop.MethodInterceptor[] types can bind to a single advise annotation and any given interceptor can bind to multiple annotations.
 
 === Cloud Features
 

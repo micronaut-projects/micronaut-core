@@ -392,6 +392,16 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
 
                     @Override
+                    public boolean canCreateUsingArrayDelegate() {
+                        return constructorArguments.length == 1 && constructorArguments[0].isContainerType();
+                    }
+
+                    @Override
+                    public JavaType getArrayDelegateType(DeserializationConfig config) {
+                        return newType(constructorArguments[0], typeFactory);
+                    }
+
+                    @Override
                     public boolean canCreateFromString() {
                         return constructorArguments.length == 1 && constructorArguments[0].equalsType(Argument.STRING);
                     }
@@ -429,6 +439,11 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
 
                     @Override
+                    public Object createUsingArrayDelegate(DeserializationContext ctxt, Object delegate) throws IOException {
+                        return introspection.instantiate(false, new Object[] { delegate });
+                    }
+
+                    @Override
                     public Object createFromString(DeserializationContext ctxt, String value) throws IOException {
                         return introspection.instantiate(false, new Object[]{ value });
                     }
@@ -462,6 +477,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                     public Object createFromBoolean(DeserializationContext ctxt, boolean value) throws IOException {
                         return introspection.instantiate(false, new Object[]{ value });
                     }
+
+
                 });
                 return builder;
             }

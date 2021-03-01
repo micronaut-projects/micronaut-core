@@ -1,1 +1,1 @@
-See the link:https://micronaut-projects.github.io/micronaut-multitenancy/latest/guide[Micronaut Multitenancy's documentation] to discover Micronaut's support for common tasks such as tenant resolution for multi-tenancy aware Micronaut applications.
+See the link:https://micronaut-projects.github.io/micronaut-multitenancy/latest/guide[Micronaut Multitenancy documentation] to learn about Micronaut's support for common tasks such as tenant resolution for multi-tenancy-aware Micronaut applications.

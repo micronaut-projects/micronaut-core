@@ -1,26 +1,26 @@
 The Micronaut HTTP server supports emitting https://en.wikipedia.org/wiki/Server-sent_events[Server Sent Events (SSE)] using the api:http.sse.Event[] API.
 
-To emit events from the server you simply return a Reactive Streams rs:Publisher[] that emits objects of type api:http.sse.Event[].
+To emit events from the server, return a Reactive Streams rs:Publisher[] that emits objects of type api:http.sse.Event[].
 
-The rs:Publisher[] itself could publish events from a background task, via an event system or whatever.
+The rs:Publisher[] itself could publish events from a background task, via an event system, etc.
 
-Imagine for an example a event stream of news headlines, you may define a data class as follows:
+Imagine for an example a event stream of news headlines; you may define a data class as follows:
 
 snippet::io.micronaut.docs.server.sse.Headline[tags="class", indent=0,title="Headline"]
 
-To emit news headline events you can write a controller that returns a rs:Publisher[] of api:http.sse.Event[] instances using which ever Reactive library you prefer. The example below uses RxJava 2's rx:Flowable[] via the `generate` method:
+To emit news headline events, write a controller that returns a rs:Publisher[] of api:http.sse.Event[] instances using whichever Reactive library you prefer. The example below uses RxJava 2's rx:Flowable[] via the `generate` method:
 
 snippet::io.micronaut.docs.server.sse.HeadlineController[tags="imports,class", indent=0,title="Publishing Server Sent Events from a Controller"]
 
 <1> The controller method returns a rs:Publisher[] of api:http.sse.Event[]
-<2> For each version of Micronaut a headline is emitted
-<3> The rx:Flowable[] type's `generate` method is used to generate a rs:Publisher[]. The `generate` method accepts an initial value and a lambda that accepts the value and a rx:Emitter[].  Note that this example executes on the same thread as the controller action, but you could use `subscribeOn` or map and existing "hot" rx:Flowable[].
-<4> The rx:Emitter[] interface's `onNext` method is used to emit objects of type api:http.sse.Event[]. The api:http.sse.Event.of(ET)[] factory method is used to construct the event.
-<5> The rx:Emitter[] interface's `onComplete` method is used to indicate when to finish sending server sent events.
+<2> A headline is emitted for each version of Micronaut
+<3> The rx:Flowable[] type's `generate` method generates a rs:Publisher[]. The `generate` method accepts an initial value and a lambda that accepts the value and a rx:Emitter[]. Note that this example executes on the same thread as the controller action, but you could use `subscribeOn` or map an existing "hot" rx:Flowable[].
+<4> The rx:Emitter[] interface `onNext` method emits objects of type api:http.sse.Event[]. The api:http.sse.Event.of(ET)[] factory method constructs the event.
+<5> The rx:Emitter[] interface `onComplete` method indicates when to finish sending server sent events.
 
 NOTE: You typically want to schedule SSE event streams on a separate executor. The previous example uses ann:scheduling.annotation.ExecuteOn[] to execute the stream on the I/O executor.
 
-The above example will send back a response of type `text/event-stream` and for each  api:http.sse.Event[] emitted the `Headline` type previously will be converted to JSON resulting in responses such as:
+The above example sends back a response of type `text/event-stream` and for each api:http.sse.Event[] emitted the `Headline` type previously will be converted to JSON resulting in responses such as:
 
 .Server Sent Event Response Output
 [source,json]
@@ -29,4 +29,4 @@ The above example will send back a response of type `text/event-stream` and for 
  data: {"title":"Micronaut 2.0 Released","description":"Come and get it"}
 ----
 
-You can use the methods of the api:http.sse.Event[] interface to customize the Server Sent Event data sent back including associating event ids, comments, retry timeouts etc.
+You can use the methods of the api:http.sse.Event[] interface to customize the Server Sent Event data sent back, including associating event ids, comments, retry timeouts, etc.

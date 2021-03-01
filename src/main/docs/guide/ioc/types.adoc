@@ -1,16 +1,15 @@
-In addition to being able to inject beans Micronaut natively supports injecting the following types:
-
+In addition to being able to inject beans, Micronaut natively supports injecting the following types:
 
 .Injectable Container Types
 |===
 |Type |Description |Example
 
 |link:{jdkapi}/java/util/Optional.html[java.util.Optional]
-|An `Optional` of a bean. If the bean doesn't exist `empty()` is injected
+|An `Optional` of a bean. `empty()` is injected if the bean doesn't exist
 |`Optional<Engine>`
 
 |link:{jdkapi}/java/lang/Iterable.html[java.lang.Iterable]
-|An `Iterable` or subtype of `Iterable` (example `List`, `Collection` etc.)
+|An `Iterable` or subtype of `Iterable` (e.g. `List`, `Collection`, etc.)
 |`Iterable<Engine>`
 
 |link:{jdkapi}/java/util/stream/Stream.html[java.util.stream.Stream]
@@ -22,7 +21,7 @@ In addition to being able to inject beans Micronaut natively supports injecting 
 |`Engine[]`
 
 |link:{jeeapi}/javax/inject/Provider.html[Provider]
-|A `javax.inject.Provider` if a circular dependency requires it or to instantiate a prototype for each `get` call.
+|A `javax.inject.Provider` if a circular dependency requires it, or to instantiate a prototype for each `get` call.
 |`Provider<Engine>`
 
 |link:{jakartaapi}/jakarta/inject/Provider.html[Provider]
@@ -37,14 +36,14 @@ In addition to being able to inject beans Micronaut natively supports injecting 
 
 NOTE: There are 3 different provider types supported, however the `BeanProvider` is the one we suggest to use.
 
-TIP: A prototype bean will have one instance created per place the bean is injected. When a prototype bean is injected as a provider, each call to `get()` will create a new instance.
+TIP: A prototype bean will have one instance created per place the bean is injected. When a prototype bean is injected as a provider, each call to `get()` creates a new instance.
 
 === Collection Ordering
 
-When injecting a collection of beans, they will not be ordered by default. To allow for the beans to be ordered, implement the api:core.order.Ordered[] interface. If the requested bean type does not implement api:core.order.Ordered[], then the ann:core.annotation.Order[] annotation will be searched for on any beans.
+When injecting a collection of beans, they are not ordered by default. Implement the api:core.order.Ordered[] interface to inject an ordered collection. If the requested bean type does not implement api:core.order.Ordered[], Micronaut searches for the ann:core.annotation.Order[] annotation on beans.
 
-The ann:core.annotation.Order[] annotation is especially useful for ordering beans created by factories where the bean type is a class in a third party library. In this example, both `LowRateLimit` and `HighRateLimit` implement the `RateLimit` interface.
+The ann:core.annotation.Order[] annotation is especially useful for ordering beans created by factories where the bean type is a class in a third-party library. In this example, both `LowRateLimit` and `HighRateLimit` implement the `RateLimit` interface.
 
 snippet::io.micronaut.docs.config.env.RateLimitsFactory[tags="clazz", indent=0, title="Factory with @Order"]
 
-When a collection of `RateLimit` beans are requested from the context, they will be returned in ascending order based on the value supplied in the annotation.
+When a collection of `RateLimit` beans are requested from the context, they are returned in ascending order based on the value in the annotation.

@@ -2,7 +2,7 @@ Since Micronaut 2.x, Micronaut's Netty-based HTTP server can be configured to su
 
 ==== Configuring the Server for HTTP/2
 
-The first step to doing so is setting the supported HTTP version is the server configuration:
+The first step is to set the supported HTTP version in the server configuration:
 
 .Enabling HTTP/2 Support
 [source,yaml]
@@ -12,9 +12,9 @@ micronaut:
     http-version: 2.0
 ----
 
-With this configuration in place Micronaut will enable support for the `h2c` protocol (see https://http2.github.io/http2-spec/#discover-http[HTTP/2 over cleartext]) which is fine for development.
+With this configuration, Micronaut enables support for the `h2c` protocol (see https://http2.github.io/http2-spec/#discover-http[HTTP/2 over cleartext]) which is fine for development.
 
-Since browsers don't support `h2c` and in general https://http2.github.io/http2-spec/#discover-https[HTTP/2 over TLS] (the `h2` protocol) is recommended for production you should enable <<https, HTTPS support>> support. For development this can be done with:
+Since browsers don't support `h2c` and in general https://http2.github.io/http2-spec/#discover-https[HTTP/2 over TLS] (the `h2` protocol), it is recommended for production that you enable <<https, HTTPS support>>. For development this can be done with:
 
 .Enabling `h2` Protocol Support
 [source,yaml]
@@ -29,7 +29,7 @@ micronaut:
 
 For production, see the <<https, configuring HTTPS>> section of the documentation.
 
-Note that if you deployment environment is JDK 8 or if you wish for improved support for OpenSSL you will need to define the following dependencies on Netty Tomcat Native:
+Note that if your deployment environment uses JDK 8, or for improved support for OpenSSL, define the following dependencies on Netty Tomcat Native:
 
 dependency:io.netty:netty-tcnative:2.0.29.Final[scope="runtimeOnly"]
 
@@ -47,7 +47,7 @@ See the documentation on https://netty.io/wiki/forked-tomcat-native.html[Tomcat 
 
 ==== HTTP/2 Clients
 
-By default Micronaut's HTTP client is configured to support HTTP 1.1. To enable support for HTTP/2 you can do so globally by setting the supported HTTP version if configuration:
+By default, Micronaut's HTTP client is configured to support HTTP 1.1. To enable support for HTTP/2, set the supported HTTP version in configuration:
 
 .Enabling HTTP/2 in Clients
 [source,yaml]

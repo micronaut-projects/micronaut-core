@@ -1,4 +1,4 @@
-The most common type of advice you may want to apply is "Around" advice, which essentially allows you to decorate a methods behaviour.
+The most common type of advice you may want to apply is "Around" advice, which lets you decorate a method's behaviour.
 
 == Writing Around Advice
 
@@ -23,47 +23,45 @@ snippet::io.micronaut.docs.aop.around.NotNullInterceptor[tags="imports,intercept
 
 NOTE: Micronaut AOP interceptors use no reflection which improves performance and reducing stack trace sizes, thus improving debugging.
 
-To put the new `MethodInterceptor` to work the
-
-With the interceptor and annotation implemented you can then simply apply the annotation to the target classes:
+Apply the annotation to target classes to put the new `MethodInterceptor` to work:
 
 snippet::io.micronaut.docs.aop.around.NotNullExample[tags="example", indent=0, title="Around Advice Usage Example"]
 
-Whenever the type `NotNullExample` is injected into any class, a compile time generated proxy will instead be injected that decorates the appropriate method calls with the `@NotNull` advice defined earlier. You can verify that the advice works by writing a test. The following test uses a JUnit `ExpectedException` rule to verify the appropriate exception is thrown when an argument is `null`:
+Whenever the type `NotNullExample` is injected into a class, a compile-time-generated proxy is injected that decorates method calls with the `@NotNull` advice defined earlier. You can verify that the advice works by writing a test. The following test verifies that the expected exception is thrown when the argument is `null`:
 
 snippet::io.micronaut.docs.aop.around.AroundSpec[tags="test", indent=0, title="Around Advice Test"]
 
-NOTE: Since Micronaut injection is done at compile time, generally the advice should be packaged in a dependent JAR file that is on the classpath when the above test is compiled and should not be in the same codebase since you don't want the test to be compiled before the advice itself is compiled.
+NOTE: Since Micronaut injection happens at compile time, generally the advice should be packaged in a dependent JAR file that is on the classpath when the above test is compiled. It should not be in the same codebase since you don't want the test to be compiled before the advice itself is compiled.
 
 == Customizing Proxy Generation
 
-The default behaviour of the link:{api}/io/micronaut/aop/Around.html[Around] annotation is to generate a proxy at compile time that is a subclass of the class being proxied. In other words, in the previous example a compile time subclass of the `NotNullExample` class will be produced where methods that are proxied are decorated with interceptor handling and the original behaviour is invoked via a call to `super`.
+The default behaviour of the link:{api}/io/micronaut/aop/Around.html[Around] annotation is to generate a proxy at compile time that is a subclass of the proxied class. In other words, in the previous example a compile-time subclass of the `NotNullExample` class will be produced where proxied methods are decorated with interceptor handling, and the original behaviour is invoked via a call to `super`.
 
-This behaviour is more efficient as only one instance of the bean is required, however depending on the use case you are trying to implement you may wish to alter this behaviour and the `@Around` annotation supports various attributes that allow you to alter this behaviour including:
+This behaviour is more efficient as only one instance of the bean is required, however depending on the use case you may wish to alter this behaviour. The `@Around` annotation supports various attributes that allow you to alter this behaviour, including:
 
-* `proxyTarget` (defaults to `false`) - If set to `true` instead of a subclass that calls `super`, the proxy will delegate to the original bean instance
-* `hotswap` (defaults to `false`) - Same as `proxyTarget=true`, but in addition the proxy will implement link:{api}/io/micronaut/aop/HotSwappableInterceptedProxy.html[HotSwappableInterceptedProxy] which wraps each method call in a `ReentrantReadWriteLock` and allows swapping the target instance at runtime.
-* `lazy` (defaults to `false`) - By default Micronaut will eagerly intialize the proxy target when the proxy is created. If set to `true` the proxy target will instead be resolved lazily for each method call.
+* `proxyTarget` (defaults to `false`) - If set to `true`, instead of a subclass that calls `super`, the proxy delegates to the original bean instance
+* `hotswap` (defaults to `false`) - Same as `proxyTarget=true`, but in addition the proxy implements link:{api}/io/micronaut/aop/HotSwappableInterceptedProxy.html[HotSwappableInterceptedProxy] which wraps each method call in a `ReentrantReadWriteLock` and allows swapping the target instance at runtime.
+* `lazy` (defaults to `false`) - By default Micronaut eagerly initializes the proxy target when the proxy is created. If set to `true` the proxy target is instead resolved lazily for each method call.
 
 == AOP Advice on @Factory Beans
 
-The semantics of AOP advice when applied to <<factories,Bean Factories>> differs to regular beans, with the following rules applying:
+The semantics of AOP advice when applied to <<factories,Bean Factories>> differs from regular beans, with the following rules applying:
 
-1. AOP advice applied at the class level of a ann:context.annotation.Factory[] bean will apply the advice to the factory itself and not to any beans defined with the ann:context.annotation.Bean[] annotation.
-2. AOP advice applied on a method annotated with a bean scope will apply the AOP advice to the bean that the factory produces.
+. AOP advice applied at the class level of a ann:context.annotation.Factory[] bean applies the advice to the factory itself and not to any beans defined with the ann:context.annotation.Bean[] annotation.
+. AOP advice applied on a method annotated with a bean scope applies the AOP advice to the bean that the factory produces.
 
 Consider the following two examples:
 
 snippet::io.micronaut.docs.aop.advice.type.MyFactory[tags="class", indent=0, title="AOP Advice at the type level of a `@Factory`"]
 
-The above example will log the time it takes to create the `MyBean` bean.
+The above example logs the time it takes to create the `MyBean` bean.
 
 Now consider this example:
 
 snippet::io.micronaut.docs.aop.advice.method.MyFactory[tags="class", indent=0, title="AOP Advice at the method level of a `@Factory`"]
 
-The above example will log the time it takes to execute all of the public methods of the `MyBean` bean, but not the bean creation.
+The above example logs the time it takes to execute the public methods of the `MyBean` bean, but not the bean creation.
 
 The rationale for this behaviour is that you may at times wish to apply advice to a factory and at other times apply advice to the bean produced by the factory.
 
-Note that there is currently no way to apply advice at the method level to a ann:context.annotation.Factory[] bean and all advice for factories must be applied at the type level. You can control which methods have advice applied by defining methods as non-public (non-public methods do not have advice applied).
+Note that there is currently no way to apply advice at the method level to a ann:context.annotation.Factory[] bean, and all advice for factories must be applied at the type level. You can control which methods have advice applied by defining methods as non-public which do not have advice applied.

@@ -1,4 +1,4 @@
-If an HTTP response is returned with a code of 400 or above, an api:http.client.exceptions.HttpClientResponseException[] is created. The exception contains the original response. How that exception gets thrown depends on the return type of the method.
+If an HTTP response is returned with a code of 400 or higher, an api:http.client.exceptions.HttpClientResponseException[] is created. The exception contains the original response. How that exception is thrown depends on the method return type.
 
 * For reactive response types, the exception is passed through the publisher as an error.
 * For blocking response types, the exception is thrown and should be caught and handled by the caller.
@@ -7,4 +7,4 @@ IMPORTANT: The one exception to this rule is HTTP Not Found (404) responses. Thi
 
 HTTP Not Found (404) responses for blocking return types is *not* considered an error condition and the client exception will *not* be thrown. That behavior includes methods that return `void`.
 
-If the method returns an `HttpResponse`, the original response will be returned. If the return type is `Optional`, an empty optional will be returned. For all other types, `null` will be returned.
+If the method returns an `HttpResponse`, the original response is returned. If the return type is `Optional`, an empty optional is returned. For all other types, `null` is returned.
