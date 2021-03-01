@@ -125,7 +125,6 @@ ext.extraPomInfo = {
                     artifactId "exec-maven-plugin"
                     delegate.version '${exec-maven-plugin.version}'
                     delegate.configuration {
-                        executable("java")
                         arguments {
                             argument("-classpath")
                             classpath()
