@@ -15,6 +15,7 @@
  */
 package io.micronaut.jackson.modules;
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
@@ -32,10 +33,12 @@ import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
 import com.fasterxml.jackson.databind.introspect.VirtualAnnotatedMember;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.AnyGetterWriter;
 import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
 import com.fasterxml.jackson.databind.ser.BeanSerializerBuilder;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import com.fasterxml.jackson.databind.ser.impl.PropertySerializerMap;
+import com.fasterxml.jackson.databind.ser.std.MapSerializer;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -44,12 +47,14 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.jackson.JacksonConfiguration;
+import io.micronaut.jackson.serialize.ConvertibleValuesSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -217,6 +222,10 @@ public class BeanIntrospectionModule extends SimpleModule {
                         }
                     }
                     newBuilder.setProperties(newProperties);
+                }
+                AnyGetterWriter anyGetter = builder.getAnyGetter();
+                if (anyGetter != null) {
+                    newBuilder.setAnyGetter(anyGetter);
                 }
                 return newBuilder;
             }

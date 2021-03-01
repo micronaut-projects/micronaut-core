@@ -1,5 +1,7 @@
 package io.micronaut.jackson.modules
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter
+import com.fasterxml.jackson.annotation.JsonAnySetter
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -22,6 +24,7 @@ import io.micronaut.jackson.modules.wrappers.IntWrapper
 import io.micronaut.jackson.modules.wrappers.IntegerWrapper
 import io.micronaut.jackson.modules.wrappers.LongWrapper
 import io.micronaut.jackson.modules.wrappers.StringWrapper
+import spock.lang.Ignore
 import spock.lang.Specification
 
 import java.beans.ConstructorProperties
@@ -49,7 +52,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "Bean introspection works with a bean without JsonInclude annotations - serializationInclusion ALWAYS"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
-                'jackson.serializationInclusion':'ALWAYS'
+                'jackson.serializationInclusion': 'ALWAYS'
         )
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
@@ -69,7 +72,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "Bean introspection works with JsonInclude.Include.NON_NULL"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
-                'jackson.serializationInclusion':'ALWAYS'
+                'jackson.serializationInclusion': 'ALWAYS'
         )
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
@@ -89,7 +92,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "Bean introspection works with JsonInclude.Include.ALWAYS"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
-                'jackson.serializationInclusion':'ALWAYS'
+                'jackson.serializationInclusion': 'ALWAYS'
         )
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
@@ -111,14 +114,14 @@ class BeanIntrospectionModuleSpec extends Specification {
         ApplicationContext ctx = ApplicationContext.run()
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
-        when:"json unwrapped is used"
+        when: "json unwrapped is used"
         def plant = new Plant(name: "Rose", attributes: new Attributes(hasFlowers: true, color: "green"))
         def str = objectMapper.writeValueAsString(plant)
 
-        then:"The result is correct"
+        then: "The result is correct"
         str == '{"name":"Rose","color":"green","hasFlowers":true}'
 
-        when:"deserializing"
+        when: "deserializing"
         def read = objectMapper.readValue(str, Plant)
 
         then:
@@ -316,6 +319,38 @@ class BeanIntrospectionModuleSpec extends Specification {
         ctx.close()
     }
 
+    void "test serialize with AnyGetter/Setter"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        def json = objectMapper.writeValueAsString(new Wrapper(new Body(123, ["foo": "bar"])))
+
+        then:
+        json == '{"body":{"foo_id":123,"foo":"bar"}}'
+
+        cleanup:
+        ctx.close()
+    }
+
+    @Ignore
+    void "test deserialize with AnyGetter/Setter"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        Wrapper wrapper = objectMapper.readValue('{"body":{"foo_id":123,"foo":"bar"}}', Wrapper)
+
+        then:
+        wrapper.body.id == 123
+        wrapper.body.properties == ["foo": "bar"]
+
+        cleanup:
+        ctx.close()
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -330,7 +365,8 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         Optional<String> opt
 
-        @JsonCreator Book(@JsonProperty("book_title") String title) {
+        @JsonCreator
+        Book(@JsonProperty("book_title") String title) {
             this.title = title
         }
     }
@@ -387,8 +423,9 @@ class BeanIntrospectionModuleSpec extends Specification {
         boolean hasFlowers
 
     }
-        //Used for @JsonView
+    //Used for @JsonView
     static class PublicView {}
+
     static class AllView extends PublicView {}
 
     @Introspected
@@ -409,8 +446,38 @@ class BeanIntrospectionModuleSpec extends Specification {
         final List<String> value;
 
         @JsonCreator
-        public ListWrapper(List<String> value) {
+        ListWrapper(List<String> value) {
             this.value = value;
+        }
+    }
+
+    @Introspected
+    static class Body {
+
+        @JsonProperty(value = "foo_id")
+        final long id
+
+        @JsonAnySetter
+        final Map<String, Object> properties
+
+        Body(long id, Map<String, Object> properties) {
+            this.id = id
+            this.properties = properties
+        }
+
+        @JsonAnyGetter
+        Map<String, Object> getProperties() {
+            properties
+        }
+    }
+
+    @Introspected
+    static class Wrapper {
+
+        final Body body
+
+        Wrapper(@JsonProperty("body") Body body) {
+            this.body = body
         }
     }
 }
