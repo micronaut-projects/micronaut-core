@@ -260,12 +260,8 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
 
             TypeMirror bound = boundGenerics.get(tv.toString());
-            if (bound != null) {
-                if (bound instanceof TypeVariable) {
-                    return mirrorToClassElement(((TypeVariable) bound).getUpperBound(), visitorContext, genericsInfo, includeTypeAnnotations);
-                } else {
-                    return mirrorToClassElement(bound, visitorContext, genericsInfo, includeTypeAnnotations);
-                }
+            if (bound != null && bound != tv) {
+                return mirrorToClassElement(bound, visitorContext, genericsInfo, includeTypeAnnotations);
             } else {
                 return mirrorToClassElement(upperBound, visitorContext, genericsInfo, includeTypeAnnotations);
             }
