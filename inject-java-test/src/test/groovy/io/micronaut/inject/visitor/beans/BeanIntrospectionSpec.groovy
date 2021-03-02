@@ -260,6 +260,35 @@ public record Foo(int x, int y){
     }
 
     @Requires({ jvm.isJava14Compatible() })
+    void "test secondary constructor with @Creator for Java 14+ records"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(int x, int y){
+    @Creator
+    public Foo(int x) {
+        this(x, 20);
+    }
+    public Foo() {
+        this(20, 20);
+    }
+}
+''')
+        when:
+        def obj = introspection.instantiate(5)
+
+        then:
+        obj.x() == 5
+        obj.y() == 20
+    }
+
+    @Requires({ jvm.isJava14Compatible() })
     void "test annotations on generic type arguments for Java 14+ records"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''

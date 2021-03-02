@@ -202,8 +202,14 @@ public class ModelUtils {
         if (JavaModelUtils.isRecord(classElement)) {
             final List<ExecutableElement> constructors = ElementFilter
                     .constructorsIn(classElement.getEnclosedElements());
-            // with records the record constructor is always the last constructor
-            return constructors.get(constructors.size() - 1);
+            Optional<ExecutableElement> element = findAnnotatedConstructor(annotationUtils, constructors);
+            if (element.isPresent()) {
+                 return element.get();
+            } else {
+
+                // with records the record constructor is always the last constructor
+                return constructors.get(constructors.size() - 1);
+            }
         } else {
             List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
             if (constructors.isEmpty()) {
@@ -213,11 +219,7 @@ public class ModelUtils {
                 return constructors.get(0);
             }
 
-            Optional<ExecutableElement> element = constructors.stream().filter(ctor -> {
-                        final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
-                        return annotationMetadata.hasStereotype(Inject.class) || annotationMetadata.hasStereotype(Creator.class);
-                    }
-            ).findFirst();
+            Optional<ExecutableElement> element = findAnnotatedConstructor(annotationUtils, constructors);
             if (!element.isPresent()) {
                 element = constructors.stream().filter(ctor ->
                         ctor.getModifiers().contains(PUBLIC)
@@ -225,6 +227,14 @@ public class ModelUtils {
             }
             return element.orElse(null);
         }
+    }
+
+    private Optional<ExecutableElement> findAnnotatedConstructor(AnnotationUtils annotationUtils, List<ExecutableElement> constructors) {
+        return constructors.stream().filter(ctor -> {
+                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
+                    return annotationMetadata.hasStereotype(Inject.class) || annotationMetadata.hasStereotype(Creator.class);
+                }
+        ).findFirst();
     }
 
     /**
