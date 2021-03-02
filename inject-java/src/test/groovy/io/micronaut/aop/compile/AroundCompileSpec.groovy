@@ -61,4 +61,30 @@ class MyBean {
         ref in AdvisedBeanType
         ref.interceptedType.name == 'test.MyBean'
     }
+
+    void "test validated on class with generics"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$BaseEntityServiceDefinition$Intercepted', """
+package test;
+
+@io.micronaut.validation.Validated
+class BaseEntityService<T extends BaseEntity> extends BaseService<T> {
+}
+
+class BaseEntity {}
+abstract class BaseService<T> implements IBeanValidator<T> {
+    public boolean isValid(T entity) {
+        return true;
+    }
+}
+interface IBeanValidator<T> {
+    boolean isValid(T entity);
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanDefinition != null
+        beanDefinition.getTypeArguments('test.BaseService')[0].type.name == 'test.BaseEntity'
+    }
 }
