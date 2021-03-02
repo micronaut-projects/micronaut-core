@@ -16,6 +16,8 @@
 package io.micronaut.http.server.exceptions.format;
 
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Secondary;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.hateoas.JsonError;
@@ -34,7 +36,7 @@ import java.util.List;
  * @since 2.4.0
  */
 @Singleton
-@Primary
+@Secondary
 public class HateoasErrorResponseFactory implements JsonErrorResponseFactory {
 
     private final boolean alwaysSerializeErrorsAsList;
