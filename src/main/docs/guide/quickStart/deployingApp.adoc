@@ -1,4 +1,4 @@
-To deploy a Micronaut application you create a runnable JAR file by running `./gradlew assemble` or `./mvnw package`.
+To deploy a Micronaut application you create an executable JAR file by running `./gradlew assemble` or `./mvnw package`.
 
 The constructed JAR file can then be executed with `java -jar`. For example:
 
@@ -16,9 +16,9 @@ $ java -jar target/hello-world.jar
 
 if building with Maven.
 
-The runnable JAR can be executed locally, deployed to a virtual machine or managed Cloud service that supports runnable JARs.
+The executable JAR can be run locally, or deployed to a virtual machine or managed Cloud service that supports executable JARs.
 
-To publish a layered application to a Docker container registry you can configure your Docker image name in `build.gradle` for Gradle:
+To publish a layered application to a Docker container registry, configure your Docker image name in `build.gradle` for Gradle:
 
 [source,groovy]
 ----
@@ -49,7 +49,7 @@ For Maven, define the following plugin in your POM:
 </plugin>
 ----
 
-Then invoke the `deploy` lifecycle phase specifying the packaging type to either `docker` or `docker-native`:
+Then invoke the `deploy` lifecycle phase specifying the packaging type as either `docker` or `docker-native`:
 
 [source,bash]
 ----

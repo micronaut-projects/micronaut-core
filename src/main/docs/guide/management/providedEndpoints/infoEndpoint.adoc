@@ -17,17 +17,17 @@ endpoints:
 
 == Customization
 
-The info endpoint consists of an info aggregator and any number of info sources. To add an info source, simply create a bean class that implements link:{api}/io/micronaut/management/endpoint/info/InfoSource.html[InfoSource].  If your info source needs to retrieve data from Java properties files, you can extend the link:{api}/io/micronaut/management/endpoint/info/source/PropertiesInfoSource.html[PropertiesInfoSource] interface which provides a helper method for this purpose.
+The info endpoint consists of an info aggregator and any number of info sources. To add an info source, create a bean class that implements link:{api}/io/micronaut/management/endpoint/info/InfoSource.html[InfoSource]. If your info source needs to retrieve data from Java properties files, extend the link:{api}/io/micronaut/management/endpoint/info/source/PropertiesInfoSource.html[PropertiesInfoSource] interface which provides a helper method for this purpose.
 
-All of the info source beans will be collected together with the info aggregator. To provide your own implementation of the info aggregator, create a class that implements link:{api}/io/micronaut/management/endpoint/info/InfoAggregator.html[InfoAggregator] and register it as a bean. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the link:{api}/io/micronaut/management/endpoint/info/impl/RxInfoAggregator.html[default implementation].
+All info source beans are collected together with the info aggregator. To provide your own implementation of the info aggregator, create a class that implements link:{api}/io/micronaut/management/endpoint/info/InfoAggregator.html[InfoAggregator] and register it as a bean. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the link:{api}/io/micronaut/management/endpoint/info/impl/RxInfoAggregator.html[default implementation].
 
-The default info aggregator returns map containing the combined properties returned by all the info sources. This map is returned as JSON from the /info endpoint.
+The default info aggregator returns a map containing the combined properties returned by all the info sources. This map is returned as JSON from the /info endpoint.
 
 == Provided Info Sources
 
 === Configuration Info Source
 
-The link:{api}/io/micronaut/management/endpoint/info/source/ConfigurationInfoSource.html[ConfigurationInfoSource] will return configuration properties under the `info` key. In addition to string, integer and boolean values, more complex properties can be exposed as maps in the JSON output (if the configuration format supports it).
+The link:{api}/io/micronaut/management/endpoint/info/source/ConfigurationInfoSource.html[ConfigurationInfoSource] returns configuration properties under the `info` key. In addition to string, integer and boolean values, more complex properties can be exposed as maps in the JSON output (if the configuration format supports it).
 
 .Info Source Example (`application.groovy`)
 [source,groovy]
@@ -37,7 +37,7 @@ info.demo.number = 123
 info.demo.map = [key: 'value', other_key: 123]
 ----
 
-The above config will result in the following JSON response from the info endpoint:
+The above config results in the following JSON response from the info endpoint:
 
 [source,json]
 ----
@@ -59,20 +59,20 @@ The configuration info source can be disabled using the `endpoints.info.config.e
 
 === Git Info Source
 
-If a `git.properties` file is available on the classpath, the link:{api}/io/micronaut/management/endpoint/info/source/GitInfoSource.html[GitInfoSource] will expose the values in that file under the `git` key. Generating of a `git.properties` file will need to be configured as part of your build. One easy option for Gradle users is the https://plugins.gradle.org/plugin/com.gorylenko.gradle-git-properties[Gradle Git Properties Plugin]. Maven users can look at the https://github.com/git-commit-id/maven-git-commit-id-plugin[Maven Git Commit Id Plugin].
+If a `git.properties` file is available on the classpath, the link:{api}/io/micronaut/management/endpoint/info/source/GitInfoSource.html[GitInfoSource] exposes the values in that file under the `git` key. Generating of a `git.properties` file must be configured as part of your build. One easy option for Gradle users is the https://plugins.gradle.org/plugin/com.gorylenko.gradle-git-properties[Gradle Git Properties Plugin]. Maven users can use the https://github.com/git-commit-id/maven-git-commit-id-plugin[Maven Git Commit ID Plugin].
 
 ==== Configuration
 
-To specify an alternate path/name of the properties file, you can supply a custom value in the `endpoints.info.git.location` property.
+To specify an alternate path or name of the properties file, supply a custom value in the `endpoints.info.git.location` property.
 
 The git info source can be disabled using the `endpoints.info.git.enabled` property.
 
 === Build Info Source
 
-If a `META-INF/build-info.properties` file is available on the classpath, the link:{api}/io/micronaut/management/endpoint/info/source/BuildInfoSource.html[BuildInfoSource] will expose the values in that file under the `build` key. Generating of a `build-info.properties` file will need to be configured as part of your build. One easy option for Gradle users is the https://plugins.gradle.org/plugin/com.pasam.gradle.buildinfo[Gradle Build Info Plugin]. Another option for Maven users is the https://docs.spring.io/spring-boot/docs/current/maven-plugin/examples/build-info.html[Spring Boot Maven Plugin]
+If a `META-INF/build-info.properties` file is available on the classpath, the link:{api}/io/micronaut/management/endpoint/info/source/BuildInfoSource.html[BuildInfoSource] exposes the values in that file under the `build` key. Generating a `build-info.properties` file must be configured as part of your build. One easy option for Gradle users is the https://plugins.gradle.org/plugin/com.pasam.gradle.buildinfo[Gradle Build Info Plugin]. An option for Maven users is the https://docs.spring.io/spring-boot/docs/current/maven-plugin/examples/build-info.html[Spring Boot Maven Plugin]
 
 ==== Configuration
 
-To specify an alternate path/name of the properties file, you can supply a custom value in the `endpoints.info.build.location` property.
+To specify an alternate path/name of the properties file, supply a custom value in the `endpoints.info.build.location` property.
 
 The build info source can be disabled using the `endpoints.info.build.enabled` property.

@@ -9,7 +9,7 @@ class FooEndpoint {
 }
 ----
 
-If a single `String` argument is supplied to the annotation, it will be used as the endpoint id.
+If a single `String` argument is supplied to the annotation, it is used as the endpoint id.
 
 It is possible to supply additional (named) arguments to the annotation. Other possible arguments to `@Endpoint` are described in the table below:
 
@@ -25,7 +25,6 @@ It is possible to supply additional (named) arguments to the annotation. Other p
 |Prefix used for configuring the endpoint (see <<endpointConfiguration, Endpoint Configuration>>)
 |`@Endpoint(prefix = "foo")`
 
-
 |`boolean defaultEnabled`
 |Sets whether the endpoint is enabled when no configuration is set (see <<endpointConfiguration, Endpoint Configuration>>)
 |`@Endpoint(defaultEnabled = false)`
@@ -38,6 +37,6 @@ It is possible to supply additional (named) arguments to the annotation. Other p
 
 == Example of custom Endpoint
 
-The following example `Endpoint` class will create an endpoint accessible at `/date`:
+The following example `Endpoint` class creates an endpoint accessible at `/date`:
 
 snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, endpointClassBegin, methodSummary, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
