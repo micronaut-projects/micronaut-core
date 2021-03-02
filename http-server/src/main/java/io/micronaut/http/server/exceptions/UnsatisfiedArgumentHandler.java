@@ -21,8 +21,12 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
+import io.micronaut.http.server.exceptions.format.Error;
+import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * Handles exception of type {@link UnsatisfiedArgumentException}.
@@ -34,11 +38,39 @@ import javax.inject.Singleton;
 @Singleton
 @Produces
 public class UnsatisfiedArgumentHandler implements ExceptionHandler<UnsatisfiedArgumentException, HttpResponse> {
+
+    private final JsonErrorResponseFactory responseFactory;
+
+    @Deprecated
+    public UnsatisfiedArgumentHandler() {
+        this.responseFactory = null;
+    }
+
+    @Inject
+    public UnsatisfiedArgumentHandler(JsonErrorResponseFactory responseFactory) {
+        this.responseFactory = responseFactory;
+    }
+
     @Override
     public HttpResponse handle(HttpRequest request, UnsatisfiedArgumentException exception) {
-        JsonError error = new JsonError(exception.getMessage());
-        error.path('/' + exception.getArgument().getName());
-        error.link(Link.SELF, Link.of(request.getUri()));
+        Object error;
+        if (responseFactory != null) {
+            error = responseFactory.createResponse(request, exception, new Error() {
+                @Override
+                public String getMessage() {
+                    return exception.getMessage();
+                }
+
+                @Override
+                public Optional<String> getPath() {
+                    return Optional.of('/' + exception.getArgument().getName());
+                }
+            });
+        } else {
+            error = new JsonError(exception.getMessage())
+                    .path('/' + exception.getArgument().getName())
+                    .link(Link.SELF, Link.of(request.getUri()));
+        }
 
         return HttpResponse.badRequest(error);
     }

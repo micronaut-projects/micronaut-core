@@ -15,14 +15,17 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.exceptions.format.Error;
+import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URISyntaxException;
+import java.util.Optional;
 
 /**
  * Handles exception of type {@link URISyntaxException}.
@@ -31,13 +34,39 @@ import java.net.URISyntaxException;
  * @since 2.0
  */
 @Singleton
-@Primary
 @Produces
 public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, HttpResponse> {
 
+    private final JsonErrorResponseFactory responseFactory;
+
+    @Deprecated
+    public URISyntaxHandler() {
+        this.responseFactory = null;
+    }
+
+    @Inject
+    public URISyntaxHandler(JsonErrorResponseFactory responseFactory) {
+        this.responseFactory = responseFactory;
+    }
+
     @Override
     public HttpResponse handle(HttpRequest request, URISyntaxException exception) {
-        JsonError error = new JsonError("Malformed URI: " + exception.getMessage());
+        Object error;
+        if (responseFactory != null) {
+            error = responseFactory.createResponse(request, exception, new Error() {
+                @Override
+                public String getMessage() {
+                    return "Malformed URI: " + exception.getMessage();
+                }
+
+                @Override
+                public Optional<String> getTitle() {
+                    return Optional.of("Malformed URI");
+                }
+            });
+        } else {
+            error = new JsonError("Malformed URI: " + exception.getMessage());
+        }
         return HttpResponse.badRequest(error);
     }
 }

@@ -19,13 +19,16 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
+import io.micronaut.http.server.exceptions.format.Error;
+import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * Default exception handler for JSON processing errors.
@@ -33,16 +36,42 @@ import javax.inject.Singleton;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Produces(MediaType.APPLICATION_JSON)
+@Produces
 @Singleton
 public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingException, Object> {
 
+    private final JsonErrorResponseFactory responseFactory;
+
+    @Deprecated
+    public JsonExceptionHandler() {
+        this.responseFactory = null;
+    }
+
+    @Inject
+    public JsonExceptionHandler(JsonErrorResponseFactory responseFactory) {
+        this.responseFactory = responseFactory;
+    }
+
     @Override
     public Object handle(HttpRequest request, JsonProcessingException exception) {
-        // TODO: Send JSON back with detailed error
         MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
-        JsonError body = new JsonError("Invalid JSON: " + exception.getMessage());
-        body.link(Link.SELF, Link.of(request.getUri()));
+        Object body;
+        if (responseFactory != null) {
+            body = responseFactory.createResponse(request, exception, new Error() {
+                @Override
+                public String getMessage() {
+                    return "Invalid JSON: " + exception.getMessage();
+                }
+
+                @Override
+                public Optional<String> getTitle() {
+                    return Optional.of("Invalid JSON");
+                }
+            });
+        } else {
+            body = new JsonError("Invalid JSON: " + exception.getMessage())
+                    .link(Link.SELF, Link.of(request.getUri()));
+        }
         response.body(body);
 
         return response;

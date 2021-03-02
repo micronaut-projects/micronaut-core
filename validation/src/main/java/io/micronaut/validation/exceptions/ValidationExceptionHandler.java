@@ -21,11 +21,14 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
+import io.micronaut.http.server.exceptions.format.Error;
+import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 import org.grails.datastore.mapping.validation.ValidationException;
 import org.springframework.validation.Errors;
 import org.springframework.validation.FieldError;
 
 import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * Default Exception handler for GORM validation errors.
@@ -35,17 +38,41 @@ import javax.inject.Singleton;
  */
 @Singleton
 @Requires(classes = ValidationException.class)
-public class ValidationExceptionHandler implements ExceptionHandler<ValidationException, HttpResponse<JsonError>> {
+public class ValidationExceptionHandler implements ExceptionHandler<ValidationException, HttpResponse<?>> {
+
+    private final JsonErrorResponseFactory responseFactory;
+
+    @Deprecated
+    public ValidationExceptionHandler() {
+        this.responseFactory = null;
+    }
+
+    public ValidationExceptionHandler(JsonErrorResponseFactory responseFactory) {
+        this.responseFactory = responseFactory;
+    }
 
     @Override
-    public HttpResponse<JsonError> handle(HttpRequest request, ValidationException exception) {
+    public HttpResponse<?> handle(HttpRequest request, ValidationException exception) {
+        Object error;
         Errors errors = exception.getErrors();
-        JsonError error = new JsonError(exception.getMessage());
         FieldError fieldError = errors.getFieldError();
-        if (fieldError != null) {
-            error.path(fieldError.getField());
+        if (responseFactory != null) {
+            error = responseFactory.createResponse(request, exception, new Error() {
+                @Override
+                public String getMessage() {
+                    return exception.getMessage();
+                }
+
+                @Override
+                public Optional<String> getPath() {
+                    return Optional.ofNullable(fieldError).map(FieldError::getField);
+                }
+            });
+        } else {
+            error = new JsonError(exception.getMessage())
+                    .path(fieldError != null ? fieldError.getField() : null)
+                    .link(Link.SELF, Link.of(request.getUri()));
         }
-        error.link(Link.SELF, Link.of(request.getUri()));
         return HttpResponse.badRequest(error);
     }
 }
