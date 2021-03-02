@@ -199,25 +199,32 @@ public class ModelUtils {
      */
     @Nullable
     public ExecutableElement concreteConstructorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
-        List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
-        if (constructors.isEmpty()) {
-            return null;
-        }
-        if (constructors.size() == 1) {
-            return constructors.get(0);
-        }
+        if (JavaModelUtils.isRecord(classElement)) {
+            final List<ExecutableElement> constructors = ElementFilter
+                    .constructorsIn(classElement.getEnclosedElements());
+            // with records the record constructor is always the last constructor
+            return constructors.get(constructors.size() - 1);
+        } else {
+            List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
+            if (constructors.isEmpty()) {
+                return null;
+            }
+            if (constructors.size() == 1) {
+                return constructors.get(0);
+            }
 
-        Optional<ExecutableElement> element = constructors.stream().filter(ctor -> {
-                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
-                    return annotationMetadata.hasStereotype(Inject.class) || annotationMetadata.hasStereotype(Creator.class);
-                }
-        ).findFirst();
-        if (!element.isPresent()) {
-            element = constructors.stream().filter(ctor ->
-                ctor.getModifiers().contains(PUBLIC)
+            Optional<ExecutableElement> element = constructors.stream().filter(ctor -> {
+                        final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
+                        return annotationMetadata.hasStereotype(Inject.class) || annotationMetadata.hasStereotype(Creator.class);
+                    }
             ).findFirst();
+            if (!element.isPresent()) {
+                element = constructors.stream().filter(ctor ->
+                        ctor.getModifiers().contains(PUBLIC)
+                ).findFirst();
+            }
+            return element.orElse(null);
         }
-        return element.orElse(null);
     }
 
     /**
