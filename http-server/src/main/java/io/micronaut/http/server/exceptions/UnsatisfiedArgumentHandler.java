@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
 import javax.inject.Inject;
@@ -55,17 +56,20 @@ public class UnsatisfiedArgumentHandler implements ExceptionHandler<UnsatisfiedA
     public HttpResponse handle(HttpRequest request, UnsatisfiedArgumentException exception) {
         Object error;
         if (responseFactory != null) {
-            error = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, new io.micronaut.http.server.exceptions.format.JsonError() {
-                @Override
-                public String getMessage() {
-                    return exception.getMessage();
-                }
+            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+                    .cause(exception)
+                    .error(new io.micronaut.http.server.exceptions.format.JsonError() {
+                        @Override
+                        public String getMessage() {
+                            return exception.getMessage();
+                        }
 
-                @Override
-                public Optional<String> getPath() {
-                    return Optional.of('/' + exception.getArgument().getName());
-                }
-            });
+                        @Override
+                        public Optional<String> getPath() {
+                            return Optional.of('/' + exception.getArgument().getName());
+                        }
+                    })
+                    .build());
         } else {
             error = new JsonError(exception.getMessage())
                     .path('/' + exception.getArgument().getName())

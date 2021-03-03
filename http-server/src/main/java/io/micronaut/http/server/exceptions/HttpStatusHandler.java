@@ -17,10 +17,12 @@ package io.micronaut.http.server.exceptions;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
 import javax.inject.Inject;
@@ -54,7 +56,10 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
         Object body = exception.getBody()
             .orElseGet(() -> {
                 if (responseFactory != null) {
-                    return responseFactory.createResponse(request, exception.getStatus(), exception, exception.getMessage());
+                    return responseFactory.createResponse(JsonErrorContext.builder(request, exception.getStatus())
+                            .cause(exception)
+                            .errorMessage(exception.getMessage())
+                            .build());
                 } else {
                     return new JsonError(exception.getMessage())
                             .link(Link.SELF, Link.of(request.getUri()));

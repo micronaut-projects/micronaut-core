@@ -20,6 +20,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
 import javax.inject.Inject;
@@ -53,17 +54,20 @@ public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, Ht
     public HttpResponse handle(HttpRequest request, URISyntaxException exception) {
         Object error;
         if (responseFactory != null) {
-            error = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, new io.micronaut.http.server.exceptions.format.JsonError() {
-                @Override
-                public String getMessage() {
-                    return "Malformed URI: " + exception.getMessage();
-                }
+            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+                    .cause(exception)
+                    .error(new io.micronaut.http.server.exceptions.format.JsonError() {
+                        @Override
+                        public String getMessage() {
+                            return "Malformed URI: " + exception.getMessage();
+                        }
 
-                @Override
-                public Optional<String> getTitle() {
-                    return Optional.of("Malformed URI");
-                }
-            });
+                        @Override
+                        public Optional<String> getTitle() {
+                            return Optional.of("Malformed URI");
+                        }
+                    })
+                    .build());
         } else {
             error = new JsonError("Malformed URI: " + exception.getMessage());
         }

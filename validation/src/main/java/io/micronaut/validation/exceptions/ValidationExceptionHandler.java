@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
+import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 import org.grails.datastore.mapping.validation.ValidationException;
 import org.springframework.validation.Errors;
@@ -57,17 +58,20 @@ public class ValidationExceptionHandler implements ExceptionHandler<ValidationEx
         Errors errors = exception.getErrors();
         FieldError fieldError = errors.getFieldError();
         if (responseFactory != null) {
-            error = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, new io.micronaut.http.server.exceptions.format.JsonError() {
-                @Override
-                public String getMessage() {
-                    return exception.getMessage();
-                }
+            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+                    .cause(exception)
+                    .error(new io.micronaut.http.server.exceptions.format.JsonError() {
+                        @Override
+                        public String getMessage() {
+                            return exception.getMessage();
+                        }
 
-                @Override
-                public Optional<String> getPath() {
-                    return Optional.ofNullable(fieldError).map(FieldError::getField);
-                }
-            });
+                        @Override
+                        public Optional<String> getPath() {
+                            return Optional.ofNullable(fieldError).map(FieldError::getField);
+                        }
+                    })
+                    .build());
         } else {
             error = new JsonError(exception.getMessage())
                     .path(fieldError != null ? fieldError.getField() : null)

@@ -81,6 +81,7 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.InternalServerException;
+import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 import io.micronaut.http.server.netty.async.ContextCompletionAwareSubscriber;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -600,7 +601,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             handleRouteMatch(routeMatch, nettyHttpRequest, ctx, false);
         } else {
             if (request.getMethod() != HttpMethod.HEAD) {
-                defaultResponse.body(errorResponseFactory.createResponse(request, defaultResponse.status(), null, message));
+                defaultResponse.body(errorResponseFactory.createResponse(
+                        JsonErrorContext.builder(request, defaultResponse.status())
+                                .errorMessage(message)
+                                .build()));
             }
             filterAndEncodeResponse(
                     ctx,
@@ -672,7 +676,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private MutableHttpResponse<Object> newNotFoundError(HttpRequest<?> request) {
         return HttpResponse.notFound()
-                .body(errorResponseFactory.createResponse(request, HttpStatus.NOT_FOUND, null, "Page Not Found"));
+                .body(errorResponseFactory.createResponse(
+                        JsonErrorContext.builder(request, HttpStatus.NOT_FOUND)
+                                .errorMessage("Page Not Found")
+                                .build()));
     }
 
     private MutableHttpResponse errorResultToResponse(Object result) {
@@ -1982,7 +1989,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         logException(cause);
 
         MutableHttpResponse<Object> error = io.micronaut.http.HttpResponse.serverError()
-                .body(errorResponseFactory.createResponse(nettyHttpRequest, HttpStatus.INTERNAL_SERVER_ERROR, cause, "Internal Server Error: " + cause.getMessage()));
+                .body(errorResponseFactory.createResponse(
+                        JsonErrorContext.builder(nettyHttpRequest, HttpStatus.INTERNAL_SERVER_ERROR)
+                                .cause(cause)
+                                .errorMessage("Internal Server Error: " + cause.getMessage())
+                                .build()));
 
         filterAndEncodeResponse(
                 ctx,

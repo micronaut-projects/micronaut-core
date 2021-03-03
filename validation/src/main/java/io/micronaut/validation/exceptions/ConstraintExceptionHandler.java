@@ -24,6 +24,7 @@ import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
+import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 import io.micronaut.jackson.JacksonConfiguration;
 
@@ -77,14 +78,19 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
 
         if (responseFactory != null) {
             Object response;
+            final JsonErrorContext.Builder contextBuilder = JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+                    .cause(exception);
             if (constraintViolations == null || constraintViolations.isEmpty()) {
-                response = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, exception.getMessage() == null ? HttpStatus.BAD_REQUEST.getReason() : exception.getMessage());
+                response = responseFactory.createResponse(contextBuilder.errorMessage(
+                        exception.getMessage() == null ? HttpStatus.BAD_REQUEST.getReason() : exception.getMessage()
+                ).build());
             } else {
-                response = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, io.micronaut.http.server.exceptions.format.JsonError.forMessages(
+                response = responseFactory.createResponse(contextBuilder.errorMessages(
                         exception.getConstraintViolations()
                                 .stream()
                                 .map(this::buildMessage)
-                                .collect(Collectors.toList())));
+                                .collect(Collectors.toList())
+                ).build());
             }
             return HttpResponse.badRequest(response);
         } else {

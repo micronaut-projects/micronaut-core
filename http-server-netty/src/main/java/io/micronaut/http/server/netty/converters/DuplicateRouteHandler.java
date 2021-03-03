@@ -22,6 +22,7 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
+import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 
@@ -54,7 +55,10 @@ public class DuplicateRouteHandler implements ExceptionHandler<DuplicateRouteExc
     public HttpResponse handle(HttpRequest request, DuplicateRouteException exception) {
         Object error;
         if (responseFactory != null) {
-            error = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, exception.getMessage());
+            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+                    .cause(exception)
+                    .errorMessage(exception.getMessage())
+                    .build());
         } else {
             error = new JsonError(exception.getMessage())
                     .link(Link.SELF, Link.of(request.getUri()));

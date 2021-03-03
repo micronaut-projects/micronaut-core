@@ -23,6 +23,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
 import javax.inject.Inject;
@@ -56,17 +57,20 @@ public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingExce
         MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
         Object body;
         if (responseFactory != null) {
-            body = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, new io.micronaut.http.server.exceptions.format.JsonError() {
-                @Override
-                public String getMessage() {
-                    return "Invalid JSON: " + exception.getMessage();
-                }
+            body = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+                    .cause(exception)
+                    .error(new io.micronaut.http.server.exceptions.format.JsonError() {
+                        @Override
+                        public String getMessage() {
+                            return "Invalid JSON: " + exception.getMessage();
+                        }
 
-                @Override
-                public Optional<String> getTitle() {
-                    return Optional.of("Invalid JSON");
-                }
-            });
+                        @Override
+                        public Optional<String> getTitle() {
+                            return Optional.of("Invalid JSON");
+                        }
+                    })
+                    .build());
         } else {
             body = new JsonError("Invalid JSON: " + exception.getMessage())
                     .link(Link.SELF, Link.of(request.getUri()));

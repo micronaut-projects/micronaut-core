@@ -16,14 +16,20 @@
 package io.micronaut.docs.server.exception;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 
 import java.util.Collections;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 
@@ -53,8 +59,15 @@ public class ExceptionHandlerSpec {
     @Test
     public void testExceptionIsHandled() {
         HttpRequest request = HttpRequest.GET("/books/stock/1234");
-        long stock = client.toBlocking().retrieve(request, long.class);
 
-        assertEquals(0L, stock);
+        Argument<Map<String, Object>> errorType = Argument.mapOf(String.class, Object.class);
+        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> {
+                client.toBlocking().exchange(request, Argument.LONG, errorType);
+        });
+        HttpResponse response = ex.getResponse();
+        Map<String, Object> body = (Map<String, Object>) response.getBody(errorType).get();
+
+        assertEquals(response.status(), HttpStatus.BAD_REQUEST);
+        assertEquals(body.get("message"), "No stock available");
     }
 }

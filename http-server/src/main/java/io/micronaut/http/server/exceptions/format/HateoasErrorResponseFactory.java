@@ -17,9 +17,6 @@ package io.micronaut.http.server.exceptions.format;
 
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.http.hateoas.JsonError;
@@ -47,30 +44,23 @@ public class HateoasErrorResponseFactory implements JsonErrorResponseFactory<Jso
 
     @Override
     @NonNull
-    public JsonError createResponse(@NonNull HttpRequest<?> request,
-                                   @NonNull HttpStatus responseStatus,
-                                   @Nullable Throwable cause,
-                                   @NonNull List<io.micronaut.http.server.exceptions.format.JsonError> jsonErrors) {
+    public JsonError createResponse(@NonNull JsonErrorContext jsonErrorContext) {
         JsonError error;
-        if (jsonErrors.isEmpty()) {
-            error = new JsonError(responseStatus.getReason());
-            error.link(Link.SELF, Link.of(request.getUri()));
-        } else if (jsonErrors.size() == 1 && !alwaysSerializeErrorsAsList) {
-            io.micronaut.http.server.exceptions.format.JsonError jsonError = jsonErrors.get(0);
+        if (!jsonErrorContext.hasErrors()) {
+            error = new JsonError(jsonErrorContext.getResponseStatus().getReason());
+        } else if (jsonErrorContext.getErrors().size() == 1 && !alwaysSerializeErrorsAsList) {
+            io.micronaut.http.server.exceptions.format.JsonError jsonError = jsonErrorContext.getErrors().get(0);
             error = new JsonError(jsonError.getMessage());
             jsonError.getPath().ifPresent(error::path);
-            error.link(Link.SELF, Link.of(request.getUri()));
         } else {
-            error = new JsonError(responseStatus.getReason());
+            error = new JsonError(jsonErrorContext.getResponseStatus().getReason());
             List<Resource> errors = new ArrayList<>();
-            for (io.micronaut.http.server.exceptions.format.JsonError errorDetail : jsonErrors) {
-                JsonError vndError = new JsonError(errorDetail.getMessage());
-                errorDetail.getPath().ifPresent(vndError::path);
-                errors.add(vndError);
+            for (io.micronaut.http.server.exceptions.format.JsonError jsonError : jsonErrorContext.getErrors()) {
+                errors.add(new JsonError(jsonError.getMessage()).path(jsonError.getPath().orElse(null)));
             }
             error.embedded("errors", errors);
-            error.link(Link.SELF, Link.of(request.getUri()));
         }
+        error.link(Link.SELF, Link.of(jsonErrorContext.getRequest().getUri()));
         return error;
     }
 }

@@ -22,6 +22,8 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
+import io.micronaut.http.server.exceptions.format.DefaultJsonErrorContext;
+import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
 import javax.inject.Inject;
@@ -54,7 +56,10 @@ public class ContentLengthExceededHandler implements ExceptionHandler<ContentLen
         Object error;
         HttpStatus status = HttpStatus.REQUEST_ENTITY_TOO_LARGE;
         if (responseFactory != null) {
-            error = responseFactory.createResponse(request, status, exception, exception.getMessage());
+            error = responseFactory.createResponse(JsonErrorContext.builder(request, status)
+                    .cause(exception)
+                    .errorMessage(exception.getMessage())
+                    .build());
         } else {
             error = new JsonError(exception.getMessage())
                     .link(Link.SELF, Link.of(request.getUri()));

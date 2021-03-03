@@ -15,13 +15,8 @@
  */
 package io.micronaut.http.server.exceptions.format;
 
+import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpStatus;
-
-import java.util.Collections;
-import java.util.List;
 
 /**
  * Creates objects to be rendered as JSON that represent errors.
@@ -29,28 +24,10 @@ import java.util.List;
  * @author James Kleeh
  * @since 2.4.0
  */
+@DefaultImplementation(HateoasErrorResponseFactory.class)
 public interface JsonErrorResponseFactory<T> {
 
     @NonNull
-    T createResponse(@NonNull HttpRequest<?> request,
-                     @NonNull HttpStatus responseStatus,
-                     @Nullable Throwable cause,
-                     @NonNull List<JsonError> jsonErrors);
-
-    @NonNull
-    default T createResponse(@NonNull HttpRequest<?> request,
-                             @NonNull HttpStatus responseStatus,
-                             @Nullable Throwable cause,
-                             @NonNull JsonError jsonError) {
-        return createResponse(request, responseStatus, cause, Collections.singletonList(jsonError));
-    }
-
-    @NonNull
-    default T createResponse(@NonNull HttpRequest<?> request,
-                             @NonNull HttpStatus responseStatus,
-                             @Nullable Throwable cause,
-                             @NonNull String message) {
-        return createResponse(request, responseStatus, cause, JsonError.forMessage(message));
-    }
+    T createResponse(@NonNull JsonErrorContext errorContext);
 
 }
