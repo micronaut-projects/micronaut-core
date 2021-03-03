@@ -33,6 +33,7 @@ import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -158,8 +159,9 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
 
     /**
      * Returns a class element with aligned generic information.
-     * @param typeMirror The type mirror
-     * @param visitorContext The visitor context
+     *
+     * @param typeMirror          The type mirror
+     * @param visitorContext      The visitor context
      * @param declaredGenericInfo The declared generic info
      * @return The class element
      */
@@ -200,13 +202,32 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
     /**
      * Obtain the ClassElement for the given mirror.
      *
+     * @param returnType             The return type
+     * @param visitorContext         The visitor context
+     * @param genericsInfo           The generic information.
+     * @param includeTypeAnnotations Whether to include type level annotations in the metadata for the element
+     * @return The class element
+     */
+    protected @NonNull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext,
+                                      Map<String, Map<String, TypeMirror>> genericsInfo,
+                                      boolean includeTypeAnnotations) {
+        return mirrorToClassElement(returnType, visitorContext, genericsInfo, includeTypeAnnotations, false);
+    }
+
+
+    /**
+     * Obtain the ClassElement for the given mirror.
+     *
      * @param returnType The return type
      * @param visitorContext The visitor context
      * @param genericsInfo The generic information.
      * @param includeTypeAnnotations Whether to include type level annotations in the metadata for the element
+     * @param resolveAllBoundGenerics Whether to resolve bound generics from super classes
      * @return The class element
      */
-    protected @NonNull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo, boolean includeTypeAnnotations) {
+    protected @NonNull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext,
+                                                         Map<String, Map<String, TypeMirror>> genericsInfo,
+                                                         boolean includeTypeAnnotations, boolean resolveAllBoundGenerics) {
         if (genericsInfo == null) {
             genericsInfo = Collections.emptyMap();
         }
@@ -220,7 +241,12 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
                 if (e instanceof TypeElement) {
                     TypeElement typeElement = (TypeElement) e;
-                    Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
+                    Map<String, TypeMirror> boundGenerics;
+                    if (resolveAllBoundGenerics) {
+                        boundGenerics = resolveAllBoundGenerics(visitorContext, genericsInfo);
+                    } else {
+                        boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
+                    }
                     AnnotationUtils annotationUtils = visitorContext
                                                         .getAnnotationUtils();
                     AnnotationMetadata newAnnotationMetadata;
@@ -257,10 +283,14 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         } else if (returnType instanceof TypeVariable) {
             TypeVariable tv = (TypeVariable) returnType;
             TypeMirror upperBound = tv.getUpperBound();
-            Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
-
+            Map<String, TypeMirror> boundGenerics;
+            if (resolveAllBoundGenerics) {
+                boundGenerics = resolveAllBoundGenerics(visitorContext, genericsInfo);
+            } else {
+                boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
+            }
             TypeMirror bound = boundGenerics.get(tv.toString());
-            if (bound != null) {
+            if (bound != null && bound != tv) {
                 return mirrorToClassElement(bound, visitorContext, genericsInfo, includeTypeAnnotations);
             } else {
                 return mirrorToClassElement(upperBound, visitorContext, genericsInfo, includeTypeAnnotations);
@@ -287,6 +317,30 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         Map<String, TypeMirror> boundGenerics = genericsInfo.get(declaringTypeName);
         if (boundGenerics == null) {
             boundGenerics = Collections.emptyMap();
+        }
+        return boundGenerics;
+    }
+
+    private Map<String, TypeMirror> resolveAllBoundGenerics(JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {
+        if (genericsInfo.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, TypeMirror> boundGenerics = new LinkedHashMap<>();
+        TypeElement clazz = visitorContext.getModelUtils().classElementFor(element);
+        while (clazz != null && !Object.class.getName().equals(clazz.getQualifiedName().toString())) {
+            Map<String, TypeMirror> mirrorMap = genericsInfo.get(clazz.getQualifiedName().toString());
+            if (mirrorMap != null) {
+                boundGenerics.putAll(mirrorMap);
+            }
+            TypeMirror superclass = clazz.getSuperclass();
+            if (superclass != null) {
+                final Element element = visitorContext.getTypes().asElement(superclass);
+                if (element instanceof TypeElement) {
+                    clazz = (TypeElement) element;
+                    continue;
+                }
+            }
+            break;
         }
         return boundGenerics;
     }

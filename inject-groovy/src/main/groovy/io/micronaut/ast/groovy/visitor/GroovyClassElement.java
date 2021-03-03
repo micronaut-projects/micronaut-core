@@ -390,11 +390,27 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     Map<String, ClassElement> getTypeArguments() {
         Map<String, Map<String, ClassNode>> genericInfo = getGenericTypeInfo();
         Map<String, ClassNode> info = genericInfo.get(classNode.getName());
-        return resolveGenericMap(info);
+        return resolveGenericMap(classNode, info, Collections.emptyMap());
+    }
+
+    private @NonNull Map<String, ClassElement> resolveAllTypeArguments() {
+        Map<String, Map<String, ClassNode>> genericInfo = getGenericTypeInfo();
+        if (genericInfo.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, ClassElement> typeArguments = new LinkedHashMap<>();
+        ClassNode clazz = classNode;
+        while (clazz != null && !"java.lang.Object".equals(clazz.getName())) {
+            Map<String, ClassNode> info = genericInfo.get(clazz.getName());
+            Map<String, ClassElement> m = resolveGenericMap(clazz, info, typeArguments);
+            typeArguments.putAll(m);
+            clazz = clazz.getUnresolvedSuperClass();
+        }
+        return typeArguments;
     }
 
     @NonNull
-    private Map<String, ClassElement> resolveGenericMap(Map<String, ClassNode> info) {
+    private Map<String, ClassElement> resolveGenericMap(ClassNode classNode, Map<String, ClassNode> info, Map<String, ClassElement> existingResolve) {
         if (info != null) {
             Map<String, ClassElement> typeArgumentMap = new LinkedHashMap<>(info.size());
             GenericsType[] genericsTypes = classNode.getGenericsTypes();
@@ -404,6 +420,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     GenericsType gt = genericsTypes[i];
                     GenericsType redirectType = redirectTypes[i];
                     if (gt.isPlaceholder()) {
+                        ClassElement existingElement = existingResolve.get(gt.getName());
+                        if (existingElement != null) {
+                            typeArgumentMap.put(redirectType.getName(), existingElement);
+                            continue;
+                        }
                         ClassNode cn = resolveTypeArgument(info, redirectType.getName());
                         if (cn != null) {
                             Map<String, ClassNode> newInfo = alignNewGenericsInfo(genericsTypes, redirectTypes, info);
@@ -565,7 +586,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                                 ClassElement getterReturnType = null;
                                 if (returnTypeNode.isGenericsPlaceHolder()) {
                                     final String placeHolderName = returnTypeNode.getUnresolvedName();
-                                    final ClassElement classElement = getTypeArguments().get(placeHolderName);
+                                    final ClassElement classElement = resolveAllTypeArguments().get(placeHolderName);
                                     if (classElement != null) {
                                         getterReturnType = classElement;
                                     }

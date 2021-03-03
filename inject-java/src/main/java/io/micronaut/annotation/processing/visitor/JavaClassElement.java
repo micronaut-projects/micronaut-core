@@ -276,7 +276,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             if (returnType instanceof TypeVariable) {
                                 TypeVariable tv = (TypeVariable) returnType;
                                 final String tvn = tv.toString();
-                                final ClassElement classElement = getTypeArguments().get(tvn);
+                                final ClassElement classElement = getResolveAllTypeArguments().get(tvn);
                                 if (classElement != null) {
                                     getterReturnType = classElement;
                                 } else {
@@ -737,6 +737,31 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         }
 
         return Collections.unmodifiableMap(map);
+    }
+
+    private @NonNull Map<String, ClassElement> getResolveAllTypeArguments() {
+        Map<String, Map<String, TypeMirror>> genericTypeInfo = getGenericTypeInfo();
+        if (genericTypeInfo.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, ClassElement> typeArguments = new LinkedHashMap<>();
+        TypeElement clazz = classElement;
+        while (!Object.class.getName().equals(clazz.getQualifiedName().toString())) {
+            for (TypeParameterElement tpe : clazz.getTypeParameters()) {
+                ClassElement classElement = mirrorToClassElement(tpe.asType(), visitorContext, genericTypeInfo, visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments(), true);
+                typeArguments.put(tpe.toString(), classElement);
+            }
+            final TypeMirror superclass = clazz.getSuperclass();
+            if (superclass != null) {
+                final Element element = visitorContext.getTypes().asElement(superclass);
+                if (element instanceof TypeElement) {
+                    clazz = (TypeElement) element;
+                    continue;
+                }
+            }
+            break;
+        }
+        return typeArguments;
     }
 
     @NonNull

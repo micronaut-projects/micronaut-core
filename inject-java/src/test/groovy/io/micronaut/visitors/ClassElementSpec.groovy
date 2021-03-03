@@ -210,6 +210,93 @@ interface AnotherInterface {
         accessibleFields*.name as Set == ['s1', 't1'] as Set
     }
 
+    void "test generic beans"() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package genericbeans;
+
+class TaskGenericEntity extends GenericEntity<Long> {
+}
+
+abstract class GenericEntity<T> {
+
+    protected T id;
+
+    public T getId() {
+        return id;
+    }
+
+    public void setId(T id) {
+        this.id = id;
+    }
+}
+
+
+''')
+        expect:
+            classElement.getBeanProperties().find(prop -> prop.name == "id").getType().getName() == "java.lang.Long"
+    }
+
+    void "test generic beans 2"() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package genericbeans;
+
+class TaskGenericEntityY extends TaskGenericEntityX {
+}
+
+abstract class TaskGenericEntityX extends GenericEntity<Long> {
+}
+
+abstract class GenericEntity<T> {
+
+    protected T id;
+
+    public T getId() {
+        return id;
+    }
+
+    public void setId(T id) {
+        this.id = id;
+    }
+}
+
+
+''')
+        expect:
+            classElement.getBeanProperties().find(prop -> prop.name == "id").getType().getName() == "java.lang.Long"
+    }
+
+    void "test generic beans 3"() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package genericbeans;
+
+class TaskGenericEntityA extends TaskGenericEntityB<Long> {
+}
+
+abstract class TaskGenericEntityB<D> extends GenericEntity<D> {
+}
+
+abstract class GenericEntity<T> {
+
+    protected T id;
+
+    public T getId() {
+        return id;
+    }
+
+    public void setId(T id) {
+        this.id = id;
+    }
+}
+
+
+''')
+        expect:
+            classElement.getBeanProperties().find(prop -> prop.name == "id").getType().getName() == "java.lang.Long"
+    }
+
     void "test visit inherited controller classes"() {
         buildBeanDefinition('test.TestController', '''
 package test;
