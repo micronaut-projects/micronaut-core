@@ -19,6 +19,7 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.CircuitState;
 import io.micronaut.retry.RetryStateBuilder;
+import io.micronaut.retry.annotation.RetryPredicate;
 import io.micronaut.retry.event.CircuitClosedEvent;
 import io.micronaut.retry.event.CircuitOpenEvent;
 import io.micronaut.retry.exception.CircuitOpenException;
@@ -74,7 +75,7 @@ class CircuitBreakerRetry implements MutableRetryState {
         if (exception == null && currentState() == CircuitState.HALF_OPEN) {
             closeCircuit();
         } else if (currentState() != CircuitState.OPEN) {
-            if (exception != null) {
+            if (exception != null && getRetryPredicate().test(exception)) {
                 openCircuit(exception);
             } else {
                 // reset state for successful operation
@@ -146,6 +147,11 @@ class CircuitBreakerRetry implements MutableRetryState {
     @Override
     public Optional<Duration> getMaxDelay() {
         return childState.getMaxDelay();
+    }
+
+    @Override
+    public RetryPredicate getRetryPredicate() {
+        return childState.getRetryPredicate();
     }
 
     /**
