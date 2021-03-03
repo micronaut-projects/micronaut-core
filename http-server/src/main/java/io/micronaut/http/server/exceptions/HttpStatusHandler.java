@@ -17,7 +17,6 @@ package io.micronaut.http.server.exceptions;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.hateoas.Link;

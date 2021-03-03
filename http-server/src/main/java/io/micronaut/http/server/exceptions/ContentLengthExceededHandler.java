@@ -22,7 +22,6 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
-import io.micronaut.http.server.exceptions.format.DefaultJsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 

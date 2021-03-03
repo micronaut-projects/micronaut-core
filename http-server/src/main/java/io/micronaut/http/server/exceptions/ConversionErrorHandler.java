@@ -22,12 +22,11 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
-import io.micronaut.http.server.exceptions.format.DefaultJsonErrorContext;
+import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -56,7 +55,7 @@ public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorE
     public HttpResponse handle(HttpRequest request, ConversionErrorException exception) {
         Object error;
         if (responseFactory != null) {
-            error = responseFactory.createResponse(DefaultJsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
                     .cause(exception)
                     .error(new io.micronaut.http.server.exceptions.format.JsonError() {
                         @Override

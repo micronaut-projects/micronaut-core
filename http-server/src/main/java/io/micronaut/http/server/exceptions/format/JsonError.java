@@ -15,10 +15,7 @@
  */
 package io.micronaut.http.server.exceptions.format;
 
-import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Contains information about an error that occurred.
@@ -28,21 +25,23 @@ import java.util.stream.Collectors;
  */
 public interface JsonError {
 
+    /**
+     * @return The optional error path
+     */
     default Optional<String> getPath() {
         return Optional.empty();
     }
 
+    /**
+     * @return The error message
+     */
     String getMessage();
 
+    /**
+     * @return An optional short description for the error
+     */
     default Optional<String> getTitle() {
         return Optional.empty();
     }
 
-    static List<JsonError> forMessage(String message) {
-        return Collections.singletonList(() -> message);
-    }
-
-    static List<JsonError> forMessages(List<String> messages) {
-        return messages.stream().map(msg -> (JsonError) () -> msg).collect(Collectors.toList());
-    }
 }

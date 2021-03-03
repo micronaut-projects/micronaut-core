@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.channels.ClosedChannelException;
@@ -187,6 +186,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
      * @param executorSelector                        The executor selector
      * @param ioExecutor                              The IO executor
      * @param httpContentProcessorResolver            The http content processor resolver
+     * @param errorResponseFactory                    The factory to create error responses
      */
     RoutingInBoundHandler(
             BeanContext beanContext,

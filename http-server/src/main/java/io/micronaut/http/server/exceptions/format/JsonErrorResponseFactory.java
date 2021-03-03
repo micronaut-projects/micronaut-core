@@ -21,12 +21,19 @@ import io.micronaut.core.annotation.NonNull;
 /**
  * Creates objects to be rendered as JSON that represent errors.
  *
+ * @param <T> The response type
  * @author James Kleeh
  * @since 2.4.0
  */
 @DefaultImplementation(HateoasErrorResponseFactory.class)
 public interface JsonErrorResponseFactory<T> {
 
+    /**
+     * Create an object to be serialized as JSON representing the error(s).
+     *
+     * @param errorContext The error context
+     * @return An error response
+     */
     @NonNull
     T createResponse(@NonNull JsonErrorContext errorContext);
 

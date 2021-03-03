@@ -170,6 +170,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param httpCompressionStrategy                 The http compression strategy
      * @param httpContentProcessorResolver            The http content processor resolver
      * @param channelOptionFactory                    The channel option factory
+     * @param responseFactory                         The factory to create error responses
      */
     @SuppressWarnings("ParameterNumber")
     public NettyHttpServer(
