@@ -15,7 +15,10 @@
  */
 package io.micronaut.http.server.exceptions.format;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 
 import java.util.Collections;
 import java.util.List;
@@ -26,22 +29,28 @@ import java.util.List;
  * @author James Kleeh
  * @since 2.4.0
  */
-public interface JsonErrorResponseFactory {
+public interface JsonErrorResponseFactory<T> {
 
-    Object createResponse(HttpRequest<?> request,
-                          Throwable cause,
-                          List<Error> errorDetails);
+    @NonNull
+    T createResponse(@NonNull HttpRequest<?> request,
+                     @NonNull HttpStatus responseStatus,
+                     @Nullable Throwable cause,
+                     @NonNull List<JsonError> jsonErrors);
 
-    default Object createResponse(HttpRequest<?> request,
-                                  Throwable cause,
-                                  Error error) {
-        return createResponse(request, cause, Collections.singletonList(error));
+    @NonNull
+    default T createResponse(@NonNull HttpRequest<?> request,
+                             @NonNull HttpStatus responseStatus,
+                             @Nullable Throwable cause,
+                             @NonNull JsonError jsonError) {
+        return createResponse(request, responseStatus, cause, Collections.singletonList(jsonError));
     }
 
-    default Object createResponse(HttpRequest<?> request,
-                                  Throwable cause,
-                                  String message) {
-        return createResponse(request, cause, Error.forMessage(message));
+    @NonNull
+    default T createResponse(@NonNull HttpRequest<?> request,
+                             @NonNull HttpStatus responseStatus,
+                             @Nullable Throwable cause,
+                             @NonNull String message) {
+        return createResponse(request, responseStatus, cause, JsonError.forMessage(message));
     }
 
 }

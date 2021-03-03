@@ -37,7 +37,7 @@ import javax.inject.Singleton;
 @Produces
 public class ContentLengthExceededHandler implements ExceptionHandler<ContentLengthExceededException, HttpResponse> {
 
-    private final JsonErrorResponseFactory responseFactory;
+    private final JsonErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public ContentLengthExceededHandler() {
@@ -45,22 +45,23 @@ public class ContentLengthExceededHandler implements ExceptionHandler<ContentLen
     }
 
     @Inject
-    public ContentLengthExceededHandler(JsonErrorResponseFactory responseFactory) {
+    public ContentLengthExceededHandler(JsonErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
     @Override
     public HttpResponse handle(HttpRequest request, ContentLengthExceededException exception) {
         Object error;
+        HttpStatus status = HttpStatus.REQUEST_ENTITY_TOO_LARGE;
         if (responseFactory != null) {
-            error = responseFactory.createResponse(request, exception, exception.getMessage());
+            error = responseFactory.createResponse(request, status, exception, exception.getMessage());
         } else {
             error = new JsonError(exception.getMessage())
                     .link(Link.SELF, Link.of(request.getUri()));
         }
 
         return HttpResponse
-            .status(HttpStatus.REQUEST_ENTITY_TOO_LARGE)
+            .status(status)
             .body(error);
     }
 }

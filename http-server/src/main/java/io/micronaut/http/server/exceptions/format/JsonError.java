@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
  * @author James Kleeh
  * @since 2.4.0
  */
-public interface Error {
+public interface JsonError {
 
     default Optional<String> getPath() {
         return Optional.empty();
@@ -38,11 +38,11 @@ public interface Error {
         return Optional.empty();
     }
 
-    static List<Error> forMessage(String message) {
+    static List<JsonError> forMessage(String message) {
         return Collections.singletonList(() -> message);
     }
 
-    static List<Error> forMessages(List<String> messages) {
-        return messages.stream().map(msg -> (Error) () -> msg).collect(Collectors.toList());
+    static List<JsonError> forMessages(List<String> messages) {
+        return messages.stream().map(msg -> (JsonError) () -> msg).collect(Collectors.toList());
     }
 }

@@ -17,11 +17,11 @@ package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.exceptions.format.Error;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.slf4j.Logger;
@@ -40,8 +40,10 @@ import java.util.Optional;
 @Singleton
 @Produces
 public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRouteException, HttpResponse> {
+
     private static final Logger LOG = LoggerFactory.getLogger(UnsatisfiedRouteHandler.class);
-    private final JsonErrorResponseFactory responseFactory;
+
+    private final JsonErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public UnsatisfiedRouteHandler() {
@@ -49,7 +51,7 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
     }
 
     @Inject
-    public UnsatisfiedRouteHandler(JsonErrorResponseFactory responseFactory) {
+    public UnsatisfiedRouteHandler(JsonErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
@@ -60,7 +62,7 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
         }
         Object error;
         if (responseFactory != null) {
-            error = responseFactory.createResponse(request, exception, new Error() {
+            error = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, new io.micronaut.http.server.exceptions.format.JsonError() {
                 @Override
                 public String getMessage() {
                     return exception.getMessage();

@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
@@ -37,7 +38,7 @@ import javax.inject.Singleton;
 @Produces
 public class DuplicateRouteHandler implements ExceptionHandler<DuplicateRouteException, HttpResponse> {
 
-    private final JsonErrorResponseFactory responseFactory;
+    private final JsonErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public DuplicateRouteHandler() {
@@ -45,7 +46,7 @@ public class DuplicateRouteHandler implements ExceptionHandler<DuplicateRouteExc
     }
 
     @Inject
-    public DuplicateRouteHandler(JsonErrorResponseFactory responseFactory) {
+    public DuplicateRouteHandler(JsonErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
@@ -53,7 +54,7 @@ public class DuplicateRouteHandler implements ExceptionHandler<DuplicateRouteExc
     public HttpResponse handle(HttpRequest request, DuplicateRouteException exception) {
         Object error;
         if (responseFactory != null) {
-            error = responseFactory.createResponse(request, exception, exception.getMessage());
+            error = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, exception.getMessage());
         } else {
             error = new JsonError(exception.getMessage())
                     .link(Link.SELF, Link.of(request.getUri()));

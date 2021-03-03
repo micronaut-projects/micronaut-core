@@ -43,6 +43,7 @@ import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ServerStartupException;
+import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
@@ -188,7 +189,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             EventLoopGroupRegistry eventLoopGroupRegistry,
             HttpCompressionStrategy httpCompressionStrategy,
             HttpContentProcessorResolver httpContentProcessorResolver,
-            ChannelOptionFactory channelOptionFactory
+            ChannelOptionFactory channelOptionFactory,
+            JsonErrorResponseFactory responseFactory
     ) {
         this.httpCompressionStrategy = httpCompressionStrategy;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
@@ -234,7 +236,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 requestArgumentSatisfier,
                 executorSelector,
                 SupplierUtil.memoized(ioExecutor::get),
-                httpContentProcessorResolver
+                httpContentProcessorResolver,
+                responseFactory
         );
         this.channelOptionFactory = channelOptionFactory;
     }

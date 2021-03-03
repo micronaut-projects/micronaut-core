@@ -18,10 +18,10 @@ package io.micronaut.http.server.exceptions;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
-import io.micronaut.http.server.exceptions.format.Error;
+import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
 import javax.inject.Inject;
@@ -39,7 +39,7 @@ import java.util.Optional;
 @Produces
 public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorException, HttpResponse> {
 
-    private final JsonErrorResponseFactory responseFactory;
+    private final JsonErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public ConversionErrorHandler() {
@@ -47,7 +47,7 @@ public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorE
     }
 
     @Inject
-    public ConversionErrorHandler(JsonErrorResponseFactory responseFactory) {
+    public ConversionErrorHandler(JsonErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
@@ -55,7 +55,7 @@ public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorE
     public HttpResponse handle(HttpRequest request, ConversionErrorException exception) {
         Object error;
         if (responseFactory != null) {
-            error = responseFactory.createResponse(request, exception, Collections.singletonList(new Error() {
+            error = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, Collections.singletonList(new io.micronaut.http.server.exceptions.format.JsonError() {
                 @Override
                 public Optional<String> getPath() {
                     return Optional.of('/' + exception.getArgument().getName());

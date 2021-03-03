@@ -17,9 +17,9 @@ package io.micronaut.http.server.exceptions;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
-import io.micronaut.http.server.exceptions.format.Error;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
 import javax.inject.Inject;
@@ -37,7 +37,7 @@ import java.util.Optional;
 @Produces
 public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, HttpResponse> {
 
-    private final JsonErrorResponseFactory responseFactory;
+    private final JsonErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public URISyntaxHandler() {
@@ -45,7 +45,7 @@ public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, Ht
     }
 
     @Inject
-    public URISyntaxHandler(JsonErrorResponseFactory responseFactory) {
+    public URISyntaxHandler(JsonErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
@@ -53,7 +53,7 @@ public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, Ht
     public HttpResponse handle(HttpRequest request, URISyntaxException exception) {
         Object error;
         if (responseFactory != null) {
-            error = responseFactory.createResponse(request, exception, new Error() {
+            error = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, new io.micronaut.http.server.exceptions.format.JsonError() {
                 @Override
                 public String getMessage() {
                     return "Malformed URI: " + exception.getMessage();

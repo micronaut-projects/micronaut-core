@@ -21,9 +21,8 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
-import io.micronaut.http.server.exceptions.format.Error;
+import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
 import javax.inject.Inject;
@@ -40,7 +39,7 @@ import java.util.Optional;
 @Singleton
 public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingException, Object> {
 
-    private final JsonErrorResponseFactory responseFactory;
+    private final JsonErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public JsonExceptionHandler() {
@@ -48,7 +47,7 @@ public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingExce
     }
 
     @Inject
-    public JsonExceptionHandler(JsonErrorResponseFactory responseFactory) {
+    public JsonExceptionHandler(JsonErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
@@ -57,7 +56,7 @@ public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingExce
         MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
         Object body;
         if (responseFactory != null) {
-            body = responseFactory.createResponse(request, exception, new Error() {
+            body = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, new io.micronaut.http.server.exceptions.format.JsonError() {
                 @Override
                 public String getMessage() {
                     return "Invalid JSON: " + exception.getMessage();

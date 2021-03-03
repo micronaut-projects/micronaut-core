@@ -36,7 +36,7 @@ import javax.inject.Singleton;
 @Produces
 public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, HttpResponse> {
 
-    private final JsonErrorResponseFactory responseFactory;
+    private final JsonErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public HttpStatusHandler() {
@@ -44,7 +44,7 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
     }
 
     @Inject
-    public HttpStatusHandler(JsonErrorResponseFactory responseFactory) {
+    public HttpStatusHandler(JsonErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
@@ -54,7 +54,7 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
         Object body = exception.getBody()
             .orElseGet(() -> {
                 if (responseFactory != null) {
-                    return responseFactory.createResponse(request, exception, exception.getMessage());
+                    return responseFactory.createResponse(request, exception.getStatus(), exception, exception.getMessage());
                 } else {
                     return new JsonError(exception.getMessage())
                             .link(Link.SELF, Link.of(request.getUri()));

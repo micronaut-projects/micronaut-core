@@ -20,11 +20,10 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
+import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.exceptions.format.Error;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 import io.micronaut.jackson.JacksonConfiguration;
 
@@ -52,7 +51,7 @@ import java.util.stream.Collectors;
 public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintViolationException, HttpResponse<?>> {
 
     private final boolean alwaysSerializeErrorsAsList;
-    private final JsonErrorResponseFactory responseFactory;
+    private final JsonErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public ConstraintExceptionHandler() {
@@ -67,7 +66,7 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
     }
 
     @Inject
-    public ConstraintExceptionHandler(JsonErrorResponseFactory responseFactory) {
+    public ConstraintExceptionHandler(JsonErrorResponseFactory<?> responseFactory) {
         this.alwaysSerializeErrorsAsList = false;
         this.responseFactory = responseFactory;
     }
@@ -79,9 +78,9 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
         if (responseFactory != null) {
             Object response;
             if (constraintViolations == null || constraintViolations.isEmpty()) {
-                response = responseFactory.createResponse(request, exception, exception.getMessage() == null ? HttpStatus.BAD_REQUEST.getReason() : exception.getMessage());
+                response = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, exception.getMessage() == null ? HttpStatus.BAD_REQUEST.getReason() : exception.getMessage());
             } else {
-                response = responseFactory.createResponse(request, exception, Error.forMessages(
+                response = responseFactory.createResponse(request, HttpStatus.BAD_REQUEST, exception, io.micronaut.http.server.exceptions.format.JsonError.forMessages(
                         exception.getConstraintViolations()
                                 .stream()
                                 .map(this::buildMessage)
