@@ -72,7 +72,9 @@ public interface RetryState {
     /**
      * @return The retry predicate checking for includes/excludes throwable classes
      */
-    RetryPredicate getRetryPredicate();
+    default RetryPredicate getRetryPredicate() {
+        throw new UnsupportedOperationException("Retry predicate not supported on this type");
+    }
 
     /**
      * Opens the retry state.

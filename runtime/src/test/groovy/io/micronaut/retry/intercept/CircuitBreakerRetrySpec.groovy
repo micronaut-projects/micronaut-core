@@ -136,6 +136,37 @@ class CircuitBreakerRetrySpec extends Specification {
         counterService.countIncludes == 1
 
         when:
+        counterService.getCountIncludes(false)
+
+        then: "the circuit is not open because the thrown exception does not match includes"
+        noExceptionThrown()
+        counterService.countIncludes == 3
+
+        cleanup:
+        context.stop()
+    }
+
+    void "test circuit breaker with includes 2"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountIncludes(false)
+
+        then: "the circuit is open so the original exception is thrown"
+        noExceptionThrown()
+        counterService.countIncludes == counterService.countThreshold
+
+        when:
+        counterService.countIncludes = 0
+        counterService.getCountIncludes(true)
+
+        then: "retry didn't kick in because the exception thrown doesn't match includes"
+        thrown(IllegalStateException)
+        counterService.countIncludes == 1
+
+        when:
         counterService.countIncludes = 0
         counterService.countThreshold = 7
         counterService.getCountIncludes(false)
