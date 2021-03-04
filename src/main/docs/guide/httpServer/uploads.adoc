@@ -45,6 +45,8 @@ snippet::io.micronaut.docs.server.upload.CompletedUploadController[tags="class",
 <2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`
 <3> The `CompletedFileUpload` instance gives access to metadata about the upload as well as access to the file contents.
 
+IMPORTANT: If a file will not be read, the `discard` method on the file object *must* be called to prevent memory leaks.
+
 == Multiple Uploads
 
 === Different Names
