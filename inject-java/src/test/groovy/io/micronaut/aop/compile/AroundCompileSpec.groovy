@@ -522,6 +522,32 @@ class TestInterceptor implements Interceptor {
         context.close()
     }
 
+    void "test validated on class with generics"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$BaseEntityServiceDefinition$Intercepted', """
+package test;
+
+@io.micronaut.validation.Validated
+class BaseEntityService<T extends BaseEntity> extends BaseService<T> {
+}
+
+class BaseEntity {}
+abstract class BaseService<T> implements IBeanValidator<T> {
+    public boolean isValid(T entity) {
+        return true;
+    }
+}
+interface IBeanValidator<T> {
+    boolean isValid(T entity);
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanDefinition != null
+        beanDefinition.getTypeArguments('test.BaseService')[0].type.name == 'test.BaseEntity'
+    }
+
     static class NamedTestAnnMapper implements NamedAnnotationMapper {
 
         @Override
@@ -532,8 +558,8 @@ class TestInterceptor implements Interceptor {
         @Override
         List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
             return Collections.singletonList(AnnotationValue.builder(InterceptorBinding)
-                        .value(getName())
-                        .build())
+                    .value(getName())
+                    .build())
         }
     }
 }
