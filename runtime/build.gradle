@@ -7,6 +7,8 @@ dependencies {
     api project(":http")
     api project(':inject')
     api project(':aop')
+    api project(':context')
+    api project(":core-reactive")
     api dependencyVersion("validation")
     api "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
     api dependencyVersion("rxjava2")

@@ -25,6 +25,9 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Consumes
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.http.annotation.Error
+import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.ErrorCollector
+import org.codehaus.groovy.control.SourceUnit
 import spock.lang.Specification
 
 /**
@@ -104,7 +107,9 @@ class FormController {
 
         ClassNode element = nodes ? nodes.find { it instanceof ClassNode &&  it.name == cls } : null
         MethodNode method = element.getMethods(methodName)[0]
-        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
+        def sourceUnit = Mock(SourceUnit)
+        sourceUnit.getErrorCollector() >> new ErrorCollector(new CompilerConfiguration())
+        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(sourceUnit, null)
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
         return metadata
     }

@@ -1,8 +1,8 @@
 The HTTP server is built on http://netty.io[Netty] which is designed as a non-blocking I/O toolkit in an event loop model.
 
-The Netty worker event loop uses the "default" named event loop group. That event loop can be configured through `micronaut.netty.event-loops.default`.
+The Netty worker event loop uses the "default" named event loop group. This can be configured through `micronaut.netty.event-loops.default`.
 
-IMPORTANT: The event loop configuration under `micronaut.server.netty.worker` will only be used if the `event-loop-group` is set to a name and that name doesn't correspond to any `micronaut.netty.event-loops` configuration. This behavior is deprecated and will be removed in a future version. Use `micronaut.netty.event-loops.*` for any event loop group configuration beyond setting the name through `event-loop-group`. This does not apply to the parent event loop configuration (`micronaut.server.netty.parent`).
+IMPORTANT: The event loop configuration under `micronaut.server.netty.worker` is only used if the `event-loop-group` is set to a name which doesn't correspond to any `micronaut.netty.event-loops` configuration. This behavior is deprecated and will be removed in a future version. Use `micronaut.netty.event-loops.*` for any event loop group configuration beyond setting the name through `event-loop-group`. This does not apply to the parent event loop configuration (`micronaut.server.netty.parent`).
 
 include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration$Worker.adoc[]
 
@@ -14,14 +14,14 @@ The server can also be configured to use a different named worker event loop:
 [source,yaml]
 ----
 micronaut:
-    server:
-        netty:
-            worker:
-                event-loop-group: other
+  server:
     netty:
-        event-loops:
-            other:
-                num-threads: 10
+      worker:
+        event-loop-group: other
+  netty:
+    event-loops:
+      other:
+        num-threads: 10
 ----
 
 NOTE: The default value for the number of threads is the value of the system property `io.netty.eventLoopThreads`, or if not specified, the available processors x 2.
@@ -32,19 +32,16 @@ include::{includedir}configurationProperties/io.micronaut.http.netty.channel.Def
 
 ==== Blocking Operations
 
-When dealing with blocking operations, Micronaut will shift the blocking operations to an unbound, caching I/O thread pool by default. You can configure the I/O thread pool using the api:scheduling.executor.ExecutorConfiguration[] named `io`. For example:
+When dealing with blocking operations, Micronaut shifts the blocking operations to an unbound, caching I/O thread pool by default. You can configure the I/O thread pool using the api:scheduling.executor.ExecutorConfiguration[] named `io`. For example:
 
 .Configuring the Server I/O Thread Pool
 [source,yaml]
 ----
 micronaut:
-    executors:
-        io:
-           type: fixed
-           nThreads: 75
+  executors:
+    io:
+      type: fixed
+      nThreads: 75
 ----
 
-The above configuration will create a fixed thread pool with 75 threads.
-
-
-
+The above configuration creates a fixed thread pool with 75 threads.

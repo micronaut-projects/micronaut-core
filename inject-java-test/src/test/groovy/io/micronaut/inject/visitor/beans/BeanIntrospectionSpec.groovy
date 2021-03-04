@@ -5,17 +5,19 @@ import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
+import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.TypeConverter
-import io.micronaut.core.naming.Named
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
+import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 import spock.lang.IgnoreIf
@@ -24,7 +26,7 @@ import spock.lang.IgnoreIf
 //import org.objectweb.asm.util.ASMifier
 //import org.objectweb.asm.util.TraceClassVisitor
 import spock.lang.Issue
-import spock.util.environment.Jvm
+import spock.lang.Requires
 
 import javax.annotation.processing.SupportedAnnotationTypes
 import javax.persistence.Column
@@ -32,11 +34,327 @@ import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
 import javax.validation.Constraint
+import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test generate bean method for introspected class"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.MethodTest', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+public class MethodTest extends SuperType implements SomeInt {
+    public boolean nonAnnotated() {
+        return true;
+    }
+
+    @Executable
+    public String invokeMe(String str) {
+        return str;
+    }
+    
+    @Executable
+    int invokePrim(int i) {
+        return i;
+    }
+}
+
+class SuperType {
+    @Executable
+    String superMethod(String str) {
+        return str;
+    }
+    
+    @Executable
+    public String invokeMe(String str) {
+        return str;
+    }
+}
+
+interface SomeInt {
+    @Executable
+    default boolean ok() {
+        return true;
+    }
+    
+    default String getName() {
+        return "ok";
+    }
+}
+''')
+        when:
+        def properties = introspection.getBeanProperties()
+        Collection<BeanMethod> beanMethods = introspection.getBeanMethods()
+
+        then:
+        properties.size() == 1
+        beanMethods*.name as Set == ['invokeMe', 'invokePrim', 'superMethod', 'ok'] as Set
+        beanMethods.every({it.annotationMetadata.hasAnnotation(Executable)})
+        beanMethods.every { it.declaringBean == introspection}
+
+        when:
+
+        def invokeMe = beanMethods.find { it.name == 'invokeMe' }
+        def invokePrim = beanMethods.find { it.name == 'invokePrim' }
+        def itfeMethod = beanMethods.find { it.name == 'ok' }
+        def bean = introspection.instantiate()
+
+        then:
+        invokeMe instanceof ExecutableMethod
+        invokeMe.invoke(bean, "test") == 'test'
+        invokePrim.invoke(bean, 10) == 10
+        itfeMethod.invoke(bean) == true
+    }
+
+    void "test custom with prefix"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('customwith.CopyMe','''\
+package customwith;
+
+import java.net.URL;
+
+@io.micronaut.core.annotation.Introspected(withPrefix="alter")
+public class CopyMe {
+
+    private final String another;
+    
+    CopyMe(String another) {
+        this.another = another;
+    }
+
+    public String getAnother() {
+        return another;
+    }
+    
+    public CopyMe alterAnother(String a) {
+        return this.another == a ? this : new CopyMe(a.toUpperCase());
+    }
+}
+''')
+
+
+        when:
+        def another = introspection.getRequiredProperty("another", String)
+        def newInstance = introspection.instantiate("test")
+
+        then:
+        newInstance.another == "test"
+
+        when:"An explicit with method is used"
+        def result = another.withValue(newInstance, "changed")
+
+        then:"It was invoked"
+        !result.is(newInstance)
+        result.another == 'CHANGED'
+    }
+
+    void "test copy constructor via mutate method"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.CopyMe','''\
+package test;
+
+import java.net.URL;
+
+@io.micronaut.core.annotation.Introspected
+public class CopyMe {
+
+    private URL url;
+    private final String name;
+    private final String another;
+    
+    CopyMe(String name, String another) {
+        this.name = name;
+        this.another = another;
+    }
+
+    public URL getUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+    
+    public String getName() {
+        return name;
+    }
+    
+    public String getAnother() {
+        return another;
+    }
+    
+    public CopyMe withAnother(String a) {
+        return this.another == a ? this : new CopyMe(this.name, a.toUpperCase());
+    }
+}
+''')
+        when:
+        def copyMe = introspection.instantiate("Test", "Another")
+        def expectUrl = new URL("http://test.com")
+        copyMe.url = expectUrl
+
+        then:
+        copyMe.name == 'Test'
+        copyMe.another == "Another"
+        copyMe.url == expectUrl
+
+
+        when:
+        def property = introspection.getRequiredProperty("name", String)
+        def another = introspection.getRequiredProperty("another", String)
+        def newInstance = property.withValue(copyMe, "Changed")
+
+        then:
+        !newInstance.is(copyMe)
+        newInstance.name == 'Changed'
+        newInstance.url == expectUrl
+        newInstance.another == "Another"
+
+        when:"the instance is changed with the same value"
+        def result = property.withValue(newInstance, "Changed")
+
+        then:"The existing instance is returned"
+        newInstance.is(result)
+
+        when:"An explicit with method is used"
+        result = another.withValue(newInstance, "changed")
+
+        then:"It was invoked"
+        !result.is(newInstance)
+        result.another == 'CHANGED'
+    }
+
+    @Requires({ jvm.isJava14Compatible() })
+    void "test secondary constructor for Java 14+ records"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(int x, int y){
+    public Foo(int x) {
+        this(x, 20);
+    }
+    public Foo() {
+        this(20, 20);
+    }
+}
+''')
+        when:
+        def obj = introspection.instantiate(5, 10)
+
+        then:
+        obj.x() == 5
+        obj.y() == 10
+    }
+
+    @Requires({ jvm.isJava14Compatible() })
+    void "test secondary constructor with @Creator for Java 14+ records"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(int x, int y){
+    @Creator
+    public Foo(int x) {
+        this(x, 20);
+    }
+    public Foo() {
+        this(20, 20);
+    }
+}
+''')
+        when:
+        def obj = introspection.instantiate(5)
+
+        then:
+        obj.x() == 5
+        obj.y() == 20
+    }
+
+    @Requires({ jvm.isJava14Compatible() })
+    void "test annotations on generic type arguments for Java 14+ records"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(List<@Min(10) Long> value){
+}
+''')
+        when:
+        BeanProperty<?, ?> property = introspection.getRequiredProperty("value", List)
+        def genericTypeArg = property.asArgument().getTypeParameters()[0]
+
+        then:
+        property != null
+        genericTypeArg.annotationMetadata.hasAnnotation(Min)
+        genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
+    }
+
+    @Requires({ jvm.isJava11Compatible() })
+    void 'test annotations on generic type arguments'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+import java.lang.annotation.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static java.lang.annotation.ElementType.*;
+
+@io.micronaut.core.annotation.Introspected
+public class Foo {
+    private List<@Min(10) @SomeAnn Long> value;
+
+    public List<Long> getValue() {
+        return value;
+    }
+    
+    public void setValue(List<Long> value) {
+        this.value = value;
+    }
+}
+
+@Documented
+@Retention(RUNTIME)
+@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
+@interface SomeAnn {
+
+}
+''')
+        when:
+        BeanProperty<?, ?> property = introspection.getRequiredProperty("value", List)
+        def genericTypeArg = property.asArgument().getTypeParameters()[0]
+
+        then:
+        property != null
+        genericTypeArg.annotationMetadata.hasAnnotation(Min)
+        genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
+    }
+
     @IgnoreIf({ !jvm.isJava14Compatible() })
     void "test bean introspection on a Java 14+ record"() {
         given:
@@ -46,11 +364,11 @@ package test;
 import io.micronaut.core.annotation.Creator;
 
 @io.micronaut.core.annotation.Introspected
-public record Foo(@javax.validation.constraints.NotBlank String name){
+public record Foo(@javax.validation.constraints.NotBlank String name, int age){
 }
 ''')
         when:
-        def test = introspection.instantiate("test")
+        def test = introspection.instantiate("test", 20)
         def property = introspection.getRequiredProperty("name", String)
         def argument = introspection.getConstructorArguments()[0]
 
@@ -59,12 +377,21 @@ public record Foo(@javax.validation.constraints.NotBlank String name){
         argument.getAnnotationMetadata().hasAnnotation(NotBlank)
         test.name == 'test'
         test.name() == 'test'
-        introspection.propertyNames.length == 1
-        introspection.propertyNames == ['name'] as String[]
+        introspection.propertyNames.length == 2
+        introspection.propertyNames == ['name', 'age'] as String[]
         property.hasAnnotation(NotBlank)
         property.isReadOnly()
+        property.hasSetterOrConstructorArgument()
         property.name == 'name'
         property.get(test) == 'test'
+
+        when:"a mutation is applied"
+        def newTest = property.withValue(test, "Changed")
+
+        then:"a new instance is returned"
+        !newTest.is(test)
+        newTest.name() == 'Changed'
+        newTest.age() == 20
     }
 
     void "test create bean introspection for external inner class"() {
@@ -173,11 +500,19 @@ interface GenBase<T> {
 ''')
         when:
         def test = introspection.instantiate()
+        def property = introspection.getRequiredProperty("name", String)
 
         then:
         introspection.beanProperties.first().type == String
-        introspection.getRequiredProperty("name", String)
-                .get(test) == 'test'
+        property.get(test) == 'test'
+        !property.hasSetterOrConstructorArgument()
+
+        when:
+        property.withValue(test, 'try change')
+
+        then:
+        def e = thrown(UnsupportedOperationException)
+        e.message =='Cannot mutate property [name] that is not mutable via a setter method or constructor argument for type: test.Foo'
     }
 
     void "test bean introspection with property of generic superclass"() {
@@ -245,6 +580,13 @@ interface GenBase<T> {
 
         then:
         bp.get(test) == 5L
+
+        when:
+        def returnedBean = bp.withValue(test, 10L)
+
+        then:
+        returnedBean.is(test)
+        bp.get(test) == 10L
     }
 
     void "test bean introspection with property with static creator method on interface"() {
@@ -2125,6 +2467,37 @@ class Test extends SuperClass implements IEmail {
         introspection.getIndexedProperties(Constraint).size() == 1
     }
 
+    void "test introspection with single leading lowercase character"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test {
+
+    private final String xForwardedFor;
+    
+    Test(String xForwardedFor) {
+        this.xForwardedFor = xForwardedFor;
+    }
+    
+    public String getXForwardedFor() {
+        return xForwardedFor;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def obj = introspection.instantiate("localhost")
+
+        then:
+        noExceptionThrown()
+        introspection.getProperty("XForwardedFor", String).get().get(obj) == "localhost"
+    }
 
     @Override
     protected JavaParser newJavaParser() {

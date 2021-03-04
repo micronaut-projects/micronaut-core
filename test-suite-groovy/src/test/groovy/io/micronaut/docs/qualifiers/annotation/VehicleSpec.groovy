@@ -3,7 +3,6 @@ package io.micronaut.docs.qualifiers.annotation
 import io.micronaut.context.BeanContext
 import spock.lang.Specification
 
-
 class VehicleSpec extends Specification {
 
     void "test start vehicle"() {
@@ -12,7 +11,7 @@ class VehicleSpec extends Specification {
         def context = BeanContext.run()
         Vehicle vehicle = context.getBean(Vehicle)
 
-        println( vehicle.start() )
+        println vehicle.start()
         // end::start[]
 
         then:

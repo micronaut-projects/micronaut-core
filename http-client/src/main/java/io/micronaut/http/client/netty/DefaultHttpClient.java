@@ -17,8 +17,8 @@ package io.micronaut.http.client.netty;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
@@ -1002,7 +1002,6 @@ public class DefaultHttpClient implements
                             request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
                             streamRequestThroughChannel(
                                     parentRequest,
-                                    requestURI,
                                     requestWrapper,
                                     emitter,
                                     channel,
@@ -1021,7 +1020,6 @@ public class DefaultHttpClient implements
                                     request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
                                     streamRequestThroughChannel(
                                             parentRequest,
-                                            requestURI,
                                             requestWrapper,
                                             emitter,
                                             channel,
@@ -1829,13 +1827,14 @@ public class DefaultHttpClient implements
 
     private void streamRequestThroughChannel(
             io.micronaut.http.HttpRequest<?> parentRequest,
-            URI requestURI,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             FlowableEmitter emitter,
             Channel channel,
             boolean failOnError) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        io.micronaut.http.HttpRequest<?> finalRequest = requestWrapper.get();
+        URI requestURI = finalRequest.getUri();
         NettyRequestWriter requestWriter = prepareRequest(
-                requestWrapper.get(),
+                finalRequest,
                 requestURI,
                 emitter,
                 false
@@ -2634,7 +2633,6 @@ public class DefaultHttpClient implements
                                         request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
                                         streamRequestThroughChannel(
                                                 request,
-                                                requestURI,
                                                 requestWrapper,
                                                 emitter,
                                                 channel,
@@ -2653,7 +2651,6 @@ public class DefaultHttpClient implements
                                                 request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
                                                 streamRequestThroughChannel(
                                                         request,
-                                                        requestURI,
                                                         requestWrapper,
                                                         emitter,
                                                         channel,

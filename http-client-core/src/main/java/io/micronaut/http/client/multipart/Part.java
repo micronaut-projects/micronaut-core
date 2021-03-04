@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client.multipart;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * The base class representing multiple parts in the {@link MultipartBody} to build a Netty multipart request.

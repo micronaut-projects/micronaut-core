@@ -21,10 +21,11 @@ import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import javax.annotation.concurrent.Immutable;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -107,6 +108,20 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
     @NonNull Optional<BeanProperty<T, Object>> getIndexedProperty(
             @NonNull Class<? extends Annotation> annotationType,
             @NonNull String annotationValue);
+
+    /**
+     * Returns the {@link BeanMethod} instances for this introspection.
+     *
+     * <p>The {@link BeanMethod} instances are only those methods annotated with {@code io.micronaut.context.annotation.Executable} and hence represent a subset
+     * of the actual methods of the class and do not include any methods that are exposed as {@link BeanProperty} instances.</p>
+     *
+     * @return A immutable collection of methods.
+     *
+     * @since 2.3.0
+     */
+    @NonNull default Collection<BeanMethod<T, Object>> getBeanMethods() {
+        return Collections.emptyList();
+    }
 
     /**
      * Get all the bean properties annotated for the given type.

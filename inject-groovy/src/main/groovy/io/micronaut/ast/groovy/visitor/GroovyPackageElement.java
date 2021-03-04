@@ -15,12 +15,10 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import org.codehaus.groovy.ast.PackageNode;
-import org.codehaus.groovy.control.CompilationUnit;
-import org.codehaus.groovy.control.SourceUnit;
 
 /**
  * A class element returning data from a {@link PackageNode}.
@@ -35,13 +33,12 @@ public class GroovyPackageElement extends AbstractGroovyElement {
     /**
      * Default constructor.
      *
-     * @param sourceUnit         The source unit
-     * @param compilationUnit    The compilation unit
+     * @param visitorContext The visitor context
      * @param packageNode      The annotated node
      * @param annotationMetadata The annotation metadata
      */
-    public GroovyPackageElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, PackageNode packageNode, AnnotationMetadata annotationMetadata) {
-        super(sourceUnit, compilationUnit, packageNode, annotationMetadata);
+    public GroovyPackageElement(GroovyVisitorContext visitorContext, PackageNode packageNode, AnnotationMetadata annotationMetadata) {
+        super(visitorContext, packageNode, annotationMetadata);
         this.packageNode = packageNode;
     }
 

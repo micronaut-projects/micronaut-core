@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 
 public final class PrimitiveElement implements ArrayableClassElement {
@@ -55,6 +55,11 @@ public final class PrimitiveElement implements ArrayableClassElement {
     @Override
     public boolean isAssignable(String type) {
         return typeName.equals(type);
+    }
+
+    @Override
+    public boolean isAssignable(ClassElement type) {
+        return this.typeName.equals(type.getName());
     }
 
     @Override

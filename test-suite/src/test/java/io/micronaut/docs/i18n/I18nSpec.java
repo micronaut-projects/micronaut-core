@@ -15,10 +15,12 @@
  */
 package io.micronaut.docs.i18n;
 
-import io.micronaut.context.MessageSource;
+import io.micronaut.context.MessageSource.MessageContext;
 import io.micronaut.context.i18n.ResourceBundleMessageSource;
 import org.junit.jupiter.api.Test;
+
 import java.util.Locale;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class I18nSpec {
@@ -26,8 +28,8 @@ class I18nSpec {
     void itIsPossibleToCreateAMessageSourceFromResourceBundle() {
         //tag::test[]
         ResourceBundleMessageSource ms = new ResourceBundleMessageSource("io.micronaut.docs.i18n.messages");
-        assertEquals("Hola", ms.getMessage("hello", MessageSource.MessageContext.of(new Locale("es"))).get());
-        assertEquals("Hello", ms.getMessage("hello", MessageSource.MessageContext.of(Locale.ENGLISH)).get());
+        assertEquals("Hola", ms.getMessage("hello", MessageContext.of(new Locale("es"))).get());
+        assertEquals("Hello", ms.getMessage("hello", MessageContext.of(Locale.ENGLISH)).get());
         //end::test[]
     }
 }

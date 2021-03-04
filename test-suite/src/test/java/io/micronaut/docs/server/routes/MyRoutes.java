@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 package io.micronaut.docs.server.routes;
+
 // tag::imports[]
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.web.router.DefaultRouteBuilder;
+
 import javax.inject.Inject;
 import javax.inject.Singleton;
 // end::imports[]
@@ -25,7 +27,8 @@ import javax.inject.Singleton;
 @Singleton
 public class MyRoutes extends DefaultRouteBuilder { // <1>
 
-    public MyRoutes(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy) {
+    public MyRoutes(ExecutionHandleLocator executionHandleLocator,
+                    UriNamingStrategy uriNamingStrategy) {
         super(executionHandleLocator, uriNamingStrategy);
     }
 

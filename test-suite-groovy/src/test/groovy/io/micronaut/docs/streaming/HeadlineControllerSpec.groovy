@@ -12,10 +12,10 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeUnit
 
 import static io.micronaut.http.HttpRequest.GET
-import static org.junit.Assert.*
+import static java.util.concurrent.TimeUnit.SECONDS
+import static org.junit.Assert.fail
 
 class HeadlineControllerSpec extends Specification {
 
@@ -24,26 +24,27 @@ class HeadlineControllerSpec extends Specification {
     // tag::streamingClient[]
     void "test client annotation streaming"() throws Exception {
         when:
-        HeadlineClient headlineClient = embeddedServer.getApplicationContext()
-                                            .getBean(HeadlineClient.class) // <1>
+        def headlineClient = embeddedServer.applicationContext
+                                           .getBean(HeadlineClient) // <1>
 
         Maybe<Headline> firstHeadline = headlineClient.streamHeadlines().firstElement() // <2>
 
         Headline headline = firstHeadline.blockingGet() // <3>
 
         then:
-        null != headline
-        headline.getText().startsWith("Latest Headline")
+        headline
+        headline.text.startsWith("Latest Headline")
     }
     // end::streamingClient[]
 
     void "test streaming client" () {
         when:
-        RxStreamingHttpClient client = embeddedServer.getApplicationContext()
-                                                     .createBean(RxStreamingHttpClient.class, embeddedServer.getURL())
+        RxStreamingHttpClient client = embeddedServer.applicationContext
+                                                     .createBean(RxStreamingHttpClient, embeddedServer.URL)
 
         // tag::streaming[]
-        Flowable<Headline> headlineStream = client.jsonStream(GET("/streaming/headlines"), Headline.class) // <1>
+        Flowable<Headline> headlineStream = client.jsonStream(
+                GET("/streaming/headlines"), Headline) // <1>
         CompletableFuture<Headline> future = new CompletableFuture<>() // <2>
         headlineStream.subscribe(new Subscriber<Headline>() {
             @Override
@@ -53,7 +54,7 @@ class HeadlineControllerSpec extends Specification {
 
             @Override
             void onNext(Headline headline) {
-                System.out.println("Received Headline = " + headline.getText())
+                println "Received Headline = $headline.text"
                 future.complete(headline) // <4>
             }
 
@@ -68,14 +69,16 @@ class HeadlineControllerSpec extends Specification {
             }
         })
         // end::streaming[]
+
         then:
         try {
-            Headline headline = future.get(3, TimeUnit.SECONDS)
-            headline.getText().startsWith("Latest Headline")
-
+            Headline headline = future.get(3, SECONDS)
+            assert headline.text.startsWith("Latest Headline")
         } catch (Throwable e) {
-            fail("Asynchronous error occurred: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()))
+            fail("Asynchronous error occurred: ${e.message ?: e.getClass().simpleName}")
         }
+
+        cleanup:
         client.stop()
     }
 }

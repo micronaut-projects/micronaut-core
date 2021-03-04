@@ -1,4 +1,4 @@
-At times you may want a bean to load conditionally based on various potential factors including the classpath, the configuration, the presence of other beans etc.
+At times you may want a bean to load conditionally based on various potential factors including the classpath, the configuration, the presence of other beans, etc.
 
 The link:{api}/io/micronaut/context/annotation/Requires.html[Requires] annotation provides the ability to define one or many conditions on a bean.
 
@@ -10,11 +10,11 @@ The above bean defines two requirements. The first indicates that a `DataSource`
 
 NOTE: Kotlin currently does not support repeatable annotations. Use the `@Requirements` annotation when multiple requires are needed. For example, `@Requirements(Requires(...), Requires(...))`. See https://youtrack.jetbrains.com/issue/KT-12794 to track this feature.
 
-If you have multiple requirements that you find you may need to repeat on multiple beans then you can define a meta-annotation with the requirements:
+If multiple beans require the same combination of requirements, you can define a meta-annotation with the requirements:
 
 snippet::io.micronaut.docs.requires.RequiresJdbc[tags="annotation",indent=0, title="Using a @Requires meta-annotation"]
 
-In the above example an annotation called `RequiresJdbc` is defined that can then be used on the `JdbcBookService` instead:
+In the above example the `RequiresJdbc` annotation can be used on the `JdbcBookService` instead:
 
 .Using a meta-annotation
 [source,java]
@@ -26,12 +26,11 @@ public class JdbcBookService implements BookService {
 ----
 // TODO any way to make this multi-lang also?
 
-If you have multiple beans that need to fulfill a given requirement before loading then you may want to consider a bean configuration group, as explained in the next section.
+If you have multiple beans that need to fulfill a given requirement before loading, you may want to consider a bean configuration group, as explained in the next section.
 
 == Configuration Requirements
 
-The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotation is very flexible and can be used for a variety of use cases. The following table summarizes some of the possibilities:
-
+The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotation is very flexible and can be used for a variety of use cases. The following table summarizes some possibilities:
 
 .Using @Requires
 |===
@@ -88,7 +87,7 @@ The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotati
 
 === Additional Notes on Property Requirements.
 
-Adding a requirement on a property has some additional functionality. You can require the property to be a certain value, not be a certain value, and use a default in those checks if its not set.
+Adding a requirement on a property has some additional functionality. You can require the property to be a certain value, not be a certain value, and use a default in those checks if it is not set.
 
 [source,java]
 ----

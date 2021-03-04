@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.type;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
 /**
@@ -33,7 +35,7 @@ public interface Executable<T, R> extends AnnotationMetadataProvider {
      *
      * @return The arguments
      */
-    Argument[] getArguments();
+    @NonNull Argument[] getArguments();
 
     /**
      * Invokes the method.
@@ -42,5 +44,5 @@ public interface Executable<T, R> extends AnnotationMetadataProvider {
      * @param arguments The arguments
      * @return The result
      */
-    R invoke(T instance, Object... arguments);
+    @Nullable R invoke(@NonNull T instance, Object... arguments);
 }

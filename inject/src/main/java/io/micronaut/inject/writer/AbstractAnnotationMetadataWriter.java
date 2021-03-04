@@ -27,7 +27,7 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -63,7 +63,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             AnnotationMetadata annotationMetadata,
             boolean writeAnnotationDefaults) {
         super(originatingElements);
-        this.targetClassType = getTypeReference(className);
+        this.targetClassType = getTypeReferenceForName(className);
         this.annotationMetadata = annotationMetadata;
         this.writeAnnotationDefault = writeAnnotationDefaults;
     }
@@ -80,7 +80,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             AnnotationMetadata annotationMetadata,
             boolean writeAnnotationDefaults) {
         super(new Element[]{ originatingElement });
-        this.targetClassType = getTypeReference(className);
+        this.targetClassType = getTypeReferenceForName(className);
         this.annotationMetadata = annotationMetadata;
         this.writeAnnotationDefault = writeAnnotationDefaults;
     }
@@ -99,7 +99,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
         } else if (annotationMetadata instanceof AnnotationMetadataReference) {
             AnnotationMetadataReference reference = (AnnotationMetadataReference) annotationMetadata;
             String className = reference.getClassName();
-            annotationMetadataMethod.getStatic(getTypeReference(className), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+            annotationMetadataMethod.getStatic(getTypeReferenceForName(className), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
         } else {
             annotationMetadataMethod.getStatic(targetClassType, AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
         }

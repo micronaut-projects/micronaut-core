@@ -216,13 +216,22 @@ class SuspendControllerSpec : StringSpec() {
             response.status shouldBe HttpStatus.OK
         }
 
-        "test keeping request scope inside coroutins with retry" {
+        "test keeping request scope inside coroutine with retry" {
             val response = client.exchange(GET<Any>("/suspend/keepRequestScopeInsideCoroutineWithRetry"), String::class.java).awaitSingle()
             val body = response.body.get()
 
             val (beforeRequestId, beforeThreadId, afterRequestId, afterThreadId) = body.split(',')
             beforeRequestId shouldBe afterRequestId
             beforeThreadId shouldNotBe afterThreadId
+            response.status shouldBe HttpStatus.OK
+        }
+
+        "test keeping request scope after a suspend" {
+            val response = client.exchange(GET<Any>("/suspend/keepRequestScopeAfterSuspend"), String::class.java).awaitSingle()
+            val body = response.body.get()
+            val (beforeRequestId, beforeThreadId, afterRequestId, afterThreadId) = body.split(',')
+            beforeRequestId shouldBe afterRequestId
+            beforeThreadId shouldNotBe afterThreadId // it will be the default co-routine dispatcher
             response.status shouldBe HttpStatus.OK
         }
     }

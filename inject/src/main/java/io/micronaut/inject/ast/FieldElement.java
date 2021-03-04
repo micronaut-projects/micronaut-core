@@ -22,4 +22,11 @@ package io.micronaut.inject.ast;
  * @since 1.0
  */
 public interface FieldElement extends TypedElement, MemberElement {
+    /**
+     * Obtain the generic type with the associated annotation metadata for the field.
+     * @return The generic field
+     */
+    default ClassElement getGenericField() {
+        return getGenericType();
+    }
 }

@@ -1,125 +1,54 @@
 Micronaut {version} includes the following changes:
 
-=== Build Features
+=== Core Features
 
-==== Maven Plugin Improvements
+==== Jakarta Inject
 
-The Maven plugin now supports different `<packaging>` types:
+The `jakarta.inject` inject annotations are now supported as an alternative to `javax.inject`. Micronaut 3 will change the default inject annotations to Jakarta, however the javax annotations will continue to be supported if added to your build explicitly.
 
-* `jar` (default): produces a runnable fat JAR.
-* `native-image`: generates a GraalVM native image.
-* `docker`: builds a Docker image with the application artifacts (compiled classes, resources, dependencies, etc).
-* `docker-native`: builds a Docker image with a GraalVM native image inside.
+Micronaut 3 will change the bean context API to return our custom provider contract, api:context.BeanProvider[]. We suggest existing applications to change to use that interface instead of `javax.inject.Provider`, however both the `jakarta.inject.Provider` and `javax.inject.Provider` interfaces will continue to be supported.
 
-To package an application, `mvn package` is the one-stop shop to produce the desired artifact.
+==== Core Nullability Annotations
 
-It also supports using `mvn deploy` as the only command required to deploy an application that, depending on the `<packaging>`:
+With the future of JSR-305 unclear and issues with regards to the module system with existing solutions, Micronaut 2.4 will replace usages of Spotbugs with core nullability annotations: ann:core.annotation.Nullable[] and ann:core.annotation.NotNull[].
 
-* `jar` (default): will deploy the artifact to a remote repository using `org.apache.maven.plugins:maven-deploy-plugin:deploy`.
-* `docker` or `docker-native`: will push the Docker image to the configured Docker registry.
+Existing applications should switch to using these annotations. If other annotations are preferable, the dependency should be added explicitly to your build because no third party `Nullable` or `NonNull` annotations will be available transitively in the next major version.
 
-Read more information in the https://micronaut-projects.github.io/micronaut-maven-plugin/latest[Maven Plugin documentation].
+==== Improvements to Interceptor Binding
 
-==== Gradle Plugin Improvements
+Micronaut's support for AOP interceptors has been improved allowing interceptors to be attached to any annotation through the use of api:inject.annotation.AnnotationMapper[] instances. It is also now possible to bind multiple api:aop.MethodInterceptor[] instances to a single annotation instead of there being a 1-to-1 mapping between annotation and interceptor.
 
-The Gradle plugin has a new `testNativeImage` task that builds the GraalVM Native Image and uses the native application as an embedded server enabling the ability to write native integration tests.
+From 2.4.x onwards the recommending way to define AOP advise is to use the ann:aop.InterceptorBinding[] annotation on the annotation you wish to trigger AOP advise:
 
-=== Micronaut Launch Enhancements
+snippet::io.micronaut.docs.aop.around.NotNull[tags="imports,annotation", indent=0, title="Around Advice Annotation Example"]
 
-==== Support for Kotlin Gradle Builds
+Then use ann:aop.InterceptorBean[] on the api:aop.MethodInterceptor[] you wish to bind to the above advise:
 
-It is now possible to create applications that use `build.gradle.kts` instead of `build.gradle` using the `--build` argument of the CLI:
+snippet::io.micronaut.docs.aop.around.NotNullInterceptor[tags="imports,interceptor", indent=0, title="MethodInterceptor Example"]
 
-[source,bash]
-----
-$ mn create-app demo --build gradle_kotlin && cd demo
-$ ./gradlew test
-----
+Multiple api:aop.MethodInterceptor[] types can bind to a single advise annotation and any given interceptor can bind to multiple annotations.
 
-Or via the Micronaut Launch API:
+=== Cloud Features
 
-[source,bash]
-----
-$ curl https://launch.micronaut.io/demo.zip?build=gradle_kotlin -o demo.zip && unzip demo.zip -d demo && cd demo
-$ ./gradlew test
-----
+==== Easier Configuration of Oracle Cloud Autonomous Database
 
-==== Push to Github
+A new `micronaut-oraclecloud-atp` has been added that makes it easier to https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/#autonomousDatabase[automatically download the Oracle Wallet definition and connect to Autonomous Database] on Oracle Cloud.
 
-It is now possible to create an application with and https://micronaut.io/launch/[Micronaut Launch] and have it pushed automatically to a repository in your Github account. When generating an application just select the "Push to Github" option.
+==== Support for Oracle Cloud Monitoring via Micrometer
 
-=== New Micronaut Modules
+A new `micronaut-oraclecloud-micrometer` module has been added that adds support for https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/#micrometer[exporting Micrometer metrics to Oracle Cloud].
 
-==== MQTT Support
+==== Official Kubernetes Client
 
-Improving the experience in IoT use cases, Micronaut now has integration with MQTT similar to the integration with Kafka and RabbitMQ. See the https://micronaut-projects.github.io/micronaut-mqtt/latest/guide/[Micronaut MQTT documentation] to get started.
+With the new `micronaut-kubernetes-client` module you can now inject apis objects from the https://github.com/kubernetes-client/java[official Kubernetes Java SDK] as regular beans.
 
-==== Micronaut Data R2DBC
-
-A new module that adds support for R2DBC (Reactive Database Connectivity) has been added in preview status. Micronaut Data R2DBC lets you define reactive data repositories using R2DBC that work with any of the supported drivers and include support for GraalVM Native Image.
-
-See the https://micronaut-projects.github.io/micronaut-r2dbc/1.0.x/guide/[Documentation for Micronaut R2DBC] for more information.
+In Micronaut 3 this new module will be used as primary kubernetes client, making the current one deprecated.
 
 === Module Upgrades
 
-- Micronaut Acme `2.1.0`
-- Micronaut Aws `2.2.3`
-- Micronaut Azure `2.1.0`
-- Micronaut Cache `2.2.0`
-- Micronaut Cassandra `3.1.0`
-- Micronaut Data `2.2.0`
-- Micronaut DiscoveryClient `2.2.0`
-- Micronaut ElasticSearch `2.1.0`
-- Micronaut Flyway `3.1.0`
-- Micronaut Gcp `3.3.0`
-- Micronaut GraphQL `2.2.0`
-- Micronaut Groovy `2.2.0`
-- Micronaut gRPC `2.2.0`
-- Micronaut Hibernate Validator `3.0.0`
-- Micronaut Jmx `2.1.0`
-- Micronaut Kafka `3.1.0`
-- Micronaut Kotlin `2.2.0`
-- Micronaut Liquibase `3.0.0`
-- Micronaut MQTT `1.0.0`
-- Micronaut Micrometer `3.1.0`
-- Micronaut Mongo `3.1.0`
-- Micronaut NatsIo `2.2.0`
-- Micronaut Neo4j `4.1.0`
-- Micronaut OpenApi `2.2.0`
-- Micronaut Oracle Cloud `1.1.0`
-- Micronaut Picocli `3.1.0`
-- Micronaut R2DBC `1.0.0.M2`
-- Micronaut RabbitMQ `2.2.0`
-- Micronaut Reactor `1.1.0`
-- Micronaut Redis `3.1.0`
-- Micronaut Rss `2.2.0`
-- Micronaut Rss `2.3.0`
-- Micronaut RxJava3 `1.1.0`
-- Micronaut Security `2.1.4`
-- Micronaut Security `2.2.0`
-- Micronaut Servlet `2.1.1`
-- Micronaut Sql `3.3.1`
-- Micronaut Test `2.2.1`
-- Micronaut Views `2.1.0`
-- Micronaut Xml `2.1.0`
-
+* Micronaut Oracle Cloud `1.1.1` -> `1.2.1`
 
 === Dependency Upgrades
 
-- Caffeine `2.8.6`
-- Eclipse Paho v3 `1.2.5`
-- Eclipse Paho v5 `1.2.5`
-- Elasticsearch `7.9.3`
-- Flyway `7.0.4`
-- gRPC `1.33.1`
-- Hibernate `5.4.23.Final`
-- Kafka `2.6.0`
-- Kotlin Coroutines `1.4.1`
-- Ktor `1.4.1`
-- Liquibase `4.2.0`
-- Lombok `1.18.16`
-- Oracle JDBC Driver `19.8.0.0`
-- Picocli `4.5.2`
-- Protobuf `3.14.0`
-- Reactor `3.4.0`
-- Swagger `2.1.5`
+* Jaeger Version `1.3.1` -> `1.5.0`
+* Zipkin Version `2.15.0` -> `2.16.3`

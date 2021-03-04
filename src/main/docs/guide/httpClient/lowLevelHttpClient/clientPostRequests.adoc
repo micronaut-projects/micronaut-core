@@ -1,4 +1,4 @@
-All the examples up until now have used the same HTTP method i.e `GET`. The api:http.HttpRequest[] interface has factory methods for all the different HTTP methods. The following table summarizes the available methods:
+All the examples so far have used the same HTTP method i.e `GET`. The api:http.HttpRequest[] interface has factory methods for all the different HTTP methods. The following table summarizes them:
 
 .HttpRequest Factory Methods
 |===
@@ -36,26 +36,26 @@ All the examples up until now have used the same HTTP method i.e `GET`. The api:
 
 A `create` method also exists to construct a request for any api:http.HttpMethod[] type. Since the `POST`, `PUT` and `PATCH` methods require a body, a second argument which is the body object is required.
 
-The following example demonstrates how to send a simply `String` body:
+The following example demonstrates how to send a simple `String` body:
 
 snippet::io.micronaut.docs.basics.HelloControllerSpec[tags="poststring", indent=0, title="Sending a `String` body"]
 
-<1> The `POST` method is used with the first argument being the URI and the second argument the body
-<2> The content type and accepted type are set to `text/plain` (the default content type is `application/json`)
+<1> The `POST` method is used; the first argument is the URI and the second is the body
+<2> The content type and accepted type are set to `text/plain` (the default is `application/json`)
 <3> The expected response type is a `String`
 
 == Sending JSON
 
-The previous example sends plain text, if you wish send JSON you can simply pass the object you wish to encode as JSON, whether that be a map or a POJO. As long as Jackson is able to encode it.
+The previous example sends plain text. To send JSON, pass the object to encode to JSON (whether that be a Map or a POJO) as long as Jackson is able to encode it.
 
-For example, the `Message` class from the previous section, you can create an instance and pass it to the `POST` method:
+For example, you can create a `Message` from the previous section and pass it to the `POST` method:
 
 snippet::io.micronaut.docs.basics.HelloControllerSpec[tags="postpojo", indent=0, title="Sending a JSON body"]
 
-<1> And instance of `Message` is created and passed to the `POST` method
-<2> The same class is used to decode the response
+<1> An instance of `Message` is created and passed to the `POST` method
+<2> The same class decodes the response
 
-With the above example the following JSON will be sent as the body of the request:
+With the above example the following JSON is sent as the body of the request:
 
 .Resulting JSON
 [source,json]
@@ -63,23 +63,22 @@ With the above example the following JSON will be sent as the body of the reques
 {"text":"Hello John"}
 ----
 
-The JSON itself can be customized however you want using https://github.com/FasterXML/jackson-annotations[Jackson Annotations].
+The JSON can be customized using https://github.com/FasterXML/jackson-annotations[Jackson Annotations].
 
 == Using a URI Template
 
-If some of the properties of the object need to be in the URI being posted to you can use a URI template.
+If include some properties of the object in the URI, you can use a URI template.
 
-For example imagine you have a class `Book` that has a property called `title`. You can represent the `title` property in the URI template and then populate it from an instance of `Book`. For example:
+For example imagine you have a `Book` class with a `title` property. You can include the `title` in the URI template and then populate it from an instance of `Book`. For example:
 
 snippet::io.micronaut.docs.basics.BookControllerSpec[tags="posturitemplate", indent=0, title="Sending a JSON body with a URI template"]
 
-In the above case the `title` property of the passed object will be included in the URI being posted to.
+In the above case the `title` property is included in the URI.
 
 == Sending Form Data
 
-You can also encode a POJO or a map as regular form data instead of JSON. Just set the content type to `application/x-www-form-urlencoded` on the post request:
+You can also encode a POJO or a map as form data instead of JSON. Just set the content type to `application/x-www-form-urlencoded` on the post request:
 
 snippet::io.micronaut.docs.basics.BookControllerSpec[tags="postform", indent=0, title="Sending a Form Data"]
 
-Note that Jackson is used to bind form data too, so to customize the binding process you can use https://github.com/FasterXML/jackson-annotations[Jackson annotations].
-
+Note that Jackson can bind form data too, so to customize the binding process use https://github.com/FasterXML/jackson-annotations[Jackson annotations].

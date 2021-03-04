@@ -2,8 +2,4 @@ Reloading (or "hot-loading") refers to the framework reinitializing classes (and
 
 Since Micronaut prioritizes startup time and most Micronaut apps can start up within seconds, a productive workflow can often be had by restarting the application as changes are made; for example, by running a test class within an IDE.
 
-However, if you wish to have your changes automatically reloaded Micronaut does support automatic restart or the use of third-party reloading agents.
-
-
-
-
+However, to have your changes automatically reloaded, Micronaut supports automatic restart and the use of third-party reloading agents.

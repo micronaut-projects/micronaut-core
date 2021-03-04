@@ -13,18 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.requires;
+package io.micronaut.docs.requires
 
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Requires
 
-import javax.sql.DataSource;
-import java.lang.annotation.*;
+import javax.sql.DataSource
+import java.lang.annotation.Documented
+import java.lang.annotation.ElementType
+import java.lang.annotation.Retention
+import java.lang.annotation.RetentionPolicy
+import java.lang.annotation.Target;
 
 // tag::annotation[]
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target([ElementType.PACKAGE, ElementType.TYPE])
-@Requires(beans = DataSource.class)
+@Requires(beans = DataSource)
 @Requires(property = "datasource.url")
 @interface RequiresJdbc {
 }

@@ -26,11 +26,13 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
 import spock.lang.IgnoreIf
+import spock.lang.Retry
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@Retry
 class UploadSpec extends AbstractMicronautSpec {
 
     @Override

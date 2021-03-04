@@ -16,12 +16,13 @@
 package io.micronaut.test.replaces;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.test.annotation.MicronautTest;
 import io.micronaut.test.annotation.MockBean;
-import static org.junit.jupiter.api.Assertions.*;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
 
 import javax.inject.Inject;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @MicronautTest
 class MockBeanTest {
@@ -37,7 +38,6 @@ class MockBeanTest {
 
     @Inject
     InterfaceB interfaceB;
-
 
     @Test
     void testMockConcretePrimaryBean() {

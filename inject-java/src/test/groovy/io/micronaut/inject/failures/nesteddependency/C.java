@@ -15,8 +15,11 @@
  */
 package io.micronaut.inject.failures.nesteddependency;
 
+import io.micronaut.context.annotation.Requires;
+
 import javax.inject.Singleton;
 
+@Requires(property = "spec.name", value = "NestedDependencyFailureSpec")
 @Singleton
 public class C {
     public C(D d) {

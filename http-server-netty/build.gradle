@@ -14,7 +14,7 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":inject-java-test")
     testImplementation project(":http-client")
-
+    testImplementation dependencyVersion("spotbugs")
     testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.7'
     testImplementation group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.9'
 
@@ -29,6 +29,7 @@ dependencies {
     testImplementation 'io.micronaut.xml:micronaut-jackson-xml:2.2.1', {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-http'
+        exclude group: 'com.fasterxml.jackson.core'
     }
 
     // following 3 dependencies needed for Http2PostTest

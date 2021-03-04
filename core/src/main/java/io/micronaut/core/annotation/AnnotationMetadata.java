@@ -15,8 +15,6 @@
  */
 package io.micronaut.core.annotation;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -64,6 +62,18 @@ public interface AnnotationMetadata extends AnnotationSource {
      * The suffix used when saving compiled metadata to classes.
      */
     String CLASS_NAME_SUFFIX = "$$AnnotationMetadata";
+
+    /**
+     * Does the metadata contain any property expressions like {@code ${foo.bar}}. Note
+     * this by default returns {@code true} as previous versions of Micronaut must assume metadata
+     * is present. The compilation time this is computed in order to decide whether to instrument
+     * annotation metadata with environment specific logic.
+     *
+     * @return True if property expressions are present
+     */
+    default boolean hasPropertyExpressions() {
+        return true;
+    }
 
     /**
      * Resolve all of the annotation names that feature the given stereotype.
@@ -222,6 +232,26 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return True if the annotation is present
      */
     default boolean hasDeclaredStereotype(@Nullable String annotation) {
+        return false;
+    }
+
+    /**
+     * Checks whether this object has any of the given stereotype directly declared on the object.
+     *
+     * @param annotations The annotations
+     * @return True if any of the given stereotypes are present
+     * @since 2.3.3
+     */
+    @SuppressWarnings("unchecked")
+    default boolean hasDeclaredStereotype(@Nullable String... annotations) {
+        if (ArrayUtils.isEmpty(annotations)) {
+            return false;
+        }
+        for (String annotation : annotations) {
+            if (hasDeclaredStereotype(annotation)) {
+                return true;
+            }
+        }
         return false;
     }
 

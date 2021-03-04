@@ -1,10 +1,10 @@
-The http://groovy-lang.org[Groovy language] has first class support in Micronaut.
+http://groovy-lang.org[Groovy] has first-class support in Micronaut.
 
-== Groovy Specific Modules
+== Groovy-Specific Modules
 
 Additional modules exist specific to Groovy that improve the overall experience. These are detailed in the table below:
 
-.Groovy Specific Modules
+.Groovy-Specific Modules
 |===
 |Dependency|Description
 
@@ -12,18 +12,18 @@ Additional modules exist specific to Groovy that improve the overall experience.
 |Includes AST transformations to generate bean definitions. Should be `compileOnly` on your classpath.
 
 |`io.micronaut:micronaut-runtime-groovy`
-|Adds the ability to specify configuration placed in `src/main/resources` in Groovy format (i.e. `application.groovy`)
+|Adds the ability to specify configuration under `src/main/resources` in Groovy format (i.e. `application.groovy`)
 
 |`io.micronaut:micronaut-function-groovy`
 |Includes AST transforms that make it easier to write <<serverlessFunctions, Functions>> for AWS Lambda
 
 |===
 
-The most common module you will need is `micronaut-inject-groovy`, which enables DI and AOP for classes written in Groovy.
+The most common module you need is `micronaut-inject-groovy`, which enables DI and AOP for Groovy classes.
 
 == Groovy Support in the CLI
 
-The <<cli, Command Line Interface>> for Micronaut includes special support for Groovy. To create a Groovy application use the `groovy` lang option. For example:
+The Micronaut <<cli, Command Line Interface>> includes special support for Groovy. To create a Groovy application, use the `groovy` lang option. For example:
 
 [source,bash]
 .Create a Micronaut Groovy application
@@ -31,9 +31,9 @@ The <<cli, Command Line Interface>> for Micronaut includes special support for G
 $ mn create-app hello-world --lang groovy
 ----
 
-The above will generate a Groovy project, built with Gradle. You can use the `-build maven` flag to generate a project built with Maven instead.
+The above generates a Groovy project, built with Gradle. Use the `-build maven` flag to generate a project built with Maven instead.
 
-Once you have created an application with the `groovy` feature commands like `create-controller`, `create-client` etc. will generate Groovy files instead of Java. The following example demonstrates this action when using interactive mode of the CLI:
+Once you have created an application with the `groovy` feature, commands like `create-controller`, `create-client` etc. generate Groovy files instead of Java. The following example demonstrates this when using interactive mode of the CLI:
 
 [source,bash]
 .Create a bean
@@ -93,9 +93,7 @@ interface HelloClient {
 }
 ----
 
-
 Now let's create a controller:
-
 
 [source,bash]
 .Create a controller
@@ -106,7 +104,6 @@ mn> create-controller helloController
 mn>
 ----
 
-
 [source,groovy]
 .Micronaut Controller
 ----
@@ -115,7 +112,6 @@ package hello.world
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.HttpStatus
-
 
 @Controller("/hello")
 class HelloController {
@@ -127,7 +123,7 @@ class HelloController {
 }
 ----
 
-As you can see from the output from the CLI a http://spockframework.org[Spock] test was also generated for you demonstrating how to test the controller:
+As you can see from the output from the CLI, a http://spockframework.org[Spock] test was also generated for you which demonstrates how to test the controller:
 
 [source,groovy]
 .HelloControllerSpec.groovy
@@ -143,14 +139,13 @@ As you can see from the output from the CLI a http://spockframework.org[Spock] t
 ...
 ----
 
-
 Notice how you use Micronaut both as client and as a server to test itself.
 
 == Programmatic Routes with GroovyRouterBuilder
 
-If you prefer to build your routes programmatically (similar to Grails `UrlMappings`) then a special `io.micronaut.web.router.GroovyRouteBuilder` exists that has some enhancements to make the DSL better.
+If you prefer to build your routes programmatically (similar to Grails `UrlMappings`), a special `io.micronaut.web.router.GroovyRouteBuilder` exists that has some enhancements to make the DSL better.
 
-The following example shows `GroovyRouteBuilder` in act:
+The following example shows `GroovyRouteBuilder` in action:
 
 .Using GroovyRouteBuilder
 [source,groovy]
@@ -170,8 +165,7 @@ The above example results in the following routes:
 
 == Using GORM in a Groovy application
 
-http://gorm.grails.org[GORM] is a data access toolkit originally created as part of Grails framework. It supports multiple database types. The following table summarizes the modules needed to use GORM and links to documentation.
-
+http://gorm.grails.org[GORM] is a data access toolkit originally created as part of Grails. It supports multiple database types. The following table summarizes the modules needed to use GORM, and links to documentation.
 
 .GORM Modules
 |===
@@ -192,8 +186,6 @@ Once you have configured a GORM implementation per the instructions linked in th
 
 http://gorm.grails.org/latest/hibernate/manual/index.html#dataServices[GORM Data Services] can also participate in dependency injection and life cycle methods:
 
-
-
 [source,groovy]
 .GORM Data Service VehicleService.groovy
 ----
@@ -202,27 +194,21 @@ abstract class VehicleService {
     @PostConstruct
     void init() {
        // do something on initialization
-
     }
 
     abstract Vehicle findVehicle(@NotBlank String name)
 
     abstract Vehicle saveVehicle(@NotBlank String name)
-
 }
 
 ----
 
-You can also define the service as an interface instead of an abstract class if you want GORM to do all of the work and you don't want to add your own behaviors.
-
+You can also define the service as an interface instead of an abstract class to have GORM implement the methods for you.
 
 == Serverless Functions with Groovy
-
 
 A microservice application is just one way to use Micronaut. You can also use it for serverless functions like on AWS Lambda.
 
 With the `function-groovy` module, Micronaut features enhanced support for functions written in Groovy.
 
 See the section on <<serverlessFunctions, Serverless Functions>> for more information.
-
-

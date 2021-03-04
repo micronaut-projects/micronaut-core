@@ -94,8 +94,80 @@ class HttpClientSenderSpec extends Specification {
 
     }
 
+    void "test http client sender receives spans with custom path"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+                'tracing.zipkin.enabled':true,
+                'tracing.zipkin.sampler.probability':1,
+                'tracing.zipkin.http.url':HttpClientSender.Builder.DEFAULT_SERVER_URL,
+                'tracing.zipkin.http.path':'/custom/path/spans'
+        )
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        PollingConditions conditions = new PollingConditions(timeout: 10)
+        // mock Zipkin server
+        EmbeddedServer zipkinServer = ApplicationContext.run(
+                EmbeddedServer,
+                ['micronaut.server.port':9411]
+        )
+        CustomPathSpanController customPathSpanController = zipkinServer.applicationContext.getBean(CustomPathSpanController)
+
+        then:
+        conditions.eventually {
+            !SocketUtils.isTcpPortAvailable(9411)
+        }
+
+        when:"Requests are executed"
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/nested/John', String)
+
+
+        then:"spans are received"
+        conditions.eventually {
+            response.status() == HttpStatus.OK
+            customPathSpanController.receivedSpans.size() == 4
+            customPathSpanController.receivedSpans[0].tags.get("foo") == 'bar'
+            customPathSpanController.receivedSpans[0].tags.get('http.path') == '/traced/hello/John'
+            customPathSpanController.receivedSpans[0].name == 'get /traced/hello/{name}'
+            customPathSpanController.receivedSpans[0].kind == Span.Kind.SERVER.name()
+            customPathSpanController.receivedSpans[1].tags.get('http.path') == '/traced/hello/John'
+            customPathSpanController.receivedSpans[1].name == 'get /traced/hello/{name}'
+            customPathSpanController.receivedSpans[1].kind == Span.Kind.CLIENT.name()
+            customPathSpanController.receivedSpans[2].name == 'get /traced/nested/{name}'
+            customPathSpanController.receivedSpans[2].kind == Span.Kind.SERVER.name()
+            customPathSpanController.receivedSpans[2].tags.get('http.method') == 'GET'
+            customPathSpanController.receivedSpans[2].tags.get('http.path') == '/traced/nested/John'
+            customPathSpanController.receivedSpans[3].tags.get("foo") == null
+            customPathSpanController.receivedSpans[3].tags.get('http.path') == '/traced/nested/John'
+            customPathSpanController.receivedSpans[3].name == 'get'
+            customPathSpanController.receivedSpans[3].kind == Span.Kind.CLIENT.name()
+
+        }
+
+        cleanup:
+        client.close()
+        context.close()
+        zipkinServer.close()
+
+    }
+
     @Controller('/api/v2')
     static class SpanController {
+        List<Map> receivedSpans = []
+        @Post('/spans')
+        Single<HttpResponse> spans(@Body Flowable<Map> spans) {
+            spans.toList().map({ List list ->
+                println "SPANS $list"
+                receivedSpans.addAll(list)
+                HttpResponse.ok()
+            })
+        }
+
+    }
+
+    @Controller('/custom/path')
+    static class CustomPathSpanController {
         List<Map> receivedSpans = []
         @Post('/spans')
         Single<HttpResponse> spans(@Body Flowable<Map> spans) {

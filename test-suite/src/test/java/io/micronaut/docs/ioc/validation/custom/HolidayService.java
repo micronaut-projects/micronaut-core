@@ -25,7 +25,7 @@ public class HolidayService {
 
     // tag::method[]
     public String startHoliday(@NotBlank String person,
-                        @DurationPattern String duration) {
+                               @DurationPattern String duration) {
         final Duration d = Duration.parse(duration);
         return "Person " + person + " is off on holiday for " + d.toMinutes() + " minutes";
     }

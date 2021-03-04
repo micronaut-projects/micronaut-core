@@ -16,7 +16,6 @@
 package io.micronaut.docs.server.filters
 
 // tag::imports[]
-
 import io.micronaut.http.HttpRequest
 import io.reactivex.Flowable
 import io.reactivex.schedulers.Schedulers
@@ -34,9 +33,7 @@ class TraceService {
 
     Flowable<Boolean> trace(HttpRequest<?> request) {
         Flowable.fromCallable({ ->  // <1>
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Tracing request: " + request.getUri())
-            }
+            LOG.debug('Tracing request: {}', request.uri)
             // trace logic here, potentially performing I/O <2>
             return true
         }).subscribeOn(Schedulers.io()) // <3>

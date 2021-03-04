@@ -29,14 +29,14 @@ class BooksController {
     @Get("/{isbn}")
     HttpResponse find(String isbn) {
         if (isbn == "1680502395") {
-            Map<String, Object> m = new HashMap<>()
-            m.put("status", 401)
-            m.put("error", "Unauthorized")
-            m.put("message", "No message available")
-            m.put("path", "/books/"+isbn)
+            Map<String, Object> m = [
+                    status : 401,
+                    error  : "Unauthorized",
+                    message: "No message available",
+                    path   : "/books/" + isbn]
             return HttpResponse.status(HttpStatus.UNAUTHORIZED).body(m)
-
         }
+
         return HttpResponse.ok(new Book("1491950358", "Building Microservices"))
     }
 }

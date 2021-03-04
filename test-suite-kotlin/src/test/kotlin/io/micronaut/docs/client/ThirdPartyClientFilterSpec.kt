@@ -19,9 +19,8 @@ import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
-
-import javax.inject.Singleton
 import java.util.Base64
+import javax.inject.Singleton
 
 class ThirdPartyClientFilterSpec: StringSpec() {
     private var result: String? = null
@@ -29,12 +28,16 @@ class ThirdPartyClientFilterSpec: StringSpec() {
     private val username = "john"
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java,
-                    mapOf("bintray.username" to username, "bintray.token" to token, "bintray.organization" to "grails", "spec.name" to ThirdPartyClientFilterSpec::class.simpleName))
+        ApplicationContext.run(EmbeddedServer::class.java,
+            mapOf(
+                "bintray.username" to username,
+                "bintray.token" to token,
+                "bintray.organization" to "grails",
+                "spec.name" to ThirdPartyClientFilterSpec::class.simpleName))
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -86,7 +89,7 @@ internal class BintrayFilter(
 
     override fun doFilter(request: MutableHttpRequest<*>, chain: ClientFilterChain): Publisher<out HttpResponse<*>> {
         return chain.proceed(
-                request.basicAuth(username, token) // <3>
+            request.basicAuth(username, token) // <3>
         )
     }
 }

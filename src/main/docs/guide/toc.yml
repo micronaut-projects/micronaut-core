@@ -75,6 +75,7 @@ httpServer:
   binding: Simple Request Binding
   customArgumentBinding: Custom Argument Binding
   hostResolution: Host Resolution
+  localeResolution: Locale Resolution
   clientIpAddress: Client IP Address
   requestResponse: The HttpRequest and HttpResponse
   statusAnnotation: Response Status
@@ -236,11 +237,11 @@ management:
     cachesEndpoint: The Caches Endpoint
     stopEndpoint: The Server Stop Endpoint
     environmentEndpoint: The Environment Endpoint
+    threadDumpEndpoint: The ThreadDump Endpoint
 security:
   title: Security
 multitenancy:
   title: Multi-Tenancy
-  multitenancyGorm: Multi-Tenancy GORM
 cli:
   title: Micronaut CLI
   createProject:

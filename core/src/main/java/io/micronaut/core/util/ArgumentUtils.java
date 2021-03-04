@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.util;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Utility methods for checking method argument values.

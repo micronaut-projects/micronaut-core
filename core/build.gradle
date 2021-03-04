@@ -8,12 +8,9 @@ shadowJar {
 
 dependencies {
     api dependencyVersion("slf4j")
-    api dependencyVersion("reactive.streams")
-    api dependencyVersion("spotbugs")
-
+    api dependencyVersion('spotbugs')
     compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
-    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"    
-
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
     compileOnly "org.ow2.asm:asm-tree:$asmVersion"
     shadowCompile "org.ow2.asm:asm:$asmVersion"
     shadowCompile "org.ow2.asm:asm-commons:$asmVersion"

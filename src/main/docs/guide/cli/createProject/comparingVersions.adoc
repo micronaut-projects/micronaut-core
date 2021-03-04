@@ -1,1 +1,1 @@
-The easiest way to see version dependency updates and other changes for a new version of Micronaut, is to produce one clean application using the older and one using the newer version of the `mn` CLI, and then comparing those directories.
+The easiest way to see version dependency updates and other changes for a new version of Micronaut is to produce one clean application using the older version and another using the newer version of the `mn` CLI, and then comparing those directories.

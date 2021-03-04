@@ -15,17 +15,108 @@
  */
 package io.micronaut.inject.generics
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
+import spock.lang.Unroll
 
+import javax.validation.ConstraintViolationException
 import java.util.function.Function
+import java.util.function.Supplier
 
 class GenericTypeArgumentsSpec extends AbstractBeanDefinitionSpec {
 
+    void "test type arguments for exception handler"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('exceptionhandler.Test', '''\
+package exceptionhandler;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import javax.validation.ConstraintViolationException;
+
+@Context
+class Test implements ExceptionHandler<ConstraintViolationException, java.util.function.Supplier<Foo>> {
+
+    public java.util.function.Supplier<Foo> handle(String request, ConstraintViolationException e) {
+        return null;
+    }
+}
+
+interface Foo {}
+interface ExceptionHandler<T extends Throwable, R> {
+    R handle(String request, T exception);
+}
+''')
+        expect:
+        definition != null
+        def typeArgs = definition.getTypeArguments("exceptionhandler.ExceptionHandler")
+        typeArgs.size() == 2
+        typeArgs[0].type == ConstraintViolationException
+        typeArgs[1].type == Supplier
+    }
+
+    void "test type arguments for factory returning interface"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('factorygenerics.Test$MyFunc0', '''\
+package factorygenerics;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@Factory
+class Test {
+
+    @Bean
+    io.micronaut.context.event.BeanCreatedEventListener<Foo> myFunc() {
+        return (event) -> event.getBean();
+    }
+}
+
+interface Foo {}
+
+''')
+        expect:
+        definition != null
+        definition.getTypeArguments(BeanCreatedEventListener).size() == 1
+        definition.getTypeArguments(BeanCreatedEventListener)[0].type.name == 'factorygenerics.Foo'
+    }
+
+    @Unroll
+    void "test generic return type resolution for return type: #returnType"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test', """\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@javax.inject.Singleton
+class Test {
+
+    @Executable
+    public $returnType test() {
+        return null;
+    }
+}
+""")
+        def method = definition.getRequiredMethod("test")
+
+        expect:
+        method.getDescription(true).startsWith("$returnType" )
+
+        where:
+        returnType <<
+        ['List<Map<String, Integer>>',
+        'List<List<String>>',
+        'List<String>',
+        'Map<String, Integer>']
+    }
+
     void "test type arguments for interface"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.GenericsTest1','''\
+        BeanDefinition definition = buildBeanDefinition('test.GenericsTest1', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -52,7 +143,7 @@ class Foo {}
 
     void "test type arguments for inherited interface"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.GenericsTest2','''\
+        BeanDefinition definition = buildBeanDefinition('test.GenericsTest2', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -78,10 +169,9 @@ interface Foo extends java.util.function.Function<String, Integer> {}
     }
 
 
-
     void "test type arguments for superclass with interface"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.GenericsTest3','''\
+        BeanDefinition definition = buildBeanDefinition('test.GenericsTest3', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -108,7 +198,7 @@ abstract class Foo implements java.util.function.Function<String, Integer> {}
 
     void "test type arguments for superclass"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.GenericsTest4','''\
+        BeanDefinition definition = buildBeanDefinition('test.GenericsTest4', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -138,7 +228,7 @@ abstract class Foo<T, R> {
 
     void "test type arguments for factory"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.TestFactory$MyFunc0','''\
+        BeanDefinition definition = buildBeanDefinition('test.TestFactory$MyFunc0', '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -188,7 +278,7 @@ class StatusController extends GenericController<String> {
         definition != null
         methods.size() == 1
         methods[0].getArguments()[0].type == String
-        methods[0].getReturnType().getFirstTypeVariable().get().type == String
+        methods[0].getReturnType().type == String
     }
 
     void "test replacing an impl with an interface"() {

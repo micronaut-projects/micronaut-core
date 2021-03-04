@@ -20,7 +20,7 @@ import io.micronaut.http.annotation.*;
 import io.micronaut.session.Session;
 import io.micronaut.session.annotation.SessionValue;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.validation.constraints.NotBlank;
 // end::imports[]
 

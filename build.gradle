@@ -1,11 +1,11 @@
 buildscript {
     repositories {
-        maven { url "https://dl.bintray.com/micronaut/core-releases-local" }
+        mavenCentral()
         maven { url "https://repo.grails.org/grails/core" }
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:6.0.0'
-        classpath "io.micronaut.build:micronaut-gradle-plugins:2.0.15"
+        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:3.0.2"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
@@ -52,11 +52,26 @@ ext {
                     name: 'micronaut-r2dbc-bom',
                     version: micronautR2DBCVersion
             ],
+            'micronaut.cache': [
+                    group: 'io.micronaut.cache',
+                    name: 'micronaut-cache-bom',
+                    version: micronautCacheVersion
+            ],
             //Third-party
             'netty': [
                     group: 'io.netty',
                     name: 'netty-bom',
                     version: nettyVersion
+            ],
+            'kotlin': [
+                    group: 'org.jetbrains.kotlin',
+                    name: 'kotlin-bom',
+                    version: kotlinVersion
+            ],
+            'kotlin.coroutines': [
+                    group: 'org.jetbrains.kotlinx',
+                    name: 'kotlinx-coroutines-bom',
+                    version: kotlinCoroutinesVersion
             ],
             'ktor': [
                     group: 'io.ktor',
@@ -148,6 +163,11 @@ ext {
                     version: javaxAnnotationApiVersion,
                     group  : 'javax.annotation',
                     name   : 'javax.annotation-api'
+            ],
+            'jakarta.annotation-api'     : [
+                    version: jakartaAnnotationApiVersion,
+                    group  : 'jakarta.annotation',
+                    name   : 'jakarta.annotation-api'
             ],
             jsr305                     : [
                     version: jsr305Version,
@@ -242,7 +262,7 @@ ext {
                     version:micronautAwsVersion,
                     group:'io.micronaut.aws',
                     name:'micronaut-function-aws-api-proxy',
-                    modules: ['micronaut-aws-common', 'micronaut-function-aws-api-proxy-test', 'micronaut-function-aws','micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver', 'micronaut-aws-parameter-store', 'micronaut-aws-sdk-v2', 'micronaut-function-client-aws']
+                    modules: ['micronaut-aws-common', 'micronaut-function-aws-api-proxy-test', 'micronaut-function-aws', 'micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver', 'micronaut-aws-parameter-store', 'micronaut-aws-sdk-v1', 'micronaut-aws-sdk-v2', 'micronaut-function-client-aws', 'micronaut-function-aws-test']
             ],
             'micronaut.kotlin': [
                     version:micronautKotlinVersion,
@@ -254,6 +274,17 @@ ext {
                     version:micronautLiquibaseVersion,
                     group:'io.micronaut.liquibase',
                     name:'micronaut-liquibase'
+            ],
+            // TODO Deprecated: Remove in the next major version
+            'micronaut.multitenancy.old': [
+                    version:micronautOldMultitenancyVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-multitenancy'
+            ],
+            'micronaut.multitenancy': [
+                    version:micronautMultitenancyVersion,
+                    group:'io.micronaut.multitenancy',
+                    name:'micronaut-multitenancy'
             ],
             'micronaut.netflix': [
                     version:micronautNetflixVersion,
@@ -363,7 +394,7 @@ ext {
                     name:'neo4j-java-driver'
             ],
             oracle                      : [
-                    version: oracleDriverVersion,
+                    version: ojdbcVersion,
                     group  : 'com.oracle.database.jdbc',
                     name   : 'ojdbc8',
                     modules: ['ucp']
@@ -590,12 +621,7 @@ ext {
             'micronaut.kubernetes': [
                     version:micronautKubernetesVersion,
                     group:'io.micronaut.kubernetes',
-                    name:'micronaut-kubernetes-discovery-client'
-            ],
-            'micronaut.cache': [
-                    version:micronautCacheVersion,
-                    group:'io.micronaut.cache',
-                    modules: ['micronaut-cache-caffeine', 'micronaut-cache-core', 'micronaut-cache-management', 'micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop', 'micronaut-cache-infinispan']
+                    modules:['micronaut-kubernetes-discovery-client', 'micronaut-kubernetes-client', 'micronaut-kubernetes-client-processor']
             ],
             'micronaut.servlet': [
                 version:micronautServletVersion,
@@ -649,6 +675,12 @@ ext {
                 version: lombokVersion,
                 group  : 'org.projectlombok',
                 name   : 'lombok'
+            ],
+            'micronaut.jms': [
+                version: micronautJmsVersion,
+                group:   'io.micronaut.jms',
+                name:    'micronaut-jms-core',
+                modules: ['micronaut-jms-activemq-classic', 'micronaut-jms-activemq-artemis', 'micronaut-jms-sqs']
             ]
     ]
 
@@ -734,13 +766,12 @@ subprojects { Project subproject ->
 
     group projectGroupId
 
-    apply plugin: "io.micronaut.build.common"
+    apply plugin: "io.micronaut.build.internal.common"
     if (!subproject.name.startsWith('test-') &&
             !subproject.name.startsWith('inject-test-') &&
             !subproject.toString().contains('benchmarks')) {
-        apply plugin: "io.micronaut.build.dependency-updates"
-        apply plugin: "io.micronaut.build.publishing"
-        bintray.pkg.version.gpg.sign = false
+        apply plugin: "io.micronaut.build.internal.dependency-updates"
+        apply plugin: "io.micronaut.build.internal.publishing"
     }
 
     micronautBuild {
@@ -757,9 +788,15 @@ subprojects { Project subproject ->
         }
     }
 
-    tasks.withType(JavaCompile){
+    tasks.withType(JavaCompile) {
        options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
        options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+       options.forkOptions.memoryMaximumSize = "2g"
+    }
+    tasks.withType(GroovyCompile) {
+        options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
+        options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+        groovyOptions.forkOptions.memoryMaximumSize = "2g"
     }
     tasks.withType(Checkstyle) {
         reports {
@@ -839,8 +876,8 @@ subprojects { Project subproject ->
         }
     }
 }
-apply plugin: "io.micronaut.build.docs"
-apply plugin: "io.micronaut.build.dependency-updates"
+apply plugin: "io.micronaut.build.internal.docs"
+apply plugin: "io.micronaut.build.internal.dependency-updates"
 
 allprojects {
 

@@ -36,7 +36,6 @@ import java.io.IOException;
 
 import static junit.framework.TestCase.fail;
 import static org.junit.Assert.assertEquals;
-
 // end::imports[]
 
 // tag::multipartBodyImports[]
@@ -46,7 +45,6 @@ import io.micronaut.http.client.multipart.MultipartBody;
 // tag::controllerImports[]
 import io.micronaut.http.annotation.Controller;
 // end::controllerImports[]
-
 
 // tag::class[]
 public class MultipartFileUploadSpec {
@@ -65,53 +63,47 @@ public class MultipartFileUploadSpec {
 
     @AfterClass
     public static void stopServer() {
-        if(embeddedServer != null) {
+        if (embeddedServer != null) {
             embeddedServer.stop();
         }
-        if(client != null) {
+        if (client != null) {
             client.stop();
         }
     }
 
     @Test
-    public void testMultipartFileRequestByteArray() {
-        try {
-            // tag::file[]
-            String toWrite = "test file";
-            File file = File.createTempFile("data", ".txt");
-            FileWriter writer = new FileWriter(file);
-            writer.write(toWrite);
-            writer.close();
-            // end::file[]
+    public void testMultipartFileRequestByteArray() throws IOException {
+        // tag::file[]
+        String toWrite = "test file";
+        File file = File.createTempFile("data", ".txt");
+        FileWriter writer = new FileWriter(file);
+        writer.write(toWrite);
+        writer.close();
+        // end::file[]
 
-            // tag::multipartBody[]
-            MultipartBody requestBody = MultipartBody.builder()     // <1>
-                    .addPart(                                       // <2>
-                        "data",
-                        file.getName(),
-                        MediaType.TEXT_PLAIN_TYPE,
-                        file
-                    ).build()   ;                                    // <3>
+        // tag::multipartBody[]
+        MultipartBody requestBody = MultipartBody.builder()     // <1>
+                .addPart(                                       // <2>
+                    "data",
+                    file.getName(),
+                    MediaType.TEXT_PLAIN_TYPE,
+                    file
+                ).build();                                      // <3>
 
-            // end::multipartBody[]
+        // end::multipartBody[]
 
-            Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                // tag::request[]
+                HttpRequest.POST("/multipart/upload", requestBody)    // <1>
+                           .contentType(MediaType.MULTIPART_FORM_DATA_TYPE) // <2>
+                // end::request[]
+                           .accept(MediaType.TEXT_PLAIN_TYPE),
+                String.class
+        ));
+        HttpResponse<String> response = flowable.blockingFirst();
+        String body = response.getBody().get();
 
-                    // tag::request[]
-                    HttpRequest.POST("/multipart/upload", requestBody)       // <1>
-                            .contentType(MediaType.MULTIPART_FORM_DATA_TYPE) // <2>
-                    // end::request[]
-                            .accept(MediaType.TEXT_PLAIN_TYPE),
-
-                    String.class
-            ));
-            HttpResponse<String> response = flowable.blockingFirst();
-            String body = response.getBody().get();
-
-            assertEquals("Uploaded 9 bytes", body);
-        } catch (IOException e) {
-            fail();
-        }
+        assertEquals("Uploaded 9 bytes", body);
     }
 
     @Test
@@ -120,7 +112,6 @@ public class MultipartFileUploadSpec {
         MultipartBody requestBody = MultipartBody.builder()
                 .addPart("data", "sample.txt", MediaType.TEXT_PLAIN_TYPE, "test content".getBytes())
                 .build();
-
         // end::multipartBodyBytes[]
 
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
@@ -136,28 +127,24 @@ public class MultipartFileUploadSpec {
     }
 
     @Test
-    public void  testMultipartFileRequestByteArrayWithoutContentType() {
-        try {
-            String toWrite = "test file";
-            File file = File.createTempFile("data", ".txt");
-            FileWriter writer = new FileWriter(file);
-            writer.write(toWrite);
-            writer.close();
-            file.createNewFile();
+    public void  testMultipartFileRequestByteArrayWithoutContentType() throws IOException {
+        String toWrite = "test file";
+        File file = File.createTempFile("data", ".txt");
+        FileWriter writer = new FileWriter(file);
+        writer.write(toWrite);
+        writer.close();
+        file.createNewFile();
 
-            Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                    HttpRequest.POST("/multipart/upload", MultipartBody.builder().addPart("data", file.getName(), file))
-                            .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
-                            .accept(MediaType.TEXT_PLAIN_TYPE),
-                    String.class
-            ));
-            HttpResponse<String> response = flowable.blockingFirst();
-            String body = response.getBody().get();
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/multipart/upload", MultipartBody.builder().addPart("data", file.getName(), file))
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String.class
+        ));
+        HttpResponse<String> response = flowable.blockingFirst();
+        String body = response.getBody().get();
 
-            assertEquals("Uploaded 9 bytes", body);
-        } catch (IOException e) {
-            fail();
-        }
+        assertEquals("Uploaded 9 bytes", body);
     }
 
     @Controller("/multipart")

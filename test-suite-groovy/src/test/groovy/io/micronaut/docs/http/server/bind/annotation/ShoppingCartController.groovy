@@ -10,7 +10,7 @@ class ShoppingCartController {
     // tag::method[]
     @Get("/annotated")
     HttpResponse<String> checkSession(@ShoppingCart Long sessionId) { //<1>
-        HttpResponse.ok("Session:${sessionId}".toString())
+        HttpResponse.ok("Session:" + sessionId)
     }
     // end::method
 }

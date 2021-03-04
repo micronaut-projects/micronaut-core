@@ -24,7 +24,7 @@ import io.micronaut.http.annotation.UriMapping;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.web.router.RouteBuilder;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import javax.inject.Singleton;
 
 /**

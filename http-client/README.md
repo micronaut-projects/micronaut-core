@@ -1,4 +1,4 @@
 # Micronaut HTTP Client
 
-This module provides a Reactive HTTP client based on the Micronaut and Reactive streams APIs.
+This module provides an implementation of the Micronaut HTTP Client interfaces for RxJava 2.
 

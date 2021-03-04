@@ -19,14 +19,14 @@ package io.micronaut.docs.server.routes
 import io.micronaut.context.ExecutionHandleLocator
 import io.micronaut.web.router.DefaultRouteBuilder
 import io.micronaut.web.router.RouteBuilder
-
 import javax.inject.Inject
 import javax.inject.Singleton
 // end::imports[]
 
 // tag::class[]
 @Singleton
-class MyRoutes(executionHandleLocator: ExecutionHandleLocator, uriNamingStrategy: RouteBuilder.UriNamingStrategy) :
+class MyRoutes(executionHandleLocator: ExecutionHandleLocator,
+               uriNamingStrategy: RouteBuilder.UriNamingStrategy) :
         DefaultRouteBuilder(executionHandleLocator, uriNamingStrategy) { // <1>
 
     @Inject

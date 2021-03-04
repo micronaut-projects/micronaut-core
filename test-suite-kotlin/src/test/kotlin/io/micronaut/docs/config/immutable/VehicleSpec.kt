@@ -15,11 +15,11 @@ class VehicleSpec: StringSpec({
         val applicationContext = ApplicationContext.run(map)
 
         val vehicle = applicationContext.getBean(Vehicle::class.java)
+        println(vehicle.start())
         // end::start[]
 
         vehicle.start().shouldBe("Ford Engine Starting V8 [rodLength=7.0]")
 
         applicationContext.close()
     }
-
 })

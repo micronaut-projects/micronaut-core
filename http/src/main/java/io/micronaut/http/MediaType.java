@@ -16,6 +16,7 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -29,7 +30,6 @@ import io.micronaut.http.annotation.Produces;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -459,7 +459,7 @@ public class MediaType implements CharSequence {
      * @param expectedContentType   Content type to match against
      * @return if successful match
      */
-    public boolean matches(@Nonnull MediaType expectedContentType) {
+    public boolean matches(@NonNull MediaType expectedContentType) {
         //noinspection ConstantConditions
         if (expectedContentType == null) {
             return false;

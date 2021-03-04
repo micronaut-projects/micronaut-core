@@ -1,4 +1,4 @@
-As mentioned previously, Micronaut includes both an <<httpServer,HTTP server>> and an <<httpClient,HTTP client>>. A <<lowLevelHttpClient,low-level HTTP client>> is provided out of the box which you can use to test the `HelloController` created in the previous section.
+As mentioned previously, Micronaut includes both an <<httpServer,HTTP server>> and an <<httpClient,HTTP client>>. A <<lowLevelHttpClient,low-level HTTP client>> is provided which you can use to test the `HelloController` created in the previous section.
 
 .Testing Hello World
 
@@ -6,35 +6,31 @@ snippet::io.micronaut.docs.server.intro.HelloControllerSpec[tags="imports,class"
 
 <1> The api:runtime.server.EmbeddedServer[] is configured as a shared test field
 <2> A api:http.client.HttpClient[] instance shared field is also defined
-<3> The test using the `toBlocking()` method to make a blocking call
-<4> The `retrieve` method returns the response of the controller as a `String`
-
+<3> The test uses the `toBlocking()` method to make a blocking call
+<4> The `retrieve` method returns the controller response as a `String`
 
 In addition to a low-level client, Micronaut features a <<clientAnnotation,declarative, compile-time HTTP client>>, powered by the api:http.client.annotation.Client[] annotation.
 
-To create a client, simply create an interface annotated with `@Client`. For example:
-
+To create a client, create an interface annotated with `@Client`, for example:
 
 .src/main/java/hello/world/HelloClient.java
 
 snippet::io.micronaut.docs.server.intro.HelloClient[tags="imports,class",indent=0]
 
-
-<1> The `@Client` annotation is used with value that is a relative path to the current server
+<1> The `@Client` annotation is used with a value that is a relative path to the current server
 <2> The same ann:http.annotation.Get[] annotation used on the server is used to define the client mapping
-<3> A RxJava rx:Single[] is returned with the value read from the server
+<3> An RxJava rx:Single[] is returned with the value read from the server
 
-To test the `HelloClient` simply retrieve it from the api:context.ApplicationContext[] associated with the server:
+To test the `HelloClient`, retrieve it from the api:context.ApplicationContext[] associated with the server:
 
 .Testing HelloClient
 
 snippet::io.micronaut.docs.server.intro.HelloClientSpec[tags="imports,class",indent=0]
 
-
-<1> The `@MicronautTest` annotation is used to define the test
+<1> The `@MicronautTest` annotation defines the test
 <2> The `HelloClient` is injected from the api:context.ApplicationContext[]
-<3> The client is invoked using RxJava's `blockingGet` method
+<3> The client is invoked using the RxJava `blockingGet` method
 
-The api:http.client.annotation.Client[] annotation produces an implementation automatically for you at compile time without the need to use proxies or runtime reflection.
+The api:http.client.annotation.Client[] annotation produces an implementation automatically for you at compile time without the using proxies or runtime reflection.
 
 The api:http.client.annotation.Client[] annotation is very flexible. See the section on the <<httpClient, Micronaut HTTP Client>> for more information.

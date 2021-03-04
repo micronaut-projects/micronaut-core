@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.upload;
+package io.micronaut.docs.server.upload
 
 // tag::class[]
-import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
@@ -27,13 +26,15 @@ import io.reactivex.Single
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 
+import static io.micronaut.http.MediaType.MULTIPART_FORM_DATA
+import static io.micronaut.http.MediaType.TEXT_PLAIN
+
 @Controller("/upload")
 class WholeBodyUploadController {
 
-    @Post(value = "/whole-body",
-            consumes = MediaType.MULTIPART_FORM_DATA,
-            produces = MediaType.TEXT_PLAIN) // <1>
+    @Post(value = "/whole-body", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
     Single<String> uploadBytes(@Body MultipartBody body) { // <2>
+
         Single.<String>create({ emitter ->
             body.subscribe(new Subscriber<CompletedPart>() {
                 private Subscription s
@@ -48,7 +49,7 @@ class WholeBodyUploadController {
                 void onNext(CompletedPart completedPart) {
                     String partName = completedPart.name
                     if (completedPart instanceof CompletedFileUpload) {
-                        String originalFileName = ((CompletedFileUpload) completedPart).filename
+                        String originalFileName = completedPart.filename
                     }
                 }
 

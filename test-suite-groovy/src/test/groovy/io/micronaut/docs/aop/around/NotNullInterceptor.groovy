@@ -16,7 +16,7 @@
 package io.micronaut.docs.aop.around
 
 // tag::imports[]
-
+import io.micronaut.aop.InterceptorBean
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.core.type.MutableArgumentValue
@@ -26,22 +26,22 @@ import javax.inject.Singleton
 
 // tag::interceptor[]
 @Singleton
-class NotNullInterceptor implements MethodInterceptor<Object, Object> { // <1>
+@InterceptorBean(NotNull) // <1>
+class NotNullInterceptor implements MethodInterceptor<Object, Object> { // <2>
     @Override
     Object intercept(MethodInvocationContext<Object, Object> context) {
-        Optional<Map.Entry<String, MutableArgumentValue<?>>> nullParam = context.getParameters()
+        Optional<Map.Entry<String, MutableArgumentValue<?>>> nullParam = context.parameters
             .entrySet()
             .stream()
             .filter({entry ->
-                MutableArgumentValue<?> argumentValue = entry.getValue()
-                return Objects.isNull(argumentValue.getValue())
+                MutableArgumentValue<?> argumentValue = entry.value
+                return Objects.isNull(argumentValue.value)
             })
-            .findFirst() // <2>
-        if (nullParam.isPresent()) {
-            throw new IllegalArgumentException("Null parameter [" + nullParam.get().getKey() + "] not allowed") // <3>
-        } else {
-            return context.proceed() // <4>
+            .findFirst() // <3>
+        if (nullParam.present) {
+            throw new IllegalArgumentException("Null parameter [${nullParam.get().key}] not allowed") // <4>
         }
+        return context.proceed() // <5>
     }
 }
 // end::interceptor[]

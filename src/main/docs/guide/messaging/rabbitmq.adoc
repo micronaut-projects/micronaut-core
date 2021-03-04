@@ -1,6 +1,6 @@
 https://www.rabbitmq.com[RabbitMQ] is the most widely deployed open source message broker.
 
-Micronaut features dedicated support for defining both RabbitMQ publishers and consumers. Micronaut applications built with RabbitMQ can be deployed with or without the presence of an HTTP server.
+Micronaut features dedicated support for defining both RabbitMQ publishers and consumers. Micronaut applications built with RabbitMQ can be deployed with or without an HTTP server.
 
 With Micronaut's efficient compile-time AOP, using RabbitMQ has never been easier. Support has been added for publisher confirms and RPC through reactive streams.
 

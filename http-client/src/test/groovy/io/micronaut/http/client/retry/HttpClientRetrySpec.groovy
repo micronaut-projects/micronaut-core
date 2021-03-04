@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client.retry
 
-import edu.umd.cs.findbugs.annotations.NonNull
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Post
 import io.reactivex.Single

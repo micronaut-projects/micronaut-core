@@ -1,12 +1,14 @@
 package io.micronaut.docs.http.server.reactive
 
-import io.micronaut.docs.ioc.beans.Person
-
 // tag::imports[]
-import io.micronaut.http.annotation.*
+import io.micronaut.docs.ioc.beans.Person
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.scheduling.TaskExecutors
-import io.reactivex.*
+import io.reactivex.Scheduler
+import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
+
 import javax.inject.Named
 import java.util.concurrent.ExecutorService
 // end::imports[]
@@ -27,9 +29,9 @@ class PersonController {
 
     @Get("/{name}")
     Single<Person> byName(String name) {
-        return Single.fromCallable({ -> // <2>
-            personService.findByName(name)
-        }).subscribeOn(scheduler) // <3>
+        return Single
+                .fromCallable({ -> personService.findByName(name) }) // <2>
+                .subscribeOn(scheduler) // <3>
     }
 }
 // end::class[]

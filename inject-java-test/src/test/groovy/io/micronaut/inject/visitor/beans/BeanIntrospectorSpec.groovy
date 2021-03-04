@@ -3,6 +3,7 @@ package io.micronaut.inject.visitor.beans
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospector
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import javax.inject.Singleton
@@ -53,7 +54,18 @@ class BeanIntrospectorSpec extends Specification {
     void "test find introspections"() {
         expect:
         BeanIntrospector.SHARED.findIntrospections(Introspected).size() > 0
-        BeanIntrospector.SHARED.findIntrospections(Introspected, "io.micronaut.inject.visitor.beans").size() == 3
+        BeanIntrospector.SHARED.findIntrospections(Introspected, "io.micronaut.inject.visitor.beans").size() == 5
         BeanIntrospector.SHARED.findIntrospections(Introspected, "blah").size() == 0
+    }
+
+    @PendingFeature
+    void "test instantiating with a non null argument with null"() {
+        BeanIntrospection<NonNullBean> introspection = BeanIntrospection.getIntrospection(NonNullBean)
+
+        when:
+        introspection.instantiate(false, [null] as Object[])
+
+        then:
+        def ex = thrown(IllegalArgumentException)
     }
 }

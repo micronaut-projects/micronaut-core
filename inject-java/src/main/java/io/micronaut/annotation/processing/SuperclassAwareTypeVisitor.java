@@ -202,18 +202,20 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
     }
 
     private String buildQualifiedName(DeclaredType type, TypeElement typeElement, ExecutableElement enclosedElement) {
-        ExecutableElement ee = enclosedElement;
-        String qualifiedName = ee.getSimpleName().toString();
-        qualifiedName += "(" + ee.getParameters().stream().map(variableElement -> types.erasure(variableElement.asType()).toString()).collect(Collectors.joining(",")) + ")";
+        String qualifiedName = enclosedElement.getSimpleName().toString();
+        qualifiedName += "(" + enclosedElement.getParameters().stream().map(variableElement -> types.erasure(variableElement.asType()).toString()).collect(Collectors.joining(",")) + ")";
 
-        TypeMirror returnTypeMirror = ee.getReturnType();
+        TypeMirror returnTypeMirror = enclosedElement.getReturnType();
         String returnType = null;
 
         if (returnTypeMirror.getKind() == TypeKind.TYPEVAR) {
-            Map<String, Object> generics = genericUtils.buildGenericTypeArgumentInfo(type)
+            Map<String, TypeMirror> generics = genericUtils.buildGenericTypeArgumentInfo(type)
                     .get(typeElement.getQualifiedName().toString());
-            if (generics != null && generics.containsKey(returnTypeMirror.toString())) {
-                returnType = generics.get(returnTypeMirror.toString()).toString();
+            if (generics != null) {
+                String key = returnTypeMirror.toString();
+                if (generics.containsKey(key)) {
+                    returnType = generics.get(key).toString();
+                }
             }
         }
 

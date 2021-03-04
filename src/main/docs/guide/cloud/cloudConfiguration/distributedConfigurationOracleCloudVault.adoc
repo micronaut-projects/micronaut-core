@@ -9,7 +9,7 @@ compile group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-secrets', version: '1.1
 compile group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-common', version: '1.15.4'
 ----
 
-To enable distributed configuration a `src/main/resources/bootstrap.yml` configuration file must be created and configured to use one or more Oracle Cloud Vaults:
+Create a `src/main/resources/bootstrap.yml` configuration file to use one or more Oracle Cloud Vaults for distributed configuration:
 
 .bootstrap.yml
 [source,yaml]
@@ -36,9 +36,9 @@ See the https://micronaut-projects.github.io/micronaut-discovery-client/latest/g
 
 NOTE: You can learn more about Oracle Cloud Vault Secrets by https://blogs.oracle.com/developers/protect-your-sensitive-data-with-secrets-in-the-oracle-cloud[reading this blog post].
 
-Each configured vault will be read and all of the secrets within the vault will be retrieved and set into configuration variables with the exact same name as the secret in the Oracle Cloud Vault.
+Each configured vault will be read and all of the secrets within the vault will be retrieved and set into configuration variables with the same name as the secret in the Oracle Cloud Vault.
 
-For example, if you create a secret with the name of `SECRET_ONE` in your Oracle Cloud Vault, then it will be available to use in your application like any standard configuration variable:
+For example, if you create a secret with the name of `SECRET_ONE` in your Oracle Cloud Vault it will be available to use in your application like any standard configuration variable:
 
 [source,java]
 ----
@@ -64,7 +64,7 @@ datasources:
 
 Vault retrieved values are always `String`, but you can use `@ConfigurationProperties` on a bean in conjunction with your `application.yml` file to provide properly typed configuration variables.
 
-So if you where to create secrets in your Oracle Cloud Vault like so:
+If you create secrets in your Oracle Cloud Vault like so:
 
 |===
 |Name |Value
@@ -82,7 +82,7 @@ So if you where to create secrets in your Oracle Cloud Vault like so:
 
 |===
 
-And then added the following to your `application.yml` file:
+and then add the following to your `application.yml` file:
 
 .application.yml
 [source, yaml]
@@ -95,7 +95,7 @@ secrets:
   five: ${SECRET_FIVE}
 ----
 
-You could add a config bean like so:
+you can add a config bean like this:
 
 .Config.java
 [source, java]
@@ -108,11 +108,11 @@ public class Config {
     private int four;
     private Double five;
 
-    /* getters/setters removed for brevity */
+    /* getters/setters omitted for brevity */
 }
 ----
 
-You could then inject and use this bean in your application with properly typed values.
+You can then inject and use this bean in your application with properly typed values.
 
 .HelloController.java
 [source, java]
@@ -122,9 +122,7 @@ public class HelloController {
 
     private Config config;
 
-    public HelloController(
-            Config config
-    ) {
+    public HelloController(Config config) {
         this.config = config;
     }
 
@@ -140,7 +138,7 @@ public class HelloController {
 }
 ----
 
-Calling the `/hello/secret` endpoint would return:
+Calling the `/hello/secret` endpoint returns:
 
 [source, json]
 ----
@@ -153,4 +151,4 @@ Calling the `/hello/secret` endpoint would return:
 }
 ----
 
-TIP: If you need support for different configurations per environment, you can create an environment specific `bootstrap.yml` file and utilize a different vault(s) configuration per environment.
+TIP: If you need support for different configurations per environment, you can create an environment-specific `bootstrap.yml` file and utilize a different vault(s) configuration per environment.

@@ -27,7 +27,7 @@ import io.micronaut.scheduling.io.watch.DefaultWatchThread;
 import io.micronaut.scheduling.io.watch.FileWatchCondition;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.nio.file.Path;

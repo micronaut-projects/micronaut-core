@@ -15,11 +15,10 @@
  */
 package io.micronaut.docs.lifecycle
 
-
 // tag::class[]
 import javax.annotation.PreDestroy // <1>
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Singleton
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Singleton
 class PreDestroyBean implements AutoCloseable {

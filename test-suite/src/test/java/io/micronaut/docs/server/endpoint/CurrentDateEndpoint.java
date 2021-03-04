@@ -37,9 +37,9 @@ import java.util.Date;
 
 //tag::endpointClassBegin[]
 @Endpoint(id = "date",
-        prefix = "custom",
-        defaultEnabled = true,
-        defaultSensitive = false)
+          prefix = "custom",
+          defaultEnabled = true,
+          defaultSensitive = false)
 public class CurrentDateEndpoint {
 //end::endpointClassBegin[]
 

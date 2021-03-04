@@ -15,12 +15,13 @@
  */
 package io.micronaut.inject.visitor;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
@@ -46,6 +47,13 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     String MICRONAUT_PROCESSING_PROJECT_DIR = "micronaut.processing.project.dir";
     String MICRONAUT_PROCESSING_GROUP = "micronaut.processing.group";
     String MICRONAUT_PROCESSING_MODULE = "micronaut.processing.module";
+
+    /**
+     * Gets the element factory for this visitor context.
+     * @return The element factory
+     * @since 2.3.0
+     */
+    @NonNull ElementFactory<?, ?, ?, ?> getElementFactory();
 
     /**
      * Allows printing informational messages.
@@ -77,6 +85,13 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @param element The element
      */
     void warn(String message, @Nullable Element element);
+
+    /**
+     * @return The visitor configuration
+     */
+    default @NonNull VisitorConfiguration getConfiguration() {
+        return VisitorConfiguration.DEFAULT;
+    }
 
     /**
      * Visit a file within the META-INF directory.
@@ -111,6 +126,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Override
     @Experimental
     Optional<GeneratedFile> visitGeneratedFile(String path);
+
 
     /**
      * Obtain a set of resources from the user classpath.

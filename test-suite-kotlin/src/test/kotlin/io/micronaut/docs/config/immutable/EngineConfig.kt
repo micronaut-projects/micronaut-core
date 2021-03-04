@@ -15,23 +15,22 @@
  */
 package io.micronaut.docs.config.immutable
 
-
 // tag::imports[]
-import io.micronaut.context.annotation.*
+import io.micronaut.context.annotation.ConfigurationInject
+import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.core.bind.annotation.Bindable
-import javax.validation.constraints.*
 import java.util.Optional
-
+import javax.validation.constraints.Min
+import javax.validation.constraints.NotBlank
+import javax.validation.constraints.NotNull
 // end::imports[]
 
 // tag::class[]
 @ConfigurationProperties("my.engine") // <1>
 data class EngineConfig @ConfigurationInject // <2>
     constructor(
-        @Bindable(defaultValue = "Ford") @NotBlank // <3>
-        val manufacturer: String,
-        @Min(1L) // <4>
-        val cylinders: Int,
+        @Bindable(defaultValue = "Ford") @NotBlank val manufacturer: String, // <3>
+        @Min(1) val cylinders: Int, // <4>
         @NotNull val crankShaft: CrankShaft) {
 
     @ConfigurationProperties("crank-shaft")

@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.Requires
 //tag::imports[]
 import io.micronaut.context.annotation.Primary
 import javax.inject.Singleton
-
 //end::imports[]
 
 @Requires(property = "spec.name", value = "primaryspec")

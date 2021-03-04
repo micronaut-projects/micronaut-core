@@ -23,8 +23,8 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -38,7 +38,7 @@ import java.util.Set;
  */
 @Internal
 public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOutputVisitor {
-    private final Map<String, Set<String>> serviceDescriptors = new HashMap<>();
+    private final Map<String, Set<String>> serviceDescriptors = new LinkedHashMap<>();
     private final boolean isWriteOnFinish;
 
     /**
@@ -64,7 +64,7 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
     @Override
     public final void visitServiceDescriptor(String type, String classname) {
         if (StringUtils.isNotEmpty(type) && StringUtils.isNotEmpty(classname)) {
-            serviceDescriptors.computeIfAbsent(type, s -> new HashSet<>()).add(classname);
+            serviceDescriptors.computeIfAbsent(type, s -> new LinkedHashSet<>()).add(classname);
         }
     }
 

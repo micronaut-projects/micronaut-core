@@ -175,6 +175,18 @@ class CircuitBreakerSpec extends Specification{
         context.stop()
     }
 
+    void "test circuit breaker empty config"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        EmptyConfigService service = context.getBean(EmptyConfigService)
+
+        when:"A method is annotated retry"
+        int result = service.getCount()
+
+        then:"It executes until successful"
+        result == 2
+    }
+
     @Singleton
     static class MyRetryListener implements RetryEventListener {
 
@@ -237,5 +249,21 @@ class CircuitBreakerSpec extends Specification{
             })
         }
 
+    }
+
+    @Singleton
+    @CircuitBreaker
+    static class EmptyConfigService {
+        int countValue = 0
+        int countRx = 0
+        int countThreshold = 2
+
+        int getCount() {
+            countValue++
+            if(countValue < countThreshold) {
+                throw new IllegalStateException("Bad count")
+            }
+            return countValue
+        }
     }
 }

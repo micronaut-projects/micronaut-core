@@ -1,6 +1,6 @@
-To parse the request body, you first need to indicate to Micronaut the parameter which will receive the data. This is done with the api:http.annotation.Body[] annotation.
+To parse the request body, you first indicate to Micronaut which parameter receives the data with the api:http.annotation.Body[] annotation.
 
-The following example implements a simple echo server that echos the body sent in the request:
+The following example implements a simple echo server that echoes the body sent in the request:
 
 snippet::io.micronaut.docs.server.body.MessageController[tags="imports,echo", indent=0, title="Using the @Body annotation"]
 
@@ -10,14 +10,14 @@ snippet::io.micronaut.docs.server.body.MessageController[tags="imports,echo", in
 
 Note that reading the request body is done in a non-blocking manner in that the request contents are read as the data becomes available and accumulated into the String passed to the method.
 
-TIP: The `micronaut.server.maxRequestSize` setting in `application.yml` will limit the size of the data (the default maximum request size is 10MB) read/buffered by the server. `@Size` is *not* a replacement for this setting.
+TIP: The `micronaut.server.maxRequestSize` setting in `application.yml` limits the size of the data (the default maximum request size is 10MB) read/buffered by the server. `@Size` is *not* a replacement for this setting.
 
 Regardless of the limit, for a large amount of data accumulating the data into a String in-memory may lead to memory strain on the server. A better approach is to include a Reactive library in your project (such as `RxJava 2.x`, `Reactor` or `Akka`) that supports the Reactive streams implementation and stream the data it becomes available:
 
 snippet::io.micronaut.docs.server.body.MessageController[tags="echoReactive", indent=0, title="Using RxJava 2 to Read the request body"]
 
 <1> In this case the method is altered to receive and return an RxJava 2.x `Flowable` type
-<2> A rx:Single[] is returned so that Micronaut will only emit the response once the operation completes without blocking.
-<3> The `collect` method is used to accumulate the data in this simulated example, but it could for example write the data to logging service, database or whatever chunk by chunk
+<2> A rx:Single[] is returned so Micronaut only emits the response once the operation completes without blocking.
+<3> The `collect` method is used to accumulate the data in this simulated example, but it could for example write the data to a logging service, database, etc. chunk by chunk
 
-IMPORTANT: Body arguments of types that do not require conversion will cause Micronaut to skip decoding of the request!
+IMPORTANT: Body arguments of types that do not require conversion cause Micronaut to skip decoding of the request!

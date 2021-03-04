@@ -15,7 +15,7 @@
  */
 package io.micronaut.discovery;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.health.HealthStatus;
 
 import java.net.URI;
