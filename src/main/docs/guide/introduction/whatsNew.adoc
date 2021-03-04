@@ -77,6 +77,40 @@ public class AccountUsernameValidator {
 }
 ----
 
+=== Integration with Oracle Coherence CE
+
+We are pleased to announce a first milestone release of Micronaut integration with Oracle Coherence Community Edition, which makes implementation of Micronaut applications with a Coherence back end a breeze.
+
+Below are some of the features supported by the various modules within `micronaut-coherence` project:
+
+==== Micronaut Data Support
+
+The `micronaut-coherence-data` module alows you to use https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#repository[Micronaut Data with Coherence as a back end data store].
+
+==== Dependency Injection of Coherence-managed Objects
+
+A new `micronaut-coherence` module provides factories for commonly used Coherence objects, such as `Cluster`, `Session`, `NamedMap`, `NamedCache`, `NamedTopic`, and many others, which allows you to https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#injection[easily inject those objects] into your application classes.
+
+==== Listeners for Coherence Events
+
+The `micronaut-coherence` module also provides support for Coherence https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#coherenceEvents[server-] and https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#mapEvents[client-side] events via Micronaut event listeners.
+
+==== Micronaut Messaging Support
+
+Finally, the `micronaut-coherence` module provides support for https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#messagingWithTopics[Micronaut Messaging using Coherence Topics].
+
+==== Micronaut Caching Support
+
+The `micronaut-coherence-cache` module adds support for https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#cache[using Coherence as a back end for Micronaut Cache].
+
+==== Micronaut Distributed Config Support
+
+The `micronaut-coherence-distributed-configuration` module adds support for https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#distributedConfiguration[using Coherence as a store for Micronaut Distributed Configuration].
+
+==== Micronaut HTTP Sessions Support
+
+The `micronaut-coherence-session` module adds support for https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#coherenceHttpSessions[using Coherence as a store for Micronaut HTTP Sessions].
+
 === Cloud Features
 
 ==== Easier Configuration of Oracle Cloud Autonomous Database
