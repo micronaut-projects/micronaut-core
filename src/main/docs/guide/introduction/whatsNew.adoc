@@ -28,6 +28,55 @@ snippet::io.micronaut.docs.aop.around.NotNullInterceptor[tags="imports,intercept
 
 Multiple api:aop.MethodInterceptor[] types can bind to a single advise annotation and any given interceptor can bind to multiple annotations.
 
+=== Micronaut Data
+
+==== Support for Java 14+ Records with JDBC
+
+Micronaut Data JDBC now https://micronaut-projects.github.io/micronaut-data/latest/guide/#javaRecords[supports using Java 14+ records to represent persistent entities], for example:
+
+[source,java]
+----
+package example;
+
+import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.data.annotation.*;
+import java.util.Date;
+
+@MappedEntity
+record Book(
+        @Id @GeneratedValue @Nullable Long id,
+        @DateCreated @Nullable Date dateCreated,
+        String title,
+        int pages) {
+    Book(String title, int pages) {
+        this(null, null, title, pages)
+    }
+}
+----
+
+==== Persistence Events Support
+
+Micronaut Data JPA, JDBC and R2DBC now support https://micronaut-projects.github.io/micronaut-data/latest/guide/#entityEvents[persistence events] on either entities or Micronaut beans. For example:
+
+[source,java]
+----
+package example;
+
+import io.micronaut.data.annotation.event.PrePersist;
+import javax.inject.Singleton;
+
+@Singleton
+public class AccountUsernameValidator {
+    @PrePersist
+    void validateUsername(Account account) {
+        final String username = account.getUsername();
+        if (username == null || !username.matches("[a-z0-9]+")) {
+            throw new IllegalArgumentException("Invalid username");
+        }
+    }
+}
+----
+
 === Cloud Features
 
 ==== Easier Configuration of Oracle Cloud Autonomous Database
@@ -47,6 +96,9 @@ In Micronaut 3 this new module will be used as primary kubernetes client, making
 === Module Upgrades
 
 * Micronaut Oracle Cloud `1.1.1` -> `1.2.1`
+* Micronaut Data `2.2.4` -> `2.3.0`
+* Micronaut R2DBC `1.0.1` -> `1.1.0`
+* Micronaut Kubernetes `2.2.0` -> `2.3.0`
 
 === Dependency Upgrades
 
