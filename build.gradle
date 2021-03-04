@@ -414,7 +414,7 @@ ext {
             picocli                    : [
                     version: picocliVersion,
                     group  : 'info.picocli',
-                    name   : 'picocli'
+                    modules: ['picocli', 'picocli-codegen']                    
             ],
             lettuce                    : [
                     version: lettuceVersion,
