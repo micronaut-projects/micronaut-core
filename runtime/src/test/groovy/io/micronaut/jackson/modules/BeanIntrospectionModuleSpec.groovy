@@ -39,7 +39,7 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         then:
         noExceptionThrown()
-        json == '{"name":"test"}'
+        json == '{"name":"Test"}'
 
         cleanup:
         ctx.close()

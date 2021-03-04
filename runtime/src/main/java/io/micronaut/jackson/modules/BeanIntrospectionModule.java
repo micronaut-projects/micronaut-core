@@ -78,6 +78,16 @@ public class BeanIntrospectionModule extends SimpleModule {
         setSerializerModifier(new BeanIntrospectionSerializerModifier());
     }
 
+    /**
+     * Find an introspection for the given class.
+     * @param beanClass The bean class
+     * @return The introspection
+     */
+    @Nullable
+    protected BeanIntrospection<Object> findIntrospection(Class<?> beanClass) {
+        return (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
+    }    
+
     private JavaType newType(Argument<?> argument, TypeFactory typeFactory) {
         return JacksonConfiguration.constructType(argument, typeFactory);
     }
@@ -222,16 +232,6 @@ public class BeanIntrospectionModule extends SimpleModule {
                 return newBuilder;
             }
         }
-    }
-
-    /**
-     * Find an introspection for the given class.
-     * @param beanClass The bean class
-     * @return The introspection
-     */
-    @Nullable
-    protected BeanIntrospection<Object> findIntrospection(Class<?> beanClass) {
-        return (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
     }
 
     /**
@@ -488,8 +488,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     public Object createFromBoolean(DeserializationContext ctxt, boolean value) throws IOException {
                         return introspection.instantiate(false, new Object[]{ value });
                     }
-
-
+                    
                 });
                 return builder;
             }
