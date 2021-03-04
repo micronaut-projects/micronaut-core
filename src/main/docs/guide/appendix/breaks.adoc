@@ -1,5 +1,9 @@
 This section documents breaking changes between Micronaut 1.x and Micronaut 2.x
 
+=== Micronaut 2.4
+
+Methods annotated with `@CircuitBreaker` that used the `includes` or `excludes` members were not functioning correctly. The circuit breaker was opening for exceptions that did not match the supplied exception types. This has been changed to correctly respect the includes and excludes.
+
 === Micronaut 2.3
 
 The `micronaut.server.multipart.enabled` setting previously was not respected for the Netty server implementation. The setting is now honored and if explicitly set to false, all multipart requests will be rejected.
