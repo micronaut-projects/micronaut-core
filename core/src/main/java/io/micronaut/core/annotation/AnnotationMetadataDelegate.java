@@ -15,8 +15,6 @@
  */
 package io.micronaut.core.annotation;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.OptionalValues;
 
@@ -35,6 +33,11 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     @Override
     default boolean hasSimpleAnnotation(@Nullable String annotation) {
         return getAnnotationMetadata().hasSimpleAnnotation(annotation);
+    }
+
+    @Override
+    default boolean hasPropertyExpressions() {
+        return getAnnotationMetadata().hasPropertyExpressions();
     }
 
     @Override

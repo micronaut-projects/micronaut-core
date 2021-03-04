@@ -1,6 +1,6 @@
 package io.micronaut.inject.configproperties
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Property
 import io.micronaut.inject.BeanDefinition
@@ -95,7 +95,7 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties(value = "foo", includes = ["property", "parentProperty"])
 class MyProperties extends Parent {
-    @edu.umd.cs.findbugs.annotations.Nullable
+    @io.micronaut.core.annotation.Nullable
     String property
     String anotherProperty
 }
@@ -173,7 +173,7 @@ import io.micronaut.context.annotation.*
 @ConfigurationProperties(value = "foo", excludes = ["anotherProperty", "anotherParentProperty"])
 class MyProperties extends Parent {
 
-    @edu.umd.cs.findbugs.annotations.Nullable
+    @io.micronaut.core.annotation.Nullable
     String property
     String anotherProperty
 }

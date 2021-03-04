@@ -15,7 +15,7 @@
  */
 package io.micronaut.context;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.Failure;
@@ -27,7 +27,7 @@ import io.micronaut.inject.BeanContextConditional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Abstract implementation of the {@link BeanContextConditional} interface.

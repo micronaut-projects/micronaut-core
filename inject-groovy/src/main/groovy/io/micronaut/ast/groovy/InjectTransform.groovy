@@ -15,9 +15,11 @@
  */
 package io.micronaut.ast.groovy
 
-import edu.umd.cs.findbugs.annotations.Nullable
+import io.micronaut.context.ProviderFactory
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
+import io.micronaut.context.ProviderUtils
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 import io.micronaut.inject.writer.GeneratedFile
@@ -51,7 +53,6 @@ import org.codehaus.groovy.control.io.StringReaderSource
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
-import javax.inject.Provider
 import java.lang.reflect.Modifier
 
 /**
@@ -138,10 +139,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             try {
                 if (beanClassNode instanceof ClassNode) {
                     ClassNode cn = (ClassNode) beanClassNode
-                    ClassNode providerType = AstGenericUtils.resolveInterfaceGenericType(cn, Provider.class)
-
-                    if (providerType != null) {
-                        beanTypeName = providerType.name
+                    for (Class providerClass: ProviderFactory.getProviders()) {
+                        ClassNode providerType = AstGenericUtils.resolveInterfaceGenericType(cn, providerClass)
+                        if (providerType != null) {
+                            beanTypeName = providerType.name
+                            break
+                        }
                     }
                 }
 

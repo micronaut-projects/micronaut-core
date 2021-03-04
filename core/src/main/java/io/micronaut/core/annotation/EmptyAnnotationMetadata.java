@@ -15,8 +15,6 @@
  */
 package io.micronaut.core.annotation;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
@@ -33,6 +31,11 @@ import java.util.*;
  */
 @Internal
 final class EmptyAnnotationMetadata implements AnnotationMetadata {
+
+    @Override
+    public boolean hasPropertyExpressions() {
+        return false;
+    }
 
     @Override
     public <E extends Enum> E[] enumValues(@NonNull String annotation, Class<E> enumType) {

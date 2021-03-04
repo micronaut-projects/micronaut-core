@@ -16,6 +16,8 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.context.BeanLocator;
+import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.subscriber.TypedSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
@@ -46,12 +48,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author James Kleeh
  * @since 1.3.0
  */
+@Internal
 public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
     private final BeanLocator beanLocator;
-    private final Provider<HttpServerConfiguration> httpServerConfiguration;
+    private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
 
     /**
      * Default constructor.
@@ -59,7 +62,19 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
      * @param beanLocator The bean locator
      * @param httpServerConfiguration The server configuration
      */
+    @Deprecated
     public MultipartBodyArgumentBinder(BeanLocator beanLocator, Provider<HttpServerConfiguration> httpServerConfiguration) {
+        this.beanLocator = beanLocator;
+        this.httpServerConfiguration = httpServerConfiguration::get;
+    }
+
+    /**
+     * Default constructor.
+     *
+     * @param beanLocator The bean locator
+     * @param httpServerConfiguration The server configuration
+     */
+    public MultipartBodyArgumentBinder(BeanLocator beanLocator, BeanProvider<HttpServerConfiguration> httpServerConfiguration) {
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;
     }

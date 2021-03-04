@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.http2;
 
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -25,7 +26,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
-import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -115,7 +115,7 @@ public class Http2PostTest implements TestPropertyProvider {
         );
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Map<String, String> getProperties() {
         return CollectionUtils.mapOf(

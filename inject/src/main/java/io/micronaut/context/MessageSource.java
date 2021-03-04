@@ -19,8 +19,8 @@ import io.micronaut.context.exceptions.NoSuchMessageException;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.Collections;
 import java.util.Locale;

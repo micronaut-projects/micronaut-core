@@ -18,7 +18,7 @@ package io.micronaut.inject
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
-import edu.umd.cs.findbugs.annotations.NonNull
+import io.micronaut.core.annotation.NonNull
 import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AnnotationUtils
 import io.micronaut.annotation.processing.GenericUtils

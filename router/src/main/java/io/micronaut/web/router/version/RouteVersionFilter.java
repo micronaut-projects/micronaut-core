@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router.version;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.version.annotation.Version;
@@ -25,7 +25,7 @@ import io.micronaut.web.router.version.resolution.RequestVersionResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.List;
 import java.util.Objects;

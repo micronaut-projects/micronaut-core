@@ -20,7 +20,7 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.value.PropertyResolver;
 
 import java.util.Collections;

@@ -24,8 +24,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.inject.ExecutableMethod;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 import javax.annotation.PreDestroy;
 import java.io.Closeable;
@@ -107,7 +107,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
      * @return The {@link ApplicationContextBuilder}
      */
     protected @NonNull ApplicationContextBuilder newApplicationContextBuilder() {
-        return ApplicationContext.build(Environment.FUNCTION);
+        return ApplicationContext.builder(Environment.FUNCTION);
     }
 
     /**

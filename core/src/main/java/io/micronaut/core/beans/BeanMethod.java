@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.beans;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.type.ReturnType;

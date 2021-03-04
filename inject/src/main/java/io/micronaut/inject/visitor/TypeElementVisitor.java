@@ -15,11 +15,12 @@
  */
 package io.micronaut.inject.visitor;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.FieldElement;
@@ -36,7 +37,7 @@ import java.util.Set;
  * @author James Kleeh
  * @since 1.0
  */
-public interface TypeElementVisitor<C, E> extends Ordered {
+public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
 
     /**
      * Executed when a class is encountered that matches the <C> generic.
