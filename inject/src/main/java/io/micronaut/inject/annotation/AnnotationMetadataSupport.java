@@ -44,7 +44,7 @@ import java.util.function.Function;
  * @since 1.0
  */
 @Internal
-class AnnotationMetadataSupport {
+public final class AnnotationMetadataSupport {
 
     private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
 
@@ -92,7 +92,8 @@ class AnnotationMetadataSupport {
      * @param annotation The annotation
      * @return The default values for the annotation
      */
-    static Map<String, Object> getDefaultValues(String annotation) {
+    @UsedByGeneratedCode
+    public static Map<String, Object> getDefaultValues(String annotation) {
         return ANNOTATION_DEFAULTS.computeIfAbsent(annotation, s -> Collections.emptyMap());
     }
 
