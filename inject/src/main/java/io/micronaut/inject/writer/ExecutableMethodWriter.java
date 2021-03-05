@@ -28,6 +28,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
@@ -166,7 +167,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                             MethodElement methodElement) {
         String methodName = methodElement.getName();
         List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
-        Type declaringTypeObject = getTypeReference(declaringType);
+        Type declaringTypeObject = JavaModelUtils.getTypeReference(declaringType);
         boolean hasArgs = !argumentTypes.isEmpty();
 
         classWriter.visit(V1_8, ACC_SYNTHETIC,
@@ -373,7 +374,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             ClassElement returnType,
             Collection<ParameterElement> argumentTypes,
             GeneratorAdapter invokeMethodVisitor) {
-        Type returnTypeObject = getTypeReference(returnType);
+        Type returnTypeObject = JavaModelUtils.getTypeReference(returnType);
 
         // load this
         invokeMethodVisitor.visitVarInsn(ALOAD, 1);
@@ -484,7 +485,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                         getTargetMethod,
                         i,
                         len,
-                        () -> getTargetMethod.push(getTypeReference(type))
+                        () -> getTargetMethod.push(JavaModelUtils.getTypeReference(type))
                 );
 
             }

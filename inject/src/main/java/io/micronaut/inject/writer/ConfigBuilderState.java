@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.Type;
 
 import javax.annotation.concurrent.Immutable;
@@ -51,7 +52,7 @@ class ConfigBuilderState {
      * @param isInterface        Whether the type is an interface or not
      */
     ConfigBuilderState(ClassElement type, String name, boolean isMethod, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder, boolean isInterface) {
-        this.type = AbstractClassFileWriter.getTypeReference(type);
+        this.type = JavaModelUtils.getTypeReference(type);
         this.name = name;
         this.invokeMethod = isMethod;
         this.metadataBuilder = metadataBuilder;

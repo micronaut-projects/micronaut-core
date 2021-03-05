@@ -16,8 +16,13 @@
 package io.micronaut.inject.processing;
 
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.TypedElement;
+import org.objectweb.asm.Type;
 
 import javax.lang.model.element.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -28,6 +33,7 @@ import java.util.Optional;
  */
 public class JavaModelUtils {
 
+    public static final Map<String, String> NAME_TO_TYPE_MAP = new HashMap<>();
     private static final ElementKind RECORD_KIND = ReflectionUtils.findDeclaredField(ElementKind.class, "RECORD").flatMap(field -> {
         try {
             return Optional.of((ElementKind) field.get(ElementKind.class));
@@ -42,6 +48,18 @@ public class JavaModelUtils {
             return Optional.empty();
         }
     }).orElse(null);
+
+    static {
+        JavaModelUtils.NAME_TO_TYPE_MAP.put("void", "V");
+        JavaModelUtils.NAME_TO_TYPE_MAP.put("boolean", "Z");
+        JavaModelUtils.NAME_TO_TYPE_MAP.put("char", "C");
+        JavaModelUtils.NAME_TO_TYPE_MAP.put("int", "I");
+        JavaModelUtils.NAME_TO_TYPE_MAP.put("byte", "B");
+        JavaModelUtils.NAME_TO_TYPE_MAP.put("long", "J");
+        JavaModelUtils.NAME_TO_TYPE_MAP.put("double", "D");
+        JavaModelUtils.NAME_TO_TYPE_MAP.put("float", "F");
+        JavaModelUtils.NAME_TO_TYPE_MAP.put("short", "S");
+    }
 
     /**
      * The Java APT throws an internal exception {code com.sun.tools.javac.code.Symbol$CompletionFailure} if a class is missing from the classpath and {@link Element#getKind()} is called. This method
@@ -190,5 +208,49 @@ public class JavaModelUtils {
      */
     public static boolean isRecordComponent(Element e) {
         return resolveKind(e, RECORD_COMPONENT_KIND).isPresent();
+    }
+
+    /**
+     * Return the type reference for a class.
+     *
+     * @param type The type
+     * @return The {@link Type}
+     */
+    public static Type getTypeReference(TypedElement type) {
+        ClassElement classElement = type.getType();
+        if (type.isPrimitive()) {
+            String internalName = NAME_TO_TYPE_MAP.get(classElement.getName());
+            if (type.isArray()) {
+                StringBuilder name = new StringBuilder(internalName);
+                for (int i = 0; i < type.getArrayDimensions(); i++) {
+                    name.insert(0, "[");
+                }
+                return Type.getObjectType(name.toString());
+            } else {
+                return Type.getType(internalName);
+            }
+        } else {
+            Object nativeType = type.getNativeType();
+            if (nativeType instanceof Class) {
+                Class<?> t = (Class<?>) nativeType;
+                return Type.getType(t);
+            } else {
+                String internalName = type.getType().getName().replace('.', '/');
+                if (internalName.isEmpty()) {
+                    return Type.getType(Object.class);
+                }
+                if (type.isArray()) {
+                    StringBuilder name = new StringBuilder(internalName);
+                    name.insert(0, "L");
+                    for (int i = 0; i < type.getArrayDimensions(); i++) {
+                        name.insert(0, "[");
+                    }
+                    name.append(";");
+                    return Type.getObjectType(name.toString());
+                } else {
+                    return Type.getObjectType(internalName);
+                }
+            }
+        }
     }
 }
