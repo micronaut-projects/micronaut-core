@@ -49,7 +49,7 @@ record Test(
         def bean = context.getBean(type)
 
         then:
-        definition.constructor.arguments.length == 3
+        definition.constructor.arguments.length == 4
         bean.num() == 25
         bean.conversionService() != null
         bean.beanContext().is(context)
