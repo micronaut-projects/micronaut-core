@@ -45,6 +45,7 @@ import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.inject.writer.OriginatingElements;
+import org.objectweb.asm.Type;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -1251,7 +1252,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 AnnotationClassValue<?>[] adaptedArgumentTypes = new AnnotationClassValue[paramLen];
                                 for (int i = 0; i < adaptedArgumentTypes.length; i++) {
                                     ParameterElement parameterElement = sourceParams[i];
-                                    adaptedArgumentTypes[i] = new AnnotationClassValue<>(parameterElement.getGenericType().getName());
+                                    final ClassElement genericType = parameterElement.getGenericType();
+                                    final Type t = JavaModelUtils.getTypeReference(genericType);
+                                    adaptedArgumentTypes[i] = new AnnotationClassValue<>(t.getClassName());
                                 }
 
                                 MethodElement javaMethodElement = elementFactory.newMethodElement(
