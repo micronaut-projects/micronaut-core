@@ -47,6 +47,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     private final Map<String, Optional<GeneratedFile>> metaInfFiles = new LinkedHashMap<>();
     private final Map<String, FileObject> openedFiles = new LinkedHashMap<>();
     private final Map<String, Optional<GeneratedFile>> generatedFiles = new LinkedHashMap<>();
+    private final boolean isGradleFiler;
 
     /**
      * @param filer The {@link Filer} for creating new files
@@ -54,6 +55,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     public AnnotationProcessingOutputVisitor(Filer filer) {
         super(isEclipseFiler(filer));
         this.filer = filer;
+        this.isGradleFiler = filer.getClass().getName().startsWith("org.gradle.api");
     }
 
     private static boolean isEclipseFiler(Filer filer) {
@@ -70,14 +72,26 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         JavaFileObject javaFileObject;
         Element[] nativeOriginatingElements;
         if (ArrayUtils.isNotEmpty(originatingElements)) {
-            List<Element> list = new ArrayList<>(originatingElements.length);
-            for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
-                Object nativeType = originatingElement.getNativeType();
+            if (isGradleFiler) {
+                // gradle filer only support single originating element for isolating processors
+                final io.micronaut.inject.ast.Element e = originatingElements[0];
+                final Object nativeType = e.getNativeType();
                 if (nativeType instanceof Element) {
-                    list.add((Element) nativeType);
+                    nativeOriginatingElements = new Element[] { (Element) nativeType };
+                } else {
+                    nativeOriginatingElements = new Element[0];
                 }
+            } else {
+                // other compilers like the IntelliJ compiler support multiple
+                List<Element> list = new ArrayList<>(originatingElements.length);
+                for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
+                    Object nativeType = originatingElement.getNativeType();
+                    if (nativeType instanceof Element) {
+                        list.add((Element) nativeType);
+                    }
+                }
+                nativeOriginatingElements = list.toArray(new Element[0]);
             }
-            nativeOriginatingElements = list.toArray(new Element[0]);
         } else {
             nativeOriginatingElements = new Element[0];
         }

@@ -419,7 +419,7 @@ ext {
             picocli                    : [
                     version: picocliVersion,
                     group  : 'info.picocli',
-                    name   : 'picocli'
+                    modules: ['picocli', 'picocli-codegen']                    
             ],
             lettuce                    : [
                     version: lettuceVersion,
@@ -643,7 +643,7 @@ ext {
                     version: dekorateVersion,
                     group  : 'io.dekorate',
                     name   : 'dekorate-project',
-                    modules: ['jaeger-annotations', 'knative-annotations', 'kubernetes-annotations',  'openshift-annotations', 'prometheus-annotations', 'servicecatalog-annotations']
+                    modules: ['jaeger-annotations', 'knative-annotations', 'kubernetes-annotations',  'openshift-annotations', 'prometheus-annotations', 'servicecatalog-annotations', 'halkyon-annotations']
             ],
             'micronaut.ignite': [
                 version: micronautIgniteVersion,

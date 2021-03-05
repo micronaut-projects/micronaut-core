@@ -28,6 +28,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.*;
 import io.micronaut.core.beans.AbstractBeanProperty;
+import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -118,7 +119,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         this.readOnly = isReadOnly;
         this.isMutable = !readOnly || hasAssociatedConstructorArgument();
         this.annotationMetadata = annotationMetadata == AnnotationMetadata.EMPTY_METADATA ? null : annotationMetadata;
-        this.type = getTypeReference(ClassElement.of(introspectionType.getClassName() + "$$" + index));
+        this.type = JavaModelUtils.getTypeReference(ClassElement.of(introspectionType.getClassName() + "$$" + index));
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         if (CollectionUtils.isNotEmpty(typeArguments)) {
             this.typeArguments = typeArguments;
@@ -391,7 +392,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         pushCastToType(writeMethod, propertyType);
         final boolean hasWriteMethod = this.writeMethod != null;
         final String methodName = hasWriteMethod ? this.writeMethod.getName() : NameUtils.setterNameFor(propertyName);
-        final Type returnType = hasWriteMethod ? getTypeReference(this.writeMethod.getReturnType()) : Type.VOID_TYPE;
+        final Type returnType = hasWriteMethod ? JavaModelUtils.getTypeReference(this.writeMethod.getReturnType()) : Type.VOID_TYPE;
         if (declaringElement.isInterface()) {
             writeMethod.invokeInterface(
                     beanType,

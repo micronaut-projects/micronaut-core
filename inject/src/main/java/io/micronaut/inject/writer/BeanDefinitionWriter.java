@@ -35,6 +35,7 @@ import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
+import io.micronaut.inject.processing.JavaModelUtils;
 import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -785,7 +786,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (parameters.length != 1) {
             throw new IllegalArgumentException("Method must have exactly 1 argument");
         }
-        Type declaringTypeRef = getTypeReference(declaringType);
+        Type declaringTypeRef = JavaModelUtils.getTypeReference(declaringType);
 
         // load 'this'
         constructorVisitor.visitVarInsn(ALOAD, 0);
@@ -1037,7 +1038,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 .orElse(null);
 
         if (StringUtils.isNotEmpty(factoryMethod)) {
-            Type builderType = getTypeReference(type);
+            Type builderType = JavaModelUtils.getTypeReference(type);
 
             injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
             injectMethodVisitor.invokeStatic(
@@ -1075,7 +1076,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 .orElse(null);
 
         if (StringUtils.isNotEmpty(factoryMethod)) {
-            Type builderType = getTypeReference(type);
+            Type builderType = JavaModelUtils.getTypeReference(type);
 
             injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
             injectMethodVisitor.invokeStatic(
@@ -1333,7 +1334,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     classWriter,
                     injectMethodVisitor,
                     propertyName,
-                    getTypeReference(propertyType),
+                    JavaModelUtils.getTypeReference(propertyType),
                     propertyType,
                     generics,
                     new HashSet<>(),
@@ -1354,8 +1355,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             String methodName,
             AnnotationMetadata methodAnnotationMetadata,
             List<ParameterElement> argumentTypes) {
-        Type factoryTypeRef = getTypeReference(factoryClass);
-        Type producedTypeRef = getTypeReference(producedType);
+        Type factoryTypeRef = JavaModelUtils.getTypeReference(factoryClass);
+        Type producedTypeRef = JavaModelUtils.getTypeReference(producedType);
         this.constructorVisitor = buildProtectedConstructor(BEAN_DEFINITION_METHOD_CONSTRUCTOR);
 
         GeneratorAdapter defaultConstructor = new GeneratorAdapter(
@@ -1421,11 +1422,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         constructorVisitor.loadThis();
 
         // 1st argument: The declaring type
-        Type declaringTypeRef = getTypeReference(declaringType);
+        Type declaringTypeRef = JavaModelUtils.getTypeReference(declaringType);
         constructorVisitor.push(declaringTypeRef);
 
         // 2nd argument: The field type
-        constructorVisitor.push(getTypeReference(fieldElement.getType()));
+        constructorVisitor.push(JavaModelUtils.getTypeReference(fieldElement.getType()));
 
         // 3rd argument: The field name
         constructorVisitor.push(fieldElement.getName());
@@ -1590,7 +1591,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
         boolean hasArguments = methodElement.hasParameters();
         int argCount = hasArguments ? argumentTypes.size() : 0;
-        Type declaringTypeRef = getTypeReference(declaringType);
+        Type declaringTypeRef = JavaModelUtils.getTypeReference(declaringType);
 
         // load 'this'
         constructorVisitor.visitVarInsn(ALOAD, 0);
@@ -1930,7 +1931,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // load the first argument of the method (the BeanResolutionContext) to be passed to the method
             buildMethodVisitor.visitVarInsn(ALOAD, 1);
             // second argument is the bean type
-            Type factoryType = getTypeReference(factoryClass);
+            Type factoryType = JavaModelUtils.getTypeReference(factoryClass);
             buildMethodVisitor.visitLdcInsn(factoryType);
             Method getBeanMethod = ReflectionUtils.getRequiredInternalMethod(DefaultBeanContext.class, "getBean", BeanResolutionContext.class, Class.class);
 
