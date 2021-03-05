@@ -127,12 +127,17 @@ With the new `micronaut-kubernetes-client` module you can now inject apis object
 
 In Micronaut 3 this new module will be used as primary kubernetes client, making the current one deprecated.
 
+=== Micronaut AWS
+
+Micronaut AWS now includes the new AWS SDK v2 that has support for GraalVM out of the box. Every service included in the module like S3, Parameter Store, SES, SQS,... is now compatible with Micronaut-GraalVM integration.
+
 === Module Upgrades
 
 * Micronaut Oracle Cloud `1.1.1` -> `1.2.1`
 * Micronaut Data `2.2.4` -> `2.3.0`
 * Micronaut R2DBC `1.0.1` -> `1.1.0`
 * Micronaut Kubernetes `2.2.0` -> `2.3.0`
+* Micronaut AWS `2.3.0` -> `2.4.0`
 
 === Dependency Upgrades
 
