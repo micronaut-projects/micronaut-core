@@ -77,6 +77,14 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
+    private static final org.objectweb.asm.commons.Method METHOD_GET_DEFAULT_VALUES = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    AnnotationMetadataSupport.class,
+                    "getDefaultValues",
+                    String.class
+            )
+    );
+
     private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_METADATA = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalConstructor(
                     DefaultAnnotationMetadata.class,
@@ -96,17 +104,11 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
-    private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_VALUE = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredInternalConstructor(
-                    io.micronaut.core.annotation.AnnotationValue.class,
-                    String.class
-            )
-    );
-
     private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalConstructor(
                     io.micronaut.core.annotation.AnnotationValue.class,
                     String.class,
+                    Map.class,
                     Map.class
             )
     );
@@ -613,10 +615,12 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
             if (CollectionUtils.isNotEmpty(values)) {
                 pushAnnotationAttributes(declaringType, declaringClassWriter, methodVisitor, values, loadTypeMethods);
-                methodVisitor.invokeConstructor(annotationValueType, CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP);
             } else {
-                methodVisitor.invokeConstructor(annotationValueType, CONSTRUCTOR_ANNOTATION_VALUE);
+                methodVisitor.getStatic(Type.getType(Collections.class), "EMPTY_MAP", Type.getType(Map.class));
             }
+            methodVisitor.push(annotationName);
+            methodVisitor.invokeStatic(Type.getType(AnnotationMetadataSupport.class), METHOD_GET_DEFAULT_VALUES);
+            methodVisitor.invokeConstructor(annotationValueType, CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
