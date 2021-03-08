@@ -42,8 +42,7 @@ import java.util.Optional;
 @Requires(classes = ValidationException.class)
 public class ValidationExceptionHandler implements ExceptionHandler<ValidationException, HttpResponse<?>> {
 
-    private final ErrorResponseProcessor<?> responseProcessor
-            ;
+    private final ErrorResponseProcessor<?> responseProcessor;
 
     @Deprecated
     public ValidationExceptionHandler() {
