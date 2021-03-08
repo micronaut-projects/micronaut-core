@@ -13,24 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.qualifiers.annotation;
+package io.micronaut.docs.qualifiers.annotationmember;
 
-import io.micronaut.context.BeanContext;
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-public class VehicleSpec {
-    @Test
-    public void testStartVehicle() {
-        // tag::start[]
-        final BeanContext context = BeanContext.run();
-        Vehicle vehicle = context.getBean(Vehicle.class);
-        System.out.println(vehicle.start());
-        // end::start[]
-
-        assertEquals("Starting V8", vehicle.start());
-        context.close();
-    }
-
+// tag::class[]
+public interface Engine { // <1>
+    int getCylinders();
+    String start();
 }
+// end::class[]

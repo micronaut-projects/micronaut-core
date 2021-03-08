@@ -13,24 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.qualifiers.annotation;
+package io.micronaut.docs.qualifiers.annotationmember;
 
-import io.micronaut.context.BeanContext;
-import org.junit.jupiter.api.Test;
+import javax.inject.Inject;
+import javax.inject.Singleton;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+// tag::class[]
+@Singleton
+public class Vehicle {
+    final Engine engine;
 
-public class VehicleSpec {
-    @Test
-    public void testStartVehicle() {
-        // tag::start[]
-        final BeanContext context = BeanContext.run();
-        Vehicle vehicle = context.getBean(Vehicle.class);
-        System.out.println(vehicle.start());
-        // end::start[]
-
-        assertEquals("Starting V8", vehicle.start());
-        context.close();
+    // tag::constructor[]
+    @Inject Vehicle(@Cylinders(8) Engine engine) {
+        this.engine = engine;
     }
+    // end::constructor[]
 
+    String start() {
+        return engine.start(); // <5>
+    }
 }
+// end::class[]
