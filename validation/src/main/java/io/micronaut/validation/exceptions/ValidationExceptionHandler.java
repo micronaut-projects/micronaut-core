@@ -16,18 +16,19 @@
 package io.micronaut.validation.exceptions;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
+import io.micronaut.http.server.exceptions.format.ErrorResponse;
 import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 import org.grails.datastore.mapping.validation.ValidationException;
 import org.springframework.validation.Errors;
 import org.springframework.validation.FieldError;
-
 import javax.inject.Singleton;
 import java.util.Optional;
 
@@ -41,24 +42,35 @@ import java.util.Optional;
 @Requires(classes = ValidationException.class)
 public class ValidationExceptionHandler implements ExceptionHandler<ValidationException, HttpResponse<?>> {
 
-    private final JsonErrorResponseFactory<?> responseFactory;
+    private final JsonErrorResponseFactory<? extends ErrorResponse<?>> responseFactory;
+    private final HttpStatus status;
 
+    /**
+     * Constructor.
+     * @deprecated Use {@link ValidationExceptionHandler(JsonErrorResponseFactory)} instead.
+     */
     @Deprecated
     public ValidationExceptionHandler() {
         this.responseFactory = null;
+        status = getErrorCode();
     }
 
-    public ValidationExceptionHandler(JsonErrorResponseFactory<?> responseFactory) {
+    /**
+     * Constructor.
+     * @param responseFactory JSON Error Response factory.
+     */
+    public ValidationExceptionHandler(JsonErrorResponseFactory<? extends ErrorResponse<?>> responseFactory) {
         this.responseFactory = responseFactory;
+        status = getErrorCode();
     }
 
     @Override
     public HttpResponse<?> handle(HttpRequest request, ValidationException exception) {
-        Object error;
-        Errors errors = exception.getErrors();
-        FieldError fieldError = errors.getFieldError();
-        if (responseFactory != null) {
-            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+
+        if (responseFactory == null) {
+            return handleWithoutDefault(request, exception);
+        }
+        ErrorResponse<?> error = responseFactory.createResponse(JsonErrorContext.builder(request, status)
                     .cause(exception)
                     .error(new io.micronaut.http.server.exceptions.format.JsonError() {
                         @Override
@@ -68,15 +80,30 @@ public class ValidationExceptionHandler implements ExceptionHandler<ValidationEx
 
                         @Override
                         public Optional<String> getPath() {
-                            return Optional.ofNullable(fieldError).map(FieldError::getField);
+                            return Optional.ofNullable(exception.getErrors().getFieldError()).map(FieldError::getField);
                         }
                     })
                     .build());
-        } else {
-            error = new JsonError(exception.getMessage())
-                    .path(fieldError != null ? fieldError.getField() : null)
-                    .link(Link.SELF, Link.of(request.getUri()));
-        }
-        return HttpResponse.badRequest(error);
+        return HttpResponse.status(status)
+                .body(error.getError())
+                .contentType(error.getMediaType());
+    }
+
+    /**
+     *
+     * @return The HTTP Status code used by this Handler.
+     */
+    @NonNull
+    protected HttpStatus getErrorCode() {
+        return HttpStatus.BAD_REQUEST;
+    }
+
+    @Deprecated
+    private HttpResponse<?> handleWithoutDefault(HttpRequest<?> request, ValidationException exception) {
+        Errors errors = exception.getErrors();
+        FieldError fieldError = errors.getFieldError();
+        return HttpResponse.status(status).body(new JsonError(exception.getMessage())
+                .path(fieldError != null ? fieldError.getField() : null)
+                .link(Link.SELF, Link.of(request.getUri())));
     }
 }

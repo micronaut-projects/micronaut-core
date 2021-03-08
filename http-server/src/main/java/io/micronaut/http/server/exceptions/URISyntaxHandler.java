@@ -15,11 +15,13 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.exceptions.format.ErrorResponse;
 import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
@@ -38,23 +40,35 @@ import java.util.Optional;
 @Produces
 public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, HttpResponse> {
 
-    private final JsonErrorResponseFactory<?> responseFactory;
+    private final JsonErrorResponseFactory<? extends ErrorResponse<?>> responseFactory;
+    private final HttpStatus status;
 
+    /**
+     * Constructor.
+     * @deprecated Use {@link URISyntaxHandler(JsonErrorResponseFactory)} instead.
+     */
     @Deprecated
     public URISyntaxHandler() {
         this.responseFactory = null;
+        this.status = getErrorCode();
     }
 
+    /**
+     * Constructor.
+     * @param responseFactory JSON Error response factory.
+     */
     @Inject
-    public URISyntaxHandler(JsonErrorResponseFactory<?> responseFactory) {
+    public URISyntaxHandler(JsonErrorResponseFactory<? extends ErrorResponse<?>> responseFactory) {
         this.responseFactory = responseFactory;
+        this.status = getErrorCode();
     }
 
     @Override
     public HttpResponse handle(HttpRequest request, URISyntaxException exception) {
-        Object error;
-        if (responseFactory != null) {
-            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+        if (responseFactory == null) {
+            return handleWithoutResponseFactory(request, exception);
+        }
+        ErrorResponse<?> errorResponse = responseFactory.createResponse(JsonErrorContext.builder(request, status)
                     .cause(exception)
                     .error(new io.micronaut.http.server.exceptions.format.JsonError() {
                         @Override
@@ -68,9 +82,22 @@ public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, Ht
                         }
                     })
                     .build());
-        } else {
-            error = new JsonError("Malformed URI: " + exception.getMessage());
-        }
-        return HttpResponse.badRequest(error);
+        return HttpResponse.status(status)
+                .body(errorResponse.getError())
+                .contentType(errorResponse.getMediaType());
+    }
+
+    /**
+     *
+     * @return The HTTP Status code used by this Handler.
+     */
+    @NonNull
+    protected HttpStatus getErrorCode() {
+        return HttpStatus.BAD_REQUEST;
+    }
+
+    @Deprecated
+    private HttpResponse<?> handleWithoutResponseFactory(HttpRequest<?> request, @NonNull URISyntaxException exception) {
+        return HttpResponse.status(status).body(new JsonError("Malformed URI: " + exception.getMessage()));
     }
 }

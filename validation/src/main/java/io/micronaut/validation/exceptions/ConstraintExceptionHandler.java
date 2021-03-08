@@ -16,6 +16,7 @@
 package io.micronaut.validation.exceptions;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -24,6 +25,8 @@ import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
+import io.micronaut.http.server.exceptions.format.ConstraintUtils;
+import io.micronaut.http.server.exceptions.format.ErrorResponse;
 import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 import io.micronaut.jackson.JacksonConfiguration;
@@ -32,10 +35,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
-import javax.validation.ElementKind;
-import javax.validation.Path;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -52,91 +52,108 @@ import java.util.stream.Collectors;
 public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintViolationException, HttpResponse<?>> {
 
     private final boolean alwaysSerializeErrorsAsList;
-    private final JsonErrorResponseFactory<?> responseFactory;
+    private final JsonErrorResponseFactory<? extends ErrorResponse<?>> responseFactory;
+    private final HttpStatus status;
 
     @Deprecated
     public ConstraintExceptionHandler() {
         this.alwaysSerializeErrorsAsList = false;
         this.responseFactory = null;
+        this.status = getErrorCode();
     }
 
     @Deprecated
     public ConstraintExceptionHandler(JacksonConfiguration jacksonConfiguration) {
         this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
         this.responseFactory = null;
+        this.status = getErrorCode();
     }
 
     @Inject
-    public ConstraintExceptionHandler(JsonErrorResponseFactory<?> responseFactory) {
+    public ConstraintExceptionHandler(JsonErrorResponseFactory<? extends ErrorResponse<?>> responseFactory) {
         this.alwaysSerializeErrorsAsList = false;
         this.responseFactory = responseFactory;
+        this.status = getErrorCode();
     }
 
     @Override
     public HttpResponse<?> handle(HttpRequest request, ConstraintViolationException exception) {
-        Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
-
-        if (responseFactory != null) {
-            Object response;
-            final JsonErrorContext.Builder contextBuilder = JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
-                    .cause(exception);
-            if (constraintViolations == null || constraintViolations.isEmpty()) {
-                response = responseFactory.createResponse(contextBuilder.errorMessage(
-                        exception.getMessage() == null ? HttpStatus.BAD_REQUEST.getReason() : exception.getMessage()
-                ).build());
-            } else {
-                response = responseFactory.createResponse(contextBuilder.errorMessages(
-                        exception.getConstraintViolations()
-                                .stream()
-                                .map(this::buildMessage)
-                                .collect(Collectors.toList())
-                ).build());
-            }
-            return HttpResponse.badRequest(response);
-        } else {
-            if (constraintViolations == null || constraintViolations.isEmpty()) {
-                JsonError error = new JsonError(exception.getMessage() == null ? HttpStatus.BAD_REQUEST.getReason() : exception.getMessage());
-                error.link(Link.SELF, Link.of(request.getUri()));
-                return HttpResponse.badRequest(error);
-            } else if (constraintViolations.size() == 1 && !alwaysSerializeErrorsAsList) {
-                ConstraintViolation<?> violation = constraintViolations.iterator().next();
-                JsonError error = new JsonError(buildMessage(violation));
-                error.link(Link.SELF, Link.of(request.getUri()));
-                return HttpResponse.badRequest(error);
-            } else {
-                JsonError error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
-                List<Resource> errors = new ArrayList<>();
-                for (ConstraintViolation<?> violation : constraintViolations) {
-                    errors.add(new JsonError(buildMessage(violation)));
-                }
-                error.embedded("errors", errors);
-                error.link(Link.SELF, Link.of(request.getUri()));
-                return HttpResponse.badRequest(error);
-            }
+        if (responseFactory == null) {
+            return handleWithoutDefault(request, exception);
         }
+        ErrorResponse<?> response = createErrorResponse(request, exception);
+        return HttpResponse.status(status)
+                .contentType(response.getMediaType())
+                .body(response.getError());
+    }
+
+    /**
+     *
+     * @param request HTTP Request
+     * @param exception Constraint violation exception
+     * @return Error Response
+     */
+    @NonNull
+    protected ErrorResponse<?> createErrorResponse(@NonNull HttpRequest<?> request, @NonNull ConstraintViolationException exception) {
+        Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
+        final JsonErrorContext.Builder contextBuilder = JsonErrorContext.builder(request, status)
+                .cause(exception);
+        if (constraintViolations == null || constraintViolations.isEmpty()) {
+            return responseFactory.createResponse(contextBuilder.errorMessage(
+                    exception.getMessage() == null ? status.getReason() : exception.getMessage()
+            ).build());
+        } else {
+            return responseFactory.createResponse(contextBuilder.errorMessages(
+                    exception.getConstraintViolations()
+                            .stream()
+                            .map(ConstraintUtils::message)
+                            .collect(Collectors.toList())
+            ).build());
+        }
+    }
+
+    /**
+     *
+     * @return The HTTP Status code used by this Handler.
+     */
+    @NonNull
+    protected HttpStatus getErrorCode() {
+        return HttpStatus.BAD_REQUEST;
     }
 
     /**
      * Builds a message based on the provided violation.
      *
      * @param violation The constraint violation
+     * @deprecated Use {@link ConstraintUtils#message(ConstraintViolation)} instead.
      * @return The violation message
      */
+    @Deprecated
     protected String buildMessage(ConstraintViolation violation) {
-        Path propertyPath = violation.getPropertyPath();
-        StringBuilder message = new StringBuilder();
-        Iterator<Path.Node> i = propertyPath.iterator();
-        while (i.hasNext()) {
-            Path.Node node = i.next();
-            if (node.getKind() == ElementKind.METHOD || node.getKind() == ElementKind.CONSTRUCTOR) {
-                continue;
+        return ConstraintUtils.message(violation);
+    }
+
+    @Deprecated
+    private HttpResponse<?> handleWithoutDefault(HttpRequest<?> request, ConstraintViolationException exception) {
+        Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
+        if (constraintViolations == null || constraintViolations.isEmpty()) {
+            JsonError error = new JsonError(exception.getMessage() == null ? status.getReason() : exception.getMessage());
+            error.link(Link.SELF, Link.of(request.getUri()));
+            return HttpResponse.badRequest(error);
+        } else if (constraintViolations.size() == 1 && !alwaysSerializeErrorsAsList) {
+            ConstraintViolation<?> violation = constraintViolations.iterator().next();
+            JsonError error = new JsonError(ConstraintUtils.message(violation));
+            error.link(Link.SELF, Link.of(request.getUri()));
+            return HttpResponse.badRequest(error);
+        } else {
+            JsonError error = new JsonError(status.getReason());
+            List<Resource> errors = new ArrayList<>();
+            for (ConstraintViolation<?> violation : constraintViolations) {
+                errors.add(new JsonError(buildMessage(violation)));
             }
-            message.append(node.getName());
-            if (i.hasNext()) {
-                message.append('.');
-            }
+            error.embedded("errors", errors);
+            error.link(Link.SELF, Link.of(request.getUri()));
+            return HttpResponse.status(status).body(error);
         }
-        message.append(": ").append(violation.getMessage());
-        return message.toString();
     }
 }

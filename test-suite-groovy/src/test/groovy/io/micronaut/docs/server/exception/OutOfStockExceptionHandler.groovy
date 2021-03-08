@@ -21,6 +21,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.server.exceptions.ExceptionHandler
+import io.micronaut.http.server.exceptions.format.ErrorResponse
 import io.micronaut.http.server.exceptions.format.JsonErrorContext
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory
 
@@ -33,19 +34,21 @@ import javax.inject.Singleton
 @Requires(classes = [OutOfStockException, ExceptionHandler])
 class OutOfStockExceptionHandler implements ExceptionHandler<OutOfStockException, HttpResponse> {
 
-    private final JsonErrorResponseFactory<?> errorResponseFactory
+    private final JsonErrorResponseFactory<? extends ErrorResponse<?>> errorResponseFactory
 
-    OutOfStockExceptionHandler(JsonErrorResponseFactory<?> errorResponseFactory) {
+    OutOfStockExceptionHandler(JsonErrorResponseFactory<? extends ErrorResponse<?>> errorResponseFactory) {
         this.errorResponseFactory = errorResponseFactory
     }
 
     @Override
     HttpResponse handle(HttpRequest request, OutOfStockException e) {
-        HttpResponse.badRequest(errorResponseFactory.createResponse(
+        ErrorResponse<?> errorResponse = errorResponseFactory.createResponse(
                 JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
-                    .cause(e)
-                    .errorMessage("No stock available")
-                    .build())) // <1>
+                        .cause(e)
+                        .errorMessage("No stock available")
+                        .build())
+        HttpResponse.badRequest(errorResponse.getError())
+                .contentType(errorResponse.getMediaType()) // <1>
     }
 }
 //end::clazz[]

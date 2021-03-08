@@ -23,6 +23,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.server.cors.CorsOriginConfiguration;
+import io.micronaut.http.server.exceptions.format.ErrorResponseFormat;
 import io.micronaut.http.server.util.locale.HttpLocaleResolutionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.executor.ThreadSelection;
@@ -110,6 +111,12 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_DUAL_PROTOCOL = false;
 
+    /**
+     * The default way to render error responses.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final ErrorResponseFormat DEFAULT_ERROR_RESPONSE_FORMAT = ErrorResponseFormat.HATEOAS;
+
     private Integer port;
     private String host;
     private Integer readTimeout;
@@ -131,6 +138,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
+    private ErrorResponseFormat errorResponse = DEFAULT_ERROR_RESPONSE_FORMAT;
 
     /**
      * Default constructor.
@@ -205,6 +213,23 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public Optional<Integer> getPort() {
         return Optional.ofNullable(port);
+    }
+
+    /**
+     * @return The Error response format.
+     */
+    @NonNull
+    public ErrorResponseFormat getErrorResponse() {
+        return errorResponse;
+    }
+
+    /**
+     * Sets the Error Response format. Default value ({@value #DEFAULT_ERROR_RESPONSE_FORMAT})
+     *
+     * @param errorResponse Error response format.
+     */
+    public void setErrorResponse(@NonNull ErrorResponseFormat errorResponse) {
+        this.errorResponse = errorResponse;
     }
 
     /**

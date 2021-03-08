@@ -15,11 +15,13 @@
  */
 package io.micronaut.http.server.exceptions.format;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.jackson.JacksonConfiguration;
 
 import javax.inject.Singleton;
@@ -34,7 +36,8 @@ import java.util.List;
  */
 @Singleton
 @Secondary
-public class HateoasErrorResponseFactory implements JsonErrorResponseFactory<JsonError> {
+@Requires(property = HttpServerConfiguration.PREFIX + ".error-response", value = "hateoas", defaultValue = "hateoas")
+public class HateoasErrorResponseFactory implements JsonErrorResponseFactory<ErrorResponse<JsonError>> {
 
     private final boolean alwaysSerializeErrorsAsList;
 
@@ -44,7 +47,7 @@ public class HateoasErrorResponseFactory implements JsonErrorResponseFactory<Jso
 
     @Override
     @NonNull
-    public JsonError createResponse(@NonNull JsonErrorContext jsonErrorContext) {
+    public ErrorResponse<JsonError> createResponse(@NonNull JsonErrorContext jsonErrorContext) {
         JsonError error;
         if (!jsonErrorContext.hasErrors()) {
             error = new JsonError(jsonErrorContext.getResponseStatus().getReason());
@@ -61,6 +64,6 @@ public class HateoasErrorResponseFactory implements JsonErrorResponseFactory<Jso
             error.embedded("errors", errors);
         }
         error.link(Link.SELF, Link.of(jsonErrorContext.getRequest().getUri()));
-        return error;
+        return () -> error;
     }
 }

@@ -16,16 +16,16 @@
 package io.micronaut.http.server.exceptions;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.exceptions.format.ErrorResponse;
 import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
-
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Optional;
@@ -40,43 +40,66 @@ import java.util.Optional;
 @Singleton
 public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingException, Object> {
 
-    private final JsonErrorResponseFactory<?> responseFactory;
+    private final JsonErrorResponseFactory<? extends ErrorResponse<?>> responseFactory;
+    private final HttpStatus status;
 
+    /**
+     * Constructor.
+     * @deprecated Use {@link JsonExceptionHandler(JsonErrorResponseFactory)} instead.
+     */
     @Deprecated
     public JsonExceptionHandler() {
         this.responseFactory = null;
+        this.status = getErrorCode();
     }
 
+    /**
+     * Constructor.
+     * @param responseFactory JSON Error response factory.
+     */
     @Inject
-    public JsonExceptionHandler(JsonErrorResponseFactory<?> responseFactory) {
+    public JsonExceptionHandler(JsonErrorResponseFactory<? extends ErrorResponse<?>> responseFactory) {
         this.responseFactory = responseFactory;
+        this.status = getErrorCode();
     }
 
     @Override
     public Object handle(HttpRequest request, JsonProcessingException exception) {
-        MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
-        Object body;
-        if (responseFactory != null) {
-            body = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
-                    .cause(exception)
-                    .error(new io.micronaut.http.server.exceptions.format.JsonError() {
-                        @Override
-                        public String getMessage() {
-                            return "Invalid JSON: " + exception.getMessage();
-                        }
-
-                        @Override
-                        public Optional<String> getTitle() {
-                            return Optional.of("Invalid JSON");
-                        }
-                    })
-                    .build());
-        } else {
-            body = new JsonError("Invalid JSON: " + exception.getMessage())
-                    .link(Link.SELF, Link.of(request.getUri()));
+        if (responseFactory == null) {
+            return handleWithoutResponseFactory(request, exception);
         }
-        response.body(body);
+        ErrorResponse<?> errorResponse = responseFactory.createResponse(JsonErrorContext.builder(request, status)
+                .cause(exception)
+                .error(new io.micronaut.http.server.exceptions.format.JsonError() {
+                    @Override
+                    public String getMessage() {
+                        return "Invalid JSON: " + exception.getMessage();
+                    }
 
-        return response;
+                    @Override
+                    public Optional<String> getTitle() {
+                        return Optional.of("Invalid JSON");
+                    }
+                })
+                .build());
+        return HttpResponse.status(status, "Invalid JSON")
+                .body(errorResponse.getError())
+                .contentType(errorResponse.getMediaType());
+    }
+
+    /**
+     *
+     * @return The HTTP Status code used by this Handler.
+     */
+    @NonNull
+    protected HttpStatus getErrorCode() {
+        return HttpStatus.BAD_REQUEST;
+    }
+
+    @Deprecated
+    private HttpResponse<?> handleWithoutResponseFactory(HttpRequest<?> request, @NonNull JsonProcessingException exception) {
+        return HttpResponse.status(status)
+                .body(new JsonError("Invalid JSON: " + exception.getMessage())
+                .link(Link.SELF, Link.of(request.getUri())));
     }
 }

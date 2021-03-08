@@ -22,6 +22,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.server.exceptions.ExceptionHandler
+import io.micronaut.http.server.exceptions.format.ErrorResponse
 import io.micronaut.http.server.exceptions.format.JsonErrorContext
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory
 import javax.inject.Singleton
@@ -35,7 +36,7 @@ import javax.inject.Singleton
 //tag::clazz[]
     Requires(classes = [OutOfStockException::class, ExceptionHandler::class])
 )
-class OutOfStockExceptionHandler(val errorResponseFactory: JsonErrorResponseFactory<Any>) :
+class OutOfStockExceptionHandler(val errorResponseFactory: JsonErrorResponseFactory<ErrorResponse<Any>>) :
     ExceptionHandler<OutOfStockException, HttpResponse<*>> {
 
     override fun handle(request: HttpRequest<*>, exception: OutOfStockException): HttpResponse<*> {
@@ -44,7 +45,7 @@ class OutOfStockExceptionHandler(val errorResponseFactory: JsonErrorResponseFact
                 JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
                     .cause(exception)
                     .errorMessage("No stock available")
-                    .build())) // <1>
+                    .build()).error) // <1>
     }
 }
 //end::clazz[]

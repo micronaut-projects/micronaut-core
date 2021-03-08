@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2021 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,26 +15,30 @@
  */
 package io.micronaut.http.server.exceptions.format;
 
-import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.MediaType;
 
 /**
- * Creates objects to be rendered as JSON that represent errors.
  *
  * @param <T> The response type
- * @author James Kleeh
  * @since 2.4.0
+ * @author Sergio del Amo
  */
-@DefaultImplementation(HateoasErrorResponseFactory.class)
-public interface JsonErrorResponseFactory<T extends ErrorResponse<?>> {
+public interface ErrorResponse<T> {
 
     /**
-     * Create an object to be serialized as JSON representing the error(s).
      *
-     * @param errorContext The error context
-     * @return An error response
+     * @return The response type
      */
     @NonNull
-    T createResponse(@NonNull JsonErrorContext errorContext);
+    T getError();
 
+    /**
+     *
+     * @return The content type of the response
+     */
+    @NonNull
+    default MediaType getMediaType() {
+        return MediaType.APPLICATION_JSON_TYPE;
+    }
 }

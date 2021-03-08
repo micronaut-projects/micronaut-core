@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -22,9 +23,9 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.exceptions.format.ErrorResponse;
 import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
-
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Optional;
@@ -39,23 +40,34 @@ import java.util.Optional;
 @Produces
 public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorException, HttpResponse> {
 
-    private final JsonErrorResponseFactory<?> responseFactory;
+    private final HttpStatus status;
+    private final JsonErrorResponseFactory<? extends ErrorResponse<?>> responseFactory;
 
+    /**
+     * @deprecated Use {@link ConversionErrorHandler(JsonErrorResponseFactory)} instead.
+     */
     @Deprecated
     public ConversionErrorHandler() {
         this.responseFactory = null;
+        this.status = getErrorCode();
     }
 
+    /**
+     * Constructor.
+     * @param responseFactory Response Factory
+     */
     @Inject
-    public ConversionErrorHandler(JsonErrorResponseFactory<?> responseFactory) {
+    public ConversionErrorHandler(JsonErrorResponseFactory<? extends ErrorResponse<?>> responseFactory) {
         this.responseFactory = responseFactory;
+        this.status = getErrorCode();
     }
 
     @Override
     public HttpResponse handle(HttpRequest request, ConversionErrorException exception) {
-        Object error;
-        if (responseFactory != null) {
-            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+        if (responseFactory == null) {
+            return handleWithoutResponseFactory(request, exception);
+        }
+        ErrorResponse<?> errorResponse = responseFactory.createResponse(JsonErrorContext.builder(request, status)
                     .cause(exception)
                     .error(new io.micronaut.http.server.exceptions.format.JsonError() {
                         @Override
@@ -69,11 +81,24 @@ public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorE
                         }
                     })
                     .build());
-        } else {
-            error = new JsonError(exception.getMessage())
-                    .path('/' + exception.getArgument().getName())
-                    .link(Link.SELF, Link.of(request.getUri()));
-        }
-        return HttpResponse.badRequest(error);
+        return HttpResponse.status(status)
+                .body(errorResponse.getError())
+                .contentType(errorResponse.getMediaType());
+    }
+
+    /**
+     *
+     * @return The HTTP Status code used by this Handler.
+     */
+    @NonNull
+    protected HttpStatus getErrorCode() {
+        return HttpStatus.BAD_REQUEST;
+    }
+
+    @Deprecated
+    private HttpResponse<?> handleWithoutResponseFactory(HttpRequest<?> request, @NonNull ConversionErrorException exception) {
+        return HttpResponse.status(status).body(new JsonError(exception.getMessage())
+                .path('/' + exception.getArgument().getName())
+                .link(Link.SELF, Link.of(request.getUri())));
     }
 }

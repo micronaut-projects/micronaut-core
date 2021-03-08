@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -22,6 +23,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.exceptions.format.ErrorResponse;
 import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 
@@ -40,23 +42,35 @@ import java.util.Optional;
 @Produces
 public class UnsatisfiedArgumentHandler implements ExceptionHandler<UnsatisfiedArgumentException, HttpResponse> {
 
-    private final JsonErrorResponseFactory<?> responseFactory;
+    private final JsonErrorResponseFactory<? extends ErrorResponse<?>> responseFactory;
+    private final HttpStatus status;
 
+    /**
+     * Constructor.
+     * @deprecated Use {@link UnsatisfiedArgumentHandler(JsonErrorResponseFactory)}.
+     */
     @Deprecated
     public UnsatisfiedArgumentHandler() {
         this.responseFactory = null;
+        status = getErrorCode();
     }
 
+    /**
+     * Constructor.
+     * @param responseFactory JSON Errro response factory.
+     */
     @Inject
-    public UnsatisfiedArgumentHandler(JsonErrorResponseFactory<?> responseFactory) {
+    public UnsatisfiedArgumentHandler(JsonErrorResponseFactory<? extends ErrorResponse<?>> responseFactory) {
         this.responseFactory = responseFactory;
+        status = getErrorCode();
     }
 
     @Override
     public HttpResponse handle(HttpRequest request, UnsatisfiedArgumentException exception) {
-        Object error;
-        if (responseFactory != null) {
-            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+        if (responseFactory == null) {
+            return handleWithoutResponseFactory(request, exception);
+        }
+        ErrorResponse<?> errorResponse = responseFactory.createResponse(JsonErrorContext.builder(request, status)
                     .cause(exception)
                     .error(new io.micronaut.http.server.exceptions.format.JsonError() {
                         @Override
@@ -70,12 +84,25 @@ public class UnsatisfiedArgumentHandler implements ExceptionHandler<UnsatisfiedA
                         }
                     })
                     .build());
-        } else {
-            error = new JsonError(exception.getMessage())
-                    .path('/' + exception.getArgument().getName())
-                    .link(Link.SELF, Link.of(request.getUri()));
-        }
+        return HttpResponse.status(status)
+                .body(errorResponse.getError())
+                .contentType(errorResponse.getMediaType());
+    }
 
-        return HttpResponse.badRequest(error);
+
+    /**
+     *
+     * @return The HTTP Status code used by this Handler.
+     */
+    @NonNull
+    protected HttpStatus getErrorCode() {
+        return HttpStatus.BAD_REQUEST;
+    }
+
+    @Deprecated
+    private HttpResponse<?> handleWithoutResponseFactory(HttpRequest<?> request, @NonNull UnsatisfiedArgumentException exception) {
+        return HttpResponse.status(status).body(new JsonError(exception.getMessage())
+                .path('/' + exception.getArgument().getName())
+                .link(Link.SELF, Link.of(request.getUri())));
     }
 }

@@ -80,6 +80,7 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.InternalServerException;
+import io.micronaut.http.server.exceptions.format.ErrorResponse;
 import io.micronaut.http.server.exceptions.format.JsonErrorContext;
 import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
 import io.micronaut.http.server.netty.async.ContextCompletionAwareSubscriber;
@@ -166,7 +167,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final BeanContext beanContext;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
-    private final JsonErrorResponseFactory<?> errorResponseFactory;
+    private final JsonErrorResponseFactory<? extends ErrorResponse<?>> errorResponseFactory;
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
@@ -600,18 +601,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             RouteMatch<Object> routeMatch = statusRoute.get();
             handleRouteMatch(routeMatch, nettyHttpRequest, ctx, false);
         } else {
+            MediaType mediaType = MediaType.APPLICATION_JSON_TYPE;
             if (request.getMethod() != HttpMethod.HEAD) {
-                defaultResponse.body(errorResponseFactory.createResponse(
+                ErrorResponse<?> errorResponse = errorResponseFactory.createResponse(
                         JsonErrorContext.builder(request, defaultResponse.status())
                                 .errorMessage(message)
-                                .build()));
+                                .build());
+                defaultResponse.body(errorResponse.getError());
+                mediaType = errorResponse.getMediaType();
             }
             filterAndEncodeResponse(
                     ctx,
                     request,
                     nettyHttpRequest,
                     defaultResponse,
-                    MediaType.APPLICATION_JSON_TYPE,
+                    mediaType,
                     false
             );
         }
@@ -675,11 +679,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private MutableHttpResponse<Object> newNotFoundError(HttpRequest<?> request) {
+        ErrorResponse<?> errorResponse = errorResponseFactory.createResponse(
+                JsonErrorContext.builder(request, HttpStatus.NOT_FOUND)
+                        .errorMessage("Page Not Found")
+                        .build());
         return HttpResponse.notFound()
-                .body(errorResponseFactory.createResponse(
-                        JsonErrorContext.builder(request, HttpStatus.NOT_FOUND)
-                                .errorMessage("Page Not Found")
-                                .build()));
+                .contentType(errorResponse.getMediaType())
+                .body(errorResponse.getError());
     }
 
     private MutableHttpResponse errorResultToResponse(Object result) {
@@ -1988,19 +1994,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private void writeDefaultErrorResponse(ChannelHandlerContext ctx, NettyHttpRequest nettyHttpRequest, Throwable cause, boolean skipOncePerRequest) {
         logException(cause);
 
+        ErrorResponse<?> errorResponse = errorResponseFactory.createResponse(
+                JsonErrorContext.builder(nettyHttpRequest, HttpStatus.INTERNAL_SERVER_ERROR)
+                        .cause(cause)
+                        .errorMessage("Internal Server Error: " + cause.getMessage())
+                        .build());
+
         MutableHttpResponse<Object> error = io.micronaut.http.HttpResponse.serverError()
-                .body(errorResponseFactory.createResponse(
-                        JsonErrorContext.builder(nettyHttpRequest, HttpStatus.INTERNAL_SERVER_ERROR)
-                                .cause(cause)
-                                .errorMessage("Internal Server Error: " + cause.getMessage())
-                                .build()));
+                .body(errorResponse.getError());
 
         filterAndEncodeResponse(
                 ctx,
                 nettyHttpRequest,
                 nettyHttpRequest,
                 error,
-                MediaType.APPLICATION_JSON_TYPE,
+                errorResponse.getMediaType(),
                 skipOncePerRequest);
     }
 
