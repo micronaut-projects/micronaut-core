@@ -191,7 +191,7 @@ public class AnnotationUtils {
     public AnnotationMetadata getAnnotationMetadata(Element element) {
         AnnotationMetadata metadata = annotationMetadataCache.get(element);
         if (metadata == null) {
-            metadata = newAnnotationBuilder().buildOverridden(element);
+            metadata = javaAnnotationMetadataBuilder.buildOverridden(element);
             annotationMetadataCache.put(element, metadata);
         }
         return metadata;

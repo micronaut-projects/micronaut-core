@@ -1,6 +1,7 @@
 package io.micronaut.jackson.modules
 
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonUnwrapped
@@ -27,6 +28,22 @@ import spock.lang.Specification
 import java.beans.ConstructorProperties
 
 class BeanIntrospectionModuleSpec extends Specification {
+    void "Bean introspection works with a bean without JsonIgnore annotations"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        IgnoreTest guide = new IgnoreTest(name:"Test", code: 9999)
+        String json = objectMapper.writeValueAsString(guide)
+
+        then:
+        noExceptionThrown()
+        json == '{"name":"Test"}'
+
+        cleanup:
+        ctx.close()
+    }
 
     void "Bean introspection works with a bean without JsonInclude annotations"() {
         given:
@@ -301,6 +318,21 @@ class BeanIntrospectionModuleSpec extends Specification {
         ctx.close()
     }
 
+    void "test deserializing from a list"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        ListWrapper instance = objectMapper.readValue("[\"bad\"]", ListWrapper)
+
+        then:
+        instance.value == ["bad"]
+
+        cleanup:
+        ctx.close()
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -387,5 +419,22 @@ class BeanIntrospectionModuleSpec extends Specification {
         NamingStrategy(String fooBar) {
             this.fooBar = fooBar
         }
+    }
+
+    @Introspected
+    static class ListWrapper {
+        final List<String> value;
+
+        @JsonCreator
+        public ListWrapper(List<String> value) {
+            this.value = value;
+        }
+    }
+
+    @Introspected
+    static class IgnoreTest {
+        String name
+        @JsonIgnore
+        int code
     }
 }

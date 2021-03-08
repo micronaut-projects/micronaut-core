@@ -11,7 +11,7 @@ interface HelloOperations {
 }
 ----
 
-At compile time the parameter name `name` is lost and becomes simply `arg0` when compiled against or read via reflection later. To avoid this problem you have two options. You can either declare the parameter name explicitly:
+At compile time the parameter name `name` is lost and becomes `arg0` when compiled against or read via reflection later. To avoid this problem you have two options. You can either declare the parameter name explicitly:
 
 .Client Interface
 [source,java]
@@ -22,7 +22,7 @@ interface HelloOperations {
 }
 ----
 
-Or alternatively it is recommended that you compile all byte code with `-parameters` flag to `javac`. See https://docs.oracle.com/javase/tutorial/reflect/member/methodparameterreflection.html[Obtaining Names of Method Parameters]. For example in `build.gradle`:
+Or alternatively it is recommended that you compile all bytecode with `-parameters` flag to `javac`. See https://docs.oracle.com/javase/tutorial/reflect/member/methodparameterreflection.html[Obtaining Names of Method Parameters]. For example in `build.gradle`:
 
 .build.gradle
 [source,groovy]

@@ -15,10 +15,7 @@
  */
 package io.micronaut.jackson.modules;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.SerializableString;
@@ -41,6 +38,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
@@ -80,6 +78,16 @@ public class BeanIntrospectionModule extends SimpleModule {
         setSerializerModifier(new BeanIntrospectionSerializerModifier());
     }
 
+    /**
+     * Find an introspection for the given class.
+     * @param beanClass The bean class
+     * @return The introspection
+     */
+    @Nullable
+    protected BeanIntrospection<Object> findIntrospection(Class<?> beanClass) {
+        return (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
+    }    
+
     private JavaType newType(Argument<?> argument, TypeFactory typeFactory) {
         return JacksonConfiguration.constructType(argument, typeFactory);
     }
@@ -106,7 +114,7 @@ public class BeanIntrospectionModule extends SimpleModule {
             final Class<?> beanClass = beanDesc.getBeanClass();
             final boolean isResource = Resource.class.isAssignableFrom(beanDesc.getBeanClass());
             final BeanIntrospection<Object> introspection =
-                    (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
+                    findIntrospection(beanClass);
 
             if (introspection == null) {
                 return super.updateBuilder(config, beanDesc, builder);
@@ -133,6 +141,9 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
                     final List<BeanPropertyWriter> newProperties = new ArrayList<>(beanProperties.size());
                     for (BeanProperty<Object, Object> beanProperty : beanProperties) {
+                        if (beanProperty.hasAnnotation(JsonIgnore.class)) {
+                            continue;
+                        }
                         final String propertyName;
                         if (isResource) {
                             final String n = beanProperty.getName();
@@ -392,6 +403,16 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
 
                     @Override
+                    public boolean canCreateUsingArrayDelegate() {
+                        return constructorArguments.length == 1 && constructorArguments[0].isContainerType();
+                    }
+
+                    @Override
+                    public JavaType getArrayDelegateType(DeserializationConfig config) {
+                        return newType(constructorArguments[0], typeFactory);
+                    }
+
+                    @Override
                     public boolean canCreateFromString() {
                         return constructorArguments.length == 1 && constructorArguments[0].equalsType(Argument.STRING);
                     }
@@ -429,6 +450,11 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
 
                     @Override
+                    public Object createUsingArrayDelegate(DeserializationContext ctxt, Object delegate) throws IOException {
+                        return introspection.instantiate(false, new Object[] { delegate });
+                    }
+
+                    @Override
                     public Object createFromString(DeserializationContext ctxt, String value) throws IOException {
                         return introspection.instantiate(false, new Object[]{ value });
                     }
@@ -462,6 +488,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     public Object createFromBoolean(DeserializationContext ctxt, boolean value) throws IOException {
                         return introspection.instantiate(false, new Object[]{ value });
                     }
+                    
                 });
                 return builder;
             }

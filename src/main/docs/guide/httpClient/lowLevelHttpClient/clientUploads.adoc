@@ -1,15 +1,15 @@
 :linkattrs:
-The Micronaut HTTP Client supports the ability to create multipart requests. In order to build a multipart request you must set the content type to `multipart/form-data` and set the body to be an instance of api:io.micronaut.http.client.multipart.MultipartBody[]:
+The Micronaut HTTP Client supports multipart requests. To build a multipart request, set the content type to `multipart/form-data` and set the body to an instance of api:io.micronaut.http.client.multipart.MultipartBody[].
 
 For example:
 
 snippet::io.micronaut.docs.client.upload.MultipartFileUploadSpec[tags="multipartBodyImports, file, multipartBody", indent=0, title="Creating the body"]
 
-<1> You need to create a MultipartBody builder for adding parts to the body.
-<2> Method to add a part to the body, in this case a file. There are different variations of this method which you can see in link:{api}/io/micronaut/http/client/multipart/MultipartBody.Builder.html[MultipartBody.Builder, window="_blank"].
-<3> Call the build method to assemble all parts from the builder into a MultipartBody. At least one part is required.
+<1> Create a MultipartBody builder for adding parts to the body.
+<2> Add a part to the body, in this case a file. There are different variations of this method in link:{api}/io/micronaut/http/client/multipart/MultipartBody.Builder.html[MultipartBody.Builder, window="_blank"].
+<3> The build method assembles all parts from the builder into a MultipartBody. At least one part is required.
 
 snippet::io.micronaut.docs.client.upload.MultipartFileUploadSpec[tags="request", indent=0, title="Creating a request"]
 
-<1> The multipart request body with different sets of data.
+<1> The multipart request body with different types of data.
 <2> Set the content-type header of the request to `multipart/form-data`.

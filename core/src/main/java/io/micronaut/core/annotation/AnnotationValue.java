@@ -828,6 +828,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return Collections.singletonList((AnnotationValue) v);
         } else if (v instanceof AnnotationValue[]) {
             return Arrays.asList((AnnotationValue[]) v);
+        } else if (v instanceof Collection) {
+            final Iterator<?> i = ((Collection<?>) v).iterator();
+            if (i.hasNext()) {
+                final Object o = i.next();
+                if (o instanceof AnnotationValue) {
+                    return new ArrayList<>((Collection<? extends AnnotationValue<T>>) v);
+                }
+            }
         }
         return Collections.emptyList();
     }
@@ -902,6 +910,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     /**
      * Start building a new annotation for the given name.
      *
+     * @param annotationName The annotation name
+     * @param retentionPolicy The retention policy
+     * @param <T>            The annotation type
+     * @return The builder
+     * @since 2.4.0
+     */
+    public static <T extends Annotation> AnnotationValueBuilder<T> builder(String annotationName, RetentionPolicy retentionPolicy) {
+        return new AnnotationValueBuilder<>(annotationName, retentionPolicy);
+    }
+
+    /**
+     * Start building a new annotation for the given name.
+     *
      * @param annotation The annotation name
      * @param <T>        The annotation type
      * @return The builder
@@ -942,7 +963,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (value instanceof CharSequence) {
             return new String[]{value.toString()};
         } else if (value instanceof String[]) {
-            return (String[]) value;
+            final String[] existing = (String[]) value;
+            return Arrays.copyOf(existing, existing.length);
         } else if (value != null) {
             if (value.getClass().isArray()) {
                 int len = Array.getLength(value);

@@ -18,6 +18,7 @@ package io.micronaut.inject.qualifiers;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.NonNull;
 
 import javax.inject.Named;
 import java.lang.annotation.Annotation;
@@ -167,5 +168,15 @@ public class Qualifiers {
      */
     public static <T> Qualifier<T> byType(Class... typeArguments) {
         return new TypeAnnotationQualifier<>(typeArguments);
+    }
+
+    /**
+     * Reduces bean definitions by the given interceptor binding.
+     * @param annotationMetadata The annotation metadata
+     * @param <T> The bean type
+     * @return The qualifier
+     */
+    public static @NonNull <T> Qualifier<T> byInterceptorBinding(@NonNull AnnotationMetadata annotationMetadata) {
+        return new InterceptorBindingQualifier<>(annotationMetadata);
     }
 }

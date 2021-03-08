@@ -15,9 +15,8 @@
  */
 package io.micronaut.inject.ast;
 
-import org.jetbrains.annotations.NotNull;
-
 import io.micronaut.core.annotation.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
@@ -47,5 +46,21 @@ public interface ParameterElement extends TypedElement {
     static @NonNull ParameterElement of(@NonNull Class<?> type, @NonNull String name) {
         Objects.requireNonNull(name, "Name cannot be null");
         return new ReflectParameterElement(ClassElement.of(type), name);
+    }
+
+    /**
+     * Creates a parameter element for the given arguments.
+     *
+     * @param type The element type
+     * @param name The name
+     * @return The parameter element
+     * @since 2.4.0
+     */
+    static @NonNull ParameterElement of(
+            @NonNull ClassElement type,
+            @NonNull String name) {
+        Objects.requireNonNull(name, "Name cannot be null");
+        Objects.requireNonNull(type, "Type cannot be null");
+        return new ReflectParameterElement(type, name);
     }
 }

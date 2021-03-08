@@ -17,7 +17,6 @@ package io.micronaut.docs.aop.around
 
 // tag::imports[]
 import io.micronaut.aop.Around
-import io.micronaut.context.annotation.Type
 import kotlin.annotation.AnnotationRetention.RUNTIME
 import kotlin.annotation.AnnotationTarget.CLASS
 import kotlin.annotation.AnnotationTarget.FILE
@@ -31,6 +30,5 @@ import kotlin.annotation.AnnotationTarget.PROPERTY_SETTER
 @Retention(RUNTIME) // <1>
 @Target(CLASS, FILE, FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER) // <2>
 @Around // <3>
-@Type(NotNullInterceptor::class) // <4>
 annotation class NotNull
 // end::annotation[]

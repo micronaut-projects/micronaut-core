@@ -15,7 +15,6 @@
  */
 package io.micronaut.core.annotation;
 
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.*;
@@ -74,6 +73,11 @@ public class AnnotationUtil {
     public static final AnnotatedElement[] ZERO_ANNOTATED_ELEMENTS = new AnnotatedElement[0];
 
     /**
+     * Constant indicating an zero annotation values.
+     */
+    public static final AnnotationValue<?>[] ZERO_ANNOTATION_VALUES = new AnnotationValue[0];
+
+    /**
      * An empty re-usable element.
      */
     public static final AnnotatedElement EMPTY_ANNOTATED_ELEMENT = new AnnotatedElement() {
@@ -102,6 +106,31 @@ public class AnnotationUtil {
      * Simple Annotation name used for non-null.
      */
     public static final String NON_NULL = "javax.annotation.Nonnull";
+
+    /**
+     * The around annotation type.
+     */
+    public static final String ANN_AROUND = "io.micronaut.aop.Around";
+
+    /**
+     * The around annotation type.
+     */
+    public static final String ANN_INTRODUCTION = "io.micronaut.aop.Introduction";
+
+    /**
+     * Name of the interceptor binding type.
+     */
+    public static final String ANN_INTERCEPTOR_BINDING = "io.micronaut.aop.InterceptorBinding";
+
+    /**
+     * Name of the interceptor binding qualifier type.
+     */
+    public static final String ANN_INTERCEPTOR_BINDING_QUALIFIER = "io.micronaut.inject.qualifiers.InterceptorBindingQualifier";
+
+    /**
+     * Name of the repeatable interceptor bindings type.
+     */
+    public static final String ANN_INTERCEPTOR_BINDINGS = "io.micronaut.aop.InterceptorBindingDefinitions";
 
     private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();

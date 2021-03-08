@@ -1,4 +1,4 @@
-Micronaut supports CORS (link:https://www.w3.org/TR/cors/[Cross Origin Resource Sharing]) out of the box. By default, CORS requests will be rejected. To enable processing of CORS requests, modify your configuration. For example with `application.yml`:
+Micronaut supports CORS (link:https://www.w3.org/TR/cors/[Cross Origin Resource Sharing]) out of the box. By default, CORS requests are rejected. To enable processing of CORS requests, modify your configuration. For example with `application.yml`:
 
 .CORS Configuration Example
 [source,yaml]
@@ -9,11 +9,11 @@ micronaut:
       enabled: true
 ----
 
-By only enabling CORS processing, a "wide open" strategy will be adopted that will allow requests from any origin.
+By only enabling CORS processing, a "wide open" strategy is adopted that allows requests from any origin.
 
-To change the settings for all origins or a specific origin, change the configuration to provide a set of "configurations". By providing any configuration, the default "wide open" configuration is not configured.
+To change the settings for all origins or a specific origin, change the configuration to provide one or more "configurations". By providing any configuration, the default "wide open" configuration is not configured.
 
-.CORS Configurations (... is a placeholder)
+.CORS Configurations
 [source,yaml]
 ----
 micronaut:
@@ -29,19 +29,19 @@ micronaut:
           ...
 ----
 
-In the above example, three configurations are being provided. Their names (`all`, `web`, `mobile`) are not important and have no significance inside Micronaut. They are there purely to be able to easily recognize the intended user of the configuration.
+In the above example, three configurations are provided. Their names (`all`, `web`, `mobile`) are not important and have no significance inside Micronaut. They are there purely to be able to easily recognize the intended user of the configuration.
 
-The same configuration properties can be applied to each configuration. See link:{api}/io/micronaut/http/server/cors/CorsOriginConfiguration.html[CorsOriginConfiguration] for the reference of properties that can be defined. Each configuration supplied will have its values default to the default values of the corresponding fields.
+The same configuration properties can be applied to each configuration. See link:{api}/io/micronaut/http/server/cors/CorsOriginConfiguration.html[CorsOriginConfiguration] for properties that can be defined. The values of each configuration supplied will default to the default values of the corresponding fields.
 
-When a CORS request is made, configurations are searched for allowed origins that are an exact match or match the request origin through a regular expression.
+When a CORS request is made, configurations are searched for allowed origins that match exactly or match the request origin through a regular expression.
 
 == Allowed Origins
 
-To allow any origin for a given configuration, simply don't include the `allowedOrigins` key in your configuration.
+To allow any origin for a given configuration, don't include the `allowedOrigins` key in your configuration.
 
-To specify a list of valid origins, set the `allowedOrigins` key of the configuration to a list of strings. Each value can either be a static value (`http://www.foo.com`) or a regular expression (`^http(|s)://www\.google\.com$`).
+For multiple valid origins, set the `allowedOrigins` key of the configuration to a list of strings. Each value can either be a static value (`http://www.foo.com`) or a regular expression (`^http(|s)://www\.google\.com$`).
 
-Any regular expressions are passed to link:{javase}java/util/regex/Pattern.html#compile-java.lang.String-[Pattern#compile] and compared to the request origin with link:{javase}java/util/regex/Matcher.html#matches--[Matcher#matches].
+Regular expressions are passed to link:{javase}java/util/regex/Pattern.html#compile-java.lang.String-[Pattern#compile] and compared to the request origin with link:{javase}java/util/regex/Matcher.html#matches--[Matcher#matches].
 
 .Example CORS Configuration
 [source,yaml]
@@ -59,9 +59,9 @@ micronaut:
 
 == Allowed Methods
 
-To allow any request method for a given configuration, simply don't include the `allowedMethods` key in your configuration.
+To allow any request method for a given configuration, don't include the `allowedMethods` key in your configuration.
 
-To specify a list of allowed methods, set the `allowedMethods` key of the configuration to a list of strings.
+For multiple allowed methods, set the `allowedMethods` key of the configuration to a list of strings.
 
 .Example CORS Configuration
 [source,yaml]
@@ -79,9 +79,9 @@ micronaut:
 
 == Allowed Headers
 
-To allow any request header for a given configuration, simply don't include the `allowedHeaders` key in your configuration.
+To allow any request header for a given configuration, don't include the `allowedHeaders` key in your configuration.
 
-To specify a list of allowed headers, set the `allowedHeaders` key of the configuration to a list of strings.
+For multiple allowed headers, set the `allowedHeaders` key of the configuration to a list of strings.
 
 .Example CORS Configuration
 [source,yaml]
@@ -99,7 +99,7 @@ micronaut:
 
 == Exposed Headers
 
-To configure the list of headers that are sent in the response to a CORS request through the `Access-Control-Expose-Headers` header, include a list of strings for the `exposedHeaders` key in your configuration. By default no headers are exposed.
+To configure the headers that are sent in the response to a CORS request through the `Access-Control-Expose-Headers` header, include a list of strings for the `exposedHeaders` key in your configuration. None are exposed by default.
 
 .Example CORS Configuration
 [source,yaml]
@@ -117,7 +117,7 @@ micronaut:
 
 == Allow Credentials
 
-Credentials are allowed by default for CORS requests. To disallow credentials, simply set the `allowCredentials` option to `false`.
+Credentials are allowed by default for CORS requests. To disallow credentials, set the `allowCredentials` option to `false`.
 
 .Example CORS Configuration
 [source,yaml]
@@ -149,7 +149,7 @@ micronaut:
 
 == Multiple Header Values
 
-By default when a header has multiple values, multiple headers will be sent each with a single value. It is possible to change the behavior to send a single header with the list of values comma separated by setting a configuration option.
+By default, when a header has multiple values, multiple headers are sent, each with a single value. It is possible to change the behavior to send a single header with a comma-separated list of values by setting a configuration option.
 
 [source,yaml]
 ----

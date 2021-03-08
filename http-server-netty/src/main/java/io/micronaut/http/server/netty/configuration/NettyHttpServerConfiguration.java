@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.configuration;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -657,6 +658,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * Configuration for Netty parent.
      */
     @ConfigurationProperties(Parent.NAME)
+    @Requires(missingProperty = EventLoopGroupConfiguration.EVENT_LOOPS + ".parent")
     public static class Parent extends EventLoopConfig {
 
         public static final String NAME = "parent";

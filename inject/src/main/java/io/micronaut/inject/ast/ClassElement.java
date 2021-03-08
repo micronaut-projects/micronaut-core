@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArgumentUtils;
@@ -291,7 +292,7 @@ public interface ClassElement extends TypedElement {
      *
      * @return A new class element
      */
-    ClassElement toArray();
+    @NonNull ClassElement toArray();
 
     /**
      * Dereference a class element denoting an array type by converting it to its element type.
@@ -300,17 +301,46 @@ public interface ClassElement extends TypedElement {
      * @return A new class element
      * @throws IllegalStateException if this class element doesn't denote an array type
      */
-    ClassElement fromArray();
+    @NonNull ClassElement fromArray();
 
     /**
      * Create a class element for the given simple type.
      * @param type The type
      * @return The class element
      */
-    static ClassElement of(Class<?> type) {
+    static @NonNull ClassElement of(@NonNull Class<?> type) {
         return new ReflectClassElement(
                 Objects.requireNonNull(type, "Type cannot be null")
         );
+    }
+
+    /**
+     * Create a class element for the given simple type.
+     * @param type The type
+     * @param annotationMetadata The annotation metadata
+     * @param typeArguments The type arguments
+     * @return The class element
+     * @since 2.4.0
+     */
+    static @NonNull ClassElement of(
+            @NonNull Class<?> type,
+            @NonNull AnnotationMetadata annotationMetadata,
+            @NonNull Map<String, ClassElement> typeArguments) {
+        Objects.requireNonNull(annotationMetadata, "Annotation metadata cannot be null");
+        Objects.requireNonNull(typeArguments, "Type arguments cannot be null");
+        return new ReflectClassElement(
+                Objects.requireNonNull(type, "Type cannot be null")
+        ) {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return annotationMetadata;
+            }
+
+            @Override
+            public Map<String, ClassElement> getTypeArguments() {
+                return Collections.unmodifiableMap(typeArguments);
+            }
+        };
     }
 
     /**
@@ -319,7 +349,7 @@ public interface ClassElement extends TypedElement {
      * @return The class element
      */
     @Internal
-    static ClassElement of(String typeName) {
+    static @NonNull ClassElement of(@NonNull String typeName) {
         return new ClassElement() {
             @Override
             public boolean isAssignable(String type) {
