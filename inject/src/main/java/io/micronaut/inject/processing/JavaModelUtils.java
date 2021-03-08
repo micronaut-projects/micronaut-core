@@ -253,4 +253,14 @@ public class JavaModelUtils {
             }
         }
     }
+
+    /**
+     * Return the type reference for a class.
+     *
+     * @param type The type
+     * @return The {@link Type}
+     */
+    public static String getClassname(TypedElement type) {
+        return getTypeReference(type).getClassName();
+    }
 }
