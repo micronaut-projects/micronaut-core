@@ -34,6 +34,7 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}.
@@ -371,7 +372,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract boolean hasAnnotation(T element, Class<? extends Annotation> annotation);
 
-
     /**
      * Checks whether any annotations are present on the given element.
      *
@@ -679,8 +679,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
                 Object annotationValue = entry.getValue();
                 if (hasAnnotations(member)) {
-                    final AnnotationMetadata memberMetadata =
-                            buildInternal(null, member, new DefaultAnnotationMetadata(), false, true, false);
+                    final DefaultAnnotationMetadata memberMetadata = new DefaultAnnotationMetadata();
+                    final List<? extends A> annotationsForMember = getAnnotationsForType(member)
+                            .stream().filter((a) -> !getAnnotationTypeName(a).equals(annotationName))
+                            .collect(Collectors.toList());
+                    includeAnnotations(memberMetadata, member, true, annotationsForMember, false);
+
                     boolean isInstantiatedMember = memberMetadata.hasAnnotation(InstantiatedMember.class);
 
                     if (memberMetadata.hasAnnotation(NonBinding.class)) {
@@ -1036,7 +1040,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             boolean isDeclared = currentElement == element;
 
-            includeAnnotations(annotationMetadata, currentElement, isDeclared, annotationHierarchy, allowAliases);
+            includeAnnotations(
+                    annotationMetadata,
+                    currentElement,
+                    isDeclared,
+                    annotationHierarchy,
+                    allowAliases
+            );
 
         }
         if (!annotationMetadata.hasDeclaredStereotype(Scope.class) && annotationMetadata.hasDeclaredStereotype(DefaultScope.class)) {
