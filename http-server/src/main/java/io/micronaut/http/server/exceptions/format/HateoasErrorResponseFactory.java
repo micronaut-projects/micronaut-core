@@ -36,7 +36,7 @@ import java.util.List;
  */
 @Singleton
 @Secondary
-@Requires(property = HttpServerConfiguration.PREFIX + ".error-response", value = "hateoas", defaultValue = "hateoas")
+@Requires(property = HttpServerConfiguration.PREFIX + ".error-response", value = "vnd", defaultValue = "vnd")
 public class HateoasErrorResponseFactory implements JsonErrorResponseFactory<ErrorResponse<JsonError>> {
 
     private final boolean alwaysSerializeErrorsAsList;

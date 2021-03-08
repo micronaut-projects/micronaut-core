@@ -115,7 +115,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      * The default way to render error responses.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final ErrorResponseFormat DEFAULT_ERROR_RESPONSE_FORMAT = ErrorResponseFormat.HATEOAS;
+    public static final ErrorResponseFormat DEFAULT_ERROR_RESPONSE_FORMAT = ErrorResponseFormat.VND;
 
     private Integer port;
     private String host;

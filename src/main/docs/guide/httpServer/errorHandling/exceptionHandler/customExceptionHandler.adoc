@@ -1,0 +1,16 @@
+Imagine your e-commerce app throws an `OutOfStockException` when a book is out of stock:
+
+snippet::io.micronaut.docs.server.exception.OutOfStockException[tags="clazz", indent=0]
+
+Along with `BookController`:
+
+snippet::io.micronaut.docs.server.exception.BookController[tags="clazz", indent=0]
+
+The server returns a 500 (Internal Server Error) status code if you don't handle the exception.
+
+To respond with 400 Bad Request as the response when the `OutOfStockException` is thrown, you can register a `ExceptionHandler`:
+
+snippet::io.micronaut.docs.server.exception.OutOfStockExceptionHandler[tags="clazz", indent=0]
+
+<1> The default api:http.server.exceptions.format.JsonErrorResponseFactory[] is used to create the body of the response
+

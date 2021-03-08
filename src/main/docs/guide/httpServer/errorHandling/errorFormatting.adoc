@@ -1,0 +1,19 @@
+Micronaut produces error response bodies via beans of type api:http.server.exceptions.format.JsonErrorResponseFactory[].
+
+**It defaults to link:https://github.com/blongden/vnd.error[vnd.error]**
+
+However, you can use other formats:
+
+|===
+| Format | Configuration: `micronaut.server.error-response` | Factory
+| link:https://github.com/blongden/vnd.error[vnd.error]
+| `vnd`
+| api:http.server.exceptions.format.HateoasErrorResponseFactory[]
+| link:https://tools.ietf.org/html/rfc7807[Problem+JSON]
+| `problem`
+| api:http.server.exceptions.format.problem.ProblemJsonErrorResponseFactory[]
+|===
+
+You create your own implementation of type api:http.server.exceptions.format.JsonErrorResponseFactory[] or replace any of the built-in implementations.
+
+If customization of the response other than body is desired, the exception handler that is handling the exception needs to be overridden.

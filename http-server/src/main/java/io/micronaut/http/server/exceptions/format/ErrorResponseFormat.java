@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum ErrorResponseFormat {
     PROBLEM,
-    HATEOAS;
+    VND;
 
     @JsonValue
     @Override

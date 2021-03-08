@@ -1,0 +1,25 @@
+Micronaut ships with several built-in handlers:
+
+|===
+|Exception|Handler
+| `javax.validation.ConstraintViolationException`
+| api:validation.exceptions.ConstraintExceptionHandler[]
+| api:http.exceptions.ContentLengthExceededException[]
+| api:http.server.exceptions.ContentLengthExceededHandler[]
+| api:core.convert.exceptions.ConversionErrorException[]
+| api:http.server.exceptions.ConversionErrorHandler[]
+| api:web.router.exceptions.DuplicateRouteException[]
+| api:http.server.netty.converters.DuplicateRouteHandler[]
+| api:http.exceptions.HttpStatusException[]
+| api:http.server.exceptions.HttpStatusHandler[]
+| `com.fasterxml.jackson.core.JsonProcessingException`
+| api:http.server.exceptions.JsonExceptionHandler[]
+| `java.net.URISyntaxException`
+| api:http.server.exceptions.URISyntaxHandler[]
+| api:core.bind.exceptions.UnsatisfiedArgumentException[]
+| api:http.server.exceptions.UnsatisfiedArgumentHandler[]
+| api:web.router.exceptions.UnsatisfiedRouteException[]
+| api:http.server.netty.converters.UnsatisfiedRouteHandler[]
+| `org.grails.datastore.mapping.validation.ValidationException`
+| api:validation.exceptions.ValidationExceptionHandler[]
+|===

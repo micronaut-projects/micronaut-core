@@ -44,7 +44,6 @@ import java.util.stream.Collectors;
 @Requires(property = HttpServerConfiguration.PREFIX + ".error-response", value = "problem")
 public class ProblemJsonErrorResponseFactory implements JsonErrorResponseFactory<ErrorResponse<? extends Problem>> {
 
-
     @Override
     public ErrorResponse<? extends Problem> createResponse(JsonErrorContext errorContext) {
         if (errorContext.getRootCause().isPresent()) {
