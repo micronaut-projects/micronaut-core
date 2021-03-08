@@ -17,6 +17,8 @@ package io.micronaut.http.server.exceptions.format;
 
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.http.hateoas.JsonError;
@@ -34,7 +36,7 @@ import java.util.List;
  */
 @Singleton
 @Secondary
-public class HateoasErrorResponseFactory implements JsonErrorResponseFactory<JsonError> {
+public class HateoasErrorResponseFactory implements ErrorResponseFactory<JsonError> {
 
     private final boolean alwaysSerializeErrorsAsList;
 
@@ -44,23 +46,24 @@ public class HateoasErrorResponseFactory implements JsonErrorResponseFactory<Jso
 
     @Override
     @NonNull
-    public JsonError createResponse(@NonNull JsonErrorContext jsonErrorContext) {
+    public MutableHttpResponse<JsonError> createResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> response) {
         JsonError error;
-        if (!jsonErrorContext.hasErrors()) {
-            error = new JsonError(jsonErrorContext.getResponseStatus().getReason());
-        } else if (jsonErrorContext.getErrors().size() == 1 && !alwaysSerializeErrorsAsList) {
-            io.micronaut.http.server.exceptions.format.JsonError jsonError = jsonErrorContext.getErrors().get(0);
+        if (!errorContext.hasErrors()) {
+            error = new JsonError(response.getStatus().getReason());
+        } else if (errorContext.getErrors().size() == 1 && !alwaysSerializeErrorsAsList) {
+            Error jsonError = errorContext.getErrors().get(0);
             error = new JsonError(jsonError.getMessage());
             jsonError.getPath().ifPresent(error::path);
         } else {
-            error = new JsonError(jsonErrorContext.getResponseStatus().getReason());
+            error = new JsonError(response.getStatus().getReason());
             List<Resource> errors = new ArrayList<>();
-            for (io.micronaut.http.server.exceptions.format.JsonError jsonError : jsonErrorContext.getErrors()) {
+            for (Error jsonError : errorContext.getErrors()) {
                 errors.add(new JsonError(jsonError.getMessage()).path(jsonError.getPath().orElse(null)));
             }
             error.embedded("errors", errors);
         }
-        error.link(Link.SELF, Link.of(jsonErrorContext.getRequest().getUri()));
-        return error;
+        error.link(Link.SELF, Link.of(errorContext.getRequest().getUri()));
+
+        return response.body(error).contentType(MediaType.APPLICATION_JSON_TYPE);
     }
 }

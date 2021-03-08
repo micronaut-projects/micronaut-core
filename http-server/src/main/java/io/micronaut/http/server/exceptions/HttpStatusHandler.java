@@ -17,15 +17,17 @@ package io.micronaut.http.server.exceptions;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
-import io.micronaut.http.server.exceptions.format.JsonErrorContext;
-import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
+import io.micronaut.http.server.exceptions.format.ErrorContext;
+import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * Handles exception of type {@link io.micronaut.http.exceptions.HttpStatusException}.
@@ -37,7 +39,7 @@ import javax.inject.Singleton;
 @Produces
 public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, HttpResponse> {
 
-    private final JsonErrorResponseFactory<?> responseFactory;
+    private final ErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public HttpStatusHandler() {
@@ -45,28 +47,26 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
     }
 
     @Inject
-    public HttpStatusHandler(JsonErrorResponseFactory<?> responseFactory) {
+    public HttpStatusHandler(ErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
     @Override
     public HttpResponse handle(HttpRequest request, HttpStatusException exception) {
-
-        Object body = exception.getBody()
-            .orElseGet(() -> {
-                if (responseFactory != null) {
-                    return responseFactory.createResponse(JsonErrorContext.builder(request, exception.getStatus())
-                            .cause(exception)
-                            .errorMessage(exception.getMessage())
-                            .build());
-                } else {
-                    return new JsonError(exception.getMessage())
-                            .link(Link.SELF, Link.of(request.getUri()));
-                }
-            });
-
-        return HttpResponse
-            .status(exception.getStatus())
-            .body(body);
+        MutableHttpResponse<?> response = HttpResponse.status(exception.getStatus());
+        Optional<Object> body = exception.getBody();
+        if (body.isPresent()) {
+            return response.body(body.get());
+        } else {
+            if (responseFactory != null) {
+                return responseFactory.createResponse(ErrorContext.builder(request)
+                        .cause(exception)
+                        .errorMessage(exception.getMessage())
+                        .build(), response);
+            } else {
+                return response.body(new JsonError(exception.getMessage())
+                        .link(Link.SELF, Link.of(request.getUri())));
+            }
+        }
     }
 }

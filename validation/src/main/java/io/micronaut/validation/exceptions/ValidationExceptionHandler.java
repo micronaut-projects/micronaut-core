@@ -19,11 +19,13 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.exceptions.format.JsonErrorContext;
-import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
+import io.micronaut.http.server.exceptions.format.Error;
+import io.micronaut.http.server.exceptions.format.ErrorContext;
+import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
 import org.grails.datastore.mapping.validation.ValidationException;
 import org.springframework.validation.Errors;
 import org.springframework.validation.FieldError;
@@ -41,14 +43,14 @@ import java.util.Optional;
 @Requires(classes = ValidationException.class)
 public class ValidationExceptionHandler implements ExceptionHandler<ValidationException, HttpResponse<?>> {
 
-    private final JsonErrorResponseFactory<?> responseFactory;
+    private final ErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public ValidationExceptionHandler() {
         this.responseFactory = null;
     }
 
-    public ValidationExceptionHandler(JsonErrorResponseFactory<?> responseFactory) {
+    public ValidationExceptionHandler(ErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
@@ -57,10 +59,11 @@ public class ValidationExceptionHandler implements ExceptionHandler<ValidationEx
         Object error;
         Errors errors = exception.getErrors();
         FieldError fieldError = errors.getFieldError();
+        MutableHttpResponse<?> response = HttpResponse.badRequest();
         if (responseFactory != null) {
-            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+            return responseFactory.createResponse(ErrorContext.builder(request)
                     .cause(exception)
-                    .error(new io.micronaut.http.server.exceptions.format.JsonError() {
+                    .error(new Error() {
                         @Override
                         public String getMessage() {
                             return exception.getMessage();
@@ -71,12 +74,11 @@ public class ValidationExceptionHandler implements ExceptionHandler<ValidationEx
                             return Optional.ofNullable(fieldError).map(FieldError::getField);
                         }
                     })
-                    .build());
+                    .build(), response);
         } else {
-            error = new JsonError(exception.getMessage())
+            return response.body(new JsonError(exception.getMessage())
                     .path(fieldError != null ? fieldError.getField() : null)
-                    .link(Link.SELF, Link.of(request.getUri()));
+                    .link(Link.SELF, Link.of(request.getUri())));
         }
-        return HttpResponse.badRequest(error);
     }
 }

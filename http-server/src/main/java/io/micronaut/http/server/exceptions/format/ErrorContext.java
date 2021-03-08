@@ -18,24 +18,17 @@ package io.micronaut.http.server.exceptions.format;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpStatus;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface JsonErrorContext {
+public interface ErrorContext {
 
     /**
      * @return The request that caused the error
      */
     @NonNull
     HttpRequest<?> getRequest();
-
-    /**
-     * @return The status to be used in the response
-     */
-    @NonNull
-    HttpStatus getResponseStatus();
 
     /**
      * @return The optional root cause exception
@@ -47,7 +40,7 @@ public interface JsonErrorContext {
      * @return The errors
      */
     @NonNull
-    List<JsonError> getErrors();
+    List<Error> getErrors();
 
     /**
      * @return True if there are errors present
@@ -60,17 +53,15 @@ public interface JsonErrorContext {
      * Create a new context builder.
      *
      * @param request        The request
-     * @param responseStatus The response status
      * @return A new context builder
      */
     @NonNull
-    static Builder builder(@NonNull HttpRequest<?> request,
-                           @NonNull HttpStatus responseStatus) {
-        return DefaultJsonErrorContext.builder(request, responseStatus);
+    static Builder builder(@NonNull HttpRequest<?> request) {
+        return DefaultJsonErrorContext.builder(request);
     }
 
     /**
-     * A builder for a {@link JsonErrorContext}.
+     * A builder for a {@link ErrorContext}.
      *
      * @author James Kleeh
      * @since 2.4.0
@@ -84,7 +75,7 @@ public interface JsonErrorContext {
          * @return This builder instance
          */
         @NonNull
-        JsonErrorContext.Builder cause(@Nullable Throwable cause);
+        ErrorContext.Builder cause(@Nullable Throwable cause);
 
         /**
          * Adds an error to the context for the given message.
@@ -93,7 +84,7 @@ public interface JsonErrorContext {
          * @return This builder instance
          */
         @NonNull
-        JsonErrorContext.Builder errorMessage(@NonNull String message);
+        ErrorContext.Builder errorMessage(@NonNull String message);
 
         /**
          * Adds an error to the context.
@@ -102,7 +93,7 @@ public interface JsonErrorContext {
          * @return This builder instance
          */
         @NonNull
-        JsonErrorContext.Builder error(@NonNull JsonError error);
+        ErrorContext.Builder error(@NonNull Error error);
 
         /**
          * Adds errors to the context for the given messages.
@@ -111,7 +102,7 @@ public interface JsonErrorContext {
          * @return This builder instance
          */
         @NonNull
-        JsonErrorContext.Builder errorMessages(@NonNull List<String> errors);
+        ErrorContext.Builder errorMessages(@NonNull List<String> errors);
 
         /**
          * Adds the errors to the context.
@@ -120,7 +111,7 @@ public interface JsonErrorContext {
          * @return This builder instance
          */
         @NonNull
-        JsonErrorContext.Builder errors(@NonNull List<JsonError> errors);
+        ErrorContext.Builder errors(@NonNull List<Error> errors);
 
         /**
          * Builds the context.
@@ -128,6 +119,6 @@ public interface JsonErrorContext {
          * @return A new context
          */
         @NonNull
-        JsonErrorContext build();
+        ErrorContext build();
     }
 }

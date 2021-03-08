@@ -17,13 +17,13 @@ package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.exceptions.format.JsonErrorContext;
-import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
+import io.micronaut.http.server.exceptions.format.ErrorContext;
+import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 
 import javax.inject.Inject;
@@ -39,7 +39,7 @@ import javax.inject.Singleton;
 @Produces
 public class DuplicateRouteHandler implements ExceptionHandler<DuplicateRouteException, HttpResponse> {
 
-    private final JsonErrorResponseFactory<?> responseFactory;
+    private final ErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public DuplicateRouteHandler() {
@@ -47,22 +47,22 @@ public class DuplicateRouteHandler implements ExceptionHandler<DuplicateRouteExc
     }
 
     @Inject
-    public DuplicateRouteHandler(JsonErrorResponseFactory<?> responseFactory) {
+    public DuplicateRouteHandler(ErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
     @Override
     public HttpResponse handle(HttpRequest request, DuplicateRouteException exception) {
-        Object error;
+        MutableHttpResponse<?> response = HttpResponse.badRequest();
         if (responseFactory != null) {
-            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+            return responseFactory.createResponse(ErrorContext.builder(request)
                     .cause(exception)
                     .errorMessage(exception.getMessage())
-                    .build());
+                    .build(), response);
         } else {
-            error = new JsonError(exception.getMessage())
-                    .link(Link.SELF, Link.of(request.getUri()));
+            return response.body(new JsonError(exception.getMessage())
+                    .link(Link.SELF, Link.of(request.getUri())));
         }
-        return HttpResponse.badRequest(error);
+
     }
 }

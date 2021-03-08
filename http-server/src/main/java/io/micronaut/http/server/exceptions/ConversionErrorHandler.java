@@ -18,12 +18,13 @@ package io.micronaut.http.server.exceptions;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
-import io.micronaut.http.server.exceptions.format.JsonErrorContext;
-import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
+import io.micronaut.http.server.exceptions.format.Error;
+import io.micronaut.http.server.exceptions.format.ErrorContext;
+import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -39,7 +40,7 @@ import java.util.Optional;
 @Produces
 public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorException, HttpResponse> {
 
-    private final JsonErrorResponseFactory<?> responseFactory;
+    private final ErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public ConversionErrorHandler() {
@@ -47,17 +48,17 @@ public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorE
     }
 
     @Inject
-    public ConversionErrorHandler(JsonErrorResponseFactory<?> responseFactory) {
+    public ConversionErrorHandler(ErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
     @Override
     public HttpResponse handle(HttpRequest request, ConversionErrorException exception) {
-        Object error;
+        MutableHttpResponse<?> response = HttpResponse.badRequest();
         if (responseFactory != null) {
-            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+            return responseFactory.createResponse(ErrorContext.builder(request)
                     .cause(exception)
-                    .error(new io.micronaut.http.server.exceptions.format.JsonError() {
+                    .error(new Error() {
                         @Override
                         public Optional<String> getPath() {
                             return Optional.of('/' + exception.getArgument().getName());
@@ -68,12 +69,11 @@ public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorE
                             return exception.getMessage();
                         }
                     })
-                    .build());
+                    .build(), response);
         } else {
-            error = new JsonError(exception.getMessage())
+            return response.body(new JsonError(exception.getMessage())
                     .path('/' + exception.getArgument().getName())
-                    .link(Link.SELF, Link.of(request.getUri()));
+                    .link(Link.SELF, Link.of(request.getUri())));
         }
-        return HttpResponse.badRequest(error);
     }
 }

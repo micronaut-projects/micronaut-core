@@ -23,7 +23,7 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 2.4.0
  */
-public interface JsonError {
+public interface Error {
 
     /**
      * @return The optional error path

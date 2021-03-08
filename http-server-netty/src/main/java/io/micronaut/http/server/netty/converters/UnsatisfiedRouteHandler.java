@@ -17,13 +17,14 @@ package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.exceptions.format.JsonErrorContext;
-import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
+import io.micronaut.http.server.exceptions.format.Error;
+import io.micronaut.http.server.exceptions.format.ErrorContext;
+import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +45,7 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
 
     private static final Logger LOG = LoggerFactory.getLogger(UnsatisfiedRouteHandler.class);
 
-    private final JsonErrorResponseFactory<?> responseFactory;
+    private final ErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public UnsatisfiedRouteHandler() {
@@ -52,7 +53,7 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
     }
 
     @Inject
-    public UnsatisfiedRouteHandler(JsonErrorResponseFactory<?> responseFactory) {
+    public UnsatisfiedRouteHandler(ErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
@@ -61,11 +62,11 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
         if (LOG.isTraceEnabled()) {
             LOG.trace("{} (Bad Request): {}", request, exception.getMessage());
         }
-        Object error;
+        MutableHttpResponse<?> response = HttpResponse.badRequest();
         if (responseFactory != null) {
-            error = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+            return responseFactory.createResponse(ErrorContext.builder(request)
                     .cause(exception)
-                    .error(new io.micronaut.http.server.exceptions.format.JsonError() {
+                    .error(new Error() {
                         @Override
                         public String getMessage() {
                             return exception.getMessage();
@@ -76,12 +77,11 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
                             return Optional.of('/' + exception.getArgument().getName());
                         }
                     })
-                    .build());
+                    .build(), response);
         } else {
-            error = new JsonError(exception.getMessage())
+            return response.body(new JsonError(exception.getMessage())
                     .path('/' + exception.getArgument().getName())
-                    .link(Link.SELF, Link.of(request.getUri()));
+                    .link(Link.SELF, Link.of(request.getUri())));
         }
-        return HttpResponse.badRequest(error);
     }
 }

@@ -23,8 +23,9 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
-import io.micronaut.http.server.exceptions.format.JsonErrorContext;
-import io.micronaut.http.server.exceptions.format.JsonErrorResponseFactory;
+import io.micronaut.http.server.exceptions.format.Error;
+import io.micronaut.http.server.exceptions.format.ErrorContext;
+import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -40,7 +41,7 @@ import java.util.Optional;
 @Singleton
 public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingException, Object> {
 
-    private final JsonErrorResponseFactory<?> responseFactory;
+    private final ErrorResponseFactory<?> responseFactory;
 
     @Deprecated
     public JsonExceptionHandler() {
@@ -48,18 +49,17 @@ public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingExce
     }
 
     @Inject
-    public JsonExceptionHandler(JsonErrorResponseFactory<?> responseFactory) {
+    public JsonExceptionHandler(ErrorResponseFactory<?> responseFactory) {
         this.responseFactory = responseFactory;
     }
 
     @Override
     public Object handle(HttpRequest request, JsonProcessingException exception) {
         MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
-        Object body;
         if (responseFactory != null) {
-            body = responseFactory.createResponse(JsonErrorContext.builder(request, HttpStatus.BAD_REQUEST)
+            return responseFactory.createResponse(ErrorContext.builder(request)
                     .cause(exception)
-                    .error(new io.micronaut.http.server.exceptions.format.JsonError() {
+                    .error(new Error() {
                         @Override
                         public String getMessage() {
                             return "Invalid JSON: " + exception.getMessage();
@@ -70,13 +70,10 @@ public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingExce
                             return Optional.of("Invalid JSON");
                         }
                     })
-                    .build());
+                    .build(), response);
         } else {
-            body = new JsonError("Invalid JSON: " + exception.getMessage())
-                    .link(Link.SELF, Link.of(request.getUri()));
+            return response.body(new JsonError("Invalid JSON: " + exception.getMessage())
+                    .link(Link.SELF, Link.of(request.getUri())));
         }
-        response.body(body);
-
-        return response;
     }
 }

@@ -17,24 +17,29 @@ package io.micronaut.http.server.exceptions.format;
 
 import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.MutableHttpResponse;
 
 /**
- * Creates objects to be rendered as JSON that represent errors.
+ * Creates Http responses that represent errors.
  *
- * @param <T> The response type
+ * @param <T> The response body type
  * @author James Kleeh
  * @since 2.4.0
  */
 @DefaultImplementation(HateoasErrorResponseFactory.class)
-public interface JsonErrorResponseFactory<T> {
+public interface ErrorResponseFactory<T> {
 
     /**
-     * Create an object to be serialized as JSON representing the error(s).
+     * Modifies the http response representing the error. Callers of this
+     * method should return the response that was passed in {@param baseResponse},
+     * however that isn't required.
      *
      * @param errorContext The error context
+     * @param baseResponse The base response to retrieve information or
+     *                     mutate
      * @return An error response
      */
     @NonNull
-    T createResponse(@NonNull JsonErrorContext errorContext);
+    MutableHttpResponse<T> createResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> baseResponse);
 
 }
