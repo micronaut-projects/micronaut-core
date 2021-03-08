@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.exceptions.format;
+package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -25,15 +25,15 @@ import java.util.List;
 import java.util.Optional;
 
 @Internal
-final class DefaultJsonErrorContext implements ErrorContext {
+final class DefaultErrorContext implements ErrorContext {
 
     private final HttpRequest<?> request;
     private final Throwable cause;
     private final List<Error> jsonErrors;
 
-    private DefaultJsonErrorContext(@NonNull HttpRequest<?> request,
-                                    @Nullable Throwable cause,
-                                    @NonNull List<Error> jsonErrors) {
+    private DefaultErrorContext(@NonNull HttpRequest<?> request,
+                                @Nullable Throwable cause,
+                                @NonNull List<Error> jsonErrors) {
         this.request = request;
         this.cause = cause;
         this.jsonErrors = jsonErrors;
@@ -117,7 +117,7 @@ final class DefaultJsonErrorContext implements ErrorContext {
         @Override
         @NonNull
         public ErrorContext build() {
-            return new DefaultJsonErrorContext(request, cause, jsonErrors);
+            return new DefaultErrorContext(request, cause, jsonErrors);
         }
     }
 }

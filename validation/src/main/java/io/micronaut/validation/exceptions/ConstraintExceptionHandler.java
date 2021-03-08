@@ -25,8 +25,8 @@ import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.exceptions.format.ErrorContext;
-import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.jackson.JacksonConfiguration;
 
 import javax.inject.Inject;
@@ -53,39 +53,39 @@ import java.util.stream.Collectors;
 public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintViolationException, HttpResponse<?>> {
 
     private final boolean alwaysSerializeErrorsAsList;
-    private final ErrorResponseFactory<?> responseFactory;
+    private final ErrorResponseProcessor<?> responseProcessor;
 
     @Deprecated
     public ConstraintExceptionHandler() {
         this.alwaysSerializeErrorsAsList = false;
-        this.responseFactory = null;
+        this.responseProcessor = null;
     }
 
     @Deprecated
     public ConstraintExceptionHandler(JacksonConfiguration jacksonConfiguration) {
         this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
-        this.responseFactory = null;
+        this.responseProcessor = null;
     }
 
     @Inject
-    public ConstraintExceptionHandler(ErrorResponseFactory<?> responseFactory) {
+    public ConstraintExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.alwaysSerializeErrorsAsList = false;
-        this.responseFactory = responseFactory;
+        this.responseProcessor = responseProcessor;
     }
 
     @Override
     public HttpResponse<?> handle(HttpRequest request, ConstraintViolationException exception) {
         Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
 
-        if (responseFactory != null) {
+        if (responseProcessor != null) {
             MutableHttpResponse<?> response = HttpResponse.badRequest();
             final ErrorContext.Builder contextBuilder = ErrorContext.builder(request).cause(exception);
             if (constraintViolations == null || constraintViolations.isEmpty()) {
-                return responseFactory.createResponse(contextBuilder.errorMessage(
+                return responseProcessor.processResponse(contextBuilder.errorMessage(
                         exception.getMessage() == null ? HttpStatus.BAD_REQUEST.getReason() : exception.getMessage()
                 ).build(), response);
             } else {
-                return responseFactory.createResponse(contextBuilder.errorMessages(
+                return responseProcessor.processResponse(contextBuilder.errorMessages(
                         exception.getConstraintViolations()
                                 .stream()
                                 .map(this::buildMessage)

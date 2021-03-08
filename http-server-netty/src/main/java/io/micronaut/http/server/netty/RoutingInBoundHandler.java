@@ -80,8 +80,8 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.InternalServerException;
-import io.micronaut.http.server.exceptions.format.ErrorContext;
-import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.netty.async.ContextCompletionAwareSubscriber;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
@@ -166,7 +166,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final BeanContext beanContext;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
-    private final ErrorResponseFactory<?> errorResponseFactory;
+    private final ErrorResponseProcessor<?> errorResponseProcessor;
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
@@ -186,7 +186,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
      * @param executorSelector                        The executor selector
      * @param ioExecutor                              The IO executor
      * @param httpContentProcessorResolver            The http content processor resolver
-     * @param errorResponseFactory                    The factory to create error responses
+     * @param errorResponseProcessor                    The factory to create error responses
      */
     RoutingInBoundHandler(
             BeanContext beanContext,
@@ -199,7 +199,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ExecutorSelector executorSelector,
             Supplier<ExecutorService> ioExecutor,
             HttpContentProcessorResolver httpContentProcessorResolver,
-            ErrorResponseFactory<?> errorResponseFactory) {
+            ErrorResponseProcessor<?> errorResponseProcessor) {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.customizableResponseTypeHandlerRegistry = customizableResponseTypeHandlerRegistry;
         this.beanContext = beanContext;
@@ -211,7 +211,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.serverConfiguration = serverConfiguration;
         this.serverHeader = serverConfiguration.getServerHeader().orElse(null);
         this.httpContentProcessorResolver = httpContentProcessorResolver;
-        this.errorResponseFactory = errorResponseFactory;
+        this.errorResponseProcessor = errorResponseProcessor;
         Optional<Boolean> multipartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = !multipartEnabled.isPresent() || multipartEnabled.get();
     }
@@ -601,7 +601,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             handleRouteMatch(routeMatch, nettyHttpRequest, ctx, false);
         } else {
             if (request.getMethod() != HttpMethod.HEAD) {
-                defaultResponse = errorResponseFactory.createResponse(ErrorContext.builder(request)
+                defaultResponse = errorResponseProcessor.processResponse(ErrorContext.builder(request)
                         .errorMessage(message)
                         .build(), defaultResponse);
             }
@@ -674,7 +674,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private MutableHttpResponse<?> newNotFoundError(HttpRequest<?> request) {
-        return errorResponseFactory.createResponse(
+        return errorResponseProcessor.processResponse(
                 ErrorContext.builder(request)
                         .errorMessage("Page Not Found")
                         .build(), HttpResponse.notFound());
@@ -1986,7 +1986,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private void writeDefaultErrorResponse(ChannelHandlerContext ctx, NettyHttpRequest nettyHttpRequest, Throwable cause, boolean skipOncePerRequest) {
         logException(cause);
 
-        MutableHttpResponse<?> response = errorResponseFactory.createResponse(
+        MutableHttpResponse<?> response = errorResponseProcessor.processResponse(
                 ErrorContext.builder(nettyHttpRequest)
                         .cause(cause)
                         .errorMessage("Internal Server Error: " + cause.getMessage())

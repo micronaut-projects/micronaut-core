@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.exceptions.format;
+package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.NonNull;
@@ -36,17 +36,17 @@ import java.util.List;
  */
 @Singleton
 @Secondary
-public class HateoasErrorResponseFactory implements ErrorResponseFactory<JsonError> {
+public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<JsonError> {
 
     private final boolean alwaysSerializeErrorsAsList;
 
-    public HateoasErrorResponseFactory(JacksonConfiguration jacksonConfiguration) {
+    public HateoasErrorResponseProcessor(JacksonConfiguration jacksonConfiguration) {
         this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
     }
 
     @Override
     @NonNull
-    public MutableHttpResponse<JsonError> createResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> response) {
+    public MutableHttpResponse<JsonError> processResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> response) {
         JsonError error;
         if (!errorContext.hasErrors()) {
             error = new JsonError(response.getStatus().getReason());

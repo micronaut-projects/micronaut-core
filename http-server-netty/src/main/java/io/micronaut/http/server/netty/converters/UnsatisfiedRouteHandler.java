@@ -22,9 +22,9 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.exceptions.format.Error;
-import io.micronaut.http.server.exceptions.format.ErrorContext;
-import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
+import io.micronaut.http.server.exceptions.response.Error;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,16 +45,16 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
 
     private static final Logger LOG = LoggerFactory.getLogger(UnsatisfiedRouteHandler.class);
 
-    private final ErrorResponseFactory<?> responseFactory;
+    private final ErrorResponseProcessor<?> responseProcessor;
 
     @Deprecated
     public UnsatisfiedRouteHandler() {
-        this.responseFactory = null;
+        this.responseProcessor = null;
     }
 
     @Inject
-    public UnsatisfiedRouteHandler(ErrorResponseFactory<?> responseFactory) {
-        this.responseFactory = responseFactory;
+    public UnsatisfiedRouteHandler(ErrorResponseProcessor<?> responseProcessor) {
+        this.responseProcessor = responseProcessor;
     }
 
     @Override
@@ -63,8 +63,8 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
             LOG.trace("{} (Bad Request): {}", request, exception.getMessage());
         }
         MutableHttpResponse<?> response = HttpResponse.badRequest();
-        if (responseFactory != null) {
-            return responseFactory.createResponse(ErrorContext.builder(request)
+        if (responseProcessor != null) {
+            return responseProcessor.processResponse(ErrorContext.builder(request)
                     .cause(exception)
                     .error(new Error() {
                         @Override

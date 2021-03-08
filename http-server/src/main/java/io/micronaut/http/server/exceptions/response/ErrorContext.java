@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.exceptions.format;
+package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -57,7 +57,7 @@ public interface ErrorContext {
      */
     @NonNull
     static Builder builder(@NonNull HttpRequest<?> request) {
-        return DefaultJsonErrorContext.builder(request);
+        return DefaultErrorContext.builder(request);
     }
 
     /**

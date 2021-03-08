@@ -22,8 +22,8 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
-import io.micronaut.http.server.exceptions.format.ErrorContext;
-import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -39,16 +39,16 @@ import java.util.Optional;
 @Produces
 public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, HttpResponse> {
 
-    private final ErrorResponseFactory<?> responseFactory;
+    private final ErrorResponseProcessor<?> responseProcessor;
 
     @Deprecated
     public HttpStatusHandler() {
-        this.responseFactory = null;
+        this.responseProcessor = null;
     }
 
     @Inject
-    public HttpStatusHandler(ErrorResponseFactory<?> responseFactory) {
-        this.responseFactory = responseFactory;
+    public HttpStatusHandler(ErrorResponseProcessor<?> responseProcessor) {
+        this.responseProcessor = responseProcessor;
     }
 
     @Override
@@ -58,8 +58,8 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
         if (body.isPresent()) {
             return response.body(body.get());
         } else {
-            if (responseFactory != null) {
-                return responseFactory.createResponse(ErrorContext.builder(request)
+            if (responseProcessor != null) {
+                return responseProcessor.processResponse(ErrorContext.builder(request)
                         .cause(exception)
                         .errorMessage(exception.getMessage())
                         .build(), response);

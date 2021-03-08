@@ -20,8 +20,8 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.server.exceptions.ExceptionHandler
-import io.micronaut.http.server.exceptions.format.ErrorContext
-import io.micronaut.http.server.exceptions.format.ErrorResponseFactory
+import io.micronaut.http.server.exceptions.response.ErrorContext
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor
 
 import javax.inject.Singleton
 
@@ -32,15 +32,15 @@ import javax.inject.Singleton
 @Requires(classes = [OutOfStockException, ExceptionHandler])
 class OutOfStockExceptionHandler implements ExceptionHandler<OutOfStockException, HttpResponse> {
 
-    private final ErrorResponseFactory<?> errorResponseFactory
+    private final ErrorResponseProcessor<?> errorResponseProcessor
 
-    OutOfStockExceptionHandler(ErrorResponseFactory<?> errorResponseFactory) {
-        this.errorResponseFactory = errorResponseFactory
+    OutOfStockExceptionHandler(ErrorResponseProcessor<?> errorResponseProcessor) {
+        this.errorResponseProcessor = errorResponseProcessor
     }
 
     @Override
     HttpResponse handle(HttpRequest request, OutOfStockException e) {
-        errorResponseFactory.createResponse(ErrorContext.builder(request)
+        errorResponseProcessor.processResponse(ErrorContext.builder(request)
                 .cause(e)
                 .errorMessage("No stock available")
                 .build(), HttpResponse.badRequest()) // <1>

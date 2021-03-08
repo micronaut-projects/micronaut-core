@@ -20,9 +20,9 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
-import io.micronaut.http.server.exceptions.format.Error;
-import io.micronaut.http.server.exceptions.format.ErrorContext;
-import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
+import io.micronaut.http.server.exceptions.response.Error;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -39,23 +39,23 @@ import java.util.Optional;
 @Produces
 public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, HttpResponse> {
 
-    private final ErrorResponseFactory<?> responseFactory;
+    private final ErrorResponseProcessor<?> responseProcessor;
 
     @Deprecated
     public URISyntaxHandler() {
-        this.responseFactory = null;
+        this.responseProcessor = null;
     }
 
     @Inject
-    public URISyntaxHandler(ErrorResponseFactory<?> responseFactory) {
-        this.responseFactory = responseFactory;
+    public URISyntaxHandler(ErrorResponseProcessor<?> responseProcessor) {
+        this.responseProcessor = responseProcessor;
     }
 
     @Override
     public HttpResponse handle(HttpRequest request, URISyntaxException exception) {
         MutableHttpResponse<?> response = HttpResponse.badRequest();
-        if (responseFactory != null) {
-            return responseFactory.createResponse(ErrorContext.builder(request)
+        if (responseProcessor != null) {
+            return responseProcessor.processResponse(ErrorContext.builder(request)
                     .cause(exception)
                     .error(new Error() {
                         @Override

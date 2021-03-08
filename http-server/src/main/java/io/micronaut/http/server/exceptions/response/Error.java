@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.exceptions.format;
+package io.micronaut.http.server.exceptions.response;
 
 import java.util.Optional;
 

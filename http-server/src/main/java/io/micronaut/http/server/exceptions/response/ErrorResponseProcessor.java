@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.exceptions.format;
+package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.core.annotation.NonNull;
@@ -26,8 +26,8 @@ import io.micronaut.http.MutableHttpResponse;
  * @author James Kleeh
  * @since 2.4.0
  */
-@DefaultImplementation(HateoasErrorResponseFactory.class)
-public interface ErrorResponseFactory<T> {
+@DefaultImplementation(HateoasErrorResponseProcessor.class)
+public interface ErrorResponseProcessor<T> {
 
     /**
      * Modifies the http response representing the error. Callers of this
@@ -40,6 +40,6 @@ public interface ErrorResponseFactory<T> {
      * @return An error response
      */
     @NonNull
-    MutableHttpResponse<T> createResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> baseResponse);
+    MutableHttpResponse<T> processResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> baseResponse);
 
 }

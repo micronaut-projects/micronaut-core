@@ -22,8 +22,8 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.exceptions.format.ErrorContext;
-import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 
 import javax.inject.Inject;
@@ -39,23 +39,23 @@ import javax.inject.Singleton;
 @Produces
 public class DuplicateRouteHandler implements ExceptionHandler<DuplicateRouteException, HttpResponse> {
 
-    private final ErrorResponseFactory<?> responseFactory;
+    private final ErrorResponseProcessor<?> responseProcessor;
 
     @Deprecated
     public DuplicateRouteHandler() {
-        this.responseFactory = null;
+        this.responseProcessor = null;
     }
 
     @Inject
-    public DuplicateRouteHandler(ErrorResponseFactory<?> responseFactory) {
-        this.responseFactory = responseFactory;
+    public DuplicateRouteHandler(ErrorResponseProcessor<?> responseProcessor) {
+        this.responseProcessor = responseProcessor;
     }
 
     @Override
     public HttpResponse handle(HttpRequest request, DuplicateRouteException exception) {
         MutableHttpResponse<?> response = HttpResponse.badRequest();
-        if (responseFactory != null) {
-            return responseFactory.createResponse(ErrorContext.builder(request)
+        if (responseProcessor != null) {
+            return responseProcessor.processResponse(ErrorContext.builder(request)
                     .cause(exception)
                     .errorMessage(exception.getMessage())
                     .build(), response);

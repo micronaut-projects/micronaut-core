@@ -58,12 +58,12 @@ To respond with 400 Bad Request as the response when the `OutOfStockException` i
 
 snippet::io.micronaut.docs.server.exception.OutOfStockExceptionHandler[tags="clazz", indent=0]
 
-<1> The default api:http.server.exceptions.format.JsonErrorResponseFactory[] is used to create the body of the response
+<1> The default api:http.server.exceptions.response.ErrorResponseProcessor[] is used to create the body of the response
 
 IMPORTANT: An `@Error` annotation capturing an exception has precedence over an implementation of `ExceptionHandler` capturing the same exception.
 
-== Error Formatting
+== Error Response Format
 
-By default Micronaut produces error response bodies in the link:https://github.com/blongden/vnd.error[vnd.error] format. This is accomplished through the provided api:http.server.exceptions.format.HateoasErrorResponseFactory[]. To change or customize the response bodies being created, create your own implementation of api:http.server.exceptions.format.JsonErrorResponseFactory[] and replace the default implementation.
+By default Micronaut produces error response bodies in the link:https://github.com/blongden/vnd.error[vnd.error] format. This is accomplished through the provided api:http.server.exceptions.format.HateoasErrorResponseProcessor[]. To change or customize the responses being created, create your own implementation of api:http.server.exceptions.response.ErrorResponseProcessor[] and replace the default implementation.
 
-If customization of the response other than body is desired, the exception handler that is handling the exception needs to be overridden.
+If customization of the response other than items related to the errors is desired, override the relevant exception handler.

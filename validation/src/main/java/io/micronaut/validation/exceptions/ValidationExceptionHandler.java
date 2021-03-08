@@ -18,14 +18,13 @@ package io.micronaut.validation.exceptions;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.exceptions.format.Error;
-import io.micronaut.http.server.exceptions.format.ErrorContext;
-import io.micronaut.http.server.exceptions.format.ErrorResponseFactory;
+import io.micronaut.http.server.exceptions.response.Error;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import org.grails.datastore.mapping.validation.ValidationException;
 import org.springframework.validation.Errors;
 import org.springframework.validation.FieldError;
@@ -43,25 +42,25 @@ import java.util.Optional;
 @Requires(classes = ValidationException.class)
 public class ValidationExceptionHandler implements ExceptionHandler<ValidationException, HttpResponse<?>> {
 
-    private final ErrorResponseFactory<?> responseFactory;
+    private final ErrorResponseProcessor<?> responseProcessor
+            ;
 
     @Deprecated
     public ValidationExceptionHandler() {
-        this.responseFactory = null;
+        this.responseProcessor = null;
     }
 
-    public ValidationExceptionHandler(ErrorResponseFactory<?> responseFactory) {
-        this.responseFactory = responseFactory;
+    public ValidationExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
+        this.responseProcessor = responseProcessor;
     }
 
     @Override
     public HttpResponse<?> handle(HttpRequest request, ValidationException exception) {
-        Object error;
         Errors errors = exception.getErrors();
         FieldError fieldError = errors.getFieldError();
         MutableHttpResponse<?> response = HttpResponse.badRequest();
-        if (responseFactory != null) {
-            return responseFactory.createResponse(ErrorContext.builder(request)
+        if (responseProcessor != null) {
+            return responseProcessor.processResponse(ErrorContext.builder(request)
                     .cause(exception)
                     .error(new Error() {
                         @Override
