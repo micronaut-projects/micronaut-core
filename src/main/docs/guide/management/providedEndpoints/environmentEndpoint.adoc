@@ -1,6 +1,6 @@
 The environment endpoint returns information about the link:{api}/io/micronaut/context/env/Environment.html[Environment] and its link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource]s.
 
-NOTE: Properties that may contain sensitive data will be masked.
+NOTE: Properties that may contain sensitive data are masked.
 
 == Configuration
 

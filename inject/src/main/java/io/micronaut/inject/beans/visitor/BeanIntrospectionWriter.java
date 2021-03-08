@@ -27,6 +27,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.*;
+import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.jetbrains.annotations.NotNull;
@@ -178,8 +179,8 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
 
-        final Type propertyType = getTypeReference(type);
-        final Type propertyGenericType = getTypeReference(genericType);
+        final Type propertyType = JavaModelUtils.getTypeReference(type);
+        final Type propertyGenericType = JavaModelUtils.getTypeReference(genericType);
 
         DefaultAnnotationMetadata.contributeDefaults(
                 this.annotationMetadata,
@@ -381,7 +382,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 desc);
 
         Collection<Type> argumentTypes = constructorArguments.stream().map(pe ->
-                getTypeReference(pe.getType())
+                JavaModelUtils.getTypeReference(pe.getType())
         ).collect(Collectors.toList());
 
         boolean isConstructor = constructor instanceof ConstructorElement;
@@ -391,7 +392,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             instantiateInternal.newInstance(beanType);
             instantiateInternal.dup();
         } else if (isCompanion) {
-            instantiateInternal.getStatic(beanType, "Companion", getTypeReference(constructor.getDeclaringType()));
+            instantiateInternal.getStatic(beanType, "Companion", JavaModelUtils.getTypeReference(constructor.getDeclaringType()));
         }
 
         int i = 0;
@@ -415,7 +416,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 instantiateInternal.invokeStatic(beanType, method);
             }
         } else if (isCompanion) {
-            instantiateInternal.invokeVirtual(getTypeReference(constructor.getDeclaringType()), new Method(constructor.getName(), getMethodDescriptor(beanType, argumentTypes)));
+            instantiateInternal.invokeVirtual(JavaModelUtils.getTypeReference(constructor.getDeclaringType()), new Method(constructor.getName(), getMethodDescriptor(beanType, argumentTypes)));
         }
 
         instantiateInternal.visitInsn(ARETURN);
@@ -433,8 +434,8 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 final String methodDescriptor = getMethodDescriptor(beanType, Collections.emptyList());
                 instantiateMethod.invokeStatic(beanType, new Method(defaultConstructor.getName(), methodDescriptor));
             } else if (constructor.getDeclaringType().getSimpleName().endsWith("$Companion")) {
-                instantiateMethod.getStatic(beanType, "Companion", getTypeReference(constructor.getDeclaringType()));
-                instantiateMethod.invokeVirtual(getTypeReference(constructor.getDeclaringType()), new Method(constructor.getName(), getMethodDescriptor(beanType, Collections.emptyList())));
+                instantiateMethod.getStatic(beanType, "Companion", JavaModelUtils.getTypeReference(constructor.getDeclaringType()));
+                instantiateMethod.invokeVirtual(JavaModelUtils.getTypeReference(constructor.getDeclaringType()), new Method(constructor.getName(), getMethodDescriptor(beanType, Collections.emptyList())));
             }
 
             instantiateMethod.visitInsn(ARETURN);

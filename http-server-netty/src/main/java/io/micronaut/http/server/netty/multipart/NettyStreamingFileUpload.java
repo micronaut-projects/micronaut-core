@@ -203,4 +203,9 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     public void subscribe(Subscriber<? super PartData> s) {
         subject.subscribe(s);
     }
+
+    @Override
+    public void discard() {
+        fileUpload.release();
+    }
 }

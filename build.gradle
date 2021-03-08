@@ -52,6 +52,11 @@ ext {
                     name: 'micronaut-r2dbc-bom',
                     version: micronautR2DBCVersion
             ],
+            'micronaut.cache': [
+                    group: 'io.micronaut.cache',
+                    name: 'micronaut-cache-bom',
+                    version: micronautCacheVersion
+            ],
             //Third-party
             'netty': [
                     group: 'io.netty',
@@ -414,7 +419,7 @@ ext {
             picocli                    : [
                     version: picocliVersion,
                     group  : 'info.picocli',
-                    name   : 'picocli'
+                    modules: ['picocli', 'picocli-codegen']                    
             ],
             lettuce                    : [
                     version: lettuceVersion,
@@ -618,11 +623,6 @@ ext {
                     group:'io.micronaut.kubernetes',
                     modules:['micronaut-kubernetes-discovery-client', 'micronaut-kubernetes-client', 'micronaut-kubernetes-client-processor']
             ],
-            'micronaut.cache': [
-                    version:micronautCacheVersion,
-                    group:'io.micronaut.cache',
-                    modules: ['micronaut-cache-caffeine', 'micronaut-cache-core', 'micronaut-cache-management', 'micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop', 'micronaut-cache-infinispan']
-            ],
             'micronaut.servlet': [
                 version:micronautServletVersion,
                 group:'io.micronaut.servlet',
@@ -643,7 +643,7 @@ ext {
                     version: dekorateVersion,
                     group  : 'io.dekorate',
                     name   : 'dekorate-project',
-                    modules: ['jaeger-annotations', 'knative-annotations', 'kubernetes-annotations',  'openshift-annotations', 'prometheus-annotations', 'servicecatalog-annotations']
+                    modules: ['jaeger-annotations', 'knative-annotations', 'kubernetes-annotations',  'openshift-annotations', 'prometheus-annotations', 'servicecatalog-annotations', 'halkyon-annotations']
             ],
             'micronaut.ignite': [
                 version: micronautIgniteVersion,

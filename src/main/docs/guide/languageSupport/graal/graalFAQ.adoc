@@ -6,7 +6,6 @@ Micronaut features a Dependency Injection and Aspect-Oriented Programming runtim
 
 Picocli provides a `picocli-codegen` module with a tool for generating a GraalVM reflection configuration file. The tool can be run https://picocli.info/picocli-on-graalvm.html[manually] or automatically as part of the build. The module's https://github.com/remkop/picocli/tree/master/picocli-codegen[README] has usage instructions with code snippets for configuring Gradle and Maven to generate a `cli-reflect.json` file automatically as part of the build. Add the generated file to the `-H:ReflectionConfigurationFiles` option when running the `native-image` tool.
 
-
 ==== What about other Third-Party Libraries?
 
 Micronaut cannot guarantee that third-party libraries work on GraalVM SubstrateVM, that is down to each individual library to implement support.
@@ -32,7 +31,7 @@ You may need to manually tweak the generated `reflect.json` file. For regular cl
 ]
 ----
 
-For arrays this needs to use the Java JVM internal array representation. For example:
+For arrays this must use the Java JVM internal array representation. For example:
 
 [source,json]
 ----
@@ -47,17 +46,17 @@ For arrays this needs to use the Java JVM internal array representation. For exa
 
 ==== What if I want to set the heap's maximum size with `-Xmx`, but I get an `OutOfMemoryError`?
 
-If you set heap's maximum size in the Dockerfile that you use to build your native image, you will probably get runtime an error like this:
+If you set the maximum heap size in the Dockerfile that you use to build your native image, you will probably get a runtime error like this:
 
 ----
 java.lang.OutOfMemoryError: Direct buffer memory
 ----
 
-The problem is that Netty is trying to allocate 16MiB of memory per chunk with its default settings for `io.netty.allocator.pageSize` and `io.netty.allocator.maxOrder`:
+The problem is that Netty tries to allocate 16MB of memory per chunk with its default settings for `io.netty.allocator.pageSize` and `io.netty.allocator.maxOrder`:
 
 [source, java]
 ----
-int defaultChunkSize = DEFAULT_PAGE_SIZE << DEFAULT_MAX_ORDER; // 8192 << 11 = 16MiB 
+int defaultChunkSize = DEFAULT_PAGE_SIZE << DEFAULT_MAX_ORDER; // 8192 << 11 = 16MB
 ----
 
 The simplest solution is to specify `io.netty.allocator.maxOrder` explicitly in your Dockerfile's entrypoint. A working example with `-Xmx64m`:
@@ -67,4 +66,4 @@ The simplest solution is to specify `io.netty.allocator.maxOrder` explicitly in 
 ENTRYPOINT ["/app/application", "-Xmx64m", "-Dio.netty.allocator.maxOrder=8"]
 ----
 
-If you want to go further, you can also experiment with `io.netty.allocator.numHeapArenas` or `io.netty.allocator.numDirectArenas`. You can find more information about Netty's `PooledByteBufAllocator` in the https://netty.io/4.1/api/io/netty/buffer/PooledByteBufAllocator.html[official documentation].
+To go further, you can also experiment with `io.netty.allocator.numHeapArenas` or `io.netty.allocator.numDirectArenas`. You can find more information about Netty's `PooledByteBufAllocator` in the https://netty.io/4.1/api/io/netty/buffer/PooledByteBufAllocator.html[official documentation].

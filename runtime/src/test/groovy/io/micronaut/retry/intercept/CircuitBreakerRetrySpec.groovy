@@ -138,9 +138,51 @@ class CircuitBreakerRetrySpec extends Specification {
         when:
         counterService.getCountIncludes(false)
 
+        then: "the circuit is not open because the thrown exception does not match includes"
+        noExceptionThrown()
+        counterService.countIncludes == 3
+
+        cleanup:
+        context.stop()
+    }
+
+    void "test circuit breaker with includes 2"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountIncludes(false)
+
         then: "the circuit is open so the original exception is thrown"
+        noExceptionThrown()
+        counterService.countIncludes == counterService.countThreshold
+
+        when:
+        counterService.countIncludes = 0
+        counterService.getCountIncludes(true)
+
+        then: "retry didn't kick in because the exception thrown doesn't match includes"
         thrown(IllegalStateException)
         counterService.countIncludes == 1
+
+        when:
+        counterService.countIncludes = 0
+        counterService.countThreshold = 7
+        counterService.getCountIncludes(false)
+
+        then: "used all attempts to open circuit breaker"
+        thrown(MyCustomException)
+        counterService.countIncludes == 6
+
+        when:
+        counterService.countIncludes = 0
+        counterService.countThreshold = 3
+        counterService.getCountIncludes(true)
+
+        then: "the circuit is open so the original exception is thrown"
+        thrown(MyCustomException)
+        counterService.countIncludes == 0
 
         cleanup:
         context.stop()
@@ -167,11 +209,22 @@ class CircuitBreakerRetrySpec extends Specification {
         counterService.countExcludes == 1
 
         when:
+        counterService.countExcludes = 0
+        counterService.countThreshold = 7
+        counterService.getCountExcludes(true)
+
+        then: "used all attempts to open circuit breaker"
+        thrown(IllegalStateException)
+        counterService.countExcludes == 6
+
+        when:
+        counterService.countExcludes = 0
+        counterService.countThreshold = 3
         counterService.getCountExcludes(true)
 
         then: "the circuit is open so the original exception is thrown"
-        thrown(MyCustomException)
-        counterService.countExcludes == 1
+        thrown(IllegalStateException)
+        counterService.countExcludes == 0
 
         cleanup:
         context.stop()
@@ -214,11 +267,22 @@ class CircuitBreakerRetrySpec extends Specification {
         counterService.countPredicate == 1
 
         when:
+        counterService.countPredicate = 0
+        counterService.countThreshold = 7
         counterService.getCountPredicate(false)
 
+        then: "used all attempts to open circuit breaker"
+        thrown(MyCustomException)
+        counterService.countPredicate == 6
+
+        when:
+        counterService.countPredicate = 0
+        counterService.countThreshold = 3
+        counterService.getCountPredicate(true)
+
         then: "the circuit is open so the original exception is thrown"
-        thrown(IllegalStateException)
-        counterService.countPredicate == 1
+        thrown(MyCustomException)
+        counterService.countPredicate == 0
 
         cleanup:
         context.stop()

@@ -15,4 +15,4 @@ endpoints:
     sensitive: Boolean
 ----
 
-NOTE: By default, the stop endpoint is disabled and needs to be explicitly enabled to be used.
+NOTE: By default, the stop endpoint is disabled and must be explicitly enabled to be used.

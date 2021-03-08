@@ -378,7 +378,10 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     private static void instrumentAnnotationMetadata(BeanContext beanContext, ExecutableMethod<?, ?> method) {
         if (beanContext instanceof ApplicationContext && method instanceof EnvironmentConfigurable) {
             // ensure metadata is environment aware
-            ((EnvironmentConfigurable) method).configure(((ApplicationContext) beanContext).getEnvironment());
+            final EnvironmentConfigurable m = (EnvironmentConfigurable) method;
+            if (m.hasPropertyExpressions()) {
+                m.configure(((ApplicationContext) beanContext).getEnvironment());
+            }
         }
     }
 

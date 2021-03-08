@@ -33,6 +33,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.writer.*;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -302,7 +303,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     private String[] getImplementedInterfaceInternalNames() {
-        return interfaceTypes.stream().map(o -> getTypeReference(o).getInternalName()).toArray(String[]::new);
+        return interfaceTypes.stream().map(o -> JavaModelUtils.getTypeReference(o).getInternalName()).toArray(String[]::new);
     }
 
     @Override
@@ -443,10 +444,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
         List<ParameterElement> argumentTypeList = Arrays.asList(methodElement.getSuspendParameters());
         int argumentCount = argumentTypeList.size();
-        Type returnTypeObject = getTypeReference(returnType);
+        Type returnTypeObject = JavaModelUtils.getTypeReference(returnType);
         boolean isPrimitive = returnType.isPrimitive();
         boolean isVoidReturn = isPrimitive && returnTypeObject.equals(Type.VOID_TYPE);
-        final Type declaringTypeReference = getTypeReference(beanType);
+        final Type declaringTypeReference = JavaModelUtils.getTypeReference(beanType);
         MethodRef methodKey = new MethodRef(methodName, argumentTypeList, returnTypeObject);
 
         if (!proxiedMethodsRefSet.contains(methodKey)) {

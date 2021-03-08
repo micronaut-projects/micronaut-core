@@ -32,6 +32,89 @@ Multiple api:aop.MethodInterceptor[] types can bind to a single advise annotatio
 
 In previous versions of Micronaut, to control the format of error response bodies, it required replacing all of the existing api:http.server.exceptions.ExceptionHanlder[] instances. In Micronaut 2.4, the logic to create error response bodies has been moved to a single bean that implements api:http.server.exceptions.response.ErrorResponseProcessor[]. Now instead of having to replace many beans to have a consistent format, only a single bean needs to be replaced. The default implementation behaves the same as in previous versions to maintain backward compatibility.
 
+=== Micronaut Data
+
+==== Support for Java 14+ Records with JDBC
+
+Micronaut Data JDBC now https://micronaut-projects.github.io/micronaut-data/latest/guide/#javaRecords[supports using Java 14+ records to represent persistent entities], for example:
+
+[source,java]
+----
+package example;
+
+import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.data.annotation.*;
+import java.util.Date;
+
+@MappedEntity
+record Book(
+        @Id @GeneratedValue @Nullable Long id,
+        @DateCreated @Nullable Date dateCreated,
+        String title,
+        int pages) {
+    Book(String title, int pages) {
+        this(null, null, title, pages)
+    }
+}
+----
+
+==== Persistence Events Support
+
+Micronaut Data JPA, JDBC and R2DBC now support https://micronaut-projects.github.io/micronaut-data/latest/guide/#entityEvents[persistence events] on either entities or Micronaut beans. For example:
+
+[source,java]
+----
+package example;
+
+import io.micronaut.data.annotation.event.PrePersist;
+import javax.inject.Singleton;
+
+@Singleton
+public class AccountUsernameValidator {
+    @PrePersist
+    void validateUsername(Account account) {
+        final String username = account.getUsername();
+        if (username == null || !username.matches("[a-z0-9]+")) {
+            throw new IllegalArgumentException("Invalid username");
+        }
+    }
+}
+----
+
+=== Integration with Oracle Coherence CE
+
+We are pleased to announce a first milestone release of Micronaut integration with Oracle Coherence Community Edition, which makes implementation of Micronaut applications with a Coherence back end a breeze.
+
+Below are some of the features supported by the various modules within `micronaut-coherence` project:
+
+==== Micronaut Data Support
+
+The `micronaut-coherence-data` module alows you to use https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#repository[Micronaut Data with Coherence as a back end data store].
+
+==== Dependency Injection of Coherence-managed Objects
+
+A new `micronaut-coherence` module provides factories for commonly used Coherence objects, such as `Cluster`, `Session`, `NamedMap`, `NamedCache`, `NamedTopic`, and many others, which allows you to https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#injection[easily inject those objects] into your application classes.
+
+==== Listeners for Coherence Events
+
+The `micronaut-coherence` module also provides support for Coherence https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#coherenceEvents[server-] and https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#mapEvents[client-side] events via Micronaut event listeners.
+
+==== Micronaut Messaging Support
+
+Finally, the `micronaut-coherence` module provides support for https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#messagingWithTopics[Micronaut Messaging using Coherence Topics].
+
+==== Micronaut Caching Support
+
+The `micronaut-coherence-cache` module adds support for https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#cache[using Coherence as a back end for Micronaut Cache].
+
+==== Micronaut Distributed Config Support
+
+The `micronaut-coherence-distributed-configuration` module adds support for https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#distributedConfiguration[using Coherence as a store for Micronaut Distributed Configuration].
+
+==== Micronaut HTTP Sessions Support
+
+The `micronaut-coherence-session` module adds support for https://micronaut-projects.github.io/micronaut-coherence/latest/guide/#coherenceHttpSessions[using Coherence as a store for Micronaut HTTP Sessions].
+
 === Cloud Features
 
 ==== Easier Configuration of Oracle Cloud Autonomous Database
@@ -48,9 +131,17 @@ With the new `micronaut-kubernetes-client` module you can now inject apis object
 
 In Micronaut 3 this new module will be used as primary kubernetes client, making the current one deprecated.
 
+==== Micronaut AWS
+
+Micronaut AWS now includes the new AWS SDK v2 that has support for GraalVM out of the box. Every service included in the module like S3, Parameter Store, SES, SQS,... is now compatible with Micronaut-GraalVM integration.
+
 === Module Upgrades
 
 * Micronaut Oracle Cloud `1.1.1` -> `1.2.1`
+* Micronaut Data `2.2.4` -> `2.3.0`
+* Micronaut R2DBC `1.0.1` -> `1.1.0`
+* Micronaut Kubernetes `2.2.0` -> `2.3.0`
+* Micronaut AWS `2.3.0` -> `2.4.0`
 
 === Dependency Upgrades
 

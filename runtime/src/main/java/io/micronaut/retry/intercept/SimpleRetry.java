@@ -148,6 +148,11 @@ class SimpleRetry implements RetryState, MutableRetryState {
         return Optional.ofNullable(maxDelay);
     }
 
+    @Override
+    public RetryPredicate getRetryPredicate() {
+        return predicate;
+    }
+
     /**
      * @return Return the milli second value for the next delay
      */
