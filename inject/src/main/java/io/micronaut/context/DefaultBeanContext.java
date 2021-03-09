@@ -39,6 +39,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.type.TypeInformation;
 import io.micronaut.core.util.*;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.core.value.PropertyResolver;
@@ -47,6 +48,7 @@ import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -2665,7 +2667,7 @@ public class DefaultBeanContext implements BeanContext {
                     return Optional.empty();
                 }
 
-                definition = lastChanceResolve(beanType, qualifier, throwNonUnique, beanDefinitionList);
+                definition = lastChanceResolve(resolutionContext, beanType, qualifier, throwNonUnique, beanDefinitionList);
             } else {
                 candidates.removeIf(BeanDefinition::isAbstract);
                 if (candidates.size() == 1) {
@@ -2678,7 +2680,12 @@ public class DefaultBeanContext implements BeanContext {
                         if (LOG.isDebugEnabled()) {
                             LOG.debug("Searching for @Primary for type [{}] from candidates: {} ", beanType.getName(), candidates);
                         }
-                        definition = lastChanceResolve(beanType, null, throwNonUnique, candidates);
+                        definition = lastChanceResolve(
+                                resolutionContext,
+                                beanType,
+                                null,
+                                throwNonUnique,
+                                candidates);
                     }
                 }
             }
@@ -2733,7 +2740,27 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private <T> BeanDefinition<T> lastChanceResolve(Class<T> beanType, Qualifier<T> qualifier, boolean throwNonUnique, Collection<BeanDefinition<T>> candidates) {
+    private <T> BeanDefinition<T> lastChanceResolve(
+            BeanResolutionContext resolutionContext,
+            Class<T> beanType,
+            Qualifier<T> qualifier,
+            boolean throwNonUnique,
+            Collection<BeanDefinition<T>> candidates) {
+        if (resolutionContext != null && candidates.size() > 1) {
+            BeanResolutionContext.Path path = resolutionContext.getPath();
+            BeanResolutionContext.Segment<?> segment = path.currentSegment().orElse(null);
+            if (segment != null) {
+                Argument[] typeParameters = segment.getArgument().getTypeParameters();
+                if (ArrayUtils.isNotEmpty(typeParameters)) {
+                    Qualifier<T> genericQualifier = getTypeArgumentQualifier(typeParameters);
+                    List<BeanDefinition<T>> byGenerics = genericQualifier.reduce(beanType, candidates.stream())
+                            .collect(Collectors.toList());
+                    if (!byGenerics.isEmpty()) {
+                        candidates = byGenerics;
+                    }
+                }
+            }
+        }
         if (candidates.size() > 1) {
             List<BeanDefinition<T>> primary = candidates.stream()
                     .filter(BeanDefinition::isPrimary)
@@ -2759,6 +2786,15 @@ public class DefaultBeanContext implements BeanContext {
                 return definition;
             }
         }
+    }
+
+    @NotNull
+    private <T> Qualifier<T> getTypeArgumentQualifier(Argument[] typeParameters) {
+        Qualifier<T> genericQualifier = Qualifiers.byTypeArgumentsClosest(
+                Arrays.stream(typeParameters).map(TypeInformation::getType)
+                        .toArray(Class[]::new)
+        );
+        return genericQualifier;
     }
 
     private <T> T createAndRegisterSingleton(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier) {
@@ -2973,6 +3009,22 @@ public class DefaultBeanContext implements BeanContext {
                 LOG.debug("Resolving beans for type: {} {} ", qualifier, beanType.getName());
             } else {
                 LOG.debug("Resolving beans for type: {}", beanType.getName());
+            }
+        }
+        if (resolutionContext != null) {
+            BeanResolutionContext.Segment<?> segment = resolutionContext.getPath().currentSegment().orElse(null);
+            if (segment != null) {
+                Argument[] typeParameters = segment.getArgument().getTypeParameters();
+                if (ArrayUtils.isNotEmpty(typeParameters)) {
+                    if (qualifier == null) {
+                        qualifier = getTypeArgumentQualifier(typeParameters);
+                    } else {
+                        qualifier = Qualifiers.byQualifiers(
+                                qualifier,
+                                getTypeArgumentQualifier(typeParameters)
+                        );
+                    }
+                }
             }
         }
         BeanKey<T> key = new BeanKey<>(beanType, qualifier);
