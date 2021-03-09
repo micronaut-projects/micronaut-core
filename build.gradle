@@ -57,6 +57,11 @@ ext {
                     name: 'micronaut-cache-bom',
                     version: micronautCacheVersion
             ],
+            'micronaut.coherence': [
+                    group: 'io.micronaut.coherence',
+                    name: 'micronaut-coherence-bom',
+                    version: micronautCoherenceVersion
+            ],
             //Third-party
             'netty': [
                     group: 'io.netty',

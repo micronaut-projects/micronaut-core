@@ -15,15 +15,19 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * Handles exception of type {@link io.micronaut.http.exceptions.HttpStatusException}.
@@ -32,23 +36,37 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Singleton
-@Primary
 @Produces
 public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, HttpResponse> {
 
+    private final ErrorResponseProcessor<?> responseProcessor;
+
+    @Deprecated
+    public HttpStatusHandler() {
+        this.responseProcessor = null;
+    }
+
+    @Inject
+    public HttpStatusHandler(ErrorResponseProcessor<?> responseProcessor) {
+        this.responseProcessor = responseProcessor;
+    }
+
     @Override
     public HttpResponse handle(HttpRequest request, HttpStatusException exception) {
-
-        Object body = exception.getBody()
-            .orElseGet(() -> {
-                JsonError error = new JsonError(exception.getMessage());
-                error.link(Link.SELF, Link.of(request.getUri()));
-
-                return error;
-            });
-
-        return HttpResponse
-            .status(exception.getStatus())
-            .body(body);
+        MutableHttpResponse<?> response = HttpResponse.status(exception.getStatus());
+        Optional<Object> body = exception.getBody();
+        if (body.isPresent()) {
+            return response.body(body.get());
+        } else {
+            if (responseProcessor != null) {
+                return responseProcessor.processResponse(ErrorContext.builder(request)
+                        .cause(exception)
+                        .errorMessage(exception.getMessage())
+                        .build(), response);
+            } else {
+                return response.body(new JsonError(exception.getMessage())
+                        .link(Link.SELF, Link.of(request.getUri())));
+            }
+        }
     }
 }

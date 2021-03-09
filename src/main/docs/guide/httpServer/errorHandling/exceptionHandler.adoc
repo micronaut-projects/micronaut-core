@@ -1,0 +1,3 @@
+Alternatively, you can implement an api:http.server.exceptions.ExceptionHandler[], a generic hook for handling exceptions that occur during execution of an HTTP request.
+
+IMPORTANT: An `@Error` annotation capturing an exception has precedence over an implementation of `ExceptionHandler` capturing the same exception.

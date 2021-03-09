@@ -18,14 +18,19 @@ package io.micronaut.validation.exceptions;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.hateoas.Link;
+import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
+import io.micronaut.http.server.exceptions.response.Error;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import org.grails.datastore.mapping.validation.ValidationException;
 import org.springframework.validation.Errors;
 import org.springframework.validation.FieldError;
 
 import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * Default Exception handler for GORM validation errors.
@@ -35,17 +40,43 @@ import javax.inject.Singleton;
  */
 @Singleton
 @Requires(classes = ValidationException.class)
-public class ValidationExceptionHandler implements ExceptionHandler<ValidationException, HttpResponse<JsonError>> {
+public class ValidationExceptionHandler implements ExceptionHandler<ValidationException, HttpResponse<?>> {
+
+    private final ErrorResponseProcessor<?> responseProcessor;
+
+    @Deprecated
+    public ValidationExceptionHandler() {
+        this.responseProcessor = null;
+    }
+
+    public ValidationExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
+        this.responseProcessor = responseProcessor;
+    }
 
     @Override
-    public HttpResponse<JsonError> handle(HttpRequest request, ValidationException exception) {
+    public HttpResponse<?> handle(HttpRequest request, ValidationException exception) {
         Errors errors = exception.getErrors();
-        JsonError error = new JsonError(exception.getMessage());
         FieldError fieldError = errors.getFieldError();
-        if (fieldError != null) {
-            error.path(fieldError.getField());
+        MutableHttpResponse<?> response = HttpResponse.badRequest();
+        if (responseProcessor != null) {
+            return responseProcessor.processResponse(ErrorContext.builder(request)
+                    .cause(exception)
+                    .error(new Error() {
+                        @Override
+                        public String getMessage() {
+                            return exception.getMessage();
+                        }
+
+                        @Override
+                        public Optional<String> getPath() {
+                            return Optional.ofNullable(fieldError).map(FieldError::getField);
+                        }
+                    })
+                    .build(), response);
+        } else {
+            return response.body(new JsonError(exception.getMessage())
+                    .path(fieldError != null ? fieldError.getField() : null)
+                    .link(Link.SELF, Link.of(request.getUri())));
         }
-        error.link(Link.SELF, Link.of(request.getUri()));
-        return HttpResponse.badRequest(error);
     }
 }

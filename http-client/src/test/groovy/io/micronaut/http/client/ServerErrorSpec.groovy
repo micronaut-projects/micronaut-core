@@ -29,6 +29,7 @@ import javax.inject.Inject
 
 @MicronautTest
 class ServerErrorSpec extends Specification {
+
     @Inject
     MyClient myClient
 
