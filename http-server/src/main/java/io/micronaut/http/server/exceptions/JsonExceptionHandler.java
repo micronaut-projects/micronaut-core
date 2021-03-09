@@ -19,13 +19,17 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
+import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.exceptions.response.Error;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * Default exception handler for JSON processing errors.
@@ -33,18 +37,43 @@ import javax.inject.Singleton;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Produces(MediaType.APPLICATION_JSON)
+@Produces
 @Singleton
 public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingException, Object> {
 
+    private final ErrorResponseProcessor<?> responseProcessor;
+
+    @Deprecated
+    public JsonExceptionHandler() {
+        this.responseProcessor = null;
+    }
+
+    @Inject
+    public JsonExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
+        this.responseProcessor = responseProcessor;
+    }
+
     @Override
     public Object handle(HttpRequest request, JsonProcessingException exception) {
-        // TODO: Send JSON back with detailed error
         MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
-        JsonError body = new JsonError("Invalid JSON: " + exception.getMessage());
-        body.link(Link.SELF, Link.of(request.getUri()));
-        response.body(body);
+        if (responseProcessor != null) {
+            return responseProcessor.processResponse(ErrorContext.builder(request)
+                    .cause(exception)
+                    .error(new Error() {
+                        @Override
+                        public String getMessage() {
+                            return "Invalid JSON: " + exception.getMessage();
+                        }
 
-        return response;
+                        @Override
+                        public Optional<String> getTitle() {
+                            return Optional.of("Invalid JSON");
+                        }
+                    })
+                    .build(), response);
+        } else {
+            return response.body(new JsonError("Invalid JSON: " + exception.getMessage())
+                    .link(Link.SELF, Link.of(request.getUri())));
+        }
     }
 }

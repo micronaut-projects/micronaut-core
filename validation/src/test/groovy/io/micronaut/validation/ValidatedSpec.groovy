@@ -564,7 +564,6 @@ class ValidatedSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         e.message == 'another thing is invalid'
 
-
         cleanup:
         server.close()
     }

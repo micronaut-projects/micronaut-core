@@ -43,6 +43,7 @@ import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ServerStartupException;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
@@ -170,6 +171,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param httpCompressionStrategy                 The http compression strategy
      * @param httpContentProcessorResolver            The http content processor resolver
      * @param channelOptionFactory                    The channel option factory
+     * @param errorResponseProcessor                  The factory to create error responses
      */
     @SuppressWarnings("ParameterNumber")
     public NettyHttpServer(
@@ -189,7 +191,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             EventLoopGroupRegistry eventLoopGroupRegistry,
             HttpCompressionStrategy httpCompressionStrategy,
             HttpContentProcessorResolver httpContentProcessorResolver,
-            ChannelOptionFactory channelOptionFactory
+            ChannelOptionFactory channelOptionFactory,
+            ErrorResponseProcessor<?> errorResponseProcessor
     ) {
         this.httpCompressionStrategy = httpCompressionStrategy;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
@@ -235,7 +238,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 requestArgumentSatisfier,
                 executorSelector,
                 SupplierUtil.memoized(ioExecutor::get),
-                httpContentProcessorResolver
+                httpContentProcessorResolver,
+                errorResponseProcessor
         );
         this.channelOptionFactory = channelOptionFactory;
     }
