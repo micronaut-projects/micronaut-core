@@ -341,12 +341,20 @@ class BeanIntrospectionModuleSpec extends Specification {
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
         when:
-        MyReqBody instance = objectMapper.readValue('[{"name":"Joe"},{"name":"Sally"}]', MyReqBody)
+        MyReqBody reqBody = objectMapper.readValue('[{"name":"Joe"},{"name":"Sally"}]', MyReqBody)
 
         then:
-        instance.getItems().size() == 2
-        instance.getItems()[0].name == "Joe"
-        instance.getItems()[1].name == "Sally"
+        reqBody.getItems().size() == 2
+        reqBody.getItems()[0].name == "Joe"
+        reqBody.getItems()[1].name == "Sally"
+
+        when:
+        MyItemBody itemBody = objectMapper.readValue('[{"name":"Joe"},{"name":"Sally"}]', MyItemBody)
+
+        then:
+        itemBody.getItems().size() == 2
+        itemBody.getItems()[0].name == "Joe"
+        itemBody.getItems()[1].name == "Sally"
 
         cleanup:
         ctx.close()
@@ -474,5 +482,27 @@ class BeanIntrospectionModuleSpec extends Specification {
     @Introspected
     static class MyItem {
         String name
+    }
+
+    @Introspected
+    static class MyGenericBody<T> {
+
+        private final List<T> items
+
+        MyGenericBody(final List<T> items) {
+            this.items = items
+        }
+
+        List<T> getItems() {
+            items
+        }
+    }
+
+    @Introspected
+    static class MyItemBody extends MyGenericBody<MyItem> {
+
+        MyItemBody(final List<MyItem> items) {
+            super(items)
+        }
     }
 }
