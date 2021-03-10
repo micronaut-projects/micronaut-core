@@ -41,11 +41,19 @@ public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, Ht
 
     private final ErrorResponseProcessor<?> responseProcessor;
 
+    /**
+     * Constructor.
+     * @deprecated Use {@link URISyntaxHandler(ErrorResponseProcessor)} instead.
+     */
     @Deprecated
     public URISyntaxHandler() {
         this.responseProcessor = null;
     }
 
+    /**
+     * Constructor.
+     * @param responseProcessor Error Response Processor
+     */
     @Inject
     public URISyntaxHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.responseProcessor = responseProcessor;
