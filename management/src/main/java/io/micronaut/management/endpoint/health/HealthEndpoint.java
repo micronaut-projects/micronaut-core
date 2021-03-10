@@ -16,6 +16,7 @@
 package io.micronaut.management.endpoint.health;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.management.endpoint.annotation.Endpoint;
@@ -29,14 +30,11 @@ import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.management.health.indicator.annotation.Liveness;
 import io.reactivex.Single;
 
-import io.micronaut.core.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
+
 import javax.inject.Inject;
 import java.security.Principal;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the health of the application.</p>
@@ -62,6 +60,9 @@ public class HealthEndpoint {
      */
     public static final String PREFIX = EndpointConfiguration.PREFIX + "." + NAME;
 
+    protected final ArrayList<String> requiredUsernames;
+    protected final String PROPERTY_USERNAMES_SENSITIVE = "endpoints.health.sensitive-usernames";
+
     private HealthAggregator<HealthResult> healthAggregator;
     private HealthIndicator[] healthIndicators;
     private HealthIndicator[] livenessHealthIndicators;
@@ -76,11 +77,14 @@ public class HealthEndpoint {
      */
     public HealthEndpoint(HealthAggregator<HealthResult> healthAggregator,
                           HealthIndicator[] healthIndicators,
-                          @Liveness HealthIndicator[] livenessHealthIndicators) {
+                          @Liveness HealthIndicator[] livenessHealthIndicators,
+                          PropertyResolver propertyResolver) {
         this.healthAggregator = healthAggregator;
         this.healthIndicators = healthIndicators;
         this.livenessHealthIndicators = livenessHealthIndicators;
         this.readinessHealthIndicators = getReadinessHealthIndicators(healthIndicators, livenessHealthIndicators);
+        this.requiredUsernames = new ArrayList(Arrays.asList(propertyResolver.get(PROPERTY_USERNAMES_SENSITIVE, String[].class).orElse(new String[0])));
+        this.requiredUsernames.removeAll(Collections.singleton(""));
     }
 
     protected final HealthIndicator[] getReadinessHealthIndicators(HealthIndicator[] allHealthIndicators,
@@ -142,6 +146,7 @@ public class HealthEndpoint {
 
     /**
      * Sets the visibility policy for health information.
+     *
      * @param detailsVisible The {@link DetailsVisibility}
      */
     public void setDetailsVisible(DetailsVisibility detailsVisible) {
@@ -184,7 +189,10 @@ public class HealthEndpoint {
             default:
                 // no-op
         }
-        if (showDetails) {
+
+        if (showDetails && (
+                this.requiredUsernames.isEmpty() || this.requiredUsernames.contains(principal != null ? principal.getName() : "")
+        )) {
             return HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS;
         } else {
             return HealthLevelOfDetail.STATUS;
