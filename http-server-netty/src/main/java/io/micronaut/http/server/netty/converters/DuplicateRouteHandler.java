@@ -15,9 +15,9 @@
  */
 package io.micronaut.http.server.netty.converters;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
@@ -53,16 +53,19 @@ public class DuplicateRouteHandler implements ExceptionHandler<DuplicateRouteExc
 
     @Override
     public HttpResponse handle(HttpRequest request, DuplicateRouteException exception) {
-        MutableHttpResponse<?> response = HttpResponse.badRequest();
-        if (responseProcessor != null) {
-            return responseProcessor.processResponse(ErrorContext.builder(request)
-                    .cause(exception)
-                    .errorMessage(exception.getMessage())
-                    .build(), response);
-        } else {
-            return response.body(new JsonError(exception.getMessage())
-                    .link(Link.SELF, Link.of(request.getUri())));
+        if (responseProcessor == null) {
+            return handleWithoutProcessor(request, exception);
         }
+        return responseProcessor.processResponse(ErrorContext.builder(request)
+                .cause(exception)
+                .errorMessage(exception.getMessage())
+                .build(), HttpResponse.badRequest());
+    }
 
+    @Deprecated
+    @NonNull
+    private HttpResponse<?> handleWithoutProcessor(@NonNull HttpRequest<?> request, @NonNull DuplicateRouteException exception) {
+        return HttpResponse.badRequest().body(new JsonError(exception.getMessage())
+                .link(Link.SELF, Link.of(request.getUri())));
     }
 }

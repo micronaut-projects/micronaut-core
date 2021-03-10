@@ -16,6 +16,7 @@
 package io.micronaut.http.server.exceptions;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -56,24 +57,31 @@ public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingExce
     @Override
     public Object handle(HttpRequest request, JsonProcessingException exception) {
         MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
-        if (responseProcessor != null) {
-            return responseProcessor.processResponse(ErrorContext.builder(request)
-                    .cause(exception)
-                    .error(new Error() {
-                        @Override
-                        public String getMessage() {
-                            return "Invalid JSON: " + exception.getMessage();
-                        }
-
-                        @Override
-                        public Optional<String> getTitle() {
-                            return Optional.of("Invalid JSON");
-                        }
-                    })
-                    .build(), response);
-        } else {
-            return response.body(new JsonError("Invalid JSON: " + exception.getMessage())
-                    .link(Link.SELF, Link.of(request.getUri())));
+        if (responseProcessor == null) {
+            return handleWithoutProcessor(response, request, exception);
         }
+        return responseProcessor.processResponse(ErrorContext.builder(request)
+                .cause(exception)
+                .error(new Error() {
+                    @Override
+                    public String getMessage() {
+                        return "Invalid JSON: " + exception.getMessage();
+                    }
+
+                    @Override
+                    public Optional<String> getTitle() {
+                        return Optional.of("Invalid JSON");
+                    }
+                })
+                .build(), response);
+    }
+
+    @Deprecated
+    @NonNull
+    private HttpResponse<?> handleWithoutProcessor(@NonNull MutableHttpResponse<Object> response,
+                                                   @NonNull HttpRequest<?> request,
+                                                   @NonNull JsonProcessingException exception) {
+        return response.body(new JsonError("Invalid JSON: " + exception.getMessage())
+                .link(Link.SELF, Link.of(request.getUri())));
     }
 }

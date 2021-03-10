@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.hateoas.JsonError;
@@ -53,16 +53,20 @@ public class ContentLengthExceededHandler implements ExceptionHandler<ContentLen
 
     @Override
     public HttpResponse handle(HttpRequest request, ContentLengthExceededException exception) {
-        MutableHttpResponse<?> response = HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
-        if (responseProcessor != null) {
-            return responseProcessor.processResponse(ErrorContext.builder(request)
-                    .cause(exception)
-                    .errorMessage(exception.getMessage())
-                    .build(), response);
-        } else {
-            return response.body(new JsonError(exception.getMessage())
-                    .link(Link.SELF, Link.of(request.getUri())));
+        if (responseProcessor == null) {
+            return handleWithoutProcessor(request, exception);
         }
+        return responseProcessor.processResponse(ErrorContext.builder(request)
+                .cause(exception)
+                .errorMessage(exception.getMessage())
+                .build(), HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE));
+    }
+
+    @Deprecated
+    @NonNull
+    private HttpResponse<?> handleWithoutProcessor(@NonNull HttpRequest<?> request, @NonNull ContentLengthExceededException exception) {
+        return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE).body(new JsonError(exception.getMessage())
+                .link(Link.SELF, Link.of(request.getUri())));
     }
 }
 

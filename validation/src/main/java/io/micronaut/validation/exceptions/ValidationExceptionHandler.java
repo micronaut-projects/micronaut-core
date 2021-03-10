@@ -16,9 +16,9 @@
 package io.micronaut.validation.exceptions;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
@@ -55,28 +55,32 @@ public class ValidationExceptionHandler implements ExceptionHandler<ValidationEx
 
     @Override
     public HttpResponse<?> handle(HttpRequest request, ValidationException exception) {
+        if (responseProcessor == null) {
+            return handleWithoutProcessor(request, exception);
+        }
         Errors errors = exception.getErrors();
         FieldError fieldError = errors.getFieldError();
-        MutableHttpResponse<?> response = HttpResponse.badRequest();
-        if (responseProcessor != null) {
-            return responseProcessor.processResponse(ErrorContext.builder(request)
-                    .cause(exception)
-                    .error(new Error() {
-                        @Override
-                        public String getMessage() {
-                            return exception.getMessage();
-                        }
+        return responseProcessor.processResponse(ErrorContext.builder(request)
+                .cause(exception)
+                .error(new Error() {
+                    @Override
+                    public String getMessage() {
+                        return exception.getMessage();
+                    }
+                    @Override
+                    public Optional<String> getPath() {
+                        return Optional.ofNullable(fieldError).map(FieldError::getField);
+                    }
+                }).build(), HttpResponse.badRequest());
+    }
 
-                        @Override
-                        public Optional<String> getPath() {
-                            return Optional.ofNullable(fieldError).map(FieldError::getField);
-                        }
-                    })
-                    .build(), response);
-        } else {
-            return response.body(new JsonError(exception.getMessage())
-                    .path(fieldError != null ? fieldError.getField() : null)
-                    .link(Link.SELF, Link.of(request.getUri())));
-        }
+    @Deprecated
+    @NonNull
+    private HttpResponse<?> handleWithoutProcessor(@NonNull HttpRequest<?> request, @NonNull ValidationException exception) {
+        Errors errors = exception.getErrors();
+        FieldError fieldError = errors.getFieldError();
+        return HttpResponse.badRequest().body(new JsonError(exception.getMessage())
+                .path(fieldError != null ? fieldError.getField() : null)
+                .link(Link.SELF, Link.of(request.getUri())));
     }
 }

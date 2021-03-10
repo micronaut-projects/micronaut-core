@@ -15,9 +15,9 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.response.Error;
@@ -53,24 +53,27 @@ public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, Ht
 
     @Override
     public HttpResponse handle(HttpRequest request, URISyntaxException exception) {
-        MutableHttpResponse<?> response = HttpResponse.badRequest();
-        if (responseProcessor != null) {
-            return responseProcessor.processResponse(ErrorContext.builder(request)
-                    .cause(exception)
-                    .error(new Error() {
-                        @Override
-                        public String getMessage() {
-                            return "Malformed URI: " + exception.getMessage();
-                        }
+        if (responseProcessor == null) {
+            return handleWithoutProcessor(exception);
+        }
+        return responseProcessor.processResponse(ErrorContext.builder(request)
+                .cause(exception)
+                .error(new Error() {
+                    @Override
+                    public String getMessage() {
+                        return "Malformed URI: " + exception.getMessage();
+                    }
 
-                        @Override
-                        public Optional<String> getTitle() {
+                    @Override
+                    public Optional<String> getTitle() {
                             return Optional.of("Malformed URI");
                         }
-                    })
-                    .build(), response);
-        } else {
-            return response.body(new JsonError("Malformed URI: " + exception.getMessage()));
-        }
+                }).build(), HttpResponse.badRequest());
+    }
+
+    @Deprecated
+    @NonNull
+    private HttpResponse<?> handleWithoutProcessor(@NonNull URISyntaxException exception) {
+        return HttpResponse.badRequest().body(new JsonError("Malformed URI: " + exception.getMessage()));
     }
 }

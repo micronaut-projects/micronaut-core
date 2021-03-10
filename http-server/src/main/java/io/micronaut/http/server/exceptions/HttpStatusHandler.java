@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
@@ -57,16 +58,22 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
         Optional<Object> body = exception.getBody();
         if (body.isPresent()) {
             return response.body(body.get());
-        } else {
-            if (responseProcessor != null) {
-                return responseProcessor.processResponse(ErrorContext.builder(request)
-                        .cause(exception)
-                        .errorMessage(exception.getMessage())
-                        .build(), response);
-            } else {
-                return response.body(new JsonError(exception.getMessage())
-                        .link(Link.SELF, Link.of(request.getUri())));
-            }
         }
+        if (responseProcessor == null) {
+            return handleWithoutProcessor(response, request, exception);
+        }
+        return responseProcessor.processResponse(ErrorContext.builder(request)
+                .cause(exception)
+                .errorMessage(exception.getMessage())
+                .build(), response);
+    }
+
+    @Deprecated
+    @NonNull
+    private HttpResponse<?> handleWithoutProcessor(@NonNull MutableHttpResponse<?> response,
+                                                   @NonNull HttpRequest<?> request,
+                                                   @NonNull HttpStatusException exception) {
+        return response.body(new JsonError(exception.getMessage())
+                .link(Link.SELF, Link.of(request.getUri())));
     }
 }

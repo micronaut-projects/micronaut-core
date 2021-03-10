@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.converters;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
@@ -62,26 +63,30 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
         if (LOG.isTraceEnabled()) {
             LOG.trace("{} (Bad Request): {}", request, exception.getMessage());
         }
-        MutableHttpResponse<?> response = HttpResponse.badRequest();
-        if (responseProcessor != null) {
-            return responseProcessor.processResponse(ErrorContext.builder(request)
-                    .cause(exception)
-                    .error(new Error() {
-                        @Override
-                        public String getMessage() {
-                            return exception.getMessage();
-                        }
-
-                        @Override
-                        public Optional<String> getPath() {
-                            return Optional.of('/' + exception.getArgument().getName());
-                        }
-                    })
-                    .build(), response);
-        } else {
-            return response.body(new JsonError(exception.getMessage())
-                    .path('/' + exception.getArgument().getName())
-                    .link(Link.SELF, Link.of(request.getUri())));
+        if (responseProcessor == null) {
+            return handleWithoutProcessor(request, exception);
         }
+        return responseProcessor.processResponse(ErrorContext.builder(request)
+                .cause(exception)
+                .error(new Error() {
+                    @Override
+                    public String getMessage() {
+                        return exception.getMessage();
+                    }
+
+                    @Override
+                    public Optional<String> getPath() {
+                        return Optional.of('/' + exception.getArgument().getName());
+                    }
+                }).build(), HttpResponse.badRequest());
+    }
+
+    @Deprecated
+    @NonNull
+    private HttpResponse<?> handleWithoutProcessor(@NonNull HttpRequest<?> request, @NonNull UnsatisfiedRouteException exception) {
+        MutableHttpResponse<?> response = HttpResponse.badRequest();
+        return response.body(new JsonError(exception.getMessage())
+                .path('/' + exception.getArgument().getName())
+                .link(Link.SELF, Link.of(request.getUri())));
     }
 }
