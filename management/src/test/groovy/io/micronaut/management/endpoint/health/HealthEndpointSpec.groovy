@@ -231,6 +231,38 @@ class HealthEndpointSpec extends Specification {
         embeddedServer.close()
     }
 
+    void "test health endpoint with a high diskspace threshold not specific by roles"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'endpoints.health.sensitive': false,
+                'endpoints.health.sensitive-usernames':"oskrcitoz,oskr_username",
+                'endpoints.health.disk-space.threshold': '9999GB'])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        def response = rxClient.exchange("/health", HealthResult)
+                .onErrorResumeNext(new Function<Throwable, Publisher<? extends HttpResponse<HealthResult>>>() {
+                    @Override
+                    Publisher<? extends HttpResponse<HealthResult>> apply(@NonNull Throwable throwable) throws Exception {
+
+                        def rsp = ((HttpClientResponseException) throwable).response
+                        rsp.getBody(HealthResult)
+                        return Flowable.just(rsp)
+                    }
+                }).blockingFirst()
+        HealthResult result = response.getBody(HealthResult).get()
+
+        then:
+        response.code() == HttpStatus.SERVICE_UNAVAILABLE.code
+        result.status == HealthStatus.DOWN
+        result.details == null
+
+        cleanup:
+        embeddedServer.close()
+    }
+
     void "test health endpoint with a non response jdbc datasource"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
