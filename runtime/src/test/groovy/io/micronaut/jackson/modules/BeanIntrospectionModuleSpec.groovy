@@ -360,6 +360,20 @@ class BeanIntrospectionModuleSpec extends Specification {
         ctx.close()
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5078")
+    void "test more list wrapping scenarios"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        Outer outer = objectMapper.readValue("{\"wrapper\":{\"inner\":[]}}", Outer.class)
+
+        then:
+        noExceptionThrown()
+        outer.wrapper.inner.isEmpty()
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -503,6 +517,28 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         MyItemBody(final List<MyItem> items) {
             super(items)
+        }
+    }
+
+    @Introspected
+    static class Wrapper {
+        public final List<String> inner
+
+        @ConstructorProperties(["inner"])
+        @JsonCreator
+        Wrapper(List<String> inner) {
+            this.inner = inner
+        }
+    }
+
+    @Introspected
+    static class Outer {
+        public final Wrapper wrapper
+
+        @ConstructorProperties(["wrapper"])
+        @JsonCreator
+        Outer(Wrapper wrapper) {
+            this.wrapper = wrapper
         }
     }
 }
