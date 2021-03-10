@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.binding
 
 import com.fasterxml.jackson.core.JsonParseException
 import groovy.json.JsonSlurper
+import io.micronaut.core.annotation.Introspected
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
@@ -18,6 +19,7 @@ import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import org.reactivestreams.Publisher
+import spock.lang.Issue
 
 import java.util.concurrent.CompletableFuture
 
@@ -286,6 +288,18 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.body() == "not found"
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5088")
+    void "test deserializing a wrapper of list of pojos"() {
+        when:
+        def json = '[{"name":"Joe"},{"name":"Sally"}]'
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/deserialize-listwrapper', json), String
+        ).blockingFirst()
+
+        then:
+        response.body() == '["Joe","Sally"]'
+    }
+
     @Controller(value = "/json", produces = io.micronaut.http.MediaType.APPLICATION_JSON)
     static class JsonController {
 
@@ -383,6 +397,11 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
             return request.getBody().map({ foo -> foo.toString()}).orElse("not found")
         }
 
+        @Post("/deserialize-listwrapper")
+        List<String> requestListWrapper(@Body MyReqBody myReqBody) {
+            return myReqBody.items*.name
+        }
+
         @Error(JsonParseException)
         HttpResponse jsonError(HttpRequest request, JsonParseException jsonParseException) {
             def response = HttpResponse.status(HttpStatus.BAD_REQUEST, "No!! Invalid JSON")
@@ -401,5 +420,24 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         String toString() {
             "Foo($name, $age)"
         }
+    }
+
+    @Introspected
+    static class MyReqBody {
+
+        private final List<MyItem> items
+
+        MyReqBody(final List<MyItem> items) {
+            this.items = items
+        }
+
+        List<MyItem> getItems() {
+            items
+        }
+    }
+
+    @Introspected
+    static class MyItem {
+        String name
     }
 }
