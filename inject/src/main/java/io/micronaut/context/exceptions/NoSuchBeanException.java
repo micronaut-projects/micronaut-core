@@ -16,6 +16,9 @@
 package io.micronaut.context.exceptions;
 
 import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.type.Argument;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -29,8 +32,15 @@ public class NoSuchBeanException extends BeanContextException {
     /**
      * @param beanType The bean type
      */
-    public NoSuchBeanException(Class beanType) {
+    public NoSuchBeanException(@NonNull Class<?> beanType) {
         super("No bean of type [" + beanType.getName() + "] exists." + additionalMessage());
+    }
+
+    /**
+     * @param beanType The bean type
+     */
+    public NoSuchBeanException(@NonNull Argument<?> beanType) {
+        super("No bean of type [" + beanType.getTypeName() + "] exists." + additionalMessage());
     }
 
     /**
@@ -38,8 +48,17 @@ public class NoSuchBeanException extends BeanContextException {
      * @param qualifier The qualifier
      * @param <T>       The type
      */
-    public <T> NoSuchBeanException(Class<T> beanType, Qualifier<T> qualifier) {
+    public <T> NoSuchBeanException(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         super("No bean of type [" + beanType.getName() + "] exists" + (qualifier != null ? " for the given qualifier: " + qualifier : "") + "." + additionalMessage());
+    }
+
+    /**
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param <T>       The type
+     */
+    public <T> NoSuchBeanException(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        super("No bean of type [" + beanType.getTypeName() + "] exists" + (qualifier != null ? " for the given qualifier: " + qualifier : "") + "." + additionalMessage());
     }
 
     /**

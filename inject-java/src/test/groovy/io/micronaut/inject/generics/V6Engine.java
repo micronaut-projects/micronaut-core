@@ -13,22 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.inject.generics;
+package io.micronaut.inject.generics;
 
 import javax.inject.Singleton;
 
 // tag::class[]
 @Singleton
-public class V8Engine implements Engine<V8> {  // <3>
+public class V6Engine implements Engine<V6> {  // <2>
     @Override
     public String start() {
-        return "Starting V8";
+        return "Starting V6";
     }
 
     @Override
-    public V8 getCylinderProvider() {
-        return new V8();
+    public V6 getCylinderProvider() {
+        return new V6();
     }
-
 }
 // end::class[]

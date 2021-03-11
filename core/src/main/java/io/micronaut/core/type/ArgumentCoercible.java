@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.inject.generics;
+package io.micronaut.core.type;
 
-import javax.inject.Singleton;
+import io.micronaut.core.annotation.NonNull;
 
-// tag::class[]
-@Singleton
-public class V6Engine implements Engine<V6> {  // <2>
-    @Override
-    public String start() {
-        return "Starting V6";
-    }
-
-    @Override
-    public V6 getCylinderProvider() {
-        return new V6();
-    }
+/**
+ * An interface for types that can be represented as an {@link Argument}.
+ *
+ * @since 3.0.0
+ * @author graemerocher
+ */
+public interface ArgumentCoercible<T> {
+    /**
+     * @return The argument
+     */
+    @NonNull Argument<T> asArgument();
 }
-// end::class[]

@@ -212,4 +212,13 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
     default boolean isArray() {
         return getType().isArray();
     }
+
+    /**
+     * Obtains the type's simple name.
+     * @return The simple name
+     * @since 3.0.0
+     */
+    default @NonNull String getSimpleName() {
+        return getType().getSimpleName();
+    }
 }

@@ -13,15 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.inject.generics;
+package io.micronaut.inject.generics;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.List;
 
-// tag::class[]
 @Singleton
 public class Vehicle {
     private final Engine<V8> engine;
+
+    @Inject
+    List<Engine<V6>> v6Engines;
+
+    private Engine<V8> anotherV8;
 
     @Inject
     public Vehicle(Engine<V8> engine) {// <4>
@@ -31,5 +36,17 @@ public class Vehicle {
     public String start() {
         return engine.start();// <5>
     }
+
+    @Inject
+    public void setAnotherV8(Engine<V8> anotherV8) {
+        this.anotherV8 = anotherV8;
+    }
+
+    public Engine<V8> getAnotherV8() {
+        return anotherV8;
+    }
+
+    public Engine<V8> getEngine() {
+        return engine;
+    }
 }
-// end::class[]

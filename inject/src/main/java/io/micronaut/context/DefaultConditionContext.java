@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
 
@@ -107,13 +108,13 @@ class DefaultConditionContext<B extends AnnotationMetadataProvider> implements C
     @NonNull
     @Override
     public <T> Collection<T> getBeansOfType(@NonNull Class<T> beanType) {
-        return beanContext.getBeansOfType(resolutionContext, beanType);
+        return beanContext.getBeansOfType(resolutionContext, Argument.of(beanType));
     }
 
     @NonNull
     @Override
     public <T> Collection<T> getBeansOfType(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return beanContext.getBeansOfType(resolutionContext, beanType, qualifier);
+        return beanContext.getBeansOfType(resolutionContext, Argument.of(beanType), qualifier);
     }
 
     @NonNull

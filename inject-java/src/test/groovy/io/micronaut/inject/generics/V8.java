@@ -1,4 +1,4 @@
-package io.micronaut.docs.inject.generics;
+package io.micronaut.inject.generics;
 
 public class V8 implements CylinderProvider {
     @Override

@@ -13,27 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.inject.generics;
+package io.micronaut.inject.generics;
 
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
-import org.junit.jupiter.api.Test;
-
-import javax.inject.Inject;
-
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-
-@MicronautTest
-public class VehicleSpec {
-    @Inject Vehicle vehicle;
-    @Inject List<Engine<V6>> v6Engines;
-
-    @Test
-    public void testStartVehicle() {
-        assertEquals("Starting V8", vehicle.start());
-        assertEquals(1, v6Engines.size());
-        assertEquals(6, v6Engines.iterator().next().getCylinders());
+// tag::class[]
+public interface Engine<T extends CylinderProvider> { // <1>
+    default int getCylinders() {
+        return getCylinderProvider().getCylinders();
     }
+
+    String start();
+
+    T getCylinderProvider();
 }
+// tag::class[]

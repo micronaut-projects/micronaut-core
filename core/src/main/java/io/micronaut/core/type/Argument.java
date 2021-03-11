@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Collections;
 
 /**
  * Represents an argument to a method or constructor or type.
@@ -155,18 +156,28 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * Delegates to {@link Class#isAssignableFrom(Class)} for this argument.
+     * @param candidateType The candidate type
+     * @return True if it is assignable from.
+     * @since 3.0.0
+     */
+    default boolean isAssignableFrom(@NonNull Class<?> candidateType) {
+        return getType().isAssignableFrom(Objects.requireNonNull(candidateType, "Candidate type cannot be null"));
+    }
+
+    /**
      * Convert an argument array to a class array.
      *
      * @param arguments The arguments
      * @return The class array
      */
-    static @NonNull Class[] toClassArray(Argument... arguments) {
+    static @NonNull Class<?>[] toClassArray(@Nullable Argument<?>... arguments) {
         if (ArrayUtils.isEmpty(arguments)) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         }
-        Class[] types = new Class[arguments.length];
+        Class<?>[] types = new Class[arguments.length];
         for (int i = 0; i < arguments.length; i++) {
-            Argument argument = arguments[i];
+            Argument<?> argument = arguments[i];
             types[i] = argument.getType();
         }
         return types;
@@ -178,18 +189,20 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @param arguments The arguments
      * @return The String representation
      */
-    static @NonNull String toString(Argument... arguments) {
-        StringBuilder baseString = new StringBuilder();
+    static @NonNull String toString(@Nullable Argument<?>... arguments) {
         if (ArrayUtils.isNotEmpty(arguments)) {
+            StringBuilder baseString = new StringBuilder();
             for (int i = 0; i < arguments.length; i++) {
-                Argument argument = arguments[i];
+                Argument<?> argument = arguments[i];
                 baseString.append(argument.toString());
                 if (i != arguments.length - 1) {
                     baseString.append(',');
                 }
             }
+            return baseString.toString();
+        } else {
+            return "";
         }
-        return baseString.toString();
     }
 
     /**
@@ -204,9 +217,9 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(
-        Class<T> type,
-        String name,
-        @Nullable Argument... typeParameters) {
+        @NonNull Class<T> type,
+        @Nullable String name,
+        @Nullable Argument<?>... typeParameters) {
         return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, typeParameters);
     }
 
@@ -225,10 +238,10 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(
-        Class<T> type,
-        String name,
-        AnnotationMetadata annotationMetadata,
-        @Nullable Argument... typeParameters) {
+        @NonNull Class<T> type,
+        @Nullable String name,
+        @Nullable AnnotationMetadata annotationMetadata,
+        @Nullable Argument<?>... typeParameters) {
         return new DefaultArgument<>(type, name, annotationMetadata, typeParameters);
     }
 
@@ -244,8 +257,8 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(
-            Class<T> type,
-            AnnotationMetadata annotationMetadata,
+            @NonNull Class<T> type,
+            @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Argument... typeParameters) {
         return new DefaultArgument<>(type, annotationMetadata, typeParameters);
     }
@@ -261,8 +274,8 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(
-        Class<T> type,
-        String name) {
+        @NonNull Class<T> type,
+        @Nullable String name) {
         return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
     }
 
@@ -277,7 +290,8 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(
-        Class<T> type, @Nullable Argument... typeParameters) {
+            @NonNull Class<T> type,
+            @Nullable Argument<?>... typeParameters) {
         if (ArrayUtils.isEmpty(typeParameters)) {
             return of(type);
         }
@@ -334,8 +348,8 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(
-        Class<T> type) {
-        return new DefaultArgument<>(type, AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
+        @NonNull Class<T> type) {
+        return new DefaultArgument<>(type, null, AnnotationMetadata.EMPTY_METADATA, Collections.emptyMap(), Argument.ZERO_ARGUMENTS);
     }
 
     /**
@@ -348,7 +362,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     @UsedByGeneratedCode
     @NonNull
-    static <T> Argument<T> of(Class<T> type, @Nullable Class<?>... typeParameters) {
+    static <T> Argument<T> of(@NonNull Class<T> type, @Nullable Class<?>... typeParameters) {
         if (ArrayUtils.isEmpty(typeParameters)) {
             return of(type);
         }
@@ -374,7 +388,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @return The argument instance
      */
     @NonNull
-    static <T> Argument<List<T>> listOf(Class<T> type) {
+    static <T> Argument<List<T>> listOf(@NonNull Class<T> type) {
         //noinspection unchecked
         return of((Class<List<T>>) ((Class) List.class), type);
     }
@@ -388,7 +402,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @return The argument instance
      */
     @NonNull
-    static <T> Argument<List<T>> listOf(Argument<T> type) {
+    static <T> Argument<List<T>> listOf(@NonNull Argument<T> type) {
         //noinspection unchecked
         return of((Class<List<T>>) ((Class) List.class), type);
     }
@@ -401,7 +415,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @return The argument instance
      */
     @NonNull
-    static <T> Argument<Set<T>> setOf(Class<T> type) {
+    static <T> Argument<Set<T>> setOf(@NonNull Class<T> type) {
         //noinspection unchecked
         return of((Class<Set<T>>) ((Class) Set.class), type);
     }
@@ -415,7 +429,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @return The argument instance
      */
     @NonNull
-    static <T> Argument<Set<T>> setOf(Argument<T> type) {
+    static <T> Argument<Set<T>> setOf(@NonNull Argument<T> type) {
         //noinspection unchecked
         return of((Class<Set<T>>) ((Class) Set.class), type);
     }
@@ -430,7 +444,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @return The argument instance
      */
     @NonNull
-    static <K, V> Argument<Map<K, V>> mapOf(Class<K> keyType, Class<V> valueType) {
+    static <K, V> Argument<Map<K, V>> mapOf(@NonNull Class<K> keyType, @NonNull Class<V> valueType) {
         //noinspection unchecked
         return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
     }
@@ -446,9 +460,8 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @return The argument instance
      */
     @NonNull
-    static <K, V> Argument<Map<K, V>> mapOf(Argument<K> keyType, Argument<V> valueType) {
+    static <K, V> Argument<Map<K, V>> mapOf(@NonNull Argument<K> keyType, @NonNull Argument<V> valueType) {
         //noinspection unchecked
         return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
     }
-
 }
