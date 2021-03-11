@@ -1,18 +1,20 @@
 package io.micronaut.docs.qualifiers.annotationmember;
 
-
+// tag::imports[]
 import io.micronaut.context.annotation.NonBinding;
-
 import javax.inject.Qualifier;
 import java.lang.annotation.Retention;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+// end::imports[]
 
-@Qualifier
+// tag::class[]
+@Qualifier // <1>
 @Retention(RUNTIME)
 public @interface Cylinders {
     int value();
 
-    @NonBinding
+    @NonBinding // <2>
     String description() default "";
 }
+// end::class[]

@@ -30,6 +30,31 @@ The above annotation is itself annotated with the `@Qualifier` annotation to des
 
 snippet::io.micronaut.docs.qualifiers.annotation.Vehicle[tags="constructor",indent=0]
 
+== Qualifying By Annotation Members
+
+Annotation qualifiers can also use annotation members to resolve the correct bean to inject. For example, consider the following annotation:
+
+snippet::io.micronaut.docs.qualifiers.annotationmember.Cylinders[tags="imports,class",indent=0]
+
+<1> The `@Cylinders` annotation is meta-annotated with `@Qualifier`
+<2> The annotation has two members. The ann:context.annotation.NonBinding[] annotation is used to exclude the `description` member from being considered during dependency resolution.
+
+You can then use the `@Cylinders` annotation on any bean and the members that are not annotated with ann:context.annotation.NonBinding[] are considered during dependency resolution:
+
+snippet::io.micronaut.docs.qualifiers.annotationmember.V6Engine[tags="class",indent=0]
+
+<1> Here the `value` member is set to 6 for the `V6Engine` type
+<2> The class implements an `Engine` interface
+
+snippet::io.micronaut.docs.qualifiers.annotationmember.V8Engine[tags="class",indent=0]
+
+<1> Here the `value` member is set to 8 for the `V6Engine` type
+<2> The class implements an `Engine` interface
+
+You can then use the `@Cylinders` qualifier on any injection point to select the correct bean to inject. For example:
+
+snippet::io.micronaut.docs.qualifiers.annotationmember.Vehicle[tags="constructor",indent="0"]
+
 == Primary and Secondary Beans
 
 api:context.annotation.Primary[] is a qualifier that indicates that a bean is the primary bean to be selected in the case of multiple interface implementations.
