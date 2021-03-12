@@ -125,7 +125,7 @@ public class LoadedVisitor implements Ordered {
     public @Nullable io.micronaut.inject.ast.Element visit(
             Element element, AnnotationMetadata annotationMetadata) {
         if (element instanceof VariableElement) {
-            final JavaFieldElement e = elementFactory.newFieldElement((VariableElement) element, annotationMetadata);
+            final JavaFieldElement e = elementFactory.newFieldElement(rootClassElement, (VariableElement) element, annotationMetadata);
             visitor.visitField(
                     e,
                     visitorContext

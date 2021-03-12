@@ -29,6 +29,38 @@ import java.util.function.Supplier
 
 class GenericTypeArgumentsSpec extends AbstractTypeElementSpec {
 
+    void "test type arguments with inherited fields"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('inheritedfields.UserDaoClient', '''
+package inheritedfields;
+
+import javax.inject.*;
+
+@Singleton
+class UserDaoClient extends DaoClient<User>{
+}
+
+@Singleton
+class UserDao extends Dao<User> {
+}
+
+class User {
+}
+
+class DaoClient<T> {
+
+    @Inject
+    Dao<T> dao;
+}
+
+class Dao<T> {
+}
+''')
+        expect:
+        definition.injectedFields.first().asArgument().typeParameters.length == 1
+        definition.injectedFields.first().asArgument().typeParameters[0].type.simpleName == "User"
+    }
+
     void "test type arguments for exception handler"() {
         given:
         BeanDefinition definition = buildBeanDefinition('exceptionhandler.Test', '''\
