@@ -2065,12 +2065,9 @@ public class DefaultBeanContext implements BeanContext {
 
             Stream<BeanDefinition<T>> candidateStream = beanDefinitionsClasses
                     .stream()
-                    .filter(reference -> {
-                        Class<?> candidateType = reference.getBeanType();
-                        final boolean isCandidate = candidateType != null &&
-                                (beanType.isAssignableFrom(candidateType) || beanClass == candidateType);
-                        return isCandidate && reference.isEnabled(this, resolutionContext);
-                    })
+                    .filter(reference ->
+                        reference.isCandidateBean(beanType.getType()) && reference.isEnabled(this, resolutionContext)
+                    )
                     .map(ref -> {
                         BeanDefinition<T> loadedBean;
                         try {
@@ -2904,7 +2901,7 @@ public class DefaultBeanContext implements BeanContext {
             BeanKey<?> key = entry.getKey();
             if (qualifier == null || qualifier.equals(key.qualifier)) {
                 BeanRegistration reg = entry.getValue();
-                if (beanType.isInstance(reg.bean)) {
+                if (reg.getBeanDefinition().isCandidateBean(beanClass)) {
                     if (qualifier == null && definition != null && !reg.beanDefinition.equals(definition)) {
                         // different definition, so ignore
                         return null;
@@ -2924,7 +2921,7 @@ public class DefaultBeanContext implements BeanContext {
             } else if (key.qualifier == null) {
                 BeanRegistration registration = entry.getValue();
                 Object existing = registration.bean;
-                if (beanType.isInstance(existing)) {
+                if (registration.beanDefinition.isCandidateBean(beanClass)) {
                     Optional<BeanDefinition<T>> candidate = qualifier.qualify(beanClass, Stream.of(registration.beanDefinition));
                     if (!candidate.isPresent() && requestedType != null && requestedType != beanType) {
                         candidate = qualifier.qualify((Class<T>) requestedType.getType(), Stream.of(registration.beanDefinition));
@@ -3203,7 +3200,7 @@ public class DefaultBeanContext implements BeanContext {
             qualifier = beanDefinition.getDeclaredQualifier();
         }
 
-        BeanKey key = new BeanKey<>(beanDefinition, qualifier);
+        BeanKey<T> key = new BeanKey<>(beanDefinition, qualifier);
         if (LOG.isDebugEnabled()) {
             if (qualifier != null) {
                 LOG.debug("Registering singleton bean {} for type [{} {}] using bean key {}", createdBean, qualifier, beanType.getName(), key);
@@ -3223,7 +3220,7 @@ public class DefaultBeanContext implements BeanContext {
             Class<?> createdType = createdBean != null ? createdBean.getClass() : beanType;
             boolean createdTypeDiffers = !createdType.equals(beanType);
 
-            BeanKey createdBeanKey = new BeanKey(createdType, qualifier);
+            BeanKey<?> createdBeanKey = new BeanKey(createdType, qualifier);
             Optional<Class<? extends Annotation>> qualifierAnn = beanDefinition.getAnnotationTypeByStereotype(javax.inject.Qualifier.class);
             if (qualifierAnn.isPresent()) {
                 Class annotation = qualifierAnn.get();

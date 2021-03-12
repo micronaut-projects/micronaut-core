@@ -170,7 +170,7 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public void fail(String message, @Nullable Element element) {
         Message msg;
-        if (element != null) {
+        if (element instanceof AbstractGroovyElement) {
             msg = buildErrorMessage(message, element);
         } else {
             msg = new SimpleMessage(message, sourceUnit);

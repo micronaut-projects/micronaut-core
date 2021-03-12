@@ -15,7 +15,13 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.ArrayUtils;
 
 /**
  * A reference to a bean. Implemented by bother {@link BeanDefinitionReference} and {@link BeanDefinition}.
@@ -37,6 +43,49 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
      * @return The underlying bean type
      */
     Class<T> getBeanType();
+
+    /**
+     * Returns a potentially limited subset of bean types exposed by this bean.
+     * The types to be exposed can be defined by the {@link io.micronaut.context.annotation.Type} annotation.
+     *
+     * @return The exposed types
+     * @since 3.0.0
+     */
+    default @NonNull Class<?>[] getExposedTypes() {
+        final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        final String beanAnn = Bean.class.getName();
+        if (annotationMetadata.hasDeclaredAnnotation(beanAnn)) {
+            final Class<?>[] exposedTypes = annotationMetadata.classValues(beanAnn, "typed");
+            if (ArrayUtils.isNotEmpty(exposedTypes)) {
+                return exposedTypes;
+            }
+        }
+        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+    }
+
+    /**
+     * Return whether this bean type is a candidate for dependency injection for the passed type.
+     * @param beanType The bean type
+     * @return True if it is
+     * @since 3.0.0
+     */
+    default boolean isCandidateBean(@Nullable Class<?> beanType) {
+        if (beanType == null) {
+            return false;
+        }
+        final Class<?>[] exposedTypes = getExposedTypes();
+        if (ArrayUtils.isNotEmpty(exposedTypes)) {
+            for (Class<?> exposedType : exposedTypes) {
+                if (beanType.isAssignableFrom(exposedType) || beanType == exposedType) {
+                    return true;
+                }
+            }
+            return false;
+        } else {
+            final Class<T> exposedType = getBeanType();
+            return beanType.isAssignableFrom(exposedType) || beanType == exposedType;
+        }
+    }
 
     /**
      * @return The class name
