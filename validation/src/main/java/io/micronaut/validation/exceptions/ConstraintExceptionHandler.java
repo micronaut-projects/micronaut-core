@@ -55,18 +55,30 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
     private final boolean alwaysSerializeErrorsAsList;
     private final ErrorResponseProcessor<?> responseProcessor;
 
+    /**
+     * Constructor.
+     * @deprecated Use {@link ConstraintExceptionHandler(ErrorResponseProcessor)} instead.
+     */
     @Deprecated
     public ConstraintExceptionHandler() {
         this.alwaysSerializeErrorsAsList = false;
         this.responseProcessor = null;
     }
 
+    /**
+     * Constructor.
+     * @deprecated Use {@link ConstraintExceptionHandler(ErrorResponseProcessor)} instead.
+     */
     @Deprecated
     public ConstraintExceptionHandler(JacksonConfiguration jacksonConfiguration) {
         this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
         this.responseProcessor = null;
     }
 
+    /**
+     * Constructor.
+     * @param responseProcessor Error Response Processor
+     */
     @Inject
     public ConstraintExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.alwaysSerializeErrorsAsList = false;
