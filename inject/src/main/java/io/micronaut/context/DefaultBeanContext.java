@@ -282,27 +282,12 @@ public class DefaultBeanContext implements BeanContext {
                 }
 
                 processed.add(sysId);
-                if (def instanceof DisposableBeanDefinition) {
-                    try {
-                        //noinspection unchecked
-                        ((DisposableBeanDefinition) def).dispose(this, bean);
-                    } catch (Throwable e) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error disposing of bean registration [" + def.getName() + "]: " + e.getMessage(), e);
-                        }
+                try {
+                    disposeBean(def.getBeanType(), bean, def);
+                } catch (BeanDestructionException e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error(e.getMessage(), e);
                     }
-                }
-                if (def instanceof Closeable) {
-                    try {
-                        ((Closeable) def).close();
-                    } catch (Throwable e) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error disposing of bean registration [" + def.getName() + "]: " + e.getMessage(), e);
-                        }
-                    }
-                }
-                if (bean instanceof LifeCycle) {
-                    ((LifeCycle) bean).stop();
                 }
             }
 
@@ -760,9 +745,9 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public <T> Collection<T> getBeansOfType(Class<T> beanType, Qualifier<T> qualifier) {
         return getBeanRegistrations(null, beanType, qualifier)
-                    .stream()
-                    .map(BeanRegistration::getBean)
-                    .collect(Collectors.toList());
+                .stream()
+                .map(BeanRegistration::getBean)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -781,7 +766,7 @@ public class DefaultBeanContext implements BeanContext {
      */
     protected <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         return getBeanRegistrations(resolutionContext, beanType, qualifier).stream()
-                    .map(BeanRegistration::getBean);
+                .map(BeanRegistration::getBean);
     }
 
     @Override
@@ -951,13 +936,85 @@ public class DefaultBeanContext implements BeanContext {
             Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(null, beanType, null, false, true);
             T finalBean = bean;
             concreteCandidate.ifPresent(definition -> {
-                        if (definition instanceof DisposableBeanDefinition) {
-                            ((DisposableBeanDefinition<T>) definition).dispose(this, finalBean);
-                        }
-                    }
-            );
+                disposeBean(beanType, finalBean, definition);
+            });
         }
         return bean;
+    }
+
+    private <T> void disposeBean(Class<T> beanType, T finalBean, BeanDefinition<T> definition) {
+        final List<BeanPreDestroyEventListener> preDestroyEventListeners = resolveListeners(
+                BeanPreDestroyEventListener.class, beanType
+        );
+
+        T beanToDestroy = finalBean;
+        if (CollectionUtils.isNotEmpty(preDestroyEventListeners)) {
+            for (BeanPreDestroyEventListener<T> listener : preDestroyEventListeners) {
+                try {
+                    final BeanPreDestroyEvent<T> event =
+                            new BeanPreDestroyEvent<>(this, definition, beanToDestroy);
+                    beanToDestroy = Objects.requireNonNull(
+                            listener.onPreDestroy(event),
+                            "PreDestroy event listener illegally returned null: " + listener.getClass()
+                    );
+                } catch (Exception e) {
+                    throw new BeanDestructionException(definition, e);
+                }
+            }
+        }
+        if (definition instanceof DisposableBeanDefinition) {
+            try {
+                ((DisposableBeanDefinition<T>) definition).dispose(this, finalBean);
+            } catch (Exception e) {
+                throw new BeanDestructionException(definition, e);
+            }
+        }
+
+        if (beanToDestroy instanceof Closeable) {
+            try {
+                ((Closeable) beanToDestroy).close();
+            } catch (Throwable e) {
+                throw new BeanDestructionException(definition, e);
+            }
+        }
+        if (beanToDestroy instanceof LifeCycle) {
+            ((LifeCycle) beanToDestroy).stop();
+        }
+
+        final List<BeanDestroyedEventListener> postDestroyListeners = resolveListeners(
+                BeanDestroyedEventListener.class, beanType
+        );
+        if (CollectionUtils.isNotEmpty(postDestroyListeners)) {
+            for (BeanDestroyedEventListener<T> listener : postDestroyListeners) {
+                try {
+                    final BeanDestroyedEvent<T> event =
+                            new BeanDestroyedEvent<>(this, definition, beanToDestroy);
+                    listener.onDestroyed(event);
+                } catch (Exception e) {
+                    throw new BeanDestructionException(definition, e);
+                }
+            }
+        }
+    }
+
+    @NonNull
+    private <T extends EventListener> List<T> resolveListeners(Class<T> type, Class<?> genericType) {
+        final Collection<BeanDefinition<T>> preDestroyListeners =
+                getBeanDefinitions(type);
+
+        if (CollectionUtils.isNotEmpty(preDestroyListeners)) {
+
+            final Qualifier<T> q =
+                    Qualifiers.byTypeArgumentsClosest(genericType);
+            final Stream<BeanDefinition<T>> listenerStream = preDestroyListeners
+                    .stream();
+            return q.reduce(type, listenerStream)
+                    .map(this::getBean)
+                    .sorted(OrderUtil.COMPARATOR)
+                    .collect(Collectors.toList());
+        } else {
+            return Collections.emptyList();
+        }
     }
 
     /**
@@ -1038,8 +1095,8 @@ public class DefaultBeanContext implements BeanContext {
     protected @NonNull
     <T> Collection<T> getBeansOfType(@Nullable BeanResolutionContext resolutionContext, @NonNull Class<T> beanType) {
         return getBeanRegistrations(resolutionContext, beanType, null)
-                    .stream().map(BeanRegistration::getBean)
-                    .collect(Collectors.toList());
+                .stream().map(BeanRegistration::getBean)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -1599,12 +1656,12 @@ public class DefaultBeanContext implements BeanContext {
             methodStream.forEach(reference -> {
                 List<Class<? extends Annotation>> annotations = reference.getAnnotationTypesByStereotype(Executable.class);
                 annotations.forEach(annotation -> byAnnotation.compute(annotation, (ann, list) -> {
-                        if (list == null) {
-                            list = new ArrayList<>(10);
-                        }
-                        list.add(reference);
-                        return list;
-                    }));
+                    if (list == null) {
+                        list = new ArrayList<>(10);
+                    }
+                    list.add(reference);
+                    return list;
+                }));
             });
 
             // Find ExecutableMethodProcessor for each annotation and process the BeanDefinitionMethodReference
@@ -1840,8 +1897,6 @@ public class DefaultBeanContext implements BeanContext {
      * Execution the creation of a bean. The returned value can be null if a
      * factory method returned null.
      *
-     * @deprecated Use {@link #doCreateBean(BeanResolutionContext, BeanDefinition, Qualifier, Class, boolean, Map)} instead.
-     *
      * @param resolutionContext The {@link BeanResolutionContext}
      * @param beanDefinition    The {@link BeanDefinition}
      * @param qualifier         The {@link Qualifier}
@@ -1849,14 +1904,15 @@ public class DefaultBeanContext implements BeanContext {
      * @param argumentValues    Any argument values passed to create the bean
      * @param <T>               The bean generic type
      * @return The created bean
+     * @deprecated Use {@link #doCreateBean(BeanResolutionContext, BeanDefinition, Qualifier, Class, boolean, Map)} instead.
      */
     @Nullable
     @Deprecated
     protected <T> T doCreateBean(@NonNull BeanResolutionContext resolutionContext,
-                       @NonNull BeanDefinition<T> beanDefinition,
-                       @Nullable Qualifier<T> qualifier,
-                       boolean isSingleton,
-                       @Nullable Map<String, Object> argumentValues) {
+                                 @NonNull BeanDefinition<T> beanDefinition,
+                                 @Nullable Qualifier<T> qualifier,
+                                 boolean isSingleton,
+                                 @Nullable Map<String, Object> argumentValues) {
         return doCreateBean(resolutionContext, beanDefinition, qualifier, beanDefinition.getBeanType(), isSingleton, argumentValues);
     }
 
@@ -2406,7 +2462,7 @@ public class DefaultBeanContext implements BeanContext {
                 }
                 BeanDefinition<T> proxyDefinition = (BeanDefinition<T>) findProxyBeanDefinition((Class) proxiedType, q).orElse(finalDefinition);
 
-                T createBean = doCreateBean(resolutionContext, proxyDefinition, qualifier,  beanType, false, null);
+                T createBean = doCreateBean(resolutionContext, proxyDefinition, qualifier, beanType, false, null);
                 if (createBean instanceof Qualified) {
                     ((Qualified) createBean).$withBeanQualifier(qualifier);
                 }
@@ -2884,10 +2940,11 @@ public class DefaultBeanContext implements BeanContext {
 
     /**
      * Obtains the bean registration for the given type and qualifier.
+     *
      * @param resolutionContext The resolution context
-     * @param beanType The bean type
-     * @param qualifier The qualifier
-     * @param <T> The generic type
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The generic type
      * @return A {@link BeanRegistration}
      */
     protected <T> BeanRegistration<T> getBeanRegistration(@Nullable BeanResolutionContext resolutionContext, @NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
@@ -2898,10 +2955,11 @@ public class DefaultBeanContext implements BeanContext {
 
     /**
      * Obtains the bean registrations for the given type and qualifier.
+     *
      * @param resolutionContext The resolution context
-     * @param beanType The bean type
-     * @param qualifier The qualifier
-     * @param <T> The generic type
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The generic type
      * @return A collection of {@link BeanRegistration}
      */
     @SuppressWarnings("unchecked")
