@@ -2161,7 +2161,6 @@ public class DefaultBeanContext implements BeanContext {
      * Execution the creation of a bean. The returned value can be null if a
      * factory method returned null.
      *
-<<<<<<< HEAD
      * @param resolutionContext The {@link BeanResolutionContext}
      * @param beanDefinition    The {@link BeanDefinition}
      * @param qualifier         The {@link Qualifier}
@@ -2185,8 +2184,6 @@ public class DefaultBeanContext implements BeanContext {
      * Execution the creation of a bean. The returned value can be null if a
      * factory method returned null.
      *
-=======
->>>>>>> Support for generic bean injection. Fixes #5079
      * @param resolutionContext The {@link BeanResolutionContext}
      * @param beanDefinition    The {@link BeanDefinition}
      * @param qualifier         The {@link Qualifier}
