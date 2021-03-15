@@ -112,6 +112,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         if (incremental) {
             final Set<String> types = CollectionUtils.setOf(
                     "javax.inject.*",
+                    "jakarta.inject.*",
                     "io.micronaut.*"
             );
             types.addAll(supportedAnnotationTypes);

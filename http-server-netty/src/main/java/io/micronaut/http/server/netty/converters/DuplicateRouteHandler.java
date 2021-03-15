@@ -41,11 +41,19 @@ public class DuplicateRouteHandler implements ExceptionHandler<DuplicateRouteExc
 
     private final ErrorResponseProcessor<?> responseProcessor;
 
+    /**
+     * Constructor.
+     * Use {@link DuplicateRouteHandler(ErrorResponseProcessor)} instead.
+     */
     @Deprecated
     public DuplicateRouteHandler() {
         this.responseProcessor = null;
     }
 
+    /**
+     * Constructor.
+     * @param responseProcessor Error Response Processor
+     */
     @Inject
     public DuplicateRouteHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.responseProcessor = responseProcessor;

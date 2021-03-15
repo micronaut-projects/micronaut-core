@@ -42,11 +42,19 @@ public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorE
 
     private final ErrorResponseProcessor<?> responseProcessor;
 
+    /**
+     * Constructor.
+     * @deprecated Use {@link ConversionErrorHandler(ErrorResponseProcessor)} instead.
+     */
     @Deprecated
     public ConversionErrorHandler() {
         this.responseProcessor = null;
     }
 
+    /**
+     * Constructor.
+     * @param responseProcessor Error Response Processor
+     */
     @Inject
     public ConversionErrorHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.responseProcessor = responseProcessor;
