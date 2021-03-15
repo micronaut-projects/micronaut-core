@@ -167,6 +167,11 @@ ext.extraPomInfo = {
                                 artifactId "micronaut-validation"
                                 delegate.version '${micronaut.version}'
                             }
+                            delegate.path {
+                                groupId "io.micronaut"
+                                artifactId "micronaut-http"
+                                delegate.version '${micronaut.version}'
+                            }
                         }
                     }
                 }
