@@ -40,6 +40,9 @@ class BeanWithPreDestroySpec extends Specification{
         then:
         b.noArgsDestroyCalled
         b.injectedDestroyCalled
+
+        cleanup:
+        context.close()
     }
 
     void "test that a bean with a pre-destroy hook works closed on close"() {
@@ -61,5 +64,28 @@ class BeanWithPreDestroySpec extends Specification{
         then:
         b.noArgsDestroyCalled
         b.injectedDestroyCalled
+    }
+
+    void "test that destroy events run in the right phase"() {
+        given:
+        BeanContext context = new DefaultBeanContext()
+        context.start()
+
+
+        when:
+        def pre = context.getBean(CPreDestroyEventListener)
+        def post = context.getBean(CDestroyedListener)
+        def c = context.getBean(C)
+
+        then:
+        !c.isClosed()
+
+        when:
+        context.close()
+
+        then:
+        pre.called
+        post.called
+        c.isClosed()
     }
 }

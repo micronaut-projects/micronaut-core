@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,25 +21,22 @@ import io.micronaut.core.annotation.NonNull;
 import java.util.EventListener;
 
 /**
- * <p>An event listener that is triggered each time a bean is created.</p>
+ * <p>An event listener that is triggered after a bean is destroyed.</p>
  * <p>
- * <p>Allows customization of the created beans.</p>
+ * <p>Allows customization of the bean destruction.</p>
  *
  * @param <T> The event type
  * @author Graeme Rocher
- * @see BeanCreatedEvent
- * @since 1.0
+ * @see BeanDestroyedEvent
+ * @since 3.0.0
  */
-@Indexed(BeanCreatedEventListener.class)
+@Indexed(BeanDestroyedEventListener.class)
 @FunctionalInterface
-public interface BeanCreatedEventListener<T> extends EventListener {
-
+public interface BeanDestroyedEventListener<T> extends EventListener {
     /**
-     * Fired when a bean is created and all {@link javax.annotation.PostConstruct} initialization hooks have been
-     * called.
+     * Fired when a bean has been destroyed and all {@link javax.annotation.PreDestroy} methods invoked.
      *
      * @param event The bean created event
-     * @return The bean or a replacement bean of the same type
      */
-    T onCreated(@NonNull BeanCreatedEvent<T> event);
+    void onDestroyed(@NonNull BeanDestroyedEvent<T> event);
 }
