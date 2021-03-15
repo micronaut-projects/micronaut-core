@@ -20,10 +20,12 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -280,6 +282,46 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
             return of(type);
         }
         return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeParameters);
+    }
+
+    /**
+     * Allows coercing a {@link Type} instance to an {@link Argument}.
+     * @param type The type
+     * @return The argument
+     * @throws IllegalArgumentException If the type cannot be coerced
+     * @since 3.0.0
+     */
+    static @NonNull Argument<?> of(@NonNull Type type) {
+        Objects.requireNonNull(type, "Type cannot be null");
+        if (type instanceof Class) {
+            return Argument.of((Class<?>) type);
+        } else if (type instanceof ParameterizedType) {
+            ParameterizedType pt = (ParameterizedType) type;
+            final Type rawType = pt.getRawType();
+            if (rawType instanceof Class<?>) {
+                Class<?> rawClass = (Class<?>) rawType;
+                final Type[] actualTypeArguments = pt.getActualTypeArguments();
+                if (ArrayUtils.isNotEmpty(actualTypeArguments)) {
+                    Argument<?>[] typeArguments = new Argument[actualTypeArguments.length];
+                    for (int i = 0; i < actualTypeArguments.length; i++) {
+                        Type typeArgument = actualTypeArguments[i];
+                        if (typeArgument instanceof Class || typeArgument instanceof ParameterizedType) {
+                            typeArguments[i] = of(typeArgument);
+                        } else {
+                            return Argument.of(rawClass);
+                        }
+                    }
+                    return Argument.of(rawClass, typeArguments);
+                } else {
+                    return Argument.of(rawClass);
+                }
+            } else {
+                throw new IllegalArgumentException("A ParameterizedType that has a raw type that is not a class cannot be converted to an argument");
+            }
+
+        } else {
+            throw new IllegalArgumentException("Type [" + type + "] must be a Class or ParameterizedType");
+        }
     }
 
     /**
