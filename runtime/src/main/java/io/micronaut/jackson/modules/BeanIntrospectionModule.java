@@ -405,12 +405,12 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                     @Override
                     public boolean canCreateUsingArrayDelegate() {
-                        return constructorArguments.length == 1 && constructorArguments[0].isContainerType();
+                        return defaultInstantiator.canCreateUsingArrayDelegate();
                     }
 
                     @Override
                     public boolean canCreateUsingDelegate() {
-                        return constructorArguments.length == 1;
+                        return false;
                     }
 
                     @Override

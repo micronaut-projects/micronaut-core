@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.binding
 
+import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.core.JsonParseException
 import groovy.json.JsonSlurper
 import io.micronaut.core.annotation.Introspected
@@ -427,6 +428,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         private final List<MyItem> items
 
+        @JsonCreator
         MyReqBody(final List<MyItem> items) {
             this.items = items
         }

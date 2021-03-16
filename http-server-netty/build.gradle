@@ -30,11 +30,7 @@ dependencies {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-http'
     }
-    testImplementation('com.fasterxml.jackson.core:jackson-databind') {
-        version {
-            strictly '2.11.2'
-        }
-    }
+    testImplementation('com.fasterxml.jackson.core:jackson-databind')
 
     // following 3 dependencies needed for Http2PostTest
     testImplementation 'io.vertx:vertx-core:3.9.4'
