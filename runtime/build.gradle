@@ -28,7 +28,7 @@ dependencies {
         transitive = false
     }
 
-    compileOnly "org.apache.logging.log4j:log4j-core:2.14.0"
+    compileOnly "org.apache.logging.log4j:log4j-core:2.14.1"
     compileOnly 'org.glassfish:javax.el:3.0.1-b12'
     compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
     compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion"
@@ -45,7 +45,7 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    testImplementation "com.github.stefanbirkner:system-lambda:1.1.0"
+    testImplementation "com.github.stefanbirkner:system-lambda:1.2.0"
 }
 
 //compileJava.options.fork = true
