@@ -150,7 +150,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
     @Override
     public JavaFieldElement newFieldElement(ClassElement declaringClass, @NonNull VariableElement field, @NonNull AnnotationMetadata annotationMetadata) {
         return new JavaFieldElement(
-                declaringClass,
+                (JavaClassElement) declaringClass,
                 field,
                 annotationMetadata,
                 visitorContext

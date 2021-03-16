@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
@@ -42,7 +43,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, BeanType<T> {
+public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, BeanType<T>, ArgumentCoercible<T> {
 
     /**
      * Attribute used to store a dynamic bean name.
@@ -169,6 +170,14 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The {@link ExecutableMethod} instances for this definition
      */
     Collection<ExecutableMethod<T, ?>> getExecutableMethods();
+
+    @Override
+    default Argument<T> asArgument() {
+        return Argument.of(
+                getBeanType(),
+                getTypeParameters()
+        );
+    }
 
     /**
      * Whether this bean definition represents a proxy.

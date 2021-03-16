@@ -22,6 +22,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
@@ -45,7 +46,7 @@ import java.util.Optional;
  * @see BeanIntrospection
  */
 @Immutable
-public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadataDelegate {
+public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadataDelegate, ArgumentCoercible<T> {
 
     /**
      * @return The declaring bean introspection.
@@ -254,6 +255,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      *
      * @return The argument
      */
+    @Override
     default Argument<T> asArgument() {
         return Argument.of(getType());
     }

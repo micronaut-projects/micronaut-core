@@ -31,6 +31,7 @@ import java.util.EventListener;
  * @since 1.0
  */
 @Indexed(BeanInitializedEventListener.class)
+@FunctionalInterface
 public interface BeanInitializedEventListener<T> extends EventListener {
 
     /**
