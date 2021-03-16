@@ -28,13 +28,12 @@ import java.util.stream.Collectors;
 
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.http.annotation.RequestBean;
-import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.validation.InternalUriMatchTemplate;
+import io.micronaut.validation.InternalUriMatchVariable;
 import io.micronaut.validation.routes.RouteValidationResult;
 
 /**
@@ -48,17 +47,17 @@ import io.micronaut.validation.routes.RouteValidationResult;
 public class NullableParameterRule implements RouteValidationRule {
 
     @Override
-    public RouteValidationResult validate(List<UriMatchTemplate> templates, ParameterElement[] parameters, MethodElement method) {
+    public RouteValidationResult validate(List<InternalUriMatchTemplate> templates, ParameterElement[] parameters, MethodElement method) {
         List<String> errorMessages = new ArrayList<>();
 
         boolean isClient = method.hasAnnotation("io.micronaut.http.client.annotation.Client");
 
         //Optional variables can be required in clients
         if (!isClient) {
-            Map<String, UriMatchVariable> variables = new HashMap<>();
-            Set<UriMatchVariable> required = new HashSet<>();
-            for (UriMatchTemplate template: templates) {
-                for (UriMatchVariable variable: template.getVariables()) {
+            Map<String, InternalUriMatchVariable> variables = new HashMap<>();
+            Set<InternalUriMatchVariable> required = new HashSet<>();
+            for (InternalUriMatchTemplate template: templates) {
+                for (InternalUriMatchVariable variable: template.getVariables()) {
                     if (!variable.isOptional() || variable.isExploded()) {
                         required.add(variable);
                     }
@@ -84,13 +83,13 @@ public class NullableParameterRule implements RouteValidationRule {
                 }
             }
 
-            for (UriMatchVariable variable: required) {
+            for (InternalUriMatchVariable variable: required) {
                 if (templates.stream().anyMatch(t -> !t.getVariableNames().contains(variable.getName()))) {
                     variables.putIfAbsent(variable.getName(), variable);
                 }
             }
 
-            for (UriMatchVariable variable : variables.values()) {
+            for (InternalUriMatchVariable variable : variables.values()) {
                 Arrays.stream(parameters)
                         .flatMap(p -> getTypedElements(p).stream())
                         .filter(p -> p.getName().equals(variable.getName()))
@@ -113,7 +112,7 @@ public class NullableParameterRule implements RouteValidationRule {
     }
 
     private List<TypedElement> getTypedElements(ParameterElement parameterElement) {
-        if (parameterElement.hasAnnotation(RequestBean.class)) {
+        if (parameterElement.hasAnnotation("io.micronaut.http.annotation.RequestBean")) {
             return parameterElement.getType().getBeanProperties().stream()
                     .filter(p -> p.hasStereotype(Bindable.class))
                     .collect(Collectors.toList());
