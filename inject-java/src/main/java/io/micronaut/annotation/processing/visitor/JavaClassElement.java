@@ -754,7 +754,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         });
         Map<String, ClassElement> typeArguments = getTypeArguments();
         if (!typeArguments.isEmpty()) {
-            result.put(getName(), typeArguments);
+            result.put(JavaModelUtils.getClassName(this.classElement), typeArguments);
         }
         return result;
     }

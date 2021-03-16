@@ -18,12 +18,14 @@ package io.micronaut.context;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.attr.MutableAttributeHolder;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 import org.jetbrains.annotations.NotNull;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -39,13 +41,13 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface BeanContext extends
-    LifeCycle<BeanContext>,
-    ExecutionHandleLocator,
-    BeanLocator,
-    BeanDefinitionRegistry,
-    ApplicationEventPublisher,
-    AnnotationMetadataResolver,
-    MutableAttributeHolder {
+        LifeCycle<BeanContext>,
+        ExecutionHandleLocator,
+        BeanLocator,
+        BeanDefinitionRegistry,
+        ApplicationEventPublisher,
+        AnnotationMetadataResolver,
+        MutableAttributeHolder {
 
     /**
      * Inject an existing instance.
@@ -54,7 +56,8 @@ public interface BeanContext extends
      * @param <T>      The bean generic type
      * @return The instance to inject
      */
-    @NonNull <T> T inject(@NonNull T instance);
+    @NonNull
+    <T> T inject(@NonNull T instance);
 
     /**
      * Creates a new instance of the given bean performing dependency injection and returning a new instance.
@@ -65,7 +68,8 @@ public interface BeanContext extends
      * @param <T>      The bean generic type
      * @return The instance
      */
-    default @NonNull <T> T createBean(@NonNull Class<T> beanType) {
+    default @NonNull
+    <T> T createBean(@NonNull Class<T> beanType) {
         return createBean(beanType, (Qualifier<T>) null);
     }
 
@@ -79,7 +83,8 @@ public interface BeanContext extends
      * @param <T>       The bean generic type
      * @return The instance
      */
-    @NonNull <T> T createBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
+    @NonNull
+    <T> T createBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
@@ -95,7 +100,8 @@ public interface BeanContext extends
      * @param <T>            The bean generic type
      * @return The instance
      */
-    @NonNull <T> T createBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Map<String, Object> argumentValues);
+    @NonNull
+    <T> T createBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Map<String, Object> argumentValues);
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
@@ -111,7 +117,8 @@ public interface BeanContext extends
      * @param <T>       The bean generic type
      * @return The instance
      */
-    @NonNull <T> T createBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Object... args);
+    @NonNull
+    <T> T createBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Object... args);
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
@@ -126,7 +133,8 @@ public interface BeanContext extends
      * @param <T>      The bean generic type
      * @return The instance
      */
-    @NonNull default <T> T createBean(@NonNull Class<T> beanType, @Nullable Object... args) {
+    @NonNull
+    default <T> T createBean(@NonNull Class<T> beanType, @Nullable Object... args) {
         return createBean(beanType, null, args);
     }
 
@@ -143,7 +151,8 @@ public interface BeanContext extends
      * @param <T>            The bean generic type
      * @return The instance
      */
-    @NonNull default <T> T createBean(@NonNull Class<T> beanType, @Nullable Map<String, Object> argumentValues) {
+    @NonNull
+    default <T> T createBean(@NonNull Class<T> beanType, @Nullable Map<String, Object> argumentValues) {
         return createBean(beanType, null, argumentValues);
     }
 
@@ -155,7 +164,45 @@ public interface BeanContext extends
      * @param <T>      The concrete class
      * @return The destroy instance or null if no such bean exists
      */
-    @Nullable <T> T destroyBean(@NonNull Class<T> beanType);
+    @Nullable
+    <T> T destroyBean(@NonNull Class<T> beanType);
+
+    /**
+     * Destroys the bean for the given type causing it to be re-created. If a singleton has been loaded it will be
+     * destroyed and removed from the context, otherwise null will be returned.
+     *
+     * @param beanType The bean type
+     * @param <T>      The concrete class
+     * @return The destroy instance or null if no such bean exists
+     * @since 3.0.0
+     */
+    @Nullable
+    default <T> T destroyBean(@NonNull Argument<T> beanType) {
+        return destroyBean(beanType, null);
+    }
+
+    /**
+     * Destroys the bean for the given type causing it to be re-created. If a singleton has been loaded it will be
+     * destroyed and removed from the context, otherwise null will be returned.
+     *
+     * @param beanType The bean type
+     * @param <T>      The concrete class
+     * @return The destroy instance or null if no such bean exists
+     * @since 3.0.0
+     */
+    @Nullable
+    <T> T destroyBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Destroys the given bean.
+     *
+     * @param bean The bean
+     * @param <T>  The concrete class
+     * @return The destroy instance
+     * @since 3.0.0
+     */
+    @NonNull
+    <T> T destroyBean(@NonNull T bean);
 
     /**
      * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
@@ -167,20 +214,24 @@ public interface BeanContext extends
      * @param <T>        The concrete class
      * @return An {@link Optional} of the instance if it exists for the given registration
      */
-    @NonNull <T> Optional<T> refreshBean(@Nullable BeanIdentifier identifier);
+    @NonNull
+    <T> Optional<T> refreshBean(@Nullable BeanIdentifier identifier);
 
     /**
      * @return The class loader used by this context
      */
-    @NonNull ClassLoader getClassLoader();
+    @NonNull
+    ClassLoader getClassLoader();
 
     /**
      * @return Get the configured bean validator, if any.
      */
-    @NonNull BeanDefinitionValidator getBeanValidator();
+    @NonNull
+    BeanDefinitionValidator getBeanValidator();
 
     @Override
-    @NonNull <T> BeanContext registerSingleton(@NonNull Class<T> type, @NonNull T singleton, @Nullable Qualifier<T> qualifier, boolean inject);
+    @NonNull
+    <T> BeanContext registerSingleton(@NonNull Class<T> type, @NonNull T singleton, @Nullable Qualifier<T> qualifier, boolean inject);
 
     @Override
     default BeanContext registerSingleton(@NonNull Object singleton) {
@@ -210,7 +261,8 @@ public interface BeanContext extends
      *
      * @return The running {@link BeanContext}
      */
-    static @NonNull BeanContext run() {
+    static @NonNull
+    BeanContext run() {
         return build().start();
     }
 
@@ -219,7 +271,8 @@ public interface BeanContext extends
      *
      * @return The built, but not yet running {@link BeanContext}
      */
-    static @NonNull BeanContext build() {
+    static @NonNull
+    BeanContext build() {
         return new DefaultBeanContext();
     }
 
@@ -229,7 +282,8 @@ public interface BeanContext extends
      * @param classLoader The classloader to use
      * @return The running {@link BeanContext}
      */
-    static @NonNull BeanContext run(ClassLoader classLoader) {
+    static @NonNull
+    BeanContext run(ClassLoader classLoader) {
         return build(classLoader).start();
     }
 
@@ -239,7 +293,8 @@ public interface BeanContext extends
      * @param classLoader The classloader to use
      * @return The built, but not yet running {@link BeanContext}
      */
-    static @NonNull BeanContext build(ClassLoader classLoader) {
+    static @NonNull
+    BeanContext build(ClassLoader classLoader) {
         return new DefaultBeanContext(classLoader);
     }
 }
