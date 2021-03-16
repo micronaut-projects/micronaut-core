@@ -287,7 +287,7 @@ public class DefaultBeanContext implements BeanContext {
 
                 processed.add(sysId);
                 try {
-                    disposeBean(def.getBeanType(), bean, def);
+                    disposeBean(def.asArgument(), bean, def);
                 } catch (BeanDestructionException e) {
                     if (LOG.isErrorEnabled()) {
                         LOG.error(e.getMessage(), e);
@@ -759,6 +759,11 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> boolean containsBean(@NonNull Class<T> beanType, Qualifier<T> qualifier) {
+        return containsBean(Argument.of(beanType), qualifier);
+    }
+
+    @Override
+    public <T> boolean containsBean(Argument<T> beanType, Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
         if (containsBeanCache.containsKey(beanKey)) {
@@ -1046,11 +1051,10 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
-    public @Nullable
-    <T> T destroyBean(@NonNull Class<T> beanType) {
+    public <T> T destroyBean(Argument<T> beanType, Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         T bean = null;
-        BeanKey<T> beanKey = new BeanKey<>(beanType, null);
+        BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
 
         synchronized (singletonObjects) {
             if (singletonObjects.containsKey(beanKey)) {
@@ -1084,7 +1088,32 @@ public class DefaultBeanContext implements BeanContext {
         return bean;
     }
 
-    private <T> void disposeBean(Class<T> beanType, T finalBean, BeanDefinition<T> definition) {
+    @Override
+    @NonNull
+    public <T> T destroyBean(T bean) {
+        Objects.requireNonNull(bean, "Bean cannot be null");
+        final Collection candidatesForInstance = findBeanCandidatesForInstance(bean);
+        final Argument arg = Argument.of(bean.getClass());
+        final BeanDefinition concreteCandidate = (BeanDefinition) findConcreteCandidate(
+                null,
+                arg,
+                null,
+                false,
+                false
+        ).orElse(null);
+        if (concreteCandidate != null) {
+            disposeBean(arg, bean, concreteCandidate);
+        }
+        return bean;
+    }
+
+    @Override
+    public @Nullable
+    <T> T destroyBean(@NonNull Class<T> beanType) {
+        return destroyBean(Argument.of(beanType), null);
+    }
+
+    private <T> void disposeBean(Argument<T> beanType, T finalBean, BeanDefinition<T> definition) {
         final List<BeanPreDestroyEventListener> preDestroyEventListeners = resolveListeners(
                 BeanPreDestroyEventListener.class, beanType
         );
@@ -1140,14 +1169,14 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @NonNull
-    private <T extends EventListener> List<T> resolveListeners(Class<T> type, Class<?> genericType) {
+    private <T extends EventListener> List<T> resolveListeners(Class<T> type, Argument<?> genericType) {
         final Collection<BeanDefinition<T>> preDestroyListeners =
                 getBeanDefinitions(type);
 
         if (CollectionUtils.isNotEmpty(preDestroyListeners)) {
 
             final Qualifier<T> q =
-                    Qualifiers.byTypeArgumentsClosest(genericType);
+                    Qualifiers.byTypeArgumentsClosest(genericType.getType());
             final Stream<BeanDefinition<T>> listenerStream = preDestroyListeners
                     .stream();
             return q.reduce(type, listenerStream)

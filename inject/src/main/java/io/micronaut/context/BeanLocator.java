@@ -70,11 +70,30 @@ public interface BeanLocator {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 3.0.0
      */
     default @NonNull <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBean(
                 Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
                 qualifier
+        );
+    }
+
+    /**
+     * Obtains a Bean for the given type and qualifier.
+     *
+     * @param beanType  The potentially parameterized bean type
+     * @param <T>       The bean type parameter
+     * @return An instanceof said bean
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 3.0.0
+     */
+    default @NonNull <T> T getBean(@NonNull Argument<T> beanType) {
+        return getBean(
+                beanType,
+                null
         );
     }
 
@@ -162,6 +181,22 @@ public interface BeanLocator {
         return streamOfType(
                 Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
                 qualifier
+        );
+    }
+
+    /**
+     * Obtain a stream of beans of the given type.
+     *
+     * @param beanType  The potentially parameterized bean type
+     * @param <T>       The bean concrete type
+     * @return A stream of instances
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 3.0.0
+     */
+    default @NonNull <T> Stream<T> streamOfType(@NonNull Argument<T> beanType) {
+        return streamOfType(
+                Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
+                null
         );
     }
 

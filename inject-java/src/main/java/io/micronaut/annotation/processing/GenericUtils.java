@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
@@ -500,11 +501,11 @@ public class GenericUtils {
                         TypeElement child = current;
                         current = (TypeElement) te;
                         if (CollectionUtils.isNotEmpty(superArguments)) {
-                            Map<String, TypeMirror> boundTypes = typeArguments.get(child.getQualifiedName().toString());
+                            Map<String, TypeMirror> boundTypes = typeArguments.get(JavaModelUtils.getClassName(child));
                             if (boundTypes != null) {
                                 Map<String, TypeMirror> types = resolveGenericTypes(dt, current, boundTypes);
 
-                                String name = current.getQualifiedName().toString();
+                                String name = JavaModelUtils.getClassName(current);
                                 typeArguments.put(name, types);
                             } else {
                                 List<? extends TypeParameterElement> typeParameters = current.getTypeParameters();
@@ -516,8 +517,7 @@ public class GenericUtils {
                                         types.put(n, i.next());
                                     }
                                 }
-                                String name = current.getQualifiedName().toString();
-                                typeArguments.put(name, types);
+                                typeArguments.put(JavaModelUtils.getClassName(current), types);
                             }
                         }
 
@@ -538,9 +538,9 @@ public class GenericUtils {
                 Element element = declaredType.asElement();
                 if (element instanceof TypeElement) {
                     TypeElement te = (TypeElement) element;
-                    String name = te.getQualifiedName().toString();
+                    String name = JavaModelUtils.getClassName(te);
                     if (!typeArguments.containsKey(name)) {
-                        Map<String, TypeMirror> boundTypes = typeArguments.get(child.getQualifiedName().toString());
+                        Map<String, TypeMirror> boundTypes = typeArguments.get(JavaModelUtils.getClassName(child));
                         if (boundTypes == null) {
                             boundTypes = Collections.emptyMap();
                         }

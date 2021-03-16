@@ -29,6 +29,25 @@ import java.util.function.Supplier
 
 class GenericTypeArgumentsSpec extends AbstractTypeElementSpec {
 
+    void "test generic type arguments with inner classes resolve"() {
+        given:
+        def definition = buildBeanDefinition('innergenerics.Outer$FooImpl', '''
+package innergenerics;
+
+class Outer {
+
+    interface Foo<T extends CharSequence> {}
+    
+    @javax.inject.Singleton
+    class FooImpl implements Foo<String> {}
+}
+''')
+        def itfe = definition.beanType.classLoader.loadClass('innergenerics.Outer$Foo')
+
+        expect:
+        definition.getTypeParameters(itfe).length == 1
+    }
+
     void "test type arguments with inherited fields"() {
         given:
         BeanDefinition definition = buildBeanDefinition('inheritedfields.UserDaoClient', '''

@@ -47,6 +47,37 @@ public interface BeanDefinitionRegistry {
     <T> boolean containsBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
+     * Return whether the bean of the given type is contained within this context.
+     *
+     * @param beanType  The bean type
+     * @param qualifier The qualifier for the bean
+     * @param <T>       The concrete type
+     * @return True if it is
+     * @since 3.0.0
+     */
+    default <T> boolean containsBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return containsBean(
+                Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
+                qualifier
+        );
+    }
+
+    /**
+     * Return whether the bean of the given type is contained within this context.
+     *
+     * @param beanType  The bean type
+     * @param <T>       The concrete type
+     * @return True if it is
+     * @since 3.0.0
+     */
+    default <T> boolean containsBean(@NonNull Argument<T> beanType) {
+        return containsBean(
+                Objects.requireNonNull(beanType, "Bean type cannot be null"),
+                null
+        );
+    }
+
+    /**
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
      * compiled ahead of time.</p>
      * <p>
@@ -470,6 +501,21 @@ public interface BeanDefinitionRegistry {
      *
      * @param beanType The type
      * @param <T>      The concrete type
+     * @return The {@link BeanDefinition}
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     * @throws NoSuchBeanException                                    If the bean cannot be found
+     * @since 3.0.0
+     */
+    default @NonNull <T> BeanDefinition<T> getBeanDefinition(@NonNull Argument<T> beanType) {
+        return getBeanDefinition(beanType, null);
+    }
+
+    /**
+     * Obtain a {@link BeanDefinition} for the given type.
+     *
+     * @param beanType The type
+     * @param <T>      The concrete type
      * @return An {@link Optional} of the bean definition
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
@@ -527,7 +573,7 @@ public interface BeanDefinitionRegistry {
      * @return True if it is
      */
     @SuppressWarnings("ConstantConditions")
-    default boolean containsBean(@NonNull Class beanType) {
+    default boolean containsBean(@NonNull Class<?> beanType) {
         return beanType != null && containsBean(beanType, null);
     }
 }
