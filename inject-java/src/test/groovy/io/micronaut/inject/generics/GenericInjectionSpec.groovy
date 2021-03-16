@@ -6,6 +6,8 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.util.stream.Collectors
+
 class GenericInjectionSpec extends Specification {
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
 
@@ -23,7 +25,7 @@ class GenericInjectionSpec extends Specification {
         bean.anotherV8.is(bean.engine)
         context.getBeanDefinition(beanType)
         context.containsBean(beanType)
-        context.streamOfType(beanType).findFirst().isPresent()
+        context.streamOfType(beanType).collect(Collectors.toList()).size() == 1
         context.getBeansOfType(beanType).size() == 1
 
         when:

@@ -195,7 +195,7 @@ public interface BeanLocator {
      */
     default @NonNull <T> Stream<T> streamOfType(@NonNull Argument<T> beanType) {
         return streamOfType(
-                Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
+                Objects.requireNonNull(beanType, "Bean type cannot be null"),
                 null
         );
     }
