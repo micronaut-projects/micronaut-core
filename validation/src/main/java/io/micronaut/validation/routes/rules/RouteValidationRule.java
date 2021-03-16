@@ -16,7 +16,6 @@
 package io.micronaut.validation.routes.rules;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.validation.InternalUriMatchTemplate;

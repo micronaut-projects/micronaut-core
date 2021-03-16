@@ -24,7 +24,6 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.*;
 import io.micronaut.validation.InternalUriMatchTemplate;
-import io.micronaut.validation.InternalUriTemplate;
 import io.micronaut.websocket.annotation.*;
 
 import javax.annotation.processing.SupportedOptions;
