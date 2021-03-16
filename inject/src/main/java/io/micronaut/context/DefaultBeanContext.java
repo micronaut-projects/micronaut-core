@@ -684,6 +684,12 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
+    public <T> BeanDefinition<T> getBeanDefinition(Argument<T> beanType, Qualifier<T> qualifier) {
+        return findConcreteCandidate(null, beanType, qualifier, true, false)
+                    .orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
+    }
+
+    @Override
     public <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType, Qualifier<T> qualifier) {
         if (Objects.requireNonNull(beanType, "Bean type cannot be null").equalsType(Argument.OBJECT_ARGUMENT)) {
             // optimization for object resolve
