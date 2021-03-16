@@ -67,6 +67,7 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
 
     /**
      * Constructor.
+     * @param jacksonConfiguration Jackson configuration
      * @deprecated Use {@link ConstraintExceptionHandler(ErrorResponseProcessor)} instead.
      */
     @Deprecated
