@@ -1512,7 +1512,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 ClassElement declaringClassElement = elementFactory.newClassElement(declaringClass, concreteClassMetadata);
-                FieldElement javaFieldElement = elementFactory.newFieldElement(variable, fieldAnnotationMetadata);
+                FieldElement javaFieldElement = elementFactory.newFieldElement(concreteClassElement, variable, fieldAnnotationMetadata);
                 addOriginatingElementIfNecessary(writer, declaringClass);
 
                 boolean isPrivate = javaFieldElement.isPrivate();

@@ -30,6 +30,45 @@ The above annotation is itself annotated with the `@Qualifier` annotation to des
 
 snippet::io.micronaut.docs.qualifiers.annotation.Vehicle[tags="constructor",indent=0]
 
+== Qualifying by Generic Type Arguments
+
+Since Micronaut 3.0, it is possible to select which bean to inject based on the generic type arguments of the class or interface. Consider the following example:
+
+snippet::io.micronaut.docs.inject.generics.CylinderProvider[tags="class",indent=0]
+
+The `CylinderProvider` interface provides the number of cylinders.
+
+snippet::io.micronaut.docs.inject.generics.Engine[tags="class",indent=0]
+
+<1> The engine class defines a generic type argument `<T>` that must be an instance of `CylinderProvider`
+
+You can define implementations of the `Engine` interface with different generic type arguments. For example for a V6 engine:
+
+snippet::io.micronaut.docs.inject.generics.V6[tags="class",indent=0]
+
+The above defines a `V6` class that implements the `CylinderProvider` interface.
+
+snippet::io.micronaut.docs.inject.generics.V6Engine[tags="class",indent=0]
+
+<1> The `V6Engine` implements `Engine` providing `V6` as a generic type parameter
+
+And a V8 engine:
+
+snippet::io.micronaut.docs.inject.generics.V8[tags="class",indent=0]
+
+The above defines a `V8` class that implements the `CylinderProvider` interface.
+
+snippet::io.micronaut.docs.inject.generics.V8Engine[tags="class",indent=0]
+
+<1> The `V8Engine` implements `Engine` providing `V8` as a generic type parameter
+
+You can then use the generic arguments when defining the injection point and Micronaut will pick the correct bean
+to inject based on the specific generic type arguments:
+
+snippet::io.micronaut.docs.inject.generics.Vehicle[tags="constructor",indent=0]
+
+In the above example the `V8Engine` bean is injected.
+
 == Primary and Secondary Beans
 
 api:context.annotation.Primary[] is a qualifier that indicates that a bean is the primary bean to be selected in the case of multiple interface implementations.

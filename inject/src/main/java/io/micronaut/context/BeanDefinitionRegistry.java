@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
@@ -24,6 +25,7 @@ import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -90,6 +92,40 @@ public interface BeanDefinitionRegistry {
      */
     @NonNull <T> Optional<BeanDefinition<T>> findBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
+    /**
+     * Obtain a {@link BeanDefinition} for the given type.
+     *
+     * @param beanType  The potentially parameterized type
+     * @param qualifier The qualifier
+     * @param <T>       The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     * @since 3.0.0
+     */
+    default @NonNull <T> Optional<BeanDefinition<T>> findBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return findBeanDefinition(
+                Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
+                qualifier
+        );
+    }
+
+    /**
+     * Obtain a {@link BeanDefinition} for the given type.
+     *
+     * @param beanType  The potentially parameterized type
+     * @param <T>       The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     * @since 3.0.0
+     */
+    default @NonNull <T> Optional<BeanDefinition<T>> findBeanDefinition(@NonNull Argument<T> beanType) {
+        return findBeanDefinition(
+                Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
+                null
+        );
+    }
 
     /**
      * Obtain a {@link BeanDefinition} for the given bean.
@@ -118,6 +154,21 @@ public interface BeanDefinitionRegistry {
      * Obtain a {@link BeanDefinition} for the given type.
      *
      * @param beanType The type
+     * @param <T>      The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible
+     * bean definitions exist for the given type
+     * @since 3.0.0
+     */
+    default @NonNull <T> Collection<BeanDefinition<T>> getBeanDefinitions(@NonNull Argument<T> beanType) {
+        Objects.requireNonNull(beanType, "Bean type cannot be null");
+        return getBeanDefinitions(beanType.getType(), null);
+    }
+
+    /**
+     * Obtain a {@link BeanDefinition} for the given type.
+     *
+     * @param beanType The type
      * @param qualifier The qualifier
      * @param <T>      The concrete type
      * @return An {@link Optional} of the bean definition
@@ -126,11 +177,27 @@ public interface BeanDefinitionRegistry {
      */
     @NonNull <T> Collection<BeanDefinition<T>> getBeanDefinitions(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
+    /**
+     * Obtain a {@link BeanDefinition} for the given type.
+     *
+     * @param beanType The type
+     * @param qualifier The qualifier
+     * @param <T>      The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible
+     * bean definitions exist for the given type
+     * @since 3.0.0
+     */
+    default @NonNull <T> Collection<BeanDefinition<T>> getBeanDefinitions(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Objects.requireNonNull(beanType, "Bean type cannot be null");
+        return getBeanDefinitions(beanType.getType(), qualifier);
+    }
+
 
     /**
      * Get all of the {@link BeanDefinition} for the given qualifier.
      *
-     * @param qualifier The qualifer
+     * @param qualifier The qualifier
      * @return The bean definitions
      */
     @NonNull Collection<BeanDefinition<?>> getBeanDefinitions(@NonNull Qualifier<Object> qualifier);
@@ -191,6 +258,23 @@ public interface BeanDefinitionRegistry {
     @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Class<T> beanType, @NonNull Qualifier<T> qualifier);
 
     /**
+     * Find and if necessary initialize {@link javax.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
+     * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
+     *
+     * @param beanType The bean type
+     * @param qualifier The qualifier
+     * @param <T>      The concrete type
+     * @return The beans
+     * @since 3.0.0
+     */
+    default @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @NonNull Qualifier<T> qualifier) {
+        return getBeanRegistrations(
+                Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
+                qualifier
+        );
+    }
+
+    /**
      * Find a bean registration for the given bean type and optional qualifier.
      *
      * @param beanType The bean type
@@ -203,6 +287,23 @@ public interface BeanDefinitionRegistry {
     @NonNull <T> BeanRegistration<T> getBeanRegistration(@NonNull Class<T> beanType, @NonNull Qualifier<T> qualifier);
 
     /**
+     * Find a bean registration for the given bean type and optional qualifier.
+     *
+     * @param beanType The potentially parameterized bean type
+     * @param qualifier The qualifier
+     * @param <T>      The concrete type
+     * @return The bean registration
+     * @throws NoSuchBeanException if the bean doesn't exist
+     * @since 3.0.0
+     */
+    default @NonNull <T> BeanRegistration<T> getBeanRegistration(@NonNull Argument<T> beanType, @NonNull Qualifier<T> qualifier) {
+        return getBeanRegistration(
+                Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
+                qualifier
+        );
+    }
+
+    /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
      *
      * @param beanType  The type
@@ -213,6 +314,24 @@ public interface BeanDefinitionRegistry {
      *                                                                for the given type
      */
     @NonNull <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
+     *
+     * @param beanType  The type
+     * @param qualifier The qualifier
+     * @param <T>       The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     */
+    default @NonNull <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Objects.requireNonNull(beanType, "Bean type cannot be null");
+        return findProxyTargetBeanDefinition(
+                beanType.getType(),
+                qualifier
+        );
+    }
 
     /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
@@ -286,6 +405,22 @@ public interface BeanDefinitionRegistry {
     }
 
     /**
+     * Obtain a {@link BeanDefinition} for the given type.
+     *
+     * @param beanType  The potentially parameterized type type
+     * @param qualifier The qualifier
+     * @param <T>       The concrete type
+     * @return The {@link BeanDefinition}
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     * @throws NoSuchBeanException                                    If the bean cannot be found
+     * @since 3.0.
+     */
+    default @NonNull <T> BeanDefinition<T> getBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return findBeanDefinition(beanType, qualifier).orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
+    }
+
+    /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
      *
      * @param beanType  The type
@@ -297,6 +432,22 @@ public interface BeanDefinitionRegistry {
      * @throws NoSuchBeanException                                    If the bean cannot be found
      */
     default @NonNull <T> BeanDefinition<T> getProxyTargetBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return findProxyTargetBeanDefinition(beanType, qualifier).orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
+    }
+
+    /**
+     * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
+     *
+     * @param beanType  The type
+     * @param qualifier The qualifier
+     * @param <T>       The concrete type
+     * @return The {@link BeanDefinition}
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     * @throws NoSuchBeanException                                    If the bean cannot be found
+     * @since 3.0.0
+     */
+    default @NonNull <T> BeanDefinition<T> getProxyTargetBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findProxyTargetBeanDefinition(beanType, qualifier).orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
     }
 

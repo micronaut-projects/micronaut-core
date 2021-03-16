@@ -19,9 +19,11 @@ import io.micronaut.core.reflect.InstantiationUtils;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -59,6 +61,24 @@ public interface BeanLocator {
     @NonNull <T> T getBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
+     * Obtains a Bean for the given type and qualifier.
+     *
+     * @param beanType  The potentially parameterized bean type
+     * @param qualifier The qualifier
+     * @param <T>       The bean type parameter
+     * @return An instanceof said bean
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     */
+    default @NonNull <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return getBean(
+                Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
+                qualifier
+        );
+    }
+
+    /**
      * Finds a Bean for the given type and qualifier.
      *
      * @param beanType  The bean type
@@ -91,6 +111,33 @@ public interface BeanLocator {
     @NonNull <T> Collection<T> getBeansOfType(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
+     * Get all beans of the given type.
+     *
+     * @param beanType The potenitally parameterized bean type
+     * @param <T>      The bean type parameter
+     * @return The found beans
+     * @since 3.0.0
+     */
+    default @NonNull <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType) {
+        Objects.requireNonNull(beanType, "Bean type cannot be null");
+        return getBeansOfType(beanType.getType());
+    }
+
+    /**
+     * Get all beans of the given type.
+     *
+     * @param beanType  The potenitally parameterized bean type
+     * @param qualifier The qualifier
+     * @param <T>       The bean type parameter
+     * @return The found beans
+     * @since 3.0.0
+     */
+    default @NonNull <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Objects.requireNonNull(beanType, "Bean type cannot be null");
+        return getBeansOfType(beanType.getType(), qualifier);
+    }
+
+    /**
      * Obtain a stream of beans of the given type.
      *
      * @param beanType  The bean type
@@ -100,6 +147,24 @@ public interface BeanLocator {
      * @see io.micronaut.inject.qualifiers.Qualifiers
      */
     @NonNull <T> Stream<T> streamOfType(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Obtain a stream of beans of the given type.
+     *
+     * @param beanType  The potentially parameterized bean type
+     * @param qualifier The qualifier
+     * @param <T>       The bean concrete type
+     * @return A stream of instances
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 3.0.0
+     */
+    default @NonNull <T> Stream<T> streamOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return streamOfType(
+                Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
+                qualifier
+        );
+    }
+
 
     /**
      * Resolves the proxy target for a given bean type. If the bean has no proxy then the original bean is returned.

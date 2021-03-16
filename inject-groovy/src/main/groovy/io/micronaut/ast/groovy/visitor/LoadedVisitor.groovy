@@ -140,7 +140,7 @@ class LoadedVisitor implements Ordered {
                 visitor.visitField(e, visitorContext)
                 return e
             case FieldNode:
-                def e = visitorContext.getElementFactory().newFieldElement((FieldNode) annotatedNode, annotationMetadata)
+                def e = visitorContext.getElementFactory().newFieldElement(currentClassElement, (FieldNode) annotatedNode, annotationMetadata)
                 visitor.visitField(e, visitorContext)
                 return e
             case ConstructorNode:
