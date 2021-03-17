@@ -67,7 +67,6 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import io.micronaut.inject.configuration.PropertyMetadata
 import io.micronaut.inject.processing.ProcessedTypes
 import io.micronaut.inject.visitor.VisitorConfiguration
-import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
@@ -130,7 +129,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
     final AtomicInteger factoryMethodIndex = new AtomicInteger(0)
     private final CompilationUnit compilationUnit
     private final GroovyElementFactory elementFactory
-    VisitorContext groovyVisitorContext
+    GroovyVisitorContext groovyVisitorContext
 
     InjectVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode targetClassNode, ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder) {
         this(sourceUnit, compilationUnit, targetClassNode, null, configurationMetadataBuilder)
@@ -1054,6 +1053,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         fieldElement.declaringType,
                         methodElement,
                         false,
+                        groovyVisitorContext
                 )
             } else if (isValue) {
                 if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
@@ -1273,11 +1273,12 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         false,
                         originatingElement,
                         methodAnnotationMetadata,
-                        [elementFactory.newClassElement(typeToImplement, AnnotationMetadata.EMPTY_METADATA)] as ClassElement[], ,
+                        [elementFactory.newClassElement(typeToImplement, AnnotationMetadata.EMPTY_METADATA)] as ClassElement[],
+                        groovyVisitorContext,
                         configurationMetadataBuilder
                 )
 
-                aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata,)
+                aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata, groovyVisitorContext)
 
                 beanDefinitionWriters.put(ClassHelper.make(packageName + '.' + beanClassName), aopProxyWriter)
 

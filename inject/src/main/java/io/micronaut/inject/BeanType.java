@@ -22,6 +22,10 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
+
+import java.util.Collections;
+import java.util.Set;
 
 /**
  * A reference to a bean. Implemented by bother {@link BeanDefinitionReference} and {@link BeanDefinition}.
@@ -51,16 +55,16 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
      * @return The exposed types
      * @since 3.0.0
      */
-    default @NonNull Class<?>[] getExposedTypes() {
+    default @NonNull Set<Class<?>> getExposedTypes() {
         final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         final String beanAnn = Bean.class.getName();
         if (annotationMetadata.hasDeclaredAnnotation(beanAnn)) {
             final Class<?>[] exposedTypes = annotationMetadata.classValues(beanAnn, "typed");
             if (ArrayUtils.isNotEmpty(exposedTypes)) {
-                return exposedTypes;
+                return Collections.unmodifiableSet(CollectionUtils.setOf(exposedTypes));
             }
         }
-        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        return Collections.emptySet();
     }
 
     /**
@@ -73,14 +77,9 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
         if (beanType == null) {
             return false;
         }
-        final Class<?>[] exposedTypes = getExposedTypes();
-        if (ArrayUtils.isNotEmpty(exposedTypes)) {
-            for (Class<?> exposedType : exposedTypes) {
-                if (beanType.isAssignableFrom(exposedType) || beanType == exposedType) {
-                    return true;
-                }
-            }
-            return false;
+        final Set<Class<?>> exposedTypes = getExposedTypes();
+        if (CollectionUtils.isNotEmpty(exposedTypes)) {
+            return exposedTypes.contains(beanType);
         } else {
             final Class<T> exposedType = getBeanType();
             return beanType.isAssignableFrom(exposedType) || beanType == exposedType;

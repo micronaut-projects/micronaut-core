@@ -41,5 +41,11 @@ class BeanTypedSpec extends Specification {
         context.findBeanDefinition(Foo1).isPresent()
         !context.findBeanDefinition(Foo2).isPresent()
         !context.findBeanDefinition(FooImpl).isPresent()
+
+        when:
+        context.getBean(FooImpl)
+
+        then:
+        thrown(NoSuchBeanException)
     }
 }
