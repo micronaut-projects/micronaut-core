@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.BeanType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
