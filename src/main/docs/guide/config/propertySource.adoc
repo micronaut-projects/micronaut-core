@@ -179,4 +179,17 @@ logger:
 
 The same configuration can be achieved by setting the environment variable `LOGGER_LEVELS_FOO_BAR`. Note that there is currently no way to set log levels for unconventional prefixes such as `foo.barBaz`.
 
+==== DIsabling a Logger with Properties
+
+To disable a logger, you need to set the logger level to `OFF`:
+
+[source,yaml]
+----
+logger:
+  levels:
+    com.example.overly.excessive.ErrorLogger: "OFF" <1>
+----
+1. It is required to add quotes to `OFF` to be treated literally as a string.  Otherwise, this will be incorrectly converted to boolean false.
+
+
 Note that the ability to control log levels via config is controlled via the api:logging.LoggingSystem[] interface. Currently, Micronaut includes a single implementation that allows setting log levels for the Logback library. If you use another library, you should provide a bean that implements this interface.
