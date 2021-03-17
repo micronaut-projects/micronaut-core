@@ -22,7 +22,6 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
@@ -87,7 +86,7 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
         properties.forEach(this::configureLogLevelForPrefix);
     }
 
-    private void configureLogLevelForPrefix(String loggerPrefix, Object levelValue) {
+    private void configureLogLevelForPrefix(final String loggerPrefix, final Object levelValue) {
         final LogLevel newLevel;
         if (levelValue instanceof Boolean && !((boolean) levelValue)) {
             newLevel = LogLevel.OFF; // SnakeYAML converts OFF (without quotations) to a boolean false value, hence we need to handle that here...
