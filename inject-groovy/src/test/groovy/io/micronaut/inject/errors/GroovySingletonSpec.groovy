@@ -15,11 +15,8 @@
  */
 package io.micronaut.inject.errors
 
-import io.micronaut.AbstractBeanDefinitionSpec
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
-import io.micronaut.inject.qualifiers.One
 
 class GroovySingletonSpec extends AbstractBeanDefinitionSpec {
 

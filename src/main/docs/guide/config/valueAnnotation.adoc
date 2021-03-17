@@ -1,4 +1,4 @@
-You can inject configuration values into beans with Micronaut using the ann:io.micronaut.context.annotation.Value[] annotation.
+You can inject configuration values into beans using the ann:io.micronaut.context.annotation.Value[] annotation.
 
 === Using the `@Value` Annotation
 
@@ -9,8 +9,7 @@ snippet::io.micronaut.docs.config.value.EngineImpl[tags="imports,class",indent=0
 <1> The `@Value` annotation accepts a string that can have embedded placeholder values (the default value can be provided by specifying a value after the colon `:` character).
 <2> The injected value can then be used within code.
 
-
-Note that `@Value` can also be used to inject a static value, for example the following will inject the number 10:
+Note that `@Value` can also be used to inject a static value. For example the following injects the number 10:
 
 .Static @Value Example
 [source,groovy]
@@ -19,7 +18,7 @@ Note that `@Value` can also be used to inject a static value, for example the fo
 int number;
 ----
 
-However it is definitely more useful when used to compose injected values combining static content and placeholders. For example to setup a URL:
+This is even more useful when used to compose injected values combining static content and placeholders. For example to set up a URL:
 
 .Placeholders with @Value
 [source,groovy]
@@ -28,9 +27,9 @@ However it is definitely more useful when used to compose injected values combin
 URL url;
 ----
 
-In the above example the URL is constructed from 2 placeholder properties that must be present in configuration: `my.host` and `my.port`.
+In the above example the URL is constructed from two placeholder properties that must be present in configuration: `my.host` and `my.port`.
 
-Remember that to specify a default value in a placeholder expression, you should use the colon `:` character, however if the default you are trying to specify has a colon then you should escape the value with back ticks. For example:
+Remember that to specify a default value in a placeholder expression, you use the colon `:` character. However, if the default you specify includes a colon, you must escape the value with backticks. For example:
 
 .Placeholders with @Value
 [source,groovy]
@@ -41,8 +40,7 @@ URL url;
 
 Note that there is nothing special about `@Value` itself regarding the resolution of property value placeholders.
 
-
-Due to Micronaut's extensive support for annotation metadata you can in fact use property placeholder expressions on any annotation. For example, to make the path of a `@Controller` configurable you can do:
+Due to Micronaut's extensive support for annotation metadata you can use property placeholder expressions on any annotation. For example, to make the path of a `@Controller` configurable you can do:
 
 [source,java]
 ----
@@ -52,7 +50,7 @@ class HelloController {
 }
 ----
 
-In the above case if `hello.controller.path` is specified in configuration then the controller will be mapped to the path specified otherwise it will be mapped to `/hello`.
+In the above case, if `hello.controller.path` is specified in configuration the controller will be mapped to the specified path, otherwise it will be mapped to `/hello`.
 
 You can also make the target server for ann:io.micronaut.http.client.annotation.Client[] configurable (although service discovery approaches are often better), for example:
 
@@ -64,12 +62,11 @@ interface HelloClient {
 }
 ----
 
-In the above example the property `my.server.url` can be used to configure the client otherwise the client will fallback to a localhost address.
-
+In the above example the property `my.server.url` can be used to configure the client, otherwise the client falls back to a localhost address.
 
 === Using the `@Property` Annotation
 
-Recall that the ann:io.micronaut.context.annotation.Value[] annotation receives a String value which is a mix of static content and placeholder expressions. This can lead to confusion if you attempt to do the following:
+Recall that the ann:io.micronaut.context.annotation.Value[] annotation receives a String value which can be a mix of static content and placeholder expressions. This can lead to confusion if you attempt to do the following:
 
 .Incorrect usage of `@Value`
 [source,groovy]
@@ -78,19 +75,19 @@ Recall that the ann:io.micronaut.context.annotation.Value[] annotation receives 
 String url;
 ----
 
-In the above case the value `my.url` will be injected and set to the `url` field and *not* the value of the `my.url` property from your application configuration, this is because `@Value` only resolves placeholders within the value specified to it.
+In the above case the literal string value `my.url` is injected and set to the `url` field and *not* the value of the `my.url` property from your application configuration. This is because `@Value` only resolves placeholders within the value specified to it.
 
-If you wish to inject a specific property name then you may be better off using ann:io.micronaut.context.annotation.Property[]:
+To inject a specific property name, you may be better off using ann:io.micronaut.context.annotation.Property[]:
 
 snippet::io.micronaut.docs.config.property.Engine[tags="imports,class",indent=0, title="Using @Property"]
 
-<1> The `my.engine.cylinders` property will be resolved from configuration and injected directly into the field.
-<2> Fields subjected to injection should never be private otherwise expensive reflection must be used
+<1> The `my.engine.cylinders` property is resolved from configuration and injected into the field.
+<2> Fields subject to injection should not be private because expensive reflection must be used
 <3> The `@Property` annotation is used to inject through the setter
 
-NOTE: Because it is not possible to define a default value with `@Property`, if the value doesn't exist or cannot be converted to the required type, the bean instantiation will fail.
+NOTE: Because it is not possible to define a default value with `@Property`, if the value doesn't exist or cannot be converted to the required type, bean instantiation will fail.
 
-The above will instead inject the value of the `my.url` property resolved from application configuration. If the property can not be found in configuration, an exception will be thrown. As with other types of injection, the injection point can also be annotated with `@Nullable` to make the injection optional.
+The above instead injects the value of the `my.url` property resolved from application configuration. If the property cannot be found in configuration, an exception is thrown. As with other types of injection, the injection point can also be annotated with `@Nullable` to make the injection optional.
 
 You can also use this feature to resolve sub maps. For example, consider the following configuration:
 
@@ -98,19 +95,18 @@ You can also use this feature to resolve sub maps. For example, consider the fol
 [source,yaml]
 ----
 datasources:
-    default:
-        name: 'mydb'
+  default:
+    name: 'mydb'
 jpa:
-    default:
-        properties:
-            hibernate:
-                hbm2ddl:
-                    auto: update
-                show_sql: true
+  default:
+    properties:
+      hibernate:
+        hbm2ddl:
+          auto: update
+        show_sql: true
 ----
 
-If you wish to resolve a flattened map containing only the properties starting with `hibernate` then you can do so with `@Property`, for example:
-
+To resolve a flattened map containing only the properties starting with `hibernate`, use `@Property`, for example:
 
 .Using `@Property`
 [source,java]
@@ -121,4 +117,4 @@ Map<String, String> jpaProperties;
 
 The injected map will contain the keys `hibernate.hbm2ddl.auto` and `hibernate.show_sql` and their values.
 
-TIP: The ann:io.micronaut.core.convert.format.MapFormat[] annotation can be used to customize the injected map depending whether you want nested keys, flat keys and it allows customization of the key style via the api:io.micronaut.core.naming.conventions.StringConvention[] enum.
+TIP: The ann:io.micronaut.core.convert.format.MapFormat[] annotation can be used to customize the injected map depending on whether you want nested keys or flat keys, and it allows customization of the key style via the api:io.micronaut.core.naming.conventions.StringConvention[] enum.

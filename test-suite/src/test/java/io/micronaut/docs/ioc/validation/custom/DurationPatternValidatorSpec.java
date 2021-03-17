@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.ioc.validation.custom;
 
-import io.micronaut.test.annotation.MicronautTest;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
 
 import javax.inject.Inject;
@@ -33,9 +33,9 @@ class DurationPatternValidatorSpec {
     @Test
     void testCustomValidator() {
         final ConstraintViolationException exception =
-                assertThrows(ConstraintViolationException.class, () ->
-                        holidayService.startHoliday("Fred", "junk")   // <1>
-                );
+            assertThrows(ConstraintViolationException.class, () ->
+                holidayService.startHoliday("Fred", "junk") // <1>
+            );
 
         assertEquals("startHoliday.duration: invalid duration (junk)", exception.getMessage()); // <2>
     }

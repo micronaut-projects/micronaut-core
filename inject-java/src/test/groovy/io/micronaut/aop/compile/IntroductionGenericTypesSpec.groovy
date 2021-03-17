@@ -110,20 +110,21 @@ class SubPerson extends Person {}
         then:
         !beanDefinition.isAbstract()
         beanDefinition != null
-        returnType(beanDefinition, "getPeopleMap").typeVariables['K'].type.name == 'test.SubPerson'
-        returnType(beanDefinition, "getPeopleMap").typeVariables['V'].type == URL
-        returnType(beanDefinition, "getPeopleSingle").typeVariables['T'].type== List
-        returnType(beanDefinition, "getPeopleSingle").typeVariables['T'].typeVariables['E'].type.name == 'test.SubPerson'
         returnType(beanDefinition, "getPerson").type.name == 'test.SubPerson'
         returnType(beanDefinition, "getPeople").type == List
         returnType(beanDefinition, "getPeople").asArgument().hasTypeVariables()
         returnType(beanDefinition, "getPeople").asArgument().typeVariables['E'].type.name == 'test.SubPerson'
+        returnType(beanDefinition, "getPeopleMap").typeVariables['K'].type.name == 'test.SubPerson'
+        returnType(beanDefinition, "getPeopleMap").typeVariables['V'].type == URL
         returnType(beanDefinition, "getPeopleArray").type.isArray()
         returnType(beanDefinition, "getPeopleArray").type.name.contains('test.SubPerson')
         returnType(beanDefinition, "getPeopleListArray").type == List
         returnType(beanDefinition, "getPeopleListArray").typeVariables['E'].type.isArray()
         beanDefinition.findPossibleMethods("save").findFirst().get().targetMethod != null
         beanDefinition.findPossibleMethods("getPerson").findFirst().get().targetMethod != null
+        def getPeopleSingle = returnType(beanDefinition, "getPeopleSingle")
+        getPeopleSingle.typeVariables['T'].type== List
+        getPeopleSingle.typeVariables['T'].typeVariables['E'].type.name == 'test.SubPerson'
 
 
         when:

@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.naming;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * An interface for components that are named.

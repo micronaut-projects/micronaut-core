@@ -17,12 +17,19 @@ package io.micronaut.docs.server.exception
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
+import static org.junit.Assert.assertEquals
+import static org.junit.Assert.assertEquals
 
 class ExceptionHandlerSpec extends Specification {
 
@@ -38,12 +45,15 @@ class ExceptionHandlerSpec extends Specification {
 
     void "test OutOfStockException is handled by ExceptionHandler"() {
         when:
+        Argument<Map<String, Object>> errorType = Argument.mapOf(String.class, Object.class);
         HttpRequest request = HttpRequest.GET('/books/stock/1234')
-        Integer stock = client.toBlocking().retrieve(request, Integer)
+        client.toBlocking().retrieve(request, Argument.LONG, errorType)
 
         then:
-        noExceptionThrown()
-        stock != null
-        stock == 0
+        def ex = thrown(HttpClientResponseException)
+        HttpResponse response = ex.getResponse()
+        Map<String, Object> body = (Map<String, Object>) response.getBody(errorType).get()
+        response.status() == HttpStatus.BAD_REQUEST
+        body.get("message") == "No stock available"
     }
 }

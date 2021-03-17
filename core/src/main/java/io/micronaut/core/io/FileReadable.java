@@ -18,7 +18,7 @@ package io.micronaut.core.io;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.Files;

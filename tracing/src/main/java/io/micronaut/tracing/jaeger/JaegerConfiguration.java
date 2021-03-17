@@ -24,7 +24,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.inject.Inject;
 
 import static io.jaegertracing.Configuration.JAEGER_SERVICE_NAME;

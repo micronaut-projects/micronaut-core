@@ -1,14 +1,16 @@
-You may need to resolve the host name of the current server. Micronaut ships with an implementation of the api:http.server.util.HttpHostResolver[] interface.
+You may need to resolve the host name of the current server. Micronaut includes an implementation of the api:http.server.util.HttpHostResolver[] interface.
 
-The default implementation will look for host information in the following places in order:
+The default implementation looks for host information in the following places in order:
 
-1. The supplied configuration
-2. The `Forwarded` header
-3. The `X-Forwarded-` headers. If the `X-Forwarded-Host` header is not present, the other `X-Forwarded` headers are ignored.
-4. The `Host` header
-5. The properties on the request URI
-6. The properties on the embedded server URI
+. The supplied configuration
+. The `Forwarded` header
+. `X-Forwarded-` headers. If the `X-Forwarded-Host` header is not present, the other `X-Forwarded` headers are ignored.
+. The `Host` header
+. The properties on the request URI
+. The properties on the embedded server URI
 
 The behavior of which headers to pull the relevant data can be changed with the following configuration:
 
 include::{includedir}configurationProperties/io.micronaut.http.server.HttpServerConfiguration$HostResolutionConfiguration.adoc[]
+
+The above configuration also supports an allowed host list. Configuring this list ensures any resolved host matches one of the supplied regular expression patterns. That is useful to prevent host cache poisoning attacks and is recommended to be configured.

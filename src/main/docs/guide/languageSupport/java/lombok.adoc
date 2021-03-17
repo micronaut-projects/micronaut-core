@@ -1,8 +1,8 @@
 https://projectlombok.org[Project Lombok] is a popular java library that adds a number of useful AST transformations to the Java language via annotation processors.
 
-Since both Micronaut and Lombok use annotation processors, special care needs to be taken when configuring Lombok to ensure that the Lombok processor runs *before* Micronaut's processor.
+Since both Micronaut and Lombok use annotation processors, special care must be taken when configuring Lombok to ensure that the Lombok processor runs *before* Micronaut's processor.
 
-For example in Gradle adding the following dependencies to the `dependencies` block:
+If you use Gradle, add the following dependencies:
 
 .Configuring Lombok in Gradle
 [source,groovy]
@@ -10,11 +10,11 @@ For example in Gradle adding the following dependencies to the `dependencies` bl
 compileOnly 'org.projectlombok:lombok:1.18.12'
 annotationProcessor "org.projectlombok:lombok:1.18.12"
 ...
-// Micronaut processor define after Lombok
+// Micronaut processor defined after Lombok
 annotationProcessor "io.micronaut:micronaut-inject-java"
 ----
 
-Or when using Maven:
+Or if using Maven:
 
 .Configuring Lombok in Maven
 [source,xml]
@@ -48,4 +48,4 @@ Or when using Maven:
 </annotationProcessorPaths>
 ----
 
-NOTE: In both cases (Gradle and Maven) the Micronaut processor should be configured after the Lombok processor, reversing the order of the declared dependencies will not work.
+NOTE: In both cases (Gradle and Maven) the Micronaut processor must be configured after the Lombok processor. Reversing the order of the declared dependencies will not work.

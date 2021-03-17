@@ -15,36 +15,28 @@
  */
 package io.micronaut.annotation.processing;
 
-import static javax.lang.model.element.Modifier.ABSTRACT;
-import static javax.lang.model.element.Modifier.FINAL;
-import static javax.lang.model.element.Modifier.PRIVATE;
-import static javax.lang.model.element.Modifier.PROTECTED;
-import static javax.lang.model.element.Modifier.PUBLIC;
-import static javax.lang.model.element.Modifier.STATIC;
-import static javax.lang.model.type.TypeKind.ARRAY;
-import static javax.lang.model.type.TypeKind.ERROR;
-import static javax.lang.model.type.TypeKind.NONE;
-import static javax.lang.model.type.TypeKind.VOID;
-
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.lang.model.element.*;
-import javax.lang.model.type.*;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import java.lang.reflect.Array;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static javax.lang.model.element.Modifier.*;
+import static javax.lang.model.type.TypeKind.NONE;
 
 /**
  * Provides utility method for working with the annotation processor AST.
@@ -207,25 +199,42 @@ public class ModelUtils {
      */
     @Nullable
     public ExecutableElement concreteConstructorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
-        List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
-        if (constructors.isEmpty()) {
-            return null;
-        }
-        if (constructors.size() == 1) {
-            return constructors.get(0);
-        }
+        if (JavaModelUtils.isRecord(classElement)) {
+            final List<ExecutableElement> constructors = ElementFilter
+                    .constructorsIn(classElement.getEnclosedElements());
+            Optional<ExecutableElement> element = findAnnotatedConstructor(annotationUtils, constructors);
+            if (element.isPresent()) {
+                 return element.get();
+            } else {
 
-        Optional<ExecutableElement> element = constructors.stream().filter(ctor -> {
+                // with records the record constructor is always the last constructor
+                return constructors.get(constructors.size() - 1);
+            }
+        } else {
+            List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
+            if (constructors.isEmpty()) {
+                return null;
+            }
+            if (constructors.size() == 1) {
+                return constructors.get(0);
+            }
+
+            Optional<ExecutableElement> element = findAnnotatedConstructor(annotationUtils, constructors);
+            if (!element.isPresent()) {
+                element = constructors.stream().filter(ctor ->
+                        ctor.getModifiers().contains(PUBLIC)
+                ).findFirst();
+            }
+            return element.orElse(null);
+        }
+    }
+
+    private Optional<ExecutableElement> findAnnotatedConstructor(AnnotationUtils annotationUtils, List<ExecutableElement> constructors) {
+        return constructors.stream().filter(ctor -> {
                     final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
                     return annotationMetadata.hasStereotype(Inject.class) || annotationMetadata.hasStereotype(Creator.class);
                 }
         ).findFirst();
-        if (!element.isPresent()) {
-            element = constructors.stream().filter(ctor ->
-                ctor.getModifiers().contains(PUBLIC)
-            ).findFirst();
-        }
-        return element.orElse(null);
     }
 
     /**
@@ -369,27 +378,6 @@ public class ModelUtils {
     }
 
     /**
-     * Obtains the class for a given primitive type name.
-     *
-     * @param primitiveType The primitive type name
-     * @return The primtitive type class
-     */
-    Class<?> classOfPrimitiveFor(String primitiveType) {
-        return ClassUtils.getPrimitiveType(primitiveType).orElseThrow(() -> new IllegalArgumentException("Unknown primitive type: " + primitiveType));
-    }
-
-    /**
-     * Obtains the class for the given primitive type array.
-     *
-     * @param primitiveType The primitive type
-     * @return The class
-     */
-    Class<?> classOfPrimitiveArrayFor(String primitiveType) {
-        return ClassUtils.arrayTypeForPrimitive(primitiveType)
-                    .orElseThrow(() -> new IllegalArgumentException("Unsupported primitive type " + primitiveType));
-    }
-
-    /**
      * Obtains the super type element for a given type element.
      *
      * @param element The type element
@@ -405,19 +393,6 @@ public class ModelUtils {
     }
 
     /**
-     * @param typeElement The {@link TypeElement}
-     * @return The resolved type reference or the qualified name for the type element
-     */
-    Object resolveTypeReference(TypeElement typeElement) {
-        TypeMirror type = typeElement.asType();
-        if (type != null) {
-            return resolveTypeReference(type);
-        } else {
-            return typeElement.getQualifiedName().toString();
-        }
-    }
-
-    /**
      * Return whether the given element is the java.lang.Object class.
      *
      * @param element The element
@@ -428,45 +403,23 @@ public class ModelUtils {
     }
 
     /**
-     * Resolves a type reference for the given element. A type reference is either a reference to the concrete
-     * {@link Class} or a String representing the type name.
-     *
-     * @param element The element
-     * @return The type reference
-     */
-    @Nullable
-    Object resolveTypeReference(Element element) {
-        if (element instanceof TypeElement) {
-            TypeElement typeElement = (TypeElement) element;
-            return resolveTypeReferenceForTypeElement(typeElement);
-        }
-        return null;
-    }
-
-    /**
-     * Resolves a type reference for the given type element. A type reference is either a reference to the concrete
-     * {@link Class} or a String representing the type name.
-     *
-     * @param typeElement The type
-     * @return The type reference
-     */
-
-    String resolveTypeReferenceForTypeElement(TypeElement typeElement) {
-        return JavaModelUtils.getClassName(typeElement);
-    }
-
-    /**
      * Resolves a type name for the given name.
      *
      * @param type The type
      * @return The type reference
      */
     String resolveTypeName(TypeMirror type) {
-        Object reference = resolveTypeReference(type);
-        if (reference instanceof Class) {
-            return ((Class) reference).getName();
+        TypeMirror typeMirror = resolveTypeReference(type);
+        if (typeMirror.getKind().isPrimitive()) {
+            return typeMirror.toString();
         }
-        return reference.toString();
+
+        TypeElement typeElement = (TypeElement) typeUtils.asElement(typeMirror);
+        if (typeElement != null) {
+            return elementUtils.getBinaryName(typeElement).toString();
+        } else {
+            return typeUtils.erasure(typeMirror).toString();
+        }
     }
 
     /**
@@ -476,42 +429,20 @@ public class ModelUtils {
      * @param type The type
      * @return The type reference
      */
-    Object resolveTypeReference(TypeMirror type) {
-        Object result = Void.TYPE;
-        if (type.getKind().isPrimitive()) {
-            result = resolvePrimitiveTypeReference(type);
-        } else if (type.getKind() == ARRAY) {
-            ArrayType arrayType = (ArrayType) type;
-            TypeMirror componentType = arrayType.getComponentType();
-            int dimension = 1;
-            while (componentType.getKind() == ARRAY) {
-                componentType = ((ArrayType) componentType).getComponentType();
-                dimension++;
+    TypeMirror resolveTypeReference(TypeMirror type) {
+        TypeKind typeKind = type.getKind();
+        if (typeKind.isPrimitive()) {
+            return type;
+        } else if (typeKind == TypeKind.DECLARED) {
+            DeclaredType dt = (DeclaredType) type;
+            if (dt.getTypeArguments().isEmpty()) {
+                return dt;
             }
-            if (componentType.getKind().isPrimitive()) {
-                result = Array.newInstance(resolvePrimitiveTypeReference(componentType), new int[dimension]).getClass();
-            } else {
-                final TypeMirror erased = typeUtils.erasure(componentType);
-                final Element e = typeUtils.asElement(erased);
-                if (e instanceof TypeElement) {
-                    StringBuilder typeString = new StringBuilder(resolveTypeReferenceForTypeElement((TypeElement) e));
-                    for (int i = 0; i < dimension; i++) {
-                        typeString.append("[]");
-                    }
-                    result = typeString.toString();
-                }
-            }
-        } else if (type.getKind() != VOID && type.getKind() != ERROR) {
-            final TypeMirror erased = typeUtils.erasure(type);
-            final Element element = typeUtils.asElement(erased);
-            if (element instanceof TypeElement) {
-                TypeElement te = (TypeElement) element;
-                result = resolveTypeReferenceForTypeElement(te);
-            }
+            return typeUtils.erasure(type);
+        } else {
+            return typeUtils.erasure(type);
         }
-        return result;
     }
-
 
     /**
      * Returns whether an element is package private.
@@ -519,11 +450,74 @@ public class ModelUtils {
      * @param element The element
      * @return True if it is package provide
      */
-    boolean isPackagePrivate(Element element) {
+    public boolean isPackagePrivate(Element element) {
         Set<Modifier> modifiers = element.getModifiers();
         return !(modifiers.contains(PUBLIC)
             || modifiers.contains(PROTECTED)
             || modifiers.contains(PRIVATE));
+    }
+
+    /**
+     * @param aClass A class
+     * @return All the interfaces
+     */
+    public Set<TypeElement> getAllInterfaces(TypeElement aClass) {
+        SortedSet<TypeElement> interfaces = new TreeSet<>((o1, o2) -> {
+            if (typeUtils.isSubtype(o1.asType(), o2.asType())) {
+                return -1;
+            } else if (o1.equals(o2)) {
+                return 0;
+            } else {
+                return 1;
+            }
+        });
+        return populateInterfaces(aClass, interfaces);
+    }
+
+    /**
+     * @param aClass     A class
+     * @param interfaces The interfaces
+     * @return A set with the interfaces
+     */
+    @SuppressWarnings("Duplicates")
+    private Set<TypeElement> populateInterfaces(TypeElement aClass, Set<TypeElement> interfaces) {
+        List<? extends TypeMirror> theInterfaces = aClass.getInterfaces();
+        interfaces.addAll(theInterfaces.stream().flatMap(tm -> {
+            TypeMirror erased = typeUtils.erasure(tm);
+            if (erased instanceof DeclaredType) {
+                Element e = ((DeclaredType) erased).asElement();
+                if (e instanceof TypeElement) {
+                    return Stream.of((TypeElement) e);
+                }
+            }
+            return Stream.empty();
+        }).collect(Collectors.toSet()));
+        for (TypeMirror theInterface : theInterfaces) {
+            TypeMirror erased = typeUtils.erasure(theInterface);
+            if (erased instanceof DeclaredType) {
+                Element e = ((DeclaredType) erased).asElement();
+                if (e instanceof TypeElement) {
+                    populateInterfaces(((TypeElement) e), interfaces);
+                }
+            }
+        }
+        if (aClass.getKind() != ElementKind.INTERFACE) {
+            TypeMirror superclass = aClass.getSuperclass();
+            while (superclass != null) {
+                TypeMirror erased = typeUtils.erasure(superclass);
+                if (erased instanceof DeclaredType) {
+                    Element e = ((DeclaredType) erased).asElement();
+                    if (e instanceof TypeElement) {
+                        TypeElement superTypeElement = (TypeElement) e;
+                        populateInterfaces(superTypeElement, interfaces);
+                        superclass = superTypeElement.getSuperclass();
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+        return interfaces;
     }
 
     /**
@@ -541,6 +535,23 @@ public class ModelUtils {
         return declaringClass != concreteClass &&
             !packageOfDeclaringClass.getQualifiedName().equals(packageOfConcreteClass.getQualifiedName())
             && (isProtected(methodOrField) || !isPublic(methodOrField));
+    }
+
+    /**
+     * Return whether the given method or field is inherited but not public.
+     *
+     * @param concreteClass  The concrete class
+     * @param declaringClass The declaring class of the field
+     * @param methodOrField  The method or field
+     * @return True if it is inherited and not public
+     */
+    boolean isInheritedAndNotPublic(ClassElement concreteClass, ClassElement declaringClass, io.micronaut.inject.ast.Element methodOrField) {
+        String packageOfDeclaringClass = declaringClass.getPackageName();
+        String packageOfConcreteClass = concreteClass.getPackageName();
+
+        return declaringClass != concreteClass &&
+                !packageOfDeclaringClass.equals(packageOfConcreteClass)
+                && (methodOrField.isProtected() || !methodOrField.isPublic());
     }
 
     /**
@@ -646,44 +657,6 @@ public class ModelUtils {
      */
     boolean isOptional(TypeMirror mirror) {
         return typeUtils.erasure(mirror).toString().equals(Optional.class.getName());
-    }
-
-    private Class resolvePrimitiveTypeReference(TypeMirror type) {
-        Class result;
-        if (type instanceof DeclaredType) {
-            DeclaredType dt = (DeclaredType) type;
-            result = classOfPrimitiveFor(dt.asElement().getSimpleName().toString());
-        } else {
-            if (type instanceof PrimitiveType) {
-                PrimitiveType pt = (PrimitiveType) type;
-                TypeKind kind = pt.getKind();
-                switch (kind) {
-                    case VOID:
-                        return void.class;
-                    case INT:
-                        return int.class;
-                    case BYTE:
-                        return byte.class;
-                    case CHAR:
-                        return char.class;
-                    case LONG:
-                        return long.class;
-                    case FLOAT:
-                        return float.class;
-                    case SHORT:
-                        return short.class;
-                    case DOUBLE:
-                        return double.class;
-                    case BOOLEAN:
-                        return boolean.class;
-                    default:
-                        result = classOfPrimitiveFor(type.toString());
-                }
-            } else {
-                result = classOfPrimitiveFor(type.toString());
-            }
-        }
-        return result;
     }
 
     /**

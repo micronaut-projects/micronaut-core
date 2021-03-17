@@ -15,9 +15,6 @@
  */
 package io.micronaut.docs.config.properties
 
-import io.micronaut.context.annotation.ConfigurationProperties
-import io.micronaut.core.convert.format.MapFormat
-
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties
 
@@ -34,12 +31,12 @@ class EngineConfig {
 
     @Min(1L)
     int cylinders
+
     CrankShaft crankShaft = new CrankShaft()
 
     @ConfigurationProperties('crank-shaft')
     static class CrankShaft { // <4>
         Optional<Double> rodLength = Optional.empty() // <5>
     }
-
 }
 // end::class[]

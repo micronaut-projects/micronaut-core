@@ -16,7 +16,6 @@
 package io.micronaut.docs.writable;
 
 //tag::imports[]
-
 import groovy.text.SimpleTemplateEngine;
 import groovy.text.Template;
 import io.micronaut.core.io.Writable;
@@ -32,11 +31,7 @@ import io.micronaut.http.server.exceptions.HttpServerException;
 public class TemplateController {
 
     private final SimpleTemplateEngine templateEngine = new SimpleTemplateEngine();
-    private final Template template;
-
-    public TemplateController() {
-        template = initTemplate(); // <1>
-    }
+    private final Template template = initTemplate(); // <1>
 
     @Get(value = "/welcome", produces = MediaType.TEXT_PLAIN)
     Writable render() { // <2>
@@ -49,15 +44,13 @@ public class TemplateController {
     }
 
     private Template initTemplate() {
-        Template template;
         try {
-            template = templateEngine.createTemplate(
+            return templateEngine.createTemplate(
                     "Dear $firstName $lastName. Nice to meet you."
             );
         } catch (Exception e) {
             throw new HttpServerException("Cannot create template");
         }
-        return template;
     }
 }
 //end::clazz[]

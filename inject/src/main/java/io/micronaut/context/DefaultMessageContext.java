@@ -17,8 +17,8 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;

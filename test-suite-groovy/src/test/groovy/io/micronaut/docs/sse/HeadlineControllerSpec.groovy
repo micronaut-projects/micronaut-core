@@ -1,9 +1,8 @@
 package io.micronaut.docs.sse
 
-
 import io.micronaut.docs.streaming.Headline
 import io.micronaut.http.sse.Event
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import org.junit.Test
 import spock.lang.Specification
 

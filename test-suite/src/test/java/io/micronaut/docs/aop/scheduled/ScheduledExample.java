@@ -38,22 +38,22 @@ public class ScheduledExample {
     // end::fixedDelay[]
 
     // tag::cron[]
-    @Scheduled(cron = "0 15 10 ? * MON" )
+    @Scheduled(cron = "0 15 10 ? * MON")
     void everyMondayAtTenFifteenAm() {
         System.out.println("Executing everyMondayAtTenFifteenAm()");
     }
     // end::cron[]
 
     // tag::initialDelay[]
-    @Scheduled(initialDelay = "1m" )
+    @Scheduled(initialDelay = "1m")
     void onceOneMinuteAfterStartup() {
         System.out.println("Executing onceOneMinuteAfterStartup()");
     }
     // end::initialDelay[]
 
     // tag::configured[]
-    @Scheduled( fixedRate = "${my.task.rate:5m}",
-                initialDelay = "${my.task.delay:1m}" )
+    @Scheduled(fixedRate = "${my.task.rate:5m}",
+            initialDelay = "${my.task.delay:1m}")
     void configuredTask() {
         System.out.println("Executing configuredTask()");
     }

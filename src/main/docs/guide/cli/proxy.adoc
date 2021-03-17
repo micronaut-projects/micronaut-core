@@ -1,4 +1,3 @@
-
 To configure the CLI to use an HTTP proxy there are two steps. Configuration options can be passed to the cli through the `MN_OPTS` environment variable.
 
 For example on *nix systems:

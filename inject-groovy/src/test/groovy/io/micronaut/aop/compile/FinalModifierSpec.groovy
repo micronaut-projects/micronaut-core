@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop.compile
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 
 class FinalModifierSpec extends AbstractBeanDefinitionSpec {
     void "test final modifier with AOP advice doesn't compile"() {

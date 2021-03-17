@@ -26,8 +26,10 @@ import javax.validation.constraints.PositiveOrZero
 
 // tag::class[]
 @Introspected
-data class MovieTicketBean(val httpRequest: HttpRequest<Any>,
-                           @field:PathVariable val movieId: String,
-                           @field:QueryValue @field:PositiveOrZero @field:Nullable val minPrice: Double,
-                           @field:QueryValue @field:PositiveOrZero @field:Nullable val maxPrice: Double)
+data class MovieTicketBean(
+    val httpRequest: HttpRequest<Any>,
+    @field:PathVariable val movieId: String,
+    @field:QueryValue @field:PositiveOrZero @field:Nullable val minPrice: Double,
+    @field:QueryValue @field:PositiveOrZero @field:Nullable val maxPrice: Double
+)
 // end::class[]

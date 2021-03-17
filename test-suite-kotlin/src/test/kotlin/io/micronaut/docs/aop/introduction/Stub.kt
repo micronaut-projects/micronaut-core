@@ -16,24 +16,22 @@
 package io.micronaut.docs.aop.introduction
 
 // tag::imports[]
-
 import io.micronaut.aop.Introduction
 import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Type
-
-import java.lang.annotation.Documented
-import java.lang.annotation.Retention
-
-import java.lang.annotation.RetentionPolicy.RUNTIME
-
+import kotlin.annotation.AnnotationRetention.RUNTIME
+import kotlin.annotation.AnnotationTarget.ANNOTATION_CLASS
+import kotlin.annotation.AnnotationTarget.CLASS
+import kotlin.annotation.AnnotationTarget.FILE
+import kotlin.annotation.AnnotationTarget.FUNCTION
+import kotlin.annotation.AnnotationTarget.PROPERTY_GETTER
+import kotlin.annotation.AnnotationTarget.PROPERTY_SETTER
 // end::imports[]
 
 // tag::class[]
 @Introduction // <1>
-@Type(StubIntroduction::class) // <2>
-@Bean // <3>
-@Documented
+@Bean // <2>
+@MustBeDocumented
 @Retention(RUNTIME)
-@Target(AnnotationTarget.CLASS, AnnotationTarget.FILE, AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER)
+@Target(CLASS, FILE, ANNOTATION_CLASS, FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
 annotation class Stub(val value: String = "")
 // end::class[]

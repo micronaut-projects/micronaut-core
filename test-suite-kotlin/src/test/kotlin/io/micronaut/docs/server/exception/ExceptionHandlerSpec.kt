@@ -1,11 +1,15 @@
 package io.micronaut.docs.server.exception
 
 import io.kotlintest.shouldBe
+import io.kotlintest.shouldThrow
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import org.junit.AfterClass
 import org.junit.BeforeClass
@@ -28,9 +32,19 @@ class ExceptionHandlerSpec: StringSpec() {
     init {
         "test exception is handled"() {
             val request = HttpRequest.GET<Any>("/books/stock/1234")
-            val stock = client!!.toBlocking().retrieve(request, Long::class.javaPrimitiveType)
+            val errorType = Argument.mapOf(
+                String::class.java,
+                Any::class.java
+            )
+            val ex = shouldThrow<HttpClientResponseException> {
+                client!!.toBlocking().retrieve(request, Argument.LONG, errorType)
+            }
 
-            stock shouldBe 0
+            val response = ex.response
+            val body = response.getBody(errorType).get() as Map<String, Any>
+
+            response.status().shouldBe(HttpStatus.BAD_REQUEST)
+            body["message"].shouldBe("No stock available")
         }
     }
 }

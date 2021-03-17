@@ -15,11 +15,12 @@
  */
 package io.micronaut.inject.annotation.internal;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.inject.annotation.NamedAnnotationMapper;
+import io.micronaut.inject.annotation.NamedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
@@ -30,7 +31,7 @@ import java.util.List;
  * @author graemerocher
  * @since 1.1.4
  */
-public class KotlinNullableMapper implements NamedAnnotationMapper {
+public class KotlinNullableMapper implements NamedAnnotationTransformer {
     @NonNull
     @Override
     public String getName() {
@@ -38,7 +39,7 @@ public class KotlinNullableMapper implements NamedAnnotationMapper {
     }
 
     @Override
-    public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
-        return Collections.singletonList(AnnotationValue.builder("javax.annotation.Nullable").build());
+    public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
+        return Collections.singletonList(AnnotationValue.builder(AnnotationUtil.NULLABLE).build());
     }
 }

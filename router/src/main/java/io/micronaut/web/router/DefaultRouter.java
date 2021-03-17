@@ -28,8 +28,8 @@ import io.micronaut.http.filter.HttpServerFilterResolver;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.web.router.exceptions.RoutingException;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URI;

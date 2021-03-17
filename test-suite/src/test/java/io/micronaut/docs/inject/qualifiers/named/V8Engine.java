@@ -19,7 +19,7 @@ import javax.inject.Singleton;
 
 // tag::class[]
 @Singleton
-public class V8Engine implements Engine {
+public class V8Engine implements Engine {  // <3>
     @Override
     public String start() {
         return "Starting V8";

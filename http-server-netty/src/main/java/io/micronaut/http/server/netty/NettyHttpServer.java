@@ -15,7 +15,8 @@
  */
 package io.micronaut.http.server.netty;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.env.Environment;
@@ -42,6 +43,7 @@ import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ServerStartupException;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
@@ -54,7 +56,7 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.runtime.server.EmbeddedServerInstance;
+import io.micronaut.discovery.EmbeddedServerInstance;
 import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskExecutors;
@@ -86,9 +88,8 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.io.File;
 import java.net.*;
@@ -97,6 +98,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
@@ -169,6 +171,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param httpCompressionStrategy                 The http compression strategy
      * @param httpContentProcessorResolver            The http content processor resolver
      * @param channelOptionFactory                    The channel option factory
+     * @param errorResponseProcessor                  The factory to create error responses
      */
     @SuppressWarnings("ParameterNumber")
     public NettyHttpServer(
@@ -179,7 +182,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
             StaticResourceResolver resourceResolver,
-            @javax.inject.Named(TaskExecutors.IO) Provider<ExecutorService> ioExecutor,
+            @javax.inject.Named(TaskExecutors.IO) BeanProvider<ExecutorService> ioExecutor,
             @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
             ExecutorSelector executorSelector,
             @Nullable ServerSslBuilder serverSslBuilder,
@@ -188,7 +191,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             EventLoopGroupRegistry eventLoopGroupRegistry,
             HttpCompressionStrategy httpCompressionStrategy,
             HttpContentProcessorResolver httpContentProcessorResolver,
-            ChannelOptionFactory channelOptionFactory
+            ChannelOptionFactory channelOptionFactory,
+            ErrorResponseProcessor<?> errorResponseProcessor
     ) {
         this.httpCompressionStrategy = httpCompressionStrategy;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
@@ -234,7 +238,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 requestArgumentSatisfier,
                 executorSelector,
                 SupplierUtil.memoized(ioExecutor::get),
-                httpContentProcessorResolver
+                httpContentProcessorResolver,
+                errorResponseProcessor
         );
         this.channelOptionFactory = channelOptionFactory;
     }
@@ -439,8 +444,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         String configName = workerConfig != null ? workerConfig.getName() : EventLoopGroupConfiguration.DEFAULT;
         return eventLoopGroupRegistry.getEventLoopGroup(configName)
                 .orElseGet(() -> {
-                    LOG.warn("The configuration for 'micronaut.server.netty.worker.event-loop-groups.{}' is deprecated. " +
-                        "Use 'micronaut.netty.event-loops' configuration instead.", configName);
+                    LOG.warn("The configuration for 'micronaut.server.netty.worker.{}' is deprecated. " +
+                        "Use 'micronaut.netty.event-loops.default' configuration instead.", configName);
                     final EventLoopGroup newGroup = newEventLoopGroup(workerConfig);
                     shutdownWorker = true;
                     return newGroup;
@@ -518,8 +523,16 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private void stopInternal() {
         try {
             if (shutdownParent) {
-                parentGroup.shutdownGracefully()
+                EventLoopGroupConfiguration parent = serverConfiguration.getParent();
+                if (parent != null) {
+                    long quietPeriod = parent.getShutdownQuietPeriod().toMillis();
+                    long timeout = parent.getShutdownTimeout().toMillis();
+                    parentGroup.shutdownGracefully(quietPeriod, timeout, TimeUnit.MILLISECONDS)
                         .addListener(this::logShutdownErrorIfNecessary);
+                } else {
+                    parentGroup.shutdownGracefully()
+                            .addListener(this::logShutdownErrorIfNecessary);
+                }
             }
             if (shutdownWorker) {
                 workerGroup.shutdownGracefully()

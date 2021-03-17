@@ -56,7 +56,7 @@ class IntrospectionSpec {
         val vehicle = introspection.instantiate("Subaru", "WRX", 2)
         assertEquals("Subaru", vehicle.make)
         assertEquals("WRX", vehicle.model)
-        assertEquals(2, vehicle.axels)
+        assertEquals(2, vehicle.axles)
     }
 
     @Test

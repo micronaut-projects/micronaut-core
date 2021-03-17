@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.reflect.Method;
 
 /**

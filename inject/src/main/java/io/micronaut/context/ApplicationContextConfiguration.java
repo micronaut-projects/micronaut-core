@@ -18,8 +18,8 @@ package io.micronaut.context;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 import java.util.Collections;
 import java.util.List;
@@ -100,5 +100,14 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      */
     default @Nullable List<String> getOverrideConfigLocations() {
         return null;
+    }
+
+    /**
+     * The banner is enabled by default.
+     *
+     * @return The banner is enabled by default
+     */
+    default boolean isBannerEnabled() {
+        return true;
     }
 }

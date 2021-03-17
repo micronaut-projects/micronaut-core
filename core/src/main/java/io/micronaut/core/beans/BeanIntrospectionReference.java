@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.Named;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * A reference to a {@link BeanIntrospection} that may or may not be present on the classpath.

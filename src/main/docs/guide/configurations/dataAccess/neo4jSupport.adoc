@@ -3,27 +3,26 @@ Micronaut features dedicated support for automatically configuring the https://n
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI, supply the `neo4j-bolt` feature to configure the Neo4j Bolt driver in your project:
+If you create your project using the Micronaut CLI, supply the `neo4j-bolt` feature to configure the Neo4j Bolt driver in your project:
 ----
 $ mn create-app my-app --features neo4j-bolt
 ----
 ====
 
-To configure the Neo4j Bolt driver you should first add the `neo4j-bolt` module to your classpath:
+To configure the Neo4j Bolt driver, first add the `neo4j-bolt` module to your build:
 
 dependency::micronaut-neo4j-bolt[groupId="io.micronaut.neo4j"]
 
-You should then configure the URI of the Neo4j server you wish to communicate with in `application.yml`:
+Then configure the URI of the Neo4j server in `application.yml`:
 
 .Configuring `neo4j.uri`
 [source,yaml]
 ----
 neo4j:
-    uri: bolt://localhost
+  uri: bolt://localhost
 ----
 
-TIP: The `neo4j.uri` setting should be in the format as described in the https://neo4j.com/docs/developer-manual/current/drivers/client-applications/#driver-connection-uris[Connection URIs] section of the Neo4j documentation
-
+TIP: The `neo4j.uri` setting must be in the format as described in the https://neo4j.com/docs/developer-manual/current/drivers/client-applications/#driver-connection-uris[Connection URIs] section of the Neo4j documentation
 
 Once you have the above configuration in place you can inject an instance of the `org.neo4j.driver.v1.Driver` bean, which features both a synchronous blocking API and a non-blocking API based on `CompletableFuture`.
 

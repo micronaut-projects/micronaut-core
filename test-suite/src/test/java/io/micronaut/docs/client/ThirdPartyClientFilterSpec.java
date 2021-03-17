@@ -18,7 +18,6 @@ package io.micronaut.docs.client;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
@@ -32,7 +31,6 @@ import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.reactivex.Flowable;
-
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -45,18 +43,19 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.junit.Assert.assertEquals;
 import static org.awaitility.Awaitility.await;
+import static org.junit.Assert.assertEquals;
 
 @Retry
 public class ThirdPartyClientFilterSpec {
-    private static String token = "XXXX";
-    private static String username = "john";
-    private String result;
+    private static final String token = "XXXX";
+    private static final String username = "john";
 
     private static ApplicationContext context;
     private static EmbeddedServer server;
     private static RxHttpClient client;
+
+    private String result;
 
     @BeforeClass
     public static void setupServer() {
@@ -72,10 +71,10 @@ public class ThirdPartyClientFilterSpec {
 
     @AfterClass
     public static void stopServer() {
-        if(server != null) {
+        if (server != null) {
             server.stop();
         }
-        if(client != null) {
+        if (client != null) {
             client.stop();
         }
     }
@@ -86,7 +85,7 @@ public class ThirdPartyClientFilterSpec {
         BintrayService bintrayService = context.getBean(BintrayService.class);
 
         bintrayService.fetchRepositories()
-                .subscribe(str -> result = str.body());
+                      .subscribe(str -> result = str.body());
 
         String encoded = Base64.getEncoder().encodeToString((username + ":" + token).getBytes());
         String expected = "Basic " + encoded;
@@ -122,11 +121,13 @@ class BintrayService {
     }
 
     Flowable<HttpResponse<String>> fetchRepositories() {
-        return client.exchange(HttpRequest.GET("/repos/" + org), String.class); // <2>
+        return client.exchange(HttpRequest.GET(
+                "/repos/" + org), String.class); // <2>
     }
 
     Flowable<HttpResponse<String>> fetchPackages(String repo) {
-        return client.exchange(HttpRequest.GET("/repos/" + org + "/" + repo + "/packages"), String.class); // <2>
+        return client.exchange(HttpRequest.GET(
+                "/repos/" + org + "/" + repo + "/packages"), String.class); // <2>
     }
 }
 //end::bintrayService[]
@@ -147,7 +148,8 @@ class BintrayFilter implements HttpClientFilter {
     }
 
     @Override
-    public Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+    public Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request,
+                                                         ClientFilterChain chain) {
         return chain.proceed(
                 request.basicAuth(username, token) // <3>
         );

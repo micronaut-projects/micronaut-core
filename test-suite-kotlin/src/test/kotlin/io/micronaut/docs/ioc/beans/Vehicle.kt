@@ -23,7 +23,7 @@ import javax.annotation.concurrent.Immutable
 
 @Introspected
 @Immutable
-class Vehicle @Creator constructor(val make: String, val model: String, val axels: Int) { // <1>
+class Vehicle @Creator constructor(val make: String, val model: String, val axles: Int) { // <1>
 
     constructor(make: String, model: String) : this(make, model, 2) {}
 }

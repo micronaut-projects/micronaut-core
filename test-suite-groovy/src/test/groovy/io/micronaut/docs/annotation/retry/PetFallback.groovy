@@ -24,10 +24,8 @@ import io.reactivex.Single
 @Fallback
 class PetFallback implements PetOperations {
     @Override
-    public Single<Pet> save(String name, int age) {
-        Pet pet = new Pet()
-        pet.setAge(age)
-        pet.setName(name)
+    Single<Pet> save(String name, int age) {
+        Pet pet = new Pet(age: age, name: name)
         return Single.just(pet)
     }
 }

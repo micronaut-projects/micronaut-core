@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -44,6 +44,14 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
      */
     @Override
     @NonNull String getName();
+
+    /**
+     * @return True if the element is package private.
+     * @since 2.3.0
+     */
+    default boolean isPackagePrivate() {
+        return false;
+    }
 
     /**
      * @return True if the element is protected.

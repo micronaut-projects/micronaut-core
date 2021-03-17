@@ -17,7 +17,7 @@ package io.micronaut.aop;
 
 import io.micronaut.inject.ExecutableMethod;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Extended version of {@link InvocationContext} for {@link MethodInterceptor} instances.
@@ -36,4 +36,14 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
      * @return The underlying method reference.
      */
     @NonNull ExecutableMethod<T, R> getExecutableMethod();
+
+    @Override
+    default boolean isSuspend() {
+        return getExecutableMethod().isSuspend();
+    }
+
+    @Override
+    default boolean isAbstract() {
+        return getExecutableMethod().isAbstract();
+    }
 }

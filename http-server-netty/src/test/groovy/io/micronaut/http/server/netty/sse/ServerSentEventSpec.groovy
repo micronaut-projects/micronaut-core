@@ -24,9 +24,9 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.sse.Event
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import io.reactivex.Emitter
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 import spock.lang.Specification
@@ -109,7 +109,7 @@ class ServerSentEventSpec extends Specification {
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> object() {
             int i = 0
-            Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
+            Flowable.generate( { Emitter<Event> emitter ->
                 if (i < 4) {
                     i++
                     emitter.onNext(Event.of(new Foo(name: "Foo $i", age: i + 10)))
@@ -124,7 +124,7 @@ class ServerSentEventSpec extends Specification {
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> rich() {
             Integer i = 0
-            Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
+            Flowable.generate( { Emitter<Event> emitter ->
                 if (i < 4) {
                     i++
                     emitter.onNext(
@@ -144,7 +144,7 @@ class ServerSentEventSpec extends Specification {
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> string() {
             int i = 0
-            Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
+            Flowable.generate( { Emitter<Event> emitter ->
                 if (i < 4) {
                     i++
                     emitter.onNext(Event.of("Foo $i"))
@@ -158,7 +158,7 @@ class ServerSentEventSpec extends Specification {
         @Get('/exception')
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> exception() {
-            Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
+            Flowable.generate( { Emitter<Event> emitter ->
                 throw new RuntimeException("bad things happened")
             })
         }
@@ -166,7 +166,7 @@ class ServerSentEventSpec extends Specification {
         @Get('on-error')
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> onError() {
-            Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
+            Flowable.generate( { Emitter<Event> emitter ->
                 emitter.onError(new RuntimeException("bad things happened"))
             })
         }

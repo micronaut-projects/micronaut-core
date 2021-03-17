@@ -24,7 +24,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.context.ServerContextPathProvider;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

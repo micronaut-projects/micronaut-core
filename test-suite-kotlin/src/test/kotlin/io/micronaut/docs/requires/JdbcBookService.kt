@@ -38,7 +38,7 @@ class JdbcBookService(internal var dataSource: DataSource) : BookService {
                     return Book(rs.getString("title"))
                 }
             }
-        } catch (ex: SQLException) {
+        } catch (ignored: SQLException) {
             return null
         }
 

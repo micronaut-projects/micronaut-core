@@ -1,54 +1,53 @@
-The Micronaut HTTP server supports the ability to apply filters to request/response processing in a similar, but reactive, way to Servlet filters in traditional Java applications.
+The Micronaut HTTP server supports applying filters to request/response processing in a similar (but reactive) way to Servlet filters in traditional Java applications.
 
-Filters provide the ability to support the following use cases:
+Filters support the following use cases:
 
 * Decoration of the incoming api:http.HttpRequest[]
 * Modification of the outgoing api:http.HttpResponse[]
-* Implementation of cross cutting concerns such as security, tracing etc.
+* Implementation of cross-cutting concerns such as security, tracing, etc.
 
-For a server application, the api:http.filter.HttpServerFilter[] interface's `doFilter` method can be implemented.
+For a server application, the api:http.filter.HttpServerFilter[] interface `doFilter` method can be implemented.
 
 The `doFilter` method accepts the api:http.HttpRequest[] and an instance of api:http.filter.ServerFilterChain[].
 
-The `ServerFilterChain` interface contains a resolved chain of filters with the final entry in the chain being the matched route. The api:http.filter.ServerFilterChain.proceed(io.micronaut.http.HttpRequest)[] method can be used to resume processing of the request.
+The `ServerFilterChain` interface contains a resolved chain of filters where the final entry in the chain is the matched route. The api:http.filter.ServerFilterChain.proceed(io.micronaut.http.HttpRequest)[] method resumes processing of the request.
 
-The `proceed(..)` method returns a Reactive Streams rs:Publisher[] that emits the response that will be returned to the client. Implementors of filters can subscribe to the rs:Publisher[] and mutate the emitted api:http.MutableHttpResponse[] object to modify the response prior to returning the response to the client.
+The `proceed(..)` method returns a Reactive Streams rs:Publisher[] that emits the response to be returned to the client. Implementors of filters can subscribe to the rs:Publisher[] and mutate the emitted api:http.MutableHttpResponse[] to modify the response prior to returning the response to the client.
 
 To put these concepts into practice lets look at an example.
 
-IMPORTANT: Filters execute in the event loop therefore blocking operations must be offloaded to another thread pool.
-
+IMPORTANT: Filters execute in the event loop, so blocking operations must be offloaded to another thread pool.
 
 == Writing a Filter
 
-Consider a hypothetical use case whereby you wish to trace each request to the Micronaut "Hello World" example using some external system. The external system could be a database, a distributed tracing service and may require I/O operations.
+Suppose you wish to trace each request to the Micronaut "Hello World" example using some external system. This system could be a database or a distributed tracing service, and may require I/O operations.
 
-What you don't want to do is block the underlying Netty event loop within your filter, instead you want the filter to proceed with execution once any I/O is complete.
+You should not block the underlying Netty event loop in your filter; instead the filter should proceed with execution once any I/O is complete.
 
-As an example, consider the following example `TraceService` that uses RxJava to compose an I/O operation:
+As an example, consider this `TraceService` that uses RxJava to compose an I/O operation:
 
 snippet::io.micronaut.docs.server.filters.TraceService[tags="imports,class", indent=0, title="A TraceService Example using RxJava"]
 
-<1> The rx:Flowable[] type is used to create logic that executes potentially blocking operations to write the trace data from the request
-<2> Since this is just an example the logic does nothing and a place holder comment is used
-<3> The RxJava I/O scheduler is used to execute the logic
+<1> The rx:Flowable[] type creates logic that executes potentially blocking operations to write the trace data from the request
+<2> Since this is just an example, the logic does nothing yet
+<3> The RxJava I/O scheduler executes the logic
 
 You can then inject this implementation into your filter definition:
 
 snippet::io.micronaut.docs.server.filters.TraceFilter[tags="imports,class,endclass", indent=0, title="An Example HttpServerFilter"]
 
-<1> The api:http.annotation.Filter[] annotation is used to define the URI patterns the filter matches
+<1> The api:http.annotation.Filter[] annotation defines the URI pattern(s) the filter matches
 <2> The class implements the api:http.filter.HttpServerFilter[] interface
-<3> The previously defined `TraceService` is injected via a constructor argument
+<3> The previously defined `TraceService` is injected via constructor
 
-The final step is write the `doFilter` implementation of the api:http.filter.HttpServerFilter[] interface.
+The final step is to write the `doFilter` implementation of the api:http.filter.HttpServerFilter[] interface.
 
 snippet::io.micronaut.docs.server.filters.TraceFilter[tags="doFilter", indent=0, title="The doFilter implementation"]
 
-<1> The previously defined `TraceService` is called to trace the request
-<2> If the trace call succeeds then the filter switches back to resuming the request processing using RxJava's `switchMap` method, which invokes the `proceed` method of the api:http.filter.ServerFilterChain[]
-<3> Finally, RxJava's `doOnNext` method is used to add a header called `X-Trace-Enabled` to the response.
+<1> `TraceService` is invoked to trace the request
+<2> If the call succeeds, the filter resumes request processing using the RxJava `switchMap` method, which invokes the `proceed` method of the api:http.filter.ServerFilterChain[]
+<3> Finally, the RxJava `doOnNext` method adds a `X-Trace-Enabled` header to the response.
 
-The previous example demonstrates some key concepts such as executing logic in a non-blocking matter before proceeding with the request and modifying the outgoing response.
+The previous example demonstrates some key concepts such as executing logic in a non-blocking manner before proceeding with the request and modifying the outgoing response.
 
 TIP: The examples use RxJava, however you can use any reactive framework that supports the Reactive streams specifications

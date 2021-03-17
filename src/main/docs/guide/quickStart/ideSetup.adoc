@@ -1,5 +1,5 @@
-The application created in the previous section contains a "main class" located in `src/main/java` that looks like the following:
+The application created in the previous section contains a main class located in `src/main/java` that looks like the following:
 
 snippet::io.micronaut.docs.server.intro.Application[tags="imports,class"]
 
-This is the class that is run when running the application via Gradle or via deployment. You can also run the main class directly within your IDE if it is configured correctly.
+This is the class that is run when starting the application via Gradle/Maven or via deployment. You can also run the main class directly within your IDE.

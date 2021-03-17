@@ -1,6 +1,6 @@
-The ann:websocket.annotation.ClientWebSocket[] annotation can be used in combination with the api:websocket.WebSocketClient[] interface to define WebSocket clients.
+The ann:websocket.annotation.ClientWebSocket[] annotation can be used with the api:websocket.WebSocketClient[] interface to define WebSocket clients.
 
-You can inject a reference to the a api:websocket.WebSocketClient[] instance using the ann:http.client.annotation.Client[] annotation:
+You can inject a reference to a api:websocket.WebSocketClient[] using the ann:http.client.annotation.Client[] annotation:
 
 [source,java]
 ----
@@ -9,7 +9,7 @@ You can inject a reference to the a api:websocket.WebSocketClient[] instance usi
 RxWebSocketClient webSocketClient;
 ----
 
-This allows you to use the same service discovery and load balancing features for WebSocket clients.
+This lets you use the same service discovery and load balancing features for WebSocket clients.
 
 Once you have a reference to the api:websocket.WebSocketClient[] interface you can use the `connect` method to obtain a connected instance of a bean annotated with ann:websocket.annotation.ClientWebSocket[].
 
@@ -20,7 +20,7 @@ snippet::io.micronaut.docs.http.server.netty.websocket.ChatClientWebSocket[tags=
 <1> The class is abstract (more on that later) and is annotated with ann:websocket.annotation.ClientWebSocket[]
 <2> The client must implement `AutoCloseable` and you should ensure that the connection is closed at some point.
 <3> You can use the same annotations as on the server, in this case `@OnOpen` to obtain a reference to the underlying session.
-<4> The `@OnMessage` annotation can be used to define the method that receives responses from the server.
+<4> The `@OnMessage` annotation defines the method that receives responses from the server.
 
 You can also define abstract methods that start with either `send` or `broadcast` and these methods will be implemented for you at compile time. For example:
 
@@ -38,7 +38,7 @@ Note by returning `void` this tells Micronaut that the method is a blocking send
 public abstract io.reactivex.Single<String> send(String message);
 ----
 
-The above example defines a send method that returns an rx:Single[].
+The above example defines a send method that returns a rx:Single[].
 
 .WebSocket Send Methods
 [source,java]
@@ -50,20 +50,21 @@ The above example defines a send method that executes asynchronously and returns
 
 Once you have defined a client class you can connect to the client socket and start sending messages:
 
-
 .Connecting a Client WebSocket
 [source,java]
 ----
-ChatClientWebSocket chatClient = webSocketClient.connect(ChatClientWebSocket.class, "/chat/football/fred").blockingFirst();
+ChatClientWebSocket chatClient = webSocketClient
+    .connect(ChatClientWebSocket.class, "/chat/football/fred")
+    .blockingFirst();
 chatClient.send("Hello World!");
 ----
 
-NOTE: For illustration purposes we use `blockingFirst()` to obtain the client, it is however possible to combine `connect` (which returns an rx:Flowable[]) to perform non-blocking interaction via WebSocket.
+NOTE: For illustration purposes we use `blockingFirst()` to obtain the client. Tt is however possible to combine `connect` (which returns an rx:Flowable[]) to perform non-blocking interaction via WebSocket.
 
 [TIP]
 .Using the CLI
 ====
-If you have created your project using the Micronaut CLI and the default (`service`) profile, you can use the `create-websocket-client` command to create an abstract class with api:websocket.WebSocketClient[].
+If you created your project using the Micronaut CLI and the default (`service`) profile, you can use the `create-websocket-client` command to create an abstract class with api:websocket.WebSocketClient[].
 
 ----
 $ mn create-websocket-client MyChat

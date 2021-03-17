@@ -13,8 +13,7 @@ class VehicleSpec extends Specification {
                 "test"
         )
 
-        Vehicle vehicle = applicationContext
-                .getBean(Vehicle)
+        def vehicle = applicationContext.getBean(Vehicle)
         println(vehicle.start())
         // end::start[]
 

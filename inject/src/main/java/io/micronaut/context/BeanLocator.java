@@ -17,8 +17,8 @@ package io.micronaut.context;
 
 import io.micronaut.core.reflect.InstantiationUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.BeanDefinition;
 
 import java.util.Collection;

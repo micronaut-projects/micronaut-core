@@ -33,12 +33,12 @@ class HeadlineController {
     @Get(value = "/headlines", processes = MediaType.TEXT_EVENT_STREAM) // <1>
     Flowable<Event<Headline>> streamHeadlines() {
         Flowable.<Event<Headline>>create( { emitter -> // <2>
-            Headline headline = new Headline()
-            headline.setText("Latest Headline at " + ZonedDateTime.now())
+            Headline headline = new Headline(text: "Latest Headline at ${ZonedDateTime.now()}")
             emitter.onNext(Event.of(headline))
             emitter.onComplete()
-        }, BackpressureStrategy.BUFFER).repeat(100) // <3>
-         .delay(1, TimeUnit.SECONDS) // <4>
+        }, BackpressureStrategy.BUFFER)
+                .repeat(100) // <3>
+                .delay(1, TimeUnit.SECONDS) // <4>
     }
     // end::streaming[]
 }

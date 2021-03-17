@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.Element;
 
 import java.io.IOException;

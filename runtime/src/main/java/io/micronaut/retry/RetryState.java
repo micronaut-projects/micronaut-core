@@ -15,7 +15,8 @@
  */
 package io.micronaut.retry;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.retry.annotation.RetryPredicate;
+import io.micronaut.core.annotation.Nullable;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -66,6 +67,13 @@ public interface RetryState {
      * @return The maximum overall delay
      */
     Optional<Duration> getMaxDelay();
+
+    /**
+     * @return The retry predicate checking for includes/excludes throwable classes
+     */
+    default RetryPredicate getRetryPredicate() {
+        throw new UnsupportedOperationException("Retry predicate not supported on this type");
+    }
 
     /**
      * Opens the retry state.

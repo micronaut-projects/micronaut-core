@@ -24,6 +24,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import io.micronaut.core.order.OrderUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,6 +103,7 @@ public class AccessLogFormatParser {
                 LOG_ELEMENT_BUILDERS.add(definition.load());
             }
         }
+        OrderUtil.sort(LOG_ELEMENT_BUILDERS);
         trimToSize(LOG_ELEMENT_BUILDERS);
     }
 

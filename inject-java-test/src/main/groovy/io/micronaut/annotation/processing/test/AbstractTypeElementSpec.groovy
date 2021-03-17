@@ -15,12 +15,12 @@
  */
 package io.micronaut.annotation.processing.test
 
-import com.google.testing.compile.JavaFileObjects
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
-import edu.umd.cs.findbugs.annotations.NonNull
-import edu.umd.cs.findbugs.annotations.Nullable
+import io.micronaut.context.Qualifier
+import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.annotation.Nullable
 import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AnnotationUtils
 import io.micronaut.annotation.processing.GenericUtils
@@ -37,10 +37,12 @@ import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.writer.BeanConfigurationWriter
+import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
 import javax.lang.model.element.Element
@@ -48,6 +50,7 @@ import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
+import java.lang.annotation.Annotation
 
 /**
  * Base class to extend from to allow compilation of Java sources
@@ -153,6 +156,26 @@ class Test {
     }
 
     /**
+     * Gets a bean from the context for the given class name
+     * @param context The context
+     * @param className The class name
+     * @return The bean instance
+     */
+    Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {
+        context.getBean(context.classLoader.loadClass(className), qualifier)
+    }
+
+    /**
+     * Builds a {@link ApplicationContext} containing only the classes produced by the given source.
+     *
+     * @param source The source code
+     * @return The context. Should be shutdown after use
+     */
+    ApplicationContext buildContext(String source) {
+        return buildContext("test.Source" + System.currentTimeMillis(), source)
+    }
+
+    /**
      * Builds a {@link ApplicationContext} containing only the classes produced by the given class.
      *
      * @param className The class name
@@ -236,13 +259,52 @@ class Test {
         return (TypeElement) element
     }
 
-    BeanDefinition buildBeanDefinition(String className, String cls) {
+    protected BeanDefinition buildBeanDefinition(String className, String cls) {
         def beanDefName= '$' + NameUtils.getSimpleName(className) + 'Definition'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
         ClassLoader classLoader = buildClassLoader(className, cls)
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    /**
+     * Builds the bean definition for an AOP proxy bean.
+     * @param className The class name
+     * @param cls The class source
+     * @return The bean definition
+     */
+    protected BeanDefinition buildInterceptedBeanDefinition(String className, String cls) {
+        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'Definition'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    /**
+     * Retrieve additional annotation mappers to apply
+     * @param annotationName The annotation name
+     * @return The mappers for the annotation
+     */
+    protected List<AnnotationMapper<? extends Annotation>> getLocalAnnotationMappers(@NonNull String annotationName) {
+        return Collections.emptyList()
+    }
+
+    /**
+     * Builds the bean definition reference for an AOP proxy bean.
+     * @param className The class name
+     * @param cls The class source
+     * @return The bean definition
+     */
+    protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, String cls) {
+        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'DefinitionClass'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (BeanDefinitionReference)classLoader.loadClass(beanFullName).newInstance()
     }
 
     protected BeanDefinitionReference buildBeanDefinitionReference(String className, String cls) {
@@ -253,6 +315,7 @@ class Test {
         ClassLoader classLoader = buildClassLoader(className, cls)
         return (BeanDefinitionReference)classLoader.loadClass(beanFullName).newInstance()
     }
+
     protected BeanConfiguration buildBeanConfiguration(String packageName, String cls) {
         ClassLoader classLoader = buildClassLoader("${packageName}.package-info", cls)
         return (BeanConfiguration)classLoader.loadClass(packageName + '.' + BeanConfigurationWriter.CLASS_SUFFIX).newInstance()
@@ -296,14 +359,38 @@ class Test {
     }
 
     @CompileStatic
-    private static JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
+    private JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
         def env = JavacProcessingEnvironment.instance(new Context())
         def elements = JavacElements.instance(new Context())
         ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
         GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
         AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, genericUtils, env.filer) {
+            @Override
+            JavaAnnotationMetadataBuilder newAnnotationBuilder() {
+                return super.newAnnotationBuilder()
+            }
         }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, modelUtils)
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, modelUtils) {
+            @Override
+            protected List<AnnotationMapper<? extends Annotation>> getAnnotationMappers(@NonNull String annotationName) {
+                def loadedMappers = super.getAnnotationMappers(annotationName)
+                def localMappers = getLocalAnnotationMappers(annotationName)
+                if (localMappers) {
+                    def newList = []
+                    if (loadedMappers) {
+                        newList.addAll(loadedMappers)
+                    }
+                    newList.addAll(localMappers)
+                    return newList
+                } else {
+                    if (localMappers) {
+                        return loadedMappers
+                    } else {
+                        return Collections.emptyList()
+                    }
+                }
+            }
+        }
         return builder
     }
 }

@@ -30,8 +30,8 @@ public class DataSourceFactory {
         URI url = configuration.getUrl();
         return new DataSource(url);
     }
-
 // end::eachBean[]
+
     static class DataSource {
         private final URI uri;
 

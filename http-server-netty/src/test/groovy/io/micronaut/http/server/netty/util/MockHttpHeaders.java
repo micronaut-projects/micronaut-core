@@ -19,7 +19,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MutableHttpHeaders;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.*;
 import java.util.stream.Collectors;
 

@@ -26,7 +26,7 @@ import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver;
 import io.micronaut.discovery.metadata.ServiceInstanceMetadataContributor;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.runtime.server.EmbeddedServerInstance;
+import io.micronaut.discovery.EmbeddedServerInstance;
 
 import java.net.URI;
 import java.util.HashMap;

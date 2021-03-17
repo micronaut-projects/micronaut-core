@@ -19,8 +19,8 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
@@ -196,6 +196,14 @@ public interface ApplicationContextBuilder {
      * @return This application
      */
     @NonNull ApplicationContextBuilder exclude(@Nullable String... configurations);
+
+    /**
+     * Whether the banner is enabled or not.
+     *
+     * @param isEnabled Whether the banner is enabled or not
+     * @return This application
+     */
+    @NonNull ApplicationContextBuilder banner(boolean isEnabled);
 
     /**
      * Set the command line arguments.

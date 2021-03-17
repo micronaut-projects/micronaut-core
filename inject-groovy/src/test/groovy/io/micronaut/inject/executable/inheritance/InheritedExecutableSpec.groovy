@@ -1,6 +1,6 @@
 package io.micronaut.inject.executable.inheritance
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
 
 class InheritedExecutableSpec extends AbstractBeanDefinitionSpec {

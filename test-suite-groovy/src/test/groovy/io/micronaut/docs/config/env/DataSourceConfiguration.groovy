@@ -15,17 +15,15 @@
  */
 package io.micronaut.docs.config.env
 
+// tag::eachProperty[]
 import io.micronaut.context.annotation.EachProperty
 import io.micronaut.context.annotation.Parameter
 
-// tag::eachProperty[]
-
-@EachProperty("test.datasource")
-// <1>
+@EachProperty("test.datasource") // <1>
 class DataSourceConfiguration {
 
     final String name
-    URI url = new URI("localhost")
+    URI url = new URI("localhost") // <3>
 
     DataSourceConfiguration(@Parameter String name) // <2>
             throws URISyntaxException {

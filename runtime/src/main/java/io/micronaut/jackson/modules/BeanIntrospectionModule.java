@@ -15,10 +15,7 @@
  */
 package io.micronaut.jackson.modules;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.SerializableString;
@@ -26,6 +23,7 @@ import com.fasterxml.jackson.core.io.SerializedString;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.*;
 import com.fasterxml.jackson.databind.deser.impl.MethodProperty;
+import com.fasterxml.jackson.databind.deser.impl.PropertyValueBuffer;
 import com.fasterxml.jackson.databind.deser.std.StdValueInstantiator;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
@@ -41,9 +39,11 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -66,7 +66,7 @@ import java.util.*;
 @Internal
 @Experimental
 @Singleton
-@Requires(property = JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
+@Requires(property = JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION, notEquals = StringUtils.FALSE)
 public class BeanIntrospectionModule extends SimpleModule {
 
     private static final Logger LOG = LoggerFactory.getLogger(BeanIntrospectionModule.class);
@@ -77,6 +77,16 @@ public class BeanIntrospectionModule extends SimpleModule {
     public BeanIntrospectionModule() {
         setDeserializerModifier(new BeanIntrospectionDeserializerModifier());
         setSerializerModifier(new BeanIntrospectionSerializerModifier());
+    }
+
+    /**
+     * Find an introspection for the given class.
+     * @param beanClass The bean class
+     * @return The introspection
+     */
+    @Nullable
+    protected BeanIntrospection<Object> findIntrospection(Class<?> beanClass) {
+        return (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
     }
 
     private JavaType newType(Argument<?> argument, TypeFactory typeFactory) {
@@ -105,7 +115,7 @@ public class BeanIntrospectionModule extends SimpleModule {
             final Class<?> beanClass = beanDesc.getBeanClass();
             final boolean isResource = Resource.class.isAssignableFrom(beanDesc.getBeanClass());
             final BeanIntrospection<Object> introspection =
-                    (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
+                    findIntrospection(beanClass);
 
             if (introspection == null) {
                 return super.updateBuilder(config, beanDesc, builder);
@@ -132,6 +142,9 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
                     final List<BeanPropertyWriter> newProperties = new ArrayList<>(beanProperties.size());
                     for (BeanProperty<Object, Object> beanProperty : beanProperties) {
+                        if (beanProperty.hasAnnotation(JsonIgnore.class)) {
+                            continue;
+                        }
                         final String propertyName;
                         if (isResource) {
                             final String n = beanProperty.getName();
@@ -287,10 +300,11 @@ public class BeanIntrospectionModule extends SimpleModule {
                             props = new SettableBeanProperty[constructorArguments.length];
                             for (int i = 0; i < constructorArguments.length; i++) {
                                 Argument<?> argument = constructorArguments[i];
-                                final JavaType javaType = existing != null && existing.length > i ? existing[i].getType() : newType(argument, typeFactory);
+                                SettableBeanProperty existingProperty = existing != null && existing.length > i ? existing[i] : null;
+                                final JavaType javaType = existingProperty != null ? existingProperty.getType() : newType(argument, typeFactory);
                                 final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
                                 PropertyMetadata propertyMetadata = newPropertyMetadata(argument, annotationMetadata);
-                                final String simpleName = annotationMetadata.stringValue(JsonProperty.class).orElse(argument.getName());
+                                final String simpleName = existingProperty != null ? existingProperty.getName() : annotationMetadata.stringValue(JsonProperty.class).orElse(argument.getName());
                                 TypeDeserializer typeDeserializer;
                                 try {
                                     typeDeserializer = config.findTypeDeserializer(javaType);
@@ -390,14 +404,107 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
 
                     @Override
+                    public boolean canCreateUsingArrayDelegate() {
+                        return defaultInstantiator.canCreateUsingArrayDelegate();
+                    }
+
+                    @Override
+                    public boolean canCreateUsingDelegate() {
+                        return false;
+                    }
+
+                    @Override
+                    public JavaType getArrayDelegateType(DeserializationConfig config) {
+                        return newType(constructorArguments[0], typeFactory);
+                    }
+
+                    @Override
+                    public JavaType getDelegateType(DeserializationConfig config) {
+                        return newType(constructorArguments[0], typeFactory);
+                    }
+
+                    @Override
+                    public boolean canCreateFromString() {
+                        return constructorArguments.length == 1 && constructorArguments[0].equalsType(Argument.STRING);
+                    }
+
+                    @Override
+                    public boolean canCreateFromInt() {
+                        return constructorArguments.length == 1 && (
+                                constructorArguments[0].equalsType(Argument.INT) ||
+                                        constructorArguments[0].equalsType(Argument.LONG));
+                    }
+
+                    @Override
+                    public boolean canCreateFromLong() {
+                        return constructorArguments.length == 1 && constructorArguments[0].equalsType(Argument.LONG);
+                    }
+
+                    @Override
+                    public boolean canCreateFromDouble() {
+                        return constructorArguments.length == 1 && constructorArguments[0].equalsType(Argument.DOUBLE);
+                    }
+
+                    @Override
+                    public boolean canCreateFromBoolean() {
+                        return constructorArguments.length == 1 && constructorArguments[0].equalsType(Argument.BOOLEAN);
+                    }
+
+                    @Override
                     public Object createUsingDefault(DeserializationContext ctxt) throws IOException {
                         return introspection.instantiate();
+                    }
+
+                    @Override
+                    public Object createUsingDelegate(DeserializationContext ctxt, Object delegate) throws IOException {
+                        return introspection.instantiate(false, new Object[] { delegate });
                     }
 
                     @Override
                     public Object createFromObjectWith(DeserializationContext ctxt, Object[] args) throws IOException {
                         return introspection.instantiate(false, args);
                     }
+
+                    @Override
+                    public Object createUsingArrayDelegate(DeserializationContext ctxt, Object delegate) throws IOException {
+                        return introspection.instantiate(false, new Object[] { delegate });
+                    }
+
+                    @Override
+                    public Object createFromString(DeserializationContext ctxt, String value) throws IOException {
+                        return introspection.instantiate(false, new Object[]{ value });
+                    }
+
+                    @Override
+                    public Object createFromInt(DeserializationContext ctxt, int value) throws IOException {
+                        InstantiationException originalException;
+                        try {
+                            return introspection.instantiate(false, new Object[]{value});
+                        } catch (InstantiationException e) {
+                            originalException = e;
+                        }
+                        try {
+                            return introspection.instantiate(false, new Object[]{Long.valueOf(value)});
+                        } catch (InstantiationException e) {
+                            throw originalException;
+                        }
+                    }
+
+                    @Override
+                    public Object createFromLong(DeserializationContext ctxt, long value) throws IOException {
+                        return introspection.instantiate(false, new Object[]{ value });
+                    }
+
+                    @Override
+                    public Object createFromDouble(DeserializationContext ctxt, double value) throws IOException {
+                        return introspection.instantiate(false, new Object[]{ value });
+                    }
+
+                    @Override
+                    public Object createFromBoolean(DeserializationContext ctxt, boolean value) throws IOException {
+                        return introspection.instantiate(false, new Object[]{ value });
+                    }
+
                 });
                 return builder;
             }

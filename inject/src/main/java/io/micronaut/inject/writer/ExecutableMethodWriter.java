@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -24,6 +24,11 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
@@ -34,11 +39,7 @@ import org.objectweb.asm.commons.Method;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Writes out {@link io.micronaut.inject.ExecutableMethod} implementations.
@@ -66,8 +67,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private final ClassWriter classWriter;
     private final String className;
     private final String internalName;
-    private final String beanFullClassName;
-    private final String methodProxyShortName;
     private final boolean isInterface;
     private final boolean isAbstract;
     private final boolean isSuspend;
@@ -76,9 +75,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private final String interceptedProxyBridgeMethodName;
 
     /**
-     * @param beanFullClassName    The bean full class name
      * @param methodClassName      The method class name
-     * @param methodProxyShortName The method proxy short name
      * @param isInterface          Whether is an interface
      * @param isAbstract           Whether the method is abstract
      * @param isDefault            Whether the method is a default method
@@ -89,9 +86,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param interceptedProxyBridgeMethodName The intercepted proxy bridge method name
      */
     public ExecutableMethodWriter(
-            String beanFullClassName,
             String methodClassName,
-            String methodProxyShortName,
             boolean isInterface,
             boolean isAbstract,
             boolean isDefault,
@@ -102,8 +97,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             String interceptedProxyBridgeMethodName) {
         super(methodClassName, originatingElements, annotationMetadata, true);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        this.beanFullClassName = beanFullClassName;
-        this.methodProxyShortName = methodProxyShortName;
         this.className = methodClassName;
         this.internalName = getInternalName(methodClassName);
         this.methodType = getObjectType(methodClassName);
@@ -168,27 +161,14 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * Write the method.
      *
      * @param declaringType              The declaring type
-     * @param returnType                 The return type
-     * @param genericReturnType          The generic return type
-     * @param returnTypeGenericTypes     The return type generics
-     * @param methodName                 The method name
-     * @param argumentTypes              The argument types
-     * @param genericArgumentTypes       The generic argument types
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes               The generic types
+     * @param methodElement              The method element
      */
-    public void visitMethod(Object declaringType,
-                            Object returnType,
-                            Object genericReturnType,
-                            Map<String, Object> returnTypeGenericTypes,
-                            String methodName,
-                            Map<String, Object> argumentTypes,
-                            Map<String, Object> genericArgumentTypes,
-                            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                            Map<String, Map<String, Object>> genericTypes) {
-        Type declaringTypeObject = getTypeReference(declaringType);
+    public void visitMethod(TypedElement declaringType,
+                            MethodElement methodElement) {
+        String methodName = methodElement.getName();
+        List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
+        Type declaringTypeObject = JavaModelUtils.getTypeReference(declaringType);
         boolean hasArgs = !argumentTypes.isEmpty();
-        Collection<Object> argumentTypeClasses = hasArgs ? argumentTypes.values() : Collections.emptyList();
 
         classWriter.visit(V1_8, ACC_SYNTHETIC,
                 internalName,
@@ -254,36 +234,41 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         constructorWriter.push(methodName);
 
         // 3rd argument the generic return type
-        if (genericReturnType instanceof Class && ((Class) genericReturnType).isPrimitive()) {
-            Class javaType = (Class) genericReturnType;
-            String constantName = javaType.getName().toUpperCase(Locale.ENGLISH);
+        ClassElement genericReturnType = methodElement.getGenericReturnType();
+        if (genericReturnType.isPrimitive() && !genericReturnType.isArray()) {
+            String constantName = genericReturnType.getName().toUpperCase(Locale.ENGLISH);
 
             // refer to constant for primitives
             Type type = Type.getType(Argument.class);
             constructorWriter.getStatic(type, constantName, type);
 
         } else {
-            // Argument.of(genericReturnType, returnTypeGenericTypes)
-            buildArgumentWithGenerics(
+            pushCreateArgument(
+                    declaringType.getName(),
+                    methodType,
+                    classWriter,
                     constructorWriter,
-                    methodName,
-                    Collections.singletonMap(genericReturnType, returnTypeGenericTypes)
+                    genericReturnType.getName(),
+                    genericReturnType,
+                    genericReturnType.getAnnotationMetadata(),
+                    genericReturnType.getTypeArguments(),
+                    loadTypeMethods
             );
         }
 
         if (hasArgs) {
             // 4th argument: the generic types
             pushBuildArgumentsForMethod(
-                    getTypeReferenceForName(getClassName()),
+                    methodType.getClassName(),
+                    methodType,
                     classWriter,
                     constructorWriter,
-                    genericArgumentTypes,
-                    argumentAnnotationMetadata,
-                    genericTypes,
-                    loadTypeMethods);
+                    argumentTypes,
+                    loadTypeMethods
+            );
 
-            for (AnnotationMetadata value : argumentAnnotationMetadata.values()) {
-                DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value);
+            for (ParameterElement pe : argumentTypes) {
+                DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, pe.getAnnotationMetadata());
             }
             // now invoke super(..) if no arg constructor
             invokeConstructor(
@@ -352,9 +337,10 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                 invokeDescriptor
         );
 
-        buildInvokeMethod(declaringTypeObject, methodName, returnType, argumentTypeClasses, invokeMethod);
+        ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
+        buildInvokeMethod(declaringTypeObject, methodName, returnType, argumentTypes, invokeMethod);
 
-        buildResolveTargetMethod(methodName, declaringTypeObject, hasArgs, argumentTypeClasses);
+        buildResolveTargetMethod(methodName, declaringTypeObject, hasArgs, argumentTypes);
 
         for (GeneratorAdapter method : loadTypeMethods.values()) {
             method.visitMaxs(3, 1);
@@ -385,16 +371,17 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     protected void buildInvokeMethod(
             Type declaringTypeObject,
             String methodName,
-            Object returnType,
-            Collection<Object> argumentTypes,
+            ClassElement returnType,
+            Collection<ParameterElement> argumentTypes,
             GeneratorAdapter invokeMethodVisitor) {
-        Type returnTypeObject = getTypeReference(returnType);
+        Type returnTypeObject = JavaModelUtils.getTypeReference(returnType);
 
         // load this
         invokeMethodVisitor.visitVarInsn(ALOAD, 1);
         // duplicate target
         invokeMethodVisitor.dup();
 
+        String methodDescriptor = getMethodDescriptor(returnType, argumentTypes);
         if (interceptedProxyClassName != null) {
             Label invokeTargetBlock = new Label();
 
@@ -414,10 +401,10 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             invokeMethodVisitor.push(true);
             invokeMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, invokeTargetBlock);
 
-            pushCastToType(invokeMethodVisitor, interceptedProxyType.getClassName());
+            pushCastToType(invokeMethodVisitor, interceptedProxyType);
 
             // load arguments
-            Iterator<Object> iterator = argumentTypes.iterator();
+            Iterator<ParameterElement> iterator = argumentTypes.iterator();
             for (int i = 0; i < argumentTypes.size(); i++) {
                 invokeMethodVisitor.loadArg(1);
                 invokeMethodVisitor.push(i);
@@ -428,7 +415,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
             invokeMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
                     interceptedProxyType.getInternalName(), interceptedProxyBridgeMethodName,
-                    getMethodDescriptor(returnType, argumentTypes), false);
+                    methodDescriptor, false);
 
             if (returnTypeObject.equals(Type.VOID_TYPE)) {
                 invokeMethodVisitor.visitInsn(ACONST_NULL);
@@ -443,13 +430,11 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             invokeMethodVisitor.pop();
         }
 
-        pushCastToType(invokeMethodVisitor, declaringTypeObject.getClassName());
+        pushCastToType(invokeMethodVisitor, declaringTypeObject);
         boolean hasArgs = !argumentTypes.isEmpty();
-        String methodDescriptor;
         if (hasArgs) {
-            methodDescriptor = getMethodDescriptor(returnType, argumentTypes);
             int argCount = argumentTypes.size();
-            Iterator<Object> argIterator = argumentTypes.iterator();
+            Iterator<ParameterElement> argIterator = argumentTypes.iterator();
             for (int i = 0; i < argCount; i++) {
                 invokeMethodVisitor.visitVarInsn(ALOAD, 2);
                 invokeMethodVisitor.push(i);
@@ -457,8 +442,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                 // cast the return value to the correct type
                 pushCastToType(invokeMethodVisitor, argIterator.next());
             }
-        } else {
-            methodDescriptor = getMethodDescriptor(returnType, Collections.emptyList());
         }
 
         invokeMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
@@ -476,7 +459,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         invokeMethodVisitor.visitEnd();
     }
 
-    private void buildResolveTargetMethod(String methodName, Type declaringTypeObject, boolean hasArgs, Collection<Object> argumentTypeClasses) {
+    private void buildResolveTargetMethod(String methodName, Type declaringTypeObject, boolean hasArgs, Collection<ParameterElement> argumentTypeClasses) {
         String targetMethodInternalName = METHOD_GET_TARGET.getName();
         String targetMethodDescriptor = METHOD_GET_TARGET.getDescriptor();
         GeneratorAdapter getTargetMethod = new GeneratorAdapter(classWriter.visitMethod(
@@ -494,15 +477,15 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         getTargetMethod.push(methodName);
         if (hasArgs) {
             int len = argumentTypeClasses.size();
-            Iterator<Object> iter = argumentTypeClasses.iterator();
+            Iterator<ParameterElement> iter = argumentTypeClasses.iterator();
             pushNewArray(getTargetMethod, Class.class, len);
             for (int i = 0; i < len; i++) {
-                Object type = iter.next();
+                ParameterElement type = iter.next();
                 pushStoreInArray(
                         getTargetMethod,
                         i,
                         len,
-                        () -> getTargetMethod.push(getTypeReference(type))
+                        () -> getTargetMethod.push(JavaModelUtils.getTypeReference(type))
                 );
 
             }

@@ -17,7 +17,7 @@ package io.micronaut.http;
 
 import io.micronaut.http.cookie.Cookie;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Locale;

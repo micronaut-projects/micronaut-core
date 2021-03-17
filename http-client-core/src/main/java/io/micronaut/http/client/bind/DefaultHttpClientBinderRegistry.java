@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client.bind;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanIntrospection;
@@ -69,6 +69,9 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         });
         byType.put(Argument.of(BasicAuth.class).typeHashCode(), (ClientArgumentRequestBinder<BasicAuth>) (context, uriContext, value, request) -> {
             request.basicAuth(value.getUsername(), value.getPassword());
+        });
+        byType.put(Argument.of(Locale.class).typeHashCode(), (ClientArgumentRequestBinder<Locale>) (context, uriContext, value, request) -> {
+            request.header(HttpHeaders.ACCEPT_LANGUAGE, value.toLanguageTag());
         });
         byAnnotation.put(QueryValue.class, (context, uriContext, value, request) -> {
             String parameterName = context.getAnnotationMetadata().stringValue(QueryValue.class)

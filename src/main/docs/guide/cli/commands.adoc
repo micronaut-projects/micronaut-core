@@ -1,4 +1,4 @@
-You can view a full list of available commands using the help flag, like this:
+You can view a full list of available commands using the help flag, for example:
 
 [source,bash]
 ----
@@ -20,23 +20,27 @@ Options:
   -x, --stacktrace   Show full stack trace when exceptions occur.
 
 Commands: # <2>
-  create-app             Creates an application
-  create-cli-app         Creates a CLI application
-  create-function-app    Creates a Cloud Function
-  create-grpc-app        Creates a gRPC application
-  create-messaging-app   Creates a messaging application
-  create-test            Creates a simple test for the projects testing framework # <3>
-  create-websocket-server  Creates a Websocket server
+  create-app               Creates an application
+  create-cli-app           Creates a CLI application
+  create-function-app      Creates a Cloud Function
+  create-grpc-app          Creates a gRPC application
+  create-messaging-app     Creates a messaging application
+  create-job               Creates a job with scheduled method
+  create-bean              Creates a singleton bean
+  create-websocket-client  Creates a Websocket client
   create-client            Creates a client interface
   create-controller        Creates a controller and associated test
-  create-bean              Creates a singleton bean
+  feature-diff             Produces the diff of an original project with an original project with
+                             additional features.
+  create-websocket-server  Creates a Websocket server
+  create-test              Creates a simple test for the project's testing framework
 ----
 
 <1> Here you can see the project generation commands lists
 <2> All commands available in the current directory are listed here
-<3> **Note:** the things listed after the project creation commands (always available) will depend on the current directory context
+<3> **Note:** the things listed after the project creation commands (always available) depend on the current directory context
 
-All of the code-generation commands will honor the values written in `micronaut-cli.yml`. For example, assume the following `micronaut-cli.yml` file.
+All the code-generation commands honor the values written in `micronaut-cli.yml`. For example, assume the following `micronaut-cli.yml` file.
 
 .micronaut-cli.yml
 [source,yaml]
@@ -47,7 +51,7 @@ testFramework: spock
 sourceLanguage: java
 ----
 
-With the above settings, the `create-bean` command will (by default) generate a Java class with an associated Spock test, under the `example` package. Commands accept arguments and these defaults can be overridden on a per-command basis.
+With the above settings, the `create-bean` command (by default) generates a Java class with an associated Spock test, in the `example` package. Commands accept arguments and these defaults can be overridden on a per-command basis.
 
 == Base Commands
 
@@ -122,7 +126,7 @@ $ mn create-job UpdateFeeds --lang groovy
 |
 |===
 
-The `create-controller` command generates a link:{api}/io/micronaut/http/annotation/Controller.html[Controller] class. It follows a `*Controller` convention for generating the class name. It creates an associated test that will run the application and instantiate an HTTP client, which can make requests against the controller.
+The `create-controller` command generates a link:{api}/io/micronaut/http/annotation/Controller.html[Controller] class. It follows a `*Controller` convention for generating the class name. It creates an associated test that runs the application and instantiates an HTTP client, which can make requests against the controller.
 
 [source,bash]
 ----
@@ -181,7 +185,6 @@ $ mn create-websocket-server MyChat
 | Rendered template WebsocketServer.java to destination src/main/java/example/MyChatServer.java
 ----
 
-
 === Create-Websocket-Client
 
 .Create-Websocket-Client Flags
@@ -227,9 +230,7 @@ $ mn create-websocket-client MyChat
 |===
 
 The `create-command` command generates a standalone application that can be executed as a
-http://picocli.info[picocli] link:http://picocli.info/apidocs/picocli/CommandLine.Command.html[Command].
-It follows a `*Command` convention for generating the class name.
-It creates an associated test that will run the application and verify that a command line option was set.
+http://picocli.info[picocli] link:http://picocli.info/apidocs/picocli/CommandLine.Command.html[Command]. It follows a `*Command` convention for generating the class name. It creates an associated test that runs the application and verifies that a command line option was set.
 
 [source,bash]
 ----
@@ -238,7 +239,4 @@ $ mn create-command print
 | Rendered template CommandTest.java to destination src/test/java/example/PrintCommandTest.java
 ----
 
-This list is just a small subset of all the code generation commands in the Micronaut CLI.
-To see all the context-sensitive commands the CLI has available (and under what circumstances they apply), check out the
-https://github.com/micronaut-projects/micronaut-starter[micronaut-starter] project and find the classes that
-extend `CodeGenCommand`. The `applies` method dictates whether a command is available or not.
+This list is just a small subset of the code generation commands in the Micronaut CLI. To see all context-sensitive commands the CLI has available (and under what circumstances they apply), check out the https://github.com/micronaut-projects/micronaut-starter[micronaut-starter] project and find the classes that extend `CodeGenCommand`. The `applies` method dictates whether a command is available or not.

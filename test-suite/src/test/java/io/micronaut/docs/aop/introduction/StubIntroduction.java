@@ -22,14 +22,15 @@ import javax.inject.Singleton;
 
 // tag::class[]
 @Singleton
-public class StubIntroduction implements MethodInterceptor<Object,Object> { // <1>
+@InterceptorBean(Stub.class) // <1>
+public class StubIntroduction implements MethodInterceptor<Object,Object> { // <2>
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        return context.getValue( // <2>
+        return context.getValue( // <3>
                 Stub.class,
                 context.getReturnType().getType()
-        ).orElse(null); // <3>
+        ).orElse(null); // <4>
     }
 }
 // end::class[]

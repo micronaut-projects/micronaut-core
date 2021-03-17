@@ -37,8 +37,9 @@ public class HeadlineController {
             headline.setText("Latest Headline at " + ZonedDateTime.now());
             emitter.onNext(Event.of(headline));
             emitter.onComplete();
-        }, BackpressureStrategy.BUFFER).repeat(100) // <3>
-          .delay(1, TimeUnit.SECONDS); // <4>
+        }, BackpressureStrategy.BUFFER)
+                .repeat(100) // <3>
+                .delay(1, TimeUnit.SECONDS); // <4>
     }
     // end::streaming[]
 }

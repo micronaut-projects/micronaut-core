@@ -15,6 +15,8 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.env.CommandLinePropertySource;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
@@ -22,9 +24,6 @@ import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.StringUtils;
-
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -52,6 +51,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private String[] args = new String[0];
     private Set<Class<? extends Annotation>> eagerInitAnnotated = new HashSet<>(3);
     private String[] overrideConfigLocations;
+    private boolean banner = true;
 
     /**
      * Default constructor.
@@ -78,6 +78,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public @Nullable  List<String> getOverrideConfigLocations() {
         return overrideConfigLocations == null ? null : Arrays.asList(overrideConfigLocations);
+    }
+
+    @Override
+    public boolean isBannerEnabled() {
+        return banner;
     }
 
     @Override
@@ -312,6 +317,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (configurations != null) {
             this.configurationExcludes.addAll(Arrays.asList(configurations));
         }
+        return this;
+    }
+
+    @Override
+    public @NonNull ApplicationContextBuilder banner(boolean isEnabled) {
+        this.banner = isEnabled;
         return this;
     }
 }

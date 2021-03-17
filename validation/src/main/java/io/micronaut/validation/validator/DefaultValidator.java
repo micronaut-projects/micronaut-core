@@ -15,8 +15,8 @@
  */
 package io.micronaut.validation.validator;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.aop.Intercepted;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.ExecutionHandleLocator;
@@ -1321,9 +1321,18 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         if (propertyValue != null) {
             beanType = propertyValue.getClass();
         } else if (cascadeProperty instanceof BeanProperty) {
-            Argument[] typeParameters = ((BeanProperty) cascadeProperty).asArgument().getTypeParameters();
-            if (typeParameters.length > 0) {
-                beanType = typeParameters[0].getType();
+            Argument argument = ((BeanProperty) cascadeProperty).asArgument();
+            if (Map.class.isAssignableFrom(argument.getType())) {
+                Argument[] typeParameters = argument.getTypeParameters();
+                if (typeParameters.length == 2) {
+                    beanType = typeParameters[1].getType();
+                }
+            } else {
+
+                beanType = argument
+                        .getFirstTypeVariable()
+                        .map(Argument::getType)
+                        .orElse(null);
             }
         }
 

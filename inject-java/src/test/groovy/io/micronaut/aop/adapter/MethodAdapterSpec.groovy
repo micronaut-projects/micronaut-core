@@ -23,11 +23,50 @@ import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
-import org.atinject.tck.auto.events.EventHandlerMultipleArguments
-import org.atinject.tck.auto.events.Metadata
-import org.atinject.tck.auto.events.SomeEvent
+import org.atinject.javaxtck.auto.events.EventHandlerMultipleArguments
+import org.atinject.javaxtck.auto.events.Metadata
+import org.atinject.javaxtck.auto.events.SomeEvent
+
+import java.nio.charset.StandardCharsets
 
 class MethodAdapterSpec extends AbstractTypeElementSpec {
+
+    void 'test method adapter with byte[] argument'() {
+        given:
+        def context = buildContext('issue5054.AsciiParser', '''
+package issue5054;
+
+import io.micronaut.aop.Adapter;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.RetentionPolicy.*;
+import javax.inject.Singleton;
+import static java.nio.charset.StandardCharsets.US_ASCII;
+
+@Singleton
+class AsciiParser {
+    @Parse
+    public String parseAsAscii(byte[] value) {
+        return new String(value, US_ASCII);
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ANNOTATION_TYPE, METHOD})
+@Adapter(Parser.class)
+@interface Parse {}
+
+interface Parser {
+    String parse(byte[] value);
+}
+''')
+        def adaptedType = context.classLoader.loadClass('issue5054.Parser')
+        def parser = context.getBean(adaptedType)
+        def result = parser.parse("test".getBytes(StandardCharsets.US_ASCII))
+
+        expect:
+        result == 'test'
+    }
 
     void "test method adapter inherits metadata"() {
         when:"An adapter method is parsed that has requirements"
@@ -54,6 +93,95 @@ class Test {
         definition != null
         definition.annotationMetadata.hasAnnotation(Requires)
         definition.annotationMetadata.stringValue(Requires, "property").get() == 'foo.bar'
+    }
+
+    void "test method adapter with around overloading"() {
+        given:
+        def context = buildContext('adapteroverloading.Test', '''
+package adapteroverloading;
+
+import io.micronaut.context.event.*;
+import io.micronaut.scheduling.annotation.Async;
+import io.reactivex.Completable;
+import javax.inject.Singleton;
+import java.util.concurrent.CompletableFuture;
+import io.micronaut.runtime.event.annotation.*;
+
+@Singleton
+public class Test {
+    boolean invoked = false;
+    boolean shutdown = false;
+    
+    public boolean getInvoked() {
+        return invoked;
+    } 
+    public boolean isShutdown() {
+        return shutdown;
+    }
+    
+    @EventListener
+    void receive(StartupEvent event) {
+        invoked = true;
+    }
+    
+    @EventListener
+    void receive(ShutdownEvent event) {
+        shutdown = true;
+    } 
+}
+
+''')
+
+        when:
+        def bean = context.getBean(context.classLoader.loadClass('adapteroverloading.Test'))
+
+        then:
+        bean.invoked
+
+        when:
+        context.close()
+
+        then:
+        bean.shutdown
+    }
+
+    void "test method adapter with around advice"() {
+        given:
+        def context = buildContext('adapteraround.Test', '''
+package adapteraround;
+
+import io.micronaut.context.event.StartupEvent;
+import io.micronaut.scheduling.annotation.Async;
+import io.reactivex.Completable;
+import javax.inject.Singleton;
+import java.util.concurrent.CompletableFuture;
+import io.micronaut.runtime.event.annotation.*;
+
+@Singleton
+public class Test {
+
+    boolean invoked = false;
+    @EventListener
+    @Async
+    CompletableFuture<Boolean> onStartup(StartupEvent event) {
+        invoked = true;
+        return CompletableFuture.completedFuture(invoked);
+    }
+    
+    public boolean getInvoked() {
+        return invoked;
+    } 
+}
+
+''')
+
+        def bean = context.getBean(context.classLoader.loadClass('adapteraround.Test'))
+
+        expect:
+        bean.invoked
+
+        cleanup:
+        context.close()
     }
 
     void  "test method adapter produces additional bean"() {
@@ -200,8 +328,8 @@ class Test {
 
     void  "test method adapter argument order"() {
         when:"An adapter method is parsed"
-        BeanDefinition definition = buildBeanDefinition('org.atinject.tck.auto.events.EventListener$EventHandlerMultipleArguments$onEvent1$Intercepted','''\
-package org.atinject.tck.auto.events;
+        BeanDefinition definition = buildBeanDefinition('org.atinject.javaxtck.auto.events.EventListener$EventHandlerMultipleArguments$onEvent1$Intercepted','''\
+package org.atinject.javaxtck.auto.events;
 
 @javax.inject.Singleton
 class EventListener {

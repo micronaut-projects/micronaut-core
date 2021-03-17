@@ -1,24 +1,24 @@
 Since 1.1, Micronaut features a native https://spring.io/projects/spring-cloud-config[Spring Cloud Configuration] for those who have not switched to a dedicated more complete solution like Consul.
 
-To enable support for Spring Cloud Configuration simply add the following configuration to your `bootstrap.yml` file:
+To enable support for Spring Cloud Configuration, add the following configuration to your `bootstrap.yml` file:
 
 .Integrating with Spring Cloud Configuration
 [source,yaml]
 ----
 micronaut:
-    application:
-        name: hello-world
-    config-client:
-        enabled: true
+  application:
+    name: hello-world
+  config-client:
+    enabled: true
 spring:
-    cloud:
-        config:
-            enabled: true
-            uri: http://localhost:8888/
-            retry-attempts: 4 # optional, number of times to retry
-            retry-delay: 2s # optional, delay between retries
+  cloud:
+    config:
+      enabled: true
+      uri: http://localhost:8888/
+      retry-attempts: 4 # optional, number of times to retry
+      retry-delay: 2s # optional, delay between retries
 ----
 
-Micronaut will use the configured `micronaut.application.name` to lookup property sources for the application from Spring Cloud config server configured via `spring.cloud.config.uri`.
+Micronaut uses the configured `micronaut.application.name` to look up property sources for the application from Spring Cloud config server configured via `spring.cloud.config.uri`.
 
-See the https://spring.io/projects/spring-cloud-config#learn[Documentation for Spring Cloud Config Server] for more information on how to setup the server.
+See the https://spring.io/projects/spring-cloud-config#learn[Documentation for Spring Cloud Config Server] for more information on how to set up the server.

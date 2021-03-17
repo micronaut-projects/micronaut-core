@@ -15,9 +15,9 @@
  */
 package io.micronaut.docs.aop.around;
 
+// tag::example[]
 import javax.inject.Singleton;
 
-// tag::example[]
 @Singleton
 public class NotNullExample {
 

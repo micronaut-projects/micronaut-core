@@ -18,8 +18,8 @@ package io.micronaut.core.util;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionService;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.lang.reflect.Constructor;
 import java.util.*;
 

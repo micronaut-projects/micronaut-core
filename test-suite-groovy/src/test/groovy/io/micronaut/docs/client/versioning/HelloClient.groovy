@@ -20,7 +20,6 @@ import io.micronaut.core.version.annotation.Version
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.reactivex.Single
-
 // end::imports[]
 
 // tag::clazz[]

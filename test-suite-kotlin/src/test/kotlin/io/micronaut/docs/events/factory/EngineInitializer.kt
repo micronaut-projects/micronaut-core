@@ -25,8 +25,8 @@ import javax.inject.Singleton
 class EngineInitializer : BeanInitializedEventListener<EngineFactory> { // <4>
     override fun onInitialized(event: BeanInitializingEvent<EngineFactory>): EngineFactory {
         val engineFactory = event.bean
-        engineFactory.setRodLength(6.6)// <5>
-        return event.bean as EngineFactory
+        engineFactory.setRodLength(6.6) // <5>
+        return engineFactory
     }
 }
 // tag::class[]
