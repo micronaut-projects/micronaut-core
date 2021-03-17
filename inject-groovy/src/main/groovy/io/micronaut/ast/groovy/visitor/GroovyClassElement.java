@@ -15,25 +15,19 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import groovy.lang.MetaProperty;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.AstClassUtils;
 import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Creator;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.*;
 import org.apache.groovy.ast.tools.ClassNodeUtils;
-import org.apache.groovy.util.BeanUtils;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
-import io.micronaut.core.annotation.NonNull;
 
 import javax.inject.Inject;
 import java.lang.reflect.Modifier;
@@ -538,7 +532,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                                     annotationMetadata,
                                     PrimitiveElement.VOID,
                                     PrimitiveElement.VOID,
-                                    MetaProperty.getSetterName(propertyName),
+                                    NameUtils.setterNameFor(propertyName),
                                     ParameterElement.of(getType(), propertyName)
 
                             ));
@@ -558,13 +552,10 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     }
 
                     private String getGetterName(String propertyName, ClassElement type) {
-                        final String prefix;
-                        if (type.equals(PrimitiveElement.BOOLEAN) || type.getName().equals(Boolean.class.getName())) {
-                            prefix = "is";
-                        } else {
-                            prefix = "get";
-                        }
-                        return prefix + BeanUtils.capitalize(propertyName);
+                        return NameUtils.getterNameFor(
+                                propertyName,
+                                type.equals(PrimitiveElement.BOOLEAN) || type.getName().equals(Boolean.class.getName())
+                        );
                     }
                 };
                 propertyElements.add(groovyPropertyElement);
