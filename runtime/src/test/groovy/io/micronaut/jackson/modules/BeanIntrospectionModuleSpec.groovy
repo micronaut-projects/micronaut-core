@@ -29,6 +29,7 @@ import spock.lang.Specification
 import java.beans.ConstructorProperties
 
 class BeanIntrospectionModuleSpec extends Specification {
+
     void "Bean introspection works with a bean without JsonIgnore annotations"() {
         given:
         ApplicationContext ctx = ApplicationContext.run()
@@ -360,6 +361,27 @@ class BeanIntrospectionModuleSpec extends Specification {
         ctx.close()
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5078")
+    void "test more list wrapping scenarios"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        OuterList outerList = objectMapper.readValue("{\"wrapper\":{\"inner\":[]}}", OuterList.class)
+
+        then:
+        noExceptionThrown()
+        outerList.wrapper.inner.isEmpty()
+
+        when:
+        OuterArray outerArray = objectMapper.readValue("{\"wrapper\":{\"inner\":[]}}", OuterArray.class)
+
+        then:
+        noExceptionThrown()
+        outerArray.wrapper.inner.length == 0
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -470,6 +492,7 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         private final List<MyItem> items
 
+        @JsonCreator
         MyReqBody(final List<MyItem> items) {
             this.items = items
         }
@@ -501,8 +524,53 @@ class BeanIntrospectionModuleSpec extends Specification {
     @Introspected
     static class MyItemBody extends MyGenericBody<MyItem> {
 
+        @JsonCreator
         MyItemBody(final List<MyItem> items) {
             super(items)
+        }
+    }
+
+    @Introspected
+    static class WrapperList {
+        public final List<String> inner
+
+        @ConstructorProperties(["inner"])
+        @JsonCreator
+        WrapperList(List<String> inner) {
+            this.inner = inner
+        }
+    }
+
+    @Introspected
+    static class OuterList {
+        public final WrapperList wrapper
+
+        @ConstructorProperties(["wrapper"])
+        @JsonCreator
+        OuterList(WrapperList wrapper) {
+            this.wrapper = wrapper
+        }
+    }
+
+    @Introspected
+    static class WrapperArray {
+        public final String[] inner
+
+        @ConstructorProperties(["inner"])
+        @JsonCreator
+        WrapperArray(String[] inner) {
+            this.inner = inner
+        }
+    }
+
+    @Introspected
+    static class OuterArray {
+        public final WrapperArray wrapper
+
+        @ConstructorProperties(["wrapper"])
+        @JsonCreator
+        OuterArray(WrapperArray wrapper) {
+            this.wrapper = wrapper
         }
     }
 }
