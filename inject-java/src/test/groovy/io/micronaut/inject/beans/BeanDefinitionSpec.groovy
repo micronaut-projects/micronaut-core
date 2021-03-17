@@ -27,7 +27,7 @@ class Test implements Runnable {
 
 ''')
         expect:
-        definition.exposedTypes == [Runnable] as Class[]
+        definition.exposedTypes == [Runnable] as Set
     }
 
     void "test limit the exposed bean types - reference"() {
@@ -46,7 +46,7 @@ class Test implements Runnable {
 
 ''')
         expect:
-        reference.exposedTypes == [Runnable] as Class[]
+        reference.exposedTypes == [Runnable] as Set
     }
 
     void "test fail compilation on invalid exposed bean type"() {

@@ -17,11 +17,11 @@ class EngineSpec {
     @Test
     fun testEngine() {
         assertThrows(NoSuchBeanException::class.java) {
-            beanContext.getBean(V6Engine::class.java) // <1>
+            beanContext.getBean(V8Engine::class.java) // <1>
         }
 
         val engine = beanContext.getBean(Engine::class.java) // <2>
-        assertTrue(engine is V6Engine)
+        assertTrue(engine is V8Engine)
     }
 }
 // end::class[]

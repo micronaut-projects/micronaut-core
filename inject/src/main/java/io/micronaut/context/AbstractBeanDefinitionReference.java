@@ -41,7 +41,7 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     private final String beanTypeName;
     private final String beanDefinitionTypeName;
     private Boolean present;
-    private Set exposedTypes;
+    private Set<Class<?>> exposedTypes;
 
     /**
      * @param beanTypeName           The bean type name
@@ -59,7 +59,7 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
 
     @Override
     @NonNull
-    public Set<Class<?>> getExposedTypes() {
+    public final Set<Class<?>> getExposedTypes() {
         if (exposedTypes == null) {
             this.exposedTypes = BeanDefinitionReference.super.getExposedTypes();
         }
