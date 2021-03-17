@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import groovy.lang.MetaProperty;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
@@ -29,9 +30,11 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.*;
 import org.apache.groovy.ast.tools.ClassNodeUtils;
+import org.apache.groovy.util.BeanUtils;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import io.micronaut.core.annotation.NonNull;
+
 import javax.inject.Inject;
 import java.lang.reflect.Modifier;
 import java.util.*;
@@ -505,14 +508,17 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         Set<String> groovyProps = new HashSet<>();
         for (PropertyNode propertyNode : propertyNodes) {
             if (propertyNode.isPublic() && !propertyNode.isStatic()) {
-                groovyProps.add(propertyNode.getName());
+                final String propertyName = propertyNode.getName();
+                groovyProps.add(propertyName);
                 boolean readOnly = propertyNode.getField().isFinal();
+                final AnnotationMetadata annotationMetadata =
+                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, propertyNode.getField());
                 GroovyPropertyElement groovyPropertyElement = new GroovyPropertyElement(
                         visitorContext,
                         this,
                         propertyNode.getField(),
-                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, propertyNode.getField()),
-                        propertyNode.getName(),
+                        annotationMetadata,
+                        propertyName,
                         readOnly,
                         propertyNode
                 ) {
@@ -522,6 +528,43 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         ClassNode type = propertyNode.getType();
                         return visitorContext.getElementFactory().newClassElement(type,
                                 AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, type));
+                    }
+
+                    @Override
+                    public Optional<MethodElement> getWriteMethod() {
+                        if (!readOnly) {
+                            return Optional.of(MethodElement.of(
+                                   GroovyClassElement.this,
+                                    annotationMetadata,
+                                    PrimitiveElement.VOID,
+                                    PrimitiveElement.VOID,
+                                    MetaProperty.getSetterName(propertyName),
+                                    ParameterElement.of(getType(), propertyName)
+
+                            ));
+                        }
+                        return Optional.empty();
+                    }
+
+                    @Override
+                    public Optional<MethodElement> getReadMethod() {
+                        return Optional.of(MethodElement.of(
+                                GroovyClassElement.this,
+                                annotationMetadata,
+                                getType(),
+                                getGenericType(),
+                                getGetterName(propertyName, getType())
+                        ));
+                    }
+
+                    private String getGetterName(String propertyName, ClassElement type) {
+                        final String prefix;
+                        if (type.equals(PrimitiveElement.BOOLEAN) || type.getName().equals(Boolean.class.getName())) {
+                            prefix = "is";
+                        } else {
+                            prefix = "get";
+                        }
+                        return prefix + BeanUtils.capitalize(propertyName);
                     }
                 };
                 propertyElements.add(groovyPropertyElement);
