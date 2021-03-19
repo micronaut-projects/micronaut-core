@@ -41,11 +41,19 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
 
     private final ErrorResponseProcessor<?> responseProcessor;
 
+    /**
+     * Constructor.
+     * @deprecated Use {@link HttpStatusHandler(ErrorResponseProcessor)} instead.
+     */
     @Deprecated
     public HttpStatusHandler() {
         this.responseProcessor = null;
     }
 
+    /**
+     * Constructor.
+     * @param responseProcessor Error Response Processor
+     */
     @Inject
     public HttpStatusHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.responseProcessor = responseProcessor;
