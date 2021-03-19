@@ -239,7 +239,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         if (throwable != null && LOG.isErrorEnabled()) {
                             LOG.error("Error subscribing to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + throwable.getMessage(), throwable);
                         }
-                        handleUnexpected(ctx, throwable);
+                        handleUnexpected(ctx, cause);
                     });
                 }
 

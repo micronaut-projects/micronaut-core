@@ -16,9 +16,9 @@
 package io.micronaut.validation.routes.rules;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.validation.InternalUriMatchTemplate;
 import io.micronaut.validation.routes.RouteValidationResult;
 
 import java.util.Collections;
@@ -41,7 +41,7 @@ public interface RouteValidationRule {
      * @param method  The route method
      * @return A {@link RouteValidationResult}
      */
-    default RouteValidationResult validate(UriMatchTemplate template, ParameterElement[] parameters, MethodElement method) {
+    default RouteValidationResult validate(InternalUriMatchTemplate template, ParameterElement[] parameters, MethodElement method) {
         return validate(Collections.singletonList(template), parameters, method);
     }
 
@@ -53,6 +53,6 @@ public interface RouteValidationRule {
      * @param method  The route method
      * @return A {@link RouteValidationResult}
      */
-    RouteValidationResult validate(List<UriMatchTemplate> templates, ParameterElement[] parameters, MethodElement method);
+    RouteValidationResult validate(List<InternalUriMatchTemplate> templates, ParameterElement[] parameters, MethodElement method);
 
 }

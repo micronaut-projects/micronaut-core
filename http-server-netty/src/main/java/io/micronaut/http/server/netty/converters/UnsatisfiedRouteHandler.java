@@ -47,11 +47,19 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
 
     private final ErrorResponseProcessor<?> responseProcessor;
 
+    /**
+     * Constructor.
+     * @deprecated Use {@link UnsatisfiedRouteHandler(ErrorResponseProcessor)} instead.
+     */
     @Deprecated
     public UnsatisfiedRouteHandler() {
         this.responseProcessor = null;
     }
 
+    /**
+     * Constructor.
+     * @param responseProcessor Error Response Processor
+     */
     @Inject
     public UnsatisfiedRouteHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.responseProcessor = responseProcessor;

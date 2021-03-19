@@ -43,11 +43,19 @@ public class UnsatisfiedArgumentHandler implements ExceptionHandler<UnsatisfiedA
 
     private final ErrorResponseProcessor<?> responseProcessor;
 
+    /**
+     * Constructor.
+     * @deprecated Use {@link UnsatisfiedArgumentHandler(ErrorResponseProcessor)} instead.
+     */
     @Deprecated
     public UnsatisfiedArgumentHandler() {
         this.responseProcessor = null;
     }
 
+    /**
+     * Constructor.
+     * @param responseProcessor Error Response Processor
+     */
     @Inject
     public UnsatisfiedArgumentHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.responseProcessor = responseProcessor;
