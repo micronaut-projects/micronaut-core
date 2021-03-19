@@ -29,8 +29,10 @@ import java.lang.annotation.Retention;
  * @see Bean
  * @see Factory
  * @since 1.0
+ * @deprecated Use the typed member of the {@link Bean} annotation instead
  */
 @Scope
 @Retention(RUNTIME)
+@Deprecated
 public @interface Provided {
 }

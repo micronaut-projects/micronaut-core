@@ -493,7 +493,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             )
 
             ClassNode returnType = methodNode.getReturnType()
-            beanMethodWriter.visitTypeArguments(factoryMethodElement.returnType.allTypeArguments)
+            def allTypeArguments = factoryMethodElement.returnType.allTypeArguments
+            beanMethodWriter.visitTypeArguments(allTypeArguments)
             beanMethodWriter.visitBeanFactoryMethod(
                     originatingElement,
                     factoryMethodElement
@@ -524,6 +525,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         configurationMetadataBuilder,
                         interceptorTypeReferences
                 )
+                proxyWriter.visitTypeArguments(allTypeArguments)
                 if (producedClassElement.isInterface()) {
                     proxyWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA)
                 } else {

@@ -115,34 +115,25 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                 if (named != null) {
                     Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
                     for (Argument argument : requiredArguments) {
-                        Class argumentType = argument.getType();
                         Optional result = ConversionService.SHARED.convert(named, argument);
                         String argumentName = argument.getName();
                         if (result.isPresent()) {
                             fulfilled.put(argumentName, result.get());
                         } else {
                             Qualifier qualifier = Qualifiers.byName(named.toString());
-                            // attempt bean lookup to full argument
-                            if (ProviderFactory.isProvider(argumentType)) {
-                                Optional<Argument<?>> genericType = argument.getFirstTypeVariable();
-                                if (genericType.isPresent()) {
-                                    Class beanType = genericType.get().getType();
-                                    try {
-                                        Provider provider = ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier);
-                                        if (provider != null) {
-                                            fulfilled.put(argumentName, ProviderFactory.createProvider(argumentType, provider::get).orElse(null));
-                                        } else {
-                                            fulfilled.put(argumentName, null);
-                                        }
-                                    } catch (NoSuchBeanException e) {
-                                        //If the parameter is not null it will be caught by AbstractParametrizedBeanDefinition
-                                    }
-                                }
-                            } else {
-                                Optional bean = context.findBean(argumentType, qualifier);
-                                if (bean.isPresent()) {
-                                    fulfilled.put(argumentName, bean.get());
-                                }
+                            final BeanResolutionContext.Path path = resolutionContext.getPath();
+                            path.pushConstructorResolve(
+                                    definition,
+                                    argument
+                            );
+                            Optional bean;
+                            try {
+                                bean = ((DefaultBeanContext) context).findBean(resolutionContext, argument, qualifier);
+                            } finally {
+                                path.pop();
+                            }
+                            if (bean.isPresent()) {
+                                fulfilled.put(argumentName, bean.get());
                             }
                         }
                     }

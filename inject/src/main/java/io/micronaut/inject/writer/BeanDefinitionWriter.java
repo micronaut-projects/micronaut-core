@@ -269,7 +269,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 classElement.getPackageName(),
                 classElement.getSimpleName(),
                 getBeanDefinitionName(classElement.getPackageName(), classElement.getSimpleName()),
-                getProvidedClassName(classElement),
+                classElement.getName(),
                 classElement.isInterface(),
                 OriginatingElements.of(classElement),
                 classElement.getAnnotationMetadata(),
@@ -314,17 +314,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.interfaceTypes = new TreeSet<>(Comparator.comparing(Class::getName));
         this.interfaceTypes.add(BeanFactory.class);
         this.isConfigurationProperties = annotationMetadata.hasDeclaredStereotype(ConfigurationProperties.class);
-    }
-
-    private static String getProvidedClassName(ClassElement classElement) {
-        for (Class provider : ProviderFactory.getProviders()) {
-            String providerName = provider.getName();
-            if (classElement.isAssignable(providerName)) {
-                Iterator<ClassElement> i = classElement.getTypeArguments(providerName).values().iterator();
-                return i.hasNext() ? i.next().getName() : classElement.getName();
-            }
-        }
-        return classElement.getName();
     }
 
     @NotNull

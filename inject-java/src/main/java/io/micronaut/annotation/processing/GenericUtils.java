@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
@@ -60,7 +61,7 @@ public class GenericUtils {
      */
     Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentInfo(DeclaredType dt) {
         Element element = dt.asElement();
-        return buildGenericTypeArgumentInfo(element, dt);
+        return buildGenericTypeArgumentInfo(element, dt, Collections.emptyMap());
     }
 
     /**
@@ -81,17 +82,22 @@ public class GenericUtils {
      * @return The type argument information
      */
     public Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentElementInfo(@NonNull Element element, @Nullable DeclaredType declaredType) {
-        return buildGenericTypeArgumentInfo(element, declaredType);
+        return buildGenericTypeArgumentInfo(element, declaredType, Collections.emptyMap());
     }
 
     /**
      * Builds type argument information for the given type.
      *
      * @param element The element
-     * @param dt The declared type
+     * @param declaredType The declared type
+     * @param boundTypes The type variables
      * @return The type argument information
      */
-    private Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentInfo(@NonNull Element element, @Nullable DeclaredType dt) {
+    public Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentElementInfo(@NonNull Element element, @Nullable DeclaredType declaredType, Map<String, TypeMirror> boundTypes) {
+        return buildGenericTypeArgumentInfo(element, declaredType, boundTypes);
+    }
+
+    private Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentInfo(@NonNull Element element, @Nullable DeclaredType dt, Map<String, TypeMirror> boundTypes) {
 
         Map<String, Map<String, TypeMirror>> beanTypeArguments = new LinkedHashMap<>();
         if (dt != null) {
@@ -109,6 +115,9 @@ public class GenericUtils {
 
         if (element instanceof TypeElement) {
             TypeElement typeElement = (TypeElement) element;
+            if (CollectionUtils.isNotEmpty(boundTypes)) {
+                beanTypeArguments.put(JavaModelUtils.getClassName(typeElement), boundTypes);
+            }
             populateTypeArguments(typeElement, beanTypeArguments);
         }
         return beanTypeArguments;
@@ -545,7 +554,9 @@ public class GenericUtils {
                             boundTypes = Collections.emptyMap();
                         }
                         Map<String, TypeMirror> types = resolveGenericTypes(declaredType, te, boundTypes);
-                        typeArguments.put(name, types);
+                        if (!types.isEmpty()) {
+                            typeArguments.put(name, types);
+                        }
                     }
                     populateTypeArgumentsForInterfaces(typeArguments, te);
                 }

@@ -15,6 +15,9 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.context.annotation.Provided;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanContext;
@@ -27,6 +30,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
@@ -53,23 +57,33 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     /**
      * @return The scope of the bean
      */
-    Optional<Class<? extends Annotation>> getScope();
+    default Optional<Class<? extends Annotation>> getScope() {
+        return Optional.empty();
+    }
 
     /**
      * @return Whether the scope is singleton
      */
-    boolean isSingleton();
+    default boolean isSingleton() {
+        AnnotationMetadata am = getAnnotationMetadata();
+        return am.hasDeclaredStereotype(Singleton.class) ||
+                am.classValue(DefaultScope.class).map(t -> t == Singleton.class).orElse(false);
+    }
 
     /**
      * @return Is this definition provided by another bean
      */
-    boolean isProvided();
+    default boolean isProvided() {
+        return getAnnotationMetadata().hasDeclaredStereotype(Provided.class);
+    }
 
     /**
      * @return Whether the bean declared with {@link io.micronaut.context.annotation.EachProperty} or
      * {@link io.micronaut.context.annotation.EachBean}
      */
-    boolean isIterable();
+    default boolean isIterable() {
+        return false;
+    }
 
     /**
      * @return The produced bean type
@@ -80,7 +94,9 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     /**
      * @return The type that declares this definition, null if not applicable.
      */
-    Optional<Class<?>> getDeclaringType();
+    default Optional<Class<?>> getDeclaringType() {
+        return Optional.empty();
+    }
 
     /**
      * The single concrete constructor that is an injection point for creating the bean.
@@ -92,41 +108,53 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     /**
      * @return All required components for this entity definition
      */
-    Collection<Class> getRequiredComponents();
+    default Collection<Class> getRequiredComponents() {
+        return Collections.emptyList();
+    }
 
     /**
      * All methods that require injection. This is a subset of all the methods in the class.
      *
      * @return The required properties
      */
-    Collection<MethodInjectionPoint> getInjectedMethods();
+    default Collection<MethodInjectionPoint> getInjectedMethods() {
+        return Collections.emptyList();
+    }
 
     /**
      * All the fields that require injection.
      *
      * @return The required fields
      */
-    Collection<FieldInjectionPoint> getInjectedFields();
+    default Collection<FieldInjectionPoint> getInjectedFields() {
+        return Collections.emptyList();
+    }
 
     /**
      * All the methods that should be called once the bean has been fully initialized and constructed.
      *
      * @return Methods to call post construct
      */
-    Collection<MethodInjectionPoint> getPostConstructMethods();
+    default Collection<MethodInjectionPoint> getPostConstructMethods() {
+        return Collections.emptyList();
+    }
 
     /**
      * All the methods that should be called when the object is to be destroyed.
      *
      * @return Methods to call pre-destroy
      */
-    Collection<MethodInjectionPoint> getPreDestroyMethods();
+    default Collection<MethodInjectionPoint> getPreDestroyMethods() {
+        return Collections.emptyList();
+    }
 
     /**
      * @return The class name
      */
     @Override
-    String getName();
+    default String getName() {
+        return getBeanType().getName();
+    }
 
     /**
      * Finds a single {@link ExecutableMethod} for the given name and argument types.
@@ -136,7 +164,9 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @param <R>           The return type
      * @return An optional {@link ExecutableMethod}
      */
-    <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class... argumentTypes);
+    default <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class... argumentTypes) {
+        return Optional.empty();
+    }
 
     /**
      * Finds possible methods for the given method name.
@@ -145,7 +175,9 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @param <R>  The return type
      * @return The possible methods
      */
-    <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name);
+    default <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name) {
+        return Stream.empty();
+    }
 
     /**
      * Inject the given bean with the context.
@@ -154,7 +186,9 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @param bean    The bean
      * @return The injected bean
      */
-    T inject(BeanContext context, T bean);
+    default T inject(BeanContext context, T bean) {
+        return bean;
+    }
 
     /**
      * Inject the given bean with the context.
@@ -164,12 +198,16 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @param bean              The bean
      * @return The injected bean
      */
-    T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean);
+    default T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        return bean;
+    }
 
     /**
      * @return The {@link ExecutableMethod} instances for this definition
      */
-    Collection<ExecutableMethod<T, ?>> getExecutableMethods();
+    default Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
+        return Collections.emptyList();
+    }
 
     @Override
     default Argument<T> asArgument() {

@@ -15,11 +15,13 @@
  */
 package io.micronaut.inject.field.factoryinjection;
 
+import io.micronaut.context.annotation.Factory;
+
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 
-@Singleton
+@Factory
 public class AProvider implements Provider<A> {
     final C c;
 
@@ -33,6 +35,7 @@ public class AProvider implements Provider<A> {
     }
 
     @Override
+    @Singleton
     public A get() {
         return new AImpl(c, another);
     }

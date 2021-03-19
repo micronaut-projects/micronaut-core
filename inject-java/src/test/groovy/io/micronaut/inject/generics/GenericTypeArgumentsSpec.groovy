@@ -15,19 +15,65 @@
  */
 package io.micronaut.inject.generics
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.BeanCreatedEventListener
+import io.micronaut.core.annotation.AnnotationMetadataProvider
 import io.micronaut.core.type.Argument
+import io.micronaut.http.filter.HttpClientFilterResolver
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.MethodInjectionPoint
+import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Unroll
+import zipkin2.Span
+import zipkin2.reporter.AsyncReporter
+import zipkin2.reporter.Reporter
 
 import javax.validation.ConstraintViolationException
 import java.util.function.Function
 import java.util.function.Supplier
+import java.util.stream.Stream
 
 class GenericTypeArgumentsSpec extends AbstractTypeElementSpec {
+
+    void 'test inject with generic inheritance'() {
+        given:
+        def context = buildContext('genericinheritance.Test', '''
+package genericinheritance;
+
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.http.filter.HttpClientFilterResolver;
+import io.micronaut.http.filter.HttpFilterResolver.FilterEntry;
+import io.micronaut.http.filter.HttpClientFilter;
+import io.micronaut.http.HttpRequest;
+import java.util.List;
+
+@javax.inject.Singleton
+public class Test implements HttpClientFilterResolver<TestMetadata> {
+    public List<FilterEntry<HttpClientFilter>> resolveFilterEntries(TestMetadata context) {
+        return java.util.Collections.emptyList();
+    }
+    
+    public List<HttpClientFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry<HttpClientFilter>> filterEntries) {
+    return java.util.Collections.emptyList();
+    }
+}
+
+interface TestMetadata extends AnnotationMetadataProvider {} 
+''')
+
+        expect:
+        context != null
+
+        Qualifiers.byGenerics(AnnotationMetadataProvider)
+            .reduce(HttpClientFilterResolver,
+                Stream.of(context.getBeanDefinition(context.classLoader.loadClass('genericinheritance.Test')))
+            ).findFirst().isPresent()
+
+        cleanup:
+        context.close()
+    }
 
     void "test generic type arguments with inner classes resolve"() {
         given:
@@ -445,6 +491,61 @@ class Test {
 }
 
 interface Foo extends java.util.function.Function<String, Integer> {}
+
+''')
+        expect:
+        definition != null
+        definition.getTypeArguments(Function).size() == 2
+        definition.getTypeArguments(Function)[0].name == 'T'
+        definition.getTypeArguments(Function)[1].name == 'R'
+        definition.getTypeArguments(Function)[0].type == String
+        definition.getTypeArguments(Function)[1].type == Integer
+    }
+
+    void "test type arguments for factory with interface"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test$AsyncReporter0', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import zipkin2.reporter.*;
+import zipkin2.*;
+
+@Factory
+class Test {
+
+    @javax.inject.Singleton
+    AsyncReporter<Span> asyncReporter() {
+        return null;
+    }
+}
+
+''')
+        expect:
+        definition != null
+        definition.getTypeArgumentsMap().size() == 2
+        definition.getTypeParameters(Reporter) == [Span] as Class[]
+        definition.getTypeParameters(AsyncReporter) == [Span] as Class[]
+    }
+
+    void "test type arguments for factory with AOP advice applied"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.$TestFactory$MyFunc0Definition$Intercepted', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@Factory
+class TestFactory {
+
+    @Bean
+    @io.micronaut.aop.simple.Mutating("foo")
+    java.util.function.Function<String, Integer> myFunc() {
+        return (String str) -> 10;
+    }
+}
 
 ''')
         expect:

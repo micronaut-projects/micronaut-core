@@ -13,31 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.field.arrayfactoryinjection;
 
-import io.micronaut.context.annotation.Factory;
-
-import javax.inject.Inject;
-import javax.inject.Provider;
-import javax.inject.Singleton;
-
-@Factory
-public class AProvider implements Provider<A> {
-    final C c;
-
-    @Inject
-    C another;
-
-
-    @Inject
-    public AProvider(C c) {
-        this.c = c;
-
-    }
-
-    @Override
-    @Singleton
-    public A get() {
-        return new AImpl(c, another);
-    }
-}
+/**
+ * Internal package to support injection providers of various types.
+ */
+package io.micronaut.inject.provider;

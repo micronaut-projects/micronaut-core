@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 
 import javax.inject.Named;
+import javax.inject.Provider;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 
@@ -145,6 +146,18 @@ public class Qualifiers {
      */
     public static <T> Qualifier<T> byTypeArguments(Class... typeArguments) {
         return new TypeArgumentQualifier<>(typeArguments);
+    }
+
+    /**
+     * Build a qualifier for the given generic type arguments.
+     *
+     * @param typeArguments The generic type arguments
+     * @param <T>           The component type
+     * @return The qualifier
+     * @since 3.0.0
+     */
+    public static <T> Qualifier<T> byGenerics(Class<?>... typeArguments) {
+        return new GenericTypeArgumentQualifier<>(typeArguments);
     }
 
     /**

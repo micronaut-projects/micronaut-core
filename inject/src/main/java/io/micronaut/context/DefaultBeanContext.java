@@ -823,6 +823,11 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
+    public <T> Optional<T> findBean(Argument<T> beanType, Qualifier<T> qualifier) {
+        return findBean(null, beanType, qualifier);
+    }
+
+    @Override
     public <T> Collection<T> getBeansOfType(Class<T> beanType) {
         return getBeansOfType(null, Argument.of(beanType));
     }
@@ -1176,7 +1181,7 @@ public class DefaultBeanContext implements BeanContext {
         if (CollectionUtils.isNotEmpty(preDestroyListeners)) {
 
             final Qualifier<T> q =
-                    Qualifiers.byTypeArgumentsClosest(genericType.getType());
+                    Qualifiers.byGenerics(genericType.getType());
             final Stream<BeanDefinition<T>> listenerStream = preDestroyListeners
                     .stream();
             return q.reduce(type, listenerStream)
@@ -1388,7 +1393,6 @@ public class DefaultBeanContext implements BeanContext {
                         beanType,
                         proxyQualifier,
                         true,
-                        false,
                         false
                 );
             }
@@ -2292,7 +2296,7 @@ public class DefaultBeanContext implements BeanContext {
                     if (propagateQualifier) {
                         resolutionContext.setAttribute(BeanDefinition.NAMED_ATTRIBUTE, ((Named) declaredQualifier).getName());
                     }
-                    resolutionContext.setCurrentQualifier(declaredQualifier);
+                    resolutionContext.setCurrentQualifier(declaredQualifier != null ? declaredQualifier : qualifier);
                     try {
                         bean = beanFactory.build(resolutionContext, this, beanDefinition);
                     } finally {
@@ -2974,7 +2978,6 @@ public class DefaultBeanContext implements BeanContext {
                     beanType,
                     qualifier,
                     throwNonUnique,
-                    includeProvided,
                     true
             );
             beanConcreteCandidateCache.put(bk, beanDefinition);
@@ -2987,18 +2990,13 @@ public class DefaultBeanContext implements BeanContext {
             Argument<T> beanType,
             Qualifier<T> qualifier,
             boolean throwNonUnique,
-            boolean includeProvided,
             boolean filterProxied) {
         Collection<BeanDefinition<T>> candidates = new ArrayList<>(findBeanCandidates(resolutionContext, beanType, null, filterProxied));
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
-
+        qualifier = getQualifierForBeanType(beanType, qualifier);
         filterProxiedTypes(candidates, filterProxied, false);
-
-        if (!includeProvided) {
-            candidates.removeIf(BeanDefinition::isProvided);
-        }
 
         int size = candidates.size();
         BeanDefinition<T> definition = null;
@@ -3007,16 +3005,19 @@ public class DefaultBeanContext implements BeanContext {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
+                Qualifier<T> finalQualifier = qualifier;
                 Stream<BeanDefinition<T>> candidateStream = candidates.stream().filter(c -> {
                     if (!c.isAbstract()) {
                         if (c instanceof NoInjectionBeanDefinition) {
                             NoInjectionBeanDefinition noInjectionBeanDefinition = (NoInjectionBeanDefinition) c;
-                            return qualifier.contains(noInjectionBeanDefinition.qualifier);
+                            return finalQualifier.contains(noInjectionBeanDefinition.qualifier);
                         }
                         return true;
                     }
                     return false;
                 });
+
+
                 Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType.getType(), candidateStream);
                 List<BeanDefinition<T>> beanDefinitionList = qualified.collect(Collectors.toList());
                 if (beanDefinitionList.isEmpty()) {
@@ -3057,6 +3058,22 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
         return Optional.ofNullable(definition);
+    }
+
+    private <T> Qualifier<T> getQualifierForBeanType(Argument<T> beanType, Qualifier<T> qualifier) {
+        final Argument[] typeParameters = beanType.getTypeParameters();
+
+        if (ArrayUtils.isNotEmpty(typeParameters)) {
+            if (qualifier != null) {
+                qualifier = Qualifiers.byQualifiers(
+                        qualifier,
+                        getTypeArgumentQualifier(typeParameters)
+                );
+            } else {
+                qualifier = getTypeArgumentQualifier(typeParameters);
+            }
+        }
+        return qualifier;
     }
 
     private <T> void filterProxiedTypes(Collection<BeanDefinition<T>> candidates, boolean filterProxied, boolean filterDelegates) {
@@ -3105,17 +3122,7 @@ public class DefaultBeanContext implements BeanContext {
             boolean throwNonUnique,
             Collection<BeanDefinition<T>> candidates) {
         final Class<T> beanClass = beanType.getType();
-        if (candidates.size() > 1) {
-            Argument<?>[] typeParameters = beanType.getTypeParameters();
-            if (ArrayUtils.isNotEmpty(typeParameters)) {
-                Qualifier<T> genericQualifier = getTypeArgumentQualifier(typeParameters);
-                List<BeanDefinition<T>> byGenerics = genericQualifier.reduce(beanClass, candidates.stream())
-                        .collect(Collectors.toList());
-                if (!byGenerics.isEmpty()) {
-                    candidates = byGenerics;
-                }
-            }
-        }
+
         if (candidates.size() > 1) {
             List<BeanDefinition<T>> primary = candidates.stream()
                     .filter(BeanDefinition::isPrimary)
@@ -3145,11 +3152,10 @@ public class DefaultBeanContext implements BeanContext {
 
     @NotNull
     private <T> Qualifier<T> getTypeArgumentQualifier(Argument[] typeParameters) {
-        Qualifier<T> genericQualifier = Qualifiers.byTypeArgumentsClosest(
+        return Qualifiers.byGenerics(
                 Arrays.stream(typeParameters).map(TypeInformation::getType)
                         .toArray(Class[]::new)
         );
-        return genericQualifier;
     }
 
     private <T> T createAndRegisterSingleton(
@@ -3605,6 +3611,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private <T> boolean isCandidatePresent(Argument<T> beanType, Qualifier<T> qualifier) {
+        qualifier = getQualifierForBeanType(beanType, qualifier);
         final Collection<BeanDefinition<T>> candidates = findBeanCandidates(null, beanType, null, true);
         if (!candidates.isEmpty()) {
             filterReplacedBeans(null, candidates);

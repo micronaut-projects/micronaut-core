@@ -42,7 +42,7 @@ class Foo {}
 ''')
         expect:
         definition != null
-        definition.getBeanType().name == 'test.Foo'
+        definition.getBeanType().name == 'test.Test'
     }
 
     void "test inject bean with provider"() {

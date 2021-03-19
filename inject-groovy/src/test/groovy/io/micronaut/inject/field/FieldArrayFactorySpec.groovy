@@ -17,6 +17,7 @@ package io.micronaut.inject.field
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.annotation.Factory
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -66,7 +67,7 @@ class FieldArrayFactorySpec extends Specification {
         }
     }
 
-    @Singleton
+    @Factory
     static class AProvider implements Provider<A> {
         final C c
         @Inject C another
@@ -75,7 +76,7 @@ class FieldArrayFactorySpec extends Specification {
             this.c = c
         }
 
-        @Override
+        @Singleton
         A get() {
             new AImpl(c, another)
         }
