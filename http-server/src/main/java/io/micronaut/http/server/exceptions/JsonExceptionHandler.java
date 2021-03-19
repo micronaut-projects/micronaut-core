@@ -43,11 +43,19 @@ public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingExce
 
     private final ErrorResponseProcessor<?> responseProcessor;
 
+    /**
+     * Constructor.
+     * @deprecated Use {@link JsonExceptionHandler(ErrorResponseProcessor)} instead.
+     */
     @Deprecated
     public JsonExceptionHandler() {
         this.responseProcessor = null;
     }
 
+    /**
+     * Constructor.
+     * @param responseProcessor Error Response Processor
+     */
     @Inject
     public JsonExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.responseProcessor = responseProcessor;

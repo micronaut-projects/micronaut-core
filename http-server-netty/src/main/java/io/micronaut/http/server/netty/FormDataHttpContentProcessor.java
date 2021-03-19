@@ -66,8 +66,6 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
         }
         factory.setMaxLimit(multipart.getMaxFileSize());
         this.decoder = new HttpPostRequestDecoder(factory, nettyHttpRequest.getNativeRequest(), characterEncoding);
-        //This is to work around a bug in Netty that should be resolved with https://github.com/netty/netty/pull/10623
-        this.decoder.setDiscardThreshold(Integer.MAX_VALUE);
         this.enabled = nettyHttpRequest.getContentType().map(type -> type.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false) ||
             multipart.isEnabled();
         this.partMaxSize = multipart.getMaxFileSize();

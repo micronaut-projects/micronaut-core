@@ -53,4 +53,4 @@ The `@BasicAuth` annotation is just an example and can be replaced with your own
 
 snippet::io.micronaut.docs.client.filter.BasicAuth[tags="class"]
 
-<1> The only requirement for custom annotations is that the ann:http.annotation.HttpFilterStereotype[] annotation must be present
+<1> The only requirement for custom annotations is that the ann:http.annotation.FilterMatcher[] annotation must be present

@@ -23,6 +23,7 @@ import com.fasterxml.jackson.core.io.SerializedString;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.*;
 import com.fasterxml.jackson.databind.deser.impl.MethodProperty;
+import com.fasterxml.jackson.databind.deser.impl.PropertyValueBuffer;
 import com.fasterxml.jackson.databind.deser.std.StdValueInstantiator;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
@@ -86,7 +87,7 @@ public class BeanIntrospectionModule extends SimpleModule {
     @Nullable
     protected BeanIntrospection<Object> findIntrospection(Class<?> beanClass) {
         return (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
-    }    
+    }
 
     private JavaType newType(Argument<?> argument, TypeFactory typeFactory) {
         return JacksonConfiguration.constructType(argument, typeFactory);
@@ -404,11 +405,21 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                     @Override
                     public boolean canCreateUsingArrayDelegate() {
-                        return constructorArguments.length == 1 && constructorArguments[0].isContainerType();
+                        return defaultInstantiator.canCreateUsingArrayDelegate();
+                    }
+
+                    @Override
+                    public boolean canCreateUsingDelegate() {
+                        return false;
                     }
 
                     @Override
                     public JavaType getArrayDelegateType(DeserializationConfig config) {
+                        return newType(constructorArguments[0], typeFactory);
+                    }
+
+                    @Override
+                    public JavaType getDelegateType(DeserializationConfig config) {
                         return newType(constructorArguments[0], typeFactory);
                     }
 
@@ -442,6 +453,11 @@ public class BeanIntrospectionModule extends SimpleModule {
                     @Override
                     public Object createUsingDefault(DeserializationContext ctxt) throws IOException {
                         return introspection.instantiate();
+                    }
+
+                    @Override
+                    public Object createUsingDelegate(DeserializationContext ctxt, Object delegate) throws IOException {
+                        return introspection.instantiate(false, new Object[] { delegate });
                     }
 
                     @Override
@@ -488,7 +504,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     public Object createFromBoolean(DeserializationContext ctxt, boolean value) throws IOException {
                         return introspection.instantiate(false, new Object[]{ value });
                     }
-                    
+
                 });
                 return builder;
             }
