@@ -16,8 +16,8 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.Element;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
@@ -47,7 +47,7 @@ final class DefaultOriginatingElements implements OriginatingElements {
     }
 
     @Override
-    public void addOriginatingElement(@NotNull Element element) {
+    public void addOriginatingElement(@NonNull Element element) {
         Objects.requireNonNull(element, "Element cannot be null");
         this.originatingElements.put(
                 element.getName(),
@@ -55,7 +55,7 @@ final class DefaultOriginatingElements implements OriginatingElements {
         );
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Element[] getOriginatingElements() {
         return this.originatingElements.values().toArray(Element.EMPTY_ELEMENT_ARRAY);

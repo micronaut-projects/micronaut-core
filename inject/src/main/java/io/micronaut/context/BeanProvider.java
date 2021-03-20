@@ -16,7 +16,6 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.NonNull;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 import java.util.Iterator;
@@ -41,7 +40,7 @@ public interface BeanProvider<T> extends Iterable<T> {
     @NonNull
     T get();
 
-    @NotNull
+    @NonNull
     @Override
     default Iterator<T> iterator() {
         return Collections.singletonList(get()).iterator();

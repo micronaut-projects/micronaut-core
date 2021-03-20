@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.annotation.NonNull;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -371,7 +370,7 @@ public interface ClassElement extends TypedElement {
                 throw new UnsupportedOperationException("Cannot convert class elements produced by from an array");
             }
 
-            @NotNull
+            @NonNull
             @Override
             public String getName() {
                 return typeName;
@@ -392,7 +391,7 @@ public interface ClassElement extends TypedElement {
                 return false;
             }
 
-            @NotNull
+            @NonNull
             @Override
             public Object getNativeType() {
                 return typeName;

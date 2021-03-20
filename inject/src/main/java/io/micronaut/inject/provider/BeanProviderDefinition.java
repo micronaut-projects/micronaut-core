@@ -21,9 +21,9 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.qualifiers.AnyQualifier;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Iterator;
 import java.util.stream.Stream;
@@ -79,7 +79,7 @@ final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvid
                 return isPresent() && (isUnique() || qualifier instanceof AnyQualifier);
             }
 
-            @NotNull
+            @NonNull
             @Override
             public Iterator<Object> iterator() {
                 return context.getBeansOfType(argument, qualifier).iterator();

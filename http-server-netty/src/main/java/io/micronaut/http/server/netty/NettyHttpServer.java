@@ -84,7 +84,6 @@ import io.netty.util.AsciiString;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -700,7 +699,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             }
         }
 
-        @NotNull
+        @NonNull
         private Map<String, ChannelHandler> getHandlerForProtocol(@Nullable String protocol) {
             final Duration idleTime = serverConfiguration.getIdleTimeout();
             Map<String, ChannelHandler> handlers = new LinkedHashMap<>(15);

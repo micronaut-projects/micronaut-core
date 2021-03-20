@@ -23,7 +23,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
-import org.jetbrains.annotations.NotNull;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -99,9 +98,8 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
         return registerSingleton(type, singleton, null, true);
     }
 
-    @NotNull
     @Override
-    default @NonNull ApplicationContext registerSingleton(@NotNull Object singleton, boolean inject) {
+    default @NonNull ApplicationContext registerSingleton(@NonNull Object singleton, boolean inject) {
         return (ApplicationContext) BeanContext.super.registerSingleton(singleton, inject);
     }
 
