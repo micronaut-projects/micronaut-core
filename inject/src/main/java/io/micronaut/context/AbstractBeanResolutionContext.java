@@ -91,10 +91,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Nullable
     @Override
     public Qualifier<?> getCurrentQualifier() {
-        if (qualifier != null) {
-            return qualifier;
-        }
-        return null;
+        return qualifier;
     }
 
     @Override

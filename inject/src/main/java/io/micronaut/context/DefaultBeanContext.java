@@ -1314,19 +1314,6 @@ public class DefaultBeanContext implements BeanContext {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get provided beans of the given type.
-     *
-     * @param resolutionContext The bean resolution context
-     * @param beanType          The bean type
-     * @param <T>               The bean type parameter
-     * @return The found beans
-     */
-    protected @NonNull
-    <T> Provider<T> getBeanProvider(@Nullable BeanResolutionContext resolutionContext, @NonNull Class<T> beanType) {
-        return getBeanProvider(resolutionContext, beanType, null);
-    }
-
     @SuppressWarnings("unchecked")
     @Override
     public @NonNull
@@ -1710,64 +1697,6 @@ public class DefaultBeanContext implements BeanContext {
     protected void invalidateCaches() {
         beanCandidateCache.clear();
         initializedObjectsByType.clear();
-    }
-
-    /**
-     * Get a bean provider.
-     *
-     * @param resolutionContext The bean resolution context
-     * @param beanType          The bean type
-     * @param qualifier         The qualifier
-     * @param <T>               The bean type parameter
-     * @return The bean provider
-     */
-    protected @NonNull
-    <T> Provider<T> getBeanProvider(@Nullable BeanResolutionContext resolutionContext, @NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return getBeanProvider(
-                resolutionContext,
-                Argument.of(beanType),
-                qualifier
-        );
-    }
-
-    /**
-     * Get a bean provider.
-     *
-     * @param resolutionContext The bean resolution context
-     * @param beanType          The bean type
-     * @param qualifier         The qualifier
-     * @param <T>               The bean type parameter
-     * @return The bean provider
-     * @since 3.0.0
-     */
-    protected @NonNull
-    <T> Provider<T> getBeanProvider(@Nullable BeanResolutionContext resolutionContext, @NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        ArgumentUtils.requireNonNull("beanType", beanType);
-
-        BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
-
-        T inFlightBean = resolutionContext != null ? resolutionContext.getInFlightBean(beanKey) : null;
-        if (inFlightBean != null) {
-            return new ResolvedProvider<>(inFlightBean);
-        }
-
-        @SuppressWarnings("unchecked") BeanRegistration<T> beanRegistration = singletonObjects.get(beanKey);
-        if (beanRegistration != null) {
-            return new ResolvedProvider<>(beanRegistration.bean);
-        }
-
-        Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(
-                resolutionContext,
-                beanType,
-                qualifier,
-                true,
-                false
-        );
-        if (concreteCandidate.isPresent()) {
-            return new UnresolvedProvider<>(concreteCandidate.get(), this);
-        } else {
-            throw new NoSuchBeanException(beanType);
-        }
     }
 
     /**
