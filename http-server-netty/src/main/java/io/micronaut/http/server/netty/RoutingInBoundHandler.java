@@ -34,6 +34,7 @@ import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
@@ -1817,7 +1818,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return mutableHttpResponse;
     }
 
-    @NotNull
+    @NonNull
     private NettyMutableHttpResponse<?> toNettyResponse(HttpResponse<?> message) {
         NettyMutableHttpResponse<?> nettyHttpResponse;
         if (message instanceof NettyMutableHttpResponse) {
