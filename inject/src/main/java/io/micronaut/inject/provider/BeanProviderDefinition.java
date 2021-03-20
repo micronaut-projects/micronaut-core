@@ -4,8 +4,15 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.context.exceptions.NonUniqueBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.qualifiers.AnyQualifier;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Iterator;
+import java.util.stream.Stream;
 
 /**
  * Implementation for {@link BeanProvider} bean lookups.
@@ -32,20 +39,42 @@ final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvid
             Argument<Object> argument,
             Qualifier<Object> qualifier,
             boolean singleton) {
-        if (singleton) {
+        return new BeanProvider<Object>() {
+            @Override
+            public Object get() {
+                return context.getBean(argument, qualifier);
+            }
 
-            return new BeanProvider<Object>() {
-                Object bean;
-                @Override
-                public Object get() {
-                    if (bean == null) {
-                        bean = context.getBean(argument, qualifier);
-                    }
-                    return bean;
+            @Override
+            public boolean isUnique() {
+                try {
+                    context.getBeanDefinition(argument, qualifier instanceof AnyQualifier ? null : qualifier);
+                    return true;
+                } catch (NoSuchBeanException e) {
+                    return false;
                 }
-            };
-        } else {
-            return () -> context.getBean(argument, qualifier);
-        }
+            }
+
+            @Override
+            public boolean isPresent() {
+                return context.containsBean(argument, qualifier);
+            }
+
+            @Override
+            public boolean isResolvable() {
+                return isPresent() && (isUnique() || qualifier instanceof AnyQualifier);
+            }
+
+            @NotNull
+            @Override
+            public Iterator<Object> iterator() {
+                return context.getBeansOfType(argument, qualifier).iterator();
+            }
+
+            @Override
+            public Stream<Object> stream() {
+                return context.streamOfType(argument, qualifier);
+            }
+        };
     }
 }

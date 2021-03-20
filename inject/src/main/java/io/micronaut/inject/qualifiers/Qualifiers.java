@@ -16,12 +16,12 @@
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 
 import javax.inject.Named;
-import javax.inject.Provider;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 
@@ -63,12 +63,15 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byAnnotation(Annotation annotation) {
-        if (annotation.annotationType() == Type.class) {
+        if (annotation instanceof Type) {
             Type typeAnn = (Type) annotation;
             return byType(typeAnn.value());
-        } else if (annotation.annotationType() == Named.class) {
+        } else if (annotation instanceof Named) {
             Named nameAnn = (Named) annotation;
             return byName(nameAnn.value());
+        }  else if (annotation instanceof Any) {
+            //noinspection unchecked
+            return AnyQualifier.INSTANCE;
         } else {
             return new AnnotationQualifier<>(annotation);
         }
@@ -83,7 +86,10 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byAnnotation(AnnotationMetadata metadata, Class<? extends Annotation> type) {
-        if (Type.class == type) {
+        if (Any.class == type) {
+            //noinspection unchecked
+            return AnyQualifier.INSTANCE;
+        } else if (Type.class == type) {
             Optional<Class> aClass = metadata.classValue(type);
             if (aClass.isPresent()) {
                 return byType(aClass.get());
@@ -112,11 +118,14 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byAnnotation(AnnotationMetadata metadata, String type) {
-        if (Type.class.getName().equals(type)) {
+        if (Type.NAME.equals(type)) {
             Optional<Class> aClass = metadata.classValue(type);
             if (aClass.isPresent()) {
                 return byType(aClass.get());
             }
+        } else if (Any.NAME.equals(type)) {
+            //noinspection unchecked
+            return AnyQualifier.INSTANCE;
         } else if (Named.class.getName().equals(type)) {
             String n = metadata.stringValue(type).orElse(null);
             if (n != null) {

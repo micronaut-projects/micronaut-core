@@ -20,6 +20,7 @@ import io.micronaut.inject.BeanFactory;
 import io.micronaut.inject.ConstructorInjectionPoint;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Collections;
@@ -106,7 +107,16 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
                         } else if (injectionPointArgument.isNullable()) {
                             throw new DisabledBeanException("Nullable bean doesn't exist");
                         } else {
-                            throw new NoSuchBeanException(argument, qualifier);
+                            if (qualifier instanceof AnyQualifier) {
+                                return buildProvider(
+                                        context,
+                                        argument,
+                                        qualifier,
+                                        definition.isSingleton()
+                                );
+                            } else {
+                                throw new NoSuchBeanException(argument, qualifier);
+                            }
                         }
                     }
 

@@ -17,4 +17,5 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 public @interface Any {
+    String NAME = Any.class.getName();
 }
