@@ -739,7 +739,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return Collections.unmodifiableMap(map);
     }
 
-    Map<String, TypeMirror> getBoundTypeMirrors() {
+    private Map<String, TypeMirror> getBoundTypeMirrors() {
         List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();
         Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();
 

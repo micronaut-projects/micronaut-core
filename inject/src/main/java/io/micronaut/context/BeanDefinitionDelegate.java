@@ -15,12 +15,11 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameResolver;
@@ -30,7 +29,6 @@ import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
-import javax.inject.Provider;
 import java.util.*;
 
 /**

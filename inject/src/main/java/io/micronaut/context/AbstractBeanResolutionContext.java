@@ -18,14 +18,11 @@ package io.micronaut.context;
 import io.micronaut.context.exceptions.CircularDependencyException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.naming.Named;
-import io.micronaut.core.type.Argument;
-import io.micronaut.inject.*;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.type.Argument;
+import io.micronaut.inject.*;
 
 import java.util.*;
 

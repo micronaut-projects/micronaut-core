@@ -71,7 +71,7 @@ public interface BeanProvider<T> extends Iterable<T> {
     }
 
     /**
-     * <p>Determines if there is no bean that matches the required type and qualifiers</p>
+     * <p>Determines if there is no bean that matches the required type and qualifiers.</p>
      *
      * @since 3.0.0
      * @return true if no bean matches.

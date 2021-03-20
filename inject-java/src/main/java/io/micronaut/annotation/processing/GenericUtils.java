@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;

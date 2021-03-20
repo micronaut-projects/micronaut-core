@@ -186,6 +186,7 @@ public interface BeanContext extends
      * destroyed and removed from the context, otherwise null will be returned.
      *
      * @param beanType The bean type
+     * @param qualifier The qualifier
      * @param <T>      The concrete class
      * @return The destroy instance or null if no such bean exists
      * @since 3.0.0
