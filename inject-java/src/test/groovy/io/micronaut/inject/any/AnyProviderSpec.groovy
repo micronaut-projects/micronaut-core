@@ -23,6 +23,10 @@ class AnyProviderSpec extends Specification {
                 BeanProvider.argumentOf(Dog),
                 Qualifiers.byName("terrier")
         )
+        def anotherDogBeanProvider = beanContext.getBean(
+                BeanProvider.argumentOf(Dog),
+                Qualifiers.any()
+        )
 
         then:
         owner.dog instanceof Dog
@@ -33,6 +37,9 @@ class AnyProviderSpec extends Specification {
         dogBeanProvider.isPresent()
         !dogBeanProvider.isUnique()
         dogBeanProvider.isResolvable()
+        !anotherDogBeanProvider.isUnique()
+        anotherDogBeanProvider.isResolvable()
+        anotherDogBeanProvider.isPresent()
         terrierProvider.isPresent()
         terrierProvider.isUnique()
         terrierProvider.isResolvable()

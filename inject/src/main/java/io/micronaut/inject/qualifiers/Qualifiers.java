@@ -34,6 +34,22 @@ import java.util.Optional;
 public class Qualifiers {
 
     /**
+     * Allows looking up the first matching instance.
+     *
+     * <p>This qualifier results on {@link io.micronaut.context.exceptions.NonUniqueBeanException} never being thrown as
+     * the first matching instance will be returned.</p>
+     *
+     * @param <T> The generic type
+     * @return The any qualifier.
+     * @see Any
+     * @since 3.0.0
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Qualifier<T> any() {
+        return AnyQualifier.INSTANCE;
+    }
+
+    /**
      * Build a qualifier from other qualifiers.
      *
      * @param qualifiers The qualifiers
