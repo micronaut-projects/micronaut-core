@@ -2686,10 +2686,24 @@ public class DefaultBeanContext implements BeanContext {
             boolean throwNoSuchBean,
             BeanDefinition<T> definition) {
         try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
-            if (definition.isSingleton() && !definition.hasStereotype(SCOPED_PROXY_ANN)) {
-                return createAndRegisterSingleton(context, definition, beanType.getType(), qualifier);
-            } else {
-                return getScopedBeanForDefinition(context, beanType, qualifier, throwNoSuchBean, definition);
+            final BeanResolutionContext.Path path = context.getPath();
+            final boolean isNewPath = path.isEmpty();
+            if (isNewPath) {
+                path.pushBeanCreate(
+                        definition,
+                        beanType
+                );
+            }
+            try {
+                if (definition.isSingleton() && !definition.hasStereotype(SCOPED_PROXY_ANN)) {
+                    return createAndRegisterSingleton(context, definition, beanType.getType(), qualifier);
+                } else {
+                    return getScopedBeanForDefinition(context, beanType, qualifier, throwNoSuchBean, definition);
+                }
+            } finally {
+                if (isNewPath) {
+                    path.pop();
+                }
             }
         }
     }

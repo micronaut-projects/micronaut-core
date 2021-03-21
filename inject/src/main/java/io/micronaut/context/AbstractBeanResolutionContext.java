@@ -197,6 +197,12 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
+        public Path pushBeanCreate(BeanDefinition<?> declaringType, Argument<?> beanType) {
+            path.push(new ConstructorSegment(declaringType, beanType));
+            return this;
+        }
+
+        @Override
         public Path pushMethodArgumentResolve(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
             MethodSegment methodSegment = new MethodSegment(declaringType, methodInjectionPoint, argument);
             if (contains(methodSegment)) {

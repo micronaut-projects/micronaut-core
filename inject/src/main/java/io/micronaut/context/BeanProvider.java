@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.type.Argument;
 
 import java.util.Collections;
 import java.util.Iterator;
@@ -98,6 +99,18 @@ public interface BeanProvider<T> extends Iterable<T> {
             Objects.requireNonNull(consumer, "Consumer cannot be null")
                     .accept(get());
         }
+    }
+
+    /**
+     * Create an argument for the given type to aid with bean provider lookup.
+     *
+     * @param type The type
+     * @param <T1>  The generic type
+     * @return 3.0.0
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static @NonNull <T1> Argument<BeanProvider<T1>> argumentOf(@NonNull Class<T1> type) {
+        return (Argument) Argument.of(BeanProvider.class, Objects.requireNonNull(type, "Type cannot be null"));
     }
 
 }

@@ -32,7 +32,10 @@ class PostConstructExceptionSpec extends Specification {
 
         then:"The implementation is injected"
         def e = thrown(BeanInstantiationException)
-        e.message == 'Error instantiating bean of type [io.micronaut.inject.failures.postconstruct.B]: bad'
+        e.message == '''Error instantiating bean of type  [io.micronaut.inject.failures.postconstruct.B]
+
+Message: bad
+Path Taken: new B()'''
 
         cleanup:
         context.close()
