@@ -13,7 +13,7 @@ import javax.inject.Inject
 class VehicleSpec {
     // tag::any[]
     @Inject
-    @Any
+    @field:Any
     lateinit var engine: Engine
     // end::any[]
 

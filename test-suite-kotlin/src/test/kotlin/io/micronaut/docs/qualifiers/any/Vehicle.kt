@@ -9,14 +9,14 @@ import javax.inject.Singleton
 
 // tag::clazz[]
 @Singleton
-class Vehicle(@Any val engineProvider: BeanProvider<Engine>) { // <1>
+class Vehicle(@param:Any val engineProvider: BeanProvider<Engine>) { // <1>
     fun start() {
         engineProvider.ifPresent { it.start() } // <2>
     }
     // tag::startAll[]
     fun startAll() {
         if (engineProvider.isPresent) { // <1>
-            engineProvider.stream().forEach { it.start() } // <2>
+            engineProvider.forEach { it.start() } // <2>
         }
     } // end::startAll[]
 // tag::clazz[]

@@ -24,7 +24,7 @@ class Vehicle {
     // tag::startAll[]
     void startAll() {
         if (engineProvider.isPresent()) { // <1>
-            engineProvider.stream().forEach(Engine::start) // <2>
+            engineProvider.each {it.start() } // <2>
         }
     }
     // end::startAll[]
