@@ -1,5 +1,45 @@
 This section will document breaking changes between Micronaut 2.x and Micronaut 3.x
 
-=== Decapitalization Strategy
+=== Core Changes
+
+==== Decapitalization Strategy
 
 For many cases, one common one being introspections, getter names like `getXForwarded()` would result in the bean property being `XForwarded`. The name will now be `xForwarded`. This can affect many areas of the framework where names like `XForwarded` are used.
+
+==== Implementations of `javax.inject.Provider` No Longer Generate Factories
+
+In Micronaut 2.x if you defined a bean that implemented the `javax.inject.Provider` interface then the return type of the `get` method also automatically became a bean.
+
+For example:
+
+[source,java]
+----
+import javax.inject.Provider;
+import javax.inject.Singleton;
+
+@Singleton
+public class AProvider implements Provider<A> {
+    @Override
+    public A get() {
+        return new AImpl();
+    }
+}
+----
+
+In the above example a bean of type `A` would automatically be exposed by Micronaut. This behaviour is no longer supported and instead the ann:context.annotation.Factory[] annotation should be used to express the same behaviour. For example:
+
+[source,java]
+----
+import io.micronaut.context.annotation.Factory;
+import javax.inject.Provider;
+import javax.inject.Singleton;
+
+@Factory
+public class AProvider implements Provider<A> {
+    @Override
+    @Singleton
+    public A get() {
+        return new AImpl();
+    }
+}
+----
