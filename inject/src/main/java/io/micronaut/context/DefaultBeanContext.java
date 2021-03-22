@@ -687,7 +687,7 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public <T> BeanDefinition<T> getBeanDefinition(Argument<T> beanType, Qualifier<T> qualifier) {
         return findConcreteCandidate(null, beanType, qualifier, true, false)
-                    .orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
+                .orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
     }
 
     @Override
@@ -779,7 +779,8 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
-    public @NonNull <T> T getBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public @NonNull
+    <T> T getBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         try {
             //noinspection ConstantConditions
@@ -799,7 +800,8 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
-    public @NonNull <T> T getBean(@NonNull Class<T> beanType) {
+    public @NonNull
+    <T> T getBean(@NonNull Class<T> beanType) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         try {
             //noinspection ConstantConditions
@@ -836,9 +838,9 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public <T> Collection<T> getBeansOfType(Class<T> beanType, Qualifier<T> qualifier) {
         return getBeanRegistrations(null, Argument.of(beanType), qualifier)
-                    .stream()
-                    .map(BeanRegistration::getBean)
-                    .collect(Collectors.toList());
+                .stream()
+                .map(BeanRegistration::getBean)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -1999,12 +2001,9 @@ public class DefaultBeanContext implements BeanContext {
 
             Stream<BeanDefinition<T>> candidateStream = beanDefinitionsClasses
                     .stream()
-                    .filter(reference -> {
-                        Class<?> candidateType = reference.getBeanType();
-                        final boolean isCandidate = candidateType != null &&
-                                (beanType.isAssignableFrom(candidateType) || beanClass == candidateType);
-                        return isCandidate && reference.isEnabled(this, resolutionContext);
-                    })
+                    .filter(reference ->
+                            reference.isCandidateBean(beanType.getType()) && reference.isEnabled(this, resolutionContext)
+                    )
                     .map(ref -> {
                         BeanDefinition<T> loadedBean;
                         try {
@@ -2859,10 +2858,15 @@ public class DefaultBeanContext implements BeanContext {
             BeanKey<?> key = entry.getKey();
             if (qualifier == null || qualifier.equals(key.qualifier)) {
                 BeanRegistration reg = entry.getValue();
-                if (beanType.isInstance(reg.bean)) {
+                if (beanClass.isInstance(reg.bean)) {
+                    final Set exposedTypes = reg.getBeanDefinition().getExposedTypes();
+                    if (!exposedTypes.isEmpty() && !exposedTypes.contains(beanClass)) {
+                        continue;
+                    }
+
                     if (qualifier == null && definition != null && !reg.beanDefinition.equals(definition)) {
                         // different definition, so ignore
-                        return null;
+                        continue;
                     }
                     synchronized (singletonObjects) {
                         bean = (T) reg.bean;
@@ -2879,7 +2883,7 @@ public class DefaultBeanContext implements BeanContext {
             } else if (key.qualifier == null) {
                 BeanRegistration registration = entry.getValue();
                 Object existing = registration.bean;
-                if (beanType.isInstance(existing)) {
+                if (beanType.getType().isInstance(registration.bean)) {
                     Optional<BeanDefinition<T>> candidate = qualifier.qualify(beanClass, Stream.of(registration.beanDefinition));
                     if (!candidate.isPresent() && requestedType != null && requestedType != beanType) {
                         candidate = qualifier.qualify((Class<T>) requestedType.getType(), Stream.of(registration.beanDefinition));
@@ -2887,8 +2891,13 @@ public class DefaultBeanContext implements BeanContext {
                     if (candidate.isPresent()) {
                         synchronized (singletonObjects) {
                             bean = (T) existing;
+                            final BeanDefinition<T> beanDefinition = candidate.get();
+                            final Set<Class<?>> exposedTypes = beanDefinition.getExposedTypes();
+                            if (!exposedTypes.isEmpty() && !exposedTypes.contains(beanClass)) {
+                                continue;
+                            }
                             registerSingletonBean(
-                                    candidate.get(),
+                                    beanDefinition,
                                     beanType,
                                     bean,
                                     qualifier,
@@ -3163,65 +3172,77 @@ public class DefaultBeanContext implements BeanContext {
             qualifier = beanDefinition.getDeclaredQualifier();
         }
 
-        qualifier = getQualifierForBeanType(beanType, qualifier);
-
-        BeanKey key = new BeanKey<>(beanDefinition, qualifier);
-        if (LOG.isDebugEnabled()) {
-            if (qualifier != null) {
-                LOG.debug("Registering singleton bean {} for type [{} {}] using bean key {}", createdBean, qualifier, beanType.getName(), key);
-            } else {
-                LOG.debug("Registering singleton bean {} for type [{}] using bean key {}", createdBean, beanType.getName(), key);
+        final Set<Class<?>> exposedTypes = beanDefinition.getExposedTypes();
+        final boolean hasNoExposedTypes = CollectionUtils.isEmpty(exposedTypes);
+        if (hasNoExposedTypes) {
+            qualifier = getQualifierForBeanType(beanType, qualifier);
+            BeanKey<T> key = new BeanKey<>(beanDefinition, qualifier);
+            if (LOG.isDebugEnabled()) {
+                if (qualifier != null) {
+                    LOG.debug("Registering singleton bean {} for type [{} {}] using bean key {}", createdBean, qualifier, beanType.getName(), key);
+                } else {
+                    LOG.debug("Registering singleton bean {} for type [{}] using bean key {}", createdBean, beanType.getName(), key);
+                }
             }
-        }
-        BeanRegistration<T> registration = new BeanRegistration<>(key, beanDefinition, createdBean);
-
-        if (singleCandidate || key.beanType.getTypeParameters().length > 0) {
-            singletonObjects.put(key, registration);
-        }
-
-        boolean isNotProxyTarget = qualifier != PROXY_TARGET_QUALIFIER;
-        if (isNotProxyTarget) {
-
+            BeanRegistration<T> registration = new BeanRegistration<>(key, beanDefinition, createdBean);
+          
+            if (singleCandidate || key.beanType.getTypeParameters().length > 0) {
+                singletonObjects.put(key, registration);
+            }
+          
             final Class<T> beanClass = beanType.getType();
             Class<?> createdType = createdBean != null ? createdBean.getClass() : beanClass;
             boolean createdTypeDiffers = !createdType.equals(beanClass);
 
-            BeanKey createdBeanKey = new BeanKey(createdType, qualifier);
-            Optional<Class<? extends Annotation>> qualifierAnn = beanDefinition.getAnnotationTypeByStereotype(javax.inject.Qualifier.class);
-            if (qualifierAnn.isPresent()) {
-                Class annotation = qualifierAnn.get();
-                if (Primary.class == annotation) {
-                    BeanKey primaryBeanKey = new BeanKey<>(beanType, null);
-                    singletonObjects.put(primaryBeanKey, registration);
-                    if (createdTypeDiffers) {
-                        singletonObjects.put(new BeanKey<>(createdType, null), registration);
-                    }
-                } else {
+            boolean isNotProxyTarget = qualifier != PROXY_TARGET_QUALIFIER;
+            if (isNotProxyTarget) {
+                Class<?> createdType = createdBean != null ? createdBean.getClass() : beanType;
+                boolean createdTypeDiffers = !createdType.equals(beanType);
 
-                    BeanKey qualifierKey = new BeanKey<>(createdType, Qualifiers.byAnnotation(beanDefinition, annotation.getName()));
+                BeanKey<?> createdBeanKey = new BeanKey(createdType, qualifier);
+                Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
+                if (declaredQualifier != null) {
+                    BeanKey qualifierKey = new BeanKey(createdType, declaredQualifier);
                     if (!qualifierKey.equals(createdBeanKey)) {
                         singletonObjects.put(qualifierKey, registration);
                     }
-                }
-            } else {
-                if (!beanDefinition.isIterable()) {
-                    BeanKey primaryBeanKey = new BeanKey<>(createdType, null);
-                    singletonObjects.put(primaryBeanKey, registration);
-                    if (qualifier != null) {
-                        BeanKey qualifiedKey = new BeanKey<>(beanType, qualifier);
-                        singletonObjects.put(qualifiedKey, registration);
-                    }
                 } else {
-                    if (beanDefinition.isPrimary()) {
-                        BeanKey primaryBeanKey = new BeanKey<>(beanType, null);
+                    if (!beanDefinition.isIterable()) {
+                        BeanKey primaryBeanKey = new BeanKey<>(createdType, null);
                         singletonObjects.put(primaryBeanKey, registration);
-                        if (createdTypeDiffers) {
-                            singletonObjects.put(new BeanKey<>(createdType, null), registration);
+                        if (qualifier != null) {
+                            BeanKey qualifiedKey = new BeanKey<>(beanType, qualifier);
+                            singletonObjects.put(qualifiedKey, registration);
+                        }
+                    } else {
+                        if (beanDefinition.isPrimary()) {
+                            BeanKey primaryBeanKey = new BeanKey<>(beanType, null);
+                            singletonObjects.put(primaryBeanKey, registration);
+                            if (createdTypeDiffers) {
+                                singletonObjects.put(new BeanKey<>(createdType, null), registration);
+                            }
                         }
                     }
                 }
+                singletonObjects.put(createdBeanKey, registration);
             }
-            singletonObjects.put(createdBeanKey, registration);
+        } else {
+            for (Class<?> exposedType : exposedTypes) {
+                BeanKey<?> key = new BeanKey(exposedType, qualifier);
+                if (LOG.isDebugEnabled()) {
+                    if (qualifier != null) {
+                        LOG.debug("Registering singleton bean {} for type [{} {}] using bean key {}", createdBean, qualifier, exposedType.getName(), key);
+                    } else {
+                        LOG.debug("Registering singleton bean {} for type [{}] using bean key {}", createdBean, exposedType.getName(), key);
+                    }
+                }
+                BeanRegistration<T> registration = new BeanRegistration<>(key, beanDefinition, createdBean);
+                singletonObjects.put(key, registration);
+                if (qualifier != null && beanDefinition.isPrimary()) {
+                    BeanKey<?> primaryKey = new BeanKey(exposedType, null);
+                    singletonObjects.put(primaryKey, registration);
+                }
+            }
         }
     }
 
@@ -3829,8 +3850,8 @@ public class DefaultBeanContext implements BeanContext {
         /**
          * A bean key for the given bean definition.
          *
-         * @param argument The argument
-         * @param qualifier  The qualifier
+         * @param argument  The argument
+         * @param qualifier The qualifier
          */
         BeanKey(Argument<T> argument, Qualifier<T> qualifier) {
             this.beanType = argument;

@@ -178,7 +178,11 @@ public class DefaultArgument<T> implements Argument<T> {
 
     @Override
     public String toString() {
-        return type.getSimpleName() + " " + getName();
+        if (this.name == null) {
+            return getType().getSimpleName();
+        } else {
+            return getType().getSimpleName() + " " + getName();
+        }
     }
 
     @Override

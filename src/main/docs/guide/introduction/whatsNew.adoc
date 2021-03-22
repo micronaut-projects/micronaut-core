@@ -2,11 +2,27 @@ Micronaut {version} includes the following changes:
 
 === Core Features
 
-==== Support for Injecting by Generic Type Arguments
+==== Support Narrowing Injection by Generic Type Arguments
 
-Micronaut and now resolve the correct bean to inject based on the generic type arguments specifed on the injection point:
+Micronaut can now resolve the correct bean to inject based on the generic type arguments specified on the injection point:
 
 snippet::io.micronaut.docs.inject.generics.Vehicle[tags="constructor",indent=0]
+
+For more information see the section on <<qualifiers, Qualifying by Generic Type Arguments>>.
+
+==== Support for using Annotation Members in Qualifiers
+
+You can now use annotation members in qualifiers and specify which members should be excluded with the new ann:context.annotation.NonBinding[] annotation.
+
+For more information see the section on <<qualifiers, Qualifying By Annotation Members>>.
+
+==== Support for Limiting the Injectable Types
+
+You can now limit the exposed types of a bean using the `typed` member of the ann:context.annotation.Bean[] annotation:
+
+snippet::io.micronaut.docs.inject.typed.V8Engine[tags="class",indent=0]
+
+For more information see the section on <<typed, Limiting Injectable Types>>.
 
 === Module Upgrades
 

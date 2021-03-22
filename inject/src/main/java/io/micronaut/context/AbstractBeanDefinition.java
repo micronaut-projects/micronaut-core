@@ -88,6 +88,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private final Collection<Class> requiredComponents = new HashSet<>(3);
     private AnnotationMetadata beanAnnotationMetadata;
     private Environment environment;
+    private Set<Class<?>> exposedTypes;
 
     /**
      * Constructs a bean definition that is produced from a method call on another type (factory bean).
@@ -278,6 +279,15 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Override
     public final Class<T> getBeanType() {
         return type;
+    }
+
+    @Override
+    @NonNull
+    public final Set<Class<?>> getExposedTypes() {
+        if (this.exposedTypes == null) {
+            this.exposedTypes = BeanDefinition.super.getExposedTypes();
+        }
+        return this.exposedTypes;
     }
 
     @Override

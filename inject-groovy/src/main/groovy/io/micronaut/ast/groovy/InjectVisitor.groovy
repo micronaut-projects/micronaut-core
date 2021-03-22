@@ -129,6 +129,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
     final AtomicInteger factoryMethodIndex = new AtomicInteger(0)
     private final CompilationUnit compilationUnit
     private final GroovyElementFactory elementFactory
+    GroovyVisitorContext groovyVisitorContext
 
     InjectVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode targetClassNode, ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder) {
         this(sourceUnit, compilationUnit, targetClassNode, null, configurationMetadataBuilder)
@@ -137,7 +138,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
     InjectVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode targetClassNode, Boolean configurationProperties, ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder) {
         this.compilationUnit = compilationUnit
         this.sourceUnit = sourceUnit
-        def visitorContext = new GroovyVisitorContext(sourceUnit, compilationUnit) {
+        groovyVisitorContext = new GroovyVisitorContext(sourceUnit, compilationUnit) {
             @Override
             VisitorConfiguration getConfiguration() {
                 new VisitorConfiguration() {
@@ -148,7 +149,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 }
             }
         }
-        this.elementFactory = visitorContext.getElementFactory()
+        this.elementFactory = groovyVisitorContext.getElementFactory()
         this.configurationMetadataBuilder = configurationMetadataBuilder
         this.concreteClass = targetClassNode
         def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, targetClassNode)
@@ -245,6 +246,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     annotationMetadata,
                     interfaceTypes,
                     configurationMetadataBuilder,
+                    groovyVisitorContext,
                     interceptorTypes
             )
             ClassElement groovyClassElement = elementFactory.newClassElement(
@@ -476,20 +478,12 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     methodAnnotationMetadata
             )
             ClassElement producedClassElement = factoryMethodElement.genericReturnType
-            String beanDefinitionPackage = concreteClass.packageName
-            String upperCaseMethodName = NameUtils.capitalize(methodNode.getName())
-            String factoryMethodBeanDefinitionName =
-                    beanDefinitionPackage + '.$' + concreteClass.nameWithoutPackage + '$' + upperCaseMethodName + factoryMethodIndex.getAndIncrement() + "Definition"
-
             BeanDefinitionWriter beanMethodWriter = new BeanDefinitionWriter(
-                    producedClassElement.packageName,
-                    producedClassElement.simpleName,
-                    factoryMethodBeanDefinitionName,
-                    producedClassElement.name,
-                    producedClassElement.isInterface(),
+                    factoryMethodElement,
                     OriginatingElements.of(originatingElement),
-                    methodAnnotationMetadata,
-                    configurationMetadataBuilder
+                    configurationMetadataBuilder,
+                    groovyVisitorContext,
+                    factoryMethodIndex.getAndIncrement()
             )
 
             ClassNode returnType = methodNode.getReturnType()
@@ -523,11 +517,12 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         beanMethodWriter,
                         OptionalValues.of(Boolean.class, finalSettings),
                         configurationMetadataBuilder,
+                        groovyVisitorContext,
                         interceptorTypeReferences
                 )
                 proxyWriter.visitTypeArguments(allTypeArguments)
                 if (producedClassElement.isInterface()) {
-                    proxyWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA)
+                    proxyWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, groovyVisitorContext)
                 } else {
                     populateProxyWriterConstructor(producedClassElement, proxyWriter)
                 }
@@ -575,7 +570,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     beanMethodWriter.visitPreDestroyMethod(
                             producedClassElement,
                             destroyMethodElement,
-                            false
+                            false,
+                            groovyVisitorContext
                     )
                 } else {
                     addError("@Bean method defines a preDestroy method that does not exist or is not public: $destroyMethodName", methodNode )
@@ -635,7 +631,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         beanWriter.visitPostConstructMethod(
                                 declaringElement,
                                 groovyMethodElement,
-                                requiresReflection
+                                requiresReflection,
+                                groovyVisitorContext
                         )
                     } else if (isDeclaredBean && methodAnnotationMetadata.hasStereotype(ProcessedTypes.PRE_DESTROY)) {
                         defineBeanDefinition(concreteClass)
@@ -646,14 +643,16 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         beanWriter.visitPreDestroyMethod(
                                 declaringElement,
                                 groovyMethodElement,
-                                requiresReflection
+                                requiresReflection,
+                                groovyVisitorContext
                         )
                     } else if (methodAnnotationMetadata.hasStereotype(Inject.class)) {
                         defineBeanDefinition(concreteClass)
                         getBeanWriter().visitMethodInjectionPoint(
                                 declaringElement,
                                 groovyMethodElement,
-                                requiresReflection
+                                requiresReflection,
+                                groovyVisitorContext
                         )
                     }
                 }
@@ -831,7 +830,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             if (!executorMethodAdded) {
                 getBeanWriter().visitExecutableMethod(
                         declaringElement,
-                        methodElement
+                        methodElement,
+                        groovyVisitorContext
                 )
             }
         }
@@ -870,6 +870,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     (BeanDefinitionWriter) getBeanWriter(),
                     aopSettings,
                     configurationMetadataBuilder,
+                    groovyVisitorContext,
                     interceptorTypeReferences
             )
 
@@ -894,18 +895,20 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         if (constructor != null) {
             if (constructor.parameters.length == 0) {
                 proxyWriter.visitDefaultConstructor(
-                        AnnotationMetadata.EMPTY_METADATA
+                        AnnotationMetadata.EMPTY_METADATA,
+                        groovyVisitorContext
                 )
             } else {
                 proxyWriter.visitBeanDefinitionConstructor(
                         constructor,
-                        constructor.isPrivate()
+                        constructor.isPrivate(),
+                        groovyVisitorContext
                 )
             }
         } else {
             ClassNode cn = targetClass.nativeType as ClassNode
             if (cn.declaredConstructors.isEmpty()) {
-                proxyWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA)
+                proxyWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, groovyVisitorContext)
             } else {
                 addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", (ASTNode) targetClass.nativeType)
             }
@@ -1051,7 +1054,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 getBeanWriter().visitMethodInjectionPoint(
                         fieldElement.declaringType,
                         methodElement,
-                        false
+                        false,
+                        groovyVisitorContext
                 )
             } else if (isValue) {
                 if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
@@ -1200,7 +1204,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 addError("Class annotated with groovy.lang.Singleton instead of javax.inject.Singleton. Import javax.inject.Singleton to use Micronaut Dependency Injection.", classNode)
             }
 
-            beanWriter = new BeanDefinitionWriter(groovyClassElement, configurationMetadataBuilder)
+            beanWriter = new BeanDefinitionWriter(groovyClassElement, configurationMetadataBuilder, groovyVisitorContext)
             beanWriter.visitTypeArguments(groovyClassElement.allTypeArguments)
             beanDefinitionWriters.put(classNode, beanWriter)
 
@@ -1209,7 +1213,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             if (constructor != null) {
                 if (constructor.parameters.length == 0) {
 
-                    beanWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA)
+                    beanWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, groovyVisitorContext)
                 } else {
                     def constructorMetadata = constructor.annotationMetadata
                     final boolean isConstructBinding = constructorMetadata.hasDeclaredStereotype(ConfigurationInject.class)
@@ -1218,13 +1222,13 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                 concreteClass,
                                 null)
                     }
-                    beanWriter.visitBeanDefinitionConstructor(constructor, constructor.isPrivate())
+                    beanWriter.visitBeanDefinitionConstructor(constructor, constructor.isPrivate(), groovyVisitorContext)
                 }
 
             } else {
                 ClassNode cn = groovyClassElement.nativeType as ClassNode
                 if (cn.declaredConstructors.isEmpty()) {
-                    beanWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA)
+                    beanWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, groovyVisitorContext)
                 } else {
                     addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", classNode)
                 }
@@ -1272,10 +1276,11 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         originatingElement,
                         methodAnnotationMetadata,
                         [elementFactory.newClassElement(typeToImplement, AnnotationMetadata.EMPTY_METADATA)] as ClassElement[],
+                        groovyVisitorContext,
                         configurationMetadataBuilder
                 )
 
-                aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata)
+                aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata, groovyVisitorContext)
 
                 beanDefinitionWriters.put(ClassHelper.make(packageName + '.' + beanClassName), aopProxyWriter)
 

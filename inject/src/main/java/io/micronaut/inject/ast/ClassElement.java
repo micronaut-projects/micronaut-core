@@ -17,6 +17,7 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.annotation.NonNull;
@@ -349,53 +350,18 @@ public interface ClassElement extends TypedElement {
      */
     @Internal
     static @NonNull ClassElement of(@NonNull String typeName) {
-        return new ClassElement() {
-            @Override
-            public boolean isAssignable(String type) {
-                return false;
-            }
+        return new SimpleClassElement(typeName);
+    }
 
-            @Override
-            public boolean isAssignable(ClassElement type) {
-                return false;
-            }
-
-            @Override
-            public ClassElement toArray() {
-                throw new UnsupportedOperationException("Cannot convert class elements produced by name to an array");
-            }
-
-            @Override
-            public ClassElement fromArray() {
-                throw new UnsupportedOperationException("Cannot convert class elements produced by from an array");
-            }
-
-            @NonNull
-            @Override
-            public String getName() {
-                return typeName;
-            }
-
-            @Override
-            public boolean isPackagePrivate() {
-                return false;
-            }
-
-            @Override
-            public boolean isProtected() {
-                return false;
-            }
-
-            @Override
-            public boolean isPublic() {
-                return false;
-            }
-
-            @NonNull
-            @Override
-            public Object getNativeType() {
-                return typeName;
-            }
-        };
+    /**
+     * Create a class element for the given simple type.
+     * @param typeName The type
+     * @param isInterface Is the type an interface
+     * @param annotationMetadata The annotation metadata
+     * @return The class element
+     */
+    @Internal
+    static @NonNull ClassElement of(@NonNull String typeName, boolean isInterface, @Nullable AnnotationMetadata annotationMetadata) {
+        return new SimpleClassElement(typeName, isInterface, annotationMetadata);
     }
 }
