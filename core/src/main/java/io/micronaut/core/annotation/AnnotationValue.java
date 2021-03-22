@@ -1048,7 +1048,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         // conditional branches ordered from most likely to least likely
         // generally at runtime values are always AnnotationClassValue
         // A class can be present at compilation time
-        if (value instanceof AnnotationClassValue) {
+        if (value == null) {
+            return null;
+        } else if (value instanceof AnnotationClassValue) {
             Class<?> type = ((AnnotationClassValue<?>) value).getType().orElse(null);
             if (type != null) {
                 return new Class[]{type};

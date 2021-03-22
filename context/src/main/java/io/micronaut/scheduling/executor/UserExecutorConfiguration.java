@@ -15,6 +15,7 @@
  */
 package io.micronaut.scheduling.executor;
 
+import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
@@ -69,7 +70,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      * @param corePoolSize the core pool size
      * @param threadFactoryClass the thread factory class
      */
-    @Inject
+    @ConfigurationInject
     protected UserExecutorConfiguration(@Nullable @Parameter String name,
                                         @Nullable Integer nThreads,
                                         @Nullable ExecutorType type,
