@@ -49,15 +49,6 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
 
     /**
      * Constructor.
-     * @deprecated Use {@link UnsatisfiedRouteHandler(ErrorResponseProcessor)} instead.
-     */
-    @Deprecated
-    public UnsatisfiedRouteHandler() {
-        this.responseProcessor = null;
-    }
-
-    /**
-     * Constructor.
      * @param responseProcessor Error Response Processor
      */
     @Inject
@@ -70,26 +61,20 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
         if (LOG.isTraceEnabled()) {
             LOG.trace("{} (Bad Request): {}", request, exception.getMessage());
         }
-        MutableHttpResponse<?> response = HttpResponse.badRequest();
-        if (responseProcessor != null) {
-            return responseProcessor.processResponse(ErrorContext.builder(request)
-                    .cause(exception)
-                    .error(new Error() {
-                        @Override
-                        public String getMessage() {
-                            return exception.getMessage();
-                        }
+        return responseProcessor.processResponse(ErrorContext.builder(request)
+                .cause(exception)
+                .error(new Error() {
+                    @Override
+                    public String getMessage() {
+                        return exception.getMessage();
+                    }
 
-                        @Override
-                        public Optional<String> getPath() {
-                            return Optional.of('/' + exception.getArgument().getName());
-                        }
-                    })
-                    .build(), response);
-        } else {
-            return response.body(new JsonError(exception.getMessage())
-                    .path('/' + exception.getArgument().getName())
-                    .link(Link.SELF, Link.of(request.getUri())));
-        }
+                    @Override
+                    public Optional<String> getPath() {
+                        return Optional.of('/' + exception.getArgument().getName());
+                    }
+                })
+                .build(), HttpResponse.badRequest());
+
     }
 }

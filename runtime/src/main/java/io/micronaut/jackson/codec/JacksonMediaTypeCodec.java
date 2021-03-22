@@ -64,20 +64,6 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
      * @param codecConfiguration       The configuration for the codec
      * @param mediaType                Client request/response media type
      */
-    @Deprecated
-    public JacksonMediaTypeCodec(Provider<ObjectMapper> objectMapperProvider,
-                                 ApplicationConfiguration applicationConfiguration,
-                                 CodecConfiguration codecConfiguration,
-                                 MediaType mediaType) {
-        this((BeanProvider<ObjectMapper>) objectMapperProvider::get, applicationConfiguration, codecConfiguration, mediaType);
-    }
-
-    /**
-     * @param objectMapperProvider     To read/write JSON
-     * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
-     * @param mediaType                Client request/response media type
-     */
     public JacksonMediaTypeCodec(BeanProvider<ObjectMapper> objectMapperProvider,
                                  ApplicationConfiguration applicationConfiguration,
                                  CodecConfiguration codecConfiguration,

@@ -17,19 +17,23 @@ package io.micronaut.jackson.bind
 
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategy
+import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionError
+import io.micronaut.core.convert.ConversionService
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
 class CharSequencePropertyNamingStrategyConverterSpec extends Specification {
-    @Shared
-    CharSequencePropertyNamingStrategyConverter converter = new CharSequencePropertyNamingStrategyConverter()
 
     @Unroll
     void 'test configuring #propertyNaminStrategyString converts to correct PropertyNamingStrategy'() {
+        given:
+        def ctx = ApplicationContext.run()
+        def converter = ctx.getBean(ConversionService)
+
         when:
         Optional<PropertyNamingStrategy> actualPropertyNamingStrategy = converter.convert(
                 propertyNaminStrategyString, PropertyNamingStrategy)
@@ -37,6 +41,9 @@ class CharSequencePropertyNamingStrategyConverterSpec extends Specification {
         then:
         actualPropertyNamingStrategy.isPresent()
         actualPropertyNamingStrategy.get() == expectedPropertyNamingStrategy
+
+        cleanup:
+        ctx.close()
 
         where:
         propertyNaminStrategyString | expectedPropertyNamingStrategy
@@ -49,14 +56,21 @@ class CharSequencePropertyNamingStrategyConverterSpec extends Specification {
 
     @Unroll
     void 'test invalid String #invalidString throws IllegalArgumentException'() {
+        given:
+        def ctx = ApplicationContext.run()
+        def converter = ctx.getBean(ConversionService)
+
         when:
-        ConversionContext ctx = ArgumentConversionContext.of(CharSequence)
-        converter.convert(invalidString, PropertyNamingStrategy, ctx)
-        ConversionError conversionError = ctx.last()
+        ConversionContext conversionContext = ArgumentConversionContext.of(CharSequence)
+        converter.convert(invalidString, PropertyNamingStrategy, conversionContext)
+        ConversionError conversionError = conversionContext.last()
 
         then:
         conversionError.cause instanceof IllegalArgumentException
         conversionError.cause.message == "Unable to convert '$invalidString' to a com.fasterxml.jackson.databind.PropertyNamingStrategy"
+
+        cleanup:
+        ctx.close()
 
         where:
         invalidString | _

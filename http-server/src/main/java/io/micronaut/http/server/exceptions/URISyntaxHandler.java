@@ -43,15 +43,6 @@ public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, Ht
 
     /**
      * Constructor.
-     * @deprecated Use {@link URISyntaxHandler(ErrorResponseProcessor)} instead.
-     */
-    @Deprecated
-    public URISyntaxHandler() {
-        this.responseProcessor = null;
-    }
-
-    /**
-     * Constructor.
      * @param responseProcessor Error Response Processor
      */
     @Inject
@@ -61,24 +52,20 @@ public class URISyntaxHandler implements ExceptionHandler<URISyntaxException, Ht
 
     @Override
     public HttpResponse handle(HttpRequest request, URISyntaxException exception) {
-        MutableHttpResponse<?> response = HttpResponse.badRequest();
-        if (responseProcessor != null) {
-            return responseProcessor.processResponse(ErrorContext.builder(request)
-                    .cause(exception)
-                    .error(new Error() {
-                        @Override
-                        public String getMessage() {
-                            return "Malformed URI: " + exception.getMessage();
-                        }
+        return responseProcessor.processResponse(ErrorContext.builder(request)
+                .cause(exception)
+                .error(new Error() {
+                    @Override
+                    public String getMessage() {
+                        return "Malformed URI: " + exception.getMessage();
+                    }
 
-                        @Override
-                        public Optional<String> getTitle() {
-                            return Optional.of("Malformed URI");
-                        }
-                    })
-                    .build(), response);
-        } else {
-            return response.body(new JsonError("Malformed URI: " + exception.getMessage()));
-        }
+                    @Override
+                    public Optional<String> getTitle() {
+                        return Optional.of("Malformed URI");
+                    }
+                })
+                .build(), HttpResponse.badRequest());
+
     }
 }

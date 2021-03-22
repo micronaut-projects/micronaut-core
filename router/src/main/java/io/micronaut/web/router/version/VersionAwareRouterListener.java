@@ -52,22 +52,6 @@ public class VersionAwareRouterListener implements BeanCreatedEventListener<Rout
     }
 
     /**
-     * Creates a configuration to decorate existing {@link Router} beans with a {@link FilteredRouter}.
-     *
-     * @param filter A {@link io.micronaut.web.router.filter.RouteMatchFilter} to delegate routes filtering
-     * @deprecated Use {@link VersionAwareRouterListener(VersionRouteMatchFilter)} instead.
-     */
-    @Deprecated
-    public VersionAwareRouterListener(RouteVersionFilter filter) {
-        this.routeVersionFilter = new VersionRouteMatchFilter() {
-            @Override
-            public <T, R> Predicate<UriRouteMatch<T, R>> filter(HttpRequest<?> request) {
-                return filter.filter(request);
-            }
-        };
-    }
-
-    /**
      * Returns a wrapped {@link Router} to {@link FilteredRouter}.
      *
      * @param event The {@link Router} bean created event

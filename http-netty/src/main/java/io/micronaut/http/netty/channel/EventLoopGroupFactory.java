@@ -92,31 +92,6 @@ public interface EventLoopGroupFactory {
     );
 
     /**
-     * Creates an EventLoopGroup.
-     *
-     * @param threads The number of threads to use.
-     * @param ioRatio The io ratio.
-     * @return An EventLoopGroup.
-     * @deprecated Use {@link #createEventLoopGroup(EventLoopGroupConfiguration, ThreadFactory)} instead
-     */
-    @Deprecated
-    default EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
-        return createEventLoopGroup(threads, (ThreadFactory) null, ioRatio);
-    }
-
-    /**
-     * Creates a default EventLoopGroup.
-     *
-     * @param ioRatio The io ratio.
-     * @return An EventLoopGroup.
-     * @deprecated Use {@link #createEventLoopGroup(EventLoopGroupConfiguration, ThreadFactory)} instead
-     */
-    @Deprecated
-    default EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return createEventLoopGroup(0, (ThreadFactory) null, ioRatio);
-    }
-
-    /**
      * Returns the server channel class.
      *
      * @return A ServerChannelClass.

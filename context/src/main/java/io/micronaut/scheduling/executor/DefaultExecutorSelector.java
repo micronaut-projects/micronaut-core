@@ -54,17 +54,6 @@ public class DefaultExecutorSelector implements ExecutorSelector {
      * @param beanLocator The bean locator
      * @param ioExecutor The IO executor
      */
-    @Deprecated
-    protected DefaultExecutorSelector(BeanLocator beanLocator, @javax.inject.Named(TaskExecutors.IO) Provider<ExecutorService> ioExecutor) {
-        this.beanLocator = beanLocator;
-        this.ioExecutor = SupplierUtil.memoized(ioExecutor::get);
-    }
-
-    /**
-     * Default constructor.
-     * @param beanLocator The bean locator
-     * @param ioExecutor The IO executor
-     */
     @Inject
     protected DefaultExecutorSelector(BeanLocator beanLocator, @javax.inject.Named(TaskExecutors.IO) BeanProvider<ExecutorService> ioExecutor) {
         this.beanLocator = beanLocator;

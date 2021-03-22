@@ -114,16 +114,6 @@ public class SessionConfiguration {
      *
      * @param executorService The executorService
      */
-    @Deprecated
-    public void setExecutorService(@Nullable @Named(TaskExecutors.SCHEDULED) Provider<ExecutorService> executorService) {
-        this.executorService = executorService::get;
-    }
-
-    /**
-     * Set the executor service.
-     *
-     * @param executorService The executorService
-     */
     @Inject
     public void setExecutorService(@Nullable @Named(TaskExecutors.SCHEDULED) BeanProvider<ExecutorService> executorService) {
         this.executorService = executorService;

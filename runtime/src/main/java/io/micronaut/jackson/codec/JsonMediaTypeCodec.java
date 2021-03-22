@@ -57,18 +57,6 @@ public class JsonMediaTypeCodec extends JacksonMediaTypeCodec {
      * @param applicationConfiguration The common application configurations
      * @param codecConfiguration       The configuration for the codec
      */
-    @Deprecated
-    public JsonMediaTypeCodec(Provider<ObjectMapper> objectMapper,
-                              ApplicationConfiguration applicationConfiguration,
-                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        super(objectMapper, applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
-    }
-
-    /**
-     * @param objectMapper             To read/write JSON
-     * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
-     */
     @Inject
     public JsonMediaTypeCodec(BeanProvider<ObjectMapper> objectMapper,
                               ApplicationConfiguration applicationConfiguration,

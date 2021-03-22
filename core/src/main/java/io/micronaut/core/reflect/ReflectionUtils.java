@@ -314,38 +314,6 @@ public class ReflectionUtils {
     }
 
     /**
-     * Finds a field in the type or super type.
-     *
-     * @param type  The type
-     * @param name  The field name
-     * @param value The value
-     * @deprecated This method uses reflection. Do not use.
-     */
-    @Deprecated
-    public static void setFieldIfPossible(Class type, String name, Object value) {
-        Optional<Field> declaredField = findDeclaredField(type, name);
-        if (declaredField.isPresent()) {
-            Field field = declaredField.get();
-            Optional<?> converted = ConversionService.SHARED.convert(value, field.getType());
-            if (converted.isPresent()) {
-                field.setAccessible(true);
-                try {
-                    field.set(type, converted.get());
-                } catch (IllegalAccessException e) {
-                    // ignore
-                }
-            } else {
-                field.setAccessible(true);
-                try {
-                    field.set(type, null);
-                } catch (IllegalAccessException e) {
-                    // ignore
-                }
-            }
-        }
-    }
-
-    /**
      * Finds a method on the given type for the given name.
      *
      * @param type The type

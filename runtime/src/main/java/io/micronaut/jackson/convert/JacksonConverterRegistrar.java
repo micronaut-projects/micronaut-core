@@ -60,22 +60,6 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
      * @param beanPropertyBinder The bean property binder provider
      * @param conversionService The conversion service
      */
-    @Deprecated
-    protected JacksonConverterRegistrar(
-            Provider<ObjectMapper> objectMapper,
-            Provider<BeanPropertyBinder> beanPropertyBinder,
-            ConversionService<?> conversionService) {
-        this.objectMapper = objectMapper::get;
-        this.conversionService = conversionService;
-        this.beanPropertyBinder = beanPropertyBinder::get;
-    }
-
-    /**
-     * Default constructor.
-     * @param objectMapper The object mapper provider
-     * @param beanPropertyBinder The bean property binder provider
-     * @param conversionService The conversion service
-     */
     @Inject
     protected JacksonConverterRegistrar(
             BeanProvider<ObjectMapper> objectMapper,

@@ -44,15 +44,6 @@ public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorE
 
     /**
      * Constructor.
-     * @deprecated Use {@link ConversionErrorHandler(ErrorResponseProcessor)} instead.
-     */
-    @Deprecated
-    public ConversionErrorHandler() {
-        this.responseProcessor = null;
-    }
-
-    /**
-     * Constructor.
      * @param responseProcessor Error Response Processor
      */
     @Inject
@@ -62,26 +53,19 @@ public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorE
 
     @Override
     public HttpResponse handle(HttpRequest request, ConversionErrorException exception) {
-        MutableHttpResponse<?> response = HttpResponse.badRequest();
-        if (responseProcessor != null) {
-            return responseProcessor.processResponse(ErrorContext.builder(request)
-                    .cause(exception)
-                    .error(new Error() {
-                        @Override
-                        public Optional<String> getPath() {
-                            return Optional.of('/' + exception.getArgument().getName());
-                        }
+        return responseProcessor.processResponse(ErrorContext.builder(request)
+                .cause(exception)
+                .error(new Error() {
+                    @Override
+                    public Optional<String> getPath() {
+                        return Optional.of('/' + exception.getArgument().getName());
+                    }
 
-                        @Override
-                        public String getMessage() {
-                            return exception.getMessage();
-                        }
-                    })
-                    .build(), response);
-        } else {
-            return response.body(new JsonError(exception.getMessage())
-                    .path('/' + exception.getArgument().getName())
-                    .link(Link.SELF, Link.of(request.getUri())));
-        }
+                    @Override
+                    public String getMessage() {
+                        return exception.getMessage();
+                    }
+                })
+                .build(), HttpResponse.badRequest());
     }
 }

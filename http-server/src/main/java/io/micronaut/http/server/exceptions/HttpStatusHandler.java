@@ -43,15 +43,6 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
 
     /**
      * Constructor.
-     * @deprecated Use {@link HttpStatusHandler(ErrorResponseProcessor)} instead.
-     */
-    @Deprecated
-    public HttpStatusHandler() {
-        this.responseProcessor = null;
-    }
-
-    /**
-     * Constructor.
      * @param responseProcessor Error Response Processor
      */
     @Inject
@@ -66,15 +57,10 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
         if (body.isPresent()) {
             return response.body(body.get());
         } else {
-            if (responseProcessor != null) {
-                return responseProcessor.processResponse(ErrorContext.builder(request)
-                        .cause(exception)
-                        .errorMessage(exception.getMessage())
-                        .build(), response);
-            } else {
-                return response.body(new JsonError(exception.getMessage())
-                        .link(Link.SELF, Link.of(request.getUri())));
-            }
+            return responseProcessor.processResponse(ErrorContext.builder(request)
+                    .cause(exception)
+                    .errorMessage(exception.getMessage())
+                    .build(), response);
         }
     }
 }

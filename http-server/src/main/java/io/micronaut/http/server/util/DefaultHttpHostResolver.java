@@ -50,17 +50,6 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
      * @param serverConfiguration The server configuration
      * @param embeddedServer The embedded server provider
      */
-    @Deprecated
-    public DefaultHttpHostResolver(HttpServerConfiguration serverConfiguration,
-                                   @Nullable Provider<EmbeddedServer> embeddedServer) {
-        this.serverConfiguration = serverConfiguration;
-        this.embeddedServer = embeddedServer::get;
-    }
-
-    /**
-     * @param serverConfiguration The server configuration
-     * @param embeddedServer The embedded server provider
-     */
     @Inject
     public DefaultHttpHostResolver(HttpServerConfiguration serverConfiguration,
                                    @Nullable BeanProvider<EmbeddedServer> embeddedServer) {

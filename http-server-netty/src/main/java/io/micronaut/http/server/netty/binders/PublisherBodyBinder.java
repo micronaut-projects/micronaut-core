@@ -61,12 +61,6 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
     }
 
     @Override
-    @Deprecated
-    public boolean supportsSuperTypes() {
-        return false;
-    }
-
-    @Override
     public Argument<Publisher> argumentType() {
         return TYPE;
     }

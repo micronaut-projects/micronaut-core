@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -43,6 +44,7 @@ import java.nio.charset.StandardCharsets
  */
 @MicronautTest
 class HttpPostSpec extends Specification {
+
     @Inject
     @Client("/")
     HttpClient client
@@ -470,6 +472,7 @@ class HttpPostSpec extends Specification {
     }
 
     @EqualsAndHashCode
+    @Introspected
     static class Book {
         String title
         Integer pages

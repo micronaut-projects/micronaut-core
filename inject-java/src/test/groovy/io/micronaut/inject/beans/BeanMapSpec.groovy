@@ -13,8 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.beans
+package io.micronaut.inject.beans
 
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.beans.BeanMap
+import io.micronaut.core.beans.exceptions.IntrospectionException
 import spock.lang.Specification
 
 /**
@@ -35,7 +38,6 @@ class BeanMapSpec extends Specification {
         BeanMap beanMap = BeanMap.of(bean)
 
         then:
-        BeanMap.of(new io.micronaut.core.beans.NoProps()).size() == 0
         beanMap.get("bool")
         beanMap.get("URL") == new URL("http://google.com")
         beanMap.get("str") == "blah"
@@ -45,14 +47,23 @@ class BeanMapSpec extends Specification {
         beanMap.size() == 6
         !beanMap.containsKey('metaClass')
         !beanMap.containsKey('class')
+
+        when:
+        BeanMap.of(new NoProps())
+
+        then:
+        thrown(IntrospectionException)
     }
 
     static class NoProps {}
+
     static class SuperClass {
         String sup
     }
 
+    @Introspected
     static class MyBean extends SuperClass {
+
         boolean bool
         URL URL
         String str
