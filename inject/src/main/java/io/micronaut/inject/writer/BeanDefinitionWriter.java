@@ -281,7 +281,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.isInterface = classElement.isInterface();
             this.beanFullClassName = classElement.getName();
             this.beanSimpleClassName = classElement.getSimpleName();
-            this.providedBeanClassName = getProvidedClassName(classElement);
+            this.providedBeanClassName = beanFullClassName;
             this.beanDefinitionName = getBeanDefinitionName(packageName, beanSimpleClassName);
         } else if (beanProducingElement instanceof MethodElement) {
             MethodElement factoryMethodElement = (MethodElement) beanProducingElement;

@@ -3191,13 +3191,11 @@ public class DefaultBeanContext implements BeanContext {
             }
           
             final Class<T> beanClass = beanType.getType();
-            Class<?> createdType = createdBean != null ? createdBean.getClass() : beanClass;
-            boolean createdTypeDiffers = !createdType.equals(beanClass);
 
             boolean isNotProxyTarget = qualifier != PROXY_TARGET_QUALIFIER;
             if (isNotProxyTarget) {
-                Class<?> createdType = createdBean != null ? createdBean.getClass() : beanType;
-                boolean createdTypeDiffers = !createdType.equals(beanType);
+                Class<?> createdType = createdBean != null ? createdBean.getClass() : beanClass;
+                boolean createdTypeDiffers = !createdType.equals(beanClass);
 
                 BeanKey<?> createdBeanKey = new BeanKey(createdType, qualifier);
                 Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
