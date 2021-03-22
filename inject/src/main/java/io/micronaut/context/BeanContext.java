@@ -185,8 +185,9 @@ public interface BeanContext extends
      * Destroys the bean for the given type causing it to be re-created. If a singleton has been loaded it will be
      * destroyed and removed from the context, otherwise null will be returned.
      *
-     * @param beanType The bean type
-     * @param <T>      The concrete class
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param <T>       The concrete class
      * @return The destroy instance or null if no such bean exists
      * @since 3.0.0
      */

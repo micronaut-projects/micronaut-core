@@ -32,5 +32,5 @@ public @interface Type {
     /**
      * @return The types
      */
-    Class[] value();
+    Class<?>[] value();
 }
