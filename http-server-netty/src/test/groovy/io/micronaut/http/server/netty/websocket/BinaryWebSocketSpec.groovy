@@ -28,7 +28,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 @Retry
-class BinaryWebSocketSpec extends Specification{
+class BinaryWebSocketSpec extends Specification {
 
     @Retry
     void "test binary websocket exchange"() {
@@ -107,6 +107,36 @@ class BinaryWebSocketSpec extends Specification{
         }
 
         cleanup:
+        wsClient.close()
+        embeddedServer.close()
+    }
+
+    void "test sending multiple frames for a single message"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
+
+        when: "a websocket connection is established"
+        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
+        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockingFirst()
+        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
+
+
+        then:"The connection is valid"
+        fred.session != null
+        fred.session.id != null
+
+        when:"A message is sent"
+        fred.sendMultiple()
+
+        then:
+        conditions.eventually {
+            bob.replies.contains("[fred] hello world")
+        }
+
+        cleanup:
+        fred.close()
+        bob.close()
         wsClient.close()
         embeddedServer.close()
     }
