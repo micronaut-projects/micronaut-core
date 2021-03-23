@@ -37,12 +37,16 @@ import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.bind.WebSocketState;
 import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
@@ -57,6 +61,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Abstract implementation that handles WebSocket frames.
@@ -85,6 +90,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final WebSocketSessionRepository webSocketSessionRepository;
     private final Argument<?> bodyArgument;
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    private AtomicReference<CompositeByteBuf> frameBuffer = new AtomicReference<>();
 
     /**
      * Default constructor.
@@ -307,7 +313,27 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param msg The frame
      */
     protected void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame msg) {
-        if (msg instanceof TextWebSocketFrame || msg instanceof BinaryWebSocketFrame) {
+        if (msg instanceof TextWebSocketFrame || msg instanceof BinaryWebSocketFrame || msg instanceof ContinuationWebSocketFrame) {
+            ByteBuf msgContent = msg.content().retain();
+            if (!msg.isFinalFragment()) {
+                frameBuffer.updateAndGet((buffer) -> {
+                    if (buffer == null) {
+                        buffer = UnpooledByteBufAllocator.DEFAULT.compositeBuffer();
+                    }
+                    buffer.addComponent(true, msgContent);
+                    return buffer;
+                });
+                return;
+            }
+
+            ByteBuf content;
+            CompositeByteBuf buffer = frameBuffer.get();
+            if (buffer == null) {
+                content = msgContent;
+            } else {
+                buffer.addComponent(true, msgContent);
+                content = buffer;
+            }
 
             if (messageHandler == null) {
                 if (LOG.isDebugEnabled()) {
@@ -320,7 +346,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             } else {
 
                 Argument<?> bodyArgument = this.getBodyArgument();
-                Optional<?> converted = ConversionService.SHARED.convert(msg.content(), bodyArgument);
+                Optional<?> converted = ConversionService.SHARED.convert(content, bodyArgument);
+                content.release();
+                frameBuffer.set(null);
+
                 NettyRxWebSocketSession currentSession = getSession();
 
                 if (!converted.isPresent()) {
