@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.beans
 
-import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanMap
 import io.micronaut.core.beans.exceptions.IntrospectionException
 import spock.lang.Specification
@@ -27,7 +26,6 @@ import spock.lang.Specification
 class BeanMapSpec extends Specification {
 
     void "test bean map"() {
-
         when:
         def bean = new MyBean("test")
         bean.bool = true
@@ -55,32 +53,5 @@ class BeanMapSpec extends Specification {
         thrown(IntrospectionException)
     }
 
-    static class NoProps {}
-
-    static class SuperClass {
-        String sup
-    }
-
-    @Introspected
-    static class MyBean extends SuperClass {
-
-        boolean bool
-        URL URL
-        String str
-        final String readOnly
-        private String foo
-
-        MyBean(String readOnly) {
-            this.readOnly = readOnly
-        }
-
-        String getFoo() {
-            return foo
-        }
-
-        void setFoo(String foo) {
-            this.foo = foo
-        }
-    }
 }
 

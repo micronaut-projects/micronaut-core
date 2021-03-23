@@ -74,7 +74,6 @@ class CharSequencePropertyNamingStrategyConverterSpec extends Specification {
 
         where:
         invalidString | _
-        null          | _
         ''            | _
         'CASE'        | _
     }
