@@ -335,6 +335,40 @@ class BeanIntrospectionModuleSpec extends Specification {
         ctx.close()
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5160")
+    void "test that snake_case with non-introspected beans works"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run([
+                'jackson.property-naming-strategy': 'SNAKE_CASE',
+                'jackson.json-view.enabled': true,
+                'jackson.bean-introspection-module': true
+        ])
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        Publisher p = objectMapper.readValue('{"publisher_name":"RandomHouse"}', Publisher)
+
+        then:
+        ctx.getBean(JacksonConfiguration).beanIntrospectionModule
+        ctx.containsBean(BeanIntrospectionModule)
+        p.publisherName == 'RandomHouse'
+
+        when:
+        def result = objectMapper.writerWithView(PublicView).writeValueAsString(p)
+
+        then:
+        !result.contains('"publisher_name":')
+
+
+        when:
+        result = objectMapper.writerWithView(AllView).writeValueAsString(p)
+        then:
+        result.contains('"publisher_name":')
+
+        cleanup:
+        ctx.close()
+    }
+
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5088")
     void "test deserializing from a list of pojos"() {
         given:
@@ -399,6 +433,14 @@ class BeanIntrospectionModuleSpec extends Specification {
         @JsonCreator Book(@JsonProperty("book_title") String title) {
             this.title = title
         }
+    }
+
+    @Introspected
+    static class Publisher {
+
+        @JsonView(AllView)
+        String publisherName
+
     }
 
     @Introspected
