@@ -215,6 +215,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        cleanupBuffer();
         Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.errorMethod();
 
         if (opt.isPresent()) {
@@ -325,7 +326,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 if (!msg.isFinalFragment()) {
                     frameBuffer.updateAndGet((buffer) -> {
                         if (buffer == null) {
-                            buffer = UnpooledByteBufAllocator.DEFAULT.compositeBuffer();
+                            buffer = ctx.alloc().compositeBuffer();
                         }
                         buffer.addComponent(true, msgContent);
                         return buffer;
@@ -334,7 +335,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 }
 
                 ByteBuf content;
-                CompositeByteBuf buffer = frameBuffer.get();
+                CompositeByteBuf buffer = frameBuffer.getAndSet(null);
                 if (buffer == null) {
                     content = msgContent;
                 } else {
@@ -345,7 +346,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 Argument<?> bodyArgument = this.getBodyArgument();
                 Optional<?> converted = ConversionService.SHARED.convert(content, bodyArgument);
                 content.release();
-                frameBuffer.set(null);
 
                 if (!converted.isPresent()) {
                     MediaType mediaType;
@@ -459,6 +459,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param cr The reason
      */
     private void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr) {
+        cleanupBuffer();
         if (closed.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Closing WebSocket session {} with reason {}", getSession(), cr);
@@ -562,8 +563,16 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     private void writeCloseFrameAndTerminate(ChannelHandlerContext ctx, int code, String reason) {
+        cleanupBuffer();
         final CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(code, reason);
         ctx.channel().writeAndFlush(closeFrame)
                      .addListener(future -> handleCloseFrame(ctx, new CloseWebSocketFrame(code, reason)));
+    }
+
+    private void cleanupBuffer() {
+        CompositeByteBuf buffer = frameBuffer.getAndSet(null);
+        if (buffer != null) {
+            buffer.release();
+        }
     }
 }
