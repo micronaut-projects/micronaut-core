@@ -230,6 +230,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
                     newBuilder.setProperties(newProperties);
                 }
+                newBuilder.setFilteredProperties(builder.getFilteredProperties());
                 return newBuilder;
             }
         }
