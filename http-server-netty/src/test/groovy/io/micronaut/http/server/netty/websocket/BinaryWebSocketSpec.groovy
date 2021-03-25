@@ -114,7 +114,7 @@ class BinaryWebSocketSpec extends Specification {
     void "test sending multiple frames for a single message"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
-        PollingConditions conditions = new PollingConditions(timeout: 20, delay: 0.5)
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
         RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
@@ -125,6 +125,10 @@ class BinaryWebSocketSpec extends Specification {
         then:"The connection is valid"
         fred.session != null
         fred.session.id != null
+        conditions.eventually {
+            fred.replies.contains("[bob] Joined!")
+            fred.replies.size() == 1
+        }
 
         when:"A message is sent"
         fred.sendMultiple()
