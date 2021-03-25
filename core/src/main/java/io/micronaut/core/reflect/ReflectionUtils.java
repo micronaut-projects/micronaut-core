@@ -17,7 +17,6 @@ package io.micronaut.core.reflect;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InvocationException;
 import io.micronaut.core.util.StringUtils;

@@ -40,8 +40,6 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import javax.inject.Provider;
-
 /**
  * A {@link MediaTypeCodec} Jackson based implementations.
  *

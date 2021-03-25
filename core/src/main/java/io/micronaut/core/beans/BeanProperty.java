@@ -256,6 +256,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @return The argument
      */
     @Override
+    @NonNull
     default Argument<T> asArgument() {
         return Argument.of(getType());
     }

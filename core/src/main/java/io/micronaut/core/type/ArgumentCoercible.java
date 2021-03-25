@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 /**
  * An interface for types that can be represented as an {@link Argument}.
  *
+ * @param <T> The argument type
  * @since 3.0.0
  * @author graemerocher
  */

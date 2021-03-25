@@ -246,6 +246,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         }
 
         @Override
+        @NonNull
         public Argument asArgument() {
             Map<String, Argument<?>> typeVariables = getTypeVariables();
             Collection<Argument<?>> values = typeVariables.values();

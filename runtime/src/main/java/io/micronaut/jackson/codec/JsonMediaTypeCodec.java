@@ -25,7 +25,6 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.core.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
-import javax.inject.Provider;
 import javax.inject.Singleton;
 
 /**

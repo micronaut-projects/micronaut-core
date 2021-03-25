@@ -19,13 +19,10 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.Router;
-import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.filter.FilteredRouter;
 import javax.inject.Singleton;
 
-import java.util.function.Predicate;
 
 import static io.micronaut.web.router.version.RoutesVersioningConfiguration.PREFIX;
 

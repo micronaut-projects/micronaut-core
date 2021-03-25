@@ -36,7 +36,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
 
 import javax.inject.Inject;
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.*;
 import java.io.IOException;

@@ -172,6 +172,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     Collection<ExecutableMethod<T, ?>> getExecutableMethods();
 
     @Override
+    @NonNull
     default Argument<T> asArgument() {
         return Argument.of(
                 getBeanType(),
