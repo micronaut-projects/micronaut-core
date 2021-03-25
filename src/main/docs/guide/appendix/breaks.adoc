@@ -7,3 +7,11 @@ For many cases, one common one being introspections, getter names like `getXForw
 === @Order default
 
 Previously the default order value for the `@Order` annotation was the lowest precedence. It is now 0.
+
+=== Deprecation Removal
+
+Classes, constructors, etc that have been deprecated in previous versions of Micronaut have been removed.
+
+=== Reflective Bean Map
+
+In several places in Micronaut, it is required to get a map representation of your object. In previous versions, a reflection based strategy was used to retrieve that information if the class was not annotated with `@Introspected`. That functionality has been removed and it is now required to annotate classes with `@Introspected` that are being used in this way. Any class may be affected if it is passed as an argument or returned from any controller or client, among other use cases.
