@@ -2,6 +2,7 @@ package io.micronaut.inject.any
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.BeanProvider
+import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.AutoCleanup
@@ -30,15 +31,15 @@ class AnyProviderSpec extends Specification {
 
         then:
         owner.dog instanceof Dog
-        dogBeanProvider.get() instanceof Dog
+        dogBeanProvider.get(Qualifiers.byName("poodle")) instanceof Dog
         dogBeanProvider.stream().collect(Collectors.toList()).size() == 2
         dogBeanProvider.iterator().toList().size() == 2
-        dogBeanProvider.iterator().toList().contains(dogBeanProvider.get())
+        dogBeanProvider.iterator().toList().contains(dogBeanProvider.get(Qualifiers.byName("poodle")))
         dogBeanProvider.isPresent()
         !dogBeanProvider.isUnique()
-        dogBeanProvider.isResolvable()
+        !dogBeanProvider.isResolvable()
         !anotherDogBeanProvider.isUnique()
-        anotherDogBeanProvider.isResolvable()
+        !anotherDogBeanProvider.isResolvable()
         anotherDogBeanProvider.isPresent()
         terrierProvider.isPresent()
         terrierProvider.isUnique()
@@ -54,12 +55,31 @@ class AnyProviderSpec extends Specification {
         catBeanProvider.stream().toArray() == [] as Object[]
         when:
         boolean called = false
-        dogBeanProvider.ifPresent({ Dog dog ->
+        terrierProvider2.ifPresent({ Dog dog ->
             assert dog in Dog
             called = true
         })
 
         then:
         called
+
+        when:
+        called = false
+        dogBeanProvider.ifPresent({ Dog dog ->
+            called = true
+        })
+
+        then:
+        thrown(NonUniqueBeanException)
+        !called
+
+        when:
+        called = false
+        dogBeanProvider.ifResolvable({ Dog dog ->
+            called = true
+        })
+
+        then:
+        !called
     }
 }

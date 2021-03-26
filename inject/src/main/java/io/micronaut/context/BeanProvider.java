@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 
 import java.util.Collections;
@@ -40,6 +41,16 @@ public interface BeanProvider<T> extends Iterable<T> {
      */
     @NonNull
     T get();
+
+    /**
+     * @param qualifier The qualifier to use.
+     * @return A fully-constructed and injected instance of T.
+     * @since 3.0.0
+     */
+    @NonNull
+    default T get(@Nullable Qualifier<T> qualifier) {
+        return get();
+    }
 
     @NonNull
     @Override
@@ -71,18 +82,21 @@ public interface BeanProvider<T> extends Iterable<T> {
     }
 
     /**
-     * <p>Determines if there is no bean that matches the required type and qualifiers.</p>
+     * <p>Determines if there is a bean that matches the required type and qualifiers.</p>
      *
      * @since 3.0.0
-     * @return true if no bean matches.
+     * @return true if at least one bean matches.
      */
     default boolean isPresent() {
         return true;
     }
 
     /**
-     * Is the bean resolvable.
-     * @return True if it is
+     * Is the bean resolvable using the {@link #get()} or {@link #ifPresent(Consumer)} methods.
+     *
+     * <p>A bean is said to be resolvable when it is both unique (see {@link #isUnique()}) and present (see {@link #isPresent()})</p>
+     *
+     * @return True if the bean is resolvable
      * @since 3.0.0
      */
     default boolean isResolvable() {
@@ -90,12 +104,29 @@ public interface BeanProvider<T> extends Iterable<T> {
     }
 
     /**
-     * Executes the given logic if the bean is present.
+     * Executes the given logic if the bean is present. Executes {@link #get()} to obtain the bean which may result in a {@link io.micronaut.context.exceptions.NonUniqueBeanException} if the bean is not unique.
+     *
      * @param consumer the consumer
      * @since 3.0.0
+     * @see #isPresent()
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException if the bean is not unique
      */
     default void ifPresent(@NonNull Consumer<T> consumer) {
         if (isPresent()) {
+            Objects.requireNonNull(consumer, "Consumer cannot be null")
+                    .accept(get());
+        }
+    }
+
+    /**
+     * Executes the given logic if the bean is resolvable. See {@link #isResolvable()}.
+     *
+     * @param consumer the consumer
+     * @since 3.0.0
+     * @see #isResolvable()
+     */
+    default void ifResolvable(@NonNull Consumer<T> consumer) {
+        if (isResolvable()) {
             Objects.requireNonNull(consumer, "Consumer cannot be null")
                     .accept(get());
         }

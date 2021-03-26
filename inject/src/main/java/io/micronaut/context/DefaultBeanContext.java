@@ -2986,7 +2986,13 @@ public class DefaultBeanContext implements BeanContext {
                     return Optional.empty();
                 }
 
-                definition = lastChanceResolve(beanType, finalQualifier, throwNonUnique, beanDefinitionList);
+                definition = lastChanceResolve(
+                        beanType,
+                        finalQualifier,
+                        qualifier,
+                        throwNonUnique,
+                        beanDefinitionList
+                );
             } else {
                 candidates.removeIf(BeanDefinition::isAbstract);
                 if (candidates.size() == 1) {
@@ -3001,6 +3007,7 @@ public class DefaultBeanContext implements BeanContext {
                         }
                         definition = lastChanceResolve(
                                 beanType,
+                                null,
                                 qualifier,
                                 throwNonUnique,
                                 candidates
@@ -3082,6 +3089,7 @@ public class DefaultBeanContext implements BeanContext {
     private <T> BeanDefinition<T> lastChanceResolve(
             Argument<T> beanType,
             Qualifier<T> qualifier,
+            Qualifier<T> specifiedQualifier,
             boolean throwNonUnique,
             Collection<BeanDefinition<T>> candidates) {
         final Class<T> beanClass = beanType.getType();
@@ -3106,7 +3114,7 @@ public class DefaultBeanContext implements BeanContext {
                 if (exactMatches.size() == 1) {
                     definition = exactMatches.iterator().next();
                 } else if (throwNonUnique) {
-                    definition = findConcreteCandidate(beanClass, qualifier, candidates);
+                    definition = findConcreteCandidate(beanClass, specifiedQualifier, candidates);
                 }
                 return definition;
             }

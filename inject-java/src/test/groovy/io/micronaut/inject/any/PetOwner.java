@@ -9,15 +9,15 @@ import javax.inject.Singleton;
 
 @Singleton
 public class PetOwner {
-    @Inject @Any Dog dog;
+    @Inject @Any Dog<?> dog;
 
     @Inject @Any
-    BeanProvider<Dog> dogBeanProvider;
+    BeanProvider<Dog<?>> dogBeanProvider;
 
     @Inject @Any
     BeanProvider<Cat> catBeanProvider;
 
-    @Inject @Named("poodle") Dog poodle;
+    @Inject @Named("poodle") Dog<?> poodle;
 
-    @Inject @Named("terrier") BeanProvider<Dog> terrierProvider;
+    @Inject @Named("terrier") BeanProvider<Dog<?>> terrierProvider;
 }

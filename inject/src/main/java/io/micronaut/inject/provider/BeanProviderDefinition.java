@@ -54,15 +54,23 @@ final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvid
             Qualifier<Object> qualifier,
             boolean singleton) {
         return new BeanProvider<Object>() {
+            private final Qualifier<Object> finalQualifier =
+                    qualifier instanceof AnyQualifier ? null : qualifier;
+
             @Override
             public Object get() {
+                return context.getBean(argument, finalQualifier);
+            }
+
+            @Override
+            public Object get(Qualifier<Object> qualifier) {
                 return context.getBean(argument, qualifier);
             }
 
             @Override
             public boolean isUnique() {
                 try {
-                    context.getBeanDefinition(argument, qualifier instanceof AnyQualifier ? null : qualifier);
+                    context.getBeanDefinition(argument, finalQualifier);
                     return true;
                 } catch (NoSuchBeanException e) {
                     return false;
@@ -71,23 +79,18 @@ final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvid
 
             @Override
             public boolean isPresent() {
-                return context.containsBean(argument, qualifier);
-            }
-
-            @Override
-            public boolean isResolvable() {
-                return isPresent() && (isUnique() || qualifier instanceof AnyQualifier);
+                return context.containsBean(argument, finalQualifier);
             }
 
             @NonNull
             @Override
             public Iterator<Object> iterator() {
-                return context.getBeansOfType(argument, qualifier).iterator();
+                return context.getBeansOfType(argument, finalQualifier).iterator();
             }
 
             @Override
             public Stream<Object> stream() {
-                return context.streamOfType(argument, qualifier);
+                return context.streamOfType(argument, finalQualifier);
             }
         };
     }
