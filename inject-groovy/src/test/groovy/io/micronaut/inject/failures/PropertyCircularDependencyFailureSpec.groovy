@@ -43,11 +43,11 @@ Failed to inject value for parameter [a] of method [setA] of class: io.micronaut
 
 Message: Circular dependency detected
 Path Taken: 
-B.setA([A a]) --> A.setB([B b])
-^                            |
-|                            |
-|                            |
-+----------------------------+'''
+new B() --> B.setA([A a]) --> A.setB([B b])
+^                                        |
+|                                        |
+|                                        |
++----------------------------------------+'''
     }
 
     @Singleton

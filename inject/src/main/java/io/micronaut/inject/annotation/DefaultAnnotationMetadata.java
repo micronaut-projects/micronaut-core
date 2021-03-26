@@ -1505,7 +1505,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param values            The values
      */
     @SuppressWarnings("WeakerAccess")
-    protected final void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
+    protected void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
         addDeclaredStereotype(parentAnnotations, stereotype, values, RetentionPolicy.RUNTIME);
     }
 
@@ -1519,7 +1519,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param retentionPolicy   The retention policy
      */
     @SuppressWarnings("WeakerAccess")
-    protected final void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
+    protected void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         if (stereotype != null) {
             String repeatedName = getRepeatedName(stereotype);
             if (repeatedName != null) {

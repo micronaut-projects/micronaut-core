@@ -35,7 +35,6 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
-import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -252,7 +251,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      */
     public BeanDefinitionWriter(ClassElement classElement,
                                 OriginatingElements originatingElements,
-                                ConfigurationMetadataBuilder<?> metadataBuilder, VisitorContext visitorContext) {
+                                ConfigurationMetadataBuilder<?> metadataBuilder, 
+                                VisitorContext visitorContext) {
         this(classElement, originatingElements, metadataBuilder, visitorContext, null);
     }
 
@@ -281,7 +281,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.isInterface = classElement.isInterface();
             this.beanFullClassName = classElement.getName();
             this.beanSimpleClassName = classElement.getSimpleName();
-            this.providedBeanClassName = getProvidedClassName(classElement);
+            this.providedBeanClassName = beanFullClassName;
             this.beanDefinitionName = getBeanDefinitionName(packageName, beanSimpleClassName);
         } else if (beanProducingElement instanceof MethodElement) {
             MethodElement factoryMethodElement = (MethodElement) beanProducingElement;
@@ -326,18 +326,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    private static String getProvidedClassName(ClassElement classElement) {
-        for (Class provider : ProviderFactory.getProviders()) {
-            String providerName = provider.getName();
-            if (classElement.isAssignable(providerName)) {
-                Iterator<ClassElement> i = classElement.getTypeArguments(providerName).values().iterator();
-                return i.hasNext() ? i.next().getName() : classElement.getName();
-            }
-        }
-        return classElement.getName();
-    }
-
-    @NotNull
+    @NonNull
     private static String getBeanDefinitionName(String packageName, String className) {
         return packageName + ".$" + className + "Definition";
     }

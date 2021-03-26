@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
@@ -38,7 +39,9 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
     /**
      * @return Whether the bean definition is the {@link io.micronaut.context.annotation.Primary}
      */
-    boolean isPrimary();
+    default boolean isPrimary() {
+        return getAnnotationMetadata().hasDeclaredStereotype(Primary.class);
+    }
 
     /**
      * Returns the bean type.

@@ -44,7 +44,7 @@ class ConstructorExceptionSpec extends Specification {
 Error instantiating bean of type  [io.micronaut.inject.failures.ConstructorExceptionSpec$A]
 
 Message: bad
-Path Taken: B.a --> new A([C c])'''
+Path Taken: new B() --> B.a --> new A([C c])'''
     }
 
     @Singleton

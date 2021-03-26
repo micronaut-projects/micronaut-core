@@ -107,6 +107,20 @@ public interface BeanLocator {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 3.0.0
+     */
+    @NonNull <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Finds a Bean for the given type and qualifier.
+     *
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param <T>       The bean type parameter
+     * @return An instance of {@link Optional} that is either empty or containing the specified bean
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     * @see io.micronaut.inject.qualifiers.Qualifiers
      */
     @NonNull <T> Optional<T> findBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 

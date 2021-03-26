@@ -30,7 +30,6 @@ import io.micronaut.inject.ast.*;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
-import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -521,21 +520,21 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         return classWriter;
     }
 
-    @NotNull
+    @NonNull
     private static String computeReferenceName(String className) {
         String packageName = NameUtils.getPackageName(className);
         final String shortName = NameUtils.getSimpleName(className);
         return packageName + ".$" + shortName + REFERENCE_SUFFIX;
     }
 
-    @NotNull
+    @NonNull
     private static String computeIntrospectionName(String className) {
         String packageName = NameUtils.getPackageName(className);
         final String shortName = NameUtils.getSimpleName(className);
         return packageName + ".$" + shortName + INTROSPECTION_SUFFIX;
     }
 
-    @NotNull
+    @NonNull
     private static String computeIntrospectionName(String generatingName, String className) {
         final String packageName = NameUtils.getPackageName(generatingName);
         return packageName + ".$" + className.replace('.', '_') + INTROSPECTION_SUFFIX;

@@ -19,7 +19,6 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Thrown when no such beans exists.
@@ -68,7 +67,7 @@ public class NoSuchBeanException extends BeanContextException {
         super(message);
     }
 
-    @NotNull
+    @NonNull
     private static String additionalMessage() {
         return " Make sure the bean is not disabled by bean requirements (enable trace logging for 'io.micronaut.context.condition' to check) and if the bean is enabled then ensure the class is declared a bean and annotation processing is enabled (for Java and Kotlin the 'micronaut-inject-java' dependency should be configured as an annotation processor).";
     }

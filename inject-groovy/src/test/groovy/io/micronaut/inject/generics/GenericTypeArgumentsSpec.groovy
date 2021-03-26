@@ -253,6 +253,34 @@ class TestFactory {
         definition.getTypeArguments(Function)[1].type == Integer
     }
 
+    void "test type arguments for factory with AOP advice applied"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.$TestFactory$MyFunc0Definition$Intercepted', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@Factory
+class TestFactory {
+
+    @Bean
+    @io.micronaut.aop.interceptors.Mutating
+    java.util.function.Function<String, Integer> myFunc() {
+        return { String str -> 10 };
+    }
+}
+
+''')
+        expect:
+        definition != null
+        definition.getTypeArguments(Function).size() == 2
+        definition.getTypeArguments(Function)[0].name == 'T'
+        definition.getTypeArguments(Function)[1].name == 'R'
+        definition.getTypeArguments(Function)[0].type == String
+        definition.getTypeArguments(Function)[1].type == Integer
+    }
+
     void "test type arguments for methods"() {
         BeanDefinition definition = buildBeanDefinition('test.StatusController', '''
 package test;

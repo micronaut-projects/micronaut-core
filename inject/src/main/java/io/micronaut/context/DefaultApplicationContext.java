@@ -308,12 +308,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     String qualifierKey = javax.inject.Qualifier.class.getName();
                                     Argument<?>[] arguments = candidate.getConstructor().getArguments();
                                     for (Argument<?> argument : arguments) {
-                                        Class<?> argumentType;
-                                        if (ProviderFactory.isProvider(argument.getType())) {
-                                            argumentType = argument.getFirstTypeVariable().orElse(argument).getType();
-                                        } else {
-                                            argumentType = argument.getType();
-                                        }
+                                        Class<?> argumentType = argument.getType();
                                         if (argumentType.equals(dependentType)) {
                                             Map<? extends Argument<?>, Qualifier> qualifedArg = Collections.singletonMap(argument, qualifier);
                                             delegate.put(qualifierKey, qualifedArg);

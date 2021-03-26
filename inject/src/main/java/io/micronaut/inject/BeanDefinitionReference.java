@@ -66,12 +66,16 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
      * @param context The bean context
      * @return The loaded bean definition or null if it shouldn't be loaded
      */
-    BeanDefinition<T> load(BeanContext context);
+    default BeanDefinition<T> load(BeanContext context) {
+        return load();
+    }
 
     /**
      * @return Is this class context scope
      */
-    boolean isContextScope();
+    default boolean isContextScope() {
+        return false;
+    }
 
     /**
      * @return Is the underlying bean type present on the classpath
