@@ -16,6 +16,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -166,7 +167,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                     for (Map.Entry<CharSequence, Object> entry : values.entrySet()) {
                         newValues.putIfAbsent(entry.getKey(), entry.getValue());
                     }
-                    ann = new AnnotationValue<>(annotation, newValues);
+                    ann = new AnnotationValue<>(annotation, newValues, AnnotationMetadataSupport.getDefaultValues(annotation));
                 }
             }
         }

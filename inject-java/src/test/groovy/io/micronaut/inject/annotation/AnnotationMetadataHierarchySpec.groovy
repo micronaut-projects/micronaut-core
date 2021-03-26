@@ -91,4 +91,26 @@ class Test {
         properties[4].get("name", String).get() == "prop3"
         properties[4].getValue(String).get() == "value3"
     }
+
+    void "test default values are propagated"() {
+        given:
+        def source = '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+
+@Nested
+class Test {
+
+    @Nested("hello")
+    void someMethod() {}
+}
+'''
+        AnnotationMetadata methodMetadata = buildDeclaredMethodAnnotationMetadata(source, 'someMethod')
+        AnnotationMetadata typeMetadata = buildTypeAnnotationMetadata(source)
+        AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(typeMetadata, methodMetadata)
+
+        expect:
+        annotationMetadata.getAnnotation(Nested).get("num", Integer).get() == 10
+    }
 }
