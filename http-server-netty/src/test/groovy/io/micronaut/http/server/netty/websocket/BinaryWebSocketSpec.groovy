@@ -144,4 +144,38 @@ class BinaryWebSocketSpec extends Specification {
         wsClient.close()
         embeddedServer.close()
     }
+
+    void "test sending many continuation frames"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
+
+        when: "a websocket connection is established"
+        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
+        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockingFirst()
+        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
+
+
+        then:"The connection is valid"
+        fred.session != null
+        fred.session.id != null
+        conditions.eventually {
+            fred.replies.contains("[bob] Joined!")
+            fred.replies.size() == 1
+        }
+
+        when:"A message is sent"
+        fred.sendMany()
+
+        then:
+        conditions.eventually {
+            bob.replies.contains("[fred] abcdef")
+        }
+
+        cleanup:
+        fred.close()
+        bob.close()
+        wsClient.close()
+        embeddedServer.close()
+    }
 }

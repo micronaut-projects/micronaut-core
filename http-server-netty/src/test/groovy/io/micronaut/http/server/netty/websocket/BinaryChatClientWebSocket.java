@@ -79,4 +79,13 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
         session.sendSync(new ContinuationWebSocketFrame(false, 0, " "));
         session.sendSync(new ContinuationWebSocketFrame(true, 0, "world"));
     }
+
+    public void sendMany() {
+        session.sendSync(new TextWebSocketFrame(false, 0, "a"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, "b"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, "c"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, "d"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, "e"));
+        session.sendSync(new ContinuationWebSocketFrame(true, 0, "f"));
+    }
 }
