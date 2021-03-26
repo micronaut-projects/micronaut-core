@@ -20,6 +20,8 @@ import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.reactivex.Single;
 
 import java.nio.ByteBuffer;
@@ -71,4 +73,19 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
     public abstract Future<ByteBuf> sendAsync(ByteBuf message);
 
     public abstract Single<ByteBuffer> sendRx(ByteBuffer message);
+
+    public void sendMultiple() {
+        session.sendSync(new TextWebSocketFrame(false, 0, "hello"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, " "));
+        session.sendSync(new ContinuationWebSocketFrame(true, 0, "world"));
+    }
+
+    public void sendMany() {
+        session.sendSync(new TextWebSocketFrame(false, 0, "a"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, "b"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, "c"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, "d"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, "e"));
+        session.sendSync(new ContinuationWebSocketFrame(true, 0, "f"));
+    }
 }
