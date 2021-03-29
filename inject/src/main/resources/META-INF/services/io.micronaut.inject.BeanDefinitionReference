@@ -1,0 +1,3 @@
+io.micronaut.inject.provider.JavaxProviderBeanDefinitionReference
+io.micronaut.inject.provider.BeanProviderDefinitionReference
+io.micronaut.inject.provider.JakartaProviderBeanDefinitionReference

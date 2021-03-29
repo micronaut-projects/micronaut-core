@@ -47,7 +47,7 @@ class ProviderNamedInjectionSpec extends Specification {
 
         then:
         def ex = thrown(BeanInstantiationException)
-        ex.message.contains("Missing bean argument value: notABeanProvider")
+        ex.cause.message.contains("No bean of type [io.micronaut.inject.provider.NotABean] exists for the given qualifier")
 
         cleanup:
         ctx.close()

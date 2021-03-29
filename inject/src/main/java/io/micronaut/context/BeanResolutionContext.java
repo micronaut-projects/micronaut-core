@@ -117,6 +117,15 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          * Push an unresolved constructor call onto the queue.
          *
          * @param declaringType The type
+         * @param beanType      The bena type
+         * @return This path
+         */
+        Path pushBeanCreate(BeanDefinition<?> declaringType, Argument<?> beanType);
+
+        /**
+         * Push an unresolved constructor call onto the queue.
+         *
+         * @param declaringType The type
          * @param argument      The unresolved argument
          * @return This path
          */

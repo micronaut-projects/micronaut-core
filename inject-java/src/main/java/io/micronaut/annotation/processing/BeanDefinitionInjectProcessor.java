@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.aop.*;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
-import io.micronaut.context.ProviderFactory;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
@@ -261,27 +260,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         try {
             beanDefinitionWriter.visitBeanDefinitionEnd();
             beanDefinitionWriter.accept(classWriterOutputVisitor);
-
             String beanTypeName = beanDefinitionWriter.getBeanTypeName();
-            List<? extends TypeMirror> interfaces = beanClassElement.getInterfaces();
-            for (TypeMirror anInterface : interfaces) {
-
-                if (anInterface instanceof DeclaredType) {
-                    DeclaredType declaredType = (DeclaredType) anInterface;
-                    Element element = declaredType.asElement();
-                    if (element instanceof TypeElement) {
-                        TypeElement te = (TypeElement) element;
-                        String name = te.getQualifiedName().toString();
-                        if (ProviderFactory.isProvider(name)) {
-                            List<? extends TypeMirror> typeArguments = declaredType.getTypeArguments();
-                            if (!typeArguments.isEmpty()) {
-                                beanTypeName = genericUtils.resolveTypeReference(typeArguments.get(0)).toString();
-                            }
-                        }
-                    }
-                }
-            }
-
             BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
                     new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter);
             beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
@@ -955,7 +934,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             );
 
             BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(beanMethod, producedElement);
-            Map<String, Map<String, ClassElement>> allTypeArguments = javaMethodElement.getReturnType().getAllTypeArguments();
+            Map<String, Map<String, ClassElement>> allTypeArguments = javaMethodElement.getGenericReturnType().getAllTypeArguments();
             beanMethodWriter.visitTypeArguments(allTypeArguments);
 
             beanDefinitionWriters.put(new DynamicName(javaMethodElement.getDescription(false)), beanMethodWriter);
@@ -1027,7 +1006,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }, proxyWriter);
             } else if (methodAnnotationMetadata.hasStereotype(Executable.class)) {
                 DeclaredType dt = (DeclaredType) returnType;
-                Map<String, Map<String, TypeMirror>> finalBeanTypeArgumentsMirrors = genericUtils.buildGenericTypeArgumentElementInfo(dt.asElement(), dt);
+                Map<String, Map<String, TypeMirror>> finalBeanTypeArgumentsMirrors = genericUtils.buildGenericTypeArgumentElementInfo(dt.asElement(), dt, Collections.emptyMap());
                 returnType.accept(new PublicMethodVisitor<Object, BeanDefinitionWriter>(javaVisitorContext) {
                     @Override
                     protected void accept(DeclaredType type, Element element, BeanDefinitionWriter beanWriter) {

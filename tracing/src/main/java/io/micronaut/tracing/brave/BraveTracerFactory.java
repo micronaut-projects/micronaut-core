@@ -27,6 +27,8 @@ import zipkin2.reporter.AsyncReporter;
 import zipkin2.reporter.Reporter;
 
 import io.micronaut.core.annotation.Nullable;
+import zipkin2.reporter.brave.ZipkinSpanHandler;
+
 import javax.inject.Singleton;
 
 /**
@@ -62,9 +64,9 @@ public class BraveTracerFactory {
     Tracing braveTracing(@Nullable Reporter<Span> reporter) {
         Tracing.Builder builder = braveTracerConfiguration.getTracingBuilder();
         if (reporter != null) {
-            builder.spanReporter(reporter);
+            builder.addSpanHandler(ZipkinSpanHandler.newBuilder(reporter).build());
         } else {
-            builder.spanReporter(Reporter.NOOP);
+            builder.addSpanHandler(ZipkinSpanHandler.newBuilder(Reporter.NOOP).build());
         }
         return builder.build();
     }

@@ -13,33 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context;
-
-import io.micronaut.core.annotation.Internal;
-
-import javax.inject.Provider;
-
 /**
- * A resolved provider.
- *
- * @param <T> The type
- * @author Graeme Rocher
- * @since 1.0
+ * Internal package to support injection providers of various types.
  */
-@Internal
-class ResolvedProvider<T> implements Provider<T> {
-
-    private final T bean;
-
-    /**
-     * @param bean The bean
-     */
-    ResolvedProvider(T bean) {
-        this.bean = bean;
-    }
-
-    @Override
-    public T get() {
-        return bean;
-    }
-}
+package io.micronaut.inject.provider;

@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.qualifiers;
 
+import io.micronaut.context.annotation.Any;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -66,6 +67,9 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
+        if (annotationMetadata.hasDeclaredAnnotation(Any.class)) {
+            return candidates;
+        }
         String name;
         String v = annotationMetadata.stringValue(Named.class).orElse(null);
         if (StringUtils.isNotEmpty(v)) {

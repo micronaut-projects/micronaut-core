@@ -15,11 +15,9 @@
  */
 package io.micronaut.inject.constructor.factoryinjection;
 
-import io.micronaut.context.annotation.Provided;
 
 import javax.inject.Inject;
 
-@Provided
 public class AImpl implements A {
     final C c;
     final C c2;

@@ -28,7 +28,7 @@ dependencies {
     testImplementation project(":validation")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
     testImplementation "jakarta.inject:jakarta.inject-api:2.0.0"
-
+    testImplementation dependencyVersion("zipkin.reporter")
 
     testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'
     testRuntimeOnly 'org.glassfish:javax.el:3.0.1-b12'

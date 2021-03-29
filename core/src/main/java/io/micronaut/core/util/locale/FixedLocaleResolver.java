@@ -17,7 +17,6 @@ package io.micronaut.core.util.locale;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.LocaleResolver;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -49,7 +48,7 @@ public class FixedLocaleResolver<T> implements LocaleResolver<T> {
 
     @Override
     @NonNull
-    public Locale resolveOrDefault(@NotNull T context) {
+    public Locale resolveOrDefault(@NonNull T context) {
         return resolve(context).orElseThrow(() -> new IllegalArgumentException("The fixed locale must be set"));
     }
 }

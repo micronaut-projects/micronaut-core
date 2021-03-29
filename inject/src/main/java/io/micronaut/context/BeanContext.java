@@ -21,7 +21,6 @@ import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
-import org.jetbrains.annotations.NotNull;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -251,9 +250,9 @@ public interface BeanContext extends
         return registerSingleton(type, singleton, null, true);
     }
 
-    @NotNull
+    @NonNull
     @Override
-    default BeanContext registerSingleton(@NotNull Object singleton, boolean inject) {
+    default BeanContext registerSingleton(@NonNull Object singleton, boolean inject) {
         return (BeanContext) BeanDefinitionRegistry.super.registerSingleton(singleton, inject);
     }
 
