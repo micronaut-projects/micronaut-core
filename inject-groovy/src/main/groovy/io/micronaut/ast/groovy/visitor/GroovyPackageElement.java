@@ -15,7 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import org.codehaus.groovy.ast.PackageNode;

@@ -70,4 +70,17 @@ public interface FileUpload {
      * @return True if the part is fully uploaded
      */
     boolean isComplete();
+
+    /**
+     * Discards the contents of the file. This must be called
+     * if the file will not be read and has not already been read.
+     *
+     * Failure to either read or discard the file will result in
+     * memory leaks!
+     *
+     * @since 2.4.0
+     */
+    default void discard() {
+        throw new UnsupportedOperationException("Discard not supported");
+    }
 }

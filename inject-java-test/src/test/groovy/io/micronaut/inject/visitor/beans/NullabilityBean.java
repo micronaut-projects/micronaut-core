@@ -1,6 +1,6 @@
 package io.micronaut.inject.visitor.beans;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Introspected;
 
 @Introspected

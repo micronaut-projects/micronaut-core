@@ -17,11 +17,10 @@ package io.micronaut.docs.server.binding;
 
 // tag::imports[]
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.QueryValue;
-
-import javax.annotation.Nullable;
 import javax.validation.constraints.PositiveOrZero;
 // end::imports[]
 

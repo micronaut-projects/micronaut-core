@@ -1,10 +1,9 @@
 package io.micronaut.aop.compile
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
-import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 class PropertyAdviceSpec extends AbstractBeanDefinitionSpec {
     void 'test advice can be applied to bean properties'() {

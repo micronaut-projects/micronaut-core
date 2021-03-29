@@ -20,7 +20,7 @@ import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.client.LoadBalancer;
 import org.reactivestreams.Publisher;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.net.URL;
 import java.util.Optional;
 

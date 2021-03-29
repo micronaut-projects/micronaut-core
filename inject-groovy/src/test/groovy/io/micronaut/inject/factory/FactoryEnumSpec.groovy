@@ -1,6 +1,6 @@
 package io.micronaut.inject.factory
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 
 class FactoryEnumSpec extends AbstractBeanDefinitionSpec {

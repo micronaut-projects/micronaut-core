@@ -1,8 +1,7 @@
 package io.micronaut.inject.value
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.Value
-import io.micronaut.inject.BeanDefinition
 
 class ValueParseSpec extends AbstractBeanDefinitionSpec{
 

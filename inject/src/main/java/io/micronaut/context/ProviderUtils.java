@@ -15,7 +15,6 @@
  */
 package io.micronaut.context;
 
-
 import javax.inject.Provider;
 import javax.validation.constraints.NotNull;
 
@@ -37,6 +36,7 @@ public class ProviderUtils {
     public static <T> Provider<T> memoized(Provider<T> delegate) {
         return new MemoizingProvider<>(delegate);
     }
+
 
     /**
      * A lazy provider.

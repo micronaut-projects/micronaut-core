@@ -15,13 +15,13 @@
  */
 package io.micronaut.docs.server.binding;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.CookieValue;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Header;
 
+import io.micronaut.core.annotation.Nullable;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.List;

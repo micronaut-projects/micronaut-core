@@ -24,9 +24,19 @@ In addition to being able to inject beans, Micronaut natively supports injecting
 |A `javax.inject.Provider` if a circular dependency requires it, or to instantiate a prototype for each `get` call.
 |`Provider<Engine>`
 
+|link:{jakartaapi}/jakarta/inject/Provider.html[Provider]
+|A `jakarta.inject.Provider` if a circular dependency requires it or to instantiate a prototype for each `get` call.
+|`Provider<Engine>`
+
+|api:context.BeanProvider[]
+|A `io.micronaut.context.BeanProvider` if a circular dependency requires it or to instantiate a prototype for each `get` call.
+|`BeanProvider<Engine>`
+
 |===
 
-TIP: A prototype bean will have one instance created per place the bean is injected. When a prototype bean is injected as a `Provider`, each call to `get()` creates a new instance.
+NOTE: There are 3 different provider types supported, however the `BeanProvider` is the one we suggest to use.
+
+TIP: A prototype bean will have one instance created per place the bean is injected. When a prototype bean is injected as a provider, each call to `get()` creates a new instance.
 
 === Collection Ordering
 

@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;

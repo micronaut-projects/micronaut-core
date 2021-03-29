@@ -23,7 +23,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.lang.reflect.Method;
@@ -87,6 +87,11 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
         this.argTypes = Argument.toClassArray(arguments);
         this.declaringBean = declaringBean;
         this.annotationMetadata = initAnnotationMetadata(annotationMetadata);
+    }
+
+    @Override
+    public final boolean hasPropertyExpressions() {
+        return annotationMetadata.hasPropertyExpressions();
     }
 
     @Override

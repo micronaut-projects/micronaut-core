@@ -18,7 +18,7 @@ dependencies {
     testImplementation project(":inject")
     testImplementation dependencyVersion("rxjava2")
     testImplementation project(":http-server-netty")
-    testImplementation "com.github.tomakehurst:wiremock-jre8:2.27.1"
+    testImplementation "com.github.tomakehurst:wiremock-jre8:2.27.2"
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'

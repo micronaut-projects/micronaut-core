@@ -34,7 +34,7 @@ public interface ConfigurationClient extends Described {
     String CONFIGURATION_PREFIX = "micronaut.config-client";
 
     /**
-     * The read timeout used when reading distributed configuration.
+     *  Whether the configuration client, responsible for reading configuration for configuration servers, is enabled.
      */
     String ENABLED = CONFIGURATION_PREFIX + ".enabled";
 

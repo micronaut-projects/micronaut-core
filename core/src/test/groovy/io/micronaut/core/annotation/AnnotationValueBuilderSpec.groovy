@@ -71,4 +71,71 @@ class AnnotationValueBuilderSpec extends Specification {
         true  | Boolean
         "str" | String
     }
+
+    void "test passing a map of members"() {
+        when:
+        def av = AnnotationValue.builder("Foo")
+                .members([
+                        "invalid": BigDecimal.valueOf(2)
+                ])
+                .build()
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message == "The member named [invalid] with type [java.math.BigDecimal] is not a valid member type"
+
+        when:
+        av = AnnotationValue.builder("Foo")
+                .members([
+                        "multidimensional array": new int[][] { new int[] {1}, new int[] {2}}
+                ])
+                .build()
+
+        then:
+        ex = thrown(IllegalArgumentException)
+        ex.message == "The member named [multidimensional array] with type [[[I] is not a valid member type"
+
+        when:
+        av = AnnotationValue.builder("Foo")
+                .members([
+                        "primitive wrapper array": new Long[] { 1L }
+                ])
+                .build()
+
+        then:
+        ex = thrown(IllegalArgumentException)
+        ex.message == "The member named [primitive wrapper array] with type [[Ljava.lang.Long;] is not a valid member type"
+
+        when:
+        av = AnnotationValue.builder("Foo")
+                .members([
+                        "primitive": 1L,
+                        "primitive wrapper": Long.valueOf(1),
+                        "primitive array": new int[] {1, 2},
+                        "enum": RetentionPolicy.RUNTIME,
+                        "enum array": new RetentionPolicy[] {
+                                RetentionPolicy.RUNTIME,
+                                RetentionPolicy.SOURCE
+                        },
+                        "class": String.class,
+                        "class array": new Class[] {
+                                String.class,
+                                Long.class
+                        },
+                        "annotation class": new AnnotationClassValue<>(String.class),
+                        "annotation class array": new AnnotationClassValue<>[] {
+                                new AnnotationClassValue<>(String.class),
+                                new AnnotationClassValue<>(Long.class)
+                        },
+                        "annotation": AnnotationValue.builder("Bar").value(true).build(),
+                        "annotation array": new AnnotationValue[] {
+                                AnnotationValue.builder("Bar").value(true).build(),
+                                AnnotationValue.builder("Bar").value(false).build()
+                        }
+                ])
+                .build()
+
+        then:
+        noExceptionThrown()
+    }
 }

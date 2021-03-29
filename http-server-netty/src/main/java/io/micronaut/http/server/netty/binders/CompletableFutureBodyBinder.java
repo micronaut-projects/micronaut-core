@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;

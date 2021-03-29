@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.errors
 
-import groovy.transform.NotYetImplemented
-import io.micronaut.AbstractBeanDefinitionSpec
+
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.http.annotation.Get
 import spock.lang.Issue
 

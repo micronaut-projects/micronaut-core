@@ -47,7 +47,7 @@ class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
         AnnotationMetadata metadata = buildMethodAnnotationMetadata('''\
 package test;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
 class Test {
     @Nullable

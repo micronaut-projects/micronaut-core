@@ -1,9 +1,8 @@
 package io.micronaut.inject.configuration
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
-import org.codehaus.groovy.GroovyBugError
 import org.codehaus.groovy.control.MultipleCompilationErrorsException
 
 class GroovyConfigBuilderSpec extends AbstractBeanDefinitionSpec {

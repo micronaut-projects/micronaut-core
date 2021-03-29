@@ -17,8 +17,8 @@ package io.micronaut.http.client.netty;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
@@ -35,6 +35,7 @@ import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.HttpResponse;
@@ -73,6 +74,9 @@ import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.jackson.codec.JsonStreamMediaTypeCodec;
 import io.micronaut.jackson.parser.JacksonProcessor;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.scheduling.instrument.Instrumentation;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.RxWebSocketClient;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
@@ -116,6 +120,7 @@ import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
@@ -148,9 +153,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS;
 import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS;
+import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
@@ -199,46 +206,50 @@ public class DefaultHttpClient implements
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
+    private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
 
     /**
      * Construct a client for the given arguments.
      *
-     * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers
-     * @param configuration              The {@link HttpClientConfiguration} object
-     * @param contextPath                The base URI to prepend to request uris
-     * @param threadFactory              The thread factory to use for client threads
-     * @param nettyClientSslBuilder      The SSL builder
-     * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
-     * @param annotationMetadataResolver The annotation metadata resolver
-     * @param filters                    The filters to use
+     * @param loadBalancer                    The {@link LoadBalancer} to use for selecting servers
+     * @param configuration                   The {@link HttpClientConfiguration} object
+     * @param contextPath                     The base URI to prepend to request uris
+     * @param threadFactory                   The thread factory to use for client threads
+     * @param nettyClientSslBuilder           The SSL builder
+     * @param codecRegistry                   The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param annotationMetadataResolver      The annotation metadata resolver
+     * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
+     * @param filters                         The filters to use
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-                             HttpClientConfiguration configuration,
-                             @Nullable String contextPath,
-                             @Nullable ThreadFactory threadFactory,
-                             NettyClientSslBuilder nettyClientSslBuilder,
-                             MediaTypeCodecRegistry codecRegistry,
-                             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
-                             HttpClientFilter... filters) {
-        this(loadBalancer, io.micronaut.http.HttpVersion.HTTP_1_1, configuration, contextPath, new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)), null, threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel.class);
+            HttpClientConfiguration configuration,
+            @Nullable String contextPath,
+            @Nullable ThreadFactory threadFactory,
+            NettyClientSslBuilder nettyClientSslBuilder,
+            MediaTypeCodecRegistry codecRegistry,
+            @Nullable AnnotationMetadataResolver annotationMetadataResolver,
+            List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
+            HttpClientFilter... filters) {
+        this(loadBalancer, io.micronaut.http.HttpVersion.HTTP_1_1, configuration, contextPath, new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)), null, threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel.class, invocationInstrumenterFactories);
     }
 
     /**
      * Construct a client for the given arguments.
      *
-     * @param loadBalancer          The {@link LoadBalancer} to use for selecting servers
-     * @param httpVersion           The HTTP version to use. Can be null and defaults to {@link io.micronaut.http.HttpVersion#HTTP_1_1}
-     * @param configuration         The {@link HttpClientConfiguration} object
-     * @param contextPath           The base URI to prepend to request uris
-     * @param filterResolver        The http client filter resolver
-     * @param clientFilterEntries   The client filter entries
-     * @param threadFactory         The thread factory to use for client threads
-     * @param nettyClientSslBuilder The SSL builder
-     * @param codecRegistry         The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
-     * @param webSocketBeanRegistry The websocket bean registry
-     * @param requestBinderRegistry The request binder registry
-     * @param eventLoopGroup        The event loop group to use
-     * @param socketChannelClass    The socket channel class
+     * @param loadBalancer                    The {@link LoadBalancer} to use for selecting servers
+     * @param httpVersion                     The HTTP version to use. Can be null and defaults to {@link io.micronaut.http.HttpVersion#HTTP_1_1}
+     * @param configuration                   The {@link HttpClientConfiguration} object
+     * @param contextPath                     The base URI to prepend to request uris
+     * @param filterResolver                  The http client filter resolver
+     * @param clientFilterEntries             The client filter entries
+     * @param threadFactory                   The thread factory to use for client threads
+     * @param nettyClientSslBuilder           The SSL builder
+     * @param codecRegistry                   The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param webSocketBeanRegistry           The websocket bean registry
+     * @param requestBinderRegistry           The request binder registry
+     * @param eventLoopGroup                  The event loop group to use
+     * @param socketChannelClass              The socket channel class
+     * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              @Nullable io.micronaut.http.HttpVersion httpVersion,
@@ -252,7 +263,9 @@ public class DefaultHttpClient implements
                              @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
                              @NonNull RequestBinderRegistry requestBinderRegistry,
                              @Nullable EventLoopGroup eventLoopGroup,
-                             @NonNull Class<? extends SocketChannel> socketChannelClass) {
+                             @NonNull Class<? extends SocketChannel> socketChannelClass,
+                             List<InvocationInstrumenterFactory> invocationInstrumenterFactories
+            ) {
         ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
         ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
         ArgumentUtils.requireNonNull("webSocketBeanRegistry", webSocketBeanRegistry);
@@ -292,6 +305,9 @@ public class DefaultHttpClient implements
 
         Optional<Duration> connectTtl = configuration.getConnectTtl();
         this.connectionTimeAliveMillis = connectTtl.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
+
+        this.invocationInstrumenterFactories =
+                invocationInstrumenterFactories == null ? Collections.emptyList() : invocationInstrumenterFactories;
 
         HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration = configuration.getConnectionPoolConfiguration();
         // HTTP/2 defaults to keep alive connections so should we should always use a pool
@@ -375,7 +391,7 @@ public class DefaultHttpClient implements
      *
      */
     public DefaultHttpClient() {
-        this((LoadBalancer) null, new DefaultHttpClientConfiguration());
+        this(null, new DefaultHttpClientConfiguration(), Collections.emptyList());
     }
 
     /**
@@ -385,18 +401,24 @@ public class DefaultHttpClient implements
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
         this(
                 url == null ? null : LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
+                new NettyClientSslBuilder(new ResourceResolver()),
+                createDefaultMediaTypeRegistry(),
+                AnnotationMetadataResolver.DEFAULT,
+                Collections.emptyList());
     }
 
     /**
      * @param loadBalancer  The {@link LoadBalancer} to use for selecting servers
      * @param configuration The {@link HttpClientConfiguration} object
+     * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      */
-    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
+    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration, List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
         this(loadBalancer,
                 configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()),
-                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
+                createDefaultMediaTypeRegistry(),
+                AnnotationMetadataResolver.DEFAULT,
+                invocationInstrumenterFactories);
     }
 
     /**
@@ -435,7 +457,7 @@ public class DefaultHttpClient implements
                     ChannelPool cp = entry.getValue();
                     try {
                         if (cp instanceof SimpleChannelPool) {
-                            ((SimpleChannelPool) cp).closeAsync().addListener(future -> {
+                            addInstrumentedListener(((SimpleChannelPool) cp).closeAsync(), future -> {
                                 if (!future.isSuccess()) {
                                     final Throwable cause = future.cause();
                                     if (cause != null) {
@@ -463,7 +485,7 @@ public class DefaultHttpClient implements
                         shutdownTimeout.toMillis(),
                         TimeUnit.MILLISECONDS
                 );
-                future.addListener(f -> {
+                addInstrumentedListener(future, f -> {
                     if (!f.isSuccess() && log.isErrorEnabled()) {
                         Throwable cause = f.cause();
                         log.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
@@ -829,7 +851,7 @@ public class DefaultHttpClient implements
                 }
             });
 
-            bootstrap.connect().addListener(future -> {
+            addInstrumentedListener(bootstrap.connect(), future -> {
                 if (!future.isSuccess()) {
                     emitter.onError(future.cause());
                 }
@@ -855,8 +877,8 @@ public class DefaultHttpClient implements
                             ByteBuf byteBuf = message.content();
                             if (log.isTraceEnabled()) {
                                 log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
-                                        byteBuf.readableBytes(), request.getMethodName(), request.getUri());
-                                traceBody("Response", byteBuf);
+                                            byteBuf.readableBytes(), request.getMethodName(), request.getUri());
+                                    traceBody("Response", byteBuf);
                             }
                             ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
                             NettyStreamedHttpResponse<ByteBuffer<?>> thisResponse = new NettyStreamedHttpResponse<>(
@@ -1013,8 +1035,7 @@ public class DefaultHttpClient implements
                     });
                 } else {
                     channelFuture = doConnect(request, requestURI, sslContext, true, null);
-                    channelFuture
-                            .addListener((ChannelFutureListener) f -> {
+                    addInstrumentedListener(channelFuture, (ChannelFutureListener) f -> {
                                 if (f.isSuccess()) {
                                     Channel channel = f.channel();
                                     request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
@@ -1075,9 +1096,9 @@ public class DefaultHttpClient implements
                     try {
                         ChannelPool channelPool = poolMap.get(new RequestKey(requestURI));
                         Future<Channel> channelFuture = channelPool.acquire();
-                        channelFuture.addListener(future -> {
+                        addInstrumentedListener(channelFuture, future -> {
                             if (future.isSuccess()) {
-                                Channel channel = (Channel) future.get();
+                                Channel channel = future.get();
                                 try {
                                     sendRequestThroughChannel(
                                             requestWrapper,
@@ -1104,7 +1125,7 @@ public class DefaultHttpClient implements
                 } else {
                     SslContext sslContext = buildSslContext(requestURI);
                     ChannelFuture connectionFuture = doConnect(request, requestURI, sslContext, false, null);
-                    connectionFuture.addListener(future -> {
+                    addInstrumentedListener(connectionFuture, future -> {
                         if (!future.isSuccess()) {
                             Throwable cause = future.cause();
                             emitter.onError(
@@ -1841,7 +1862,7 @@ public class DefaultHttpClient implements
         );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
         ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new SimpleChannelInboundHandler<FullHttpResponse>() {
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new SimpleChannelInboundHandlerInstrumented<FullHttpResponse>() {
             final AtomicBoolean received = new AtomicBoolean(false);
             final AtomicBoolean emitted = new AtomicBoolean(false);
 
@@ -1866,7 +1887,7 @@ public class DefaultHttpClient implements
             }
 
             @Override
-            protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) {
+            protected void channelReadInstrumented(ChannelHandlerContext ctx, FullHttpResponse msg) {
                 if (received.compareAndSet(false, true)) {
                     NettyMutableHttpResponse<Object> response = new NettyMutableHttpResponse<>(
                             msg,
@@ -1882,7 +1903,7 @@ public class DefaultHttpClient implements
                 }
             }
         });
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandler<StreamedHttpResponse>() {
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandlerInstrumented<StreamedHttpResponse>() {
 
             final AtomicBoolean received = new AtomicBoolean(false);
 
@@ -1899,7 +1920,7 @@ public class DefaultHttpClient implements
             }
 
             @Override
-            protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) {
+            protected void channelReadInstrumented(ChannelHandlerContext ctx, StreamedHttpResponse msg) {
                 if (received.compareAndSet(false, true)) {
                     HttpResponseStatus status = msg.status();
                     int statusCode = status.code();
@@ -2052,13 +2073,13 @@ public class DefaultHttpClient implements
             FlowableEmitter<io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
-        final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandler<FullHttpResponse>(false) {
+        final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandlerInstrumented<FullHttpResponse>(false) {
 
             AtomicBoolean complete = new AtomicBoolean(false);
             boolean keepAlive = true;
 
             @Override
-            protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
+            protected void channelReadInstrumented(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
                 try {
 
                     HttpResponseStatus status = fullResponse.status();
@@ -2249,7 +2270,7 @@ public class DefaultHttpClient implements
                     if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
                         Http2SettingsHandler settingsHandler = (Http2SettingsHandler) ctx.pipeline().get(HANDLER_HTTP2_SETTINGS);
                         if (settingsHandler != null) {
-                            settingsHandler.promise.addListener(future -> {
+                            addInstrumentedListener(settingsHandler.promise, future -> {
                                 if (future.isSuccess()) {
                                     pipeline.addBefore(
                                             ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
@@ -2644,8 +2665,8 @@ public class DefaultHttpClient implements
                                 });
                             } else {
                                 channelFuture = doConnect(request, requestURI, sslContext, true, null);
-                                channelFuture
-                                        .addListener((ChannelFutureListener) f -> {
+                                addInstrumentedListener(channelFuture,
+                                        (ChannelFutureListener) f -> {
                                             if (f.isSuccess()) {
                                                 Channel channel = f.channel();
                                                 request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
@@ -2686,6 +2707,75 @@ public class DefaultHttpClient implements
                     );
                     return proxyResponsePublisher;
                 });
+    }
+
+    /**
+     * Adds a Netty listener that is instrumented by instrumenters given by managed or provided collection of
+     * the {@link InvocationInstrumenterFactory}.
+     *
+     * @param channelFuture The channel future
+     * @param listener The listener logic
+     * @param <V> the type of value returned by the future
+     * @param <C> the future type
+     * @return a Netty listener that is instrumented
+     */
+    private <V, C extends Future<V>> Future<V> addInstrumentedListener(
+            Future<V> channelFuture, GenericFutureListener<C> listener
+    ) {
+        InvocationInstrumenter instrumenter = combineFactories(invocationInstrumenterFactories);
+
+        return channelFuture.addListener(f -> {
+            try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+                listener.operationComplete((C) f);
+            }
+        });
+    }
+
+    private static @NonNull InvocationInstrumenter combineFactories(Collection<InvocationInstrumenterFactory> factories) {
+        if (CollectionUtils.isEmpty(factories)) {
+            return NOOP;
+        }
+        return InvocationInstrumenter.combine(factories.stream()
+                .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList()));
+    }
+
+
+    @FunctionalInterface
+    interface ThrowingBiConsumer<T1, T2> {
+        void accept(T1 t1, T2 t2) throws Exception;
+    }
+
+
+    /**
+     * An extension of Netty {@link SimpleChannelInboundHandler} that instruments the channel read handler
+     * by using collection of available {@link InvocationInstrumenterFactory} (such as
+     * {@link ServerRequestContext#with(io.micronaut.http.HttpRequest, java.util.concurrent.Callable)}) if present during
+     * the constructor call of the http client.
+     * Thanks to that the {@link ServerRequestContext#currentRequest()} returns parent request.
+     *
+     * @param <I> the type of the inbound message
+     */
+    abstract class SimpleChannelInboundHandlerInstrumented<I> extends SimpleChannelInboundHandler<I> {
+
+        private final InvocationInstrumenter instrumenter = combineFactories(invocationInstrumenterFactories);
+
+        SimpleChannelInboundHandlerInstrumented() {
+        }
+
+        SimpleChannelInboundHandlerInstrumented(boolean autoRelease) {
+            super(autoRelease);
+        }
+
+        protected abstract void channelReadInstrumented(ChannelHandlerContext ctx, I msg) throws Exception;
+
+        @Override
+        protected final void channelRead0(ChannelHandlerContext ctx, I msg) throws Exception {
+            try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+                channelReadInstrumented(ctx, msg);
+            }
+        }
     }
 
 
@@ -2864,7 +2954,7 @@ public class DefaultHttpClient implements
                     }
                 });
 
-                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandler<ByteBuf>(false) {
+                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandlerInstrumented<ByteBuf>(false) {
 
                     @Override
                     public boolean acceptInboundMessage(Object msg) {
@@ -2872,7 +2962,7 @@ public class DefaultHttpClient implements
                     }
 
                     @Override
-                    protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
+                    protected void channelReadInstrumented(ChannelHandlerContext ctx, ByteBuf msg) {
                         try {
                             Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
                             Http2Stream http2Stream = streamKey.get();
@@ -2918,7 +3008,8 @@ public class DefaultHttpClient implements
     /**
      * Reads the first {@link Http2Settings} object and notifies a {@link io.netty.channel.ChannelPromise}.
      */
-    private static final class Http2SettingsHandler extends SimpleChannelInboundHandler<Http2Settings> {
+    private final class Http2SettingsHandler extends
+            SimpleChannelInboundHandlerInstrumented<Http2Settings> {
         private final ChannelPromise promise;
 
         /**
@@ -2931,7 +3022,7 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, Http2Settings msg) {
+        protected void channelReadInstrumented(ChannelHandlerContext ctx, Http2Settings msg) {
             promise.setSuccess();
 
             // Only care about the first settings message
@@ -3118,7 +3209,7 @@ public class DefaultHttpClient implements
                 // since this means the HTTP/2 clear text upgrade completed, otherwise
                 // add a listener to the future that writes once the upgrade completes
                 if (settingsHandler != null) {
-                    settingsHandler.promise.addListener(future -> {
+                    addInstrumentedListener(settingsHandler.promise, future -> {
                         if (future.isSuccess()) {
                             processRequestWrite(channel, channelPool, emitter, pipeline);
                         } else {
@@ -3154,7 +3245,7 @@ public class DefaultHttpClient implements
                 FlowableEmitter<?> emitter,
                 ChannelFuture channelFuture,
                 boolean closeChannelAfterWrite) {
-            channelFuture.addListener(f -> {
+            addInstrumentedListener(channelFuture, f -> {
                 try {
                     if (!f.isSuccess()) {
                         if (!emitter.isCancelled()) {

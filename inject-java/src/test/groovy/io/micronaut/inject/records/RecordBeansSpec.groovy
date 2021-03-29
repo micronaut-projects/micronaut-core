@@ -18,9 +18,17 @@ class RecordBeansSpec extends AbstractTypeElementSpec {
         ApplicationContext context = buildContext('test.Test', '''
 package test;
 import io.micronaut.context.annotation.*;
+import io.micronaut.core.convert.ConversionService;
+import javax.validation.constraints.Min;
+import javax.inject.Inject;
+import io.micronaut.context.BeanContext;
 
 @ConfigurationProperties("foo")
-record Test(@javax.validation.constraints.Min(20) int num, String name, @Primary io.micronaut.core.convert.ConversionService conversionService) {
+record Test(
+    @Min(20) int num, 
+    String name, 
+    @Primary ConversionService conversionService,
+    @Inject BeanContext beanContext) {
 }
 ''')
         def type = context.classLoader.loadClass('test.Test')
@@ -41,8 +49,10 @@ record Test(@javax.validation.constraints.Min(20) int num, String name, @Primary
         def bean = context.getBean(type)
 
         then:
-        definition.constructor.arguments.length == 3
-        bean.num == 25
+        definition.constructor.arguments.length == 4
+        bean.num() == 25
+        bean.conversionService() != null
+        bean.beanContext().is(context)
 
         cleanup:
         context.close()

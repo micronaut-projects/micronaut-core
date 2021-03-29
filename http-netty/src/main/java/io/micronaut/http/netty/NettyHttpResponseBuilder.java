@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.netty;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;

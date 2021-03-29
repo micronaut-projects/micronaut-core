@@ -17,7 +17,7 @@ package io.micronaut.discovery;
 
 import io.micronaut.context.env.Environment;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Interface for generating IDs for {@link ServiceInstance}.

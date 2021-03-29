@@ -15,7 +15,7 @@
  */
 package io.micronaut.validation.validator.constraints;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import javax.validation.ValidationException;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
