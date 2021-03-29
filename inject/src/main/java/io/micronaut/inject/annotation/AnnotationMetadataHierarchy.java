@@ -166,7 +166,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                     for (Map.Entry<CharSequence, Object> entry : values.entrySet()) {
                         newValues.putIfAbsent(entry.getKey(), entry.getValue());
                     }
-                    ann = new AnnotationValue<>(annotation, newValues);
+                    ann = new AnnotationValue<>(annotation, newValues, AnnotationMetadataSupport.getDefaultValues(annotation));
                 }
             }
         }
