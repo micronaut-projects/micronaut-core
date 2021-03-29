@@ -136,6 +136,8 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLException;
+
 import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
 import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
 
@@ -274,9 +276,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         NettyHttpRequest nettyHttpRequest = NettyHttpRequest.remove(ctx);
         if (nettyHttpRequest == null) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
+            if (cause instanceof SSLException) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
+                }
+            } else {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
+                }
             }
+
             ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR));
             return;
         }
