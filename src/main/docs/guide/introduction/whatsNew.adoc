@@ -30,7 +30,7 @@ Multiple api:aop.MethodInterceptor[] types can bind to a single advise annotatio
 
 ==== JSON Error Responses
 
-In previous versions of Micronaut, to control the format of error response bodies, it required replacing all of the existing api:http.server.exceptions.ExceptionHanlder[] instances. In Micronaut 2.4, the logic to create error response bodies has been moved to a single bean that implements api:http.server.exceptions.response.ErrorResponseProcessor[]. Now instead of having to replace many beans to have a consistent format, only a single bean needs to be replaced. The default implementation behaves the same as in previous versions to maintain backward compatibility.
+In previous versions of Micronaut, to control the format of error response bodies, it required replacing all of the existing api:http.server.exceptions.ExceptionHandler[] instances. In Micronaut 2.4, the logic to create error response bodies has been moved to a single bean that implements api:http.server.exceptions.response.ErrorResponseProcessor[]. Now instead of having to replace many beans to have a consistent format, only a single bean needs to be replaced. The default implementation behaves the same as in previous versions to maintain backward compatibility.
 
 === Micronaut Data
 
