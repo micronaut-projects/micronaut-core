@@ -147,6 +147,28 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_JSON_TYPE = new MediaType(MediaType.APPLICATION_JSON);
 
     /**
+     * JSON: application/problem+json.
+     * @see <a href="https://tools.ietf.org/html/rfc7807#section-6.1">RFC 7807 - Problem Details for HTTP APIs</a>
+     */
+    public static final String PROBLEM_JSON = "application/problem+json";
+
+    /**
+     * JSON: application/problem+json.
+     */
+    public static final MediaType PROBLEM_JSON_TYPE = new MediaType(MediaType.PROBLEM_JSON);
+
+    /**
+     * XML: application/problem+xml.
+     * @see <a href="https://tools.ietf.org/html/rfc7807#section-6.2">RFC 7807 - Problem Details for HTTP APIs</a>
+     */
+    public static final String PROBLEM_XML = "application/problem+xml";
+
+    /**
+     * XML: application/problem+xml.
+     */
+    public static final MediaType PROBLEM_XML_TYPE = new MediaType(MediaType.PROBLEM_XML);
+
+    /**
      * YAML: application/x-yaml.
      */
     public static final String APPLICATION_YAML = "application/x-yaml";
