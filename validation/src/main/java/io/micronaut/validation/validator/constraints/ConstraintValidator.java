@@ -63,7 +63,7 @@ public interface ConstraintValidator<A extends Annotation, T> extends javax.vali
         // simply adapt the interfaces for now.
         return isValid(value, new AnnotationValue(Constraint.class.getName()), new ConstraintValidatorContext() {
 
-            private String messageOverride = null;
+            private String messageTemplateOverride = null;
 
             @NonNull
             @Override
@@ -79,13 +79,13 @@ public interface ConstraintValidator<A extends Annotation, T> extends javax.vali
 
             @Override
             public void overrideMessageTemplate(@Nullable final String messageTemplateOverride) {
-                this.messageOverride = messageTemplateOverride;
+                this.messageTemplateOverride = messageTemplateOverride;
             }
 
             @Nullable
             @Override
             public String getMessageTemplateOverride() {
-                return messageOverride;
+                return messageTemplateOverride;
             }
 
         });

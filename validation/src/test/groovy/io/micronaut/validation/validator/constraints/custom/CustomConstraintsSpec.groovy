@@ -170,10 +170,10 @@ class CustomTestInvalid {
     CustomInvalidOuter invalidOuter
 
     @Introspected
-    @AlwaysInvalidConstraint
+    @CustomMessageConstraint
     static class CustomInvalidInner {}
 }
 
 @Introspected
-@AlwaysInvalidConstraint
+@CustomMessageConstraint
 class CustomInvalidOuter {}

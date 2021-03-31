@@ -1798,6 +1798,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         final Set<Object> validatedObjects = new HashSet<>(20);
         final PathImpl currentPath;
         final List<Class> groups;
+        String messageTemplateOverride = null;
 
         private <T> DefaultConstraintValidatorContext(T object, Class<?>... groups) {
             this(object, new PathImpl(), groups);
@@ -1830,6 +1831,17 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @Override
         public Object getRootBean() {
             return validatedObjects.isEmpty() ? null : validatedObjects.iterator().next();
+        }
+
+        @Override
+        public void overrideMessageTemplate(@Nullable final String messageTemplateOverride) {
+            this.messageTemplateOverride = messageTemplateOverride;
+        }
+
+        @Nullable
+        @Override
+        public String getMessageTemplateOverride() {
+            return messageTemplateOverride;
         }
 
         Path.Node addPropertyNode(String name, @Nullable DefaultPropertyNode container) {
