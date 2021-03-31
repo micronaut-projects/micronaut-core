@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.exception.InvocationException;
@@ -161,6 +162,8 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
             if (result instanceof Writable) {
                 Writable writable = (Writable) result;
                 writable.writeTo(output, environment.getProperty(LocalFunctionRegistry.FUNCTION_CHARSET, Charset.class, StandardCharsets.UTF_8));
+            } else if (result instanceof InputStream) {
+                IOUtils.copy((InputStream) result, output);
             } else {
                 Optional<MediaTypeCodec> codec = registry instanceof MediaTypeCodecRegistry ? ((MediaTypeCodecRegistry) registry).findCodec(MediaType.APPLICATION_JSON_TYPE) : Optional.empty();
 

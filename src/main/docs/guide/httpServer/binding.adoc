@@ -51,6 +51,10 @@ Because hyphens are not allowed in variable names, it may be necessary to set th
 
 snippet::io.micronaut.docs.server.binding.BindingController[tags="header1,header2",indent=0]
 
+== Stream Support
+
+Micronaut also supports binding the body to an `InputStream`. Note that in this case, it is required for the controller method execution to be offloaded to a different thread pool.
+
 == Binding from Multiple Query values
 
 Instead of binding from a single section of the request, it may be desirable to bind all query values for example to a POJO. This can be achieved by using the exploded operator (`?pojo*`) in the URI template. For example:

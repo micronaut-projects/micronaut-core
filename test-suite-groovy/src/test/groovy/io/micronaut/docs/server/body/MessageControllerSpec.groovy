@@ -16,7 +16,7 @@ class MessageControllerSpec extends Specification {
     @Shared @AutoCleanup HttpClient httpClient =
             embeddedServer.getApplicationContext()
                           .createBean(HttpClient, embeddedServer.getURL())
-    
+
     void "test echo response"() {
         given:
         String body = "My Text"
@@ -35,6 +35,18 @@ class MessageControllerSpec extends Specification {
         String body = "My Text"
         String response = httpClient.toBlocking().retrieve(
                 HttpRequest.POST('/receive/echo-flow', body)
+                        .contentType(MediaType.TEXT_PLAIN_TYPE),
+                String
+        )
+        expect:
+        response == body
+    }
+
+    void "test echo stream response"() {
+        given:
+        String body = "My Text"
+        String response = httpClient.toBlocking().retrieve(
+                HttpRequest.POST('/receive/echo-stream', body)
                         .contentType(MediaType.TEXT_PLAIN_TYPE),
                 String
         )

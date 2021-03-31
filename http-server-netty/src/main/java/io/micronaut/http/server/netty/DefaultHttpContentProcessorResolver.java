@@ -32,6 +32,7 @@ import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.micronaut.core.annotation.NonNull;
 
 import javax.inject.Singleton;
+import java.io.InputStream;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -52,7 +53,7 @@ import java.util.function.Supplier;
 @Internal
 class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolver {
 
-    private static final Set<Class> RAW_BODY_TYPES = CollectionUtils.setOf(String.class, byte[].class, ByteBuffer.class);
+    private static final Set<Class> RAW_BODY_TYPES = CollectionUtils.setOf(String.class, byte[].class, ByteBuffer.class, InputStream.class);
 
     private final BeanLocator beanLocator;
     private final BeanProvider<NettyHttpServerConfiguration> serverConfiguration;

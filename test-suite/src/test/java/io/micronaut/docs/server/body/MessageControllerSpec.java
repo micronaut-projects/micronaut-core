@@ -68,4 +68,14 @@ public class MessageControllerSpec {
 
         assertEquals(body, response);
     }
+
+    @Test
+    public void testEchoInputStreamResponse() {
+        String body = "My Text";
+        String response = client.toBlocking().retrieve(
+                HttpRequest.POST("/receive/echo-stream", body)
+                        .contentType(MediaType.TEXT_PLAIN_TYPE), String.class);
+
+        assertEquals(body, response);
+    }
 }

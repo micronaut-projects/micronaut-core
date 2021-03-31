@@ -22,6 +22,7 @@ import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
+import io.micronaut.http.server.netty.types.stream.StreamedCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
@@ -37,7 +38,7 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
-public class NettyStreamedFileCustomizableResponseType extends StreamedFile implements NettyFileCustomizableResponseType {
+public class NettyStreamedFileCustomizableResponseType extends StreamedFile implements NettyFileCustomizableResponseType, StreamedCustomizableResponseType {
 
     private final Optional<StreamedFile> delegate;
 
@@ -84,35 +85,5 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
             response.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         }
         delegate.ifPresent(type -> type.process(response));
-    }
-
-    @Override
-    public void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
-        if (response instanceof NettyMutableHttpResponse) {
-            FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
-
-            // Write the request data
-            final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), nettyResponse.headers());
-            final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
-            final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
-            if (isHttp2 && request instanceof NettyHttpRequest) {
-                final io.netty.handler.codec.http.HttpHeaders nativeHeaders = ((NettyHttpRequest<?>) request).getNativeRequest().headers();
-                final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
-                if (streamId != null) {
-                    finalResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
-                }
-            }
-            InputStream inputStream = getInputStream();
-            //  can be null if the stream was closed
-            context.write(finalResponse, context.voidPromise());
-            if (inputStream != null) {
-                context.writeAndFlush(new HttpChunkedInput(new ChunkedStream(inputStream)));
-            } else {
-                context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
-            }
-
-        } else {
-            throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
-        }
     }
 }

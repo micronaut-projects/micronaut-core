@@ -21,6 +21,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.Reader;
 
 /**
@@ -73,5 +75,24 @@ public class IOUtils {
             }
         }
         return answer.toString();
+    }
+
+    /**
+     * Read the contents of the input stream and copy it to the output stream.
+     * The input stream is closed after the copy is complete.
+     *
+     * @param inputStream The stream to read from
+     * @param outputStream The stream to write to
+     * @throws IOException if an IOException occurs.
+     * @since 2.5.0
+     */
+    @Blocking
+    public static void copy(InputStream inputStream, OutputStream outputStream) throws IOException {
+        byte[] buf = new byte[BUFFER_MAX];
+        int length;
+        while ((length = inputStream.read(buf)) > 0) {
+            outputStream.write(buf, 0, length);
+        }
+        inputStream.close();
     }
 }

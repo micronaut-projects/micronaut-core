@@ -31,6 +31,7 @@ import io.netty.handler.codec.http.FullHttpResponse;
 
 import javax.inject.Singleton;
 import java.io.File;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
