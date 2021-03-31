@@ -127,6 +127,16 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_XHTML_TYPE = new MediaType(APPLICATION_XHTML, "html");
 
     /**
+     * HTML: text/vnd.turbo-stream.html.
+     */
+    public static final String TEXT_TURBO_STREAM = "text/vnd.turbo-stream.html";
+
+    /**
+     * HTML: text/vnd.turbo-stream.html.
+     */
+    public static final MediaType TEXT_TURBO_STREAM_TYPE = new MediaType(TEXT_TURBO_STREAM);
+
+    /**
      * XML: application/xml.
      */
     public static final String APPLICATION_XML = "application/xml";
