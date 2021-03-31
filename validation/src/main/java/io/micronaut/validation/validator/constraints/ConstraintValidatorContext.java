@@ -50,18 +50,18 @@ public interface ConstraintValidatorContext {
     @Nullable Object getRootBean();
 
     /**
-     * Sets a message to be used for the validation error to override default
+     * Sets a message template to be used for the validation error to override default.
      *
      * @param messageTemplateOverride the message to override default
      */
-    default void overrideMessageTemplate(final String messageTemplateOverride) { }
+    default void overrideMessageTemplate(@Nullable final String messageTemplateOverride) { }
 
     /**
-     * Get the message override
+     * Get the message template override.
      *
      * @return the message override
      */
-    default String getMessageTemplateOverride() {
+    @Nullable default String getMessageTemplateOverride() {
         return null;
     }
     

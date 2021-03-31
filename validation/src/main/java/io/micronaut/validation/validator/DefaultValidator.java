@@ -2220,7 +2220,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             this.rootBeanClass = rootBeanClass;
             this.invalidValue = invalidValue;
             this.message = message;
-            this.ildmessageTemplate;
+            this.messageTemplate = messageTemplate;
             this.path = path;
             this.leafBean = leafBean;
             this.constraintDescriptor = constraintDescriptor;

@@ -17,13 +17,12 @@ package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Indexed;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+
 import javax.validation.ClockProvider;
 import javax.validation.Constraint;
 import java.lang.annotation.Annotation;
-import java.util.Optional;
 
 /**
  * Constraint validator that can be used at either runtime or compilation time and
@@ -64,7 +63,7 @@ public interface ConstraintValidator<A extends Annotation, T> extends javax.vali
         // simply adapt the interfaces for now.
         return isValid(value, new AnnotationValue(Constraint.class.getName()), new ConstraintValidatorContext() {
 
-            private String messageOverride;
+            private String messageOverride = null;
 
             @NonNull
             @Override
@@ -79,10 +78,11 @@ public interface ConstraintValidator<A extends Annotation, T> extends javax.vali
             }
 
             @Override
-            public void overrideMessageTemplate(final String messageTemplateOverride) {
+            public void overrideMessageTemplate(@Nullable final String messageTemplateOverride) {
                 this.messageOverride = messageTemplateOverride;
             }
 
+            @Nullable
             @Override
             public String getMessageTemplateOverride() {
                 return messageOverride;
