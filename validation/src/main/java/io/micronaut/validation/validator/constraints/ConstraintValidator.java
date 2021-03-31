@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Nullable;
 import javax.validation.ClockProvider;
 import javax.validation.Constraint;
 import java.lang.annotation.Annotation;
+import java.util.Optional;
 
 /**
  * Constraint validator that can be used at either runtime or compilation time and
@@ -62,6 +63,9 @@ public interface ConstraintValidator<A extends Annotation, T> extends javax.vali
     default boolean isValid(T value, javax.validation.ConstraintValidatorContext context) {
         // simply adapt the interfaces for now.
         return isValid(value, new AnnotationValue(Constraint.class.getName()), new ConstraintValidatorContext() {
+
+            private String messageOverride;
+
             @NonNull
             @Override
             public ClockProvider getClockProvider() {
@@ -73,6 +77,17 @@ public interface ConstraintValidator<A extends Annotation, T> extends javax.vali
             public Object getRootBean() {
                 return null;
             }
+
+            @Override
+            public void overrideMessageTemplate(final String messageTemplateOverride) {
+                this.messageOverride = messageTemplateOverride;
+            }
+
+            @Override
+            public String getMessageTemplateOverride() {
+                return messageOverride;
+            }
+
         });
     }
 }

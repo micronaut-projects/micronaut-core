@@ -1010,7 +1010,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     final AnnotationValue<? extends Annotation> annotationValue =
                             annotationMetadata.getAnnotation(constraintType);
                     if (annotationValue != null && !constraintValidator.isValid(parameterValue, annotationValue, context)) {
-                        final String messageTemplate = buildMessageTemplate(annotationValue, annotationMetadata);
+                        final String messageTemplate = buildMessageTemplate(context, annotationValue, annotationMetadata);
                         final Map<String, Object> variables = newConstraintVariables(annotationValue, parameterValue, annotationMetadata);
                         overallViolations.add(new DefaultConstraintViolation(
                                 object,
@@ -1063,7 +1063,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 AnnotationValue<? extends Annotation> annotationValue = beanAnnotationMetadata.getAnnotation(pojoConstraint);
 
                 final String propertyValue = "";
-                final String messageTemplate = buildMessageTemplate(annotationValue, beanAnnotationMetadata);
+                final String messageTemplate = buildMessageTemplate(context, annotationValue, beanAnnotationMetadata);
                 final Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, beanAnnotationMetadata);
                 overallViolations.add(new DefaultConstraintViolation(
                         object,
@@ -1522,7 +1522,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 //noinspection unchecked
                 if (!validator.isValid(propertyValue, annotationValue, context)) {
 
-                    final String messageTemplate = buildMessageTemplate(annotationValue, annotationMetadata);
+                    final String messageTemplate = buildMessageTemplate(context, annotationValue, annotationMetadata);
                     Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, annotationMetadata);
                     //noinspection unchecked
                     overallViolations.add(
@@ -1563,12 +1563,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         return variables;
     }
 
-    private String buildMessageTemplate(AnnotationValue<?> annotationValue, AnnotationMetadata annotationMetadata) {
-        return annotationValue.stringValue("message")
-                .orElseGet(() ->
-                        annotationMetadata.getDefaultValue(annotationValue.getAnnotationName(), "message", String.class)
-                            .orElse("{" + annotationValue.getAnnotationName() + ".message}")
-                        );
+    private String buildMessageTemplate(final DefaultConstraintValidatorContext context, final AnnotationValue<?> annotationValue,
+                                        final AnnotationMetadata annotationMetadata) {
+        return Optional.ofNullable(context.getMessageTemplateOverride())
+            .orElseGet(() -> annotationValue.stringValue("message")
+                .orElseGet(() -> annotationMetadata.getDefaultValue(annotationValue.getAnnotationName(), "message", String.class)
+                            .orElse("{" + annotationValue.getAnnotationName() + ".message}")));
     }
 
     @NonNull
@@ -1784,7 +1784,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         Object parameterValue,
         Object... parameters
     ) {
-        String messageTemplate = "{" + Introspected.class.getName() + ".message}";
+        final String messageTemplate = Optional.ofNullable(context.getMessageTemplateOverride())
+            .orElseGet(() -> "{" + Introspected.class.getName() + ".message}");
         return new DefaultConstraintViolation<>(object, rootClass, object, parameterValue,
             messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(Collections.singletonMap("type", parameterType.getName()))),
             messageTemplate, new PathImpl(context.currentPath), null, parameters);
@@ -2219,7 +2220,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             this.rootBeanClass = rootBeanClass;
             this.invalidValue = invalidValue;
             this.message = message;
-            this.messageTemplate = messageTemplate;
+            this.ildmessageTemplate;
             this.path = path;
             this.leafBean = leafBean;
             this.constraintDescriptor = constraintDescriptor;

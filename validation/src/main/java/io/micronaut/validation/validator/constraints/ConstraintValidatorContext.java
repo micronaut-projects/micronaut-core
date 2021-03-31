@@ -48,5 +48,21 @@ public interface ConstraintValidatorContext {
      * @return The root bean under validation.
      */
     @Nullable Object getRootBean();
+
+    /**
+     * Sets a message to be used for the validation error to override default
+     *
+     * @param messageTemplateOverride the message to override default
+     */
+    default void overrideMessageTemplate(final String messageTemplateOverride) { }
+
+    /**
+     * Get the message override
+     *
+     * @return the message override
+     */
+    default String getMessageTemplateOverride() {
+        return null;
+    }
     
 }

@@ -79,6 +79,69 @@ class CustomConstraintsSpec extends Specification {
         violations.size() == 1
         violations[0].message == "invalid"
     }
+
+    void "test validation where pojo with inner custom message constraint fails"() {
+        given:
+        CustomTestInvalid testInvalid = new CustomTestInvalid(invalidInner: new CustomTestInvalid.CustomInvalidInner())
+
+        when:
+        def violations = validator.validate(testInvalid)
+
+        then:
+        violations.size() == 1
+        violations[0].message == "custom invalid"
+    }
+
+    void "test validation where pojo with outer custom message constraint fails"() {
+        given:
+        CustomTestInvalid testInvalid = new CustomTestInvalid(invalidOuter: new CustomInvalidOuter())
+
+        when:
+        def violations = validator.validate(testInvalid)
+
+        then:
+        violations.size() == 1
+        violations[0].message == "custom invalid"
+    }
+
+    void "test validation where pojo with inner and outer custom message constraint both fail"() {
+        given:
+        CustomTestInvalid testInvalid = new CustomTestInvalid(
+                invalidInner: new CustomTestInvalid.CustomInvalidInner(),
+                invalidOuter: new CustomInvalidOuter())
+
+        when:
+        def violations = validator.validate(testInvalid)
+
+        then:
+        violations.size() == 2
+        violations[0].message == "custom invalid"
+        violations[1].message == "custom invalid"
+    }
+
+    void "test validation where inner custom message constraint fails"() {
+        given:
+        CustomTestInvalid.CustomInvalidInner invalidInner = new CustomTestInvalid.CustomInvalidInner()
+
+        when:
+        def violations = validator.validate(invalidInner)
+
+        then:
+        violations.size() == 1
+        violations[0].message == "custom invalid"
+    }
+
+    void "test validation where outer custom message constraint fails"() {
+        given:
+        CustomInvalidOuter invalidOuter = new CustomInvalidOuter()
+
+        when:
+        def violations = validator.validate(invalidOuter)
+
+        then:
+        violations.size() == 1
+        violations[0].message == "custom invalid"
+    }
 }
 
 @Introspected
@@ -97,3 +160,20 @@ class TestInvalid {
 @Introspected
 @AlwaysInvalidConstraint
 class InvalidOuter {}
+
+@Introspected
+class CustomTestInvalid {
+    @Valid
+    CustomInvalidInner invalidInner
+
+    @Valid
+    CustomInvalidOuter invalidOuter
+
+    @Introspected
+    @AlwaysInvalidConstraint
+    static class CustomInvalidInner {}
+}
+
+@Introspected
+@AlwaysInvalidConstraint
+class CustomInvalidOuter {}

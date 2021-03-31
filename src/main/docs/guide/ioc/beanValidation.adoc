@@ -102,6 +102,8 @@ The latter approach is recommended if you plan to define multiple validators:
 .Example Constraint Validator
 snippet::io.micronaut.docs.ioc.validation.custom.MyValidatorFactory[tags="imports,class", indent="0"]
 
+<1> Override the default message template with an inline call for more control over the validation error message.
+
 The above example implements a validator that validates any field, parameter etc. that is annotated with `DurationPattern`, ensuring that the string can be parsed with `java.time.Duration.parse`.
 
 NOTE: Generally `null` is regarded as valid and `@NotNull` is used to constrain a value as not being `null`. The example above regards `null` as a valid value.
