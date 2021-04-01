@@ -29,7 +29,7 @@ import java.util.Optional;
 import java.util.concurrent.Executor;
 
 /**
- * Writes an {@link InputStream} to the Netty context.
+ * Writes a file backed by an {@link InputStream} to the Netty context.
  *
  * @author James Kleeh
  * @since 1.0
@@ -43,6 +43,7 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
     /**
      * @param inputStream The input stream
      * @param name        The file name
+     * @param executor The executor to read the file with
      */
     public NettyStreamedFileCustomizableResponseType(InputStream inputStream, String name, Executor executor) {
         super(inputStream, MediaType.forFilename(name));
@@ -53,6 +54,7 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
     /**
      * @param inputStream The input stream
      * @param mediaType   The file media type
+     * @param executor The executor to read the file with
      */
     public NettyStreamedFileCustomizableResponseType(InputStream inputStream, MediaType mediaType, Executor executor) {
         super(inputStream, mediaType);
@@ -62,6 +64,7 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
 
     /**
      * @param url The URL
+     * @param executor The executor to read the file with
      */
     public NettyStreamedFileCustomizableResponseType(URL url, Executor executor) {
         super(url);
@@ -71,6 +74,7 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
 
     /**
      * @param delegate The streamed file
+     * @param executor The executor to read the file with
      */
     public NettyStreamedFileCustomizableResponseType(StreamedFile delegate, Executor executor) {
         super(delegate.getInputStream(), delegate.getMediaType(), delegate.getLastModified(), delegate.getLength());

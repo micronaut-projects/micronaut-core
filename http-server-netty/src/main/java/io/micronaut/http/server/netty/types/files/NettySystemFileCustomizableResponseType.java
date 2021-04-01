@@ -60,11 +60,12 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
 
     protected final RandomAccessFile raf;
     protected final long rafLength;
-    private final Executor executor;
     protected Optional<FileCustomizableResponseType> delegate = Optional.empty();
+    private final Executor executor;
 
     /**
      * @param file The file
+     * @param executor The executor to read the file with
      */
     public NettySystemFileCustomizableResponseType(File file, Executor executor) {
         super(file);
@@ -83,6 +84,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
 
     /**
      * @param delegate The system file customizable response type
+     * @param executor The executor to read the file with
      */
     public NettySystemFileCustomizableResponseType(SystemFile delegate, Executor executor) {
         this(delegate.getFile(), executor);

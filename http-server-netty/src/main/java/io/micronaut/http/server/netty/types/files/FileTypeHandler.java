@@ -29,15 +29,12 @@ import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.scheduling.TaskExecutors;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SingleThreadEventLoop;
 import io.netty.handler.codec.http.FullHttpResponse;
-import org.jetbrains.annotations.NotNull;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.File;
-import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -73,6 +70,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
     /**
      * @param configuration The file type handler configuration
+     * @param executorService The executor service to read files with
      */
     @Inject
     public FileTypeHandler(FileTypeHandlerConfiguration configuration,

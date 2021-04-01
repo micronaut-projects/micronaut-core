@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.types;
 
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 
