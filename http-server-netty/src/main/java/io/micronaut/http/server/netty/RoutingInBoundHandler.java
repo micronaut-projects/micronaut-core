@@ -662,11 +662,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (url.getProtocol().equals("file")) {
                     File file = Paths.get(url.toURI()).toFile();
                     if (file.exists() && !file.isDirectory() && file.canRead()) {
-                        return Optional.of(new NettySystemFileCustomizableResponseType(file));
+                        return Optional.of(new NettySystemFileCustomizableResponseType(file, getIoExecutor()));
                     }
                 }
 
-                return Optional.of(new NettyStreamedFileCustomizableResponseType(url));
+                return Optional.of(new NettyStreamedFileCustomizableResponseType(url, getIoExecutor()));
             } catch (URISyntaxException e) {
                 //no-op
             }
@@ -1557,11 +1557,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     Writable writable = (Writable) body;
                     writable.writeTo(outputStream, nettyRequest.getCharacterEncoding());
                 };
-            } else if (body instanceof InputStream) {
+            }/* else if (body instanceof InputStream) {
                 writeFunc = (OutputStream outputStream) -> {
                     IOUtils.copy((InputStream) body, outputStream);
                 };
-            }
+            }*/
 
             if (writeFunc != null) {
                 ThrowingConsumer<OutputStream, IOException> finalWriteFunc = writeFunc;
@@ -1933,8 +1933,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     LOG.error(e.getMessage());
                 }
             }
-
-        } else if (body instanceof InputStream) {
+        /*} else if (body instanceof InputStream) {
             byteBuf = context.alloc().ioBuffer(128);
             ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
             InputStream inputStream = (InputStream) body;
@@ -1945,7 +1944,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     LOG.error(e.getMessage());
                 }
             }
-        } else {
+        */} else {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Encoding emitted response object [{}] using codec: {}", body, codec);
             }

@@ -6,6 +6,8 @@ import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseType;
+import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -14,12 +16,20 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.stream.ChunkedStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.util.concurrent.Executor;
 
-public interface StreamedCustomizableResponseType extends NettyCustomizableResponseType {
+public interface NettyStreamedCustomizableResponseType extends NettyCustomizableResponseType {
+
+    Logger LOG = LoggerFactory.getLogger(NettyStreamedCustomizableResponseType.class);
 
     InputStream getInputStream();
+
+    Executor getExecutor();
 
     @Override
     default void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
@@ -40,8 +50,23 @@ public interface StreamedCustomizableResponseType extends NettyCustomizableRespo
             InputStream inputStream = getInputStream();
             //  can be null if the stream was closed
             context.write(finalResponse, context.voidPromise());
+
             if (inputStream != null) {
-                context.writeAndFlush(new HttpChunkedInput(new ChunkedStream(inputStream)));
+                ChannelFutureListener closeListener = (future) -> {
+                    try {
+                        inputStream.close();
+                    } catch (IOException e) {
+                        LOG.warn("An error occurred closing an input stream", e);
+                    }
+                };
+                final HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedStream(inputStream));
+                if (context.executor().inEventLoop()) {
+                    getExecutor().execute(() -> {
+                        context.writeAndFlush(chunkedInput).addListener(closeListener);
+                    });
+                } else {
+                    context.writeAndFlush(chunkedInput).addListener(closeListener);
+                }
             } else {
                 context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             }

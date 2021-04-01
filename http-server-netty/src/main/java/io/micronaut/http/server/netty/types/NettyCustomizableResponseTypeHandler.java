@@ -31,7 +31,6 @@ import io.netty.channel.ChannelHandlerContext;
  * @since 1.0
  */
 @Internal
-@Experimental
 @Indexed(NettyCustomizableResponseTypeHandler.class)
 public interface NettyCustomizableResponseTypeHandler<T> extends Ordered {
 

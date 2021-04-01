@@ -36,14 +36,5 @@ class MessageControllerSpec: StringSpec() {
 
             response shouldBe body
         }
-
-        "test echo stream response"() {
-            val body = "My Text"
-            val response = client.toBlocking().retrieve(
-                HttpRequest.POST("/receive/echo-stream", body)
-                    .contentType(MediaType.TEXT_PLAIN_TYPE), String::class.java)
-
-            response shouldBe body
-        }
     }
 }

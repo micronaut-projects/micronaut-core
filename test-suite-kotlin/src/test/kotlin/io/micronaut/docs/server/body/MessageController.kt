@@ -49,12 +49,4 @@ open class MessageController {
     }
     // end::echoReactive[]
 
-    // end::echoReactive[]
-    // tag::echoStream[]
-    @Post(value = "/echo-stream", consumes = [MediaType.TEXT_PLAIN])
-    @ExecuteOn(TaskExecutors.IO)
-    open fun echoStream(@Body inputStream: InputStream): InputStream { // <1>
-        return inputStream // <2>
-    }
-    // end::echoStream[]
 }

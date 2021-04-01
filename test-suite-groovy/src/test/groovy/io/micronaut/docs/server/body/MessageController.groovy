@@ -51,13 +51,6 @@ class MessageController {
     }
     // end::echoReactive[]
 
-    // tag::echoStream[]
-    @Post(value = "/echo-stream", consumes = MediaType.TEXT_PLAIN)
-    @ExecuteOn(TaskExecutors.IO)
-    InputStream echoStream(@Body InputStream inputStream) { // <1>
-        inputStream // <2>
-    }
-    // end::echoStream[]
 // tag::class[]
 }
 // end::class[]

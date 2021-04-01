@@ -42,15 +42,4 @@ class MessageControllerSpec extends Specification {
         response == body
     }
 
-    void "test echo stream response"() {
-        given:
-        String body = "My Text"
-        String response = httpClient.toBlocking().retrieve(
-                HttpRequest.POST('/receive/echo-stream', body)
-                        .contentType(MediaType.TEXT_PLAIN_TYPE),
-                String
-        )
-        expect:
-        response == body
-    }
 }

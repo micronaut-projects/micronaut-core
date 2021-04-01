@@ -26,6 +26,5 @@ import io.micronaut.http.server.types.files.FileCustomizableResponseType;
  * @since 1.0
  */
 @Internal
-@Experimental
 public interface NettyFileCustomizableResponseType extends FileCustomizableResponseType, NettyCustomizableResponseType {
 }

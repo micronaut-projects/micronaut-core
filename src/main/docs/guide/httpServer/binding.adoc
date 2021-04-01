@@ -53,7 +53,13 @@ snippet::io.micronaut.docs.server.binding.BindingController[tags="header1,header
 
 == Stream Support
 
-Micronaut also supports binding the body to an `InputStream`. Note that in this case, it is required for the controller method execution to be offloaded to a different thread pool.
+Micronaut also supports binding the body to an `InputStream`. If the method is reading the stream, the method execution must be offloaded to another thread pool to avoid blocking the event loop.
+
+snippet::io.micronaut.docs.http.server.stream.StreamController[tags="read", indent=0, title="Performing Blocking I/O With InputStream"]
+
+<1> The controller method is executed on the IO thread pool
+<2> The body is passed to the method as an input stream
+<3> The stream is read
 
 == Binding from Multiple Query values
 

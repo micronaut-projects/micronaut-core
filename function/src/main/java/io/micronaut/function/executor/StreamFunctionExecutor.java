@@ -162,8 +162,6 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
             if (result instanceof Writable) {
                 Writable writable = (Writable) result;
                 writable.writeTo(output, environment.getProperty(LocalFunctionRegistry.FUNCTION_CHARSET, Charset.class, StandardCharsets.UTF_8));
-            } else if (result instanceof InputStream) {
-                IOUtils.copy((InputStream) result, output);
             } else {
                 Optional<MediaTypeCodec> codec = registry instanceof MediaTypeCodecRegistry ? ((MediaTypeCodecRegistry) registry).findCodec(MediaType.APPLICATION_JSON_TYPE) : Optional.empty();
 
