@@ -186,19 +186,7 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
                     LOG.error(e.getMessage());
                 }
             }
-
-        /*} else if (body instanceof InputStream) {
-            byteBuf = context.alloc().ioBuffer(128);
-            ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
-            InputStream inputStream = (InputStream) body;
-            try {
-                IOUtils.copy(inputStream, outputStream);
-            } catch (IOException e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error(e.getMessage());
-                }
-            }
-        */} else {
+        } else {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Encoding emitted response object [{}] using codec: {}", body, codec);
             }

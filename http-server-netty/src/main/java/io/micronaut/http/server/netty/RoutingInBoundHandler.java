@@ -1551,25 +1551,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         boolean isNotHead = nettyRequest.getMethod() != HttpMethod.HEAD;
 
         if (isNotHead) {
-            ThrowingConsumer<OutputStream, IOException> writeFunc = null;
             if (body instanceof Writable) {
-                writeFunc = (OutputStream outputStream) -> {
-                    Writable writable = (Writable) body;
-                    writable.writeTo(outputStream, nettyRequest.getCharacterEncoding());
-                };
-            }/* else if (body instanceof InputStream) {
-                writeFunc = (OutputStream outputStream) -> {
-                    IOUtils.copy((InputStream) body, outputStream);
-                };
-            }*/
-
-            if (writeFunc != null) {
-                ThrowingConsumer<OutputStream, IOException> finalWriteFunc = writeFunc;
                 getIoExecutor().execute(() -> {
                     ByteBuf byteBuf = context.alloc().ioBuffer(128);
                     ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
                     try {
-                        finalWriteFunc.accept(outputStream);
+                        Writable writable = (Writable) body;
+                        writable.writeTo(outputStream, nettyRequest.getCharacterEncoding());
                         response.body(byteBuf);
                         if (!response.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
                             response.header(HttpHeaders.CONTENT_TYPE, defaultResponseMediaType);
@@ -1933,18 +1921,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     LOG.error(e.getMessage());
                 }
             }
-        /*} else if (body instanceof InputStream) {
-            byteBuf = context.alloc().ioBuffer(128);
-            ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
-            InputStream inputStream = (InputStream) body;
-            try {
-                IOUtils.copy(inputStream, outputStream);
-            } catch (IOException e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error(e.getMessage());
-                }
-            }
-        */} else {
+        } else {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Encoding emitted response object [{}] using codec: {}", body, codec);
             }
