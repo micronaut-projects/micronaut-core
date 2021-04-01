@@ -392,7 +392,9 @@ public class NameUtils {
             char[] chars = name.toCharArray();
             boolean first = true;
             char last = '0';
-            for (char c : chars) {
+            char secondLast = separatorChar;
+            for (int i = 0; i < chars.length; i++) {
+                char c = chars[i];
                 if (Character.isLowerCase(c) || !Character.isLetter(c)) {
                     first = false;
                     if (c != separatorChar) {
@@ -406,11 +408,16 @@ public class NameUtils {
                     if (first) {
                         first = false;
                         newName.append(lowerCaseChar);
-                    } else if (Character.isUpperCase(last) || Character.isDigit(last) || last == '.') {
+                    } else if (Character.isUpperCase(last) || last == '.') {
+                        newName.append(lowerCaseChar);
+                    } else if (Character.isDigit(last) && (Character.isUpperCase(secondLast) || secondLast == separatorChar)) {
                         newName.append(lowerCaseChar);
                     } else {
                         newName.append(separatorChar).append(lowerCaseChar);
                     }
+                }
+                if (i > 1) {
+                    secondLast = last;
                 }
                 last = c;
             }
