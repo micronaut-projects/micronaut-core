@@ -54,7 +54,9 @@ public interface ConstraintValidatorContext {
      *
      * @param messageTemplateOverride the message to override default
      */
-    default void overrideMessageTemplate(@Nullable final String messageTemplateOverride) { }
+    default void overrideMessageTemplate(@Nullable final String messageTemplateOverride) {
+        throw new UnsupportedOperationException("not implemented");
+    }
 
     /**
      * Get the message template override.
