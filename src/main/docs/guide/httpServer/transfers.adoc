@@ -44,4 +44,4 @@ By default, file responses include caching headers. The following options determ
 
 include::{includedir}configurationProperties/io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration.adoc[]
 
-include::{includedir}configurationProperties/io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration$CacheControlConfiguration.adoc[]
+include::{includedir}configurationProperties/io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration.CacheControlConfiguration.adoc[]
