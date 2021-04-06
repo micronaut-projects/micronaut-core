@@ -212,6 +212,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param annotationMetadata The annotation metadata
      * @param interfaceTypes     The additional interfaces to implement
      * @param metadataBuilder    The configuration metadata builder
+     * @param configurationMetadata The configuration metadata for the class
      * @param interceptorBinding   The interceptor types
      */
     public AopProxyWriter(String packageName,
@@ -237,6 +238,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param annotationMetadata The annotation metadata
      * @param interfaceTypes     The additional interfaces to implement
      * @param metadataBuilder    The configuration metadata builder
+     * @param configurationMetadata The configuration metadata for the class
      * @param interceptorBinding   The interceptor binding
      */
     public AopProxyWriter(String packageName,
