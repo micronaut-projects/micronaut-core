@@ -15,7 +15,7 @@ class CustomConstraintsValidatorFactory {
     @Singleton
     ConstraintValidator<CustomMessageConstraint, Object> customMessageConstraintValidator() {
         return (value, annotationMetadata, context) -> {
-            context.overrideMessageTemplate("custom invalid");
+            context.messageTemplate("custom invalid");
             return false;
         };
     }

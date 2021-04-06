@@ -29,7 +29,7 @@ public class MyValidatorFactory {
     @Singleton
     ConstraintValidator<DurationPattern, CharSequence> durationPatternValidator() {
         return (value, annotationMetadata, context) -> {
-            context.overrideMessageTemplate("invalid duration ({validatedValue}), additional custom message"); // <1>
+            context.messageTemplate("invalid duration ({validatedValue}), additional custom message"); // <1>
             return value == null || value.toString().matches("^PT?[\\d]+[SMHD]{1}$");
         };
     }

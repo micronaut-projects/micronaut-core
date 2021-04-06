@@ -1565,7 +1565,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
     private String buildMessageTemplate(final DefaultConstraintValidatorContext context, final AnnotationValue<?> annotationValue,
                                         final AnnotationMetadata annotationMetadata) {
-        return Optional.ofNullable(context.getMessageTemplateOverride())
+        return context.getMessageTemplate()
             .orElseGet(() -> annotationValue.stringValue("message")
                 .orElseGet(() -> annotationMetadata.getDefaultValue(annotationValue.getAnnotationName(), "message", String.class)
                             .orElse("{" + annotationValue.getAnnotationName() + ".message}")));
@@ -1784,7 +1784,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         Object parameterValue,
         Object... parameters
     ) {
-        final String messageTemplate = Optional.ofNullable(context.getMessageTemplateOverride())
+        final String messageTemplate = context.getMessageTemplate()
             .orElseGet(() -> "{" + Introspected.class.getName() + ".message}");
         return new DefaultConstraintViolation<>(object, rootClass, object, parameterValue,
             messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(Collections.singletonMap("type", parameterType.getName()))),
@@ -1798,7 +1798,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         final Set<Object> validatedObjects = new HashSet<>(20);
         final PathImpl currentPath;
         final List<Class> groups;
-        String messageTemplateOverride = null;
+        String messageTemplate = null;
 
         private <T> DefaultConstraintValidatorContext(T object, Class<?>... groups) {
             this(object, new PathImpl(), groups);
@@ -1834,14 +1834,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         }
 
         @Override
-        public void overrideMessageTemplate(@Nullable final String messageTemplateOverride) {
-            this.messageTemplateOverride = messageTemplateOverride;
+        public void messageTemplate(@Nullable final String messageTemplate) {
+            this.messageTemplate = messageTemplate;
         }
 
-        @Nullable
-        @Override
-        public String getMessageTemplateOverride() {
-            return messageTemplateOverride;
+        Optional<String> getMessageTemplate() {
+            return Optional.ofNullable(messageTemplate);
         }
 
         Path.Node addPropertyNode(String name, @Nullable DefaultPropertyNode container) {

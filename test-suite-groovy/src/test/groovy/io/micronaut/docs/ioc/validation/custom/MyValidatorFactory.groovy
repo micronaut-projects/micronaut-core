@@ -33,7 +33,7 @@ class MyValidatorFactory {
         return { CharSequence value,
                  AnnotationValue<DurationPattern> annotation,
                  ConstraintValidatorContext context ->
-            context.overrideMessageTemplate("invalid duration ({validatedValue}), additional custom message") // <1>
+            context.messageTemplate("invalid duration ({validatedValue}), additional custom message") // <1>
             return value == null || value.toString() ==~ /^PT?[\d]+[SMHD]{1}$/
         } as ConstraintValidator<DurationPattern, CharSequence>
     }
