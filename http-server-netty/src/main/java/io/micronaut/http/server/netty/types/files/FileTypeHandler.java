@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.types.files;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -26,15 +27,20 @@ import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
+import io.micronaut.scheduling.TaskExecutors;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.File;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Responsible for writing files out to the response in Netty.
@@ -43,6 +49,7 @@ import java.util.Arrays;
  * @since 1.0
  */
 @Singleton
+@Internal
 public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
 
     // sorted array of entity headers
@@ -50,12 +57,26 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
     private static final String[] ENTITY_HEADERS = new String[] {HttpHeaders.ALLOW, HttpHeaders.CONTENT_ENCODING, HttpHeaders.CONTENT_LANGUAGE, HttpHeaders.CONTENT_LENGTH, HttpHeaders.CONTENT_LOCATION, HttpHeaders.CONTENT_MD5, HttpHeaders.CONTENT_RANGE, HttpHeaders.CONTENT_TYPE, HttpHeaders.EXPIRES, HttpHeaders.LAST_MODIFIED};
     private static final Class<?>[] SUPPORTED_TYPES = new Class[]{File.class, StreamedFile.class, NettyFileCustomizableResponseType.class, SystemFile.class};
     private final FileTypeHandlerConfiguration configuration;
+    private final Executor executor;
 
     /**
      * @param configuration The file type handler configuration
      */
+    @Deprecated
     public FileTypeHandler(FileTypeHandlerConfiguration configuration) {
         this.configuration = configuration;
+        this.executor = Runnable::run;
+    }
+
+    /**
+     * @param configuration The file type handler configuration
+     * @param executorService The executor service to read files with
+     */
+    @Inject
+    public FileTypeHandler(FileTypeHandlerConfiguration configuration,
+                           @Named(TaskExecutors.IO) ExecutorService executorService) {
+        this.configuration = configuration;
+        this.executor = executorService;
     }
 
     @SuppressWarnings("MagicNumber")
@@ -63,13 +84,13 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
     public void handle(Object obj, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
         NettyFileCustomizableResponseType type;
         if (obj instanceof File) {
-            type = new NettySystemFileCustomizableResponseType((File) obj);
+            type = new NettySystemFileCustomizableResponseType((File) obj, executor);
         } else if (obj instanceof NettyFileCustomizableResponseType) {
             type = (NettyFileCustomizableResponseType) obj;
         } else if (obj instanceof StreamedFile) {
-            type = new NettyStreamedFileCustomizableResponseType((StreamedFile) obj);
+            type = new NettyStreamedFileCustomizableResponseType((StreamedFile) obj, executor);
         } else if (obj instanceof SystemFile) {
-            type = new NettySystemFileCustomizableResponseType((SystemFile) obj);
+            type = new NettySystemFileCustomizableResponseType((SystemFile) obj, executor);
         } else {
             throw new CustomizableResponseTypeException("FileTypeHandler only supports File or FileCustomizableResponseType types");
         }

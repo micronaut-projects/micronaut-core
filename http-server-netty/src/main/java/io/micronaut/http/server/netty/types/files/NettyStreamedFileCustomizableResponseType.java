@@ -15,64 +15,71 @@
  */
 package io.micronaut.http.server.netty.types.files;
 
-import io.micronaut.http.HttpRequest;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
-import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
+import io.micronaut.http.server.netty.types.stream.NettyStreamedCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.stream.ChunkedStream;
 
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 
 /**
- * Writes an {@link InputStream} to the Netty context.
+ * Writes a file backed by an {@link InputStream} to the Netty context.
  *
  * @author James Kleeh
  * @since 1.0
  */
-public class NettyStreamedFileCustomizableResponseType extends StreamedFile implements NettyFileCustomizableResponseType {
+@Internal
+public class NettyStreamedFileCustomizableResponseType extends StreamedFile implements NettyFileCustomizableResponseType, NettyStreamedCustomizableResponseType {
 
     private final Optional<StreamedFile> delegate;
+    private final Executor executor;
 
     /**
      * @param inputStream The input stream
      * @param name        The file name
+     * @param executor The executor to read the file with
      */
-    public NettyStreamedFileCustomizableResponseType(InputStream inputStream, String name) {
+    public NettyStreamedFileCustomizableResponseType(InputStream inputStream, String name, Executor executor) {
         super(inputStream, MediaType.forFilename(name));
+        this.executor = executor;
         this.delegate = Optional.empty();
     }
 
     /**
      * @param inputStream The input stream
      * @param mediaType   The file media type
+     * @param executor The executor to read the file with
      */
-    public NettyStreamedFileCustomizableResponseType(InputStream inputStream, MediaType mediaType) {
+    public NettyStreamedFileCustomizableResponseType(InputStream inputStream, MediaType mediaType, Executor executor) {
         super(inputStream, mediaType);
+        this.executor = executor;
         this.delegate = Optional.empty();
     }
 
     /**
      * @param url The URL
+     * @param executor The executor to read the file with
      */
-    public NettyStreamedFileCustomizableResponseType(URL url) {
+    public NettyStreamedFileCustomizableResponseType(URL url, Executor executor) {
         super(url);
+        this.executor = executor;
         this.delegate = Optional.empty();
     }
 
     /**
      * @param delegate The streamed file
+     * @param executor The executor to read the file with
      */
-    public NettyStreamedFileCustomizableResponseType(StreamedFile delegate) {
+    public NettyStreamedFileCustomizableResponseType(StreamedFile delegate, Executor executor) {
         super(delegate.getInputStream(), delegate.getMediaType(), delegate.getLastModified(), delegate.getLength());
         this.delegate = Optional.of(delegate);
+        this.executor = executor;
     }
 
     @Override
@@ -87,32 +94,7 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
     }
 
     @Override
-    public void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
-        if (response instanceof NettyMutableHttpResponse) {
-            FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
-
-            // Write the request data
-            final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), nettyResponse.headers());
-            final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
-            final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
-            if (isHttp2 && request instanceof NettyHttpRequest) {
-                final io.netty.handler.codec.http.HttpHeaders nativeHeaders = ((NettyHttpRequest<?>) request).getNativeRequest().headers();
-                final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
-                if (streamId != null) {
-                    finalResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
-                }
-            }
-            InputStream inputStream = getInputStream();
-            //  can be null if the stream was closed
-            context.write(finalResponse, context.voidPromise());
-            if (inputStream != null) {
-                context.writeAndFlush(new HttpChunkedInput(new ChunkedStream(inputStream)));
-            } else {
-                context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
-            }
-
-        } else {
-            throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
-        }
+    public Executor getExecutor() {
+        return executor;
     }
 }
