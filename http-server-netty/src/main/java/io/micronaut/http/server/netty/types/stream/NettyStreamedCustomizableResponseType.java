@@ -49,8 +49,6 @@ public interface NettyStreamedCustomizableResponseType extends NettyCustomizable
 
     InputStream getInputStream();
 
-    Executor getExecutor();
-
     @Override
     default void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
         if (response instanceof NettyMutableHttpResponse) {
@@ -80,13 +78,7 @@ public interface NettyStreamedCustomizableResponseType extends NettyCustomizable
                     }
                 };
                 final HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedStream(inputStream));
-                if (context.executor().inEventLoop()) {
-                    getExecutor().execute(() -> {
-                        context.writeAndFlush(chunkedInput).addListener(closeListener);
-                    });
-                } else {
-                    context.writeAndFlush(chunkedInput).addListener(closeListener);
-                }
+                context.writeAndFlush(chunkedInput).addListener(closeListener);
             } else {
                 context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             }

@@ -52,17 +52,7 @@ class StreamTypeHandler implements NettyCustomizableResponseTypeHandler<Object> 
         NettyStreamedCustomizableResponseType type;
 
         if (object instanceof InputStream) {
-            type = new NettyStreamedCustomizableResponseType() {
-                @Override
-                public InputStream getInputStream() {
-                    return (InputStream) object;
-                }
-
-                @Override
-                public Executor getExecutor() {
-                    return executorService;
-                }
-            };
+            type = () -> (InputStream) object;
         } else if (object instanceof NettyStreamedCustomizableResponseType) {
             type = (NettyStreamedCustomizableResponseType) object;
         } else {

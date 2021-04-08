@@ -61,15 +61,13 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
     protected final RandomAccessFile raf;
     protected final long rafLength;
     protected Optional<FileCustomizableResponseType> delegate = Optional.empty();
-    private final Executor executor;
 
     /**
      * @param file The file
      * @param executor The executor to read the file with
      */
-    public NettySystemFileCustomizableResponseType(File file, Executor executor) {
+    public NettySystemFileCustomizableResponseType(File file) {
         super(file);
-        this.executor = executor;
         try {
             this.raf = new RandomAccessFile(file, "r");
         } catch (FileNotFoundException e) {
@@ -86,8 +84,8 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
      * @param delegate The system file customizable response type
      * @param executor The executor to read the file with
      */
-    public NettySystemFileCustomizableResponseType(SystemFile delegate, Executor executor) {
-        this(delegate.getFile(), executor);
+    public NettySystemFileCustomizableResponseType(SystemFile delegate) {
+        this(delegate.getFile());
         this.delegate = Optional.of(delegate);
     }
 
@@ -155,13 +153,8 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
                     final HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K));
-                    if (context.executor().inEventLoop()) {
-                        executor.execute(() ->
-                                context.writeAndFlush(chunkedInput, context.newProgressivePromise()).addListener(closeListener));
-                    } else {
-                        context.writeAndFlush(chunkedInput, context.newProgressivePromise())
+                    context.writeAndFlush(chunkedInput, context.newProgressivePromise())
                             .addListener(closeListener);
-                    }
                 } catch (IOException e) {
                     throw new CustomizableResponseTypeException("Could not read file", e);
                 }

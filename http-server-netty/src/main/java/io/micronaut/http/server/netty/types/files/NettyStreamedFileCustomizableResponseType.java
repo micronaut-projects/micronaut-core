@@ -38,16 +38,14 @@ import java.util.concurrent.Executor;
 public class NettyStreamedFileCustomizableResponseType extends StreamedFile implements NettyFileCustomizableResponseType, NettyStreamedCustomizableResponseType {
 
     private final Optional<StreamedFile> delegate;
-    private final Executor executor;
 
     /**
      * @param inputStream The input stream
      * @param name        The file name
      * @param executor The executor to read the file with
      */
-    public NettyStreamedFileCustomizableResponseType(InputStream inputStream, String name, Executor executor) {
+    public NettyStreamedFileCustomizableResponseType(InputStream inputStream, String name) {
         super(inputStream, MediaType.forFilename(name));
-        this.executor = executor;
         this.delegate = Optional.empty();
     }
 
@@ -56,9 +54,8 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
      * @param mediaType   The file media type
      * @param executor The executor to read the file with
      */
-    public NettyStreamedFileCustomizableResponseType(InputStream inputStream, MediaType mediaType, Executor executor) {
+    public NettyStreamedFileCustomizableResponseType(InputStream inputStream, MediaType mediaType) {
         super(inputStream, mediaType);
-        this.executor = executor;
         this.delegate = Optional.empty();
     }
 
@@ -66,9 +63,8 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
      * @param url The URL
      * @param executor The executor to read the file with
      */
-    public NettyStreamedFileCustomizableResponseType(URL url, Executor executor) {
+    public NettyStreamedFileCustomizableResponseType(URL url) {
         super(url);
-        this.executor = executor;
         this.delegate = Optional.empty();
     }
 
@@ -76,10 +72,9 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
      * @param delegate The streamed file
      * @param executor The executor to read the file with
      */
-    public NettyStreamedFileCustomizableResponseType(StreamedFile delegate, Executor executor) {
+    public NettyStreamedFileCustomizableResponseType(StreamedFile delegate) {
         super(delegate.getInputStream(), delegate.getMediaType(), delegate.getLastModified(), delegate.getLength());
         this.delegate = Optional.of(delegate);
-        this.executor = executor;
     }
 
     @Override
@@ -91,10 +86,5 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
             response.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         }
         delegate.ifPresent(type -> type.process(response));
-    }
-
-    @Override
-    public Executor getExecutor() {
-        return executor;
     }
 }
