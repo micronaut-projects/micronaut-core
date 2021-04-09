@@ -17,6 +17,7 @@ package io.micronaut.aop;
 
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.type.Argument;
 
 /**
  * <p>An Interceptor intercepts the execution of a method allowing cross cutting behaviour to be applied to a
@@ -39,6 +40,9 @@ import io.micronaut.core.order.Ordered;
  */
 @Indexed(Interceptor.class)
 public interface Interceptor<T, R> extends Ordered {
+
+    @SuppressWarnings("unchecked")
+    Argument<Interceptor<?, ?>> ARGUMENT = (Argument) Argument.of(Interceptor.class);
 
     /**
      * The {@link Around#proxyTarget()} setting.

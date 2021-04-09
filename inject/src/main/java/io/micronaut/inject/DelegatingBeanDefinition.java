@@ -59,7 +59,7 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
-    default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class... argumentTypes) {
+    default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class<?>... argumentTypes) {
         return getTarget().getRequiredMethod(name, argumentTypes);
     }
 
@@ -94,37 +94,38 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
-    default Collection<Class> getRequiredComponents() {
+    default Collection<Class<?>> getRequiredComponents() {
         return getTarget().getRequiredComponents();
     }
 
     @Override
-    default Collection<MethodInjectionPoint> getInjectedMethods() {
+    default Collection<MethodInjectionPoint<T, ?>> getInjectedMethods() {
         return getTarget().getInjectedMethods();
     }
 
     @Override
-    default Collection<FieldInjectionPoint> getInjectedFields() {
+    default Collection<FieldInjectionPoint<T, ?>> getInjectedFields() {
         return getTarget().getInjectedFields();
     }
 
     @Override
-    default Collection<MethodInjectionPoint> getPostConstructMethods() {
+    default Collection<MethodInjectionPoint<T, ?>> getPostConstructMethods() {
         return getTarget().getPostConstructMethods();
     }
 
     @Override
-    default Collection<MethodInjectionPoint> getPreDestroyMethods() {
+    default Collection<MethodInjectionPoint<T, ?>> getPreDestroyMethods() {
         return getTarget().getPreDestroyMethods();
     }
 
     @Override
+    @NonNull
     default String getName() {
         return getTarget().getName();
     }
 
     @Override
-    default <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class... argumentTypes) {
+    default <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class<?>... argumentTypes) {
         return getTarget().findMethod(name, argumentTypes);
     }
 

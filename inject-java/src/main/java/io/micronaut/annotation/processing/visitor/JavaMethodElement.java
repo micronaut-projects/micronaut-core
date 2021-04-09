@@ -47,14 +47,14 @@ import java.util.Optional;
 @Internal
 public class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
-    private final ExecutableElement executableElement;
-    private final JavaVisitorContext visitorContext;
-    private final JavaClassElement declaringClass;
     private JavaClassElement resolvedDeclaringClass;
     private ParameterElement[] parameters;
     private ParameterElement continuationParameter;
     private ClassElement genericReturnType;
     private ClassElement returnType;
+    protected final JavaClassElement declaringClass;
+    protected final ExecutableElement executableElement;
+    protected final JavaVisitorContext visitorContext;
 
     /**
      * @param declaringClass     The declaring class

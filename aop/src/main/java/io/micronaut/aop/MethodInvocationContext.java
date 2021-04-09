@@ -15,6 +15,7 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
 
 import io.micronaut.core.annotation.NonNull;
@@ -28,7 +29,7 @@ import io.micronaut.core.annotation.NonNull;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, ExecutableMethod<T, R> {
+public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, Executable<T, R>, ExecutableMethod<T, R> {
 
     /**
      * The underlying {@link ExecutableMethod} reference.

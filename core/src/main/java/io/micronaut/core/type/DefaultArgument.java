@@ -34,7 +34,7 @@ import java.util.*;
  * @since 1.0
  */
 @Internal
-public class DefaultArgument<T> implements Argument<T> {
+public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
 
     static final Set<Class<?>> CONTAINER_TYPES = CollectionUtils.setOf(
         List.class,
@@ -234,4 +234,8 @@ public class DefaultArgument<T> implements Argument<T> {
         return typeParameters;
     }
 
+    @Override
+    public @NonNull Argument<T> asArgument() {
+        return this;
+    }
 }

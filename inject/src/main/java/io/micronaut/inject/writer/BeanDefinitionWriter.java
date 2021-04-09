@@ -18,6 +18,7 @@ package io.micronaut.inject.writer;
 import io.micronaut.context.*;
 import io.micronaut.core.annotation.*;
 import io.micronaut.context.annotation.*;
+import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -89,6 +90,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             AnnotationMetadata.class,
             boolean.class,
             Argument[].class)
+            .orElseThrow(() -> new ClassGenerationException("Invalid version of Micronaut present on the class path"));
+
+    private static final Constructor<AbstractConstructorInjectionPoint> CONSTRUCTOR_ABSTRACT_CONSTRUCTOR_IP = ReflectionUtils.findConstructor(
+            AbstractConstructorInjectionPoint.class,
+            BeanDefinition.class)
             .orElseThrow(() -> new ClassGenerationException("Invalid version of Micronaut present on the class path"));
 
     private static final org.objectweb.asm.commons.Method METHOD_MAP_OF = org.objectweb.asm.commons.Method.getMethod(
@@ -169,6 +175,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final org.objectweb.asm.commons.Method METHOD_OPTIONAL_OF = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(Optional.class, "of", Object.class)
     );
+    public static final org.objectweb.asm.commons.Method METHOD_INVOKE_CONSTRUCTOR = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(
+            ConstructorInjectionPoint.class,
+            "invoke",
+            Object[].class
+    ));
+    public static final String METHOD_DESCRIPTOR_CONSTRUCTOR_INSTANTIATE = getMethodDescriptor(Object.class, Arrays.asList(
+            BeanResolutionContext.class,
+            BeanContext.class,
+            List.class,
+            BeanDefinition.class,
+            BeanConstructor.class,
+            Object[].class
+    ));
     private final ClassWriter classWriter;
     private final String beanFullClassName;
     private final String beanDefinitionName;
@@ -190,6 +209,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private GeneratorAdapter constructorVisitor;
     private GeneratorAdapter buildMethodVisitor;
     private GeneratorAdapter injectMethodVisitor;
+    private ClassWriter interceptedConstructorWriter;
+    private String interceptedConstructorWriterName;
     private Label injectEnd = null;
     private GeneratorAdapter preDestroyMethodVisitor;
     private GeneratorAdapter postConstructMethodVisitor;
@@ -244,14 +265,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     /**
      * Creates a bean definition writer.
-     *  @param classElement        The class element
+     *
+     * @param classElement        The class element
      * @param originatingElements The originating elements
      * @param metadataBuilder     The configuration metadata builder
      * @param visitorContext      The visitor context
      */
     public BeanDefinitionWriter(ClassElement classElement,
                                 OriginatingElements originatingElements,
-                                ConfigurationMetadataBuilder<?> metadataBuilder, 
+                                ConfigurationMetadataBuilder<?> metadataBuilder,
                                 VisitorContext visitorContext) {
         this(classElement, originatingElements, metadataBuilder, visitorContext, null);
     }
@@ -759,6 +781,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
         try (OutputStream out = visitor.visitClass(getBeanDefinitionName(), getOriginatingElements())) {
+            if (interceptedConstructorWriter != null) {
+                try (OutputStream constructorOut = visitor.visitClass(interceptedConstructorWriterName, getOriginatingElements())) {
+                    constructorOut.write(interceptedConstructorWriter.toByteArray());
+                }
+            }
             try {
                 for (ExecutableMethodWriter methodWriter : methodExecutors.values()) {
                     methodWriter.accept(visitor);
@@ -1921,6 +1948,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             ParameterElement[] parameters = factoryMethod.getParameters();
             List<ParameterElement> parameterList = Arrays.asList(parameters);
             boolean isParametrized = isParametrized(factoryMethod);
+            boolean isIntercepted = isConstructorIntercepted(factoryMethod);
             defineBuilderMethod(isParametrized);
             // load this
 
@@ -1971,17 +1999,29 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void visitBuildMethodDefinition(MethodElement constructor) {
         if (buildMethodVisitor == null) {
             boolean isParametrized = isParametrized(constructor);
+            boolean isIntercepted = isConstructorIntercepted(constructor);
             List<ParameterElement> parameters = Arrays.asList(constructor.getParameters());
             defineBuilderMethod(isParametrized);
             // load this
 
             GeneratorAdapter buildMethodVisitor = this.buildMethodVisitor;
 
-            buildMethodVisitor.visitTypeInsn(NEW, beanType.getInternalName());
-            buildMethodVisitor.visitInsn(DUP);
-            pushConstructorArguments(buildMethodVisitor, constructor);
-            String constructorDescriptor = getConstructorDescriptor(parameters);
-            buildMethodVisitor.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
+            // if there is constructor interception present then we have to
+            // build the parameters into an Object[] and build a constructor invocation
+            if (isIntercepted) {
+                initInterceptedConstructorWriter(buildMethodVisitor, parameters);
+                final int constructorIndex = pushNewBuildLocalVariable();
+                // populate an Object[] of all constructor arguments
+                final int parametersIndex = createParameterArray(parameters, buildMethodVisitor);
+                invokeConstructorChain(buildMethodVisitor, constructorIndex, parametersIndex, parameters);
+            } else {
+                buildMethodVisitor.visitTypeInsn(NEW, beanType.getInternalName());
+                buildMethodVisitor.visitInsn(DUP);
+                pushConstructorArguments(buildMethodVisitor, constructor);
+                String constructorDescriptor = getConstructorDescriptor(parameters);
+                buildMethodVisitor.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
+            }
+
             // store a reference to the bean being built at index 3
             this.buildInstanceIndex = pushNewBuildLocalVariable();
             pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
@@ -1989,6 +2029,151 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
             buildMethodVisitor.visitVarInsn(ALOAD, buildInstanceIndex);
         }
+    }
+
+    private void invokeConstructorChain(GeneratorAdapter generatorAdapter, int constructorIndex, int parametersIndex, List<ParameterElement> parameters) {
+        // 1st argument: The resolution context
+        generatorAdapter.visitVarInsn(ALOAD, 1);
+        // 2nd argument: The bean context
+        generatorAdapter.visitVarInsn(ALOAD, 2);
+        // 3rd argument: The interceptors if present
+        if (StringUtils.isNotEmpty(interceptedType)) {
+            // interceptors will be last entry in parameter list for interceptors types
+            generatorAdapter.visitVarInsn(ALOAD, parametersIndex);
+            // array index for last parameter
+            generatorAdapter.push(parameters.size() -1);
+            generatorAdapter.arrayLoad(TYPE_OBJECT);
+            pushCastToType(generatorAdapter, List.class);
+        } else {
+            // for non interceptor types we have to perform a lookup based on the binding
+            generatorAdapter.visitInsn(ACONST_NULL);
+        }
+        // 4th argument: the bean definition
+        generatorAdapter.loadThis();
+        // 5th argument: The constructor
+        generatorAdapter.visitVarInsn(ALOAD, constructorIndex);
+        // 6th argument:  load the Object[] for the parameters
+        generatorAdapter.visitVarInsn(ALOAD, parametersIndex);
+
+        generatorAdapter.visitMethodInsn(
+                INVOKESTATIC,
+                "io/micronaut/aop/chain/ConstructorInterceptorChain",
+                "instantiate",
+                METHOD_DESCRIPTOR_CONSTRUCTOR_INSTANTIATE,
+                false
+        );
+    }
+
+    private void initInterceptedConstructorWriter(GeneratorAdapter buildMethodVisitor, List<ParameterElement> parameters) {
+        this.interceptedConstructorWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        this.interceptedConstructorWriterName = this.beanDefinitionName + "$1";
+        final String constructorInternalName = getInternalName(interceptedConstructorWriterName);
+        final ClassWriter interceptedConstructorWriter = this.interceptedConstructorWriter;
+        interceptedConstructorWriter.visit(V1_8, ACC_SYNTHETIC | ACC_FINAL | ACC_PRIVATE,
+                constructorInternalName,
+                null,
+                Type.getInternalName(AbstractConstructorInjectionPoint.class),
+                null);
+
+        interceptedConstructorWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
+        interceptedConstructorWriter.visitOuterClass(
+                beanDefinitionInternalName,
+                null,
+                null
+        );
+        classWriter.visitInnerClass(constructorInternalName, beanDefinitionInternalName, null, ACC_PRIVATE);
+        org.objectweb.asm.commons.Method constructorMethod = org.objectweb.asm.commons.Method.getMethod(CONSTRUCTOR_ABSTRACT_CONSTRUCTOR_IP);
+
+        // write the constructor that is a subclass of AbstractConstructorInjectionPoint
+        GeneratorAdapter protectedConstructor = new GeneratorAdapter(
+                interceptedConstructorWriter.visitMethod(
+                        ACC_PROTECTED, CONSTRUCTOR_NAME,
+                        constructorMethod.getDescriptor(),
+                        null,
+                        null
+                ),
+                ACC_PROTECTED,
+                CONSTRUCTOR_NAME,
+                constructorMethod.getDescriptor()
+        );
+        protectedConstructor.loadThis();
+        protectedConstructor.loadArg(0);
+        protectedConstructor.invokeConstructor(Type.getType(AbstractConstructorInjectionPoint.class), constructorMethod);
+        protectedConstructor.returnValue();
+        protectedConstructor.visitMaxs(1, 1);
+        protectedConstructor.visitEnd();
+
+        // now we need to implement the invoke method to execute the actual instantiation
+        final GeneratorAdapter invokeMethod = startPublicMethod(interceptedConstructorWriter, METHOD_INVOKE_CONSTRUCTOR);
+
+        invokeMethod.visitTypeInsn(NEW, beanType.getInternalName());
+        invokeMethod.visitInsn(DUP);
+        for (int i = 0; i < parameters.size(); i++) {
+            invokeMethod.loadArg(0);
+            invokeMethod.push(i);
+            invokeMethod.arrayLoad(TYPE_OBJECT);
+            pushCastToType(invokeMethod, parameters.get(i));
+        }
+        String constructorDescriptor = getConstructorDescriptor(parameters);
+        invokeMethod.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
+        invokeMethod.returnValue();
+        invokeMethod.visitMaxs(1, 1);
+        invokeMethod.visitEnd();
+
+        // instantiate a new instance and return
+        buildMethodVisitor.visitTypeInsn(NEW, constructorInternalName);
+        buildMethodVisitor.visitInsn(DUP);
+        buildMethodVisitor.loadThis();
+        buildMethodVisitor.visitMethodInsn(
+                INVOKESPECIAL,
+                constructorInternalName,
+                "<init>",
+                constructorMethod.getDescriptor(),
+                false
+        );
+    }
+
+    private int createParameterArray(List<ParameterElement> parameters, GeneratorAdapter buildMethodVisitor) {
+        final int pLen = parameters.size();
+        pushNewArray(buildMethodVisitor, Object.class, pLen);
+        for (int i = 0; i < pLen; i++) {
+            final ParameterElement parameter = parameters.get(i);
+            int parameterIndex = i;
+            pushStoreInArray(buildMethodVisitor, i, pLen, () ->
+                    pushConstructorArgument(
+                            buildMethodVisitor,
+                            parameter.getName(),
+                            parameter,
+                            parameter.getAnnotationMetadata(),
+                            parameterIndex
+                    )
+            );
+        }
+        return pushNewBuildLocalVariable();
+    }
+
+    private boolean isConstructorIntercepted(MethodElement constructor) {
+        // a constructor is intercepted when this bean is an advised type but not proxied
+        // and any AROUND_CONSTRUCT annotations are present
+        AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(annotationMetadata, constructor.getAnnotationMetadata());
+
+        // for beans that are @Around(proxyTarget=true) only the constructor of the proxy target should be intercepted. Beans returned from factories are always proxyTarget=true
+        final boolean isProxyTarget = hierarchy.booleanValue(AnnotationUtil.ANN_AROUND, "proxyTarget").orElse(false) || !(constructor instanceof ConstructorElement);
+        // for beans that are @Around(proxyTarget=false) only the generated AOP impl should be intercepted
+        final boolean isAopType = StringUtils.isNotEmpty(interceptedType);
+        final boolean isConstructorInterceptionCandidate = (isProxyTarget && !isAopType) || (isAopType && !isProxyTarget);
+
+        if (isConstructorInterceptionCandidate) {
+
+            final io.micronaut.core.annotation.AnnotationValue<Annotation> interceptorBindings
+                    = hierarchy.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+            if (interceptorBindings != null) {
+                return interceptorBindings.getAnnotations(AnnotationMetadata.VALUE_MEMBER)
+                        .stream()
+                        .anyMatch(av -> av.stringValue("kind").map(k -> k.equals("AROUND_CONSTRUCT")).orElse(false));
+            }
+        }
+        return false;
     }
 
     private void pushConstructorArguments(GeneratorAdapter buildMethodVisitor,

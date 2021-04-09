@@ -20,15 +20,11 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanType;
 
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -42,6 +38,7 @@ import java.util.stream.Stream;
 @Internal
 public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
 
+    private static final String META_MEMBER_INTERCEPTOR_TYPE = "interceptorType";
     private final Set<String> supportedAnnotationNames;
     private final Set<Class<?>> supportedInterceptorTypes;
 
@@ -56,8 +53,17 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
                 .collect(Collectors.toSet());
         this.supportedInterceptorTypes = annotationValues
                 .stream()
-                .flatMap(av -> av.classValue("interceptorType").map(Stream::of).orElse(Stream.empty()))
+                .flatMap(av -> av.classValue(META_MEMBER_INTERCEPTOR_TYPE).map(Stream::of).orElse(Stream.empty()))
                 .collect(Collectors.toSet());
+    }
+
+    /**
+     * Interceptor binding qualifiers.
+     * @param bindingAnnotations The binding annotations
+     */
+    InterceptorBindingQualifier(Collection<String> bindingAnnotations) {
+        this.supportedAnnotationNames = CollectionUtils.isNotEmpty(bindingAnnotations) ? new HashSet<>(bindingAnnotations) : Collections.emptySet();
+        this.supportedInterceptorTypes = Collections.emptySet();
     }
 
     @Override
@@ -101,6 +107,16 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
                     .collect(Collectors.toList());
         } else {
             return Collections.emptyList();
+        }
+    }
+
+    @Override
+    public String toString() {
+        if (CollectionUtils.isEmpty(supportedAnnotationNames) && CollectionUtils.isEmpty(supportedInterceptorTypes)) {
+            return "@InterceptorBinding(NONE)";
+        } else {
+            return supportedAnnotationNames.stream().map((name) -> "@InterceptorBinding(" + name + ")").collect(Collectors.joining( " ")) +
+                    supportedInterceptorTypes.stream().map((name) -> "@InterceptorBinding(interceptorType = " + name + ")").collect(Collectors.joining( " "));
         }
     }
 }

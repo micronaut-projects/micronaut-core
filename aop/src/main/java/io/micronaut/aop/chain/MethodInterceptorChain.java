@@ -68,6 +68,11 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     @Override
+    public R invoke(T instance, Object... arguments) {
+        return new MethodInterceptorChain<>(interceptors, instance, executionHandle, originalParameters).proceed();
+    }
+
+    @Override
     public boolean isSuspend() {
         return executionHandle.isSuspend();
     }

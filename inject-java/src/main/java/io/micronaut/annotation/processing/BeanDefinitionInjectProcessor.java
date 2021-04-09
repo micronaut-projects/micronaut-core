@@ -820,7 +820,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             } else if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
                 return annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class)
                         .stream().anyMatch(av ->
-                                av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND
+                                av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND).name().startsWith(InterceptorKind.AROUND.name())
                         );
             }
 

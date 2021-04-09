@@ -200,13 +200,16 @@ class Test {
         return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader), "test") {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                files.findAll { JavaFileObject jfo ->
+                def references = files.findAll { JavaFileObject jfo ->
                     jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith("DefinitionClass.class")
                 }.collect { JavaFileObject jfo ->
                     def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
                     name = name.replace('/', '.') - '.class'
                     return classLoader.loadClass(name).newInstance()
                 } as List<BeanDefinitionReference>
+
+                def coreReferences = super.resolveBeanDefinitionReferences()
+                return references + coreReferences
             }
         }.start()
     }
