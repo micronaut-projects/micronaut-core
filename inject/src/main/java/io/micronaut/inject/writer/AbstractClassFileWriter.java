@@ -1008,6 +1008,21 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
+     * @param argumentTypes The argument types
+     * @return The constructor descriptor
+     */
+    protected static String getConstructorDescriptor(Type[] argumentTypes) {
+        StringBuilder builder = new StringBuilder();
+        builder.append('(');
+
+        for (Type argumentType : argumentTypes) {
+            builder.append(argumentType.getDescriptor());
+        }
+
+        return builder.append(")V").toString();
+    }
+
+    /**
      * @param argList The argument list
      * @return The constructor descriptor
      */

@@ -175,12 +175,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final org.objectweb.asm.commons.Method METHOD_OPTIONAL_OF = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(Optional.class, "of", Object.class)
     );
-    public static final org.objectweb.asm.commons.Method METHOD_INVOKE_CONSTRUCTOR = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(
+    private static final org.objectweb.asm.commons.Method METHOD_INVOKE_CONSTRUCTOR = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(
             ConstructorInjectionPoint.class,
             "invoke",
             Object[].class
     ));
-    public static final String METHOD_DESCRIPTOR_CONSTRUCTOR_INSTANTIATE = getMethodDescriptor(Object.class, Arrays.asList(
+    private static final String METHOD_DESCRIPTOR_CONSTRUCTOR_INSTANTIATE = getMethodDescriptor(Object.class, Arrays.asList(
             BeanResolutionContext.class,
             BeanContext.class,
             List.class,
@@ -188,6 +188,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             BeanConstructor.class,
             Object[].class
     ));
+    private static final Method METHOD_GET_BEAN = ReflectionUtils.getRequiredInternalMethod(DefaultBeanContext.class, "getBean", BeanResolutionContext.class, Class.class);
     private final ClassWriter classWriter;
     private final String beanFullClassName;
     private final String beanDefinitionName;
@@ -1949,45 +1950,55 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             List<ParameterElement> parameterList = Arrays.asList(parameters);
             boolean isParametrized = isParametrized(factoryMethod);
             boolean isIntercepted = isConstructorIntercepted(factoryMethod);
+            Type factoryType = JavaModelUtils.getTypeReference(factoryClass);
+
             defineBuilderMethod(isParametrized);
             // load this
 
             GeneratorAdapter buildMethodVisitor = this.buildMethodVisitor;
+            // for Factory beans first we need to lookup the the factory bean
+            // before invoking the method to instantiate
+            // the below code looks up the factory bean.
+
             // Load the BeanContext for the method call
             buildMethodVisitor.visitVarInsn(ALOAD, 2);
             pushCastToType(buildMethodVisitor, DefaultBeanContext.class);
             // load the first argument of the method (the BeanResolutionContext) to be passed to the method
             buildMethodVisitor.visitVarInsn(ALOAD, 1);
             // second argument is the bean type
-            Type factoryType = JavaModelUtils.getTypeReference(factoryClass);
-            buildMethodVisitor.visitLdcInsn(factoryType);
-            Method getBeanMethod = ReflectionUtils.getRequiredInternalMethod(DefaultBeanContext.class, "getBean", BeanResolutionContext.class, Class.class);
-
-            buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                    Type.getInternalName(DefaultBeanContext.class),
-                    "getBean",
-                    Type.getMethodDescriptor(getBeanMethod), false);
+            buildMethodVisitor.push(factoryType);
+            buildMethodVisitor.invokeVirtual(
+                    Type.getType(DefaultBeanContext.class),
+                    org.objectweb.asm.commons.Method.getMethod(METHOD_GET_BEAN)
+            );
 
             // store a reference to the bean being built at index 3
             int factoryVar = pushNewBuildLocalVariable();
-
             buildMethodVisitor.visitVarInsn(ALOAD, factoryVar);
             pushCastToType(buildMethodVisitor, factoryClass);
-
-            if (parameterList.isEmpty()) {
-                buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                        factoryType.getInternalName(),
-                        factoryMethod.getName(),
-                        Type.getMethodDescriptor(beanType), false);
+            String methodDescriptor = getMethodDescriptorForReturnType(beanType, parameterList);
+            if (isIntercepted) {
+                initInterceptedConstructorWriter(
+                        buildMethodVisitor,
+                        parameterList,
+                        new FactoryMethodDef(factoryType, factoryMethod, methodDescriptor, factoryVar)
+                );
+                final int constructorIndex = pushNewBuildLocalVariable();
+                // populate an Object[] of all constructor arguments
+                final int parametersIndex = createParameterArray(parameterList, buildMethodVisitor);
+                invokeConstructorChain(buildMethodVisitor, constructorIndex, parametersIndex, parameterList);
             } else {
-                pushConstructorArguments(buildMethodVisitor, factoryMethod);
 
-                String methodDescriptor = getMethodDescriptorForReturnType(beanType, parameterList);
+                if (!parameterList.isEmpty()) {
+                    pushConstructorArguments(buildMethodVisitor, factoryMethod);
+                }
                 buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
                         factoryType.getInternalName(),
                         factoryMethod.getName(),
                         methodDescriptor, false);
             }
+
+
             this.buildInstanceIndex = pushNewBuildLocalVariable();
             pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
             pushCastToType(buildMethodVisitor, beanType);
@@ -2009,7 +2020,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // if there is constructor interception present then we have to
             // build the parameters into an Object[] and build a constructor invocation
             if (isIntercepted) {
-                initInterceptedConstructorWriter(buildMethodVisitor, parameters);
+                initInterceptedConstructorWriter(buildMethodVisitor, parameters, null);
                 final int constructorIndex = pushNewBuildLocalVariable();
                 // populate an Object[] of all constructor arguments
                 final int parametersIndex = createParameterArray(parameters, buildMethodVisitor);
@@ -2064,16 +2075,21 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
     }
 
-    private void initInterceptedConstructorWriter(GeneratorAdapter buildMethodVisitor, List<ParameterElement> parameters) {
+    private void initInterceptedConstructorWriter(
+            GeneratorAdapter buildMethodVisitor,
+            List<ParameterElement> parameters,
+            @Nullable FactoryMethodDef factoryMethodDef) {
         this.interceptedConstructorWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.interceptedConstructorWriterName = this.beanDefinitionName + "$1";
         final String constructorInternalName = getInternalName(interceptedConstructorWriterName);
+        final Type interceptedConstructorType = getTypeReferenceForName(interceptedConstructorWriterName);
         final ClassWriter interceptedConstructorWriter = this.interceptedConstructorWriter;
         interceptedConstructorWriter.visit(V1_8, ACC_SYNTHETIC | ACC_FINAL | ACC_PRIVATE,
                 constructorInternalName,
                 null,
                 Type.getInternalName(AbstractConstructorInjectionPoint.class),
-                null);
+                null
+        );
 
         interceptedConstructorWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
         interceptedConstructorWriter.visitOuterClass(
@@ -2085,17 +2101,56 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         org.objectweb.asm.commons.Method constructorMethod = org.objectweb.asm.commons.Method.getMethod(CONSTRUCTOR_ABSTRACT_CONSTRUCTOR_IP);
 
         // write the constructor that is a subclass of AbstractConstructorInjectionPoint
-        GeneratorAdapter protectedConstructor = new GeneratorAdapter(
-                interceptedConstructorWriter.visitMethod(
-                        ACC_PROTECTED, CONSTRUCTOR_NAME,
-                        constructorMethod.getDescriptor(),
-                        null,
-                        null
-                ),
-                ACC_PROTECTED,
-                CONSTRUCTOR_NAME,
-                constructorMethod.getDescriptor()
-        );
+
+        GeneratorAdapter protectedConstructor;
+
+        final boolean hasFactoryMethod = factoryMethodDef != null;
+        final String interceptedConstructorDescriptor;
+        if (hasFactoryMethod) {
+            // for factory methods we have to store the factory instance in a field and modify the constructor pass the factory instance
+            interceptedConstructorWriter
+                    .visitField(ACC_PRIVATE | ACC_FINAL,
+                            "$factory",
+                            factoryMethodDef.factoryType.getDescriptor(),
+                            null,
+                            null
+                    );
+
+            interceptedConstructorDescriptor = getConstructorDescriptor(new Type[] {
+                    Type.getType(BeanDefinition.class),
+                    factoryMethodDef.factoryType
+            });
+            protectedConstructor = new GeneratorAdapter(
+                    interceptedConstructorWriter.visitMethod(
+                            ACC_PROTECTED, CONSTRUCTOR_NAME,
+                            interceptedConstructorDescriptor,
+                            null,
+                            null
+                    ),
+                    ACC_PROTECTED,
+                    CONSTRUCTOR_NAME,
+                    interceptedConstructorDescriptor
+            );
+        } else {
+            interceptedConstructorDescriptor = constructorMethod.getDescriptor();
+            protectedConstructor = new GeneratorAdapter(
+                    interceptedConstructorWriter.visitMethod(
+                            ACC_PROTECTED, CONSTRUCTOR_NAME,
+                            interceptedConstructorDescriptor,
+                            null,
+                            null
+                    ),
+                    ACC_PROTECTED,
+                    CONSTRUCTOR_NAME,
+                    interceptedConstructorDescriptor
+            );
+
+        }
+        if (hasFactoryMethod) {
+            protectedConstructor.loadThis();
+            protectedConstructor.loadArg(1);
+            protectedConstructor.putField(interceptedConstructorType, "$factory", factoryMethodDef.factoryType);
+        }
         protectedConstructor.loadThis();
         protectedConstructor.loadArg(0);
         protectedConstructor.invokeConstructor(Type.getType(AbstractConstructorInjectionPoint.class), constructorMethod);
@@ -2105,17 +2160,38 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         // now we need to implement the invoke method to execute the actual instantiation
         final GeneratorAdapter invokeMethod = startPublicMethod(interceptedConstructorWriter, METHOD_INVOKE_CONSTRUCTOR);
-
-        invokeMethod.visitTypeInsn(NEW, beanType.getInternalName());
-        invokeMethod.visitInsn(DUP);
+        if (hasFactoryMethod) {
+            invokeMethod.loadThis();
+            final Type factoryType = factoryMethodDef.factoryType;
+            invokeMethod.getField(
+                    interceptedConstructorType,
+                    "$factory",
+                    factoryType
+            );
+            pushCastToType(invokeMethod, factoryType);
+        } else {
+            invokeMethod.visitTypeInsn(NEW, beanType.getInternalName());
+            invokeMethod.visitInsn(DUP);
+        }
         for (int i = 0; i < parameters.size(); i++) {
             invokeMethod.loadArg(0);
             invokeMethod.push(i);
             invokeMethod.arrayLoad(TYPE_OBJECT);
             pushCastToType(invokeMethod, parameters.get(i));
         }
-        String constructorDescriptor = getConstructorDescriptor(parameters);
-        invokeMethod.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
+
+        if (hasFactoryMethod) {
+            invokeMethod.visitMethodInsn(
+                    INVOKEVIRTUAL,
+                    factoryMethodDef.factoryType.getInternalName(),
+                    factoryMethodDef.factoryMethod.getName(),
+                    factoryMethodDef.methodDescriptor,
+                    false
+            );
+        } else {
+            String constructorDescriptor = getConstructorDescriptor(parameters);
+            invokeMethod.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
+        }
         invokeMethod.returnValue();
         invokeMethod.visitMaxs(1, 1);
         invokeMethod.visitEnd();
@@ -2123,12 +2199,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // instantiate a new instance and return
         buildMethodVisitor.visitTypeInsn(NEW, constructorInternalName);
         buildMethodVisitor.visitInsn(DUP);
+        // pass outer class instance to constructor
         buildMethodVisitor.loadThis();
+
+        if (hasFactoryMethod) {
+            buildMethodVisitor.visitVarInsn(ALOAD, factoryMethodDef.factoryVar);
+            pushCastToType(buildMethodVisitor, factoryMethodDef.factoryType);
+        }
+
         buildMethodVisitor.visitMethodInsn(
                 INVOKESPECIAL,
                 constructorInternalName,
                 "<init>",
-                constructorMethod.getDescriptor(),
+                interceptedConstructorDescriptor,
                 false
         );
     }
@@ -2562,6 +2645,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
          */
         public boolean isRequiresReflection() {
             return requiresReflection;
+        }
+    }
+
+    private class FactoryMethodDef {
+        private final Type factoryType;
+        private final MethodElement factoryMethod;
+        private final String methodDescriptor;
+        private final int factoryVar;
+
+        public FactoryMethodDef(Type factoryType, MethodElement factoryMethod, String methodDescriptor, int factoryVar) {
+            this.factoryType = factoryType;
+            this.factoryMethod = factoryMethod;
+            this.methodDescriptor = methodDescriptor;
+            this.factoryVar = factoryVar;
         }
     }
 }

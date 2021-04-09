@@ -86,21 +86,39 @@ class AnotherInterceptor implements Interceptor {
         !interceptor.invoked
         !anotherInterceptor.invoked
 
-        when:
+        when:"A bean that features constructor injection is instantiated"
         def instance = getBean(context, 'annbinding1.MyBean')
 
-        then:
+        then:"The constructor interceptor is invoked"
         constructorInterceptor.invoked
+
+        and:"Other non-constructor interceptors are not invoked"
         !interceptor.invoked
         !anotherInterceptor.invoked
 
 
-        when:
+        when:"A method with interception is invoked"
+        constructorInterceptor.invoked = false
         instance.test()
 
-        then:"the interceptor was invoked"
+        then:"the methods interceptor are invoked"
         instance instanceof Intercepted
         interceptor.invoked
+        !anotherInterceptor.invoked
+
+        and:"The constructor interceptor is not"
+        !constructorInterceptor.invoked
+
+        when:"A bean that is created from a factory is instantiated"
+        constructorInterceptor.invoked = false
+        interceptor.invoked = false
+        def factoryCreatedInstance = getBean(context, 'annbinding1.MyOtherBean')
+
+        then:"Constructor interceptors are invoked for the created instance"
+        constructorInterceptor.invoked
+
+        and:"Other interceptors are not"
+        !interceptor.invoked
         !anotherInterceptor.invoked
 
         cleanup:

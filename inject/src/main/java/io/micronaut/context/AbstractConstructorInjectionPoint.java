@@ -1,10 +1,8 @@
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.AbstractBeanConstructor;
-import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
