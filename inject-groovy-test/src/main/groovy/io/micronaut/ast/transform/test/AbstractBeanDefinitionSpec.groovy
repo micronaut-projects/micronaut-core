@@ -16,6 +16,7 @@
 package io.micronaut.ast.transform.test
 
 import groovy.transform.CompileStatic
+import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
@@ -170,11 +171,12 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
                 ClassPathResourceLoader.defaultLoader(classLoader),"test") {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                return classLoader.generatedClasses.keySet().findAll {
+                def references = classLoader.generatedClasses.keySet().findAll {
                     it.endsWith("DefinitionClass")
                 }.collect {
                     classLoader.loadClass(it).newInstance()
                 }
+                return references + new InterceptorRegistryBean()
             }
         }.start()
     }

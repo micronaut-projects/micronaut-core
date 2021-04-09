@@ -125,7 +125,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final String proxyFullName;
     private final BeanDefinitionWriter proxyBeanDefinitionWriter;
     private final String proxyInternalName;
-    private final Map<String, AnnotationValue<?>> interceptorBinding;
+    private final Set<AnnotationValue<?>> interceptorBinding;
     private final Set<ClassElement> interfaceTypes;
     private final Type proxyType;
     private final boolean hotswap;
@@ -185,7 +185,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         String proxyShortName = NameUtils.getSimpleName(proxyFullName);
         this.proxyInternalName = getInternalName(this.proxyFullName);
         this.proxyType = getTypeReferenceForName(proxyFullName);
-        this.interceptorBinding = new LinkedHashMap<>(toInterceptorBindingMap(interceptorBinding));
+        this.interceptorBinding = toInterceptorBindingMap(interceptorBinding);
         this.interfaceTypes = Collections.emptySet();
         final ClassElement aopElement = ClassElement.of(proxyFullName, isInterface, parent.getAnnotationMetadata());
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
@@ -604,8 +604,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         }
 
         interceptorParameter.annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
-            final AnnotationValue<?>[] interceptorBinding = this.interceptorBinding.values()
-                    .toArray(new AnnotationValue[0]);
+            final AnnotationValue<?>[] interceptorBinding = this.interceptorBinding.toArray(new AnnotationValue[0]);
             builder.values(interceptorBinding);
         });
         qualifierParameter.annotate(AnnotationUtil.NULLABLE);
@@ -1118,20 +1117,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         if (interceptorBinding != null) {
             for (AnnotationValue<?> annotationValue : interceptorBinding) {
                 annotationValue.stringValue().ifPresent(annName ->
-                        this.interceptorBinding.put(annName, annotationValue)
+                        this.interceptorBinding.add(annotationValue)
                 );
             }
         }
     }
 
-    private Map<String, AnnotationValue<?>> toInterceptorBindingMap(AnnotationValue<?>[] interceptorBinding) {
-        Map<String, AnnotationValue<?>> binding = new LinkedHashMap<>(interceptorBinding.length);
-        for (AnnotationValue<?> annotationValue : interceptorBinding) {
-            annotationValue.stringValue().ifPresent(annName ->
-                    binding.put(annName, annotationValue)
-            );
-        }
-        return binding;
+    private Set<AnnotationValue<?>> toInterceptorBindingMap(AnnotationValue<?>[] interceptorBinding) {
+        return new LinkedHashSet<>(Arrays.asList(interceptorBinding));
     }
 
     private void readUnlock(GeneratorAdapter interceptedTargetVisitor) {

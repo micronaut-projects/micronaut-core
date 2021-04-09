@@ -1193,7 +1193,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             }
                         }
                         if (interceptorType != null) {
-                            interceptorBindings.getLast().member("interceptorType", interceptorType);
+                            for (AnnotationValueBuilder<?> interceptorBinding : interceptorBindings) {
+                                interceptorBinding.member("interceptorType", interceptorType);
+                            }
                         }
                     }
 

@@ -183,7 +183,7 @@ class Test {
      * @param cls The class data
      * @return The context. Should be shutdown after use
      */
-    ApplicationContext buildContext(String className, String cls) {
+    ApplicationContext buildContext(String className, String cls, boolean includeAllBeans = false) {
         def files = newJavaParser().generate(className, cls)
         ClassLoader classLoader = new ClassLoader() {
             @Override
@@ -209,7 +209,7 @@ class Test {
                     return classLoader.loadClass(name).newInstance()
                 } as List<BeanDefinitionReference>
 
-                return references + new InterceptorRegistryBean()
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : new InterceptorRegistryBean())
             }
         }.start()
     }
