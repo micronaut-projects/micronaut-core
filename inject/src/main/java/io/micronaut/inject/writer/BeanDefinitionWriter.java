@@ -2245,18 +2245,30 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // for beans that are @Around(proxyTarget=false) only the generated AOP impl should be intercepted
         final boolean isAopType = StringUtils.isNotEmpty(interceptedType);
         final boolean isConstructorInterceptionCandidate = (isProxyTarget && !isAopType) || (isAopType && !isProxyTarget);
+        final boolean hasAroundConstruct;
+        final io.micronaut.core.annotation.AnnotationValue<Annotation> interceptorBindings
+                = hierarchy.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+        final List<AnnotationValue<Annotation>> interceptorBindingAnnotations;
+        if (interceptorBindings != null) {
+            interceptorBindingAnnotations = interceptorBindings.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+            hasAroundConstruct = interceptorBindingAnnotations
+                    .stream()
+                    .anyMatch(av -> av.stringValue("kind").map(k -> k.equals("AROUND_CONSTRUCT")).orElse(false));
+        } else {
+            interceptorBindingAnnotations = Collections.emptyList();
+            hasAroundConstruct = false;
+        }
 
         if (isConstructorInterceptionCandidate) {
-
-            final io.micronaut.core.annotation.AnnotationValue<Annotation> interceptorBindings
-                    = hierarchy.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
-            if (interceptorBindings != null) {
-                return interceptorBindings.getAnnotations(AnnotationMetadata.VALUE_MEMBER)
-                        .stream()
-                        .anyMatch(av -> av.stringValue("kind").map(k -> k.equals("AROUND_CONSTRUCT")).orElse(false));
-            }
+            return hasAroundConstruct;
+        } else if (hasAroundConstruct) {
+            // if no other AOP advice is applied
+            return interceptorBindingAnnotations
+                    .stream()
+                    .noneMatch(av -> av.stringValue("kind").map(k -> k.equals("AROUND")).orElse(false));
+        } else {
+            return false;
         }
-        return false;
     }
 
     private void pushConstructorArguments(GeneratorAdapter buildMethodVisitor,

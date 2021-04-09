@@ -186,8 +186,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
                 annotationMetadata.getAnnotationValuesByType(InterceptorBinding)
                     .stream().anyMatch{ av ->
-                    av.enumValue("kind", InterceptorKind).orElse(InterceptorKind.AROUND)
-                        .name().startsWith(InterceptorKind.AROUND.name())
+                    av.enumValue("kind", InterceptorKind).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND
                 }
             }
         }
