@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing.test
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
+import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.Qualifier
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
@@ -208,8 +209,7 @@ class Test {
                     return classLoader.loadClass(name).newInstance()
                 } as List<BeanDefinitionReference>
 
-                def coreReferences = super.resolveBeanDefinitionReferences()
-                return references + coreReferences
+                return references + new InterceptorRegistryBean()
             }
         }.start()
     }
