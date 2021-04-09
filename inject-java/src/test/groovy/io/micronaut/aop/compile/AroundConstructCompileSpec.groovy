@@ -30,7 +30,7 @@ class MyBean {
 class MyFactory {
     @TestAnn
     @Singleton
-    MyOtherBean test() {
+    MyOtherBean test(io.micronaut.context.env.Environment env) {
         return new MyOtherBean();
     }
 }
@@ -48,9 +48,12 @@ class MyOtherBean {}
 @InterceptorBean(TestAnn.class)
 class TestConstructInterceptor implements ConstructorInterceptor<Object> {
     boolean invoked = false;
+    Object[] parameters;
+    
     @Override
     public Object intercept(ConstructorInvocationContext<Object> context) {
         invoked = true;
+        parameters = context.getParameterValues();
         return context.proceed();
     }
 } 
@@ -91,6 +94,7 @@ class AnotherInterceptor implements Interceptor {
 
         then:"The constructor interceptor is invoked"
         constructorInterceptor.invoked
+        constructorInterceptor.parameters.size() == 1
 
         and:"Other non-constructor interceptors are not invoked"
         !interceptor.invoked
@@ -116,6 +120,7 @@ class AnotherInterceptor implements Interceptor {
 
         then:"Constructor interceptors are invoked for the created instance"
         constructorInterceptor.invoked
+        constructorInterceptor.parameters.size() == 1
 
         and:"Other interceptors are not"
         !interceptor.invoked
