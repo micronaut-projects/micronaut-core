@@ -60,6 +60,21 @@ class TestConstructInterceptor implements ConstructorInterceptor<Object> {
 } 
 
 @Singleton
+@InterceptorBean(TestAnn.class)
+class TypeSpecificConstructInterceptor implements ConstructorInterceptor<MyBean> {
+    boolean invoked = false;
+    Object[] parameters;
+    
+    @Override
+    public MyBean intercept(ConstructorInvocationContext<MyBean> context) {
+        invoked = true;
+        parameters = context.getParameterValues();
+        MyBean mb = context.proceed();
+        return mb;
+    }
+} 
+
+@Singleton
 @InterceptorBinding(TestAnn.class)
 class TestInterceptor implements MethodInterceptor {
     boolean invoked = false;
@@ -83,6 +98,7 @@ class AnotherInterceptor implements Interceptor {
         when:
         def interceptor = getBean(context, 'annbinding1.TestInterceptor')
         def constructorInterceptor = getBean(context, 'annbinding1.TestConstructInterceptor')
+        def typeSpecificInterceptor = getBean(context, 'annbinding1.TypeSpecificConstructInterceptor')
         def anotherInterceptor = getBean(context, 'annbinding1.AnotherInterceptor')
 
         then:
@@ -95,6 +111,7 @@ class AnotherInterceptor implements Interceptor {
 
         then:"The constructor interceptor is invoked"
         constructorInterceptor.invoked
+        typeSpecificInterceptor.invoked
         constructorInterceptor.parameters.size() == 1
 
         and:"Other non-constructor interceptors are not invoked"
@@ -104,6 +121,7 @@ class AnotherInterceptor implements Interceptor {
 
         when:"A method with interception is invoked"
         constructorInterceptor.invoked = false
+        typeSpecificInterceptor.invoked = false
         instance.test()
 
         then:"the methods interceptor are invoked"
@@ -113,6 +131,7 @@ class AnotherInterceptor implements Interceptor {
 
         and:"The constructor interceptor is not"
         !constructorInterceptor.invoked
+        !typeSpecificInterceptor.invoked
 
         when:"A bean that is created from a factory is instantiated"
         constructorInterceptor.invoked = false
@@ -121,6 +140,7 @@ class AnotherInterceptor implements Interceptor {
 
         then:"Constructor interceptors are invoked for the created instance"
         constructorInterceptor.invoked
+        !typeSpecificInterceptor.invoked
         constructorInterceptor.parameters.size() == 1
 
         and:"Other interceptors are not"

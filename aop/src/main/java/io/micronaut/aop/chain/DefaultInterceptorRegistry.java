@@ -11,6 +11,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.naming.Described;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
@@ -110,6 +111,15 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                                 .orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND_CONSTRUCT)
                 .collect(Collectors.toList());
         final Interceptor[] resolvedInterceptors = interceptors.stream()
+                .filter(beanRegistration -> {
+                    final List<Argument<?>> typeArgs = beanRegistration.getBeanDefinition().getTypeArguments(ConstructorInterceptor.class);
+                    if (typeArgs.isEmpty()) {
+                        return true;
+                    } else {
+                        final Class<?> applicableType = typeArgs.iterator().next().getType();
+                        return applicableType.isAssignableFrom(constructor.getDeclaringBeanType());
+                    }
+                })
                 .filter(beanRegistration -> applicableBindings.stream().anyMatch(annotationValue -> {
                     // does the annotation metadata contain @InterceptorBinding(interceptorType=SomeInterceptor.class)
                     // that matches the list of interceptors ?
