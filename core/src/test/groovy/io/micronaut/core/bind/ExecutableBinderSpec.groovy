@@ -37,6 +37,11 @@ class ExecutableBinderSpec extends Specification {
             Object invoke(Object instance, Object... arguments) {
                 return arguments[0]
             }
+
+            @Override
+            Class getDeclaringType() {
+                return null
+            }
         }
 
         ExecutableBinder binder = new DefaultExecutableBinder()
@@ -75,6 +80,11 @@ class ExecutableBinderSpec extends Specification {
             Object invoke(Object instance, Object... arguments) {
                 return arguments[0]
             }
+
+            @Override
+            Class getDeclaringType() {
+                return null
+            }
         }
 
         ExecutableBinder binder = new DefaultExecutableBinder()
@@ -107,6 +117,11 @@ class ExecutableBinderSpec extends Specification {
             @Override
             Object invoke(Object instance, Object... arguments) {
                 return arguments[0]
+            }
+
+            @Override
+            Class getDeclaringType() {
+                return null
             }
         }
 

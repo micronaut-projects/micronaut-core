@@ -77,6 +77,12 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
 
     @SuppressWarnings("unchecked")
     @Override
+    default Class<T> getDeclaringType() {
+        return (Class<T>) getTarget().getClass();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
     default InvocationContext<T, R> setAttribute(@NonNull CharSequence name, Object value) {
         return (InvocationContext<T, R>) MutableAttributeHolder.super.setAttribute(name, value);
     }

@@ -47,4 +47,9 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
     default boolean isAbstract() {
         return getExecutableMethod().isAbstract();
     }
+
+    @Override
+    default Class<T> getDeclaringType() {
+        return getExecutableMethod().getDeclaringType();
+    }
 }

@@ -4,6 +4,7 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
 
 import java.util.List;
@@ -30,7 +31,7 @@ public interface InterceptorRegistry {
      * @param <T> the bean type
      */
     @NonNull <T> Interceptor<T, ?>[] resolveInterceptors(
-            @NonNull ExecutableMethod<T, ?> method,
+            @NonNull Executable<T, ?> method,
             @NonNull List<BeanRegistration<Interceptor<T, ?>>> interceptors,
             @NonNull InterceptorKind interceptorKind
     );

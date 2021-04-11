@@ -39,6 +39,8 @@ public interface BeanConstructor<T> extends AnnotationMetadataProvider, Describe
      * The description of the constructor.
      * @return The description
      */
+    @Override
+    @NonNull
     default String getDescription() {
         return getDescription(true);
     }
@@ -48,6 +50,8 @@ public interface BeanConstructor<T> extends AnnotationMetadataProvider, Describe
      * @param simple Whether to return a simple representation without package names
      * @return The description
      */
+    @Override
+    @NonNull
     default String getDescription(boolean simple) {
         String args = Arrays.stream(getArguments())
                 .map(arg -> arg.getTypeString(simple) + " " + arg.getName())

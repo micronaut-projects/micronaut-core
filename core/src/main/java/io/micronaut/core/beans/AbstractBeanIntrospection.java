@@ -85,6 +85,39 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
         this.beanMethods = methodCount == 0 ? Collections.emptyList() : new ArrayList<>(methodCount);
     }
 
+    @Override
+    public BeanConstructor<T> getConstructor() {
+        return new BeanConstructor<T>() {
+            @Override
+            public Class<T> getDeclaringBeanType() {
+                return getBeanType();
+            }
+
+            @Override
+            public Argument<?>[] getArguments() {
+                return getConstructorArguments();
+            }
+
+            @Override
+            public T instantiate(Object... parameterValues) {
+                return AbstractBeanIntrospection.this.instantiate(parameterValues);
+            }
+
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return getConstructorAnnotationMetadata();
+            }
+        };
+    }
+
+    /**
+     * @return Annotation metadata for the constructor.
+     * @since 3.0.0
+     */
+    protected AnnotationMetadata getConstructorAnnotationMetadata() {
+        return AnnotationMetadata.EMPTY_METADATA;
+    }
+
     @NonNull
     @Override
     public Optional<BeanProperty<T, Object>> getIndexedProperty(@NonNull Class<? extends Annotation> annotationType, @NonNull String annotationValue) {

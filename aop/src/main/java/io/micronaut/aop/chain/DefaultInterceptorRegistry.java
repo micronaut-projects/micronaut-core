@@ -5,10 +5,13 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.EnvironmentConfigurable;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.naming.Described;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import org.slf4j.Logger;
@@ -36,13 +39,14 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
     @Override
     @NonNull
     public <T> Interceptor<T, ?>[] resolveInterceptors(
-            @NonNull ExecutableMethod<T, ?> method,
+            @NonNull Executable<T, ?> method,
             @NonNull List<BeanRegistration<Interceptor<T, ?>>> interceptors,
             @NonNull InterceptorKind interceptorKind) {
+        final AnnotationMetadata annotationMetadata = method.getAnnotationMetadata();
         if (interceptors.isEmpty()) {
             if (interceptorKind == InterceptorKind.INTRODUCTION) {
-                if (method.hasStereotype(Adapter.class)) {
-                    return new MethodInterceptor[] { new AdapterIntroduction(beanContext, method) };
+                if (annotationMetadata.hasStereotype(Adapter.class)) {
+                    return new MethodInterceptor[] { new AdapterIntroduction(beanContext, (ExecutableMethod<?, ?>) method) };
                 } else {
                     throw new IllegalStateException("At least one @Introduction method interceptor required, but missing. Check if your @Introduction stereotype annotation is marked with @Retention(RUNTIME) and @Type(..) with the interceptor type. Otherwise do not load @Introduction beans if their interceptor definitions are missing!");
 
@@ -54,7 +58,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
         } else {
             instrumentAnnotationMetadata(beanContext, method);
             final List<AnnotationValue<InterceptorBinding>> applicableBindings
-                    = method.getAnnotationValuesByType(InterceptorBinding.class)
+                    = annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class)
                     .stream()
                     .filter(ann ->
                             ann.enumValue("kind", InterceptorKind.class)
@@ -81,7 +85,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                     .filter(bean -> !(bean instanceof ConstructorInterceptor))
                     .toArray(Interceptor[]::new);
             if (LOG.isTraceEnabled()) {
-                LOG.trace("Resolved {} {} interceptors out of a possible {} for method: {} - {}", resolvedInterceptors.length, interceptorKind, interceptors.size(), method.getDeclaringType(), method.getDescription(true));
+                LOG.trace("Resolved {} {} interceptors out of a possible {} for method: {} - {}", resolvedInterceptors.length, interceptorKind, interceptors.size(), method.getDeclaringType(), method instanceof Described ? ((Described) method).getDescription(true) : method.toString());
                 for (int i = 0; i < resolvedInterceptors.length; i++) {
                     Interceptor resolvedInterceptor = resolvedInterceptors[i];
                     LOG.trace("Interceptor {} - {}", i, resolvedInterceptor);
