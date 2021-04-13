@@ -3,6 +3,7 @@ package io.micronaut.validation.validator.map
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.validation.validator.Validator
+import org.jetbrains.annotations.NotNull
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -10,6 +11,7 @@ import spock.lang.Specification
 import javax.validation.ConstraintViolation
 import javax.validation.Valid
 import javax.validation.constraints.NotBlank
+import javax.validation.constraints.Size
 
 class MapValidatorSpec extends Specification {
     @Shared
@@ -39,7 +41,7 @@ class Author {
     String name
 
     @Valid
-    Map<String, Book> books
+    Map<String, @NotNull Book> books
 }
 
 @Introspected

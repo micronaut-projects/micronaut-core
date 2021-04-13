@@ -737,6 +737,32 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }, aopProxyWriter);
         }
 
+        private boolean methodHasValidatedParameters(JavaMethodElement javaMethodElement) {
+            boolean validated = false;
+            final ParameterElement[] parameters = javaMethodElement.getParameters();
+            for (ParameterElement parameter: parameters) {
+                if (parameter.hasStereotype(ANN_VALID)) {
+                    validated = true;
+                    continue;
+                }
+                if (parameter.hasStereotype(ANN_CONSTRAINT)) {
+                    validated = true;
+                }
+
+                final Map<String, ClassElement> typeArguments = parameter.getGenericType().getTypeArguments();
+                for (ClassElement classElement: typeArguments.values()) {
+                    if (classElement.hasDeclaredStereotype(ANN_CONSTRAINT) ||
+                        classElement.hasDeclaredStereotype(ANN_VALID))
+                    {
+                        validated = true;
+                        parameter.annotate(ANN_VALID);
+                    }
+                }
+            }
+
+            return validated;
+        }
+
         @Override
         public Object visitExecutable(ExecutableElement method, Object o) {
             if (method.getKind() == ElementKind.CONSTRUCTOR) {
@@ -753,13 +779,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             postponeIfParametersContainErrors(method);
 
             final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
-
             AnnotationMetadata methodAnnotationMetadata;
 
             if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
                 methodAnnotationMetadata = annotationMetadata;
             } else {
-
                 methodAnnotationMetadata = new AnnotationMetadataHierarchy(
                         concreteClassMetadata,
                         annotationMetadata
@@ -805,9 +829,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     hasAroundStereotype(annotationMetadata));
 
             boolean hasConstraints = false;
-            if (isDeclaredBean && !methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
-                    Arrays.stream(javaMethodElement.getParameters())
-                            .anyMatch(p -> p.hasStereotype(ANN_CONSTRAINT) || p.hasStereotype(ANN_VALID))) {
+            if (isDeclaredBean && methodHasValidatedParameters(javaMethodElement))
+            {
                 hasConstraints = true;
                 methodAnnotationMetadata = javaMethodElement.annotate(ANN_VALIDATED);
             }

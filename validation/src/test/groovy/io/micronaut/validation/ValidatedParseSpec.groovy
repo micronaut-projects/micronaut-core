@@ -5,6 +5,7 @@ import io.micronaut.aop.Around
 import io.micronaut.inject.ProxyBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
+import javax.validation.Valid
 import java.time.LocalDate
 
 class ValidatedParseSpec extends AbstractTypeElementSpec {
@@ -55,5 +56,60 @@ interface ExchangeRates {
 
         expect:
         definition.findMethod("rate", LocalDate).get().hasStereotype(Validated)
+    }
+
+    void "test constraints on list generic parameters make method parameters @Validated"() {
+        given:
+        def definition = buildBeanDefinition('test.Test','''
+package test;
+
+import java.util.List;
+import javax.validation.constraints.NotBlank;
+
+@javax.inject.Singleton
+class Test {
+    @io.micronaut.context.annotation.Executable
+    public void setList(List<@NotBlank String> list) {
+    
+    }
+}
+''')
+        when:
+        def method = definition.findMethod("setList", List<String>);
+
+        then:
+        !method.isEmpty()
+        method.get().hasStereotype(Validated.class)
+        method.get().getArguments().size() == 1
+
+        when:
+        def argument = method.get().getArguments()[0]
+        def argumentMetadata = argument.getAnnotationMetadata()
+
+        then:
+        argumentMetadata.hasStereotype(Valid.class)
+    }
+
+    void "test constraints on list generic parameters make return value @Validated"() {
+        given:
+        def definition = buildBeanDefinition('test.Test','''
+package test;
+
+import java.util.List;
+import javax.validation.constraints.Min;
+
+@javax.inject.Singleton
+class Test {
+
+    @io.micronaut.context.annotation.Executable
+    public @Min(value=10) Integer getValue() {
+    
+    }
+}
+''')
+
+        expect:
+        true
+        // definition.findMethod("setList", List<String>).get().hasStereotype(Validated)
     }
 }

@@ -372,6 +372,15 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 continue;
             }
 
+            final Map<String, ClassElement> typeArguments = genericType.getTypeArguments();
+            for (ClassElement typeArgument: typeArguments.values()) {
+                if (typeArgument.hasDeclaredStereotype(JAVAX_VALIDATION_CONSTRAINT) ||
+                        typeArgument.hasDeclaredStereotype(JAVAX_VALIDATION_VALID))
+                {
+                    beanProperty.annotate(JAVAX_VALIDATION_VALID);
+                }
+            }
+
             writer.visitProperty(
                     type,
                     genericType,

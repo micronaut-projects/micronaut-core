@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.validation.validator.resolver.CompositeTraversableResolver
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
@@ -12,10 +13,13 @@ import spock.lang.Specification
 
 import javax.inject.Singleton
 import javax.validation.ElementKind
+import javax.validation.Path
 import javax.validation.Valid
 import javax.validation.ValidatorFactory
 import javax.validation.constraints.*
 import javax.validation.metadata.BeanDescriptor
+
+import java.util.regex.Pattern
 
 class ValidatorSpec extends Specification {
 
@@ -24,6 +28,7 @@ class ValidatorSpec extends Specification {
     ApplicationContext applicationContext = ApplicationContext.run()
     @Shared
     Validator validator = applicationContext.getBean(Validator)
+
 
     void "test validator config"() {
         given:
@@ -48,6 +53,7 @@ class ValidatorSpec extends Specification {
         violations[0].constraintDescriptor.annotation instanceof Size
         violations[0].constraintDescriptor.annotation.min() == 1
         violations[0].constraintDescriptor.annotation.max() == 10
+
         violations[1].invalidValue == 50
         violations[1].propertyPath.iterator().next().name == 'pages'
         violations[1].rootBean == b
@@ -56,10 +62,12 @@ class ValidatorSpec extends Specification {
         violations[1].constraintDescriptor != null
         violations[1].constraintDescriptor.annotation instanceof Min
         violations[1].constraintDescriptor.annotation.value() == 100l
+
         violations[2].invalidValue == null
         violations[2].propertyPath.iterator().next().name == 'primaryAuthor'
         violations[2].constraintDescriptor != null
         violations[2].constraintDescriptor.annotation instanceof NotNull
+
         violations[3].invalidValue == ''
         violations[3].propertyPath.iterator().next().name == 'title'
         violations[3].constraintDescriptor != null
@@ -67,6 +75,125 @@ class ValidatorSpec extends Specification {
 
     }
 
+    void "test annotate property with argument constraints"() {
+        when:
+        def b = new ValidatorSpecClasses.Book("Mary", [])
+        def introspection = BeanIntrospector.SHARED.findIntrospection((Class<Object>) b.getClass()).orElse(null);
+        def authorsProperty = introspection.beanProperties
+                .stream().filter(p -> p.name == "authors").findFirst().get()
+        def nameProperty = introspection.beanProperties
+                .stream().filter(p -> p.name == "name").findFirst().get()
+
+        then:
+        authorsProperty.name == "authors"
+        // is auto generated for List with generic parameter annotations
+        authorsProperty.hasStereotype(Valid.class)
+
+        nameProperty.name == "name"
+        !nameProperty.hasStereotype(Valid.class)
+    }
+
+    void "test validate property argument"() {
+        given:
+        def listOfNames = new ValidatorSpecClasses.ListOfNames(['X', 'Ann', 'TooLongName'])
+        def violations = validator.validate(listOfNames)
+                .sort { it.propertyPath.toString() }
+
+        expect:
+        violations.size() == 2
+        violations[0].invalidValue == 'X'
+        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].propertyPath.toString() == 'names[0]<E class java.lang.String>'
+
+        violations[1].invalidValue == 'TooLongName'
+        violations[1].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[1].propertyPath.toString() == 'names[2]<E class java.lang.String>'
+    }
+
+    void "test validate property argument of map"() {
+        given:
+        def phoneBook = new ValidatorSpecClasses.PhoneBook([
+                "Andriy": 2000,
+                "Bob": -10,
+                "": 911
+        ])
+        def violations = validator.validate(phoneBook)
+            .sort{it.propertyPath.toString() }
+
+        expect:
+        violations.size() == 2
+        violations[0].invalidValue == -10
+        violations[0].propertyPath.toString() == 'numbers[Bob]<V class java.lang.Integer>'
+
+        violations[1].invalidValue == ""
+        violations[1].propertyPath.toString() == 'numbers[]<K class java.lang.String>'
+    }
+
+    void "test validate property argument cascade"() {
+        given:
+        def book = new ValidatorSpecClasses.Book("LOTR", [new ValidatorSpecClasses.Author("")])
+        def violations = validator.validate(book);
+
+        expect:
+        violations.size() == 1
+        violations[0].invalidValue == ""
+        Pattern.matches("authors\\[0]<E class .*Author>\\.name", violations[0].propertyPath.toString())
+    }
+
+    void "test validate property argument cascade with cycle"() {
+        given:
+        def book = new ValidatorSpecClasses.Book("LOTR", [new ValidatorSpecClasses.Author("")])
+        book.authors[0].books.add(book)
+        def violations = validator.validate(book)
+
+        expect:
+        violations.size() == 1
+        violations[0].invalidValue == ""
+        Pattern.matches("authors\\[0]<E class .*Author>\\.name", violations[0].propertyPath.toString())
+    }
+
+    void "test validate property argument cascade of null container"() {
+        given:
+        def book = new ValidatorSpecClasses.Book("LOTR")
+        def violations = validator.validate(book)
+
+        expect:
+        violations.size() == 0
+    }
+
+    void "test validate property argument cascade - nested"() {
+        given:
+        Set books = [
+                new ValidatorSpecClasses.Book("Alice in wonderland", []),
+                new ValidatorSpecClasses.Book("LOTR", [
+                        new ValidatorSpecClasses.Author("Bob"),
+                        new ValidatorSpecClasses.Author("")
+                ]),
+                new ValidatorSpecClasses.Book("?")
+        ]
+        def library = new ValidatorSpecClasses.Library(books)
+        def violations = validator.validate(library)
+                .sort{it.propertyPath.toString()}
+
+        expect:
+        violations.size() == 2
+        violations[0].invalidValue == ""
+        Pattern.matches("books\\[]<E .*Book>.authors\\[1]<E .*Author>.name",
+                violations[0].propertyPath.toString())
+
+        violations[1].invalidValue == "?"
+        Pattern.matches("books\\[]<E .*Book>.name", violations[1].propertyPath.toString())
+    }
+
+    @Ignore("The validateProperty method does not support cascading")
+    void "test validate bean property cascade"() {
+        given:
+        Book b = new Book(primaryAuthor: new Author(name: "", age: 200));
+        def violations = validator.validateProperty(b, "primaryAuthor").sort{it.propertyPath.toString();}
+
+        expect:
+        violations.size() == 2
+    }
 
     void "test validate bean property"() {
         given:
@@ -111,6 +238,7 @@ class ValidatorSpec extends Specification {
         v1.constraintDescriptor != null
         v1.constraintDescriptor.annotation instanceof Max
         v1.constraintDescriptor.annotation.value() == 100l
+
         v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
         v2.propertyPath.toString() == 'primaryAuthor.name'
         v2.constraintDescriptor != null
@@ -141,12 +269,14 @@ class ValidatorSpec extends Specification {
         v1.constraintDescriptor != null
         v1.constraintDescriptor.annotation instanceof Max
         v1.constraintDescriptor.annotation.value() == 100l
+
         v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
         v2.propertyPath.toString() == 'primaryAuthor.name'
         v2.constraintDescriptor != null
         v2.constraintDescriptor.annotation instanceof NotBlank
     }
 
+    @Ignore("List cascade not supported on groovy")
     void "test cascade to list - no cycle"() {
         given:
         Book b = new Book(
@@ -181,7 +311,7 @@ class ValidatorSpec extends Specification {
         v2.constraintDescriptor.annotation instanceof NotBlank
     }
 
-    void "test array elements"() {
+    void "test array size"() {
         given:
         ObjectArray arrayTest = new ObjectArray(strings: [] as String[])
         def violations = validator.validate(arrayTest)
@@ -235,6 +365,7 @@ class ValidatorSpec extends Specification {
         violations[0].constraintDescriptor.annotation.max() == 2
     }
 
+    @Ignore("Array cascade not supported")
     void "test cascade to array elements"() {
         given:
         ArrayTest arrayTest = new ArrayTest(integers: [30, 10, 60] as int[])
@@ -254,6 +385,7 @@ class ValidatorSpec extends Specification {
         v2.constraintDescriptor.annotation instanceof  Max
     }
 
+    @Ignore("Array cascade not supported")
     void "test cascade to array elements - nested"() {
         when:
         ArrayTest arrayTest = new ArrayTest(integers: [10, 15] as int[], child: new ArrayTest(integers: [10, 60] as int[]))
@@ -279,7 +411,7 @@ class ValidatorSpec extends Specification {
         violations[0].constraintDescriptor.annotation instanceof  Max
     }
 
-
+    @Ignore("Array cascade not supported")
     void "test cascade to array elements null"() {
         given:
         ArrayTest arrayTest = new ArrayTest(integers: null)
@@ -309,11 +441,39 @@ class ValidatorSpec extends Specification {
         constraintViolations[0].constraintDescriptor != null
         constraintViolations[0].constraintDescriptor.annotation instanceof  Min
         constraintViolations[0].constraintDescriptor.annotation.value() == 100l
+
         constraintViolations[1].constraintDescriptor != null
         constraintViolations[1].constraintDescriptor.annotation instanceof  NotBlank
 
     }
 
+    void "test executable validator - cascade"() {
+        when:
+        def bookService = applicationContext.getBean(ValidatorSpecClasses.BookService)
+        def book = new ValidatorSpecClasses.Book("X", [
+                new ValidatorSpecClasses.Author("")
+        ])
+        def violations = validator.forExecutables().validateParameters(
+                bookService,
+                ValidatorSpecClasses.BookService.getDeclaredMethod("saveBook", ValidatorSpecClasses.Book),
+                [book] as Object[]
+        ).sort{it.propertyPath.toString()}
+
+        then:
+        violations.size() == 2
+        violations[0].invalidValue == ""
+        violations[0].propertyPath.toString() ==
+                'saveBook.book.authors[0]<E class io.micronaut.validation.validator.ValidatorSpecClasses$Author>.name'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof NotBlank
+
+        violations[1].invalidValue == "X"
+        violations[1].propertyPath.toString() == 'saveBook.book.name'
+        violations[1].constraintDescriptor != null
+        violations[1].constraintDescriptor.annotation instanceof Size
+    }
+
+    @Ignore("Array cascade not supported")
     void "test executable validator - cascade to array"() {
         when:
         ArrayTest arrayTest = applicationContext.getBean(ArrayTest)
@@ -379,6 +539,32 @@ class ValidatorSpec extends Specification {
         beanDescriptor.getConstrainedProperties().size() == 0
     }
 
+    void "test validate property argument cascade - to non-introspected - inside map"(){
+        when:
+        def notIntrospected = new ValidatorSpecClasses.Person("")
+        def apartmentBuilding = new ValidatorSpecClasses.ApartmentBuilding([1: notIntrospected])
+        def violations = validator.validate(apartmentBuilding)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.ValidatorSpecClasses\$Person. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+        // violations[0].propertyPath.toString() ==
+        //        'apartmentLivers[1]<V class io.micronaut.validation.validator.ValidatorSpecClasses.Person>'
+
+        when:
+        apartmentBuilding = new ValidatorSpecClasses.ApartmentBuilding([2: null])
+        violations = validator.validate(apartmentBuilding)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.ValidatorSpecClasses\$Person. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+    }
+
+    @Ignore("List cascade not supported in Groovy")
     void "test cascade to container of non-introspected class" () {
         when:
         Bee notIntrospected = new Bee(name: "")
@@ -402,6 +588,7 @@ class ValidatorSpec extends Specification {
                 "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
     }
 
+    @Ignore("Map cascade not supported in Groovy")
     void "test cascade to map of non-introspected value class" () {
         when:
         Bee notIntrospected = new Bee(name: "")
@@ -427,7 +614,7 @@ class ValidatorSpec extends Specification {
                 "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
     }
 
-    @Ignore("FIXME: https://github.com/micronaut-projects/micronaut-core/issues/4410")
+    @Ignore("List cascade not supported in Groovy https://github.com/micronaut-projects/micronaut-core/issues/4410")
     void "test element validation in String collection" () {
         when:
         ListOfStrings strings = new ListOfStrings(strings: ["", null, "a string that's too long"])
@@ -444,6 +631,21 @@ class ValidatorSpec extends Specification {
         violations[2].constraintDescriptor.annotation instanceof Size
     }
 
+    void "test validate property argument cascade - enum"() {
+        given:
+        def inventory = new ValidatorSpecClasses.BooksInventory([
+                ValidatorSpecClasses.BookCondition.USED,
+                null,
+                ValidatorSpecClasses.BookCondition.NEW
+        ])
+        def violations = validator.validate(inventory)
+
+        expect:
+        violations.size() == 1
+        violations[0].message == "must not be null"
+    }
+
+    @Ignore("List cascade not supported in Groovy")
     void "test cascade to bean - enum"() {
         given:
         EnumList b = new EnumList(
@@ -455,6 +657,124 @@ class ValidatorSpec extends Specification {
         expect:
         violations.size() == 1
         violations.first().message == "must not be null"
+    }
+
+    void "test kotlin validation"() {
+//        when:
+//        var b = new BookKotlin(["X", "Me", "TooLongName"])
+//        var violations = validator.validate(b)
+//
+//        then:
+//        violations.size() == 2
+    }
+
+    void "test validate method argument generic annotations"() {
+        when:
+        var b = applicationContext.getBean(ValidatorSpecClasses.Bank)
+        var violations = validator.forExecutables().validateParameters(
+                b,
+                ValidatorSpecClasses.Bank.getDeclaredMethod("deposit", List<Integer>),
+                [[0, 100, 500, -1]] as Object[]
+        )
+        violations = violations.sort({it -> it.getPropertyPath().toString() })
+
+        then:
+        violations.size() == 2
+        Pattern.matches("deposit.banknotes\\[0]<E [^>]*Integer>", violations[0].getPropertyPath().toString())
+        Pattern.matches("deposit.banknotes\\[3]<E [^>]*Integer>", violations[1].getPropertyPath().toString())
+        violations[0].getPropertyPath().size() == 3
+
+        when:
+        def path0 = violations[0].getPropertyPath().iterator()
+        def node0 = path0.next()
+        def node1 = path0.next()
+        def node2 = path0.next()
+
+        then:
+        node0 instanceof Path.MethodNode
+        node0.getName() == "deposit"
+
+        node1 instanceof Path.ParameterNode
+        node1.getName() == "banknotes"
+
+        node2 instanceof Path.ContainerElementNode
+        node2.getName() == "E class java.lang.Integer"
+    }
+
+    void "test validate method argument generic annotations cascade"() {
+        when:
+        var b = applicationContext.getBean(ValidatorSpecClasses.Bank)
+        var methDecl = ValidatorSpecClasses.Bank.getDeclaredMethod(
+                "createAccount",
+                ValidatorSpecClasses.Client,
+                Map<Integer, ValidatorSpecClasses.Client>
+        )
+        // client, clientsWithAccess
+        var params = [
+                new ValidatorSpecClasses.Client(""),
+                [
+                        "child": new ValidatorSpecClasses.Client("Ann"),
+                        "spouse": new ValidatorSpecClasses.Client("X"),
+                        "": new ValidatorSpecClasses.Client("Jack")
+                ]
+        ]
+        var violations = validator.forExecutables().validateParameters(b, methDecl, params as Object[])
+        violations = violations.sort({it -> it.getPropertyPath().toString() })
+
+        then:
+        violations.size() == 3
+        violations[0].getPropertyPath().toString() == "createAccount.client.name"
+        Pattern.matches("createAccount.clientsWithAccess\\[]<K .*String>",
+                violations[1].getPropertyPath().toString())
+        Pattern.matches("createAccount.clientsWithAccess\\[spouse]<V [^>]*Client>.name",
+                violations[2].getPropertyPath().toString())
+
+        when:
+        var path0 = violations[0].getPropertyPath().iterator()
+        var path1 = violations[1].getPropertyPath().iterator()
+        var path2 = violations[2].getPropertyPath().iterator()
+
+        then:
+        violations[0].getPropertyPath().size() == 3
+        violations[1].getPropertyPath().size() == 3
+        violations[2].getPropertyPath().size() == 4
+
+        path0.next() instanceof Path.MethodNode
+        path0.next() instanceof Path.ParameterNode
+        path0.next() instanceof Path.PropertyNode
+
+        path1.next() instanceof Path.MethodNode
+        path1.next() instanceof Path.ParameterNode
+        path1.next() instanceof Path.ContainerElementNode
+
+        path2.next() instanceof Path.MethodNode
+        path2.next() instanceof Path.ParameterNode
+        path2.next() instanceof Path.ContainerElementNode
+        path2.next() instanceof Path.PropertyNode
+
+    }
+
+    void "test validate annotations null"() {
+        when:
+        var book = new ValidatorSpecClasses.Book("Alice In Wonderland", [null])
+        var violations = validator.validate(book)
+
+        then:
+        violations.size() == 0
+
+        when:
+        var b = applicationContext.getBean(ValidatorSpecClasses.Bank)
+        var methDecl = ValidatorSpecClasses.Bank.getDeclaredMethod(
+                "createAccount",
+                ValidatorSpecClasses.Client,
+                Map<Integer, ValidatorSpecClasses.Client>
+        )
+        // client, clientsWithAccess
+        var params = [null, ["child": null]]
+        var methodViolations = validator.forExecutables().validateParameters(b, methDecl, params as Object[])
+
+        then:
+        methodViolations.size() == 0
     }
 }
 
@@ -490,6 +810,12 @@ class ListOfStrings {
 }
 
 @Introspected
+class ListOfNames {
+    @NotNull
+    List<@Size(min=3, max=8) String> names;
+}
+
+@Introspected
 class ObjectArray {
     @Size(min = 1, max = 2)
     String[] strings
@@ -512,7 +838,7 @@ class Book {
 
     @Size(min = 1, max = 10)
     @Valid
-    List<Author> authors = []
+    List<@Valid Author> authors = []
 }
 
 @Introspected
@@ -560,7 +886,6 @@ class BookService {
 
 @Introspected
 class EnumList {
-
     @Valid
     @NotNull
     List<AuthorState> enums
