@@ -831,4 +831,44 @@ class AwsConfig {
         beanDefinition.injectedMethods[1].getAnnotationMetadata().getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "aws.disable-ec-metadata"
         beanDefinition.injectedMethods[2].getAnnotationMetadata().getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "aws.disable-ec2instance-metadata"
     }
+
+    void "test inner interface EachProperty list = true"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.Parent$Child$Intercepted', '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.EachProperty;
+
+import javax.inject.Inject;
+import java.util.List;
+
+@ConfigurationProperties("parent")
+class Parent {
+
+    private final List<Child> children;
+
+    @Inject
+    public Parent(List<Child> children) {
+        this.children = children;
+    }
+
+    public List<Child> getChildren() {
+        return children;
+    }
+
+    @EachProperty(value = "children", list = true)
+    interface Child {
+        String getPropA();
+        String getPropB();
+    }
+}
+''')
+
+        then:
+        noExceptionThrown()
+        beanDefinition != null
+        beanDefinition.getAnnotationMetadata().stringValue(ConfigurationReader.class, "prefix").get() == "parent.children[*]"
+        beanDefinition.getRequiredMethod("getPropA").getAnnotationMetadata().getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "parent.children[*].prop-a"
+    }
 }
