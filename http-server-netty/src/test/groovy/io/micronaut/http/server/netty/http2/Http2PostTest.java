@@ -91,7 +91,7 @@ public class Http2PostTest implements TestPropertyProvider {
             System.out.println("Received response with status code " + response.statusCode() + " " + response.version());
             response.bodyHandler(buffer -> result.complete(new String(buffer.getBytes())));
         })
-                .putHeader("content-length", "1000")
+                .putHeader("content-length", "9")
                 .write("Request-1")
                 .end();
 
@@ -105,7 +105,7 @@ public class Http2PostTest implements TestPropertyProvider {
             System.out.println("Received response with status code " + response.statusCode() + " " + response.version());
             response.bodyHandler(buffer -> result2.complete(new String(buffer.getBytes())));
         })
-        .putHeader("content-length", "1000")
+        .putHeader("content-length", "9")
         .write("Request-2")
         .end();
 
