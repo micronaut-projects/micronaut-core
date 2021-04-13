@@ -439,6 +439,29 @@ class NettyHttpServerConfigurationSpec extends Specification {
         cleanup:
         beanContext.close()
     }
+
+    void "test configuring the parent through event-loops"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+                [
+                 'micronaut.netty.event-loops.parent.shutdown-quiet-period'  : '500ms'
+                ]
+
+        ))
+        beanContext.start()
+
+        when:
+        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        server.start()
+
+        then:
+        noExceptionThrown()
+        server != null
+
+        cleanup:
+        beanContext.close()
+    }
 }
 
 class MemoryAppender extends AppenderBase<ILoggingEvent> {

@@ -16,10 +16,11 @@
 package io.micronaut.docs.ioc.validation.custom;
 
 // tag::imports[]
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.validation.validator.constraints.*;
+import io.micronaut.validation.validator.constraints.ConstraintValidator;
+import io.micronaut.validation.validator.constraints.ConstraintValidatorContext;
 // end::imports[]
 
 // tag::class[]

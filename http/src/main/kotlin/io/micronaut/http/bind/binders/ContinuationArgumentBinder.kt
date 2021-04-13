@@ -20,6 +20,7 @@ import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.context.ServerRequestContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ThreadContextElement
 import java.util.*
 import java.util.concurrent.CompletableFuture
@@ -62,7 +63,7 @@ private class CustomContinuation(
     override fun get(): CompletableFuture<Any?> = completableFuture
 
     override val context: CoroutineContext =
-        serverRequestScopeHandler
+        serverRequestScopeHandler + Dispatchers.Default
 
     override fun resumeWith(result: Result<Any?>) {
         if (result.isSuccess) {

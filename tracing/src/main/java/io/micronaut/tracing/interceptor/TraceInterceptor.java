@@ -34,7 +34,7 @@ import io.opentracing.Span;
 import io.opentracing.Tracer;
 import io.opentracing.log.Fields;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;

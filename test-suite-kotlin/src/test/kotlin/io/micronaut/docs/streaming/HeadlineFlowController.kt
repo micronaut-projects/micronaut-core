@@ -16,16 +16,16 @@
 package io.micronaut.docs.streaming
 
 // tag::imports[]
-
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.*
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Produces
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.time.ZonedDateTime
-
 // end::imports[]
 
 @Controller("/streaming")
@@ -37,7 +37,7 @@ class HeadlineFlowController {
         flow { // <2>
             repeat(100) { // <3>
                 with (Headline()) {
-                    text = "Latest Headline at " + ZonedDateTime.now()
+                    text = "Latest Headline at ${ZonedDateTime.now()}"
                     emit(this) // <4>
                     delay(1_000) // <5>
                 }

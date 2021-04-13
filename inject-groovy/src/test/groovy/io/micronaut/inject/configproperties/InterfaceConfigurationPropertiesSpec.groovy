@@ -1,6 +1,6 @@
 package io.micronaut.inject.configproperties
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.exceptions.NoSuchBeanException
@@ -175,18 +175,11 @@ interface MyConfig {
 
     @ConfigurationProperties("child")    
     static interface ChildConfig {
-        @Executable
         URL getURL();
     }
 }
 
 ''')
-        then:
-        beanDefinition instanceof BeanDefinition
-        beanDefinition.getRequiredMethod("getURL")
-                .stringValue(Property, "name").get() == 'foo.bar.child.url'
-
-        when:
         def context = ApplicationContext.run('foo.bar.child.url': 'http://test')
         def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
 

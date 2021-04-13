@@ -1,7 +1,7 @@
 package io.micronaut.docs.ioc.validation
 
 // tag::imports[]
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.Specification
 
 import javax.inject.Inject

@@ -1,11 +1,13 @@
 package io.micronaut.inject.visitor
 
 import com.blazebit.persistence.impl.function.entity.ValuesEntity
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
+import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
+import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
@@ -19,6 +21,153 @@ class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
 
     def setup() {
         System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, IntrospectedTypeElementVisitor.name)
+    }
+
+    void "test copy constructor via mutate method"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.CopyMe','''\
+package test;
+
+import java.net.URL;
+
+@io.micronaut.core.annotation.Introspected
+class CopyMe {
+
+    URL url
+    boolean enabled = false
+    private final String name
+    private final String another
+    
+    CopyMe(String name, String another) {
+        this.name = name;
+        this.another = another;
+    }
+    
+    String getName() {
+        return name
+    }
+    
+    String getAnother() {
+        return another
+    }
+    
+    public CopyMe withAnother(String a) {
+        return this.another == a ? this : new CopyMe(this.name, a.toUpperCase())
+    }
+}
+''')
+        when:
+        def copyMe = introspection.instantiate("Test", "Another")
+        def expectUrl = new URL("http://test.com")
+        copyMe.url = expectUrl
+
+        then:
+        copyMe.name == 'Test'
+        copyMe.another == "Another"
+        copyMe.url == expectUrl
+
+
+        when:
+        def enabled = introspection.getRequiredProperty("enabled", boolean.class)
+        def urlProperty = introspection.getRequiredProperty("url", URL)
+        def property = introspection.getRequiredProperty("name", String)
+        def another = introspection.getRequiredProperty("another", String)
+        def newInstance = property.withValue(copyMe, "Changed")
+
+        then:
+        !newInstance.is(copyMe)
+        enabled.get(newInstance) == false
+        newInstance.name == 'Changed'
+        newInstance.url == expectUrl
+        newInstance.another == "Another"
+
+        when:"the instance is changed with the same value"
+        def result = property.withValue(newInstance, "Changed")
+
+        then:"The existing instance is returned"
+        newInstance.is(result)
+
+        when:"An explicit with method is used"
+        result = another.withValue(newInstance, "changed")
+
+        then:"It was invoked"
+        !result.is(newInstance)
+        result.another == 'CHANGED'
+
+        when:"a mutable property is used"
+        def anotherUrl = new URL("http://another.com")
+        urlProperty.withValue(result, anotherUrl)
+        enabled.withValue(result, true)
+        then:"it is correct"
+        result.url == anotherUrl
+        result.enabled == true
+    }
+
+    void "test generate bean method for introspected class"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.MethodTest', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+public class MethodTest extends SuperType implements SomeInt {
+    public boolean nonAnnotated() {
+        return true;
+    }
+    
+    @Executable
+    public String invokeMe(String str) {
+        return str;
+    }
+    
+    @Executable
+    int invokePrim(int i) {
+        return i;
+    }
+}
+
+class SuperType {
+    @Executable
+    String superMethod(String str) {
+        return str;
+    }
+    
+    @Executable
+    public String invokeMe(String str) {
+        return str;
+    }
+}
+
+interface SomeInt {
+    @Executable
+    default boolean ok() {
+        return true;
+    }
+    
+    default String getName() {
+        return "ok";
+    }
+}
+''')
+        when:
+        Collection<BeanMethod> beanMethods = introspection.getBeanMethods()
+
+        then:
+        // bizarrely Groovy doesn't support resolving default interface methods
+        beanMethods*.name as Set == ['invokeMe', 'invokePrim', 'superMethod'] as Set
+        beanMethods.every({it.annotationMetadata.hasAnnotation(Executable)})
+        beanMethods.every { it.declaringBean == introspection}
+
+        when:
+        def invokeMe = beanMethods.find { it.name == 'invokeMe' }
+        def invokePrim = beanMethods.find { it.name == 'invokePrim' }
+        def bean = introspection.instantiate()
+
+        then:
+        invokeMe.invoke(bean, "test") == 'test'
+        invokePrim.invoke(bean, 10) == 10
     }
 
     void "test generate bean introspection for interface"() {

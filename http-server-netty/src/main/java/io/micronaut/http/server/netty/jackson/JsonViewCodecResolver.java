@@ -17,7 +17,7 @@ package io.micronaut.http.server.netty.jackson;
 
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Interface for resolving codecs for {@link com.fasterxml.jackson.annotation.JsonView} types.

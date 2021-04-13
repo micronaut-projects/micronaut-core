@@ -15,7 +15,7 @@
  */
 package io.micronaut.validation.validator.extractors;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import javax.validation.ValidationException;
 import javax.validation.valueextraction.ValueExtractor;
 import java.util.Optional;

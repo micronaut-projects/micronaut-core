@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
@@ -38,6 +38,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     private final JavaVisitorContext visitorContext;
     private final VariableElement variableElement;
     private ClassElement declaringElement;
+    private ClassElement typeElement;
 
     /**
      * @param variableElement    The {@link VariableElement}
@@ -64,11 +65,29 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         this.declaringElement = declaringElement;
     }
 
+    @Override
+    public boolean isPrimitive() {
+        return getType().isPrimitive();
+    }
+
+    @Override
+    public boolean isArray() {
+        return getType().isArray();
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return getType().getArrayDimensions();
+    }
+
     @NonNull
     @Override
     public ClassElement getType() {
-        TypeMirror returnType = variableElement.asType();
-        return mirrorToClassElement(returnType, visitorContext);
+        if (this.typeElement == null) {
+            TypeMirror returnType = variableElement.asType();
+            this.typeElement = mirrorToClassElement(returnType, visitorContext);
+        }
+        return this.typeElement;
     }
 
     @Override

@@ -44,4 +44,37 @@ class Foo {}
         definition != null
         definition.getBeanType().name == 'test.Foo'
     }
+
+    void "test inject bean with provider"() {
+        given:
+        BeanDefinitionReference ref = buildBeanDefinitionReference('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+
+@javax.inject.Singleton
+class Test {
+    javax.inject.Provider<Foo> provider;
+    Test(javax.inject.Provider<Foo> provider) {
+        this.provider = provider;
+    }
+    public Foo get() {
+        return provider.get();
+    }
+}
+
+@javax.inject.Singleton
+class Foo {}
+''')
+        def definition = ref.load()
+
+        expect:
+        ref != null
+        ref.getBeanType().name == 'test.Test'
+        definition.constructor.arguments[0].typeParameters.length == 1
+        definition.constructor.arguments[0].typeParameters.length == 1
+        definition.constructor.arguments[0].typeParameters[0].type.name == 'test.Foo'
+    }
 }

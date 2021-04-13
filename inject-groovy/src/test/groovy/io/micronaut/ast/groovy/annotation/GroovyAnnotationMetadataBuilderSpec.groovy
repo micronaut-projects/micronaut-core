@@ -15,15 +15,11 @@
  */
 package io.micronaut.ast.groovy.annotation
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.annotation.MultipleAlias
-import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassNode
-import org.codehaus.groovy.ast.MethodNode
-import org.codehaus.groovy.ast.builder.AstBuilder
 import io.micronaut.aop.Around
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Requirements
@@ -32,7 +28,6 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.ScopedProxy
 import spock.lang.Ignore
-import spock.lang.Specification
 
 import javax.inject.Qualifier
 import javax.inject.Scope

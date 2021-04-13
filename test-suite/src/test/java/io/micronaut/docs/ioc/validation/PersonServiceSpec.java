@@ -16,13 +16,16 @@
 package io.micronaut.docs.ioc.validation;
 
 // tag::imports[]
-import io.micronaut.test.annotation.MicronautTest;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 
 import javax.inject.Inject;
 import javax.validation.ConstraintViolationException;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 // end::imports[]
+
 // tag::test[]
 @MicronautTest
 class PersonServiceSpec {

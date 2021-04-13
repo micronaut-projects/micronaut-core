@@ -17,9 +17,11 @@ package io.micronaut.docs.server.intro;
 
 import io.micronaut.context.annotation.Property;
 // tag::imports[]
-import io.micronaut.test.annotation.MicronautTest;
-import javax.inject.Inject;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
+
+import javax.inject.Inject;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 // end::imports[]
 

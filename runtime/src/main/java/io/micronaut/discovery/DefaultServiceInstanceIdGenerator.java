@@ -16,9 +16,8 @@
 package io.micronaut.discovery;
 
 import io.micronaut.context.env.Environment;
-import io.micronaut.runtime.server.EmbeddedServerInstance;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.StringJoiner;

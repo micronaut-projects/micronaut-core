@@ -754,4 +754,81 @@ class Parent {
         ((Engine.Builder) bean.engine).build().manufacturer == 'Subaru'
         ((Engine.Builder) bean.getEngine2()).build().manufacturer == 'Subaru'
     }
+
+    void "test name is correct with inner classes of non config props class"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition("test.Test\$TestNestedConfig", '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+class Test {
+
+    @ConfigurationProperties("test")
+    static class TestNestedConfig {
+        private String val;
+
+        public String getVal() {
+            return val;
+        }
+
+        public void setVal(String val) {
+            this.val = val;
+        }
+    }
+
+}
+''')
+
+        then:
+        noExceptionThrown()
+        beanDefinition.injectedMethods[0].annotationMetadata.getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "test.val"
+    }
+
+    void "test property names with numbers"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.AwsConfig', '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+@ConfigurationProperties("aws")
+class AwsConfig {
+
+    private String disableEc2Metadata;
+    private String disableEcMetadata;
+    private String disableEc2instanceMetadata;
+
+    public String getDisableEc2Metadata() {
+        return disableEc2Metadata;
+    }
+
+    public void setDisableEc2Metadata(String disableEc2Metadata) {
+        this.disableEc2Metadata = disableEc2Metadata;
+    }
+
+    public String getDisableEcMetadata() {
+        return disableEcMetadata;
+    }
+
+    public void setDisableEcMetadata(String disableEcMetadata) {
+        this.disableEcMetadata = disableEcMetadata;
+    }
+
+    public String getDisableEc2instanceMetadata() {
+        return disableEc2instanceMetadata;
+    }
+
+    public void setDisableEc2instanceMetadata(String disableEc2instanceMetadata) {
+        this.disableEc2instanceMetadata = disableEc2instanceMetadata;
+    }
+}
+''')
+
+        then:
+        noExceptionThrown()
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "aws.disable-ec2-metadata"
+        beanDefinition.injectedMethods[1].getAnnotationMetadata().getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "aws.disable-ec-metadata"
+        beanDefinition.injectedMethods[2].getAnnotationMetadata().getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "aws.disable-ec2instance-metadata"
+    }
 }

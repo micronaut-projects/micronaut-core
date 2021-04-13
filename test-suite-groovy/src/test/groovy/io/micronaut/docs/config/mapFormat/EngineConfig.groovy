@@ -17,8 +17,9 @@ package io.micronaut.docs.config.mapFormat
 
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties
-import javax.validation.constraints.Min
 import io.micronaut.core.convert.format.MapFormat
+
+import javax.validation.constraints.Min
 // end::imports[]
 
 // tag::class[]
@@ -30,6 +31,5 @@ class EngineConfig {
 
     @MapFormat(transformation = MapFormat.MapTransformation.FLAT) //<1>
     Map<Integer, String> sensors
-
 }
 // end::class[]

@@ -25,7 +25,7 @@ import javax.annotation.concurrent.Immutable;
 @Immutable
 public class Business {
 
-    private String name;
+    private final String name;
 
     private Business(String name) {
         this.name = name;
@@ -39,6 +39,5 @@ public class Business {
     public String getName() {
         return name;
     }
-
 }
 // end::class[]

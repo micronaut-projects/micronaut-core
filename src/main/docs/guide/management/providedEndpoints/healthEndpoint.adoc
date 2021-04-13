@@ -1,4 +1,4 @@
-The health endpoint returns information about the "health" of the application. The application health is determined by any number of "health indicators".
+The health endpoint returns information about the "health" of the application, which is determined by any number of "health indicators".
 
 To execute the health endpoint, send a GET request to /health. Additionally the health endpoint exposes /health/liveness and /health/readiness health indicators.
 
@@ -10,32 +10,31 @@ To configure the health endpoint, supply configuration through `endpoints.health
 [source,yaml]
 ----
 endpoints:
-    health:
-        enabled: Boolean
-        sensitive: Boolean
-        details-visible: String <1>
-        status:
-            http-mapping: Map<String, HttpStatus>
+  health:
+    enabled: Boolean
+    sensitive: Boolean
+    details-visible: String <1>
+    status:
+      http-mapping: Map<String, HttpStatus>
 ----
 
 <1> One of api:management.endpoint.health.DetailsVisibility[]
 
-The `details-visible` setting is used to control whether health detail should be exposed to users who are not authenticated.
+The `details-visible` setting controls whether health detail will be exposed to users who are not authenticated.
 
-For example setting:
+For example, setting:
 
 .Using `details-visible`
 [source,yaml]
 ----
 endpoints:
-    health:
-        details-visible: ANONYMOUS
+  health:
+    details-visible: ANONYMOUS
 ----
 
-Will expose detailed information read from the various health indicators about the health status of the application to anonymous unauthenticated users.
+exposes detailed information from the various health indicators about the health status of the application to anonymous unauthenticated users.
 
-The `endpoints.health.status.http-mapping` setting can be used to control what status codes are returned for each health status. The defaults are described in the table below:
-
+The `endpoints.health.status.http-mapping` setting controls which status codes to return for each health status. The defaults are described in the table below:
 
 |===
 |Status | HTTP Code
@@ -53,27 +52,25 @@ The `endpoints.health.status.http-mapping` setting can be used to control what s
 
 You can provide custom mappings in `application.yml`:
 
-
 .Custom Health Status Codes
 [source,yaml]
 ----
 endpoints:
-    health:
-        status:
-            http-mapping:
-                DOWN: 200
+  health:
+    status:
+      http-mapping:
+        DOWN: 200
 ----
 
-The above will return api:http.HttpStatus#OK[] (200) even when the api:health.HealthStatus[] is api:health.HealthStatus#DOWN[].
-
+The above returns api:http.HttpStatus#OK[] (200) even when the api:health.HealthStatus[] is api:health.HealthStatus#DOWN[].
 
 == Customization
 
-The health endpoint consists of a health aggregator and any number of health indicators. To add a health indicator, simply create a bean class that implements link:{api}/io/micronaut/management/health/indicator/HealthIndicator.html[HealthIndicator]. It is recommended to also use either link:{api}/io/micronaut/health/indicator/annotation/Liveness.html[@Liveness] or link:{api}/io/micronaut/health/indicator/annotation/Readiness.html[@Readiness] qualifier. If no qualifier is used then the health incidator is part of /health and /health/readiness endpoints. A base class link:{api}/io/micronaut/management/health/indicator/AbstractHealthIndicator.html[AbstractHealthIndicator] has been provided for you to extend to make the process easier.
+The health endpoint consists of a health aggregator and any number of health indicators. To add a health indicator, create a bean class that implements link:{api}/io/micronaut/management/health/indicator/HealthIndicator.html[HealthIndicator]. It is recommended to also use either link:{api}/io/micronaut/health/indicator/annotation/Liveness.html[@Liveness] or link:{api}/io/micronaut/health/indicator/annotation/Readiness.html[@Readiness] qualifier. If no qualifier is used, the health indicator will be part of /health and /health/readiness endpoints. A base class link:{api}/io/micronaut/management/health/indicator/AbstractHealthIndicator.html[AbstractHealthIndicator] is available to subclass to make the process easier.
 
-All of the health indicator beans will be collected together with the health aggregator. To provide your own implementation of the health aggregator, create a class that implements link:{api}/io/micronaut/management/health/aggregator/HealthAggregator.html[HealthAggregator] and register it as a bean. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the link:{api}/io/micronaut/management/health/aggregator/RxJavaHealthAggregator.html[default implementation].
+All health indicator beans are collected together with the health aggregator. To provide your own implementation of the health aggregator, create a class that implements link:{api}/io/micronaut/management/health/aggregator/HealthAggregator.html[HealthAggregator] and register it as a bean. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the link:{api}/io/micronaut/management/health/aggregator/RxJavaHealthAggregator.html[default implementation].
 
-The default health aggregator returns an overall status that is calculated based on the health statuses of the indicators. A link:{api}/io/micronaut/health/HealthStatus.html[health status] consists of several pieces of information.
+The default health aggregator returns an overall status calculated based on the health statuses of the indicators. A link:{api}/io/micronaut/health/HealthStatus.html[health status] consists of several pieces of information.
 
 |=======
 |Name |The name of the status
@@ -82,11 +79,11 @@ The default health aggregator returns an overall status that is calculated based
 |Severity |How severe the status is. A higher number is more severe
 |=======
 
-The "worst" status will be returned as the overall status. A non operational status will be selected over an operational status. A higher severity will be selected over a lower severity.
+The "worst" status is returned as the overall status. A non-operational status is selected over an operational status. A higher severity is selected over a lower severity.
 
 == Provided Indicators
 
-All micronaut provided health indicators are exposed on /health and /health/readiness endpoints.
+All Micronaut provided health indicators are exposed on /health and /health/readiness endpoints.
 
 === Disk Space
 
@@ -96,11 +93,11 @@ A health indicator is provided that determines the health of the application bas
 [source,yaml]
 ----
 endpoints:
-    health:
-        disk-space:
-            enabled: Boolean
-            path: String #The file path used to determine the disk space
-            threshold: String | Long #The minimum amount of free space
+  health:
+    disk-space:
+      enabled: Boolean
+      path: String #The file path used to determine the disk space
+      threshold: String | Long #The minimum amount of free space
 ----
 
 The threshold can be provided as a string like "10MB" or "200KB", or the number of bytes.
@@ -111,4 +108,4 @@ The JDBC health indicator determines the health of your application based on the
 
 === Discovery Client
 
-If your application is using service discovery, a health indicator will be included to monitor the health of the discovery client. The data returned can include a list of the services available.
+If your application uses service discovery, a health indicator is included to monitor the health of the discovery client. The data returned can include a list of the services available.

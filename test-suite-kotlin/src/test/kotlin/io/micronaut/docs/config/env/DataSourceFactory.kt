@@ -30,8 +30,8 @@ class DataSourceFactory {
         val url = configuration.url
         return DataSource(url)
     }
+// end::eachBean[]
 
-    // end::eachBean[]
     internal class DataSource(private val uri: URI) {
 
         fun connect(): Connection {

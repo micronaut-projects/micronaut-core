@@ -15,8 +15,6 @@
  */
 package io.micronaut.core.annotation;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
@@ -33,6 +31,11 @@ import java.util.*;
  */
 @Internal
 final class EmptyAnnotationMetadata implements AnnotationMetadata {
+
+    @Override
+    public boolean hasPropertyExpressions() {
+        return false;
+    }
 
     @Override
     public <E extends Enum> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
@@ -57,28 +60,24 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @NonNull
     @Override
     public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
-        //noinspection unchecked
         return Collections.emptyList();
     }
 
     @NonNull
     @Override
     public Set<String> getAnnotationNames() {
-        //noinspection unchecked
         return Collections.emptySet();
     }
 
     @NonNull
     @Override
     public Set<String> getDeclaredAnnotationNames() {
-        //noinspection unchecked
         return Collections.emptySet();
     }
 
     @NonNull
     @Override
     public List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
-        //noinspection unchecked
         return Collections.emptyList();
     }
 
@@ -97,14 +96,12 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @NonNull
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@NonNull Class<T> annotationType) {
-        //noinspection unchecked
         return Collections.emptyList();
     }
 
     @NonNull
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@NonNull Class<T> annotationType) {
-        //noinspection unchecked
         return Collections.emptyList();
     }
 
@@ -234,14 +231,12 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @NonNull
     @Override
     public List<String> getAnnotationNamesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
-        //noinspection unchecked
         return Collections.emptyList();
     }
 
     @NonNull
     @Override
     public List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
-        //noinspection unchecked
         return Collections.emptyList();
     }
 

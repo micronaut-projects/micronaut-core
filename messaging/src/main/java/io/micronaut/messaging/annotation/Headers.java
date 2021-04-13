@@ -34,10 +34,12 @@ import java.lang.annotation.Target;
  *
  * @author graemerocher
  * @since 1.0
+ * @deprecated Use {@link MessageHeaders} instead
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
+@Deprecated
 public @interface Headers {
 
     /***

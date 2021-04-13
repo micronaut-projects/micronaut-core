@@ -18,7 +18,9 @@ package io.micronaut.docs.ioc.validation.custom
 // tag::imports[]
 import io.micronaut.context.annotation.Factory
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.validation.validator.constraints.*
+import io.micronaut.validation.validator.constraints.ConstraintValidator
+import io.micronaut.validation.validator.constraints.ConstraintValidatorContext
+
 import javax.inject.Singleton
 // end::imports[]
 
@@ -36,4 +38,3 @@ class MyValidatorFactory {
     }
 }
 // end::class[]
-

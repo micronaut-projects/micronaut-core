@@ -1,4 +1,4 @@
-Gradle supports https://docs.gradle.org/current/userguide/command_line_interface.html#sec:continuous_build[continuous builds], allowing you to run a task that will be rerun every time the source files change. In order to make use of this with a reloading agent (configured as described above), you will run the application normally (with the agent), and then run a recompilation task in a separate terminal with continuous mode enabled.
+Gradle supports https://docs.gradle.org/current/userguide/command_line_interface.html#sec:continuous_build[continuous builds], letting you run a task that will be rerun whenever source files change. To use this with a reloading agent (configured as described above), run the application normally (with the agent), and then run a recompilation task in a separate terminal with continuous mode enabled.
 
 .Run the app
 [source,bash]

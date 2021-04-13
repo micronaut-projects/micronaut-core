@@ -17,8 +17,8 @@ package io.micronaut.inject.provider
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
-import org.atinject.tck.auto.DriversSeat
-import org.atinject.tck.auto.accessories.SpareTire
+import org.atinject.javaxtck.auto.DriversSeat
+import org.atinject.javaxtck.auto.accessories.SpareTire
 import spock.lang.Specification
 
 class ProviderNamedInjectionSpec extends Specification {
@@ -37,7 +37,7 @@ class ProviderNamedInjectionSpec extends Specification {
     }
 
     void "test each bean with a nullable provider parameter"() {
-        ApplicationContext ctx = ApplicationContext.run()
+        ApplicationContext ctx = ApplicationContext.run(["spec.name": getClass().simpleName])
 
         expect:
         ctx.getBeansOfType(EachBeanProvider).size() == 2

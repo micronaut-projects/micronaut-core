@@ -15,9 +15,13 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArgumentUtils;
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -37,6 +41,42 @@ public interface ClassElement extends TypedElement {
      * @return {@code true} if and only if the this type is assignable to the second
      */
     boolean isAssignable(String type);
+
+    /**
+     * Tests whether one type is assignable to another.
+     *
+     * @param type The type to check
+     * @return {@code true} if and only if the this type is assignable to the second
+     * @since 2.3.0
+     */
+    default boolean isAssignable(ClassElement type) {
+        return isAssignable(type.getName());
+    }
+
+    /**
+     * Whether this element is an {@link Optional}.
+     *
+     * @return Is this element an optional
+     * @since 2.3.0
+     */
+    default boolean isOptional() {
+        return isAssignable(Optional.class);
+    }
+
+    /**
+     * This method will return the name of the underlying type automatically unwrapping in the case of an optional
+     * or wrapped representation of the type.
+     *
+     * @return Returns the canonical name of the type.
+     * @since 2.3.0
+     */
+    default String getCanonicalName() {
+        if (isOptional()) {
+            return getFirstTypeArgument().map(ClassElement::getName).orElse(Object.class.getName());
+        } else {
+            return getName();
+        }
+    }
 
     /**
      * @return Whether this element is a record
@@ -132,7 +172,7 @@ public interface ClassElement extends TypedElement {
      * @return The fields
      */
     default List<FieldElement> getFields() {
-        return getFields(modifiers -> true);
+        return getEnclosedElements(ElementQuery.ALL_FIELDS);
     }
 
     /**
@@ -140,9 +180,40 @@ public interface ClassElement extends TypedElement {
      *
      * @param modifierFilter Can be used to filter fields by modifier
      * @return The fields
+     * @deprecated Use {@link #getEnclosedElements(ElementQuery)} instead
      */
+    @Deprecated
     default List<FieldElement> getFields(@NonNull Predicate<Set<ElementModifier>> modifierFilter) {
+        Objects.requireNonNull(modifierFilter, "The modifier filter cannot be null");
+        return getEnclosedElements(ElementQuery.ALL_FIELDS.modifiers(modifierFilter));
+    }
+
+    /**
+     * Return the elements that match the given query.
+     *
+     * @param query The query to use.
+     * @param <T>  The element type
+     * @return The fields
+     * @since 2.3.0
+     */
+    default <T extends Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
         return Collections.emptyList();
+    }
+
+    /**
+     * Return the first enclosed element matching the given query.
+     *
+     * @param query The query to use.
+     * @param <T>  The element type
+     * @return The fields
+     * @since 2.3.0
+     */
+    default <T extends Element> Optional<T> getEnclosedElement(@NonNull ElementQuery<T> query) {
+        List<T> enclosedElements = getEnclosedElements(query);
+        if (!enclosedElements.isEmpty()) {
+            return Optional.of(enclosedElements.iterator().next());
+        }
+        return Optional.empty();
     }
 
     /**
@@ -189,6 +260,16 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Builds a map of all the type parameters for a class, its super classes and interfaces.
+     * The resulting map contains the name of the class to the a map of the resolved generic types.
+     *
+     * @return The type arguments for this class element
+     */
+    default @NonNull Map<String, Map<String, ClassElement>> getAllTypeArguments() {
+        return Collections.emptyMap();
+    }
+
+    /**
      * @return The first type argument
      */
     default Optional<ClassElement> getFirstTypeArgument() {
@@ -211,7 +292,7 @@ public interface ClassElement extends TypedElement {
      *
      * @return A new class element
      */
-    ClassElement toArray();
+    @NonNull ClassElement toArray();
 
     /**
      * Dereference a class element denoting an array type by converting it to its element type.
@@ -220,5 +301,102 @@ public interface ClassElement extends TypedElement {
      * @return A new class element
      * @throws IllegalStateException if this class element doesn't denote an array type
      */
-    ClassElement fromArray();
+    @NonNull ClassElement fromArray();
+
+    /**
+     * Create a class element for the given simple type.
+     * @param type The type
+     * @return The class element
+     */
+    static @NonNull ClassElement of(@NonNull Class<?> type) {
+        return new ReflectClassElement(
+                Objects.requireNonNull(type, "Type cannot be null")
+        );
+    }
+
+    /**
+     * Create a class element for the given simple type.
+     * @param type The type
+     * @param annotationMetadata The annotation metadata
+     * @param typeArguments The type arguments
+     * @return The class element
+     * @since 2.4.0
+     */
+    static @NonNull ClassElement of(
+            @NonNull Class<?> type,
+            @NonNull AnnotationMetadata annotationMetadata,
+            @NonNull Map<String, ClassElement> typeArguments) {
+        Objects.requireNonNull(annotationMetadata, "Annotation metadata cannot be null");
+        Objects.requireNonNull(typeArguments, "Type arguments cannot be null");
+        return new ReflectClassElement(
+                Objects.requireNonNull(type, "Type cannot be null")
+        ) {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return annotationMetadata;
+            }
+
+            @Override
+            public Map<String, ClassElement> getTypeArguments() {
+                return Collections.unmodifiableMap(typeArguments);
+            }
+        };
+    }
+
+    /**
+     * Create a class element for the given simple type.
+     * @param typeName The type
+     * @return The class element
+     */
+    @Internal
+    static @NonNull ClassElement of(@NonNull String typeName) {
+        return new ClassElement() {
+            @Override
+            public boolean isAssignable(String type) {
+                return false;
+            }
+
+            @Override
+            public boolean isAssignable(ClassElement type) {
+                return false;
+            }
+
+            @Override
+            public ClassElement toArray() {
+                throw new UnsupportedOperationException("Cannot convert class elements produced by name to an array");
+            }
+
+            @Override
+            public ClassElement fromArray() {
+                throw new UnsupportedOperationException("Cannot convert class elements produced by from an array");
+            }
+
+            @NotNull
+            @Override
+            public String getName() {
+                return typeName;
+            }
+
+            @Override
+            public boolean isPackagePrivate() {
+                return false;
+            }
+
+            @Override
+            public boolean isProtected() {
+                return false;
+            }
+
+            @Override
+            public boolean isPublic() {
+                return false;
+            }
+
+            @NotNull
+            @Override
+            public Object getNativeType() {
+                return typeName;
+            }
+        };
+    }
 }

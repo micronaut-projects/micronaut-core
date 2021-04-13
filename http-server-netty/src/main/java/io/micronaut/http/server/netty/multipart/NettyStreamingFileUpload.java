@@ -144,7 +144,9 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
                     public void onError(Throwable t) {
                         emitter.onError(t);
                         try {
-                            outputStream.close();
+                            if (outputStream != null) {
+                                outputStream.close();
+                            }
                         } catch (IOException e) {
                             if (LOG.isWarnEnabled()) {
                                 LOG.warn("Failed to close file stream : " + fileUpload.getName());
@@ -202,5 +204,10 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     @Override
     public void subscribe(Subscriber<? super PartData> s) {
         subject.subscribe(s);
+    }
+
+    @Override
+    public void discard() {
+        fileUpload.release();
     }
 }

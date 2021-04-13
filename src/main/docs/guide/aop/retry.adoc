@@ -1,30 +1,30 @@
-In distributed systems and Microservice environments, failure is something you have to plan for and it is pretty common to want to attempt to retry an operation if it fails. If first you don't succeed try again!
+In distributed systems and microservice environments, failure is something you have to plan for, and it is common to want to attempt to retry an operation if it fails. If first you don't succeed try again!
 
-With this in mind Micronaut comes with a api:retry.annotation.Retryable[] annotation out of the box that is integrated into the container.
+With this in mind, Micronaut includes a api:retry.annotation.Retryable[] annotation.
 
 == Simple Retry
 
-The simplest form of retry is just to add the `@Retryable` annotation to any type or method. The default behaviour of `@Retryable` is to retry 3 times with an exponential delay of 1 second between each retry. (first attempt with 1s delay, second attempt with 2s delay, third attempt with 3s delay)
+The simplest form of retry is just to add the `@Retryable` annotation to a type or method. The default behaviour of `@Retryable` is to retry three times with an exponential delay of one second between each retry. (first attempt with 1s delay, second attempt with 2s delay, third attempt with 3s delay).
 
 For example:
 
 snippet::io.micronaut.docs.aop.retry.BookService[tags="simple", indent=0, title="Simple Retry Example"]
 
-With the above example if the `listBooks()` method throws a RuntimeException it will be retried until the maximum number of attempts is reached.
+With the above example if the `listBooks()` method throws a RuntimeException, it is retried until the maximum number of attempts is reached.
 
-The `multiplier` value of the `@Retryable` annotation can be used to configure a multiplier used to calculate the delay between retries, thus allowing exponential retry support.
+The `multiplier` value of the `@Retryable` annotation can be used to configure a multiplier used to calculate the delay between retries, allowing exponential retry support.
 
-Note also that the `@Retryable` annotation can be applied on interfaces and the behaviour will be inherited through annotation metadata. The implication of this is that `@Retryable` can be used in combination with <<introductionAdvice, Introduction Advice>> such as the HTTP api:http.client.annotation.Client[] annotation.
+Note also that the `@Retryable` annotation can be applied on interfaces, and the behaviour is inherited through annotation metadata. The implication of this is that `@Retryable` can be used in combination with <<introductionAdvice, Introduction Advice>> such as the HTTP api:http.client.annotation.Client[] annotation.
 
-To customize retry behaviour you can set the `attempts` and `delay` members, For example to configure 5 attempts with a 2 second delay:
+To customize retry behaviour, set the `attempts` and `delay` members, For example to configure five attempts with a two second delay:
 
 snippet::io.micronaut.docs.aop.retry.BookService[tags="attempts", indent=0, title="Setting Retry Attempts"]
 
-Notice how both `attempts` and `delay` are defined as strings. This is to support configurability through annotation metadata. For example you can allow the retry policy to be configured using property placeholder resolution:
+Notice how both `attempts` and `delay` are defined as strings. This is to support configurability through annotation metadata. For example, you can allow the retry policy to be configured using property placeholder resolution:
 
 snippet::io.micronaut.docs.aop.retry.BookService[tags="config", indent=0, title="Setting Retry via Configuration"]
 
-With the above in place if `book.retry.attempts` is specified in configuration it will be bound the value of the `attempts` member of the `@Retryable` annotation via annotation metadata.
+With the above in place, if `book.retry.attempts` is specified in configuration it is bound to the value of the `attempts` member of the `@Retryable` annotation via annotation metadata.
 
 == Reactive Retry
 
@@ -32,23 +32,23 @@ With the above in place if `book.retry.attempts` is specified in configuration i
 
 snippet::io.micronaut.docs.aop.retry.BookService[tags="reactive", indent=0, title="Applying Retry Policy to Reactive Types"]
 
-In this case `@Retryable` advice will apply the retry policy to the reactive type.
+In this case `@Retryable` advice applies the retry policy to the reactive type.
 
 == Circuit Breaker
 
-In a Microservice environment retry is useful, but in some cases excessive retries can overwhelm the system as clients repeatedly re-attempt failing operations.
+Retry is useful in a microservice environment, but in some cases excessive retries can overwhelm the system as clients repeatedly re-attempt failing operations.
 
-The https://en.wikipedia.org/wiki/Circuit_breaker_design_pattern[Circuit Breaker] pattern is designed to resolve this issue by essentially allowing a certain number of failing requests and then opening a circuit that remains open for a period before allowing any additional retry attempts.
+The https://en.wikipedia.org/wiki/Circuit_breaker_design_pattern[Circuit Breaker] pattern is designed to resolve this issue by allowing a certain number of failing requests and then opening a circuit that remains open for a period before allowing additional retry attempts.
 
-The api:retry.annotation.CircuitBreaker[] annotation is a variation of the `@Retryable` annotation that supports a `reset` member that indicates how long the circuit should remain open before it is reset (the default is 20 seconds).
+The api:retry.annotation.CircuitBreaker[] annotation is a variation of the `@Retryable` annotation that supports a `reset` member which indicates how long the circuit should remain open before it is reset (the default is 20 seconds).
 
 snippet::io.micronaut.docs.aop.retry.BookService[tags="circuit", indent=0, title="Applying CircuitBreaker Advice"]
 
-The above example will retry to `findBooks` method 3 times and then open the circuit for 30 seconds, rethrowing the original exception and preventing potential downstream traffic such as HTTP requests and I/O operations flooding the system.
+The above example retries the `findBooks` method three times and then opens the circuit for 30 seconds, rethrowing the original exception and preventing potential downstream traffic such as HTTP requests and I/O operations flooding the system.
 
 == Factory Bean Retry
 
-When ann:retry.annotation.Retryable[] is applied to bean factory methods, it will behave as if the annotation was placed on the type being returned. When the methods on the returned object get invoked, the retry behavior will apply at that time. Note that the bean factory method itself will *not* be retried. If you would like the functionality of creating the bean to be retried, it should be delegated to another singleton that has the ann:retry.annotation.Retryable[] annotation applied.
+When ann:retry.annotation.Retryable[] is applied to bean factory methods, it behaves as if the annotation was placed on the type being returned. The retry behavior applies when the methods on the returned object are invoked. Note that the bean factory method itself is *not* retried. If you want the functionality of creating the bean to be retried, it should be delegated to another singleton that has the ann:retry.annotation.Retryable[] annotation applied.
 
 For example:
 
@@ -70,8 +70,6 @@ public class Neo4jDriverFactory {
 
 == Retry Events
 
-You can register api:retry.event.RetryEventListener[] instances as beans in order to listen for api:retry.event.RetryEvent[] events that are published every time an operation is retried.
+You can register api:retry.event.RetryEventListener[] instances as beans to listen for api:retry.event.RetryEvent[] events that are published every time an operation is retried.
 
-In addition, you can register event listeners for api:retry.event.CircuitOpenEvent[], when a circuit breaker circuit is opened, or api:retry.event.CircuitClosedEvent[] for when a circuit is closed.
-
-
+In addition, you can register event listeners for api:retry.event.CircuitOpenEvent[] to be notified when a circuit breaker circuit is opened, or api:retry.event.CircuitClosedEvent[] for when a circuit is closed.

@@ -6,7 +6,7 @@ The most common data interchange format nowadays is JSON.
 
 In fact, the defaults in the api:http.annotation.Controller[] annotation specify that the controllers in Micronaut consume and produce JSON by default.
 
-In order to do so in a non-blocking manner Micronaut builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty such that the reading of incoming JSON is done in a non-blocking manner.
+To do so in a non-blocking manner, Micronaut builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty, such that the reading of incoming JSON is done in a non-blocking manner.
 
 == Binding using Reactive Frameworks
 
@@ -14,13 +14,13 @@ From a developer perspective however, you can generally just work with Plain Old
 
 snippet::io.micronaut.docs.server.json.PersonController[tags="class,single,endclass", indent=0, title="Using RxJava 2 to Read the JSON"]
 
-<1> The method receives a RxJava rx:Single[] which emits the POJO once the JSON has been read
-<2> The `map` method is used to store the instance in `Map`
+<1> The method receives an RxJava rx:Single[] which emits the POJO once the JSON has been read
+<2> The `map` method stores the instance in a `Map`
 <3> An api:http.HttpResponse[] is returned
 
-Using CURL from the command line you can POST JSON to the `/people` URI for the server to receive it:
+Using cURL from the command line, you can POST JSON to the `/people` URI:
 
-.Using CURL to Post JSON
+.Using cURL to Post JSON
 ----
 $ curl -X POST localhost:8080/people -d '{"firstName":"Fred","lastName":"Flintstone","age":45}'
 ----
@@ -39,15 +39,15 @@ Note however you can just as easily write:
 
 snippet::io.micronaut.docs.server.json.PersonController[tags="class,regular,endclass", indent=0, title="Binding JSON POJOs"]
 
-Micronaut will only execute your method once the data has been read in a non-blocking manner.
+Micronaut only executes your method once the data has been read in a non-blocking manner.
 
-TIP: The output produced by Jackson can be customized in a variety of manners, from defining Jackson modules to using https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations[Jackson's annotations]
+TIP: The output produced by Jackson can be customized in a variety of ways, from defining Jackson modules to using https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations[Jackson annotations]
 
 == Jackson Configuration
 
-The Jackson ObjectMapper can be configured through normal configuration with the api:io.micronaut.jackson.JacksonConfiguration[] class.
+The Jackson `ObjectMapper` can be configured through configuration with the api:io.micronaut.jackson.JacksonConfiguration[] class.
 
-All jackson configuration keys start with `jackson`.
+All Jackson configuration keys start with `jackson`.
 
 |=======
 | dateFormat | String | The date format
@@ -63,7 +63,7 @@ Example:
 [source,yaml]
 ----
 jackson:
-    serializationInclusion: ALWAYS
+  serializationInclusion: ALWAYS
 ----
 
 === Features
@@ -78,29 +78,28 @@ All features can be configured with their name as the key and a boolean to indic
 |generator | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonGenerator.Feature.html[JsonGenerator.Feature]
 |======
 
-
 Example:
 
 [source,yaml]
 ----
 jackson:
-    serialization:
-        indentOutput: true
-        writeDatesAsTimestamps: false
-    deserialization:
-        useBigIntegerForInts: true
-        failOnUnknownProperties: false
+  serialization:
+    indentOutput: true
+    writeDatesAsTimestamps: false
+  deserialization:
+    useBigIntegerForInts: true
+    failOnUnknownProperties: false
 ----
 
 === Support for `@JsonView`
 
-You can use the `@JsonView` annotation to controller methods if you set `jackson.json-view.enabled` to `true` in `application.yml`.
+You can use the `@JsonView` annotation on controller methods if you set `jackson.json-view.enabled` to `true` in `application.yml`.
 
-Jackson's `@JsonView` annotation allows you to control which properties are exposes on a per response basis. See https://www.baeldung.com/jackson-json-view-annotation[Jackson JSON Views] for more information.
+Jackson's `@JsonView` annotation lets you control which properties are exposed on a per-response basis. See https://www.baeldung.com/jackson-json-view-annotation[Jackson JSON Views] for more information.
 
 === Beans
 
-In addition to configuration, beans can be registered to customize Jackson. All beans that extend any of the following classes will be registered with the object mapper.
+In addition to configuration, beans can be registered to customize Jackson. All beans that extend any of the following classes are registered with the object mapper:
 
 * link:{jackson-databind}com/fasterxml/jackson/databind/Module.html[Module]
 * link:{jackson-databind}com/fasterxml/jackson/databind/JsonDeserializer.html[JsonDeserializer]
@@ -111,4 +110,4 @@ In addition to configuration, beans can be registered to customize Jackson. All 
 
 === Service Loader
 
-Any modules registered via the service loader will also be added to the default object mapper.
+Any modules registered via the service loader are also added to the default object mapper.

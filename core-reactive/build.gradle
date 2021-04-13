@@ -1,0 +1,5 @@
+dependencies {
+    api project(":core")
+    api dependencyVersion("reactive.streams")
+    api dependencyVersion("slf4j")
+}

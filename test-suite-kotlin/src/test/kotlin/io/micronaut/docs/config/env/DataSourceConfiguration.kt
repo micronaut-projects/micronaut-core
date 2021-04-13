@@ -15,19 +15,16 @@
  */
 package io.micronaut.docs.config.env
 
+// tag::eachProperty[]
 import io.micronaut.context.annotation.EachProperty
 import io.micronaut.context.annotation.Parameter
-
 import java.net.URI
 import java.net.URISyntaxException
 
-// tag::eachProperty[]
-
 @EachProperty("test.datasource")  // <1>
-class DataSourceConfiguration // <2>
+class DataSourceConfiguration
 @Throws(URISyntaxException::class)
-constructor(@param:Parameter val name: String) {
-    // <3>
-    var url = URI("localhost")
+constructor(@param:Parameter val name: String) { // <2>
+    var url = URI("localhost") // <3>
 }
 // end::eachProperty[]

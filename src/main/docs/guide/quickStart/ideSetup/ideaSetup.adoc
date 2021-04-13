@@ -1,6 +1,6 @@
-To import a Micronaut project into IntelliJ IDEA simply open the `build.gradle` or `pom.xml` file and follow the instructions to import the project.
+To import a Micronaut project into IntelliJ IDEA, open the `build.gradle` or `pom.xml` file and follow the instructions to import the project.
 
-For IntelliJ IDEA if you plan to use the IntelliJ compiler then you should enable annotation processing under the "Build, Execution, Deployment -> Compiler -> Annotation Processors" by ticking the "Enable annotation processing" checkbox:
+For IntelliJ IDEA, if you plan to use the IntelliJ compiler, enable annotation processing under "Build, Execution, Deployment -> Compiler -> Annotation Processors" by ticking the "Enable annotation processing" checkbox:
 
 image::intellij-annotation-processors.png[Intellij Settings,1024,768]
 

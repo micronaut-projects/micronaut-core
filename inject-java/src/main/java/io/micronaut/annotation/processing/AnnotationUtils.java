@@ -27,7 +27,7 @@ import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -191,7 +191,7 @@ public class AnnotationUtils {
     public AnnotationMetadata getAnnotationMetadata(Element element) {
         AnnotationMetadata metadata = annotationMetadataCache.get(element);
         if (metadata == null) {
-            metadata = newAnnotationBuilder().buildOverridden(element);
+            metadata = javaAnnotationMetadataBuilder.buildOverridden(element);
             annotationMetadataCache.put(element, metadata);
         }
         return metadata;
@@ -289,7 +289,7 @@ public class AnnotationUtils {
      * @param element The element
      */
     @Internal
-    public void invalidateMetadata(Element element) {
+    public static void invalidateMetadata(Element element) {
         if (element != null) {
             annotationMetadataCache.remove(element);
         }

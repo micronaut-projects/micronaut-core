@@ -36,10 +36,10 @@ public class BooksController {
             m.put("status", 401);
             m.put("error", "Unauthorized");
             m.put("message", "No message available");
-            m.put("path", "/books/"+isbn);
+            m.put("path", "/books/" + isbn);
             return HttpResponse.status(HttpStatus.UNAUTHORIZED).body(m);
-
         }
+
         return HttpResponse.ok(new Book("1491950358", "Building Microservices"));
     }
 }

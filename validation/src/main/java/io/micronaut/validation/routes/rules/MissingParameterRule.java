@@ -24,12 +24,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.RequestBean;
-import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.validation.InternalUriMatchTemplate;
 import io.micronaut.validation.routes.RouteValidationResult;
 
 /**
@@ -41,13 +39,13 @@ import io.micronaut.validation.routes.RouteValidationResult;
 public class MissingParameterRule implements RouteValidationRule {
 
     @Override
-    public RouteValidationResult validate(List<UriMatchTemplate> templates, ParameterElement[] parameters, MethodElement method) {
+    public RouteValidationResult validate(List<InternalUriMatchTemplate> templates, ParameterElement[] parameters, MethodElement method) {
 
         Set<String> variables = templates.stream().flatMap(t -> t.getVariableNames().stream()).collect(Collectors.toSet());
         Set<String> routeVariables = Arrays.stream(parameters).map(ParameterElement::getName).collect(Collectors.toCollection(LinkedHashSet::new));
 
         routeVariables.addAll(Arrays.stream(parameters)
-                .filter(p -> p.hasAnnotation(Body.class))
+                .filter(p -> p.hasAnnotation("io.micronaut.http.annotation.Body"))
                 .map(ParameterElement::getType)
                 .filter(Objects::nonNull)
                 .flatMap(t -> t.getBeanProperties().stream())
@@ -56,7 +54,7 @@ public class MissingParameterRule implements RouteValidationRule {
 
         // RequestBean has properties inside
         routeVariables.addAll(Arrays.stream(parameters)
-                .filter(p -> p.hasAnnotation(RequestBean.class))
+                .filter(p -> p.hasAnnotation("io.micronaut.http.annotation.RequestBean"))
                 .map(ParameterElement::getType)
                 .flatMap(t -> t.getBeanProperties().stream())
                 .filter(p -> p.hasStereotype(Bindable.class))

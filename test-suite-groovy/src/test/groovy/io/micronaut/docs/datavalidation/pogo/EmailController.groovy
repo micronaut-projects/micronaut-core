@@ -13,18 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.datavalidation.pogo;
+package io.micronaut.docs.datavalidation.pogo
 
+import io.micronaut.context.annotation.Requires
 //tag::imports[]
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Post;
-import io.micronaut.validation.Validated;
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Post
+import io.micronaut.validation.Validated
 
-import javax.validation.Valid;
-import java.util.Collections;
+import javax.validation.Valid
 //end::imports[]
 
 @Requires(property = "spec.name", value = "datavalidationpogo")
@@ -35,7 +34,7 @@ class EmailController {
 
     @Post("/send")
     HttpResponse send(@Body @Valid Email email) { // <2>
-        HttpResponse.ok(Collections.singletonMap("msg", "OK"))
+        HttpResponse.ok(msg: "OK")
     }
 }
 //end::clazz[]

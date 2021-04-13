@@ -2,35 +2,35 @@ The ann:websocket.annotation.ServerWebSocket[] annotation can be applied to any 
 
 snippet::io.micronaut.docs.http.server.netty.websocket.ChatServerWebSocket[tags="clazz", indent=0,title="WebSocket Chat Example"]
 
-<1> The ann:websocket.annotation.ServerWebSocket[] annotation is used to define the path the WebSocket is mapped under. The URI can be a URI template.
-<2> The ann:websocket.annotation.OnOpen[] annotation is used to declare a method that is invoked when the WebSocket is opened.
-<3> The ann:websocket.annotation.OnMessage[] annotation is used to declare a method that is invoked when a message is received.
-<4> You can use a api:websocket.WebSocketBroadcaster[] to broadcast messages to every WebSocket session. You can filter which sessions to communicate with a `Predicate`. Also, you could use the passed api:websocket.WebSocketSession[] instance to send a message to it with `WebSocketSession::send`.
-<5> The ann:websocket.annotation.OnClose[] annotation is used to declare a method that is invoked when the WebSocket is closed.
+<1> The ann:websocket.annotation.ServerWebSocket[] annotation defines the path the WebSocket is mapped under. The URI can be a URI template.
+<2> The ann:websocket.annotation.OnOpen[] annotation declares the method to invoke when the WebSocket is opened.
+<3> The ann:websocket.annotation.OnMessage[] annotation declares the method to invoke when a message is received.
+<4> You can use a api:websocket.WebSocketBroadcaster[] to broadcast messages to every WebSocket session. You can filter which sessions to send to with a `Predicate`. Also, you could use the api:websocket.WebSocketSession[] instance to send a message to it with `WebSocketSession::send`.
+<5> The ann:websocket.annotation.OnClose[] annotation declares the method to invoke when the WebSocket is closed.
 
 TIP: A working example of WebSockets in action can be found in the https://github.com/micronaut-projects/micronaut-examples/tree/master/websocket-chat[Micronaut Examples] GitHub repository.
 
-In terms of binding the method arguments to each WebSocket method can be:
+For binding, method arguments to each WebSocket method can be:
 
-* A variable from the URI template (in the above example `topic` and `username` are variables in the URI template)
+* A variable from the URI template (in the above example `topic` and `username` are URI template variables)
 * An instance of api:websocket.WebSocketSession[]
 
 === The @OnClose Method
 
-The ann:websocket.annotation.OnClose[] method can also optionally receive a api:websocket.CloseReason[]. The `@OnClose` method is invoked prior to the session closing.
+The ann:websocket.annotation.OnClose[] method can optionally receive a api:websocket.CloseReason[]. The `@OnClose` method is invoked prior to the session closing.
 
 === The @OnMessage Method
 
-The ann:websocket.annotation.OnMessage[] method can define a parameter that is the message body. The parameter can be one of the following:
+The ann:websocket.annotation.OnMessage[] method can define a parameter for the message body. The parameter can be one of the following:
 
 * A Netty `WebSocketFrame`
-* Any Java primitive or simple type (such as `String`). In fact any type that can be converted from `ByteBuf` (you can register additional api:core.convert.TypeConverter[] beans if you wish to support a custom type).
+* Any Java primitive or simple type (such as `String`). In fact, any type that can be converted from `ByteBuf` (you can register additional api:core.convert.TypeConverter[] beans to support a custom type).
 * A `byte[]`, a `ByteBuf` or a Java NIO `ByteBuffer`.
-* A Plain Old Java Object (POJO). In the case of a POJO the POJO will be decoded by default  as JSON using api:jackson.codec.JsonMediaTypeCodec[]. You can register a custom codec if necessary and define the content type of the handler using the ann:http.annotation.Consumes[] annotation.
+* A POJO. In this case, it will be decoded by default as JSON using api:jackson.codec.JsonMediaTypeCodec[]. You can register a custom codec and define the content type of the handler using the ann:http.annotation.Consumes[] annotation.
 
 === The @OnError Method
 
-A method annotated with ann:websocket.annotation.OnError[] can be added to implement custom error handling. The `@OnError` method can optionally define a parameter that receives the exception type that is to be handled. If no `@OnError` handling is present and a unrecoverable exception occurs the WebSocket is automatically closed.
+A method annotated with ann:websocket.annotation.OnError[] can be added to implement custom error handling. The `@OnError` method can define a parameter that receives the exception type to be handled. If no `@OnError` handling is present and an unrecoverable exception occurs, the WebSocket is automatically closed.
 
 === Non-Blocking Message Handling
 
@@ -38,29 +38,26 @@ The previous example uses the `broadcastSync` method of the api:websocket.WebSoc
 
 snippet::io.micronaut.docs.http.server.netty.websocket.ReactivePojoChatServerWebSocket[tags="onmessage", indent=0,title="WebSocket Chat Example"]
 
-The example above uses `broadcast`, which creates an instance of rs:Publisher[] and returns the value to Micronaut.
-Micronaut will then take care of sending the message asynchronously based on the Publisher interface.
-The similar `send` method can be used to send a single message asynchronously via Micronaut return value.
+The example above uses `broadcast`, which creates an instance of rs:Publisher[] and returns the value to Micronaut. Micronaut sends the message asynchronously based on the Publisher interface. The similar `send` method sends a single message asynchronously via Micronaut return value.
 
-For sending messages asynchronously outside Micronaut annotated handler methods, you can use `broadcastAsync` and `sendAsync` methods in their respective api:websocket.WebSocketBroadcaster[] and api:websocket.WebSocketSession[] interfaces.
-For blocking sends, the `broadcastSync` and `sendSync` methods can be used.
+For sending messages asynchronously outside Micronaut annotated handler methods, you can use `broadcastAsync` and `sendAsync` methods in their respective api:websocket.WebSocketBroadcaster[] and api:websocket.WebSocketSession[] interfaces. For blocking sends, the `broadcastSync` and `sendSync` methods can be used.
 
 === @ServerWebSocket and Scopes
 
-By default a unique `@ServerWebSocket` instance is created for each WebSocket connection. This allows you to retrieve the api:websocket.WebSocketSession[] from the `@OnOpen` handler and assign it to a field of the  `@ServerWebSocket` instance.
+By default, a unique `@ServerWebSocket` instance is created for each WebSocket connection. This lets you retrieve the api:websocket.WebSocketSession[] from the `@OnOpen` handler and assign it to a field of the `@ServerWebSocket` instance.
 
-If you define the `@ServerWebSocket` as `@Singleton` it should be noted that extra care will need to be taken to synchronize local state to avoid thread safety issues.
+If you define the `@ServerWebSocket` as `@Singleton`, extra care must be taken to synchronize local state to avoid thread safety issues.
 
 === Sharing Sessions with the HTTP Session
 
-The api:websocket.WebSocketSession[] is by default backed by an in-memory map. If you add the the `session` module you can however share <<sessions,sessions>> between the HTTP server and the WebSocket server.
+The api:websocket.WebSocketSession[] is by default backed by an in-memory map. If you add the `session` module you can however share <<sessions,sessions>> between the HTTP server and the WebSocket server.
 
-NOTE: When sessions are backed by a persistent store such as Redis then after each message is processed the session is updated to the backing store.
+NOTE: When sessions are backed by a persistent store such as Redis, after each message is processed the session is updated to the backing store.
 
 [TIP]
 .Using the CLI
 ====
-If you have created your project using the Micronaut CLI and the default (`service`) profile, you can use the `create-websocket-server` command to create a class with api:websocket.WebSocketServer[].
+If you created your project using the Micronaut CLI and the default (`service`) profile, you can use the `create-websocket-server` command to create a class with api:websocket.WebSocketServer[].
 
 ----
 $ mn create-websocket-server MyChat
@@ -70,23 +67,23 @@ $ mn create-websocket-server MyChat
 
 === Connection Timeouts
 
-By default Micronaut will timeout idle connections that have no activity after 5 minutes. Normally this is not a problem as browsers will automatically reconnect WebSocket sessions, however you can control this behaviour by setting the `micronaut.server.idle-timeout` setting (a negative value will result no timeout):
+By default, Micronaut times out idle connections with no activity after five minutes. Normally this is not a problem as browsers automatically reconnect WebSocket sessions, however you can control this behaviour by setting the `micronaut.server.idle-timeout` setting (a negative value results in no timeout):
 
 .Setting the Connection Timeout for the Server
 [source,yaml]
 ----
 micronaut:
-    server:
-        idle-timeout: 30m # 30 minutes
+  server:
+    idle-timeout: 30m # 30 minutes
 ----
 
-If you are using Micronaut's WebSocket client then you may also wish to set the timeout on the client:
+If you use Micronaut's WebSocket client you may also wish to set the timeout on the client:
 
 .Setting the Connection Timeout for the Client
 [source,yaml]
 ----
 micronaut:
-    http:
-        client:
-            read-idle-timeout: 30m # 30 minutes
+  http:
+    client:
+      read-idle-timeout: 30m # 30 minutes
 ----

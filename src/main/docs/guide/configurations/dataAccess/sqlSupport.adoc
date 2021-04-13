@@ -1,17 +1,17 @@
-Java data sources can be configured for one of three currently provided implementations. Apache DBCP2, Hikari, and Tomcat are supported by default.
+JDBC DataSources can be configured for one of three currently provided implementations - Apache DBCP2, Hikari, and Tomcat are supported by default.
 
 == Configuring a JDBC DataSource
 
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI, supply one of the `jdbc-tomcat`, `jdbc-hikari`, or `jdbc-dbcp` features to preconfigure a simple JDBC connection in your project, along with a default H2 database driver:
+If you create your project using the Micronaut CLI, supply one of the `jdbc-tomcat`, `jdbc-hikari`, or `jdbc-dbcp` features to preconfigure a simple JDBC connection pool in your project, along with a default H2 database driver:
 ----
 $ mn create-app my-app --features jdbc-tomcat
 ----
 ====
 
-To get started, simply add a dependency to one of the JDBC configurations that corresponds to the implementation you would like to use. Choose one of the following:
+To get started, add a dependency for one of the JDBC configurations that corresponds to the implementation you will use. Choose one of the following:
 
 dependency:micronaut-jdbc-tomcat[groupId="io.micronaut.sql", scope="runtime"]
 
@@ -21,8 +21,7 @@ dependency:micronaut-jdbc-dbcp[groupId="io.micronaut.sql",scope="runtime"]
 
 dependency:micronaut-jdbc-ucp[groupId="io.micronaut.sql",scope="runtime"]
 
-
-You also need to add a JDBC driver dependency to your classpath. For example to add the http://www.h2database.com[H2 In-Memory Database]:
+Also, add a JDBC driver dependency to your build. For example to add the http://www.h2database.com[H2 In-Memory Database]:
 
 dependency:h2[groupId="com.h2database",scope="runtime"]
 

@@ -1,2 +1,1 @@
-
-Check https://micronaut-projects.github.io/micronaut-discovery-client/latest/guide/index.html#serviceDiscoveryConsul[Micronaut Consul documentation].
+See the https://micronaut-projects.github.io/micronaut-discovery-client/latest/guide/index.html#serviceDiscoveryConsul[Micronaut Consul documentation].

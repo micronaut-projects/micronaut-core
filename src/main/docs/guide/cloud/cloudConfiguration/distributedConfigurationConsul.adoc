@@ -1,4 +1,4 @@
-https://www.consul.io[Consul] is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native api:discovery.consul.client.v1.ConsulClient[] that is built using Micronaut's support for <<clientAnnotation, Declarative HTTP Clients>>.
+https://www.consul.io[Consul] is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native api:discovery.consul.client.v1.ConsulClient[] that uses Micronaut's support for <<clientAnnotation, Declarative HTTP Clients>>.
 
 == Starting Consul
 
@@ -17,43 +17,40 @@ Alternatively you can https://www.consul.io/docs/install/index.html[install and 
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI, supply the `config-consul` feature to enable Consul's distributed configuration in your project:
+If you create your project using the Micronaut CLI, supply the `config-consul` feature to enable Consul's distributed configuration in your project:
 ----
 $ mn create-app my-app --features config-consul
 ----
 ====
 
-To enable distributed configuration, similar to Spring Boot and Grails, you need to create a `src/main/resources/bootstrap.yml` configuration file and configure Consul as well as enable the configuration client:
+To enable distributed configuration, similar to Spring Boot and Grails, create a `src/main/resources/bootstrap.yml` configuration file to configure Consul, and enable the configuration client:
 
 .bootstrap.yml
 [source,yaml]
 ----
 micronaut:
-    application:
-        name: hello-world
-    config-client:
-        enabled: true
+  application:
+    name: hello-world
+  config-client:
+    enabled: true
 consul:
-    client:
-        defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
+  client:
+    defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
 ----
 
-Once you have enabled distributed configuration you need to store the configuration you wish to share in Consul's Key/Value store.
-
-There are a number of different ways to do that.
+After enabling distributed configuration, store the configuration to share in Consul's key/value store. There are a number of ways to do that.
 
 == Storing Configuration as Key/Value Pairs
 
-One way is to store each key and value directly in Consul. In this case by default Micronaut will look for configuration in the `/config` folder of Consul.
+One way is to store the keys and values directly in Consul. In this case by default Micronaut looks for configuration in the Consul `/config` directory.
 
 TIP: You can alter the path searched for by setting `consul.client.config.path`
 
-Within the `/config` folder Micronaut will search values within the following folders in order of precedence:
-
+Within the `/config` directory Micronaut searches values within the following directories in order of precedence:
 
 .Configuration Resolution Precedence
 |===
-|Folder|Description
+|Directory|Description
 
 |`/config/application`
 |Configuration shared by all applications
@@ -62,18 +59,18 @@ Within the `/config` folder Micronaut will search values within the following fo
 |Configuration shared by all applications for the `prod` api:context.env.Environment[]
 
 |`/config/[APPLICATION_NAME]`
-|Application specific configuration, example `/config/hello-world`
+|Application-specific configuration, example `/config/hello-world`
 
 |`/config/[APPLICATION_NAME],prod`
-|Application specific configuration for an active api:context.env.Environment[]
+|Application-specific configuration for an active api:context.env.Environment[]
 
 |===
 
 The value of `APPLICATION_NAME` is whatever your have configured `micronaut.application.name` to be in `bootstrap.yml`.
 
-To see this in action use the following curl command to store a property called `foo.bar` with a value of `myvalue` in the folder `/config/application`.
+To see this in action, use the following cURL command to store a property called `foo.bar` with a value of `myvalue` in the directory `/config/application`.
 
-.Using curl to Write a Value
+.Using cURL to Write a Value
 [source,bash]
 ----
 curl -X PUT -d @- localhost:8500/v1/kv/config/application/foo.bar <<< myvalue
@@ -83,7 +80,7 @@ If you now define a `@Value("${foo.bar}")` or call `environment.getProperty(..)`
 
 == Storing Configuration in YAML, JSON etc.
 
-Some Consul users prefer storing configuration in blobs of a certain format, such as YAML. Micronaut supports this mode and supports storing configuration in either YAML, JSON or Java properties format.
+Some Consul users prefer storing configuration in blobs of a certain format, such as YAML. Micronaut supports this mode and supports storing configuration in either YAML, JSON, or Java properties format.
 
 TIP: The api:discovery.config.ConfigDiscoveryConfiguration[] has a number of configuration options for configuring how distributed configuration is discovered.
 
@@ -95,14 +92,14 @@ For example, to configure JSON:
 [source,yaml]
 ----
 consul:
-    client:
-        config:
-            format: JSON
+  client:
+    config:
+      format: JSON
 ----
 
 Now write your configuration in JSON format to Consul:
 
-.Using curl write JSON
+.Using cURL to write JSON
 [source,bash]
 ----
 curl -X PUT  localhost:8500/v1/kv/config/application \
@@ -113,17 +110,17 @@ EOF
 
 == Storing Configuration as File References
 
-Another popular option is https://github.com/breser/git2consul[git2consul] which mirrors the contents of a Git repository to Consul's Key/Value store.
+Another popular option is https://github.com/breser/git2consul[git2consul] which mirrors the contents of a Git repository to Consul's key/value store.
 
-You can setup a Git repository that contains files like `application.yml`, `hello-world-test.json` etc. and the contents of these files are cloned to Consul.
+You can setup a Git repository that contains files like `application.yml`, `hello-world-test.json`, etc., and the contents of these files will be cloned to Consul.
 
-In this case each key in consul represents a file with an extension. For example `/config/application.yml` and you must configure the `FILE` format:
+In this case, each key in Consul represents a file with an extension, for example `/config/application.yml`, and you must configure the `FILE` format:
 
 .application.yml
 [source,yaml]
 ----
 consul:
-    client:
-        config:
-            format: FILE
+  client:
+    config:
+      format: FILE
 ----

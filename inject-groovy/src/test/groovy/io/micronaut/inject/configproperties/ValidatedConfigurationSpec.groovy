@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.configproperties
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
@@ -69,7 +69,7 @@ class ValidatedConfigurationSpec extends AbstractBeanDefinitionSpec {
 
     void "test config props with @Valid on field is a validating bean definition"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig2', '''
 package test
 
 import io.micronaut.context.annotation.ConfigurationProperties
@@ -79,7 +79,7 @@ import javax.validation.Valid
 import java.util.List
 
 @ConfigurationProperties("test.valid")
-public class MyConfig {
+public class MyConfig2 {
 
     @Valid
     private List<Pojo> pojos

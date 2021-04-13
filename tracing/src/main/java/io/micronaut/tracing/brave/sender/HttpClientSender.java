@@ -24,6 +24,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.*;
 import io.micronaut.http.client.netty.DefaultHttpClient;
+import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.tracing.brave.ZipkinServiceInstanceList;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
@@ -57,6 +58,7 @@ public final class HttpClientSender extends Sender {
     private final int messageMaxBytes;
     private final boolean compressionEnabled;
     private final URI endpoint;
+    private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
     private final Provider<LoadBalancerResolver> loadBalancerResolver;
     private final HttpClientConfiguration clientConfiguration;
     private HttpClient httpClient;
@@ -67,13 +69,15 @@ public final class HttpClientSender extends Sender {
             boolean compressionEnabled,
             HttpClientConfiguration clientConfiguration,
             Provider<LoadBalancerResolver> loadBalancerResolver,
-            String path) {
+            String path,
+            List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
         this.loadBalancerResolver = loadBalancerResolver;
         this.clientConfiguration = clientConfiguration;
         this.encoding = encoding;
         this.messageMaxBytes = messageMaxBytes;
         this.compressionEnabled = compressionEnabled;
         this.endpoint = path != null ? URI.create(path) : URI.create(Builder.DEFAULT_PATH);
+        this.invocationInstrumenterFactories = invocationInstrumenterFactories;
     }
 
     @Override
@@ -127,7 +131,8 @@ public final class HttpClientSender extends Sender {
 
             this.httpClient = loadBalancer.map(lb -> new DefaultHttpClient(
                     lb,
-                    clientConfiguration
+                    clientConfiguration,
+                    invocationInstrumenterFactories
             )).orElse(null);
         }
     }
@@ -250,6 +255,7 @@ public final class HttpClientSender extends Sender {
         private boolean compressionEnabled = true;
         private List<URI> servers = Collections.singletonList(URI.create(DEFAULT_SERVER_URL));
         private final HttpClientConfiguration clientConfiguration;
+        private List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
 
         /**
          * Initialize the builder with HTTP client configurations.
@@ -339,6 +345,28 @@ public final class HttpClientSender extends Sender {
         }
 
         /**
+         * The path to use.
+         *
+         * @param path The path of the Zipkin endpoint
+         * @return This builder
+         */
+        public Builder path(String path) {
+            this.path = path;
+            return this;
+        }
+
+        /**
+         * The invocation instrumenter factories to use.
+         *
+         * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument http client netty handlers execution with
+         * @return This builder
+         */
+        public Builder invocationInstrumenterFactories(List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
+            this.invocationInstrumenterFactories = invocationInstrumenterFactories;
+            return this;
+        }
+
+        /**
          * Constructs a {@link HttpClientSender}.
          *
          * @param loadBalancerResolver Resolver instance capable of resolving references to services into a concrete load-balance
@@ -351,7 +379,8 @@ public final class HttpClientSender extends Sender {
                     compressionEnabled,
                     clientConfiguration,
                     loadBalancerResolver,
-                    path
+                    path,
+                    invocationInstrumenterFactories
             );
         }
     }

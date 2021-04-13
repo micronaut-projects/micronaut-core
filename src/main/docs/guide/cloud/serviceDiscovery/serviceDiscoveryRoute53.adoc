@@ -1,18 +1,14 @@
-To use the https://aws.amazon.com/route53/[Route 53 Service Discovery], you must meet the following criteria:
+To use https://aws.amazon.com/route53/[Route 53 Service Discovery], you must meet the following criteria:
 
 * Run EC2 instances of some type
 * Have a domain name hosted in Route 53
 * Have a newer version of AWS-CLI (such as 14+)
 
-Assuming you have those things, you are ready. It is not as fancy as Consul or Eureka, but other than some initial setup
-with the AWS-CLI, there is no other software running to go wrong. You can even support health checks
-if you add a custom health check to your service. If you would like to test if your account can create and use Service Discovery see the Integration Test section.
-More information can be found at https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html.
+Assuming you have those things, you are ready. It is not as fancy as Consul or Eureka, but other than some initial setup with the AWS-CLI, there is no other software running to go wrong. You can even support health checks if you add a custom health check to your service. To test if your account can create and use Service Discovery, see the Integration Test section. More information is available at https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html.
 
 Here are the steps:
 
-1. Use AWS-CLI to create a namespace. You can make either a public or private one depending on what IPs or subnets
-you are using
+1. Use AWS-CLI to create a namespace. You can make either a public or private one depending on the IPs or subnets you use
 2. Create a service with DNS Records with AWS-CLI command
 3. Add health checks or custom health checks (optional)
 4. Add Service ID to your application configuration file like so:
@@ -21,32 +17,32 @@ you are using
 [source,yaml]
 ----
 aws:
-    route53:
-        registration
-            enabled: true
-            aws-service-id: srv-978fs98fsdf
-            namespace: micronaut.io
+  route53:
+    registration
+    enabled: true
+    aws-service-id: srv-978fs98fsdf
+    namespace: micronaut.io
 micronaut:
-    application:
-        name: something
+  application:
+    name: something
 ----
 
-5. Make sure you have the following dependencies included in your build file:
+5. Make sure you have the following dependencies in your build file:
 
 dependency:io.micronaut.aws:micronaut-aws-route53[]
 
-6. On the client side, you will need the same dependencies and less configuration options:
+6. On the client side, you need the same dependencies and fewer configuration options:
 
 .Sample application.yml
-[source,groovy]
+[source,yaml]
 ----
 aws:
-    route53:
-        discovery:
-            client:
-                enabled: true
-                aws-service-id: srv-978fs98fsdf
-                namespace-id: micronaut.io
+  route53:
+    discovery:
+      client:
+        enabled: true
+        aws-service-id: srv-978fs98fsdf
+        namespace-id: micronaut.io
 ----
 
 You can then use the api:discovery.DiscoveryClient[] API to find other services registered via Route 53. For example:
@@ -54,19 +50,16 @@ You can then use the api:discovery.DiscoveryClient[] API to find other services 
 .Sample code for client
 [source,java]
 ----
-DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient);
+DiscoveryClient discoveryClient = embeddedServer.getApplicationContext().getBean(DiscoveryClient.class);
 List<String> serviceIds = Flowable.fromPublisher(discoveryClient.getServiceIds()).blockingFirst();
 List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceIds.get(0))).blockingFirst();
 ----
 
 ==== Creating the Namespace
 
+Namespaces are similar to a regular Route53 hosted zone, and they appear in the Route53 console, but the console doesn't support modifying them. You must use the AWS-CLI at this time for any Service Discovery functionality.
 
-Namespaces are similar to a regular Route53 hosted zone, and they appear in the Route53 console but the console doesn't support
- modifying them. You must use the AWS-CLI at this time for any Service Discovery functionality.
-
-First decide if you are creating a public facing namespace or a private one, as the commands are different:
-
+First decide if you are creating a public-facing namespace or a private one, as the commands are different:
 
 .Creating Namespace
 [source,bash]
@@ -78,7 +71,6 @@ or
 $ aws servicediscovery create-private-dns-namespace --name micronaut.internal.io --create-request-id create-1522767790 --description adescriptionhere --vpc yourvpcID
 ----
 
-
 When you run this you will get an operation ID. You can check the status with the `get-operation` CLI command:
 
 .Get Operation Results
@@ -87,11 +79,11 @@ When you run this you will get an operation ID. You can check the status with th
 $ aws servicediscovery get-operation --operation-id asdffasdfsda
 ----
 
-You can use this command to get the status of any call you make that returns an operation id.
+You can use this command to get the status of any call you make that returns an operation ID.
 
 The result of the command will tell you the ID of the namespace. Write that down, you'll need it for the next steps. If you get an error it will say what the error was.
 
-==== Creating the Service & DNS Records
+==== Creating the Service and DNS Records
 
 The next step is creating the Service and DNS records.
 
@@ -103,7 +95,7 @@ $ aws create-service --name yourservicename --create-request-id somenumber --des
 
 The `DnsRecord` type can be `A`(ipv4),`AAAA`(ipv6),`SRV`, or `CNAME`. `RoutingPolicy` can be `WEIGHTED` or `MULTIVALUE`. Keep in mind `CNAME` must use weighted routing type, `SRV` must have a valid port configured.
 
-If you want to add a health check, you can use the following syntax on the CLI: 
+To add a health check, use the following syntax on the CLI:
 
 .Specifying a Health Check
 [source,bash]
@@ -111,47 +103,45 @@ If you want to add a health check, you can use the following syntax on the CLI:
 Type=string,ResourcePath=string,FailureThreshold=integer
 ----
 
-Type can be 'HTTP','HTTPS', or 'TCP'. You can only use a standard health check on a public namespace. See Custom Health Checks for private namespaces. Resource path should be a url that returns 200 OK if it's healthy.
+Type can be 'HTTP','HTTPS', or 'TCP'. You can only use a standard health check on a public namespace. See Custom Health Checks for private namespaces. Resource path should be a URL that returns `200 OK` if it is healthy.
 
-For a custom health check, you only need to specify `--health-check-custom-config FailureThreshold=integer` which will work on private namespaces as well.
+For a custom health check, you only need to specify `--health-check-custom-config FailureThreshold=integer` which works on private namespaces as well.
 
-This is also good because Micronaut will send out pulsation commands to let AWS know the instance is still healthy.
+This is also good because Micronaut sends out pulsation commands to let AWS know the instance is still healthy.
 
 For more help run 'aws discoveryservice create-service help'.
 
-You will get a service ID and an ARN back from this command if successful. Write that down, it's going to go into the Micronaut configuration.
-
+You will get a service ID and an ARN back from this command if successful. Write that down, it is going to go into the Micronaut configuration.
 
 ==== Setting up the configuration in Micronaut
 
 ==== Auto Naming Registration
 
-You will need to add the configuration to make your applications register with Route 53 Auto-discovery:
+Add the configuration to make your applications register with Route 53 Auto-discovery:
 
 .Registration Properties
 [source,yaml]
 ----
 aws:
-    route53:
-        registration:
-            enabled: true
-            aws-service-id=<enter the service id you got after creation on aws cli>
-        discovery:
-            namespace-id=<enter the namespace id you got after creating the namespace>
+  route53:
+    registration:
+      enabled: true
+      aws-service-id=<enter the service id you got after creation on aws cli>
+    discovery:
+      namespace-id=<enter the namespace id you got after creating the namespace>
 ----
 
 ==== Discovery Client Configuration
-
 
 .Discovery Properties
 [source,yaml]
 ----
 aws:
-    route53:
-        discovery:
-            client
-                enabled: true
-                aws-service-id: <enter the service id you got after creation on aws cli>
+  route53:
+    discovery:
+      client
+      enabled: true
+      aws-service-id: <enter the service id you got after creation on aws cli>
 ----
 
 You can also call the following methods by getting the bean "Route53AutoNamingClient":
@@ -161,22 +151,10 @@ You can also call the following methods by getting the bean "Route53AutoNamingCl
 ----
 // if serviceId is null it will use property "aws.route53.discovery.client.awsServiceId"
 Publisher<List<ServiceInstance>> getInstances(String serviceId)
-// reads property "aws.route53.discovery.namespaceId" 
-Publisher<List<String>> getServiceIds() 
+// reads property "aws.route53.discovery.namespaceId"
+Publisher<List<String>> getServiceIds()
 ----
 
 ==== Integration Tests
 
-If you set the environment variable AWS_SUBNET_ID and have credentials configured in your home directory that are valid (in `~/.aws/credentials`)
-you can run the integration tests. You will still need a domain hosted on route53 as well. This test will create a t2.nano instance, a namespace, service, and register that instance to service discovery.
-When the test completes it will remove/terminate all resources it spun up.
-
-
-
-
-
-
-
-
-
-
+If you set the environment variable AWS_SUBNET_ID and have credentials configured in your home directory that are valid (in `~/.aws/credentials`) you can run the integration tests. You need a domain hosted on Route53 as well. This test will create a t2.nano instance, a namespace, service, and register that instance to service discovery. When the test completes it will remove/terminate all resources it spun up.

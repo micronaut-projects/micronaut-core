@@ -30,8 +30,8 @@ import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.ValidationException;
@@ -402,11 +402,11 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
                         ReflectionUtils.getWrapperType(targetType)
                 );
                 Class<T> finalTargetType = targetType;
+                final Class[] finalTypeArguments = {constraintType, finalTargetType};
                 final Optional<ConstraintValidator> local = localValidators.entrySet().stream().filter(entry -> {
                             final ValidatorKey k = entry.getKey();
-                            return TypeArgumentQualifier.areTypesCompatible(
-                                    new Class[]{constraintType, finalTargetType},
-                                    Arrays.asList(k.constraintType, k.targetType)
+                    return TypeArgumentQualifier.areTypesCompatible(
+                            finalTypeArguments, Arrays.asList(k.constraintType, k.targetType)
                             );
                         }
                 ).map(Map.Entry::getValue).findFirst();

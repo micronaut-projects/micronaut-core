@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.i18n
 
-import io.micronaut.context.MessageSource
+import io.micronaut.context.MessageSource.MessageContext
 import io.micronaut.context.i18n.ResourceBundleMessageSource
 import spock.lang.Specification
 
@@ -24,13 +24,13 @@ class I18nSpec extends Specification {
     void "it is possible to create a MessageSource from resource bundle"() {
         //tag::test[]
         given:
-        ResourceBundleMessageSource ms = new ResourceBundleMessageSource("io.micronaut.docs.i18n.messages")
+        def ms = new ResourceBundleMessageSource("io.micronaut.docs.i18n.messages")
 
         expect:
-        ms.getMessage("hello", MessageSource.MessageContext.of(new Locale("es"))).get() == 'Hola'
+        ms.getMessage("hello", MessageContext.of(new Locale("es"))).get() == 'Hola'
 
         and:
-        ms.getMessage("hello", MessageSource.MessageContext.of(Locale.ENGLISH)).get() == 'Hello'
+        ms.getMessage("hello", MessageContext.of(Locale.ENGLISH)).get() == 'Hello'
         //end::test[]
     }
 }

@@ -15,8 +15,8 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import groovy.lang.GroovyClassLoader;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
@@ -67,6 +67,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final SourceUnit sourceUnit;
     private final MutableConvertibleValues<Object> attributes;
     private final List<String> generatedResources = new ArrayList<>();
+    private final GroovyElementFactory groovyElementFactory;
 
     /**
      * @param sourceUnit      The source unit
@@ -77,6 +78,7 @@ public class GroovyVisitorContext implements VisitorContext {
         this.errorCollector = sourceUnit.getErrorCollector();
         this.compilationUnit = compilationUnit;
         this.attributes = VISITOR_ATTRIBUTES;
+        this.groovyElementFactory = new GroovyElementFactory(this);
     }
 
     @NonNull
@@ -108,7 +110,7 @@ public class GroovyVisitorContext implements VisitorContext {
                 });
 
         return Optional.ofNullable(classNode)
-                .map(cn -> AbstractGroovyElement.toClassElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)));
+                .map(cn -> groovyElementFactory.newClassElement(cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)));
     }
 
     @Override
@@ -116,7 +118,7 @@ public class GroovyVisitorContext implements VisitorContext {
         final ClassNode classNode = ClassHelper.makeCached(type);
         final AnnotationMetadata annotationMetadata = AstAnnotationUtils
                 .getAnnotationMetadata(sourceUnit, compilationUnit, classNode);
-        final ClassElement classElement = AbstractGroovyElement.toClassElement(sourceUnit, compilationUnit, classNode, annotationMetadata);
+        final ClassElement classElement = groovyElementFactory.newClassElement(classNode, annotationMetadata);
         return Optional.of(
                 classElement
         );
@@ -137,10 +139,16 @@ public class GroovyVisitorContext implements VisitorContext {
         for (String s : stereotypes) {
             scanner.scan(s, aPackage).forEach(aClass -> {
                 final ClassNode classNode = ClassHelper.make(aClass);
-                classElements.add(AbstractGroovyElement.toClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)));
+                classElements.add(groovyElementFactory.newClassElement(classNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)));
             });
         }
         return classElements.toArray(new ClassElement[0]);
+    }
+
+    @NonNull
+    @Override
+    public GroovyElementFactory getElementFactory() {
+        return groovyElementFactory;
     }
 
     @Override
@@ -266,6 +274,13 @@ public class GroovyVisitorContext implements VisitorContext {
      */
     SourceUnit getSourceUnit() {
         return sourceUnit;
+    }
+
+    /**
+     * @return The compilation unit
+     */
+    CompilationUnit getCompilationUnit() {
+        return compilationUnit;
     }
 
     /**

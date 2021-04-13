@@ -17,21 +17,25 @@ package io.micronaut.docs.server.upload;
 
 // tag::class[]
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.reactivex.Single;
-import java.io.File;
 import org.reactivestreams.Publisher;
+
+import java.io.File;
 import java.io.IOException;
+
+import static io.micronaut.http.HttpStatus.CONFLICT;
+import static io.micronaut.http.MediaType.MULTIPART_FORM_DATA;
+import static io.micronaut.http.MediaType.TEXT_PLAIN;
 
 @Controller("/upload")
 public class UploadController {
 
-    @Post(value = "/", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN) // <1>
+    @Post(value = "/", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
     public Single<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
+
         File tempFile;
         try {
             tempFile = File.createTempFile(file.getFilename(), "temp");
@@ -39,12 +43,13 @@ public class UploadController {
             return Single.error(e);
         }
         Publisher<Boolean> uploadPublisher = file.transferTo(tempFile); // <3>
+
         return Single.fromPublisher(uploadPublisher)  // <4>
             .map(success -> {
                 if (success) {
                     return HttpResponse.ok("Uploaded");
                 } else {
-                    return HttpResponse.<String>status(HttpStatus.CONFLICT)
+                    return HttpResponse.<String>status(CONFLICT)
                                        .body("Upload Failed");
                 }
             });

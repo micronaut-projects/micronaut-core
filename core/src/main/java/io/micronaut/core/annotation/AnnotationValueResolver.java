@@ -16,8 +16,6 @@
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.value.ValueResolver;
-
-import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.*;
 
 /**

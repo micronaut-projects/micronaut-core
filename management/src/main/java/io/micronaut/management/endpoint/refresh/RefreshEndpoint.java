@@ -21,7 +21,7 @@ import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Write;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.Map;
 import java.util.Set;
 

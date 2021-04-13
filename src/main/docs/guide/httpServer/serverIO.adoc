@@ -1,8 +1,8 @@
 === Reactively Writing Response Data
 
-Micronaut's HTTP server supports writing chunks of response data by returning a rs:Publisher[] the emits objects that can be encoded to the HTTP response.
+Micronaut's HTTP server supports writing chunks of response data by returning a rs:Publisher[] that emits objects that can be encoded to the HTTP response.
 
-The following table summarizes example return type signatures and the behaviour the server exhibits to handle each of them:
+The following table summarizes example return type signatures and the behaviour the server exhibits to handle them:
 
 |===
 |Return Type | Description
@@ -13,31 +13,29 @@ The following table summarizes example return type signatures and the behaviour 
 |`Flux<ByteBuf>`
 |A Reactor `Flux` that emits each chunk as a Netty `ByteBuf`
 
-
 |`Publisher<String>`
 |A rs:Publisher[] that emits each chunk of content as a String
 
-
 |`Flowable<Book>`
-|When emitting a POJO each emitted object is encoded as JSON by default without blocking
+|When emitting a POJO, each emitted object is encoded as JSON by default without blocking
 
 |===
 
-When returning reactive type the server will use a `Transfer-Encoding` of `chunked` and keep writing data until the rs:Publisher[]'s `onComplete` method is called.
+When returning a reactive type, the server uses a `Transfer-Encoding` of `chunked` and keeps writing data until the rs:Publisher[] `onComplete` method is called.
 
-The server will request a single item from the rs:Publisher[], write the item and then request the next item, controlling back pressure.
+The server requests a single item from the rs:Publisher[], writes it, and requests the next, controlling back pressure.
 
 NOTE: It is up to the implementation of the rs:Publisher[] to schedule any blocking I/O work that may be done as a result of subscribing to the publisher.
 
 === Performing Blocking I/O
 
-In some cases you may wish to integrate with a library that does not support non-blocking I/O.
+In some cases you may wish to integrate a library that does not support non-blocking I/O.
 
-In this case you can return a api:core.io.Writable[] object from any controller method. The api:core.io.Writable[] has various signatures that allowing writing to traditional blocking streams like jdk:java.io.Writer[] or jdk:java.io.OutputStream[].
+In this case you can return a api:core.io.Writable[] object from any controller method. The api:core.io.Writable[] interface has various signatures that allow writing to traditional blocking streams like jdk:java.io.Writer[] or jdk:java.io.OutputStream[].
 
-When returning a api:core.io.Writable[] object the blocking I/O operation will be shifted to the I/O thread pool so that the Netty event loop is not blocked.
+When returning a api:core.io.Writable[], the blocking I/O operation is shifted to the I/O thread pool so the Netty event loop is not blocked.
 
-TIP: See the section on configuring <<threadPools, Server Thread Pools>> for details on how to configure the I/O thread pool to meet the requirements of your application.
+TIP: See the section on configuring <<threadPools, Server Thread Pools>> for details on how to configure the I/O thread pool to meet your application requirements.
 
 The following example demonstrates how to use this API with Groovy's `SimpleTemplateEngine` to write a server side template:
 
@@ -58,4 +56,4 @@ snippet::io.micronaut.docs.respondingnotfound.BooksController[tags="clazz", inde
 <1> Returning `null` triggers a 404 (Not Found) response.
 <2> Returning an empty `Maybe` triggers a 404 (Not Found) response.
 
-NOTE: Responding with an empty `Publisher` or `Flowable` will result in an empty array being returned if the content type is JSON.
+NOTE: Responding with an empty `Publisher` or `Flowable` results in an empty array being returned if the content type is JSON.

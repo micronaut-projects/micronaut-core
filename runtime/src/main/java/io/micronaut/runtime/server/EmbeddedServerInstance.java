@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,18 +15,10 @@
  */
 package io.micronaut.runtime.server;
 
-import io.micronaut.discovery.ServiceInstance;
-
 /**
- * Extended version of the {@link ServiceInstance} interface for the {@link EmbeddedServer}.
- *
+ * @deprecated Use {@link io.micronaut.discovery.EmbeddedServerInstance} instead.
  * @author graemerocher
- * @since 1.0
  */
-public interface EmbeddedServerInstance extends ServiceInstance {
-
-    /**
-     * @return A reference to the server
-     */
-    EmbeddedServer getEmbeddedServer();
+@Deprecated
+public interface EmbeddedServerInstance extends io.micronaut.discovery.EmbeddedServerInstance {
 }

@@ -16,20 +16,17 @@
 package io.micronaut.docs.aop.around
 
 // tag::imports[]
-
+import io.micronaut.aop.InterceptorBean
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
-import io.micronaut.core.type.MutableArgumentValue
-
-import javax.inject.Singleton
 import java.util.Objects
-import java.util.Optional
-
+import javax.inject.Singleton
 // end::imports[]
 
 // tag::interceptor[]
 @Singleton
-class NotNullInterceptor : MethodInterceptor<Any, Any> { // <1>
+@InterceptorBean(NotNull::class) // <1>
+class NotNullInterceptor : MethodInterceptor<Any, Any> { // <2>
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any {
         val nullParam = context.parameters
                 .entries
@@ -38,11 +35,11 @@ class NotNullInterceptor : MethodInterceptor<Any, Any> { // <1>
                     val argumentValue = entry.value
                     Objects.isNull(argumentValue.value)
                 }
-                .findFirst() // <2>
+                .findFirst() // <3>
         return if (nullParam.isPresent) {
-            throw IllegalArgumentException("Null parameter [" + nullParam.get().key + "] not allowed") // <3>
+            throw IllegalArgumentException("Null parameter [${nullParam.get().key}] not allowed") // <4>
         } else {
-            context.proceed() // <4>
+            context.proceed() // <5>
         }
     }
 }

@@ -15,10 +15,10 @@
  */
 package io.micronaut.docs.ioc.validation.custom
 
-
 // tag::imports[]
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.validation.validator.constraints.*
+import io.micronaut.validation.validator.constraints.ConstraintValidator
+import io.micronaut.validation.validator.constraints.ConstraintValidatorContext
 // end::imports[]
 
 // tag::class[]

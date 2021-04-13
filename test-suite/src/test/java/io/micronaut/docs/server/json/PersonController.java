@@ -20,8 +20,11 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.reactivex.Maybe;
@@ -96,8 +99,8 @@ public class PersonController {
 
     // tag::localError[]
     @Error
-    public HttpResponse<JsonError> jsonError(HttpRequest request, JsonParseException jsonParseException) { // <1>
-        JsonError error = new JsonError("Invalid JSON: " + jsonParseException.getMessage()) // <2>
+    public HttpResponse<JsonError> jsonError(HttpRequest request, JsonParseException e) { // <1>
+        JsonError error = new JsonError("Invalid JSON: " + e.getMessage()) // <2>
                 .link(Link.SELF, Link.of(request.getUri()));
 
         return HttpResponse.<JsonError>status(HttpStatus.BAD_REQUEST, "Fix Your JSON")

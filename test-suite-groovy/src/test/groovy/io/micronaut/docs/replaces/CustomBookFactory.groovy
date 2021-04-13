@@ -21,10 +21,9 @@ import io.micronaut.docs.requires.Book
 
 import javax.inject.Singleton
 
-
 // tag::class[]
 @Factory
-@Replaces(factory = BookFactory.class)
+@Replaces(factory = BookFactory)
 class CustomBookFactory {
 
     @Singleton

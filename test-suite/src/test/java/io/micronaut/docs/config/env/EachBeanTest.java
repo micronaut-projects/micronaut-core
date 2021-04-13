@@ -17,21 +17,20 @@ package io.micronaut.docs.config.env;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.junit.Test;
-import io.micronaut.core.util.CollectionUtils;
 
-import static org.junit.Assert.assertNotNull;
-import static io.micronaut.docs.config.env.DataSourceFactory.*;
-import java.net.URISyntaxException;
 import java.util.Collection;
 
+import static io.micronaut.docs.config.env.DataSourceFactory.DataSource;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 public class EachBeanTest {
 
     @Test
-    public void testEachBean() throws URISyntaxException {
+    public void testEachBean() {
         // tag::config[]
         ApplicationContext applicationContext = ApplicationContext.run(PropertySource.of(
                 "test",
@@ -49,8 +48,8 @@ public class EachBeanTest {
                 DataSource.class,
                 Qualifiers.byName("one") // <2>
         );
-
         // end::beans[]
+
         assertNotNull(firstConfig);
 
         applicationContext.close();

@@ -3,16 +3,15 @@ The api:runtime.context.scope.Refreshable[] scope is a custom scope that allows 
 - `/refresh` endpoint.
 - Publication of a api:runtime.context.scope.refresh.RefreshEvent[].
 
-The following example, illustrates the `@Refreshable` scope behavior.
+The following example illustrates `@Refreshable` scope behavior.
 
 snippet::io.micronaut.docs.inject.scope.RefreshEventSpec[tags="weatherService",indent="0"]
-
 
 <1> The `WeatherService` is annotated with `@Refreshable` scope which stores an instance until a refresh event is triggered
 <2> The value of the `forecast` property is set to a fixed value when the bean is created and won't change until the bean is refreshed
 
-If you invoke the `latestForecast()` twice, you will see identical responses such as `"Scattered Clouds 01/Feb/18 10:29.199"`.
+If you invoke `latestForecast()` twice, you will see identical responses such as `"Scattered Clouds 01/Feb/18 10:29.199"`.
 
-When the `/refresh` endpoint is invoked or a api:runtime.context.scope.refresh.RefreshEvent[] is published then the instance is invalidated and a new instance is created the next time the object is requested. For example:
+When the `/refresh` endpoint is invoked or a api:runtime.context.scope.refresh.RefreshEvent[] is published, the instance is invalidated and a new instance is created the next time the object is requested. For example:
 
 snippet::io.micronaut.docs.inject.scope.RefreshEventSpec[tags="publishEvent",indent="0"]

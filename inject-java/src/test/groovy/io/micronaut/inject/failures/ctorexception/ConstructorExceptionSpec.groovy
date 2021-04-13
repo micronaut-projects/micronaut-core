@@ -15,18 +15,15 @@
  */
 package io.micronaut.inject.failures.ctorexception
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
-import io.micronaut.context.exceptions.DependencyInjectionException
 import spock.lang.Specification
 
 class ConstructorExceptionSpec extends Specification {
 
     void "test error message when exception occurs in constructor"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run(["spec.name": getClass().simpleName])
 
         when:"A bean is obtained that has a setter with @Inject"
         B b =  context.getBean(B)
@@ -39,6 +36,9 @@ Error instantiating bean of type  [io.micronaut.inject.failures.ctorexception.A]
 
 Message: bad
 Path Taken: B.a --> new A([C c])'''
+
+        cleanup:
+        context.close()
     }
 
 }

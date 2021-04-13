@@ -1,0 +1,7 @@
+io.micronaut.inject.annotation.internal.CoreNullableTransformer
+io.micronaut.inject.annotation.internal.CoreNonNullTransformer
+io.micronaut.inject.annotation.internal.KotlinNullableMapper
+io.micronaut.inject.annotation.internal.KotlinNotNullMapper
+io.micronaut.inject.annotation.internal.MessageBodyTransformer
+io.micronaut.inject.annotation.internal.MessageHeadersTransformer
+io.micronaut.inject.annotation.internal.MessageHeaderTransformer

@@ -26,8 +26,8 @@ import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
@@ -42,6 +42,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -87,6 +88,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected void addError(@NonNull Element originatingElement, @NonNull String error) {
         messager.printMessage(Diagnostic.Kind.ERROR, error, originatingElement);
+    }
+
+    @Override
+    protected void addWarning(@NonNull Element originatingElement, @NonNull String warning) {
+        messager.printMessage(Diagnostic.Kind.WARNING, warning, originatingElement);
     }
 
     @Override
@@ -180,13 +186,39 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     protected List<? extends AnnotationMirror> getAnnotationsForType(Element element) {
         List<? extends AnnotationMirror> annotationMirrors = new ArrayList<>(element.getAnnotationMirrors());
         annotationMirrors.removeIf(mirror -> getAnnotationTypeName(mirror).equals(AnnotationUtil.KOTLIN_METADATA));
-        return annotationMirrors;
+        List<AnnotationMirror> expanded = new ArrayList<>(annotationMirrors.size());
+        for (AnnotationMirror annotation: annotationMirrors) {
+            boolean repeatable = false;
+            for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry: annotation.getElementValues().entrySet()) {
+                if (entry.getKey().getSimpleName().toString().equals("value")) {
+                    Object value = entry.getValue().getValue();
+                    if (value instanceof List) {
+                        String parentAnnotationName = getAnnotationTypeName(annotation);
+                        for (Object val: (List<?>) value) {
+                            if (val instanceof AnnotationMirror) {
+                                String name = getRepeatableName((AnnotationMirror) val);
+                                if (name != null && name.equals(parentAnnotationName)) {
+                                    repeatable = true;
+                                    expanded.add((AnnotationMirror) val);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (!repeatable) {
+                expanded.add(annotation);
+            }
+        }
+        return expanded;
     }
 
     @Override
     protected List<Element> buildHierarchy(Element element, boolean inheritTypeAnnotations, boolean declaredOnly) {
         if (declaredOnly) {
-            return Collections.singletonList(element);
+            List<Element> onlyDeclared = new ArrayList<>(1);
+            onlyDeclared.add(element);
+            return onlyDeclared;
         }
 
         if (element instanceof TypeElement) {
@@ -288,6 +320,33 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                 annotationValues.put(memberName, resolvedValue);
             }
         }
+    }
+
+    @Override
+    protected boolean isValidationRequired(Element member) {
+        final List<? extends AnnotationMirror> annotationMirrors = member.getAnnotationMirrors();
+        return isValidationRequired(annotationMirrors);
+    }
+
+    private boolean isValidationRequired(List<? extends AnnotationMirror> annotationMirrors) {
+        for (AnnotationMirror annotationMirror : annotationMirrors) {
+            final String annotationName = getAnnotationTypeName(annotationMirror);
+            if (annotationName.startsWith("javax.validation")) {
+                return true;
+            } else if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
+                final Element element = getAnnotationMirror(annotationName).orElse(null);
+                if (element != null) {
+                    final List<? extends AnnotationMirror> childMirrors = element.getAnnotationMirrors()
+                            .stream()
+                            .filter(ann -> !getAnnotationTypeName(ann).equals(annotationName))
+                            .collect(Collectors.toList());
+                    if (isValidationRequired(childMirrors)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     @Override

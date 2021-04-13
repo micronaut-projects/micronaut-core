@@ -16,10 +16,12 @@
 package io.micronaut.docs.server.uris;
 
 import io.micronaut.http.uri.UriMatchTemplate;
-import static org.junit.Assert.*;
 import org.junit.Test;
 
 import java.util.Collections;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class UriTemplateTest {
 
@@ -30,7 +32,7 @@ public class UriTemplateTest {
         UriMatchTemplate template = UriMatchTemplate.of("/hello/{name}");
 
         assertTrue(template.match("/hello/John").isPresent()); // <1>
-        assertEquals("/hello/John", template.expand(  // <2>
+        assertEquals("/hello/John", template.expand( // <2>
                 Collections.singletonMap("name", "John")
         ));
         // end::match[]

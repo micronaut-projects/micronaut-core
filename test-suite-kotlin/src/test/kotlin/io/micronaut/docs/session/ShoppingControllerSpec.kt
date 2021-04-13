@@ -9,22 +9,21 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import kotlin.test.assertNotNull
 
-
 class ShoppingControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java)
+        ApplicationContext.run(EmbeddedServer::class.java)
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
     )
 
     init {
         "testSessionValueUsedOnReturnValue" {
             // tag::view[]
             var response = client.exchange(HttpRequest.GET<Cart>("/shopping/cart"), Cart::class.java) // <1>
-                    .blockingFirst()
+                                 .blockingFirst()
             var cart = response.body()
 
             assertNotNull(response.header(HttpHeaders.AUTHORIZATION_INFO)) // <2>
@@ -35,10 +34,9 @@ class ShoppingControllerSpec: StringSpec() {
             // tag::add[]
             val sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO) // <1>
 
-            response = client.exchange(
-                    HttpRequest.POST("/shopping/cart/Apple", "")
-                            .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart::class.java) // <2>
-                    .blockingFirst()
+            response = client.exchange(HttpRequest.POST("/shopping/cart/Apple", "")
+                             .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart::class.java) // <2>
+                             .blockingFirst()
             cart = response.body()
             // end::add[]
 
@@ -46,8 +44,8 @@ class ShoppingControllerSpec: StringSpec() {
             cart.items.size shouldBe 1
 
             response = client.exchange(HttpRequest.GET<Any>("/shopping/cart")
-                    .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart::class.java)
-                    .blockingFirst()
+                             .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart::class.java)
+                             .blockingFirst()
             cart = response.body()
 
             response.header(HttpHeaders.AUTHORIZATION_INFO)

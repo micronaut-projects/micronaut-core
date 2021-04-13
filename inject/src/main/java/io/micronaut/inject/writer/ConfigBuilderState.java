@@ -17,10 +17,10 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.Type;
-
-import javax.annotation.concurrent.Immutable;
 
 /**
  * Stores data to be used when visiting a configuration builder method.
@@ -29,7 +29,6 @@ import javax.annotation.concurrent.Immutable;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Immutable
 @Internal
 class ConfigBuilderState {
 
@@ -49,8 +48,8 @@ class ConfigBuilderState {
      * @param metadataBuilder    The metadata builder
      * @param isInterface        Whether the type is an interface or not
      */
-    ConfigBuilderState(Object type, String name, boolean isMethod, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder, boolean isInterface) {
-        this.type = AbstractClassFileWriter.getTypeReference(type);
+    ConfigBuilderState(ClassElement type, String name, boolean isMethod, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder, boolean isInterface) {
+        this.type = JavaModelUtils.getTypeReference(type);
         this.name = name;
         this.invokeMethod = isMethod;
         this.metadataBuilder = metadataBuilder;
