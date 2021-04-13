@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2021 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.aop.chain;
 
 import io.micronaut.aop.*;
@@ -18,6 +33,7 @@ import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,9 +44,8 @@ import java.util.stream.Collectors;
  * @since 3.0.0
  */
 public class DefaultInterceptorRegistry implements InterceptorRegistry {
-    private static final MethodInterceptor<?, ?>[] ZERO_METHOD_INTERCEPTORS = new MethodInterceptor[0];
     protected static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
-
+    private static final MethodInterceptor<?, ?>[] ZERO_METHOD_INTERCEPTORS = new MethodInterceptor[0];
     private final BeanContext beanContext;
 
     public DefaultInterceptorRegistry(BeanContext beanContext) {
@@ -41,7 +56,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
     @NonNull
     public <T> Interceptor<T, ?>[] resolveInterceptors(
             @NonNull Executable<T, ?> method,
-            @NonNull List<BeanRegistration<Interceptor<T, ?>>> interceptors,
+            @NonNull Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
             @NonNull InterceptorKind interceptorKind) {
         final AnnotationMetadata annotationMetadata = method.getAnnotationMetadata();
         if (interceptors.isEmpty()) {
@@ -75,10 +90,10 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                         // does the annotation metadata of the interceptor definition contain
                         // @InterceptorBinding(SomeAnnotation.class) ?
                         final boolean isApplicationByBinding = annotationValue.stringValue()
-                                .map(annotationName -> InterceptorBindingQualifier.resolveInterceptorValues(beanRegistration
-                                        .getBeanDefinition()
-                                        .getAnnotationMetadata())
-                                        .contains(annotationName))
+                                .map(annotationName -> InterceptorBindingQualifier
+                                        .resolveInterceptorValues(beanRegistration.getBeanDefinition().getAnnotationMetadata(), interceptorKind.name())
+                                        .contains(annotationName)
+                                )
                                 .orElse(false);
                         return isApplicableByType || isApplicationByBinding;
                     })).sorted(OrderUtil.COMPARATOR)
@@ -101,7 +116,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
     @NonNull
     public <T> Interceptor<T, T>[] resolveConstructorInterceptors(
             @NonNull BeanConstructor<T> constructor,
-            @NonNull List<BeanRegistration<Interceptor<T, T>>> interceptors) {
+            @NonNull Collection<BeanRegistration<Interceptor<T, T>>> interceptors) {
         instrumentAnnotationMetadata(beanContext, constructor);
         final List<AnnotationValue<InterceptorBinding>> applicableBindings
                 = constructor.getAnnotationMetadata().getAnnotationValuesByType(InterceptorBinding.class)

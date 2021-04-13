@@ -62,7 +62,6 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     private final Map<String, Optional<GeneratedFile>> generatedFiles = new LinkedHashMap<>();
     private final boolean isGradleFiler;
 
-
     /**
      * @param filer The {@link Filer} for creating new files
      */

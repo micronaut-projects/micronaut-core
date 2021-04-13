@@ -16,10 +16,7 @@
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanType;
 
@@ -95,28 +92,36 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
         return Objects.hash(supportedAnnotationNames, supportedInterceptorTypes);
     }
 
+    @Override
+    public String toString() {
+        if (CollectionUtils.isEmpty(supportedAnnotationNames) && CollectionUtils.isEmpty(supportedInterceptorTypes)) {
+            return "@InterceptorBinding(NONE)";
+        } else {
+            return supportedAnnotationNames.stream().map((name) -> "@InterceptorBinding(" + name + ")").collect(Collectors.joining(" ")) +
+                    supportedInterceptorTypes.stream().map((name) -> "@InterceptorBinding(interceptorType = " + name + ")").collect(Collectors.joining(" "));
+        }
+    }
+
     public static List<String> resolveInterceptorValues(AnnotationMetadata annotationMetadata) {
+        return resolveInterceptorValues(annotationMetadata, null);
+    }
+
+    public static List<String> resolveInterceptorValues(AnnotationMetadata annotationMetadata, @Nullable String kind) {
         AnnotationValue<?> bindings = annotationMetadata
                 .getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
         if (bindings != null) {
             return bindings.getAnnotations(AnnotationMetadata.VALUE_MEMBER)
                     .stream()
+                    .filter(av -> {
+                        final String specifiedkind = av.stringValue("kind").orElse(null);
+                        return kind == null || specifiedkind == null || specifiedkind.equals(kind);
+                    })
                     .map(AnnotationValue::stringValue)
                     .filter(Optional::isPresent)
                     .map(Optional::get)
                     .collect(Collectors.toList());
         } else {
             return Collections.emptyList();
-        }
-    }
-
-    @Override
-    public String toString() {
-        if (CollectionUtils.isEmpty(supportedAnnotationNames) && CollectionUtils.isEmpty(supportedInterceptorTypes)) {
-            return "@InterceptorBinding(NONE)";
-        } else {
-            return supportedAnnotationNames.stream().map((name) -> "@InterceptorBinding(" + name + ")").collect(Collectors.joining( " ")) +
-                    supportedInterceptorTypes.stream().map((name) -> "@InterceptorBinding(interceptorType = " + name + ")").collect(Collectors.joining( " "));
         }
     }
 }

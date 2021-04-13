@@ -25,7 +25,6 @@ import javax.inject.Named;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * Factory for {@link io.micronaut.context.annotation.Bean} qualifiers.
@@ -219,7 +218,6 @@ public class Qualifiers {
     public static @NonNull <T> Qualifier<T> byInterceptorBinding(@NonNull AnnotationMetadata annotationMetadata) {
         return new InterceptorBindingQualifier<>(annotationMetadata);
     }
-
 
     /**
      * Reduces bean definitions by the given interceptor binding.

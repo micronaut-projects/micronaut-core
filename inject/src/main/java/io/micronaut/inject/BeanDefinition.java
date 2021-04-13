@@ -28,7 +28,6 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
-import io.micronaut.inject.provider.AbstractProviderDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import javax.inject.Singleton;

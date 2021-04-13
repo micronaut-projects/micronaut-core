@@ -1100,7 +1100,6 @@ public class DefaultBeanContext implements BeanContext {
     @NonNull
     public <T> T destroyBean(T bean) {
         Objects.requireNonNull(bean, "Bean cannot be null");
-        final Collection candidatesForInstance = findBeanCandidatesForInstance(bean);
         final Argument arg = Argument.of(bean.getClass());
         final BeanDefinition concreteCandidate = (BeanDefinition) findConcreteCandidate(
                 null,

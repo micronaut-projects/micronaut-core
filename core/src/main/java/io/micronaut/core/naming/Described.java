@@ -33,7 +33,8 @@ public interface Described {
     @NonNull String getDescription();
 
     /**
-     * Allows returning a more simple description if requested
+     * Allows returning a more simple description if requested.
+     *
      * @param simple True if a simple description is required
      * @return The simple description
      */

@@ -17,22 +17,31 @@ package io.micronaut.aop.chain;
 
 import io.micronaut.aop.*;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
-import io.micronaut.core.annotation.NonNull;
 import java.lang.reflect.Method;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * An internal representation of the {@link Interceptor} chain. This class implements {@link MethodInvocationContext} and is
  * consumed by the framework itself and should not be used directly in application code.
  *
- *
  * @param <T> type
  * @param <R> result
- *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -45,8 +54,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     /**
      * Constructor for empty parameters.
      *
-     * @param interceptors array of interceptors
-     * @param target target
+     * @param interceptors    array of interceptors
+     * @param target          target
      * @param executionHandle executionHandle
      */
     @UsedByGeneratedCode
@@ -57,9 +66,9 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     /**
      * Constructor.
      *
-     * @param interceptors array of interceptors
-     * @param target target
-     * @param executionHandle executionHandle
+     * @param interceptors       array of interceptors
+     * @param target             target
+     * @param executionHandle    executionHandle
      * @param originalParameters originalParameters
      */
     @UsedByGeneratedCode
@@ -139,5 +148,105 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     @Override
     public ExecutableMethod<T, R> getExecutableMethod() {
         return executionHandle;
+    }
+
+    /**
+     * Internal method that handles the logic for executing {@link InterceptorKind#POST_CONSTRUCT} interception.
+     *
+     * @param resolutionContext   The resolution context
+     * @param beanContext         The bean context
+     * @param definition          The definition
+     * @param postConstructMethod The post construct method
+     * @param bean                The bean
+     * @param <T1>                The bean type
+     * @return the bean instance
+     * @since 3.0.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    @NonNull
+    public static <T1> T1 initialize(
+            @NonNull BeanResolutionContext resolutionContext,
+            @NonNull BeanContext beanContext,
+            @NonNull BeanDefinition<T1> definition,
+            @NonNull ExecutableMethod<T1, T1> postConstructMethod,
+            @NonNull T1 bean) {
+        return doIntercept(
+                resolutionContext,
+                beanContext,
+                definition,
+                postConstructMethod,
+                bean,
+                InterceptorKind.POST_CONSTRUCT
+        );
+    }
+
+    /**
+     * Internal method that handles the logic for executing {@link InterceptorKind#PRE_DESTROY} interception.
+     *
+     * @param resolutionContext The resolution context
+     * @param beanContext       The bean context
+     * @param definition        The definition
+     * @param preDestroyMethod  The pre destroy method
+     * @param bean              The bean
+     * @param <T1>              The bean type
+     * @return the bean instance
+     * @since 3.0.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    @NonNull
+    public static <T1> T1 dispose(
+            @NonNull BeanResolutionContext resolutionContext,
+            @NonNull BeanContext beanContext,
+            @NonNull BeanDefinition<T1> definition,
+            @NonNull ExecutableMethod<T1, T1> preDestroyMethod,
+            @NonNull T1 bean) {
+        return doIntercept(
+                resolutionContext,
+                beanContext,
+                definition,
+                preDestroyMethod,
+                bean,
+                InterceptorKind.PRE_DESTROY
+        );
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T1> T1 doIntercept(
+            BeanResolutionContext resolutionContext,
+            BeanContext beanContext,
+            BeanDefinition<T1> definition,
+            ExecutableMethod<T1, T1> interceptedMethod,
+            T1 bean,
+            InterceptorKind kind) {
+        final List<String> annotationNames = InterceptorBindingQualifier.resolveInterceptorValues(interceptedMethod.getAnnotationMetadata());
+
+        final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = ((DefaultBeanContext) beanContext).getBeanRegistrations(
+                resolutionContext,
+                Interceptor.ARGUMENT,
+                Qualifiers.byInterceptorBinding(annotationNames)
+        );
+        final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
+        final Interceptor[] resolvedInterceptors = interceptorRegistry
+                .resolveInterceptors(
+                        (ExecutableMethod) interceptedMethod,
+                        (Collection) resolved,
+                        kind
+                );
+
+        if (ArrayUtils.isNotEmpty(resolvedInterceptors)) {
+            final MethodInterceptorChain<T1, T1> chain = new MethodInterceptorChain<T1, T1>(
+                    resolvedInterceptors,
+                    bean,
+                    interceptedMethod
+            );
+            return Objects.requireNonNull(
+                    chain.proceed(),
+                    kind.name() + " interceptor chain illegal returned null for type: " + definition.getBeanType()
+            );
+        } else {
+            return interceptedMethod.invoke(bean);
+        }
     }
 }

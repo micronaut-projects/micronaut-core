@@ -116,7 +116,7 @@ public class ArgumentUtils {
                 Class<?> type = argument.getWrapperType();
                 Object value = values[i];
                 if (value != null && !type.isInstance(value)) {
-                    throw new IllegalArgumentException("Invalid type [" + values[i].getClass().getName() + "] for argument [" + argument + "] of "+ (described instanceof Executable ? "method" : "constructor") + ": " + described.getDescription());
+                    throw new IllegalArgumentException("Invalid type [" + values[i].getClass().getName() + "] for argument [" + argument + "] of " + (described instanceof Executable ? "method" : "constructor") + ": " + described.getDescription());
                 }
             }
         }

@@ -81,6 +81,17 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         this(declaringType, methodName, genericReturnType, Argument.ZERO_ARGUMENTS);
     }
 
+    /**
+     * @param declaringType     The declaring type
+     * @param methodName        The method name
+     */
+    @SuppressWarnings("WeakerAccess")
+    @UsedByGeneratedCode
+    protected AbstractExecutableMethod(Class<?> declaringType,
+                                       String methodName) {
+        this(declaringType, methodName, Argument.OBJECT_ARGUMENT, Argument.ZERO_ARGUMENTS);
+    }
+
     @Override
     public boolean hasPropertyExpressions() {
         return getAnnotationMetadata().hasPropertyExpressions();
