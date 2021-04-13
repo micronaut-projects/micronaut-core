@@ -35,7 +35,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.concurrent.Executor;
 
 /**
  * Writes an {@link InputStream} to the Netty context.

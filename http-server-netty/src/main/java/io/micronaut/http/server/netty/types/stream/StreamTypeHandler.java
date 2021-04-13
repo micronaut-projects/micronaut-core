@@ -20,15 +20,11 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
-import io.micronaut.scheduling.TaskExecutors;
 import io.netty.channel.ChannelHandlerContext;
 
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.InputStream;
 import java.util.Arrays;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 
 /**
  * Responsible for writing streams out to the response in Netty.
@@ -41,11 +37,6 @@ import java.util.concurrent.ExecutorService;
 class StreamTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
 
     private static final Class<?>[] SUPPORTED_TYPES = new Class[]{NettyStreamedCustomizableResponseType.class, InputStream.class};
-    private final ExecutorService executorService;
-
-    StreamTypeHandler(@Named(TaskExecutors.IO) ExecutorService executorService) {
-        this.executorService = executorService;
-    }
 
     @Override
     public void handle(Object object, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {

@@ -658,11 +658,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (url.getProtocol().equals("file")) {
                     File file = Paths.get(url.toURI()).toFile();
                     if (file.exists() && !file.isDirectory() && file.canRead()) {
-                        return Optional.of(new NettySystemFileCustomizableResponseType(file, getIoExecutor()));
+                        return Optional.of(new NettySystemFileCustomizableResponseType(file));
                     }
                 }
 
-                return Optional.of(new NettyStreamedFileCustomizableResponseType(url, getIoExecutor()));
+                return Optional.of(new NettyStreamedFileCustomizableResponseType(url));
             } catch (URISyntaxException e) {
                 //no-op
             }

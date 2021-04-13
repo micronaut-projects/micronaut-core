@@ -26,7 +26,6 @@ import io.netty.handler.codec.http.*;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Optional;
-import java.util.concurrent.Executor;
 
 /**
  * Writes a file backed by an {@link InputStream} to the Netty context.
@@ -42,7 +41,6 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
     /**
      * @param inputStream The input stream
      * @param name        The file name
-     * @param executor The executor to read the file with
      */
     public NettyStreamedFileCustomizableResponseType(InputStream inputStream, String name) {
         super(inputStream, MediaType.forFilename(name));
@@ -52,7 +50,6 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
     /**
      * @param inputStream The input stream
      * @param mediaType   The file media type
-     * @param executor The executor to read the file with
      */
     public NettyStreamedFileCustomizableResponseType(InputStream inputStream, MediaType mediaType) {
         super(inputStream, mediaType);
@@ -61,7 +58,6 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
 
     /**
      * @param url The URL
-     * @param executor The executor to read the file with
      */
     public NettyStreamedFileCustomizableResponseType(URL url) {
         super(url);
@@ -70,7 +66,6 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
 
     /**
      * @param delegate The streamed file
-     * @param executor The executor to read the file with
      */
     public NettyStreamedFileCustomizableResponseType(StreamedFile delegate) {
         super(delegate.getInputStream(), delegate.getMediaType(), delegate.getLastModified(), delegate.getLength());

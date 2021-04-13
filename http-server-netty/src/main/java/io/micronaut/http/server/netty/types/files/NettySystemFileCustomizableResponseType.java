@@ -43,7 +43,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Optional;
-import java.util.concurrent.Executor;
 
 /**
  * Writes a {@link File} to the Netty context.
@@ -64,7 +63,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
 
     /**
      * @param file The file
-     * @param executor The executor to read the file with
      */
     public NettySystemFileCustomizableResponseType(File file) {
         super(file);
@@ -82,7 +80,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
 
     /**
      * @param delegate The system file customizable response type
-     * @param executor The executor to read the file with
      */
     public NettySystemFileCustomizableResponseType(SystemFile delegate) {
         this(delegate.getFile());

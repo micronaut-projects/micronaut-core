@@ -27,20 +27,15 @@ import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.micronaut.scheduling.TaskExecutors;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
 
-import javax.inject.Inject;
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.File;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 
 /**
  * Responsible for writing files out to the response in Netty.
