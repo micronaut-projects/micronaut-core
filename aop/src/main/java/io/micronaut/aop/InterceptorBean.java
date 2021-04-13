@@ -32,7 +32,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
+@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE, ElementType.METHOD})
 @Bean
 @DefaultScope(Singleton.class)
 public @interface InterceptorBean {

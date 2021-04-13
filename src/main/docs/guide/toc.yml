@@ -58,6 +58,7 @@ aop:
   aroundAdvice: Around Advice
   introductionAdvice: Introduction Advice
   adapterAdvice: Method Adapter Advice
+  lifecycleAdvice: Bean Life Cycle Advice
   validation:
     title: Validation Advice
   caching:

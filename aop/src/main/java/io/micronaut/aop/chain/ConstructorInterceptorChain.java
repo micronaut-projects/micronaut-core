@@ -83,6 +83,12 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     }
 
     @Override
+    @NonNull
+    public InterceptorKind getKind() {
+        return InterceptorKind.AROUND_CONSTRUCT;
+    }
+
+    @Override
     public T getTarget() {
         throw new UnsupportedOperationException("The target cannot be retrieved for Constructor interception");
     }

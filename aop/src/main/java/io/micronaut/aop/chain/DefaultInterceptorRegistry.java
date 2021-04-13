@@ -81,6 +81,15 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                                     .orElse(InterceptorKind.AROUND) == interceptorKind)
                     .collect(Collectors.toList());
             final Interceptor[] resolvedInterceptors = interceptors.stream()
+                    .filter(beanRegistration -> {
+                        final List<Argument<?>> typeArgs = beanRegistration.getBeanDefinition().getTypeArguments(ConstructorInterceptor.class);
+                        if (typeArgs.isEmpty()) {
+                            return true;
+                        } else {
+                            final Class<?> applicableType = typeArgs.iterator().next().getType();
+                            return applicableType.isAssignableFrom(method.getDeclaringType());
+                        }
+                    })
                     .filter(beanRegistration -> applicableBindings.stream().anyMatch(annotationValue -> {
                         // does the annotation metadata contain @InterceptorBinding(interceptorType=SomeInterceptor.class)
                         // that matches the list of interceptors ?

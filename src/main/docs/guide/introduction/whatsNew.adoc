@@ -24,6 +24,20 @@ snippet::io.micronaut.docs.inject.typed.V8Engine[tags="class",indent=0]
 
 For more information see the section on <<typed, Limiting Injectable Types>>.
 
+=== AOP Features
+
+==== Support for Constructor Interception
+
+It is now possible to intercept bean construction invocations through the api:aop.ConstructorInterceptor[] interface and ann:aop.AroundConstruct[] annotation.
+
+See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
+
+==== Support for `@PostConstruct` & `@PreDestroy` Interception
+
+It is now possible to intercept `@PostConstruct` and `@PreDestroy` method invocations through the api:aop.MethodInterceptor[] interface and ann:aop.InterceptorBinding[] annotation.
+
+See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
+
 === Module Upgrades
 
 TODO

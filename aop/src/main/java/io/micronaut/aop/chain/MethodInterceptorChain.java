@@ -23,6 +23,7 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
@@ -50,6 +51,7 @@ import java.util.Objects;
 public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> implements MethodInvocationContext<T, R> {
 
     private static final Object[] EMPTY_ARRAY = new Object[0];
+    private final @Nullable InterceptorKind kind;
 
     /**
      * Constructor for empty parameters.
@@ -60,8 +62,26 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      */
     @UsedByGeneratedCode
     public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle) {
-        super(interceptors, target, executionHandle, EMPTY_ARRAY);
+        this(interceptors, target, executionHandle, (InterceptorKind) null);
     }
+
+    /**
+     * Constructor for empty parameters.
+     *
+     * @param interceptors    array of interceptors
+     * @param target          target
+     * @param executionHandle executionHandle
+     * @param kind            The interception kind
+     */
+    public MethodInterceptorChain(
+            Interceptor<T, R>[] interceptors,
+            T target,
+            ExecutableMethod<T, R> executionHandle,
+            @Nullable InterceptorKind kind) {
+        super(interceptors, target, executionHandle, EMPTY_ARRAY);
+        this.kind = kind;
+    }
+
 
     /**
      * Constructor.
@@ -74,6 +94,13 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     @UsedByGeneratedCode
     public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, Object... originalParameters) {
         super(interceptors, target, executionHandle, originalParameters);
+        this.kind = null;
+    }
+
+    @Override
+    @NonNull
+    public InterceptorKind getKind() {
+        return this.kind != null ? kind : target instanceof Introduced ? InterceptorKind.INTRODUCTION : InterceptorKind.AROUND;
     }
 
     @Override
@@ -239,7 +266,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
             final MethodInterceptorChain<T1, T1> chain = new MethodInterceptorChain<T1, T1>(
                     resolvedInterceptors,
                     bean,
-                    interceptedMethod
+                    interceptedMethod,
+                    kind
             );
             return Objects.requireNonNull(
                     chain.proceed(),

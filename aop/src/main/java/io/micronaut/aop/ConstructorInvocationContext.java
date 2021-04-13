@@ -36,4 +36,12 @@ public interface ConstructorInvocationContext<T> extends InvocationContext<T, T>
     default Class<T> getDeclaringType() {
         return getConstructor().getDeclaringBeanType();
     }
+
+    @Override
+    @NonNull
+    T proceed() throws RuntimeException;
+
+    @Override
+    @NonNull
+    T proceed(Interceptor from) throws RuntimeException;
 }

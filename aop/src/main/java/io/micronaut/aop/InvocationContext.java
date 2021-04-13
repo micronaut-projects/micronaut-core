@@ -75,6 +75,14 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      */
     @Nullable R proceed(Interceptor from) throws RuntimeException;
 
+    /**
+     * @return An enum representing the kind of interception that is occurring.
+     * @since 3.0.0
+     */
+    default @NonNull InterceptorKind getKind() {
+        return InterceptorKind.AROUND;
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     default Class<T> getDeclaringType() {
