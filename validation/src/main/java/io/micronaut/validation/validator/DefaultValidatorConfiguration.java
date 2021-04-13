@@ -62,6 +62,8 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
 
     private boolean enabled = true;
 
+    private boolean useIterableAnnotationsForIterableValues = false;
+
     @Override
     @NonNull
     public ConstraintValidatorRegistry getConstraintValidatorRegistry() {
@@ -248,5 +250,17 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     @Override
     public Validator getValidator() {
         return new DefaultValidator(this);
+    }
+
+    @Override
+    public boolean isUseIterableAnnotationsForIterableValues() {
+        return useIterableAnnotationsForIterableValues;
+    }
+
+    @Override
+    public ValidatorContext setUseIterableAnnotationsForIterableValues(boolean useIterableAnnotationsForIterableValues)
+    {
+        this.useIterableAnnotationsForIterableValues = useIterableAnnotationsForIterableValues;
+        return this;
     }
 }

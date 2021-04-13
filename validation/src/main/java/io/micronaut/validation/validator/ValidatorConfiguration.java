@@ -23,6 +23,7 @@ import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 import io.micronaut.core.annotation.NonNull;
 import javax.validation.ClockProvider;
 import javax.validation.TraversableResolver;
+import javax.validation.ValidatorContext;
 
 /**
  * Configuration for the {@link Validator}.
@@ -41,6 +42,12 @@ public interface ValidatorConfiguration {
      * Whether the validator is enabled.
      */
     String ENABLED = PREFIX + ".enabled";
+
+    /**
+     * Whether to use the annotations defined for the iterable container on the elements of this iterable container
+     * See {@link #setUseIterableAnnotationsForIterableValues(boolean)} for details.
+     */
+    String USE_ITERABLE_ANNOTATIONS_FOR_ITERABLE_VALUES = PREFIX + ".useIterableAnnotationsForIterableValues";
 
     /**
      * @return The constraint registry to use.
@@ -78,4 +85,19 @@ public interface ValidatorConfiguration {
      */
     @NonNull
     ExecutionHandleLocator getExecutionHandleLocator();
+
+
+    /**
+     * Set flag to use annotations of iterable container for its elements.
+     * Will use container annotations if set and iterable annotated with @javax.validation.Valid
+     * The container will not be validated with these annotations in this case (they apply only to elements)
+     * If set, generic annotations for iterables will be disabled
+     */
+    ValidatorContext setUseIterableAnnotationsForIterableValues(boolean useIterableAnnotationsForIterableValues);
+
+    /**
+     * Is flag to use annotations of iterable container for its elements set.
+     * See {@link #setUseIterableAnnotationsForIterableValues(boolean)} for detailed description
+     */
+    boolean isUseIterableAnnotationsForIterableValues();
 }

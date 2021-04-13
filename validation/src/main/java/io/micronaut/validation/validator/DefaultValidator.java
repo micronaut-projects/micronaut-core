@@ -88,9 +88,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     private final TraversableResolver traversableResolver;
     private final ExecutionHandleLocator executionHandleLocator;
     private final MessageSource messageSource;
-
-    // TODO refactor this to config parameter
-    private final boolean useIterableAnnotationsForIterableValues = false;
+    private final boolean useIterableAnnotationsForIterableValues;
 
     /**
      * Default constructor.
@@ -106,6 +104,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         this.traversableResolver = configuration.getTraversableResolver();
         this.executionHandleLocator = configuration.getExecutionHandleLocator();
         this.messageSource = configuration.getMessageSource();
+        this.useIterableAnnotationsForIterableValues = configuration.isUseIterableAnnotationsForIterableValues();
     }
 
     @SuppressWarnings("unchecked")
@@ -171,7 +170,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
         final Optional<BeanProperty<Object, Object>> property = introspection.getProperty(propertyName);
 
-        //TODO should there be an error if property is not present
         //TODO should it cascade if it has @Valid annotation
 
         if (property.isPresent()) {
@@ -932,9 +930,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @SuppressWarnings("unchecked")
         final Class<T> rootBeanClass = (Class<T>) rootBean.getClass();
 
-        Set<BeanProperty<Object, Object>> cascadeIterableProperties;
+        Set<BeanProperty<Object, Object>> cascadeIterableProperties = null;
         if (useIterableAnnotationsForIterableValues) {
-            cascadeIterableProperties = new HashSet<>();
+            cascadeIterableProperties = new HashSet<>(cascadeProperties.size());
         }
 
         for (BeanProperty<Object, Object> cascadeProperty: cascadeProperties) {
@@ -1038,7 +1036,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         } else if (annotatedIterable instanceof Argument) {
             //noinspection unchecked
             iterableType = ((Argument<Object>) annotatedIterable).getType();
-        } else if (annotatedIterable instanceof Property) {
+        } else if (annotatedIterable instanceof BeanProperty) {
             //noinspection unchecked
             iterableType = ((BeanProperty<Object, Object>) annotatedIterable).getType();
         } else {
@@ -1057,15 +1055,19 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
         // Get its type parameters
         ValueExtractor<Object> valueExtractor = opt.get();
-        Argument<Object> annotatedIterableAsArgument = null;
+        final Argument<Object> annotatedIterableAsArgument;
         if (annotatedIterable instanceof Argument) {
             //noinspection unchecked
             annotatedIterableAsArgument = (Argument<Object>) annotatedIterable;
         } else if (annotatedIterable instanceof BeanProperty) {
             //noinspection unchecked
             annotatedIterableAsArgument = ((BeanProperty<Object, Object>) annotatedIterable).asArgument();
+        } else if (annotatedIterable instanceof ReturnType) {
+            //noinspection unchecked
+            annotatedIterableAsArgument = ((ReturnType<Object>) annotatedIterable).asArgument();
+        } else {
+            annotatedIterableAsArgument = null;
         }
-        assert annotatedIterableAsArgument != null;
         Argument<?>[] arguments = annotatedIterableAsArgument.getTypeParameters();
 
         // Check if its values need validation
@@ -1092,6 +1094,10 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         }
 
         // extract and validate values
+        boolean argumentsPresent = arguments != null && arguments.length > 0;
+        Argument<?> valueArgument = argumentsPresent ? arguments[0] : null;
+        Class<?> valueType = argumentsPresent ? arguments[0].getType() : annotatedIterableAsArgument.getType();
+
         valueExtractor.extractValues(propertyValue, new ValueExtractor.ValueReceiver() {
             @Override
             public void value(String nodeName, Object object1) { }
@@ -1099,25 +1105,27 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             @Override
             public void iterableValue(String nodeName, Object iterableValue) {
                 cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object, annotatedIterable,
-                        iterableType, arguments[0], iterableValue, parameterIndex, null, null, true);
+                        iterableType, valueArgument, iterableValue, valueType, parameterIndex, null, null, true);
             }
 
             @Override
             public void indexedValue(String nodeName, int i, Object iterableValue) {
                 cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object, annotatedIterable,
-                        iterableType, arguments[0], iterableValue, parameterIndex, i, null, true);
+                        iterableType, valueArgument, iterableValue, valueType, parameterIndex, i, null, true);
             }
 
             @Override
             public void keyedValue(String nodeName, Object key, Object keyedValue) {
                 if (keyValidation) {
                     cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object, annotatedIterable,
-                            iterableType, arguments[0], key, parameterIndex, null, key, false);
+                            iterableType, arguments[0], key, arguments[0].getType(), parameterIndex,
+                            null, key, false);
                 }
 
                 if (valueValidation) {
                     cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object, annotatedIterable,
-                            iterableType, arguments[1], keyedValue, parameterIndex,null, key, false);
+                            iterableType, arguments[1], keyedValue, arguments[1].getType(), parameterIndex,
+                            null, key, false);
                 }
             }
         });
@@ -1139,7 +1147,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             DefaultConstraintValidatorContext context, Set overallViolations,
             @Nullable T rootBean, @NonNull Class<T> rootClass, Object object,
             AnnotatedElement annotatedIterable, Class<Object> iterableType, Argument<?> valueArgument,
-            Object iterableValue, Integer parameterIndex, Integer index, Object key, boolean isIterable)
+            Object iterableValue, Class<?> iterableValueType, Integer parameterIndex,
+            Integer index, Object key, boolean isIterable)
     {
         final DefaultPropertyNode container;
 
@@ -1166,11 +1175,11 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         AnnotatedElement appliedAnnotations = useIterableAnnotationsForIterableValues ?
                 annotatedIterable : valueArgument;
         AnnotationMetadata metadata = appliedAnnotations.getAnnotationMetadata();
-        Class<?> valueType = iterableValue == null ? valueArgument.getType() : iterableValue.getClass();
+        Class<?> valueType = iterableValue != null ? iterableValue.getClass() : iterableValueType;
 
         if (metadata.hasStereotype(Constraint.class)) {
-            validateConstrainedPropertyInternal(context, overallViolations, rootBean, rootClass, object, valueArgument,
-                    valueType, iterableValue, container, containerElement);
+            validateConstrainedPropertyInternal(context, overallViolations, rootBean, rootClass, object,
+                    appliedAnnotations, valueType, iterableValue, container, containerElement);
         }
         if (metadata.hasStereotype(Valid.class)) {
             if (!context.validatedObjects.contains(iterableValue)) {
@@ -1725,7 +1734,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             while (i.hasNext()) {
                 final Node node = i.next();
                 if (node instanceof ContainerElementNode) {
-                    builder.append('<').append(node.getName()).append('>');
+                    if (node.getName() != null) {
+                        builder.append('<').append(node.getName()).append('>');
+                    }
                 } else {
                     builder.append(firstNode ? "" : ".");
                     builder.append(node.getName());
@@ -1956,7 +1967,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         private final String name;
 
         DefaultContainerElementNode(Argument<?> elementArgument) {
-            this.name = elementArgument.getName() + " " + elementArgument.getType().toString();
+            if (elementArgument == null) {
+                // It is an Array
+                this.name = null;
+            } else {
+                this.name = elementArgument.getName() + " " + elementArgument.getType().toString();
+            }
         }
 
         @Override
@@ -1991,7 +2007,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
         @Override
         public ElementKind getKind() {
-            return null;// ElementKind.CONTAINER_ELEMENT;
+            return ElementKind.CONTAINER_ELEMENT;
         }
 
         @Override
