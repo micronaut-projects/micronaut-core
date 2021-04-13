@@ -39,27 +39,20 @@ class HttpClientSenderSpec extends Specification {
 
     void "test http client sender receives spans"() {
         given:
-        ApplicationContext context = ApplicationContext.run(
-                'tracing.zipkin.enabled':true,
-                'tracing.zipkin.sampler.probability':1,
-                'tracing.zipkin.http.url':HttpClientSender.Builder.DEFAULT_SERVER_URL
-        )
-        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
-
-        when:
-        PollingConditions conditions = new PollingConditions(timeout: 10)
-        // mock Zipkin server
         EmbeddedServer zipkinServer = ApplicationContext.run(
                 EmbeddedServer,
-                ['micronaut.server.port':9411]
+                ['micronaut.server.port':-1]
         )
         SpanController spanController = zipkinServer.applicationContext.getBean(SpanController)
 
-        then:
-        conditions.eventually {
-            !SocketUtils.isTcpPortAvailable(9411)
-        }
+        ApplicationContext context = ApplicationContext.run(
+                'tracing.zipkin.enabled':true,
+                'tracing.zipkin.sampler.probability':1,
+                'tracing.zipkin.http.url':zipkinServer.getURL().toString()
+        )
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions(timeout: 10)
 
         when:"Requests are executed"
         HttpResponse<String> response = client.toBlocking().exchange('/traced/nested/John', String)
@@ -96,28 +89,21 @@ class HttpClientSenderSpec extends Specification {
 
     void "test http client sender receives spans with custom path"() {
         given:
+        EmbeddedServer zipkinServer = ApplicationContext.run(
+                EmbeddedServer,
+                ['micronaut.server.port':-1]
+        )
         ApplicationContext context = ApplicationContext.run(
                 'tracing.zipkin.enabled':true,
                 'tracing.zipkin.sampler.probability':1,
-                'tracing.zipkin.http.url':HttpClientSender.Builder.DEFAULT_SERVER_URL,
+                'tracing.zipkin.http.url':zipkinServer.getURL().toString(),
                 'tracing.zipkin.http.path':'/custom/path/spans'
         )
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
-        when:
         PollingConditions conditions = new PollingConditions(timeout: 10)
-        // mock Zipkin server
-        EmbeddedServer zipkinServer = ApplicationContext.run(
-                EmbeddedServer,
-                ['micronaut.server.port':9411]
-        )
         CustomPathSpanController customPathSpanController = zipkinServer.applicationContext.getBean(CustomPathSpanController)
-
-        then:
-        conditions.eventually {
-            !SocketUtils.isTcpPortAvailable(9411)
-        }
 
         when:"Requests are executed"
         HttpResponse<String> response = client.toBlocking().exchange('/traced/nested/John', String)
