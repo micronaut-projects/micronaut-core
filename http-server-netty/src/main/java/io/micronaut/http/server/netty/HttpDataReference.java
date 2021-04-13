@@ -36,7 +36,6 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiPredicate;
-import java.util.function.Consumer;
 
 /**
  * A helper class to store references to httpdata and related information.
@@ -80,7 +79,6 @@ public class HttpDataReference {
      * Adds a reference to a section of the http data. Should only
      * be called after data has been added to the underlying http data.
      *
-     * @param onError A consumer to call if an IOException occurs
      * @return The newly added component, or null if an error occurred
      */
     Component addComponent() throws IOException {
