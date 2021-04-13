@@ -83,33 +83,33 @@ public class HttpDataReference {
      * @param onError A consumer to call if an IOException occurs
      * @return The newly added component, or null if an error occurred
      */
-    Component addComponent(Consumer<IOException> onError) {
+    Component addComponent() throws IOException {
         Component component;
-        try {
-            long readable = readableBytes(data);
-            long offset = position.getAndUpdate(p -> readable);
-            int length = (int) (readable - offset);
-            if (length == 0) {
-                return null;
-            }
-            component = new Component(length, offset);
-            components.add(component);
-        } catch (IOException e) {
-            onError.accept(e);
+        long readable = readableBytes(data);
+        long offset = position.getAndUpdate(p -> readable);
+        int length = (int) (readable - offset);
+        if (length == 0) {
             return null;
         }
+        component = new Component(length, offset);
+        components.add(component);
 
         if (!data.isInMemory()) {
+            AtomicReference<IOException> error = new AtomicReference<>();
             fileAccess.getAndUpdate(channel -> {
                 if (channel == null) {
                     try {
                         return new RandomAccessFile(data.getFile(), "r");
                     } catch (IOException e) {
-                        onError.accept(e);
+                        error.set(e);
                     }
                 }
                 return channel;
             });
+            IOException exception = error.get();
+            if (exception != null) {
+                throw exception;
+            }
         }
 
         return component;
