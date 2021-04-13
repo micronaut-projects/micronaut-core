@@ -27,6 +27,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.tracing.brave.sender.HttpClientSender
 import io.reactivex.Flowable
 import io.reactivex.Single
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import zipkin2.Span
@@ -37,6 +38,7 @@ import zipkin2.Span
  */
 class HttpClientSenderSpec extends Specification {
 
+    @Retry
     void "test http client sender receives spans"() {
         given:
         ApplicationContext context = ApplicationContext.run(
