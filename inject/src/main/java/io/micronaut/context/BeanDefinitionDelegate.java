@@ -139,7 +139,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                                     }
                                 }
                             } else {
-                                Optional bean = context.findBean(argumentType, qualifier);
+                                Optional bean = ((DefaultBeanContext) context).findBean(resolutionContext, argumentType, qualifier);
                                 if (bean.isPresent()) {
                                     fulfilled.put(argumentName, bean.get());
                                 }

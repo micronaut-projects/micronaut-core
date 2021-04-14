@@ -1225,7 +1225,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             sourceMethodElement,
                             new AnnotationMetadataHierarchy(concreteClassMetadata, methodAnnotationMetadata),
                             new ClassElement[]{typeToImplementElement},
-                            metadataBuilder
+                            metadataBuilder,
+                            null
                     );
 
                     aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata);
@@ -1865,6 +1866,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     annotationMetadata,
                     interfaceTypes,
                     metadataBuilder,
+                    configurationMetadata,
                     interceptorTypes
             );
 
