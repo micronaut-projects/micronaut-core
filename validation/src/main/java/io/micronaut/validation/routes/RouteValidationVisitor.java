@@ -48,6 +48,7 @@ import java.util.stream.Collectors;
 @SupportedOptions(RouteValidationVisitor.VALIDATION_OPTION)
 public class RouteValidationVisitor implements TypeElementVisitor<Object, Object> {
 
+    static final String MICRONAUT_PROCESSING_INCREMENTAL = "micronaut.processing.incremental";
     static final String VALIDATION_OPTION = "micronaut.route.validation";
     private static final String METHOD_MAPPING_ANN = "io.micronaut.http.annotation.HttpMethodMapping";
     private List<RouteValidationRule> rules = new ArrayList<>();
@@ -111,10 +112,48 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
 
     @Override
     public void start(VisitorContext visitorContext) {
-        String prop = visitorContext.getOptions().getOrDefault(VALIDATION_OPTION, "true");
-        skipValidation = prop != null && prop.equals("false");
+        skipValidation = shouldSkipRouteValidation(visitorContext);
         rules.add(new MissingParameterRule());
         rules.add(new NullableParameterRule());
         rules.add(new RequestBeanParameterRule());
+    }
+
+    /**
+     * Check whether to skip route validation.
+     * <p>
+     * Route validation is disabled when using Java 8 or below with incremental compilation. The
+     * Java 8 compiler does not load parameter names for compiled classes, so in this case it is
+     * impossible to match route parameters to method parameters.
+     *
+     * @param visitorContext The visitor context
+     * @return A boolean indicating whether to skip route validation.
+     */
+    private static boolean shouldSkipRouteValidation(VisitorContext visitorContext) {
+        int javaVersion = getVersion();
+        if (javaVersion < 9) {
+            String incremental = visitorContext.getOptions().get(MICRONAUT_PROCESSING_INCREMENTAL);
+            if (incremental != null && incremental.equals("true")) {
+                return true;
+            }
+        }
+        String prop = visitorContext.getOptions().getOrDefault(VALIDATION_OPTION, "true");
+        return prop != null && prop.equals("false");
+    }
+
+    private static int getVersion() {
+        String version = System.getProperty("java.version");
+        if (version.startsWith("1.")) {
+            version = version.substring(2, 3);
+        } else {
+            int dot = version.indexOf(".");
+            if (dot != -1) {
+                version = version.substring(0, dot);
+            }
+        }
+        try {
+            return Integer.parseInt(version);
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
     }
 }
