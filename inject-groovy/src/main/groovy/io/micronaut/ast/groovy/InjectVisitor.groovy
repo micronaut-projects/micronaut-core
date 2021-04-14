@@ -245,8 +245,9 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     originatingElement,
                     annotationMetadata,
                     interfaceTypes,
-                    configurationMetadataBuilder,
                     groovyVisitorContext,
+                    configurationMetadataBuilder,
+                    configurationMetadata,
                     interceptorTypes
             )
             ClassElement groovyClassElement = elementFactory.newClassElement(
@@ -1277,7 +1278,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         methodAnnotationMetadata,
                         [elementFactory.newClassElement(typeToImplement, AnnotationMetadata.EMPTY_METADATA)] as ClassElement[],
                         groovyVisitorContext,
-                        configurationMetadataBuilder
+                        configurationMetadataBuilder,
+                        null
                 )
 
                 aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata, groovyVisitorContext)

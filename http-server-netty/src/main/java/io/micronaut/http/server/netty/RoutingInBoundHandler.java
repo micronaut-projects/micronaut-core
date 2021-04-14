@@ -136,6 +136,8 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLException;
+
 import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
 import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
 
@@ -274,9 +276,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         NettyHttpRequest nettyHttpRequest = NettyHttpRequest.remove(ctx);
         if (nettyHttpRequest == null) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
+            if (cause instanceof SSLException || cause.getCause() instanceof SSLException || isIgnorable(cause)) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
+                }
+            } else {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
+                }
             }
+
             ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR));
             return;
         }
@@ -1536,48 +1545,49 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Object body,
             MediaType defaultResponseMediaType) {
         boolean isNotHead = nettyRequest.getMethod() != HttpMethod.HEAD;
-        if (isNotHead && body instanceof Writable) {
-            Writable writable = (Writable) body;
-            getIoExecutor().execute(() -> {
-                ByteBuf byteBuf = context.alloc().ioBuffer(128);
-                ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
-                try {
-                    writable.writeTo(outputStream, nettyRequest.getCharacterEncoding());
-                    response.body(byteBuf);
-                    if (!response.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
-                        response.header(HttpHeaders.CONTENT_TYPE, defaultResponseMediaType);
+
+        if (isNotHead) {
+            if (body instanceof Writable) {
+                getIoExecutor().execute(() -> {
+                    ByteBuf byteBuf = context.alloc().ioBuffer(128);
+                    ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
+                    try {
+                        Writable writable = (Writable) body;
+                        writable.writeTo(outputStream, nettyRequest.getCharacterEncoding());
+                        response.body(byteBuf);
+                        if (!response.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
+                            response.header(HttpHeaders.CONTENT_TYPE, defaultResponseMediaType);
+                        }
+                        writeFinalNettyResponse(
+                                response,
+                                nettyRequest,
+                                context
+                        );
+                    } catch (IOException e) {
+                        exceptionCaughtInternal(context, e, nettyRequest, false);
                     }
-                    writeFinalNettyResponse(
-                            response,
-                            nettyRequest,
-                            context
-                    );
-                } catch (IOException e) {
-                    exceptionCaughtInternal(context, e, nettyRequest, false);
-                }
-            });
-        } else {
+                });
+            } else {
+                encodeResponseBody(
+                        context,
+                        nettyRequest,
+                        response,
+                        body,
+                        defaultResponseMediaType
+                );
 
-            try {
-                if (isNotHead) {
-
-                    encodeResponseBody(
-                            context,
-                            nettyRequest,
-                            response,
-                            body,
-                            defaultResponseMediaType
-                    );
-
-                }
                 writeFinalNettyResponse(
                         response,
                         nettyRequest,
                         context
                 );
-            } catch (Exception e) {
-                exceptionCaughtInternal(context, e, nettyRequest, false);
             }
+        } else {
+            writeFinalNettyResponse(
+                    response,
+                    nettyRequest,
+                    context
+            );
         }
     }
 
@@ -1907,7 +1917,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     LOG.error(e.getMessage());
                 }
             }
-
         } else {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Encoding emitted response object [{}] using codec: {}", body, codec);

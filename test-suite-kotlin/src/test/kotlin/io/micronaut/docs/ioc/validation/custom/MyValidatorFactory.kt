@@ -28,6 +28,7 @@ class MyValidatorFactory {
     @Singleton
     fun durationPatternValidator() : ConstraintValidator<DurationPattern, CharSequence> {
         return ConstraintValidator { value, annotation, context ->
+            context.messageTemplate("invalid duration ({validatedValue}), additional custom message") // <1>
             value == null || value.toString().matches("^PT?[\\d]+[SMHD]{1}$".toRegex())
         }
     }

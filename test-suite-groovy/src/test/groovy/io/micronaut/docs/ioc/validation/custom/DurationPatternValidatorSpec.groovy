@@ -18,7 +18,7 @@ class DurationPatternValidatorSpec extends Specification {
 
         then:"A validation error occurs"
         def e = thrown(ConstraintViolationException)
-        e.message == "startHoliday.duration: invalid duration (junk)" //  <2>
+        e.message == "startHoliday.duration: invalid duration (junk), additional custom message" //  <2>
     }
     // end::test[]
 }

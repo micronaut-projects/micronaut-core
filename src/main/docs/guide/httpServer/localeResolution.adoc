@@ -4,7 +4,7 @@ The api:http.server.util.LocaleResolver[] API does not need to be used directly.
 
 There are several configuration options to control how to resolve the locale:
 
-include::{includedir}configurationProperties/io.micronaut.http.server.HttpServerConfiguration$LocaleResolutionConfiguration.adoc[]
+include::{includedir}configurationProperties/io.micronaut.http.server.HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.adoc[]
 
 Locales can be configured in the "en_GB" format, or in the BCP 47 (Language tag) format. If multiple methods are configured, the fixed locale takes precedence, followed by session/cookie, then header.
 

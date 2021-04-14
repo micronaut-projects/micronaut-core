@@ -95,6 +95,9 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
                 beanLocator,
                 httpServerConfiguration
         ));
+        registry.addRequestArgumentBinder(new InputStreamBodyBinder(
+                httpContentProcessorResolver
+        ));
         return registry;
     }
 }
