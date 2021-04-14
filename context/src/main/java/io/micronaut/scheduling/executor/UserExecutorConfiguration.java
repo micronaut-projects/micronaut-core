@@ -23,7 +23,6 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.Nullable;
 
-import javax.inject.Inject;
 import javax.validation.constraints.Min;
 import java.util.Optional;
 import java.util.concurrent.ThreadFactory;

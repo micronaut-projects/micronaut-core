@@ -187,7 +187,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      */
     @Experimental
     default Optional<Path> getClassesOutputPath() {
-        Optional<GeneratedFile> dummy = visitMetaInfFile("dummy");
+        Optional<GeneratedFile> dummy = visitMetaInfFile("dummy", Element.EMPTY_ELEMENT_ARRAY);
         if (dummy.isPresent()) {
             // we want the parent directory of META-INF/dummy
             Path classesOutputDir = Paths.get(dummy.get().toURI()).getParent().getParent();

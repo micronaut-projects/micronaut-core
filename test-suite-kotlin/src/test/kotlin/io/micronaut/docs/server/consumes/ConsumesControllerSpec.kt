@@ -4,6 +4,7 @@ import io.kotlintest.shouldNotThrowAny
 import io.kotlintest.shouldThrow
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.RxHttpClient
@@ -53,6 +54,7 @@ class ConsumesControllerSpec: StringSpec() {
         }
     }
 
+    @Introspected
     class Book {
         var title: String? = null
         var pages: Int? = null

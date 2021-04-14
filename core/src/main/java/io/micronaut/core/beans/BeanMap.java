@@ -44,8 +44,7 @@ public interface BeanMap<T> extends Map<String, Object> {
     @SuppressWarnings({"unchecked", "deprecation"})
     static @NonNull <B> BeanMap<B> of(@NonNull B bean) {
         ArgumentUtils.requireNonNull("bean", bean);
-        return BeanIntrospector.SHARED.findIntrospection(bean.getClass())
-                .map(i -> (BeanMap<B>) new BeanIntrospectionMap<>((BeanIntrospection<B>) i, bean))
-                .orElseGet(() -> new ReflectionBeanMap<>(bean));
+        BeanIntrospection<B> introspection = (BeanIntrospection<B>) BeanIntrospector.SHARED.getIntrospection(bean.getClass());
+        return new BeanIntrospectionMap<>(introspection, bean);
     }
 }

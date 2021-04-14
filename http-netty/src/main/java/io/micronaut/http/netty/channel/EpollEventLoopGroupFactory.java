@@ -50,18 +50,6 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
     /**
      * Creates an EpollEventLoopGroup.
      *
-     * @param threads The number of threads to use.
-     * @param ioRatio The io ratio.
-     * @return An EpollEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
-        return new EpollEventLoopGroup(threads);
-    }
-
-    /**
-     * Creates an EpollEventLoopGroup.
-     *
      * @param threads       The number of threads to use.
      * @param threadFactory The thread factory.
      * @param ioRatio       The io ratio.
@@ -83,17 +71,6 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
         return new EpollEventLoopGroup(threads, executor);
-    }
-
-    /**
-     * Creates a default EpollEventLoopGroup.
-     *
-     * @param ioRatio The io ratio.
-     * @return An EpollEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return new EpollEventLoopGroup();
     }
 
     /**

@@ -210,6 +210,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     }
 
     @Override
+    @NonNull
     default Argument<T> asArgument() {
         return Argument.of(
                 getBeanType(),

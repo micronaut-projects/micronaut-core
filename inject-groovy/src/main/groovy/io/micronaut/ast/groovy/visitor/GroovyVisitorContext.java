@@ -244,7 +244,7 @@ public class GroovyVisitorContext implements VisitorContext {
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                     classesDir
             );
-            return outputVisitor.visitMetaInfFile(path);
+            return outputVisitor.visitMetaInfFile(path, originatingElements);
         }
 
         return Optional.empty();

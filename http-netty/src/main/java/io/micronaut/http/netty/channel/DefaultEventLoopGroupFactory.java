@@ -19,13 +19,11 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Property;
 import io.micronaut.core.util.ArgumentUtils;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 
-import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
@@ -43,7 +41,6 @@ import java.util.concurrent.ThreadFactory;
 @BootstrapContextCompatible
 public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
 
-    private boolean useNativeTransport = false;
     private final EventLoopGroupFactory nativeFactory;
     private final EventLoopGroupFactory defaultFactory;
 
@@ -59,29 +56,12 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
         this.nativeFactory = nativeFactory != null ? nativeFactory : defaultFactory;
     }
 
-    /**
-     * @deprecated Use {@link DefaultEventLoopGroupConfiguration} instead and {@code micronaut.netty.event-loops.default.prefer-native-transport}
-     *
-     * @param useNativeTransport Whether to use native transport
-     */
-    @Deprecated
-    @Inject
-    protected void setUseNativeTransport(@Property(name = "micronaut.server.netty.use-native-transport") @Nullable Boolean useNativeTransport) {
-        if (useNativeTransport != null) {
-            this.useNativeTransport = useNativeTransport;
-        }
-    }
-
     @Override
     public EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration configuration, ThreadFactory threadFactory) {
         ArgumentUtils.requireNonNull("configuration", configuration);
         ArgumentUtils.requireNonNull("threadFactory", threadFactory);
 
-        if (useNativeTransport || configuration.isPreferNativeTransport()) {
-            return this.nativeFactory.createEventLoopGroup(configuration, threadFactory);
-        } else {
-            return this.defaultFactory.createEventLoopGroup(configuration, threadFactory);
-        }
+        return getFactory(configuration).createEventLoopGroup(configuration, threadFactory);
     }
 
     @Override
@@ -102,20 +82,20 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     @NonNull
     @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass(EventLoopGroupConfiguration configuration) {
-        if (useNativeTransport || configuration != null && configuration.isPreferNativeTransport()) {
-            return this.nativeFactory.serverSocketChannelClass(configuration);
-        } else {
-            return this.defaultFactory.serverSocketChannelClass(configuration);
-        }
+        return getFactory(configuration).serverSocketChannelClass(configuration);
     }
 
     @NonNull
     @Override
     public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
-        if (useNativeTransport || configuration != null && configuration.isPreferNativeTransport()) {
-            return this.nativeFactory.clientSocketChannelClass(configuration);
+        return getFactory(configuration).clientSocketChannelClass(configuration);
+    }
+
+    private EventLoopGroupFactory getFactory(@Nullable EventLoopGroupConfiguration configuration) {
+        if (configuration != null && configuration.isPreferNativeTransport()) {
+            return this.nativeFactory;
         } else {
-            return this.defaultFactory.clientSocketChannelClass(configuration);
+            return this.defaultFactory;
         }
     }
 
