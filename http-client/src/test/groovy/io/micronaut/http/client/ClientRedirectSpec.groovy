@@ -1,15 +1,20 @@
 package io.micronaut.http.client
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Nullable
-import groovy.transform.NotYetImplemented
+import groovy.test.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.async.publisher.Publishers
+import io.micronaut.core.util.StringUtils
 import io.micronaut.discovery.ServiceInstance
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Produces
+import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
@@ -150,6 +155,17 @@ class ClientRedirectSpec extends Specification {
         client.close()
     }
 
+    void "test the host header is correct for redirect"() {
+        EmbeddedServer otherServer = ApplicationContext.run(EmbeddedServer, ['redirect.server': true])
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        String result = client.retrieve(HttpRequest.GET("/test/redirect-host").header("redirect", "http://localhost:${otherServer.getPort()}/test/host-header")).blockingFirst()
+
+        then:
+        result == "localhost:${otherServer.getPort()}"
+    }
+
     @Controller('/test')
     static class StreamController {
 
@@ -163,6 +179,11 @@ class ClientRedirectSpec extends Specification {
             return HttpResponse.redirect(URI.create("./direct"))
         }
 
+        @Get("/redirect-host")
+        HttpResponse redirectHost(@Header String redirect) {
+            return HttpResponse.redirect(URI.create(redirect))
+        }
+
         @Get("/direct")
         @Produces("text/plain")
         HttpResponse direct() {
@@ -170,4 +191,14 @@ class ClientRedirectSpec extends Specification {
         }
     }
 
+    @Requires(property = "redirect.server", value = StringUtils.TRUE)
+    @Controller('/test')
+    static class RedirectController {
+
+        @Get("/host-header")
+        @Produces("text/plain")
+        HttpResponse hostHeader(@Header String host) {
+            return HttpResponse.ok(host)
+        }
+    }
 }
