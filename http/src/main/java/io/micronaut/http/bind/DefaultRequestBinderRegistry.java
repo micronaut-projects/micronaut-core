@@ -224,7 +224,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                     } else {
                         final String str = object.toString();
                         try {
-                            return Optional.of(new MediaType(str));
+                            return Optional.of(MediaType.of(str));
                         } catch (IllegalArgumentException e) {
                             context.reject(e);
                             return Optional.empty();

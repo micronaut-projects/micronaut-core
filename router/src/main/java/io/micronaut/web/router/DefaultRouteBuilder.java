@@ -429,6 +429,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private final boolean single;
         private final boolean async;
         private final boolean specifiedSingle;
+        private final boolean isAsyncOrReactive;
 
         /**
          * @param targetMethod The target method execution handle
@@ -454,6 +455,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             single = RouteInfo.super.isSingleResult();
             isVoid = RouteInfo.super.isVoid();
             specifiedSingle = RouteInfo.super.isSpecifiedSingle();
+            isAsyncOrReactive = RouteInfo.super.isAsyncOrReactive();
             for (Argument argument : targetMethod.getArguments()) {
                 if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
                     this.bodyArgument = argument;
@@ -495,6 +497,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public boolean isAsync() {
             return async;
+        }
+
+        @Override
+        public boolean isAsyncOrReactive() {
+            return isAsyncOrReactive;
         }
 
         @Override

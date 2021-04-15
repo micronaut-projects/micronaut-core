@@ -134,14 +134,16 @@ public class NameUtils {
      * @return The camel case form
      */
     public static String dehyphenate(String name) {
-        return Arrays.stream(name.split("-"))
-            .map(str -> {
-                if (str.length() > 0 && Character.isLetter(str.charAt(0))) {
-                    return Character.toUpperCase(str.charAt(0)) + str.substring(1);
-                }
-                return str;
-            })
-            .collect(Collectors.joining(""));
+        StringBuilder sb = new StringBuilder(name.length());
+        for (String token : StringUtils.splitOmitEmptyStrings(name, '-')) {
+            if (token.length() > 0 && Character.isLetter(token.charAt(0))) {
+                sb.append(Character.toUpperCase(token.charAt(0)));
+                sb.append(token.substring(1));
+            } else {
+                sb.append(token);
+            }
+        }
+        return sb.toString();
     }
 
     /**

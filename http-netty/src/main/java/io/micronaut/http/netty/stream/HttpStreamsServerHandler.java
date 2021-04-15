@@ -141,7 +141,7 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
     }
 
     @Override
-    protected void unbufferedWrite(ChannelHandlerContext ctx, HttpStreamsHandler<HttpRequest, HttpResponse>.Outgoing out) {
+    protected void unbufferedWrite(ChannelHandlerContext ctx, HttpStreamsHandler.Outgoing<HttpResponse> out) {
 
         if (out.message instanceof WebSocketHttpResponse) {
             if ((lastRequest instanceof FullHttpRequest) || !hasBody(lastRequest)) {
@@ -152,13 +152,12 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
                 webSocketResponse = out;
             }
         } else {
-            String connection = out.message.headers().get(HttpHeaderNames.CONNECTION);
             if (lastRequest.protocolVersion().isKeepAliveDefault()) {
-                if ("close".equalsIgnoreCase(connection)) {
+                if (out.message.headers().contains(HttpHeaderNames.CONNECTION, "close", true)) {
                     close = true;
                 }
             } else {
-                if (!"keep-alive".equalsIgnoreCase(connection)) {
+                if (!out.message.headers().contains(HttpHeaderNames.CONNECTION, "keep-alive", true)) {
                     close = true;
                 }
             }

@@ -72,7 +72,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
             "^(" + STRING_PATTERN_SCHEME + ")?" + "(//(" + STRING_PATTERN_USER_INFO + "@)?" + STRING_PATTERN_HOST + "(:" + STRING_PATTERN_PORT +
                     ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
 
-    private final String templateString;
+    protected final String templateString;
     final List<PathSegment> segments = new ArrayList<>();
 
     /**

@@ -17,6 +17,7 @@ package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Headers;
+import io.micronaut.core.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -591,10 +592,9 @@ public interface HttpHeaders extends Headers {
         if (!values.isEmpty()) {
             List<MediaType> mediaTypes = new ArrayList<>(10);
             for (String value : values) {
-                final String[] tokens = value.split(",");
-                for (String token : tokens) {
+                for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
                     try {
-                        mediaTypes.add(new MediaType(token));
+                        mediaTypes.add(MediaType.of(token));
                     } catch (IllegalArgumentException e) {
                         // ignore
                     }
