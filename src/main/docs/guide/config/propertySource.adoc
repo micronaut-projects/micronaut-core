@@ -168,7 +168,7 @@ IMPORTANT: It is recommended to use this feature sparingly to ensure fast startu
 
 === Controlling Log Levels with Properties
 
-Log levels can be configured via properties defined in `application.yml` (and environment variables) with the `log.level` prefix:
+Log levels can be configured via properties defined in `application.yml` (and environment variables) with the `logger.levels` prefix:
 
 [source,yaml]
 ----

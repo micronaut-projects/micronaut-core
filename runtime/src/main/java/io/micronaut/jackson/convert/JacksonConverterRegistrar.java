@@ -36,7 +36,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
 
 import javax.inject.Inject;
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.*;
 import java.io.IOException;
@@ -53,22 +52,6 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
     private final BeanProvider<ObjectMapper> objectMapper;
     private final ConversionService<?> conversionService;
     private final BeanProvider<BeanPropertyBinder> beanPropertyBinder;
-
-    /**
-     * Default constructor.
-     * @param objectMapper The object mapper provider
-     * @param beanPropertyBinder The bean property binder provider
-     * @param conversionService The conversion service
-     */
-    @Deprecated
-    protected JacksonConverterRegistrar(
-            Provider<ObjectMapper> objectMapper,
-            Provider<BeanPropertyBinder> beanPropertyBinder,
-            ConversionService<?> conversionService) {
-        this.objectMapper = objectMapper::get;
-        this.conversionService = conversionService;
-        this.beanPropertyBinder = beanPropertyBinder::get;
-    }
 
     /**
      * Default constructor.

@@ -59,7 +59,7 @@ ChatClientWebSocket chatClient = webSocketClient
 chatClient.send("Hello World!");
 ----
 
-NOTE: For illustration purposes we use `blockingFirst()` to obtain the client. Tt is however possible to combine `connect` (which returns an rx:Flowable[]) to perform non-blocking interaction via WebSocket.
+NOTE: For illustration purposes we use `blockingFirst()` to obtain the client. It is however possible to combine `connect` (which returns a rx:Flowable[]) to perform non-blocking interaction via WebSocket.
 
 [TIP]
 .Using the CLI

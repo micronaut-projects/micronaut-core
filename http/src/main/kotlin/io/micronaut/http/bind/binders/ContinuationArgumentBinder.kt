@@ -41,9 +41,6 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
 
     override fun argumentType(): Argument<Continuation<*>> = Argument.of(Continuation::class.java)
 
-    @Deprecated("Deprecated in v2.1. Will be removed in v3", replaceWith = ReplaceWith("superTypes()"))
-    override fun supportsSuperTypes(): Boolean = false
-
     companion object {
         @JvmStatic
         fun extractContinuationCompletableFutureSupplier(source: HttpRequest<*>): Supplier<CompletableFuture<*>>? =

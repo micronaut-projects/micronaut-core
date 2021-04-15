@@ -35,6 +35,7 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.*;
 
@@ -45,16 +46,18 @@ import java.util.*;
  * @since 1.0
  */
 public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutputVisitor {
+
     private static final Field FILTER_OUTPUT_STREAM_OUT = ReflectionUtils.findField(FilterOutputStream.class, "out")
-            .map(field -> {
-                try {
-                    field.setAccessible(true);
-                    return field;
-                } catch (Exception e) {
-                    return null;
-                }
-            })
-            .orElse(null);
+        .map(field -> {
+            try {
+                addOpenJavaModules(FilterOutputStream.class, AnnotationProcessingOutputVisitor.class);
+                field.setAccessible(true);
+                return field;
+            } catch (Exception e) {
+                return null;
+            }
+        })
+        .orElse(null);
 
     private final Filer filer;
     private final Map<String, Optional<GeneratedFile>> metaInfFiles = new LinkedHashMap<>();
@@ -68,7 +71,25 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     public AnnotationProcessingOutputVisitor(Filer filer) {
         super(isEclipseFiler(filer));
         this.filer = filer;
-        this.isGradleFiler = filer.getClass().getName().startsWith("org.gradle.api");
+        final String filerName = filer.getClass().getName();
+        this.isGradleFiler = filerName.startsWith("org.gradle.api") || filerName.startsWith("org.jetbrains.kotlin.kapt3");
+    }
+
+    //--add-opens=java.base/$hostPackageName=ALL-UNNAMED
+    private static void addOpenJavaModules(Class<?> hostClass, Class<?> targetClass) {
+        // For Java 9 and above
+        try {
+            Method getModule = Class.class.getMethod("getModule");
+            Class<?> module = getModule.getReturnType();
+            Method getPackageName = Class.class.getMethod("getPackageName");
+            Method addOpens = module.getMethod("addOpens", String.class, module);
+            Object hostModule = getModule.invoke(hostClass);
+            String hostPackageName = (String) getPackageName.invoke(hostClass);
+            Object actionModule = getModule.invoke(targetClass);
+            addOpens.invoke(hostModule, hostPackageName, actionModule);
+        } catch (Exception e) {
+            // Ignore
+        }
     }
 
     private static boolean isEclipseFiler(Filer filer) {

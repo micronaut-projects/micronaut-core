@@ -16,6 +16,7 @@
 package io.micronaut.aop.writer;
 
 import io.micronaut.context.*;
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.*;
 import io.micronaut.aop.HotSwappableInterceptedProxy;
 import io.micronaut.aop.Intercepted;
@@ -27,11 +28,15 @@ import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
+import io.micronaut.inject.annotation.AnnotationMetadataSupport;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.*;
+import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -206,8 +211,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param originatingElement The originating element
      * @param annotationMetadata The annotation metadata
      * @param interfaceTypes     The additional interfaces to implement
-     * @param metadataBuilder    The configuration metadata builder
      * @param visitorContext     The visitor context
+     * @param metadataBuilder    The configuration metadata builder
+     * @param configurationMetadata The configuration metadata for the class
      * @param interceptorBinding The interceptor types
      */
     public AopProxyWriter(String packageName,
@@ -216,10 +222,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                           Element originatingElement,
                           AnnotationMetadata annotationMetadata,
                           ClassElement[] interfaceTypes,
-                          ConfigurationMetadataBuilder<?> metadataBuilder,
                           VisitorContext visitorContext,
+                          ConfigurationMetadataBuilder<?> metadataBuilder,
+                          ConfigurationMetadata configurationMetadata,
                           AnnotationValue<?>... interceptorBinding) {
-        this(packageName, className, isInterface, true, originatingElement, annotationMetadata, interfaceTypes, visitorContext, metadataBuilder, interceptorBinding);
+        this(packageName, className, isInterface, true, originatingElement, annotationMetadata, interfaceTypes, visitorContext, metadataBuilder, configurationMetadata, interceptorBinding);
     }
 
     /**
@@ -233,6 +240,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param interfaceTypes     The additional interfaces to implement
      * @param visitorContext     The visitor context
      * @param metadataBuilder    The configuration metadata builder
+     * @param configurationMetadata The configuration metadata for the class
      * @param interceptorBinding The interceptor binding
      */
     public AopProxyWriter(String packageName,
@@ -244,6 +252,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                           ClassElement[] interfaceTypes,
                           VisitorContext visitorContext,
                           ConfigurationMetadataBuilder<?> metadataBuilder,
+                          ConfigurationMetadata configurationMetadata,
                           AnnotationValue<?>... interceptorBinding) {
         super(OriginatingElements.of(originatingElement));
         this.isIntroduction = true;
@@ -266,6 +275,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.interceptorBinding = toInterceptorBindingMap(interceptorBinding);
         this.interfaceTypes = interfaceTypes != null ? new LinkedHashSet<>(Arrays.asList(interfaceTypes)) : Collections.emptySet();
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        if (configurationMetadata != null) {
+            // unfortunate we have to do this
+            String existingPrefix = annotationMetadata.stringValue(
+                    ConfigurationReader.class,
+                    "prefix")
+                    .orElse("");
+
+            String computedPrefix = StringUtils.isNotEmpty(existingPrefix) ? existingPrefix + "." + configurationMetadata.getName() : configurationMetadata.getName();
+            annotationMetadata = DefaultAnnotationMetadata.mutateMember(
+                    annotationMetadata,
+                    ConfigurationReader.class.getName(),
+                    "prefix",
+                    computedPrefix
+            );
+        }
         ClassElement aopElement = ClassElement.of(
                 proxyFullName,
                 isInterface,

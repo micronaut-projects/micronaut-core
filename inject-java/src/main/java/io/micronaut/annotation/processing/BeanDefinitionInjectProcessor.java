@@ -1213,7 +1213,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             new AnnotationMetadataHierarchy(concreteClassMetadata, methodAnnotationMetadata),
                             new ClassElement[]{typeToImplementElement},
                             javaVisitorContext,
-                            metadataBuilder);
+                            metadataBuilder,
+                            null
+                    );
 
                     aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata, javaVisitorContext);
                     beanDefinitionWriters.put(elementUtils.getName(packageName + '.' + beanClassName), aopProxyWriter);
@@ -1855,9 +1857,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     typeElement,
                     annotationMetadata,
                     interfaceTypes,
-                    metadataBuilder,
                     javaVisitorContext,
+                    metadataBuilder,
+                    configurationMetadata,
                     interceptorTypes);
+
 
             Set<TypeElement> additionalInterfaces = Arrays.stream(interfaceTypes)
                     .map(ce -> elementUtils.getTypeElement(ce.getName()))

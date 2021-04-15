@@ -17,7 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.SupplierUtil;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;

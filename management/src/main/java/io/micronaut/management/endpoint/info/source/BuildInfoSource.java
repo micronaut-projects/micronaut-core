@@ -18,7 +18,7 @@ package io.micronaut.management.endpoint.info.source;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.PropertySource;
-import io.micronaut.core.async.SupplierUtil;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.management.endpoint.info.InfoEndpoint;

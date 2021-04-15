@@ -62,6 +62,11 @@ ext {
                     name: 'micronaut-coherence-bom',
                     version: micronautCoherenceVersion
             ],
+            'micronaut.aws': [
+                    group: 'io.micronaut.aws',
+                    name: 'micronaut-aws-bom',
+                    version: micronautAwsVersion
+            ],
             //Third-party
             'netty': [
                     group: 'io.netty',
@@ -262,12 +267,6 @@ ext {
                 version:micronautFlywayVersion,
                 group:'io.micronaut.flyway',
                 name:'micronaut-flyway'
-            ],
-            'micronaut.aws': [
-                    version:micronautAwsVersion,
-                    group:'io.micronaut.aws',
-                    name:'micronaut-function-aws-api-proxy',
-                    modules: ['micronaut-aws-common', 'micronaut-function-aws-api-proxy-test', 'micronaut-function-aws', 'micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver', 'micronaut-aws-parameter-store', 'micronaut-aws-sdk-v1', 'micronaut-aws-sdk-v2', 'micronaut-function-client-aws', 'micronaut-function-aws-test']
             ],
             'micronaut.kotlin': [
                     version:micronautKotlinVersion,

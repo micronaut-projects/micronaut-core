@@ -20,9 +20,9 @@ The actual implementation of the ann:runtime.event.annotation.EventListener[] is
 
 [source,java]
 ----
-include::runtime/src/main/java/io/micronaut/runtime/event/annotation/EventListener.java[tags=imports, indent=0]
+include::context/src/main/java/io/micronaut/runtime/event/annotation/EventListener.java[tags=imports, indent=0]
 
-include::runtime/src/main/java/io/micronaut/runtime/event/annotation/EventListener.java[tags=clazz, indent=0]
+include::context/src/main/java/io/micronaut/runtime/event/annotation/EventListener.java[tags=clazz, indent=0]
 ----
 
 <1> The ann:aop.Adapter[] annotation indicates which SAM type to adapt, in this case api:context.event.ApplicationEventListener[].

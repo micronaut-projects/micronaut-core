@@ -61,12 +61,6 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
         this.httpContentProcessorResolver = httpContentProcessorResolver;
     }
 
-    @Override
-    @Deprecated
-    public boolean supportsSuperTypes() {
-        return false;
-    }
-
     @NonNull
     @Override
     public List<Class<?>> superTypes() {

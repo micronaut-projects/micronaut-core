@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.types.files;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -43,6 +44,7 @@ import java.util.Arrays;
  * @since 1.0
  */
 @Singleton
+@Internal
 public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
 
     // sorted array of entity headers

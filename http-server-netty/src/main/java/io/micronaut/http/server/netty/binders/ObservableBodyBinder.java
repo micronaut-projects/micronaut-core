@@ -57,12 +57,6 @@ public class ObservableBodyBinder extends DefaultBodyAnnotationBinder<Observable
         this.publisherBodyBinder = new PublisherBodyBinder(conversionService, httpContentProcessorResolver);
     }
 
-    @Override
-    @Deprecated
-    public boolean supportsSuperTypes() {
-        return false;
-    }
-
     @NonNull
     @Override
     public List<Class<?>> superTypes() {
