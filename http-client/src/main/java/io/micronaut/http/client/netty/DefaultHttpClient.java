@@ -2330,7 +2330,7 @@ public class DefaultHttpClient implements
     private void setRedirectHeaders(@Nullable HttpRequest request, MutableHttpRequest<Object> redirectRequest) {
         if (request != null) {
             request.headers().forEach(header -> redirectRequest.header(header.getKey(), header.getValue()));
-            //The host should be recalculcated based on the location
+            //The host should be recalculated based on the location
             redirectRequest.getHeaders().remove(HttpHeaderNames.HOST);
         }
     }
@@ -2351,7 +2351,7 @@ public class DefaultHttpClient implements
                     }
                 }
             }
-            //The host should be recalculcated based on the location
+            //The host should be recalculated based on the location
             redirectRequest.getHeaders().remove(HttpHeaderNames.HOST);
         }
     }

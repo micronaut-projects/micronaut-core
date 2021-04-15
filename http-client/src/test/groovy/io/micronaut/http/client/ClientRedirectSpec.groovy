@@ -164,6 +164,9 @@ class ClientRedirectSpec extends Specification {
 
         then:
         result == "localhost:${otherServer.getPort()}"
+
+        cleanup:
+        otherServer.close()
     }
 
     @Controller('/test')
