@@ -31,7 +31,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanFactory;
-import io.micronaut.inject.ConstructorInjectionPoint;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.qualifiers.AnyQualifier;
@@ -151,31 +150,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
     }
 
     @Override
-    public final ConstructorInjectionPoint<T> getConstructor() {
-        return new ConstructorInjectionPoint<T>() {
-            @Override
-            public T invoke(Object... args) {
-                throw new UnsupportedOperationException("Cannot be instantiated directly");
-            }
-
-            @Override
-            public Argument<?>[] getArguments() {
-                return Argument.ZERO_ARGUMENTS;
-            }
-
-            @Override
-            public BeanDefinition<T> getDeclaringBean() {
-                return AbstractProviderDefinition.this;
-            }
-
-            @Override
-            public boolean requiresReflection() {
-                return false;
-            }
-        };
-    }
-
-    @Override
+    @NonNull
     public final List<Argument<?>> getTypeArguments(Class<?> type) {
         if (type == getBeanType()) {
             return getTypeArguments();
@@ -184,6 +159,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
     }
 
     @Override
+    @NonNull
     public final List<Argument<?>> getTypeArguments() {
         return Collections.singletonList(
                 Argument.OBJECT_ARGUMENT

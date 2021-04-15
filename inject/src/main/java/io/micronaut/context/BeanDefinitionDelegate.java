@@ -227,6 +227,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     }
 
     @Override
+    @NonNull
     public String getName() {
         return definition.getName();
     }

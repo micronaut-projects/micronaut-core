@@ -18,6 +18,7 @@ package io.micronaut.inject
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
+import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.core.annotation.NonNull
 import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AnnotationUtils
@@ -165,13 +166,15 @@ abstract class AbstractTypeElementSpec extends Specification {
         return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader),"test") {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                files.findAll { JavaFileObject jfo ->
+                def references = files.findAll { JavaFileObject jfo ->
                     jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith("DefinitionClass.class")
                 }.collect { JavaFileObject jfo ->
                     def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
                     name = name.replace('/', '.') - '.class'
                     return classLoader.loadClass(name).newInstance()
                 } as List<BeanDefinitionReference>
+
+                return references + new InterceptorRegistryBean()
             }
         }.start()
     }

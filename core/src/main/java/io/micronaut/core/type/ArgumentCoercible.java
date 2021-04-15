@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.NonNull;
  * @param <T> The argument type
  * @since 3.0.0
  * @author graemerocher
+ * @param <T> The generic type
  */
 public interface ArgumentCoercible<T> {
     /**

@@ -72,7 +72,11 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
 
     /**
      * @return Is this definition provided by another bean
+     * @deprecated Provided beans are deprecated
+     * @see Provided
      */
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @Deprecated
     default boolean isProvided() {
         return getAnnotationMetadata().hasDeclaredStereotype(Provided.class);
     }
@@ -103,12 +107,34 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      *
      * @return The constructor injection point
      */
-    ConstructorInjectionPoint<T> getConstructor();
+    default ConstructorInjectionPoint<T> getConstructor() {
+        return new ConstructorInjectionPoint<T>() {
+            @Override
+            public T invoke(Object... args) {
+                throw new UnsupportedOperationException("Cannot be instantiated directly");
+            }
+
+            @Override
+            public Argument<?>[] getArguments() {
+                return Argument.ZERO_ARGUMENTS;
+            }
+
+            @Override
+            public BeanDefinition<T> getDeclaringBean() {
+                return BeanDefinition.this;
+            }
+
+            @Override
+            public boolean requiresReflection() {
+                return false;
+            }
+        };
+    }
 
     /**
      * @return All required components for this entity definition
      */
-    default Collection<Class> getRequiredComponents() {
+    default Collection<Class<?>> getRequiredComponents() {
         return Collections.emptyList();
     }
 
@@ -117,7 +143,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      *
      * @return The required properties
      */
-    default Collection<MethodInjectionPoint> getInjectedMethods() {
+    default Collection<MethodInjectionPoint<T, ?>> getInjectedMethods() {
         return Collections.emptyList();
     }
 
@@ -126,7 +152,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      *
      * @return The required fields
      */
-    default Collection<FieldInjectionPoint> getInjectedFields() {
+    default Collection<FieldInjectionPoint<T, ?>> getInjectedFields() {
         return Collections.emptyList();
     }
 
@@ -135,7 +161,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      *
      * @return Methods to call post construct
      */
-    default Collection<MethodInjectionPoint> getPostConstructMethods() {
+    default Collection<MethodInjectionPoint<T, ?>> getPostConstructMethods() {
         return Collections.emptyList();
     }
 
@@ -144,7 +170,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      *
      * @return Methods to call pre-destroy
      */
-    default Collection<MethodInjectionPoint> getPreDestroyMethods() {
+    default Collection<MethodInjectionPoint<T, ?>> getPreDestroyMethods() {
         return Collections.emptyList();
     }
 
@@ -152,6 +178,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The class name
      */
     @Override
+    @NonNull
     default String getName() {
         return getBeanType().getName();
     }
@@ -164,7 +191,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @param <R>           The return type
      * @return An optional {@link ExecutableMethod}
      */
-    default <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class... argumentTypes) {
+    default <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class<?>... argumentTypes) {
         return Optional.empty();
     }
 
@@ -254,7 +281,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @param type The type
      * @return The type parameters
      */
-    default @NonNull Class[] getTypeParameters(@Nullable Class<?> type) {
+    default @NonNull Class<?>[] getTypeParameters(@Nullable Class<?> type) {
         if (type == null) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         } else {
@@ -269,7 +296,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      *
      * @return The type parameters for the bean type as a class array.
      */
-    default @NonNull Class[] getTypeParameters() {
+    default @NonNull Class<?>[] getTypeParameters() {
         return getTypeParameters(getBeanType());
     }
 
@@ -293,7 +320,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @throws IllegalStateException If the method cannot be found
      */
     @SuppressWarnings("unchecked")
-    default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class... argumentTypes) {
+    default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class<?>... argumentTypes) {
         return (ExecutableMethod<T, R>) findMethod(name, argumentTypes)
             .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(getBeanType(), name, argumentTypes));
     }

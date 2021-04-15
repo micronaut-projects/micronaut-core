@@ -11,6 +11,26 @@ import javax.inject.Qualifier
 
 class BeanDefinitionSpec extends AbstractTypeElementSpec {
 
+    void 'test dynamic instantiate with constructor'() {
+        given:
+        def definition = buildBeanDefinition('genctor.Test', '''
+package genctor;
+
+import javax.inject.*;
+
+@Singleton
+class Test {
+    Test(Runnable foo) {}
+}
+
+''')
+        when:
+        def instance = definition.constructor.instantiate({} as Runnable)
+
+        then:
+        instance != null
+    }
+
     void "test limit the exposed bean types"() {
         given:
         def definition = buildBeanDefinition('limittypes.Test', '''

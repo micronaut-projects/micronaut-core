@@ -20,9 +20,9 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 
@@ -79,6 +79,17 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
                                        String methodName,
                                        Argument genericReturnType) {
         this(declaringType, methodName, genericReturnType, Argument.ZERO_ARGUMENTS);
+    }
+
+    /**
+     * @param declaringType     The declaring type
+     * @param methodName        The method name
+     */
+    @SuppressWarnings("WeakerAccess")
+    @UsedByGeneratedCode
+    protected AbstractExecutableMethod(Class<?> declaringType,
+                                       String methodName) {
+        this(declaringType, methodName, Argument.OBJECT_ARGUMENT, Argument.ZERO_ARGUMENTS);
     }
 
     @Override
@@ -147,7 +158,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
     @Override
     public final Object invoke(Object instance, Object... arguments) {
-        validateArguments(arguments);
+        ArgumentUtils.validateArguments(this, getArguments(), arguments);
         return invokeInternal(instance, arguments);
     }
 
@@ -181,26 +192,6 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
             }
         } else {
             return AnnotationMetadata.EMPTY_METADATA;
-        }
-    }
-
-    private void validateArguments(Object[] argArray) {
-        Argument<?>[] arguments = getArguments();
-        int requiredCount = arguments.length;
-        int actualCount = argArray == null ? 0 : argArray.length;
-        if (requiredCount != actualCount) {
-            throw new IllegalArgumentException("Wrong number of arguments to method: " + getMethodName());
-        }
-        if (requiredCount > 0) {
-            for (int i = 0; i < arguments.length; i++) {
-                Argument<?> argument = arguments[i];
-                Class<?> javaType = argument.getType();
-                Class<?> type = javaType.isPrimitive() ? ReflectionUtils.getWrapperType(javaType) : javaType;
-                Object value = argArray[i];
-                if (value != null && !type.isInstance(value)) {
-                    throw new IllegalArgumentException("Invalid type [" + argArray[i].getClass().getName() + "] for argument [" + argument + "] of method: " + getDescription(true));
-                }
-            }
         }
     }
 

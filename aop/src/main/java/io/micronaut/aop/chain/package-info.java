@@ -19,4 +19,7 @@
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 package io.micronaut.aop.chain;
+
+import io.micronaut.core.annotation.Internal;

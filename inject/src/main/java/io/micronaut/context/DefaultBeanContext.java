@@ -1100,7 +1100,6 @@ public class DefaultBeanContext implements BeanContext {
     @NonNull
     public <T> T destroyBean(T bean) {
         Objects.requireNonNull(bean, "Bean cannot be null");
-        final Collection candidatesForInstance = findBeanCandidatesForInstance(bean);
         final Argument arg = Argument.of(bean.getClass());
         final BeanDefinition concreteCandidate = (BeanDefinition) findConcreteCandidate(
                 null,
@@ -3353,7 +3352,7 @@ public class DefaultBeanContext implements BeanContext {
      * @return A collection of {@link BeanRegistration}
      */
     @SuppressWarnings("unchecked")
-    protected <T> Collection<BeanRegistration<T>> getBeanRegistrations(
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(
             @Nullable BeanResolutionContext resolutionContext,
             @NonNull Argument<T> beanType,
             @Nullable Qualifier<T> qualifier) {
@@ -3998,31 +3997,32 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
-        public Collection<Class> getRequiredComponents() {
+        public Collection<Class<?>> getRequiredComponents() {
             return Collections.emptyList();
         }
 
         @Override
-        public Collection<MethodInjectionPoint> getInjectedMethods() {
+        public Collection<MethodInjectionPoint<T, ?>> getInjectedMethods() {
             return Collections.emptyList();
         }
 
         @Override
-        public Collection<FieldInjectionPoint> getInjectedFields() {
+        public Collection<FieldInjectionPoint<T, ?>> getInjectedFields() {
             return Collections.emptyList();
         }
 
         @Override
-        public Collection<MethodInjectionPoint> getPostConstructMethods() {
+        public Collection<MethodInjectionPoint<T, ?>> getPostConstructMethods() {
             return Collections.emptyList();
         }
 
         @Override
-        public Collection<MethodInjectionPoint> getPreDestroyMethods() {
+        public Collection<MethodInjectionPoint<T, ?>> getPreDestroyMethods() {
             return Collections.emptyList();
         }
 
         @Override
+        @NonNull
         public String getName() {
             return singletonClass.getName();
         }
@@ -4038,7 +4038,7 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
-        public <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class[] argumentTypes) {
+        public <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class<?>[] argumentTypes) {
             return Optional.empty();
         }
 

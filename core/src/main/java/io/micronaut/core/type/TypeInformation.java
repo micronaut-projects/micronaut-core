@@ -17,6 +17,7 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 
 import java.lang.reflect.ParameterizedType;
@@ -39,6 +40,26 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      * @return The type
      */
     @NonNull Class<T> getType();
+
+    /**
+     * @return Is the type primitive.
+     * @since 3.0.0
+     */
+    default boolean isPrimitive() {
+        return getType().isPrimitive();
+    }
+
+    /**
+     * If the type is primitive returns the wrapper type, otherwise returns the actual type.
+     * @return The wrapper type if primitive
+     */
+    default Class<?> getWrapperType() {
+        if (isPrimitive()) {
+            return ReflectionUtils.getWrapperType(getType());
+        } else {
+            return getType();
+        }
+    }
 
     @Override
     @NonNull

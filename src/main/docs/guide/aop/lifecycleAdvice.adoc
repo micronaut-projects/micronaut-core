@@ -1,0 +1,44 @@
+Sometimes you may need to apply advice to a bean's lifecycle. There are 3 types of advice that are applicable in this case:
+
+* Interception of the construction of the bean
+* Interception of the bean's `@PostConstruct` invocation
+* Interception of a bean's `@PreDestroy` invocation
+
+Micronaut supports these 3 use cases by allowing the definition of additional ann:aop.InterceptorBinding[] meta-annotations.
+
+Consider the following annotation definition:
+
+snippet::io.micronaut.docs.aop.lifecycle.ProductBean[tags="imports,class", indent=0, title="AroundConstruct example"]
+
+<1> The ann:aop.AroundConstruct[] annotation is added to indicate that interception of the constructor should occur
+<2> An ann:aop.InterceptorBinding[] definition is used to indicate that `@PostConstruct` interception should occur
+<3> An ann:aop.InterceptorBinding[] definition is used to indicate that `@PreDestroy` interception should occur
+<4> The bean is defined as ann:context.annotation.Prototype[] so a new instance is required for each injection point
+
+Note that if you do not need `@PostConstruct` and `@PreDestroy` interception you can simply remove those bindings.
+
+The `@ProductBean` annotation can then be used on the target class:
+
+snippet::io.micronaut.docs.aop.lifecycle.Product[tags="imports,class", indent=0, title="Using an AroundConstruct meta-annotation"]
+
+<1> The `@ProductBean` annotation is defined on a class of type `Product`
+<2> The ann:context.annotation.Parameter[] annotation indicates that this bean requires an argument to complete constructions
+<3> Any `@PreDestroy` or `@PostConstruct` methods are executed last in the interceptor chain
+
+Now you can define api:aop.ConstructorInterceptor[] beans for constructor interception and api:aop.MethodInterceptor[] beans for `@PostConstruct` or `@PreDestroy` interception.
+
+The following factory defines a api:aop.ConstructorInterceptor[] that intercepts construction of `Product` instances and registers them with a hypothetical `ProductService` validating the product name first:
+
+snippet::io.micronaut.docs.aop.lifecycle.ProductInterceptors[tags="imports,class,constructor-interceptor", indent=0, title="Defining a constructor interceptor"]
+
+<1> A new ann:aop.InterceptorBean[] is defined that is a api:aop.ConstructorInterceptor[]
+<2> The constructor parameter values can be retrieved and modified as needed
+<3> The constructor can be invoked with the `proceed()` method
+
+Defining api:aop.MethodInterceptor[] instances that interceptor the `@PostConstruct` and `@PreDestroy` methods is no different from defining interceptors for regular methods. Note however that you can use the passed api:aop.MethodInvocationContext[] to identify what kind of interception is occurring and adapt the code accordingly like in the following example:
+
+snippet::io.micronaut.docs.aop.lifecycle.ProductInterceptors[tags="method-interceptor", indent="0", title="Defining a constructor interceptor"]
+
+<1> A new ann:aop.InterceptorBean[] is defined that is a api:aop.MethodInterceptor[]
+<2> `@PostConstruct` interception is handled
+<3> `@PreDestroy` interception is handled

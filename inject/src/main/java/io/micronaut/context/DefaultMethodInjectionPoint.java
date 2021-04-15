@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -41,29 +42,13 @@ import java.util.Objects;
 @Internal
 class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, EnvironmentConfigurable {
 
-    private final BeanDefinition declaringBean;
+    private final BeanDefinition<B> declaringBean;
     private final AnnotationMetadata annotationMetadata;
     private final Class<?> declaringType;
     private final String methodName;
     private final Class[] argTypes;
-    private final Argument[] arguments;
+    private final Argument<?>[] arguments;
     private Environment environment;
-
-    /**
-     * Constructs a new {@link DefaultMethodInjectionPoint}.
-     *
-     * @param declaringBean The declaring bean
-     * @param declaringType The declaring type
-     * @param methodName    The method name
-     * @param arguments     The arguments
-     */
-    DefaultMethodInjectionPoint(
-        BeanDefinition declaringBean,
-        Class<?> declaringType,
-        String methodName,
-        @Nullable Argument[] arguments) {
-        this(declaringBean, declaringType, methodName, arguments, AnnotationMetadata.EMPTY_METADATA);
-    }
 
     /**
      * Constructs a new {@link DefaultMethodInjectionPoint}.
@@ -75,10 +60,10 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
      * @param annotationMetadata The annotation metadata
      */
     DefaultMethodInjectionPoint(
-        BeanDefinition declaringBean,
+        BeanDefinition<B> declaringBean,
         Class<?> declaringType,
         String methodName,
-        @Nullable Argument[] arguments,
+        @Nullable Argument<?>[] arguments,
         @Nullable AnnotationMetadata annotationMetadata) {
         Objects.requireNonNull(declaringBean, "Declaring bean cannot be null");
         this.declaringType = declaringType;
@@ -129,18 +114,20 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
     }
 
     @Override
-    public Object invoke(Object instance, Object... args) {
+    public T invoke(Object instance, Object... args) {
         Method targetMethod = getMethod();
         return ReflectionUtils.invokeMethod(instance, targetMethod, args);
     }
 
     @Override
+    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
 
     @Override
-    public BeanDefinition getDeclaringBean() {
+    @NonNull
+    public BeanDefinition<B> getDeclaringBean() {
         return declaringBean;
     }
 
@@ -150,6 +137,7 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
     }
 
     @Override
+    @NonNull
     public Argument<?>[] getArguments() {
         return arguments;
     }
@@ -162,7 +150,8 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        DefaultMethodInjectionPoint that = (DefaultMethodInjectionPoint) o;
+        @SuppressWarnings("unchecked")
+        DefaultMethodInjectionPoint<B, T> that = (DefaultMethodInjectionPoint<B, T>) o;
         return Objects.equals(declaringType, that.declaringType) &&
             Objects.equals(methodName, that.methodName) &&
             Arrays.equals(argTypes, that.argTypes);
@@ -170,7 +159,6 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
 
     @Override
     public int hashCode() {
-
         int result = Objects.hash(declaringType, methodName);
         result = 31 * result + Arrays.hashCode(argTypes);
         return result;

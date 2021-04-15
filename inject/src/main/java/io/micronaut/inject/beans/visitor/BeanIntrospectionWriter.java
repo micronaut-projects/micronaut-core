@@ -25,6 +25,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.processing.JavaModelUtils;
@@ -327,10 +328,31 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             // write the instantiate method
             writeInstantiateMethod();
 
-            // write constructor arguments
-            if (constructor != null && ArrayUtils.isNotEmpty(constructor.getParameters())) {
-                writeConstructorArguments();
+
+            if (constructor != null) {
+                // write constructor arguments
+                if (ArrayUtils.isNotEmpty(constructor.getParameters())) {
+                    writeConstructorArguments();
+                }
+
+                // write the constructor annotation metadata
+                final AnnotationMetadata annotationMetadata = constructor.getAnnotationMetadata();
+                if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+                    final GeneratorAdapter constructorMetadata = startPublicFinalMethodZeroArgs(introspectionWriter, AnnotationMetadata.class, "getConstructorAnnotationMetadata");
+                    AnnotationMetadataWriter.instantiateNewMetadata(
+                            beanType,
+                            introspectionWriter,
+                            constructorMetadata,
+                            (DefaultAnnotationMetadata) annotationMetadata,
+                            localLoadTypeMethods
+                    );
+                    constructorMetadata.returnValue();
+                    constructorMetadata.visitMaxs(1, 1);
+                    constructorMetadata.visitEnd();
+                }
             }
+
+
 
             for (GeneratorAdapter generatorAdapter : localLoadTypeMethods.values()) {
                 generatorAdapter.visitMaxs(1, 1);
