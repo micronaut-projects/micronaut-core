@@ -24,6 +24,7 @@ import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.uri.UriBuilder;
 import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -35,8 +36,9 @@ import io.netty.handler.ssl.SslHandler;
  * @author Iván López
  * @since 2.5.0
  */
+@ChannelHandler.Sharable
 @Internal
-class HttpToHttpsRedirectHandler extends ChannelDuplexHandler {
+final class HttpToHttpsRedirectHandler extends ChannelDuplexHandler {
 
     private final ServerSslConfiguration sslConfiguration;
     private final HttpHostResolver hostResolver;
@@ -55,7 +57,7 @@ class HttpToHttpsRedirectHandler extends ChannelDuplexHandler {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        if (ctx.pipeline().get(SslHandler.class) == null && msg instanceof HttpRequest) {
+        if (msg instanceof HttpRequest && ctx.pipeline().get(SslHandler.class) == null) {
             HttpRequest<?> request = (HttpRequest<?>) msg;
             UriBuilder uriBuilder = UriBuilder.of(hostResolver.resolve(request));
             uriBuilder.scheme("https");
