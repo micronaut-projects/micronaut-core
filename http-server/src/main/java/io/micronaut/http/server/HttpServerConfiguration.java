@@ -493,7 +493,10 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * @param httpToHttpsRedirect the redirect HTTP to HTTPS configuration. This should only be used when {@code dualProtocol} is enabled. Default value ({@value #DEFAULT_HTTP_TO_HTTPS_REDIRECT}).
+     * @param httpToHttpsRedirect Set to true to enable redirecting all http requests to the same URL but with
+                                  https instead. This should only be used when {@code dualProtocol} is enabled. 
+                                  Default value ({@value #DEFAULT_HTTP_TO_HTTPS_REDIRECT}). This feature uses
+                                  the host resolution capabilities to determine the host to redirect to.
      */
     public void setHttpToHttpsRedirect(boolean httpToHttpsRedirect) {
         this.httpToHttpsRedirect = httpToHttpsRedirect;
