@@ -42,6 +42,26 @@ import javax.inject.Singleton
  */
 class HttpClientSenderSpec extends Specification {
 
+    void "test http client sender bean initialization with instrumented threads"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+          'tracing.zipkin.enabled':true,
+          'tracing.instrument-threads':true,
+          'tracing.zipkin.sampler.probability':1,
+          'tracing.zipkin.http.url':HttpClientSender.Builder.DEFAULT_SERVER_URL
+        )
+
+        when:
+        HttpClientSender httpClientSender = context.getBean(HttpClientSender)
+
+        then:
+        httpClientSender != null
+
+        cleanup:
+        httpClientSender.close()
+        context.close()
+    }
+
     void "test http client sender receives spans"() {
         given:
         ApplicationContext context = ApplicationContext.run(
