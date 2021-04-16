@@ -36,6 +36,7 @@ public interface ChannelPipelineCustomizer {
     String HANDLER_HTTP_CLIENT_CODEC = "http-client-codec";
     String HANDLER_HTTP_SERVER_CODEC = "http-server-codec";
     String HANDLER_HTTP_CLIENT_INIT = "http-client-init";
+    String HANDLER_HTTP_TO_HTTPS_REDIRECT = "http-to-https-redirect";
     String HANDLER_FLOW_CONTROL = "flow-control-handler";
     String HANDLER_CONNECT_TTL = "connect-ttl";
     String HANDLER_IDLE_STATE = "idle-state";

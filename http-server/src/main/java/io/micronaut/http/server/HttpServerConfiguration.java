@@ -110,6 +110,12 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_DUAL_PROTOCOL = false;
 
+    /**
+     * The default value for redirect HTTP to HTTPS when using dual protocal.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_HTTP_TO_HTTPS_REDIRECT = false;
+
     private Integer port;
     private String host;
     private Integer readTimeout;
@@ -127,6 +133,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private String clientAddressHeader;
     private String contextPath;
     private boolean dualProtocol = DEFAULT_DUAL_PROTOCOL;
+    private boolean httpToHttpsRedirect = DEFAULT_HTTP_TO_HTTPS_REDIRECT;
     private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
@@ -324,6 +331,13 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
+     * @return if redirection from HTTP to HTTPS is enabled or not
+     */
+    public boolean isHttpToHttpsRedirect() {
+        return httpToHttpsRedirect;
+    }
+
+    /**
      * @param defaultCharset The default charset to use
      */
     public void setDefaultCharset(Charset defaultCharset) {
@@ -476,6 +490,13 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public void setDualProtocol(boolean dualProtocol) {
         this.dualProtocol = dualProtocol;
+    }
+
+    /**
+     * @param httpToHttpsRedirect the redirect HTTP to HTTPS configuration
+     */
+    public void setHttpToHttpsRedirect(boolean httpToHttpsRedirect) {
+        this.httpToHttpsRedirect = httpToHttpsRedirect;
     }
 
     /**
