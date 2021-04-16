@@ -486,14 +486,14 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * @param dualProtocol the dual protocol (http/https) configuration
+     * @param dualProtocol the dual protocol (http/https) configuration. Default value ({@value #DEFAULT_DUAL_PROTOCOL}).
      */
     public void setDualProtocol(boolean dualProtocol) {
         this.dualProtocol = dualProtocol;
     }
 
     /**
-     * @param httpToHttpsRedirect the redirect HTTP to HTTPS configuration
+     * @param httpToHttpsRedirect the redirect HTTP to HTTPS configuration. This should only be used when {@code dualProtocol} is enabled. Default value ({@value #DEFAULT_HTTP_TO_HTTPS_REDIRECT}).
      */
     public void setHttpToHttpsRedirect(boolean httpToHttpsRedirect) {
         this.httpToHttpsRedirect = httpToHttpsRedirect;
