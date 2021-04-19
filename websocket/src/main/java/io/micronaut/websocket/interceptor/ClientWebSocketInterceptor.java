@@ -16,6 +16,7 @@
 package io.micronaut.websocket.interceptor;
 
 import io.micronaut.aop.InterceptedMethod;
+import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Prototype;
@@ -23,6 +24,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.websocket.WebSocketSession;
+import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.exceptions.WebSocketClientException;
 
 import java.io.Closeable;
@@ -34,6 +36,7 @@ import java.io.Closeable;
  * @since 1.0
  */
 @Prototype
+@InterceptorBean(ClientWebSocket.class)
 public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Object> {
 
     private WebSocketSession webSocketSession;

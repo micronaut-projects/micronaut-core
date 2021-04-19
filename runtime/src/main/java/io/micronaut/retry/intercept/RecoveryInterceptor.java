@@ -15,10 +15,7 @@
  */
 package io.micronaut.retry.intercept;
 
-import io.micronaut.aop.InterceptPhase;
-import io.micronaut.aop.InterceptedMethod;
-import io.micronaut.aop.MethodInterceptor;
-import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.aop.*;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
@@ -34,7 +31,6 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -46,7 +42,7 @@ import java.util.concurrent.CompletionStage;
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
+@InterceptorBean(Recoverable.class)
 public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
 
     /**

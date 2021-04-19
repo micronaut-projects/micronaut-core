@@ -15,6 +15,7 @@
  */
 package io.micronaut.runtime.context.env;
 
+import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
@@ -40,6 +41,7 @@ import java.util.Optional;
  * @since 1.3.0
  */
 @Prototype
+@InterceptorBean(ConfigurationAdvice.class)
 @Internal
 public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object, Object> {
     private static final String MEMBER_BEAN = "bean";
