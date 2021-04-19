@@ -6,6 +6,10 @@ Micronaut {version} includes the following changes:
 
 It is now possible to define a body argument of a controller method with an InputStream. For example `@Body InputStream inputStream`. Note that you must offload the execution to another thread pool to avoid blocking the event loop when reading the stream. `InputStream` can also be returned from controller methods. The stream will be read by Micronaut on the IO thread pool if the controller method is executed on the event loop.
 
+==== HTTP to HTTPS redirect with Dual Protocol
+
+If Dual Protocol is enabled, now it is possible to redirect all HTTP requests automatically to the HTTPS port. See more information <<dualProtocol, about how to enable and configure it>>.
+
 
 === Module Upgrades
 
