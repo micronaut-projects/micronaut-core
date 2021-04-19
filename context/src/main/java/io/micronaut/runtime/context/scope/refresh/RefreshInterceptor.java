@@ -22,7 +22,6 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.runtime.context.scope.Refreshable;
 
-import javax.inject.Singleton;
 import java.util.concurrent.locks.Lock;
 
 /**
