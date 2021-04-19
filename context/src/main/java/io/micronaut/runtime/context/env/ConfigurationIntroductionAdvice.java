@@ -15,10 +15,12 @@
  */
 package io.micronaut.runtime.context.env;
 
+import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.Environment;
@@ -40,6 +42,7 @@ import java.util.Optional;
  * @since 1.3.0
  */
 @Prototype
+@InterceptorBean(ConfigurationAdvice.class)
 @Internal
 public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object, Object> {
     private static final String MEMBER_BEAN = "bean";

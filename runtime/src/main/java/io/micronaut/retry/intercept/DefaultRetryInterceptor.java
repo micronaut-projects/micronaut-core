@@ -15,10 +15,7 @@
  */
 package io.micronaut.retry.intercept;
 
-import io.micronaut.aop.InterceptPhase;
-import io.micronaut.aop.InterceptedMethod;
-import io.micronaut.aop.MethodInterceptor;
-import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.aop.*;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -55,7 +52,7 @@ import java.util.function.Supplier;
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
+@InterceptorBean(Retryable.class)
 public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);

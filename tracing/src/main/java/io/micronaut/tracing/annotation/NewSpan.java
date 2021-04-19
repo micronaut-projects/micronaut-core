@@ -16,9 +16,6 @@
 package io.micronaut.tracing.annotation;
 
 import io.micronaut.aop.Around;
-import io.micronaut.context.annotation.Type;
-import io.micronaut.tracing.interceptor.TraceInterceptor;
-
 import java.lang.annotation.*;
 
 /**
@@ -33,7 +30,6 @@ import java.lang.annotation.*;
 @Inherited
 @Target(value = { ElementType.METHOD })
 @Around
-@Type(TraceInterceptor.class)
 public @interface NewSpan {
 
     /**
