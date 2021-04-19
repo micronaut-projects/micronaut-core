@@ -36,6 +36,26 @@ In addition to being able to inject beans, Micronaut natively supports injecting
 
 NOTE: There are 3 different provider types supported, however the `BeanProvider` is the one we suggest to use.
 
+[NOTE]
+====
+When injecting a `java.lang.Iterable`, or `java.util.stream.Stream`, `Array` of beans into a bean matching the injection type, then the owning bean will not be be a member of the injected collection.  A common pattern demonstrating this is aggregation. For example:
+```java
+@Singleton
+class AggregateEngine implements Engine {
+  @Inject
+  List<Engine> engines;
+
+  @Override
+  public void start() {
+    engines.forEach(Engine::start);
+  }
+
+  ...
+}
+```
+In this example, the injected member variable `engines` will not contain an instance of `AggregateEngine`
+====
+
 TIP: A prototype bean will have one instance created per place the bean is injected. When a prototype bean is injected as a provider, each call to `get()` creates a new instance.
 
 === Collection Ordering

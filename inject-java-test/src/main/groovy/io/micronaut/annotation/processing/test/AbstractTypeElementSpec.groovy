@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing.test
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
+import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.Qualifier
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
@@ -182,7 +183,7 @@ class Test {
      * @param cls The class data
      * @return The context. Should be shutdown after use
      */
-    ApplicationContext buildContext(String className, String cls) {
+    ApplicationContext buildContext(String className, String cls, boolean includeAllBeans = false) {
         def files = newJavaParser().generate(className, cls)
         ClassLoader classLoader = new ClassLoader() {
             @Override
@@ -200,13 +201,15 @@ class Test {
         return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader), "test") {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                files.findAll { JavaFileObject jfo ->
+                def references = files.findAll { JavaFileObject jfo ->
                     jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith("DefinitionClass.class")
                 }.collect { JavaFileObject jfo ->
                     def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
                     name = name.replace('/', '.') - '.class'
                     return classLoader.loadClass(name).newInstance()
                 } as List<BeanDefinitionReference>
+
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : new InterceptorRegistryBean())
             }
         }.start()
     }

@@ -30,7 +30,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import io.micronaut.core.annotation.NonNull;
@@ -351,7 +350,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         return Optional.empty();
     }
 
-    @NotNull
+    @NonNull
     private <T> String cacheKey(@NonNull String name, Class<T> requiredType) {
         return name + '|' + requiredType.getSimpleName();
     }

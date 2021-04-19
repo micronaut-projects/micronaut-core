@@ -16,6 +16,7 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.bind.BeanPropertyBinder
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -154,6 +155,7 @@ class BlockingPojoCrudSpec extends Specification {
     }
 
 
+    @Introspected
     static class Book {
         Long id
         String title

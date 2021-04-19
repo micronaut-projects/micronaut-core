@@ -33,7 +33,6 @@ import io.micronaut.inject.beans.AbstractExecutableBeanMethod;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
-import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -89,7 +88,7 @@ final class BeanMethodWriter extends AbstractClassFileWriter implements Named {
         return type;
     }
 
-    @NotNull
+    @NonNull
     @Override
     public String getName() {
         return type.getClassName();

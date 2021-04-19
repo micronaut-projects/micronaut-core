@@ -220,7 +220,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Class<T> beanType, BeanDefinition<?> filter, boolean filterProxied) {
+    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Argument<T> beanType, BeanDefinition<?> filter, boolean filterProxied) {
         Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(resolutionContext, beanType, filter, filterProxied);
         return transformIterables(resolutionContext, candidates, filterProxied);
     }
@@ -286,7 +286,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         continue;
                     }
 
-                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, dependentType, null, filterProxied);
+                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), null, filterProxied);
                     if (!dependentCandidates.isEmpty()) {
                         for (BeanDefinition dependentCandidate : dependentCandidates) {
 
@@ -308,12 +308,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     String qualifierKey = javax.inject.Qualifier.class.getName();
                                     Argument<?>[] arguments = candidate.getConstructor().getArguments();
                                     for (Argument<?> argument : arguments) {
-                                        Class<?> argumentType;
-                                        if (ProviderFactory.isProvider(argument.getType())) {
-                                            argumentType = argument.getFirstTypeVariable().orElse(argument).getType();
-                                        } else {
-                                            argumentType = argument.getType();
-                                        }
+                                        Class<?> argumentType = argument.getType();
                                         if (argumentType.equals(dependentType)) {
                                             Map<? extends Argument<?>, Qualifier> qualifedArg = Collections.singletonMap(argument, qualifier);
                                             delegate.put(qualifierKey, qualifedArg);

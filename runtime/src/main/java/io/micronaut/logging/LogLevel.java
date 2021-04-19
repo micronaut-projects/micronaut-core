@@ -15,6 +15,8 @@
  */
 package io.micronaut.logging;
 
+import io.micronaut.core.annotation.Introspected;
+
 /**
  * Logging levels supported by a {@link LoggingSystem}
  *
@@ -25,6 +27,7 @@ package io.micronaut.logging;
  * @author Matthew Moss
  * @since 1.0
  */
+@Introspected
 public enum LogLevel {
     ALL,
     TRACE,

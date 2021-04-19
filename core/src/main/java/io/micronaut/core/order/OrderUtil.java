@@ -127,7 +127,7 @@ public class OrderUtil {
         if (o instanceof Ordered) {
             return getOrder((Ordered) o);
         }
-        return annotationMetadata.intValue(Order.class).orElse(Ordered.LOWEST_PRECEDENCE);
+        return annotationMetadata.intValue(Order.class).orElse(0);
     }
 
     /**

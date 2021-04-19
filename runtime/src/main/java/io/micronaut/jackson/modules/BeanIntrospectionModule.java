@@ -15,13 +15,32 @@
  */
 package io.micronaut.jackson.modules;
 
-import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.SerializableString;
 import com.fasterxml.jackson.core.io.SerializedString;
-import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.deser.*;
+import com.fasterxml.jackson.databind.BeanDescription;
+import com.fasterxml.jackson.databind.DeserializationConfig;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.PropertyMetadata;
+import com.fasterxml.jackson.databind.PropertyName;
+import com.fasterxml.jackson.databind.SerializationConfig;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.deser.BeanDeserializerBuilder;
+import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
+import com.fasterxml.jackson.databind.deser.CreatorProperty;
+import com.fasterxml.jackson.databind.deser.NullValueProvider;
+import com.fasterxml.jackson.databind.deser.SettableBeanProperty;
+import com.fasterxml.jackson.databind.deser.ValueInstantiator;
 import com.fasterxml.jackson.databind.deser.impl.MethodProperty;
 import com.fasterxml.jackson.databind.deser.std.StdValueInstantiator;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
@@ -54,7 +73,14 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * A Jackson module that adds reflection-free bean serialization and deserialization for Micronaut.
@@ -86,7 +112,7 @@ public class BeanIntrospectionModule extends SimpleModule {
     @Nullable
     protected BeanIntrospection<Object> findIntrospection(Class<?> beanClass) {
         return (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
-    }    
+    }
 
     private JavaType newType(Argument<?> argument, TypeFactory typeFactory) {
         return JacksonConfiguration.constructType(argument, typeFactory);
@@ -229,6 +255,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
                     newBuilder.setProperties(newProperties);
                 }
+                newBuilder.setFilteredProperties(builder.getFilteredProperties());
                 return newBuilder;
             }
         }
@@ -404,11 +431,21 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                     @Override
                     public boolean canCreateUsingArrayDelegate() {
-                        return constructorArguments.length == 1 && constructorArguments[0].isContainerType();
+                        return defaultInstantiator.canCreateUsingArrayDelegate();
+                    }
+
+                    @Override
+                    public boolean canCreateUsingDelegate() {
+                        return false;
                     }
 
                     @Override
                     public JavaType getArrayDelegateType(DeserializationConfig config) {
+                        return newType(constructorArguments[0], typeFactory);
+                    }
+
+                    @Override
+                    public JavaType getDelegateType(DeserializationConfig config) {
                         return newType(constructorArguments[0], typeFactory);
                     }
 
@@ -442,6 +479,11 @@ public class BeanIntrospectionModule extends SimpleModule {
                     @Override
                     public Object createUsingDefault(DeserializationContext ctxt) throws IOException {
                         return introspection.instantiate();
+                    }
+
+                    @Override
+                    public Object createUsingDelegate(DeserializationContext ctxt, Object delegate) throws IOException {
+                        return introspection.instantiate(false, new Object[] { delegate });
                     }
 
                     @Override
@@ -488,7 +530,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     public Object createFromBoolean(DeserializationContext ctxt, boolean value) throws IOException {
                         return introspection.instantiate(false, new Object[]{ value });
                     }
-                    
+
                 });
                 return builder;
             }

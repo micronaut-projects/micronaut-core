@@ -193,6 +193,29 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
     }
 
     /**
+     * @return The bean constructor.
+     * @since 3.0.0
+     */
+    default @NonNull BeanConstructor<T> getConstructor() {
+        return new BeanConstructor<T>() {
+            @Override
+            public @NonNull Class<T> getDeclaringBeanType() {
+                return getBeanType();
+            }
+
+            @Override
+            public @NonNull Argument<?>[] getArguments() {
+                return getConstructorArguments();
+            }
+
+            @Override
+            public @NonNull T instantiate(Object... parameterValues) {
+                return BeanIntrospection.this.instantiate(parameterValues);
+            }
+        };
+    }
+
+    /**
      * Obtains an introspection from the default {@link BeanIntrospector}.
      *
      * @param type The type

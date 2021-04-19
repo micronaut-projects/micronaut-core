@@ -9,7 +9,85 @@ import spock.lang.Issue
 import javax.inject.Named
 import javax.inject.Qualifier
 
-class BeanDefinitionSpec extends AbstractTypeElementSpec{
+class BeanDefinitionSpec extends AbstractTypeElementSpec {
+
+    void 'test dynamic instantiate with constructor'() {
+        given:
+        def definition = buildBeanDefinition('genctor.Test', '''
+package genctor;
+
+import javax.inject.*;
+
+@Singleton
+class Test {
+    Test(Runnable foo) {}
+}
+
+''')
+        when:
+        def instance = definition.constructor.instantiate({} as Runnable)
+
+        then:
+        instance != null
+    }
+
+    void "test limit the exposed bean types"() {
+        given:
+        def definition = buildBeanDefinition('limittypes.Test', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import javax.inject.*;
+
+@Singleton
+@Bean(typed = Runnable.class)
+class Test implements Runnable {
+    public void run() {}
+}
+
+''')
+        expect:
+        definition.exposedTypes == [Runnable] as Set
+    }
+
+    void "test limit the exposed bean types - reference"() {
+        given:
+        def reference = buildBeanDefinitionReference('limittypes.Test', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import javax.inject.*;
+
+@Singleton
+@Bean(typed = Runnable.class)
+class Test implements Runnable {
+    public void run() {}
+}
+
+''')
+        expect:
+        reference.exposedTypes == [Runnable] as Set
+    }
+
+    void "test fail compilation on invalid exposed bean type"() {
+        when:
+        buildBeanDefinition('limittypes.Test', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import javax.inject.*;
+
+@Singleton
+@Bean(typed = Runnable.class)
+class Test {
+
+}
+
+''')
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Bean defines an exposed type [java.lang.Runnable] that is not implemented by the bean type")
+    }
 
     void 'test order annotation'() {
         given:

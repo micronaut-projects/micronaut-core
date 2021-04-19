@@ -15,13 +15,18 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.context.annotation.Any;
+import io.micronaut.core.annotation.*;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanType;
 
 import javax.inject.Named;
+import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
+import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -62,6 +67,9 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
+        if (annotationMetadata.hasDeclaredAnnotation(Any.class)) {
+            return candidates;
+        }
         String name;
         String v = annotationMetadata.stringValue(Named.class).orElse(null);
         if (StringUtils.isNotEmpty(v)) {
@@ -69,9 +77,60 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
             return reduceByName(beanType, candidates, name);
         } else {
             name = getName();
-            return reduceByAnnotation(beanType, candidates, name, qualifiedName);
+            final String qualifierName = annotationMetadata
+                    .getAnnotationNameByStereotype(Qualifier.class).orElse(null);
+            AnnotationValue<Annotation> qualifierAnn;
+            if (qualifierName != null) {
+                Set<String> nonBinding = resolveNonBindingMembers(annotationMetadata);
+                Map<CharSequence, Object> bindingValues = resolveBindingValues(annotationMetadata, qualifierName, nonBinding);
+                if (CollectionUtils.isNotEmpty(bindingValues)) {
+                    qualifierAnn = new AnnotationValue<>(qualifierName, bindingValues);
+                } else {
+                    qualifierAnn = null;
+                }
+            } else {
+                qualifierAnn = null;
+            }
+            final Stream<BT> reduced = reduceByAnnotation(beanType, candidates, name, qualifiedName);
+            if (qualifierAnn != null) {
+                return reduced
+                        .filter(candidate -> {
+                            final AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
+                            final AnnotationValue<Annotation> av = candidate.getAnnotation(qualifierName);
+                            if (av != null) {
+                                Set<String> nonBinding = resolveNonBindingMembers(annotationMetadata);
+                                final Map<CharSequence, Object> values = resolveBindingValues(annotationMetadata, qualifierName, nonBinding);
+                                return qualifierAnn.equals(new AnnotationValue<>(qualifierName, values));
+                            }
+                            return false;
+                        });
+            }
+            return reduced;
         }
 
+    }
+
+    private @Nullable
+    Map<CharSequence, Object> resolveBindingValues(AnnotationMetadata annotationMetadata, String qualifierName, Set<String> nonBinding) {
+        Map<CharSequence, Object> bindingValues = null;
+        final AnnotationValue<Annotation> av = annotationMetadata.getAnnotation(qualifierName);
+        if (av != null) {
+            bindingValues = av.getValues();
+            if (!nonBinding.isEmpty()) {
+                bindingValues = bindingValues.entrySet()
+                        .stream()
+                        .filter((entry) -> !nonBinding.contains(entry.getKey().toString()))
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            }
+        }
+        return bindingValues;
+    }
+
+    @NonNull
+    private Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
+        final String[] nonBindingArray = annotationMetadata.stringValues(Qualifier.class, "nonBinding");
+        Set<String> nonBinding = ArrayUtils.isNotEmpty(nonBindingArray) ? new HashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();
+        return nonBinding;
     }
 
     @Override

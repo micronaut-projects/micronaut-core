@@ -16,6 +16,7 @@
 package io.micronaut.core.type
 
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.lang.reflect.ParameterizedType
 
@@ -24,6 +25,28 @@ import java.lang.reflect.ParameterizedType
  * @since 1.0
  */
 class ArgumentSpec extends Specification {
+
+    private List<String> stringList
+    private Map<String, Integer> mapStringInteger
+    private List<?> withWildcard
+    private List<Argument<?>> withNestedWildcard;
+
+    @Unroll
+    void 'test of parameterized type #field'() {
+        given:
+        def listOfString = Argument.of(getClass().getDeclaredField(field).genericType)
+
+        expect:
+        listOfString.type == type
+        listOfString.typeParameters*.type == parameters
+
+        where:
+        field                | type | parameters
+        "stringList"         | List | [String]
+        "withWildcard"       | List | []
+        "withNestedWildcard" | List | [Argument]
+        "mapStringInteger"   | Map  | [String, Integer]
+    }
 
     void "test as parameterized type"() {
         given:

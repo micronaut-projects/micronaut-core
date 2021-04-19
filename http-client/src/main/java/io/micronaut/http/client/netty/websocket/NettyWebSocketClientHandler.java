@@ -146,7 +146,18 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             // web socket client connected
             FullHttpResponse res = (FullHttpResponse) msg;
             this.handshakeResponse = res;
-            handshaker.finishHandshake(ch, res);
+            try {
+                handshaker.finishHandshake(ch, res);
+            } catch (Exception e) {
+                try {
+                    emitter.onError(new WebSocketClientException("Error finishing WebSocket handshake: " + e.getMessage(), e));
+                } finally {
+                    if (getSession().isOpen()) {
+                        getSession().close(CloseReason.INTERNAL_ERROR);
+                    }
+                }
+                return;
+            }
             handshakeFuture.setSuccess();
 
             this.clientSession = createWebSocketSession(ctx);

@@ -17,6 +17,7 @@ package io.micronaut.docs.server.consumes
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.RxHttpClient
@@ -78,6 +79,7 @@ class ConsumesControllerSpec extends Specification {
         noExceptionThrown()
     }
 
+    @Introspected
     static class Book {
         String title
         Integer pages

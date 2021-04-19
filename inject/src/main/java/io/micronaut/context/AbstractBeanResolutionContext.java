@@ -18,12 +18,12 @@ package io.micronaut.context;
 import io.micronaut.context.exceptions.CircularDependencyException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.*;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import java.util.*;
 
 /**
@@ -193,6 +193,12 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 ConstructorSegment constructorSegment = new ConstructorSegment(declaringType, argument);
                 detectCircularDependency(declaringType, argument, constructorSegment);
             }
+            return this;
+        }
+
+        @Override
+        public Path pushBeanCreate(BeanDefinition<?> declaringType, Argument<?> beanType) {
+            path.push(new ConstructorSegment(declaringType, beanType));
             return this;
         }
 

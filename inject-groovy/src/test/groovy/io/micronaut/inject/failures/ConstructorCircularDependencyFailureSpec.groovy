@@ -43,11 +43,11 @@ Failed to inject value for field [a] of class: io.micronaut.inject.failures.Cons
 
 Message: Circular dependency detected
 Path Taken: 
-B.a --> new A([C c]) --> new C([B b])
-^                                  |
-|                                  |
-|                                  |
-+----------------------------------+'''
+new B() --> B.a --> new A([C c]) --> new C([B b])
+^                                              |
+|                                              |
+|                                              |
++----------------------------------------------+'''
     }
 
     static class C {

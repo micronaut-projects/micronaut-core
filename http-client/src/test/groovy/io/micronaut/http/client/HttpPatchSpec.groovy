@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -188,6 +189,7 @@ class HttpPatchSpec extends Specification {
     }
 
     @EqualsAndHashCode
+    @Introspected
     static class Book {
         String title
         Integer pages

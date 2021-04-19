@@ -41,7 +41,7 @@ class FieldDependencyMissingFailureSpec extends Specification {
         e.message.normalize() == '''\
 Failed to inject value for field [a] of class: io.micronaut.inject.failures.FieldDependencyMissingFailureSpec$B
 
-Path Taken: B.a'''
+Path Taken: new B() --> B.a'''
     }
 
     static interface A {

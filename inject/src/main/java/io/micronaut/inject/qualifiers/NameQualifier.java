@@ -18,6 +18,7 @@ package io.micronaut.inject.qualifiers;
 import static io.micronaut.core.util.ArgumentUtils.check;
 
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -57,7 +58,9 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
             if (!beanType.isAssignableFrom(candidate.getBeanType())) {
                 return false;
             }
-
+            if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(Any.class)) {
+                return true;
+            }
             String typeName;
                 AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
                 // here we resolved the declared Qualifier of the bean
@@ -116,6 +119,8 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
     protected <BT extends BeanType<T>> Stream<BT> reduceByAnnotation(Class<T> beanType, Stream<BT> candidates, String annotationName, String qualifiedName) {
         return candidates.filter(candidate -> {
                 if (candidate.isPrimary() && Primary.class.getSimpleName().equals(annotationName)) {
+                    return true;
+                } else if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(Any.class)) {
                     return true;
                 }
                 String candidateName;

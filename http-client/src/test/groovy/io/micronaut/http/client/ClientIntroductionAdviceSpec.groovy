@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.ServiceInstanceList
 import io.micronaut.http.BasicAuth
@@ -264,9 +265,11 @@ class ClientIntroductionAdviceSpec extends Specification {
         String post(@Body String data, BasicAuth basicAuth)
     }
 
-    class MyObject {
+    @Introspected
+    static class MyObject {
         String code
     }
+
     class TestServiceInstanceList implements ServiceInstanceList {
 
         private final URI uri

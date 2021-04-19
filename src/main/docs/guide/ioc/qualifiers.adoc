@@ -30,6 +30,70 @@ The above annotation is itself annotated with the `@Qualifier` annotation to des
 
 snippet::io.micronaut.docs.qualifiers.annotation.Vehicle[tags="constructor",indent=0]
 
+== Qualifying By Annotation Members
+
+Since Micronaut 3.0, annotation qualifiers can also use annotation members to resolve the correct bean to inject. For example, consider the following annotation:
+
+snippet::io.micronaut.docs.qualifiers.annotationmember.Cylinders[tags="imports,class",indent=0]
+
+<1> The `@Cylinders` annotation is meta-annotated with `@Qualifier`
+<2> The annotation has two members. The ann:context.annotation.NonBinding[] annotation is used to exclude the `description` member from being considered during dependency resolution.
+
+You can then use the `@Cylinders` annotation on any bean and the members that are not annotated with ann:context.annotation.NonBinding[] are considered during dependency resolution:
+
+snippet::io.micronaut.docs.qualifiers.annotationmember.V6Engine[tags="class",indent=0]
+
+<1> Here the `value` member is set to 6 for the `V6Engine` type
+<2> The class implements an `Engine` interface
+
+snippet::io.micronaut.docs.qualifiers.annotationmember.V8Engine[tags="class",indent=0]
+
+<1> Here the `value` member is set to 8 for the `V6Engine` type
+<2> The class implements an `Engine` interface
+
+You can then use the `@Cylinders` qualifier on any injection point to select the correct bean to inject. For example:
+
+snippet::io.micronaut.docs.qualifiers.annotationmember.Vehicle[tags="constructor",indent="0"]
+
+== Qualifying by Generic Type Arguments
+
+Since Micronaut 3.0, it is possible to select which bean to inject based on the generic type arguments of the class or interface. Consider the following example:
+
+snippet::io.micronaut.docs.inject.generics.CylinderProvider[tags="class",indent=0]
+
+The `CylinderProvider` interface provides the number of cylinders.
+
+snippet::io.micronaut.docs.inject.generics.Engine[tags="class",indent=0]
+
+<1> The engine class defines a generic type argument `<T>` that must be an instance of `CylinderProvider`
+
+You can define implementations of the `Engine` interface with different generic type arguments. For example for a V6 engine:
+
+snippet::io.micronaut.docs.inject.generics.V6[tags="class",indent=0]
+
+The above defines a `V6` class that implements the `CylinderProvider` interface.
+
+snippet::io.micronaut.docs.inject.generics.V6Engine[tags="class",indent=0]
+
+<1> The `V6Engine` implements `Engine` providing `V6` as a generic type parameter
+
+And a V8 engine:
+
+snippet::io.micronaut.docs.inject.generics.V8[tags="class",indent=0]
+
+The above defines a `V8` class that implements the `CylinderProvider` interface.
+
+snippet::io.micronaut.docs.inject.generics.V8Engine[tags="class",indent=0]
+
+<1> The `V8Engine` implements `Engine` providing `V8` as a generic type parameter
+
+You can then use the generic arguments when defining the injection point and Micronaut will pick the correct bean
+to inject based on the specific generic type arguments:
+
+snippet::io.micronaut.docs.inject.generics.Vehicle[tags="constructor",indent=0]
+
+In the above example the `V8Engine` bean is injected.
+
 == Primary and Secondary Beans
 
 api:context.annotation.Primary[] is a qualifier that indicates that a bean is the primary bean to be selected in the case of multiple interface implementations.
@@ -55,3 +119,23 @@ snippet::io.micronaut.docs.context.annotation.primary.TestController[tags="clazz
 If multiple possible candidates are present and no `@Primary` is defined a api:context.exceptions.NonUniqueBeanException[] is thrown.
 
 In addition to `@Primary`, there is also a api:context.annotation.Secondary[] annotation which causes the opposite effect and allows de-prioritizing a bean.
+
+== Injecting Any Bean
+
+If you are not particular about which bean gets injected then you can use the ann:annotation.Any[] qualifier which will inject the first available bean, for example:
+
+snippet::io.micronaut.docs.qualifiers.any.VehicleSpec[tags="any", indent=0, title="Injecting Any Instance"]
+
+The ann:annotation.Any[] qualifier is typically used in conjunction with the api:context.BeanProvider[] interface to allow more dynamic use cases. For example the following `Vehicle` implementation will start the `Engine` if the bean is present:
+
+snippet::io.micronaut.docs.qualifiers.any.Vehicle[tags="imports,clazz", indent=0, title="Using BeanProvider with Any"]
+
+<1> Use `@Any` to inject the api:context.BeanProvider[]
+<2> Call the `start` method if the underlying bean is present using the `ifPresent` method
+
+If there are multiple beans you can also adapt the behaviour. The following example starts all the engines installed in the `Vehicle` if any are present:
+
+snippet::io.micronaut.docs.qualifiers.any.Vehicle[tags="startAll", indent=0, title="Using BeanProvider with Any"]
+
+<1> Check if any beans present
+<2> If so iterate over each one via the `stream().forEach(..)` method, starting the engines

@@ -36,11 +36,13 @@ class BeanDefinitionDelegateSpec extends Specification {
         Collection<OrderedBean> beans = ctx.getBeansOfType(OrderedBean)
 
         then:
-        beans.size() == 4
-        beans[0].class == One
-        beans[1].class == Ten
-        beans[2].class == Fifty
-        beans[3].class == Hundred
+        beans.size() == 6
+        beans[0].class == NegativeOne
+        beans[1].class == Zero
+        beans[2].class == One
+        beans[3].class == Ten
+        beans[4].class == Fifty
+        beans[5].class == Hundred
     }
 
     void "test the @Order annotation is ignored if the bean type implements Ordered"() {
@@ -66,7 +68,19 @@ class BeanDefinitionDelegateSpec extends Specification {
 
     @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
     @Singleton
-    @Order(value = Ordered.HIGHEST_PRECEDENCE)
+    @Order
+    private static class Zero implements OrderedBean {
+    }
+
+    @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
+    @Singleton
+    @Order(-1)
+    private static class NegativeOne implements OrderedBean {
+    }
+
+    @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
+    @Singleton
+    @Order(value = 1)
     private static class One implements OrderedBean {
     }
 

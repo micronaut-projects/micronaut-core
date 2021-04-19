@@ -37,8 +37,9 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     private final JavaVisitorContext visitorContext;
     private final VariableElement variableElement;
-    private ClassElement declaringElement;
+    private JavaClassElement declaringElement;
     private ClassElement typeElement;
+    private ClassElement genericType;
 
     /**
      * @param variableElement    The {@link VariableElement}
@@ -57,12 +58,29 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      */
-    JavaFieldElement(ClassElement declaringElement,
+    JavaFieldElement(JavaClassElement declaringElement,
                      VariableElement variableElement,
                      AnnotationMetadata annotationMetadata,
                      JavaVisitorContext visitorContext) {
         this(variableElement, annotationMetadata, visitorContext);
         this.declaringElement = declaringElement;
+    }
+
+    @Override
+    public ClassElement getGenericType() {
+        if (this.genericType == null) {
+            if (declaringElement == null) {
+                this.genericType = getType();
+            } else {
+                this.genericType = mirrorToClassElement(
+                        variableElement.asType(),
+                        visitorContext,
+                        declaringElement.getGenericTypeInfo(),
+                        false
+                );
+            }
+        }
+        return this.genericType;
     }
 
     @Override

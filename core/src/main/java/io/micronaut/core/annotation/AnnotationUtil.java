@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.annotation;
 
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.*;
@@ -115,6 +116,11 @@ public class AnnotationUtil {
     /**
      * The around annotation type.
      */
+    public static final String ANN_AROUND_CONSTRUCT = "io.micronaut.aop.AroundConstruct";
+
+    /**
+     * The around annotation type.
+     */
     public static final String ANN_INTRODUCTION = "io.micronaut.aop.Introduction";
 
     /**
@@ -126,6 +132,15 @@ public class AnnotationUtil {
      * Name of the interceptor binding qualifier type.
      */
     public static final String ANN_INTERCEPTOR_BINDING_QUALIFIER = "io.micronaut.inject.qualifiers.InterceptorBindingQualifier";
+
+    /**
+     * The advice stereotypes.
+     */
+    public static final Set<String> ADVICE_STEREOTYPES = CollectionUtils.setOf(
+            ANN_AROUND,
+            ANN_AROUND_CONSTRUCT,
+            ANN_INTRODUCTION
+    );
 
     /**
      * Name of the repeatable interceptor bindings type.
