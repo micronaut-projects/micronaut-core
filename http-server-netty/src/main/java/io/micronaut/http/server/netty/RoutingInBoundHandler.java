@@ -1250,7 +1250,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     }
                                 } else {
                                     boolean isJson = mediaType.getExtension().equals(MediaType.EXTENSION_JSON) && isJsonFormattable(typeArgument);
-                                    Flowable<Object> bodyFlowable = Publishers.convertPublisher(body, Flowable.class);
+                                    Flowable<Object> bodyFlowable = (Flowable<Object>) applyExecutorToPublisher(Publishers.convertPublisher(body, Flowable.class), executor);
                                     NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
 
                                     Publisher<HttpContent> httpContentPublisher = Publishers.map(bodyFlowable, new Function<Object, HttpContent>() {
@@ -1949,7 +1949,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (!filters.isEmpty()) {
             // make the action executor the last filter in the chain
             filters.add((HttpServerFilter) (req, chain) -> Flowable.defer(() ->
-                    applyExecutorToPublisher(Flowable.defer(routePublisherSupplier::get), executor)));
+                    applyExecutorToPublisher(Flowable.defer(routePublisherSupplier::get), executor))
+            );
             AtomicInteger integer = new AtomicInteger();
             int len = filters.size();
             ServerFilterChain filterChain = new ServerFilterChain() {
@@ -1973,17 +1974,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return publisherToFlowable(finalPublisher);
     }
 
-    private <T extends MutableHttpResponse<?>> Publisher<T> applyExecutorToPublisher(
+    private <T> Publisher<T> applyExecutorToPublisher(
             Publisher<T> publisher,
             @Nullable ExecutorService executor) {
         if (executor != null) {
-            return publisherToFlowable(publisher).subscribeOn(Schedulers.from(executor));
+            final Scheduler scheduler = Schedulers.from(executor);
+            return publisherToFlowable(publisher)
+                        .subscribeOn(scheduler)
+                        .observeOn(scheduler);
         } else {
             return publisher;
         }
     }
 
-    private <T extends MutableHttpResponse<?>> Flowable<T> publisherToFlowable(
+    private <T> Flowable<T> publisherToFlowable(
             Publisher<T> publisher) {
         if (publisher instanceof Flowable) {
             return (Flowable<T>) publisher;
