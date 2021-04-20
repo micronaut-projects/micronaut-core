@@ -16,7 +16,6 @@
 package io.micronaut.http.client.interceptor;
 
 import io.micronaut.aop.InterceptedMethod;
-import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
@@ -76,7 +75,7 @@ import java.util.function.Supplier;
  * @author graemerocher
  * @since 1.0
  */
-@InterceptorBean(Client.class)
+@Singleton
 @Internal
 @BootstrapContextCompatible
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object> {

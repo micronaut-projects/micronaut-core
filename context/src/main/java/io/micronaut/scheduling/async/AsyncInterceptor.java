@@ -15,7 +15,10 @@
  */
 package io.micronaut.scheduling.async;
 
-import io.micronaut.aop.*;
+import io.micronaut.aop.InterceptPhase;
+import io.micronaut.aop.InterceptedMethod;
+import io.micronaut.aop.MethodInterceptor;
+import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
@@ -28,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Named;
+import javax.inject.Singleton;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -41,7 +45,7 @@ import java.util.function.Function;
  * @author graemerocher
  * @since 1.0
  */
-@InterceptorBean(Async.class)
+@Singleton
 @Internal
 public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
 

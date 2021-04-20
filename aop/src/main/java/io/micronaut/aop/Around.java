@@ -38,7 +38,7 @@ import java.lang.annotation.Target;
  *   }
  * </code></pre>
  *
- * <p>Note that the annotation MUST be {@link java.lang.annotation.RetentionPolicy#RUNTIME} and if the specified {@link io.micronaut.context.annotation.Type} is present, it must implement {@link MethodInterceptor}</p>
+ * <p>Note that the annotation MUST be {@link java.lang.annotation.RetentionPolicy#RUNTIME} and the specified {@link io.micronaut.context.annotation.Type} must implement {@link MethodInterceptor}</p>
  *
  * @author Graeme Rocher
  * @since 1.0

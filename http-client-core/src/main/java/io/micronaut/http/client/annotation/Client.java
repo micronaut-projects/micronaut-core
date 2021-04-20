@@ -19,8 +19,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.Type;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.retry.annotation.Recoverable;
 
@@ -37,6 +39,7 @@ import java.lang.annotation.Retention;
 @Documented
 @Retention(RUNTIME)
 @Introduction
+@Type(HttpClientIntroductionAdvice.class)
 @Recoverable
 @Singleton
 // tag::value[]

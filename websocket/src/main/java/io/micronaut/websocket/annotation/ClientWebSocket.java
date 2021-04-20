@@ -18,6 +18,7 @@ package io.micronaut.websocket.annotation;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.*;
 import io.micronaut.websocket.WebSocketVersion;
+import io.micronaut.websocket.interceptor.ClientWebSocketInterceptor;
 import io.micronaut.websocket.interceptor.WebSocketSessionAware;
 
 import java.lang.annotation.Documented;
@@ -39,6 +40,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @WebSocketComponent
 @Introduction(interfaces = WebSocketSessionAware.class)
+@Type(ClientWebSocketInterceptor.class)
 @DefaultScope(Prototype.class)
 public @interface ClientWebSocket {
 

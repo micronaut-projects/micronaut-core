@@ -15,7 +15,10 @@
  */
 package io.micronaut.retry.intercept;
 
-import io.micronaut.aop.*;
+import io.micronaut.aop.InterceptPhase;
+import io.micronaut.aop.InterceptedMethod;
+import io.micronaut.aop.MethodInterceptor;
+import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -32,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Named;
+import javax.inject.Singleton;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -51,7 +55,7 @@ import java.util.function.Supplier;
  * @author graemerocher
  * @since 1.0
  */
-@InterceptorBean(Retryable.class)
+@Singleton
 public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);

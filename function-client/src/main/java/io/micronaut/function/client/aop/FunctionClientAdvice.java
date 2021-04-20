@@ -16,12 +16,14 @@
 package io.micronaut.function.client.aop;
 
 import io.micronaut.aop.InterceptedMethod;
-import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.function.client.*;
+import io.micronaut.function.client.FunctionDefinition;
+import io.micronaut.function.client.FunctionDiscoveryClient;
+import io.micronaut.function.client.FunctionInvoker;
+import io.micronaut.function.client.FunctionInvokerChooser;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
@@ -37,7 +39,7 @@ import java.util.concurrent.CompletableFuture;
  * @author graemerocher
  * @since 1.0
  */
-@InterceptorBean(FunctionClient.class)
+@Singleton
 public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
 
     private final FunctionDiscoveryClient discoveryClient;

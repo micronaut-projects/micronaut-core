@@ -15,8 +15,11 @@
  */
 package io.micronaut.validation;
 
-import io.micronaut.aop.*;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.aop.InterceptPhase;
+import io.micronaut.aop.InterceptedMethod;
+import io.micronaut.aop.MethodInterceptor;
+import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.validation.validator.ExecutableMethodValidator;
 import io.micronaut.validation.validator.ReactiveValidator;
@@ -36,7 +39,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
-@InterceptorBean(Validated.class)
+@Singleton
 public class ValidatingInterceptor implements MethodInterceptor<Object, Object> {
 
     /**

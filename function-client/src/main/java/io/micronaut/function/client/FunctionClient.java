@@ -18,6 +18,8 @@ package io.micronaut.function.client;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.aop.Introduction;
+import io.micronaut.context.annotation.Type;
+import io.micronaut.function.client.aop.FunctionClientAdvice;
 import io.micronaut.retry.annotation.Recoverable;
 
 import javax.inject.Singleton;
@@ -36,5 +38,6 @@ import java.lang.annotation.Retention;
 @Singleton
 @Introduction
 @Recoverable
+@Type(FunctionClientAdvice.class)
 public @interface FunctionClient {
 }
