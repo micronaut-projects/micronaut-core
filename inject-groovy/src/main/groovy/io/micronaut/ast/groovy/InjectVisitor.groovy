@@ -183,7 +183,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             return true
         } else {
             if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-                annotationMetadata.getAnnotationValuesByType(InterceptorBinding)
+                return annotationMetadata.getAnnotationValuesByType(InterceptorBinding)
                     .stream().anyMatch{ av ->
                     InterceptorKind.AROUND == av.enumValue("kind", InterceptorKind).orElse(null)
                 }
