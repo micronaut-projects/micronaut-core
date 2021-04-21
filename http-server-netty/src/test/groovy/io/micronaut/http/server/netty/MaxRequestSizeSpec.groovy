@@ -182,6 +182,30 @@ class MaxRequestSizeSpec extends Specification {
         embeddedServer.close()
     }
 
+    void "test content length exceeded with different disk storage"() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.server.maxRequestSize': '10KB',
+                'micronaut.server.multipart.disk': true
+        ])
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        MultipartBody body = MultipartBody.builder()
+                .addPart("a", "a.pdf", new byte[20240])
+                .build()
+
+        String result = client.retrieve(HttpRequest.POST("/test-max-size/multipart-body", body)
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)).blockingFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.message == "The content length [20240] exceeds the maximum allowed content length [10240]"
+
+        cleanup:
+        client.close()
+        embeddedServer.close()
+    }
+
     @Controller("/test-max-size")
     static class TestController {
 
