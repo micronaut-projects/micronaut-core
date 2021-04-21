@@ -22,10 +22,12 @@ import io.micronaut.ast.groovy.visitor.GroovyClassElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.Qualifier
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.writer.BeanDefinitionVisitor
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
@@ -85,6 +87,36 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         } catch (ClassNotFoundException e) {
             return null
         }
+    }
+
+    /**
+     * Builds the bean definition for an AOP proxy bean.
+     * @param className The class name
+     * @param cls The class source
+     * @return The bean definition
+     */
+    protected BeanDefinition buildInterceptedBeanDefinition(String className, String cls) {
+        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'Definition'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(cls)
+        return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    /**
+     * Builds the bean definition reference for an AOP proxy bean.
+     * @param className The class name
+     * @param cls The class source
+     * @return The bean definition
+     */
+    protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, String cls) {
+        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'DefinitionClass'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(cls)
+        return (BeanDefinitionReference)classLoader.loadClass(beanFullName).newInstance()
     }
 
     InMemoryByteCodeGroovyClassLoader buildClassLoader(String classStr) {
@@ -163,6 +195,16 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
     }
 
+    /**
+     * Gets a bean from the context for the given class name
+     * @param context The context
+     * @param className The class name
+     * @return The bean instance
+     */
+    Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {
+        context.getBean(context.classLoader.loadClass(className), qualifier)
+    }
+
     protected ApplicationContext buildContext(String className, String cls) {
         InMemoryByteCodeGroovyClassLoader classLoader = buildClassLoader(cls)
 
@@ -177,5 +219,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
                 }
             }
         }.start()
+    }
+
+    protected ApplicationContext buildContext(String cls) {
+        buildContext(null, cls)
     }
 }
