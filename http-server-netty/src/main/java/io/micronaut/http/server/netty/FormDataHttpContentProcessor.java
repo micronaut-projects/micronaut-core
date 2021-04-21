@@ -23,6 +23,7 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.multipart.*;
+import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -169,6 +170,10 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     @Override
     protected void doAfterOnError(Throwable throwable) {
         decoder.destroy();
+        final InterfaceHttpData data = decoder.currentPartialHttpData();
+        if (data != null && data.refCnt() != 0) {
+            ReferenceCountUtil.safeRelease(data);
+        }
     }
 
     @Override
