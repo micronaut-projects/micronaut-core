@@ -177,7 +177,7 @@ public class DefaultValidator implements
 
             validateElement(context, overallViolations, object,
                     rootClass, constrainedProperty, object, constrainedProperty.getType(),
-                    propertyValue, false, false,null, null);
+                    propertyValue, false, false, null, null);
 
             //noinspection unchecked
             return Collections.unmodifiableSet(overallViolations);
@@ -890,7 +890,7 @@ public class DefaultValidator implements
     }
 
     /**
-     * validates object's properties
+     * Validates object's properties.
      *
      * @param introspection - object introspection
      * @param object - the object to validate
@@ -994,12 +994,12 @@ public class DefaultValidator implements
     }
 
     /**
-     * validatesElement on @Valid and Constraint annotations
-     * Works for properties, method arguments and return values
-     * For iterables validates iterable items with generic parameter annotations and iterables themselves
+     * ValidatesElement on @Valid and Constraint annotations.
+     * Works for properties, method arguments and return values.
+     * For iterables validates iterable items with generic parameter annotations and iterables themselves.
      * If {@link #disableIterableGenericParameters} is set, @Valid cancels the validation of iterables and cascades
      * the annotations to iterable values only.
-     * NOTE: IntrospectedTypeVisitor adds @Valid on iterable if its arguments have any annotations
+     * NOTE: IntrospectedTypeVisitor adds @Valid on iterable if its arguments have any annotations.
      *
      * @param annotatedElement - element to validate - Argument, ReturnType or BeanProperty
      * @param annotatedElementType - the type of annotatedElement (not essentially value type)
@@ -1130,8 +1130,8 @@ public class DefaultValidator implements
     }
 
     /**
-     * Cascades to values of iterable (object having a value extractor)
-     * All the parameters match ones defined in validateCascadeElement(...) method
+     * Cascades to values of iterable (object having a value extractor).
+     * All the parameters match ones defined in validateCascadeElement(...) method.
      * @return - whether element was an iterable
      */
     private <T> boolean cascadeToIterable(
@@ -1181,7 +1181,8 @@ public class DefaultValidator implements
             valueValidation = doesRequireCascadeValidation(arguments[1].getAnnotationMetadata());
         } else {
             // Filling the final values
-            keyValidation = valueValidation = false;
+            keyValidation = false;
+            valueValidation = false;
         }
 
         if (!keyValidation && !valueValidation) {
@@ -1228,7 +1229,7 @@ public class DefaultValidator implements
 
     /**
      * Cascades to an element of iterable. Uses annotations either from valueArgument or
-     * annotatedIterable (if the {@link #disableIterableGenericParameters} is set
+     * annotatedIterable (if the {@link #disableIterableGenericParameters} is set.
      *
      * @param annotatedIterable - the iterable
      * @param iterableType - the type of annotated iterable
@@ -1280,7 +1281,7 @@ public class DefaultValidator implements
     }
 
     /**
-     * Validates the given object (all its properties) with its introspection
+     * Validates the given object (all its properties) with its introspection.
      *
      * @param object - the object to validate
      * @param beanIntrospection - its introspection
@@ -1308,7 +1309,7 @@ public class DefaultValidator implements
     }
 
     /**
-     * Validates the constraints on the given value
+     * Validates the constraints on the given value.
      *
      * @param object - the object that this element belongs to (like object of property)
      * @param annotatedElement - the element to get the annotations from
@@ -1847,7 +1848,7 @@ public class DefaultValidator implements
     }
 
     /**
-     * Default implementation of ContainerElementNode
+     * Default implementation of ContainerElementNode.
      */
     private static final class DefaultContainerElementNode implements Path.ContainerElementNode {
         private String name;

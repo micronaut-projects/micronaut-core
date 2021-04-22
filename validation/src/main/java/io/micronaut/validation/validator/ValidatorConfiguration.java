@@ -44,12 +44,12 @@ public interface ValidatorConfiguration {
     String ENABLED = PREFIX + ".enabled";
 
     /**
-     * The configuration of Validator
+     * The configuration of Validator.
      */
     public enum ValidatorBehaviour {
         /**
          * The default behaviour, that validates iterables with iterable annotations and validates
-         * items of iterables with generic parameters, like List<@Ann T>
+         * items of iterables with generic parameters, like List<@Ann T>.
          */
         DEFAULT,
         /**
@@ -62,7 +62,7 @@ public interface ValidatorConfiguration {
     }
 
     /**
-     * Validator behaviour
+     * Validator behaviour.
      */
     String VALIDATOR_BEHAVIOUR = PREFIX + ".validatorBehaviour";
 
@@ -104,7 +104,7 @@ public interface ValidatorConfiguration {
     ExecutionHandleLocator getExecutionHandleLocator();
 
     /**
-     * Sets the type of behaviour of the validator
+     * Sets the type of behaviour of the validator.
      * @param behaviour - a value from the ValidatorBehaviour enum
      * @return itself
      */

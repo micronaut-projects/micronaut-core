@@ -76,11 +76,19 @@ snippet::io.micronaut.docs.ioc.validation.pojo.PersonServiceSpec[tags="validate-
 <1> A validated method is invoked
 <2> The constraint violations are verified
 
-.Validation of iterables with generic parameters
+.Validation of iterable items
 
-[example with List and Map
+You can validate values of java iterables, like List, Set and Map by defining generic parameters on them.
 
-NOTE: Iterable generic parameters validation does not work on Groovy.
+snippet::io.micronaut.docs.ioc.validation.iterableGenericParameters.BookInfoService[tags="validate-iterables",indent="0"]
+
+<1> List items will be validated with given annotation
+<2> Both keys and values of Map will be validated
+
+snippet::io.micronaut.docs.ioc.validation.iterableGenericParameters.BookInfoSpec[tags="validate-iterables",indent="0"]
+
+<1> The violation on the 1-st index in List
+<2> The violation was found in Map's key
 
 === Validating Configuration Properties
 
