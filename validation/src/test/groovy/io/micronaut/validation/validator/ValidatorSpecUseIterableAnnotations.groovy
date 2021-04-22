@@ -1,6 +1,8 @@
 package io.micronaut.validation.validator
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.beans.BeanIntrospector
+import spock.lang.Ignore
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -15,7 +17,8 @@ class ValidatorSpecUseIterableAnnotations extends Specification {
     @Shared
     @AutoCleanup
     ApplicationContext applicationContext = ApplicationContext.run(
-            'micronaut.validator.useIterableAnnotationsForIterableValues': true
+            'micronaut.validator.validatorBehaviour':
+                    ValidatorConfiguration.ValidatorBehaviour.DISABLE_ITERABLE_GENERIC_PARAMETERS
     )
 
     @Shared
@@ -70,11 +73,11 @@ class ValidatorSpecUseIterableAnnotations extends Specification {
         v1.messageTemplate == '{javax.validation.constraints.Max.message}'
         v1.invalidValue == 150
         v1.propertyPath.size() == 3
-        v1.propertyPath[0].kind == ElementKind.CONTAINER_ELEMENT
-        v1.propertyPath[0].isInIterable()
-        v1.propertyPath[0].index == 0
-        !v1.propertyPath[1].isInIterable()
-        v1.propertyPath[1].index == null
+        v1.propertyPath[0].kind == ElementKind.PROPERTY
+        !v1.propertyPath[0].isInIterable()
+        v1.propertyPath[0].index == null
+        v1.propertyPath[1].isInIterable()
+        v1.propertyPath[1].index == 0
         v1.propertyPath[1].kind == ElementKind.CONTAINER_ELEMENT
         !v1.propertyPath[2].isInIterable()
         v1.propertyPath[2].index == null
@@ -104,13 +107,10 @@ class ValidatorSpecUseIterableAnnotations extends Specification {
 
         when:
         beeHive = new HiveOfBeeList(bees: [null])
-        violations = validator.validate(beeHive)
+        var violations2 = validator.validate(beeHive)
 
         then:
-        violations.size() == 1
-        !violations[0].constraintDescriptor
-        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
-                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+        violations2.size() == 0
     }
 
     void "test cascade to map of non-introspected value class" () {
@@ -129,13 +129,10 @@ class ValidatorSpecUseIterableAnnotations extends Specification {
         Map<String, Bee> map = [:]
         map.put("blank", null)
         beeHive = new HiveOfBeeMap(bees: map)
-        violations = validator.validate(beeHive)
+        var violations2 = validator.validate(beeHive)
 
         then:
-        violations.size() == 1
-        !violations[0].constraintDescriptor
-        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
-                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+        violations2.size() == 0
     }
 
     // ARRAY CASCADES
@@ -149,13 +146,13 @@ class ValidatorSpecUseIterableAnnotations extends Specification {
         expect:
         violations.size() == 2
         violations[0].invalidValue == 30
-        violations[0].propertyPath.toList()[0].index == 0
+        violations[0].propertyPath.toList()[1].index == 0
         violations[0].propertyPath.toString() == "integers[0]"
         violations[0].constraintDescriptor != null
         violations[0].constraintDescriptor.annotation instanceof Max
 
         violations[1].invalidValue == 60
-        violations[1].propertyPath.toList()[0].index == 2
+        violations[1].propertyPath.toList()[1].index == 2
         violations[1].propertyPath.toString() == "integers[2]"
         violations[1].constraintDescriptor != null
         violations[1].constraintDescriptor.annotation instanceof Max
@@ -227,21 +224,36 @@ class ValidatorSpecUseIterableAnnotations extends Specification {
 
         when:
         arrayTest = applicationContext.createBean(ArrayTest)
-        arrayTest.integers = [30,10,60] as int[]
+        var childTest = new ArrayTest(integers: [30, 10, null])
         def violations = validator.forExecutables().validateParameters(
-                new ArrayTest(),
+                arrayTest,
                 ArrayTest.getDeclaredMethod("saveChild", ArrayTest.class),
-                [arrayTest] as Object[]
+                [childTest] as Object[]
         ).toList().sort({ it -> it.propertyPath.toString() })
 
         then:
         violations.size() == 2
         violations[0].propertyPath.toString() == 'saveChild.arrayTest.integers[0]'
         violations[0].constraintDescriptor != null
-        violations[0].constraintDescriptor.annotation instanceof  Max
+        violations[0].constraintDescriptor.annotation instanceof Max
         violations[1].propertyPath.toString() == 'saveChild.arrayTest.integers[2]'
         violations[1].constraintDescriptor != null
-        violations[1].constraintDescriptor.annotation instanceof  Max
+        violations[1].constraintDescriptor.annotation instanceof NotNull
 
+    }
+
+    // TODO: ask on the meeting
+    @Ignore()
+    void "test"() {
+        given:
+        var a = applicationContext.getBean(ArrayTest)
+        var intro = BeanIntrospector.SHARED.findIntrospection((Class<Object>) a.getClass()).orElse(null)
+
+        var b = new ArrayTest();
+        var intro_b = BeanIntrospector.SHARED.findIntrospection((Class<Object>) b.getClass()).orElse(null)
+
+        expect:
+        intro_b != null
+        intro != null
     }
 }

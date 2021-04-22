@@ -44,10 +44,27 @@ public interface ValidatorConfiguration {
     String ENABLED = PREFIX + ".enabled";
 
     /**
-     * Whether to use the annotations defined for the iterable container on the elements of this iterable container
-     * See {@link #setUseIterableAnnotationsForIterableValues(boolean)} for details.
+     * The configuration of Validator
      */
-    String USE_ITERABLE_ANNOTATIONS_FOR_ITERABLE_VALUES = PREFIX + ".useIterableAnnotationsForIterableValues";
+    public enum ValidatorBehaviour {
+        /**
+         * The default behaviour, that validates iterables with iterable annotations and validates
+         * items of iterables with generic parameters, like List<@Ann T>
+         */
+        DEFAULT,
+        /**
+         * The behaviour, that disables validating iterable items with generic parameters.
+         * If javax.validation.Valid annotations is used on an iterable, all its contraint annotations will be applied
+         * to the items of this iterable, but not to the iterable itself. In this case the javax.validation.Valid
+         * annotation will also be checked on the iterable items if the bean has introspection.
+         */
+        DISABLE_ITERABLE_GENERIC_PARAMETERS
+    }
+
+    /**
+     * Validator behaviour
+     */
+    String VALIDATOR_BEHAVIOUR = PREFIX + ".validatorBehaviour";
 
     /**
      * @return The constraint registry to use.
@@ -86,18 +103,15 @@ public interface ValidatorConfiguration {
     @NonNull
     ExecutionHandleLocator getExecutionHandleLocator();
 
+    /**
+     * Sets the type of behaviour of the validator
+     * @param behaviour - a value from the ValidatorBehaviour enum
+     * @return itself
+     */
+    ValidatorContext setValidatorBehaviour(ValidatorBehaviour behaviour);
 
     /**
-     * Set flag to use annotations of iterable container for its elements.
-     * Will use container annotations if set and iterable annotated with @javax.validation.Valid
-     * The container will not be validated with these annotations in this case (they apply only to elements)
-     * If set, generic annotations for iterables will be disabled
+     * @return validator behaviour
      */
-    ValidatorContext setUseIterableAnnotationsForIterableValues(boolean useIterableAnnotationsForIterableValues);
-
-    /**
-     * Is flag to use annotations of iterable container for its elements set.
-     * See {@link #setUseIterableAnnotationsForIterableValues(boolean)} for detailed description
-     */
-    boolean isUseIterableAnnotationsForIterableValues();
+    ValidatorBehaviour getValidatorBehaviour();
 }

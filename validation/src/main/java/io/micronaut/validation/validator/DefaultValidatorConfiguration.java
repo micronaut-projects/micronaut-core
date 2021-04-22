@@ -62,7 +62,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
 
     private boolean enabled = true;
 
-    private boolean useIterableAnnotationsForIterableValues = false;
+    private ValidatorBehaviour validatorBehaviour = ValidatorBehaviour.DEFAULT;
 
     @Override
     @NonNull
@@ -253,14 +253,13 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     }
 
     @Override
-    public boolean isUseIterableAnnotationsForIterableValues() {
-        return useIterableAnnotationsForIterableValues;
+    public ValidatorContext setValidatorBehaviour(ValidatorBehaviour behaviour) {
+        this.validatorBehaviour = behaviour;
+        return null;
     }
 
     @Override
-    public ValidatorContext setUseIterableAnnotationsForIterableValues(boolean useIterableAnnotationsForIterableValues)
-    {
-        this.useIterableAnnotationsForIterableValues = useIterableAnnotationsForIterableValues;
-        return this;
+    public ValidatorBehaviour getValidatorBehaviour() {
+        return validatorBehaviour;
     }
 }

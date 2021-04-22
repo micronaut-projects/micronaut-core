@@ -7,7 +7,6 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.validation.validator.resolver.CompositeTraversableResolver
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -127,7 +126,6 @@ class ValidatorSpec extends Specification {
         violations[0].constraintDescriptor.annotation.max() == 2
     }
 
-    @Ignore("Issue? The validateProperty method does not support cascading")
     void "test validate bean property cascade"() {
         given:
         Book b = new Book(primaryAuthor: new Author(name: "", age: 200));
@@ -255,6 +253,39 @@ class ValidatorSpec extends Specification {
         violations[1].propertyPath.toString() == 'names[2]<E class java.lang.String>'
     }
 
+    void "test validate property argument - w iterable constraints"() {
+        given:
+        var e = new ValidatorSpecClasses.Email(["me@oracle.com", "", "me2@oracle.com"])
+        var violations = validator.validate(e);
+        violations = violations.sort{it->it.getPropertyPath().toString()}
+
+        expect:
+        violations.size() == 2
+        violations[0].getPropertyPath().toString() == "recoveryEmails"
+        violations[0].constraintDescriptor.annotation instanceof Size
+
+        violations[1].constraintDescriptor.annotation instanceof NotBlank
+        violations[1].getPropertyPath().size() == 2
+
+        when:
+        var path = violations[1].getPropertyPath().iterator()
+        var path0 = path.next()
+        var path1 = path.next()
+
+        then:
+        path0.getName() == "recoveryEmails"
+        path0 instanceof Path.PropertyNode
+        !path0.isInIterable()
+        path0.getIndex() == null
+        path0.getKey() == null
+
+        Pattern.matches("E .*String", path1.getName())
+        path1 instanceof Path.ContainerElementNode
+        path1.isInIterable()
+        path1.getIndex() == 1
+        path1.getKey() == null
+    }
+
     void "test validate property argument of map"() {
         given:
         def phoneBook = new ValidatorSpecClasses.PhoneBook([
@@ -346,13 +377,10 @@ class ValidatorSpec extends Specification {
 
         when:
         apartmentBuilding = new ValidatorSpecClasses.ApartmentBuilding([2: null])
-        violations = validator.validate(apartmentBuilding)
+        var violations2 = validator.validate(apartmentBuilding)
 
         then:
-        violations.size() == 1
-        !violations[0].constraintDescriptor
-        violations[0].message == "Cannot validate io.micronaut.validation.validator.ValidatorSpecClasses\$Person. No bean introspection present. " +
-                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+        violations2.size() == 0
     }
 
     void "test validate property argument cascade - enum"() {
@@ -392,7 +420,7 @@ class ValidatorSpec extends Specification {
         methodViolations.size() == 0
     }
 
-    // EXECUTABLE VALIDATOR
+    // EXECUTABLE ARGUMENTS VALIDATOR
 
     void "test executable validator"() {
         given:
@@ -528,6 +556,83 @@ class ValidatorSpec extends Specification {
 
     }
 
+    // EXECUTABLE RETURN VALUE VALIDATOR
+
+    void "test validate return value"() {
+        given:
+        var b = applicationContext.getBean(ValidatorSpecClasses.Bank)
+        var violations = validator.forExecutables().validateReturnValue(
+                b,
+                ValidatorSpecClasses.Bank.getDeclaredMethod("getBalance"),
+                -100
+        )
+
+        expect:
+        violations.size() == 1
+        violations[0].invalidValue == -100
+        violations[0].getPropertyPath().toString() == "Float"
+        violations[0].getPropertyPath().iterator().next() instanceof Path.ReturnValueNode
+    }
+
+    void "test validate return value type annotations - cascade"() {
+        given:
+        var b = applicationContext.getBean(ValidatorSpecClasses.Bank)
+        var violations = validator.forExecutables().validateReturnValue(
+                b,
+                ValidatorSpecClasses.Bank.getDeclaredMethod("getClientsWithAccess", String),
+                [
+                        "spouse": new ValidatorSpecClasses.Client(""),
+                        "son": new ValidatorSpecClasses.Client("Joe"),
+                        "": new ValidatorSpecClasses.Client("Rick")
+                ]
+        )
+        violations = violations.sort{it -> it.getPropertyPath().toString() }
+
+        expect:
+        violations.size() == 2
+        violations[0].getPropertyPath().toString() == "Map[]<K class java.lang.String>"
+        Pattern.matches("Map\\[spouse]<V [^>]*Client>.name", violations[1].getPropertyPath().toString())
+
+        when:
+        var path0 = violations[0].getPropertyPath().iterator()
+        var path1 = violations[1].getPropertyPath().iterator()
+
+        then:
+        violations[0].getPropertyPath().size() == 2
+        path0.next() instanceof Path.ReturnValueNode
+        path0.next() instanceof Path.ContainerElementNode
+
+        violations[1].getPropertyPath().size() == 3
+        path1.next() instanceof Path.ReturnValueNode
+        path1.next() instanceof Path.ContainerElementNode
+        path1.next() instanceof Path.PropertyNode
+    }
+
+    void "test validate return type annotations cascade - nested iterables"() {
+        given:
+        var b = applicationContext.getBean(ValidatorSpecClasses.Bank)
+        var value = [
+                11: [new ValidatorSpecClasses.Client("Andriy")],
+                22: [],
+                33: [
+                        new ValidatorSpecClasses.Client("Jerry"),
+                        new ValidatorSpecClasses.Client("")
+                ],
+                0: [
+                        new ValidatorSpecClasses.Client("Too long name")
+                ]
+        ]
+        var violations = validator.forExecutables().validateReturnValue(
+                b,
+                ValidatorSpecClasses.Bank.getDeclaredMethod("getAllAccounts"),
+                value
+        )
+        violations = violations.sort{it -> it.getPropertyPath().toString() }
+
+        expect:
+        violations.size() == 3
+    }
+
     // DESCRIPTOR
 
     void "test bean descriptor"() {
@@ -586,11 +691,6 @@ class Bee {
     String name
 }
 
-// FIXME see https://github.com/micronaut-projects/micronaut-core/issues/4410
-// demonstrated by "test fail elements in String list"
-// List, Set and array all work same
-// 1) With Valid and constraints, validation is broken because it also applies @Size constraint to the container itself
-// 2) Without @Valid only the container itself is validated for given constraints (makes sense)
 @Introspected
 class ListOfStrings {
     @Valid

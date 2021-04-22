@@ -102,7 +102,7 @@ public class ValidatorSpecClasses {
     // test validate property argument cascade - nested
     @Introspected
     public static class Library {
-        private Set<@Valid Book> books;
+        final private Set<@Valid Book> books;
 
         public Library(Set<@Valid Book> books) {
             this.books = books;
@@ -110,6 +110,20 @@ public class ValidatorSpecClasses {
 
         public Set<Book> getBooks() {
             return books;
+        }
+    }
+
+    // test validate property argument cascade
+    @Introspected
+    public static class Email {
+        final private @Size(max=2) List<@NotBlank String> recoveryEmails;
+
+        public Email(@Size(max=2) List<String> recoveryEmails) {
+            this.recoveryEmails = recoveryEmails;
+        }
+
+        public List<String> getRecoveryEmails() {
+            return recoveryEmails;
         }
     }
 
@@ -171,6 +185,9 @@ public class ValidatorSpecClasses {
 
     // test validate method argument generic annotations
     // test validate method argument generic annotations cascade
+    // test validate return type
+    // test validate return type annotations cascade
+    // test validate return type annotations cascade - nested iterables
     @Introspected
     public static class Client {
         @Size(min=3, max=10)
@@ -198,6 +215,22 @@ public class ValidatorSpecClasses {
                 Map<@NotBlank String, @Valid Client> clientsWithAccess)
         {
 
+        }
+
+        @Executable
+        public @Min(0) Float getBalance() {
+            return -100.0f;
+        }
+
+        @Executable
+        public Map<@NotBlank String, @Valid Client> getClientsWithAccess(String accountName) {
+            return null;
+        }
+
+        // returns all accounts with a list of authorized clients
+        @Executable
+        public Map<Integer, @Size(min=1) @Valid List<@Valid Client>> getAllAccounts() {
+            return null;
         }
     }
 }

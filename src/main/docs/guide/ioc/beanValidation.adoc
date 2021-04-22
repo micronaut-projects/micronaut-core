@@ -76,6 +76,12 @@ snippet::io.micronaut.docs.ioc.validation.pojo.PersonServiceSpec[tags="validate-
 <1> A validated method is invoked
 <2> The constraint violations are verified
 
+.Validation of iterables with generic parameters
+
+[example with List and Map
+
+NOTE: Iterable generic parameters validation does not work on Groovy.
+
 === Validating Configuration Properties
 
 You can also validate the properties of classes that are annotated with ann:context.annotation.ConfigurationProperties[] to ensure configuration is correct.
