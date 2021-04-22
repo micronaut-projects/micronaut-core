@@ -13,6 +13,18 @@ If Dual Protocol is enabled, now it is possible to redirect all HTTP requests au
 
 === Module Upgrades
 
+==== Micronaut Data 2.4.0
+
+https://micronaut-projects.github.io/micronaut-data/latest/guide/[Micronaut Data] has many new features including:
+
+- Full support for immutable entities. You can use Java 16 records or Kotlin immutable data classes
+- Integrated support for R2DBC, now the `data-r2dbc` module is a part of the data project and shares the same code with JDBC
+- Optimistic locking for JDBC/R2DBC
+- Repositories now support batch insert/update/delete even with a custom query
+- Rewritten entity mapper allows more complex mapping for JDBC/R2DBC entities
+- Support for `@JoinTable` and `@JoinColumn` annotations
+- A lot of bugfixes!
+
 ==== Micronaut Micrometer 3.4.0
 
 The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micrometer module] has been upgraded and now supports repeated definitions of the https://micrometer.io/docs/concepts#_the_timed_annotation[@Timed] annotation as well as also supporting the `@Counted` annotation for counters when you add the `micronaut-micrometer-annotation` dependency to your annotation processor classpath.
