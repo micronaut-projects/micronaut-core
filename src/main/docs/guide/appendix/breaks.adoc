@@ -1,5 +1,9 @@
 This section documents breaking changes between Micronaut 1.x and Micronaut 2.x
 
+=== Micronaut 2.5
+
+In previous versions of Micronaut it was possible to read the body of a request in a server filter under some conditions. Reading the request body in a filter has historically been inconsistent because the body is not read in many cases. In Micronaut 2.4, the body was read until the route arguments were satisfied, and then the server filters were executed. This lead to issues with memory leaks in some cases and is inefficient because a filter may skip route execution altogether by not proceeding the chain, thus the body did not need to be read. In Micronaut 2.5 the body will not be read until after filters are executed. This may lead to cases where the body was available in a filter and is no longer available.
+
 === Micronaut 2.4
 
 Methods annotated with `@CircuitBreaker` that used the `includes` or `excludes` members were not functioning correctly. The circuit breaker was opening for exceptions that did not match the supplied exception types. This has been changed to correctly respect the includes and excludes.
