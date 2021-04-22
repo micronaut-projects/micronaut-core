@@ -16,12 +16,12 @@
 package io.micronaut.docs.session;
 
 // tag::imports[]
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.session.Session;
 import io.micronaut.session.annotation.SessionValue;
+import io.micronaut.core.annotation.Nullable;
 
 import javax.validation.constraints.NotBlank;
 // end::imports[]

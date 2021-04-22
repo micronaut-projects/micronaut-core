@@ -23,6 +23,7 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.multipart.*;
+import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -66,8 +67,6 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
         }
         factory.setMaxLimit(multipart.getMaxFileSize());
         this.decoder = new HttpPostRequestDecoder(factory, nettyHttpRequest.getNativeRequest(), characterEncoding);
-        //This is to work around a bug in Netty that should be resolved with https://github.com/netty/netty/pull/10623
-        this.decoder.setDiscardThreshold(Integer.MAX_VALUE);
         this.enabled = nettyHttpRequest.getContentType().map(type -> type.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false) ||
             multipart.isEnabled();
         this.partMaxSize = multipart.getMaxFileSize();
@@ -171,6 +170,10 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     @Override
     protected void doAfterOnError(Throwable throwable) {
         decoder.destroy();
+        final InterfaceHttpData data = decoder.currentPartialHttpData();
+        if (data != null && data.refCnt() != 0) {
+            ReferenceCountUtil.safeRelease(data);
+        }
     }
 
     @Override

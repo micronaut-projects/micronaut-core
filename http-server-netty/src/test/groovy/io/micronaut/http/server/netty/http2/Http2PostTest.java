@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.http2;
 
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -25,7 +26,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
-import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -91,7 +91,7 @@ public class Http2PostTest implements TestPropertyProvider {
             System.out.println("Received response with status code " + response.statusCode() + " " + response.version());
             response.bodyHandler(buffer -> result.complete(new String(buffer.getBytes())));
         })
-                .putHeader("content-length", "1000")
+                .putHeader("content-length", "9")
                 .write("Request-1")
                 .end();
 
@@ -105,7 +105,7 @@ public class Http2PostTest implements TestPropertyProvider {
             System.out.println("Received response with status code " + response.statusCode() + " " + response.version());
             response.bodyHandler(buffer -> result2.complete(new String(buffer.getBytes())));
         })
-        .putHeader("content-length", "1000")
+        .putHeader("content-length", "9")
         .write("Request-2")
         .end();
 
@@ -115,7 +115,7 @@ public class Http2PostTest implements TestPropertyProvider {
         );
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Map<String, String> getProperties() {
         return CollectionUtils.mapOf(

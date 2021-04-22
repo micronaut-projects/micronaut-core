@@ -15,11 +15,12 @@
  */
 package io.micronaut.inject.annotation.internal;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.annotation.NamedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
@@ -40,7 +41,7 @@ public class KotlinNotNullMapper implements NamedAnnotationTransformer {
     @Override
     public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         return Collections.singletonList(
-                AnnotationValue.builder("javax.annotation.Nonnull").build()
+                AnnotationValue.builder(AnnotationUtil.NON_NULL).build()
         );
     }
 }

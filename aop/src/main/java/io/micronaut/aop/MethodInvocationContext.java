@@ -17,7 +17,7 @@ package io.micronaut.aop;
 
 import io.micronaut.inject.ExecutableMethod;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Extended version of {@link InvocationContext} for {@link MethodInterceptor} instances.

@@ -17,8 +17,8 @@ package io.micronaut.validation.validator;
 
 import io.micronaut.core.beans.BeanIntrospection;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 import javax.validation.Constraint;
 import javax.validation.ConstraintViolation;

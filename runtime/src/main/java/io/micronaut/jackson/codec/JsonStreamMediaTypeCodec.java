@@ -16,12 +16,13 @@
 package io.micronaut.jackson.codec;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
@@ -66,8 +67,20 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
      * @param applicationConfiguration The common application configurations
      * @param codecConfiguration       The configuration for the codec
      */
-    @Inject
+    @Deprecated
     public JsonStreamMediaTypeCodec(Provider<ObjectMapper> objectMapper,
+                                    ApplicationConfiguration applicationConfiguration,
+                                    @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
+        this((BeanProvider<ObjectMapper>) objectMapper::get, applicationConfiguration, codecConfiguration);
+    }
+
+    /**
+     * @param objectMapper             To read/write JSON
+     * @param applicationConfiguration The common application configurations
+     * @param codecConfiguration       The configuration for the codec
+     */
+    @Inject
+    public JsonStreamMediaTypeCodec(BeanProvider<ObjectMapper> objectMapper,
                                     ApplicationConfiguration applicationConfiguration,
                                     @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         super(objectMapper, applicationConfiguration, null);

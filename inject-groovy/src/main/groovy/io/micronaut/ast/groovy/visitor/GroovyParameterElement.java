@@ -23,8 +23,8 @@ import io.micronaut.inject.ast.ParameterElement;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.control.SourceUnit;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 /**
  * Implementation of {@link ParameterElement} for Groovy.

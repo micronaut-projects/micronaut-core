@@ -15,7 +15,7 @@
  */
 package io.micronaut.ast.groovy.annotation
 
-import edu.umd.cs.findbugs.annotations.NonNull
+import io.micronaut.core.annotation.NonNull
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
@@ -103,6 +103,17 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
+    protected boolean isValidationRequired(AnnotatedNode member) {
+        if (member != null) {
+            def annotations = member.getAnnotations()
+            if (annotations) {
+                return annotations.any { it.classNode.name.startsWith("javax.validation") }
+            }
+        }
+        return false
+    }
+
+    @Override
     protected AnnotatedNode getAnnotationMember(AnnotatedNode originatingElement, CharSequence member) {
         if (originatingElement instanceof ClassNode) {
             def methods = ((ClassNode) originatingElement).getMethods(member.toString())
@@ -144,6 +155,11 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     @Override
     protected void addError(@NonNull AnnotatedNode originatingElement, @NonNull String error) {
         AstMessageUtils.error(sourceUnit, originatingElement, error)
+    }
+
+    @Override
+    protected void addWarning(@NonNull AnnotatedNode originatingElement, @NonNull String warning) {
+        AstMessageUtils.warning(sourceUnit, originatingElement, warning)
     }
 
     @Override

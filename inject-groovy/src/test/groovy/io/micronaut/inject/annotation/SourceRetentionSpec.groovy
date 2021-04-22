@@ -1,6 +1,6 @@
 package io.micronaut.inject.annotation
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
 
 import java.lang.annotation.Native

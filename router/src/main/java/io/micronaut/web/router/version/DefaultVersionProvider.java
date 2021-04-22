@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router.version;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Defines a provider of a default Version.

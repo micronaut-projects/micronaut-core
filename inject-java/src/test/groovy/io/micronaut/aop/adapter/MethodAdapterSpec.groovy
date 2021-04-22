@@ -23,9 +23,9 @@ import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
-import org.atinject.tck.auto.events.EventHandlerMultipleArguments
-import org.atinject.tck.auto.events.Metadata
-import org.atinject.tck.auto.events.SomeEvent
+import org.atinject.javaxtck.auto.events.EventHandlerMultipleArguments
+import org.atinject.javaxtck.auto.events.Metadata
+import org.atinject.javaxtck.auto.events.SomeEvent
 
 import java.nio.charset.StandardCharsets
 
@@ -328,8 +328,8 @@ class Test {
 
     void  "test method adapter argument order"() {
         when:"An adapter method is parsed"
-        BeanDefinition definition = buildBeanDefinition('org.atinject.tck.auto.events.EventListener$EventHandlerMultipleArguments$onEvent1$Intercepted','''\
-package org.atinject.tck.auto.events;
+        BeanDefinition definition = buildBeanDefinition('org.atinject.javaxtck.auto.events.EventListener$EventHandlerMultipleArguments$onEvent1$Intercepted','''\
+package org.atinject.javaxtck.auto.events;
 
 @javax.inject.Singleton
 class EventListener {

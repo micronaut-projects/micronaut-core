@@ -1,10 +1,8 @@
 package io.micronaut.inject.visitor
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
-import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.util.environment.RestoreSystemProperties
 

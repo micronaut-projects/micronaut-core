@@ -1,7 +1,7 @@
 package io.micronaut.inject.annotation
 
 
-import edu.umd.cs.findbugs.annotations.NonNull
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.context.annotation.ConfigurationInject
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.Creator

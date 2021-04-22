@@ -1,0 +1,5 @@
+Micronaut produces error response bodies via beans of type api:http.server.exceptions.response.ErrorResponseProcessor[].
+
+The default response body is link:https://github.com/blongden/vnd.error[vnd.error], however you can create your own implementation of type api:http.server.exceptions.response.ErrorResponseProcessor[] to control the responses.
+
+If customization of the response other than items related to the errors is desired, the exception handler that is handling the exception needs to be overridden.

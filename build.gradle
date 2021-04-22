@@ -4,8 +4,8 @@ buildscript {
         maven { url "https://repo.grails.org/grails/core" }
     }
     dependencies {
-        classpath 'com.github.jengelman.gradle.plugins:shadow:6.0.0'
-        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:3.0.2"
+        classpath 'com.github.jengelman.gradle.plugins:shadow:6.1.0'
+        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:3.0.3"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
@@ -51,6 +51,16 @@ ext {
                     group: 'io.micronaut.r2dbc',
                     name: 'micronaut-r2dbc-bom',
                     version: micronautR2DBCVersion
+            ],
+            'micronaut.cache': [
+                    group: 'io.micronaut.cache',
+                    name: 'micronaut-cache-bom',
+                    version: micronautCacheVersion
+            ],
+            'micronaut.coherence': [
+                    group: 'io.micronaut.coherence',
+                    name: 'micronaut-coherence-bom',
+                    version: micronautCoherenceVersion
             ],
             //Third-party
             'netty': [
@@ -616,12 +626,7 @@ ext {
             'micronaut.kubernetes': [
                     version:micronautKubernetesVersion,
                     group:'io.micronaut.kubernetes',
-                    name:'micronaut-kubernetes-discovery-client'
-            ],
-            'micronaut.cache': [
-                    version:micronautCacheVersion,
-                    group:'io.micronaut.cache',
-                    modules: ['micronaut-cache-caffeine', 'micronaut-cache-core', 'micronaut-cache-management', 'micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop', 'micronaut-cache-infinispan']
+                    modules:['micronaut-kubernetes-discovery-client', 'micronaut-kubernetes-client', 'micronaut-kubernetes-client-processor']
             ],
             'micronaut.servlet': [
                 version:micronautServletVersion,
@@ -788,9 +793,15 @@ subprojects { Project subproject ->
         }
     }
 
-    tasks.withType(JavaCompile){
+    tasks.withType(JavaCompile) {
        options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
        options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+       options.forkOptions.memoryMaximumSize = "2g"
+    }
+    tasks.withType(GroovyCompile) {
+        options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
+        options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+        groovyOptions.forkOptions.memoryMaximumSize = "2g"
     }
     tasks.withType(Checkstyle) {
         reports {

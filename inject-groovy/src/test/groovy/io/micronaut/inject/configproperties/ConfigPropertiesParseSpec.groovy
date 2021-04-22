@@ -1,7 +1,8 @@
 package io.micronaut.inject.configproperties
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
@@ -95,7 +96,7 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties(value = "foo", includes = ["property", "parentProperty"])
 class MyProperties extends Parent {
-    @edu.umd.cs.findbugs.annotations.Nullable
+    @io.micronaut.core.annotation.Nullable
     String property
     String anotherProperty
 }
@@ -173,7 +174,7 @@ import io.micronaut.context.annotation.*
 @ConfigurationProperties(value = "foo", excludes = ["anotherProperty", "anotherParentProperty"])
 class MyProperties extends Parent {
 
-    @edu.umd.cs.findbugs.annotations.Nullable
+    @io.micronaut.core.annotation.Nullable
     String property
     String anotherProperty
 }
@@ -272,5 +273,41 @@ class Test {
         then:
         noExceptionThrown()
         beanDefinition.injectedMethods[0].annotationMetadata.getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "test.val"
+    }
+
+    void "test inner interface EachProperty list = true"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.Parent$Child$Intercepted', '''
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.context.annotation.EachProperty
+
+import javax.inject.Inject
+import java.util.List
+
+@ConfigurationProperties("parent")
+class Parent {
+
+    final List<Child> children
+
+    @Inject
+    public Parent(List<Child> children) {
+        this.children = children
+    }
+
+    @EachProperty(value = "children", list = true)
+    static interface Child {
+        String getPropA()
+        String getPropB()
+    }
+}
+''')
+
+        then:
+        noExceptionThrown()
+        beanDefinition != null
+        beanDefinition.getAnnotationMetadata().stringValue(ConfigurationReader.class, "prefix").get() == "parent.children[*]"
+        beanDefinition.getRequiredMethod("getPropA").getAnnotationMetadata().getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "parent.children[*].prop-a"
     }
 }

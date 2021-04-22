@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop.compile
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.core.type.ReturnType
 import io.micronaut.inject.BeanDefinition

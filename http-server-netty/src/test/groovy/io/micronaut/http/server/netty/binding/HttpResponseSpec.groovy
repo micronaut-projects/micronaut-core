@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.binding
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
@@ -117,11 +118,11 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     void "test custom headers"() {
         when:
         def response = rxClient.exchange(HttpRequest.GET("/java/response/custom-headers")).onErrorReturn({ t -> t.response }).blockingFirst()
-        Set<String> headers = response.headers.names()
+        HttpHeaders headers = response.headers
 
         then: // The content length header was replaced, not appended
-        !headers.contains("content-type")
-        !headers.contains("Content-Length")
+        !headers.names().contains("content-type")
+        !headers.names().contains("Content-Length")
         headers.contains("content-length")
         response.header("Content-Type") == "text/plain"
         response.header("Content-Length") == "3"

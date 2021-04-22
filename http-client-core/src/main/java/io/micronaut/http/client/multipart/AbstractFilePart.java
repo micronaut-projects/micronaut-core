@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.client.multipart;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.MediaType;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.io.IOException;
 import java.nio.charset.Charset;
 

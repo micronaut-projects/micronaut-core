@@ -18,11 +18,17 @@ package io.micronaut.http.server.exceptions;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
+import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.server.exceptions.response.Error;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * Handles exception of type {@link UnsatisfiedArgumentException}.
@@ -34,12 +40,49 @@ import javax.inject.Singleton;
 @Singleton
 @Produces
 public class UnsatisfiedArgumentHandler implements ExceptionHandler<UnsatisfiedArgumentException, HttpResponse> {
+
+    private final ErrorResponseProcessor<?> responseProcessor;
+
+    /**
+     * Constructor.
+     * @deprecated Use {@link UnsatisfiedArgumentHandler(ErrorResponseProcessor)} instead.
+     */
+    @Deprecated
+    public UnsatisfiedArgumentHandler() {
+        this.responseProcessor = null;
+    }
+
+    /**
+     * Constructor.
+     * @param responseProcessor Error Response Processor
+     */
+    @Inject
+    public UnsatisfiedArgumentHandler(ErrorResponseProcessor<?> responseProcessor) {
+        this.responseProcessor = responseProcessor;
+    }
+
     @Override
     public HttpResponse handle(HttpRequest request, UnsatisfiedArgumentException exception) {
-        JsonError error = new JsonError(exception.getMessage());
-        error.path('/' + exception.getArgument().getName());
-        error.link(Link.SELF, Link.of(request.getUri()));
+        MutableHttpResponse<?> response = HttpResponse.badRequest();
+        if (responseProcessor != null) {
+            return responseProcessor.processResponse(ErrorContext.builder(request)
+                    .cause(exception)
+                    .error(new Error() {
+                        @Override
+                        public String getMessage() {
+                            return exception.getMessage();
+                        }
 
-        return HttpResponse.badRequest(error);
+                        @Override
+                        public Optional<String> getPath() {
+                            return Optional.of('/' + exception.getArgument().getName());
+                        }
+                    })
+                    .build(), response);
+        } else {
+            return response.body(new JsonError(exception.getMessage())
+                    .path('/' + exception.getArgument().getName())
+                    .link(Link.SELF, Link.of(request.getUri())));
+        }
     }
 }

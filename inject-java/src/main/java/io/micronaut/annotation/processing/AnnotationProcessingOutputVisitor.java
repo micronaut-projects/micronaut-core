@@ -15,7 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor;
@@ -71,7 +71,8 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     public AnnotationProcessingOutputVisitor(Filer filer) {
         super(isEclipseFiler(filer));
         this.filer = filer;
-        this.isGradleFiler = filer.getClass().getName().startsWith("org.gradle.api");
+        final String filerName = filer.getClass().getName();
+        this.isGradleFiler = filerName.startsWith("org.gradle.api") || filerName.startsWith("org.jetbrains.kotlin.kapt3");
     }
 
     //--add-opens=java.base/$hostPackageName=ALL-UNNAMED

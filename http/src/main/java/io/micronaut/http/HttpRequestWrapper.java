@@ -15,7 +15,7 @@
  */
 package io.micronaut.http;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.cookie.Cookies;
 
 import java.net.InetSocketAddress;

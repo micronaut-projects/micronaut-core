@@ -21,7 +21,10 @@ import groovy.transform.PackageScope
 import io.micronaut.aop.Adapter
 import io.micronaut.aop.Around
 import io.micronaut.aop.Interceptor
+import io.micronaut.aop.InterceptorBinding
+import io.micronaut.aop.InterceptorKind
 import io.micronaut.aop.Introduction
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil
 import io.micronaut.aop.writer.AopProxyWriter
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
@@ -41,6 +44,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Value
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.Internal
 import io.micronaut.core.bind.annotation.Bindable
@@ -102,8 +106,8 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName
 
 @CompileStatic
 final class InjectVisitor extends ClassCodeVisitorSupport {
-    public static final String AROUND_TYPE = "io.micronaut.aop.Around"
-    public static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction"
+    public static final String AROUND_TYPE = AnnotationUtil.ANN_AROUND
+    public static final String INTRODUCTION_TYPE = AnnotationUtil.ANN_INTRODUCTION
     final SourceUnit sourceUnit
     final ClassNode concreteClass
     final ClassElement concreteClassElement
@@ -152,7 +156,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         this.originatingElement = elementFactory.newClassElement(concreteClass, annotationMetadata)
         this.concreteClassElement = originatingElement
         this.isFactoryClass = annotationMetadata.hasStereotype(Factory)
-        this.isAopProxyType = annotationMetadata.hasStereotype(AROUND_TYPE) && !targetClassNode.isAbstract()
+        this.isAopProxyType = hasAroundStereotype(annotationMetadata) && !targetClassNode.isAbstract()
         this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()
         this.isExecutableType = isAopProxyType || annotationMetadata.hasStereotype(Executable)
         this.isConfigurationProperties = configurationProperties != null ? configurationProperties : annotationMetadata.hasDeclaredStereotype(ConfigurationReader)
@@ -168,10 +172,24 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         } else if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean, Scope)) {
             defineBeanDefinition(concreteClass)
         }
-        this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasStereotype(Scope.class) || annotationMetadata.hasStereotype(DefaultScope.class) || concreteClass.declaredConstructors.any {
+        this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasStereotype(Scope.class) || annotationMetadata.hasStereotype(DefaultScope.class) || annotationMetadata.hasDeclaredStereotype(Bean) ||concreteClass.declaredConstructors.any {
             AnnotationMetadata constructorMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, it)
             constructorMetadata.hasStereotype(Inject)
         }
+    }
+
+    static boolean hasAroundStereotype(AnnotationMetadata annotationMetadata) {
+        if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
+            return true
+        } else {
+            if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+                return annotationMetadata.getAnnotationValuesByType(InterceptorBinding)
+                    .stream().anyMatch{ av ->
+                    InterceptorKind.AROUND == av.enumValue("kind", InterceptorKind).orElse(null)
+                }
+            }
+        }
+        return false
     }
 
     BeanDefinitionVisitor getBeanWriter() {
@@ -208,14 +226,14 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             String packageName = node.packageName
             String beanClassName = node.nameWithoutPackage
 
-            ClassElement[] aroundInterceptors = annotationMetadata
-                    .getAnnotationNamesByStereotype(AROUND_TYPE).collect { ClassElement.of(it) }
+            AnnotationValue<?>[] aroundInterceptors = InterceptedMethodUtil
+                    .resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND)
 
-            ClassElement[] introductionInterceptors = annotationMetadata
-                    .getAnnotationNamesByStereotype(Introduction.class).collect { ClassElement.of(it) }
+            AnnotationValue<?>[] introductionInterceptors = InterceptedMethodUtil
+                    .resolveInterceptorBinding(annotationMetadata, InterceptorKind.INTRODUCTION)
 
 
-            ClassElement[] interceptorTypes = ArrayUtils.concat(aroundInterceptors, introductionInterceptors) as ClassElement[]
+            AnnotationValue<?>[] interceptorTypes = (AnnotationValue<?>[]) ArrayUtils.concat(aroundInterceptors, introductionInterceptors)
             ClassElement[] interfaceTypes = annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0])
                                                     .collect {ClassElement.of(it) }
 
@@ -227,6 +245,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     annotationMetadata,
                     interfaceTypes,
                     configurationMetadataBuilder,
+                    configurationMetadata,
                     interceptorTypes
             )
             ClassElement groovyClassElement = elementFactory.newClassElement(
@@ -304,7 +323,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
             @Override
             protected boolean isAcceptableMethod(MethodNode methodNode) {
-                return super.isAcceptableMethod(methodNode) || AstAnnotationUtils.getAnnotationMetadata(source, unit, methodNode).hasDeclaredStereotype(AROUND_TYPE)
+                return super.isAcceptableMethod(methodNode) || hasDeclaredAroundStereotype(AstAnnotationUtils.getAnnotationMetadata(source, unit, methodNode))
             }
 
             @Override
@@ -399,10 +418,10 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
                 }
 
-                if (AstAnnotationUtils.hasStereotype(source, unit, methodNode, AROUND_TYPE)) {
-                    ClassElement[] interceptorTypeReferences = annotationMetadata.getAnnotationNamesByStereotype(Around)
-                                                                    .collect { ClassElement.of(it) }
-                    aopProxyWriter.visitInterceptorTypes(interceptorTypeReferences)
+                if (hasAroundStereotype(AstAnnotationUtils.getAnnotationMetadata(source, unit, methodNode))) {
+                    AnnotationValue<?>[] interceptorTypeReferences = InterceptedMethodUtil
+                            .resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND)
+                    aopProxyWriter.visitInterceptorBinding(interceptorTypeReferences)
                 }
 
                 if (methodNode.isAbstract()) {
@@ -481,7 +500,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     factoryMethodElement
             )
 
-            if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
+            if (hasAroundStereotype(methodAnnotationMetadata)) {
 
                 if (Modifier.isFinal(returnType.modifiers)) {
                     addError(
@@ -491,8 +510,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     return
                 }
 
-                ClassElement[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around)
-                                                            .collect { ClassElement.of(it) }
+                AnnotationValue<?>[] interceptorTypeReferences = InterceptedMethodUtil
+                        .resolveInterceptorBinding(methodAnnotationMetadata, InterceptorKind.AROUND)
                 OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
                 Map<CharSequence, Object> finalSettings = [:]
                 for (key in aopSettings) {
@@ -641,7 +660,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         } else if (!isConstructor) {
             boolean hasInvalidModifiers = methodNode.isStatic() || methodNode.isAbstract() || methodNode.isSynthetic() || methodAnnotationMetadata.hasAnnotation(Internal) || methodNode.isPrivate()
             boolean isPublic = methodNode.isPublic() && !hasInvalidModifiers
-            boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable) || methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) && !hasInvalidModifiers
+            boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable) || hasAroundStereotype(methodAnnotationMetadata)) && !hasInvalidModifiers
             if (isDeclaredBean && isExecutable) {
                 visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
             } else if (isConfigurationProperties && isPublic) {
@@ -773,10 +792,10 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 visitAdaptedMethod(methodNode, methodAnnotationMetadata)
             }
 
-            boolean hasAround = hasConstraints || methodAnnotationMetadata.hasStereotype(AROUND_TYPE)
+            boolean hasAround = hasConstraints || hasAroundStereotype(methodAnnotationMetadata)
             if ((isAopProxyType && isPublic) || (hasAround && !concreteClass.isAbstract())) {
 
-                boolean hasExplicitAround = methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE)
+                boolean hasExplicitAround = hasDeclaredAroundStereotype(methodAnnotationMetadata)
 
                 if (methodNode.isFinal()) {
                     if (hasExplicitAround) {
@@ -785,12 +804,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         addError("Public method inherits AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.", methodNode)
                     }
                 } else {
-                    ClassElement[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around)
-                                                                        .collect { ClassElement.of(it) }
-                    if (hasConstraints) {
-                        interceptorTypeReferences = ArrayUtils.concat(interceptorTypeReferences, ClassElement.of("io.micronaut.validation.Validated"))
-                                                            as ClassElement[]
-                    }
+                    AnnotationValue<?>[] interceptorTypeReferences = InterceptedMethodUtil
+                            .resolveInterceptorBinding(methodAnnotationMetadata, InterceptorKind.AROUND)
                     OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
                     AopProxyWriter proxyWriter = resolveProxyWriter(
                             aopSettings,
@@ -800,7 +815,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
                     if (proxyWriter != null && !methodNode.isFinal()) {
 
-                        proxyWriter.visitInterceptorTypes(interceptorTypeReferences)
+                        proxyWriter.visitInterceptorBinding(interceptorTypeReferences)
 
                         proxyWriter.visitAroundMethod(
                                 declaringElement,
@@ -821,6 +836,17 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         }
     }
 
+    static boolean hasDeclaredAroundStereotype(AnnotationMetadata methodAnnotationMetadata) {
+        if (methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE)) {
+            return true
+        } else if (methodAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+            methodAnnotationMetadata.getDeclaredAnnotationValuesByType(InterceptorBinding)
+                    .stream().anyMatch { av ->
+                InterceptorKind.AROUND == av.enumValue("kind", InterceptorKind).orElse(null)
+            }
+        }
+    }
+
     @CompileDynamic
     private AnnotationMetadata addValidated(Element element) {
         return addAnnotation(element, "io.micronaut.validation.Validated")
@@ -835,7 +861,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
     private AopProxyWriter resolveProxyWriter(
             OptionalValues<Boolean> aopSettings,
             boolean isFactoryType,
-            ClassElement[] interceptorTypeReferences) {
+            AnnotationValue<?>[] interceptorTypeReferences) {
         AopProxyWriter proxyWriter = (AopProxyWriter) aopProxyWriter
         if (proxyWriter == null) {
 
@@ -1204,7 +1230,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
 
             if (isAopProxyType) {
-                ClassElement[] interceptorTypeReferences = annotationMetadata.getAnnotationNamesByStereotype(Around).collect { ClassElement.of(it) }
+                AnnotationValue<?>[] interceptorTypeReferences = InterceptedMethodUtil
+                        .resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND)
                 resolveProxyWriter(aopSettings, false, interceptorTypeReferences)
             }
 
@@ -1244,7 +1271,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         originatingElement,
                         methodAnnotationMetadata,
                         [elementFactory.newClassElement(typeToImplement, AnnotationMetadata.EMPTY_METADATA)] as ClassElement[],
-                        configurationMetadataBuilder
+                        configurationMetadataBuilder,
+                        null
                 )
 
                 aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata)

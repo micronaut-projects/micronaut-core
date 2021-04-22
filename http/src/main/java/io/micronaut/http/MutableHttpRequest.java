@@ -15,7 +15,7 @@
  */
 package io.micronaut.http;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.uri.UriBuilder;

@@ -1,6 +1,7 @@
 package io.micronaut.jackson.modules
 
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonUnwrapped
@@ -22,11 +23,29 @@ import io.micronaut.jackson.modules.wrappers.IntWrapper
 import io.micronaut.jackson.modules.wrappers.IntegerWrapper
 import io.micronaut.jackson.modules.wrappers.LongWrapper
 import io.micronaut.jackson.modules.wrappers.StringWrapper
+import spock.lang.Issue
 import spock.lang.Specification
 
 import java.beans.ConstructorProperties
 
 class BeanIntrospectionModuleSpec extends Specification {
+
+    void "Bean introspection works with a bean without JsonIgnore annotations"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        IgnoreTest guide = new IgnoreTest(name:"Test", code: 9999)
+        String json = objectMapper.writeValueAsString(guide)
+
+        then:
+        noExceptionThrown()
+        json == '{"name":"Test"}'
+
+        cleanup:
+        ctx.close()
+    }
 
     void "Bean introspection works with a bean without JsonInclude annotations"() {
         given:
@@ -316,6 +335,87 @@ class BeanIntrospectionModuleSpec extends Specification {
         ctx.close()
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5160")
+    void "test that snake_case with non-introspected beans works"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run([
+                'jackson.property-naming-strategy': 'SNAKE_CASE',
+                'jackson.json-view.enabled': true,
+                'jackson.bean-introspection-module': true
+        ])
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        Publisher p = objectMapper.readValue('{"publisher_name":"RandomHouse"}', Publisher)
+
+        then:
+        ctx.getBean(JacksonConfiguration).beanIntrospectionModule
+        ctx.containsBean(BeanIntrospectionModule)
+        p.publisherName == 'RandomHouse'
+
+        when:
+        def result = objectMapper.writerWithView(PublicView).writeValueAsString(p)
+
+        then:
+        !result.contains('"publisher_name":')
+
+
+        when:
+        result = objectMapper.writerWithView(AllView).writeValueAsString(p)
+        then:
+        result.contains('"publisher_name":')
+
+        cleanup:
+        ctx.close()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5088")
+    void "test deserializing from a list of pojos"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        MyReqBody reqBody = objectMapper.readValue('[{"name":"Joe"},{"name":"Sally"}]', MyReqBody)
+
+        then:
+        reqBody.getItems().size() == 2
+        reqBody.getItems()[0].name == "Joe"
+        reqBody.getItems()[1].name == "Sally"
+
+        when:
+        MyItemBody itemBody = objectMapper.readValue('[{"name":"Joe"},{"name":"Sally"}]', MyItemBody)
+
+        then:
+        itemBody.getItems().size() == 2
+        itemBody.getItems()[0].name == "Joe"
+        itemBody.getItems()[1].name == "Sally"
+
+        cleanup:
+        ctx.close()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5078")
+    void "test more list wrapping scenarios"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        OuterList outerList = objectMapper.readValue("{\"wrapper\":{\"inner\":[]}}", OuterList.class)
+
+        then:
+        noExceptionThrown()
+        outerList.wrapper.inner.isEmpty()
+
+        when:
+        OuterArray outerArray = objectMapper.readValue("{\"wrapper\":{\"inner\":[]}}", OuterArray.class)
+
+        then:
+        noExceptionThrown()
+        outerArray.wrapper.inner.length == 0
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -333,6 +433,14 @@ class BeanIntrospectionModuleSpec extends Specification {
         @JsonCreator Book(@JsonProperty("book_title") String title) {
             this.title = title
         }
+    }
+
+    @Introspected
+    static class Publisher {
+
+        @JsonView(AllView)
+        String publisherName
+
     }
 
     @Introspected
@@ -406,11 +514,105 @@ class BeanIntrospectionModuleSpec extends Specification {
 
     @Introspected
     static class ListWrapper {
-        final List<String> value;
+        final List<String> value
 
         @JsonCreator
-        public ListWrapper(List<String> value) {
-            this.value = value;
+        ListWrapper(List<String> value) {
+            this.value = value
+        }
+    }
+
+    @Introspected
+    static class IgnoreTest {
+        String name
+        @JsonIgnore
+        int code
+    }
+
+    @Introspected
+    static class MyReqBody {
+
+        private final List<MyItem> items
+
+        @JsonCreator
+        MyReqBody(final List<MyItem> items) {
+            this.items = items
+        }
+
+        List<MyItem> getItems() {
+            items
+        }
+    }
+
+    @Introspected
+    static class MyItem {
+        String name
+    }
+
+    @Introspected
+    static class MyGenericBody<T> {
+
+        private final List<T> items
+
+        MyGenericBody(final List<T> items) {
+            this.items = items
+        }
+
+        List<T> getItems() {
+            items
+        }
+    }
+
+    @Introspected
+    static class MyItemBody extends MyGenericBody<MyItem> {
+
+        @JsonCreator
+        MyItemBody(final List<MyItem> items) {
+            super(items)
+        }
+    }
+
+    @Introspected
+    static class WrapperList {
+        public final List<String> inner
+
+        @ConstructorProperties(["inner"])
+        @JsonCreator
+        WrapperList(List<String> inner) {
+            this.inner = inner
+        }
+    }
+
+    @Introspected
+    static class OuterList {
+        public final WrapperList wrapper
+
+        @ConstructorProperties(["wrapper"])
+        @JsonCreator
+        OuterList(WrapperList wrapper) {
+            this.wrapper = wrapper
+        }
+    }
+
+    @Introspected
+    static class WrapperArray {
+        public final String[] inner
+
+        @ConstructorProperties(["inner"])
+        @JsonCreator
+        WrapperArray(String[] inner) {
+            this.inner = inner
+        }
+    }
+
+    @Introspected
+    static class OuterArray {
+        public final WrapperArray wrapper
+
+        @ConstructorProperties(["wrapper"])
+        @JsonCreator
+        OuterArray(WrapperArray wrapper) {
+            this.wrapper = wrapper
         }
     }
 }

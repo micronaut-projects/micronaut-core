@@ -17,7 +17,7 @@ package io.micronaut.inject;
 
 import io.micronaut.core.type.Argument;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * An injection point for a method or constructor argument.

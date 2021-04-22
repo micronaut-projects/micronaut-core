@@ -22,7 +22,7 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.ExecutableMethod;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.reflect.Method;
 
 /**

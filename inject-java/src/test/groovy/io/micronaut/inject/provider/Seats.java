@@ -15,10 +15,10 @@
  */
 package io.micronaut.inject.provider;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-import org.atinject.tck.auto.Drivers;
-import org.atinject.tck.auto.Seat;
-import org.atinject.tck.auto.Tire;
+import io.micronaut.core.annotation.Nullable;
+import org.atinject.javaxtck.auto.Drivers;
+import org.atinject.javaxtck.auto.Seat;
+import org.atinject.javaxtck.auto.Tire;
 
 import javax.inject.Named;
 import javax.inject.Provider;

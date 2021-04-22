@@ -22,6 +22,7 @@ import io.micronaut.core.type.Argument;
 import org.reactivestreams.Publisher;
 
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutorService;
 
 /**
  * The intercept method supporting intercepting different reactive invocations.
@@ -97,6 +98,19 @@ public interface InterceptedMethod {
     }
 
     /**
+     * Proceeds with invocation of {@link InvocationContext#proceed()} and converts result to {@link Publisher}.
+     *
+     * @param executorService The executor service to subscribe on
+     * @return The intercepted result
+     */
+    default Publisher<?> interceptResultAsPublisher(ExecutorService executorService) {
+        if (resultType() != ResultType.PUBLISHER) {
+            throw new ConfigurationException("Cannot return `Publisher` result from '" + resultType() + "' interceptor");
+        }
+        return interceptResultAsPublisher();
+    }
+
+    /**
      * Proceeds with invocation of {@link InvocationContext#proceed(Interceptor)} and converts result to {@link CompletionStage}.
      *
      * @param from The interceptor to start from
@@ -121,7 +135,6 @@ public interface InterceptedMethod {
         }
         return (Publisher<?>) interceptResult(from);
     }
-
 
     /**
      * Handle the value that should be the result of the invocation.

@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.version;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
