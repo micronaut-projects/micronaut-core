@@ -10,12 +10,15 @@ It is now possible to define a body argument of a controller method with an Inpu
 
 If Dual Protocol is enabled, now it is possible to redirect all HTTP requests automatically to the HTTPS port. See more information <<dualProtocol, about how to enable and configure it>>.
 
+==== Support for JDK 16 and Gradle 7.0 in Micronaut Launch
+
+https://micronaut.io/launch/[Micronaut Launch] has been updated with support for JDK 16 and Gradle 7.0.
 
 === Module Upgrades
 
 ==== Micronaut Data 2.4.0
 
-https://micronaut-projects.github.io/micronaut-data/latest/guide/[Micronaut Data] has many new features including:
+Huge https://micronaut-projects.github.io/micronaut-data/latest/guide/[Micronaut Data] update including many new features including:
 
 - Full support for immutable entities. You can use Java 16 records or Kotlin immutable data classes
 - Integrated support for R2DBC, now the `data-r2dbc` module is a part of the data project and shares the same code with JDBC
@@ -28,6 +31,10 @@ https://micronaut-projects.github.io/micronaut-data/latest/guide/[Micronaut Data
 ==== Micronaut Micrometer 3.4.0
 
 The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micrometer module] has been upgraded and now supports repeated definitions of the https://micrometer.io/docs/concepts#_the_timed_annotation[@Timed] annotation as well as also supporting the `@Counted` annotation for counters when you add the `micronaut-micrometer-annotation` dependency to your annotation processor classpath.
+
+==== Micronaut Oracle Cloud 1.3.0
+
+Micronaut's https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/[Oracle Cloud Integration] has been updated with support for Cloud Monitoring and Tracing.
 
 === Dependency Upgrades
 
