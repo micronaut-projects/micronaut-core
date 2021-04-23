@@ -44,29 +44,6 @@ public interface ValidatorConfiguration {
     String ENABLED = PREFIX + ".enabled";
 
     /**
-     * The configuration of Validator.
-     */
-    public enum ValidatorBehaviour {
-        /**
-         * The default behaviour, that validates iterables with iterable annotations and validates
-         * items of iterables with generic parameters, like List<@Ann T>.
-         */
-        DEFAULT,
-        /**
-         * The behaviour, that disables validating iterable items with generic parameters.
-         * If javax.validation.Valid annotations is used on an iterable, all its contraint annotations will be applied
-         * to the items of this iterable, but not to the iterable itself. In this case the javax.validation.Valid
-         * annotation will also be checked on the iterable items if the bean has introspection.
-         */
-        DISABLE_ITERABLE_GENERIC_PARAMETERS
-    }
-
-    /**
-     * Validator behaviour.
-     */
-    String VALIDATOR_BEHAVIOUR = PREFIX + ".validatorBehaviour";
-
-    /**
      * @return The constraint registry to use.
      */
     @NonNull
@@ -102,16 +79,4 @@ public interface ValidatorConfiguration {
      */
     @NonNull
     ExecutionHandleLocator getExecutionHandleLocator();
-
-    /**
-     * Sets the type of behaviour of the validator.
-     * @param behaviour - a value from the ValidatorBehaviour enum
-     * @return itself
-     */
-    ValidatorContext setValidatorBehaviour(ValidatorBehaviour behaviour);
-
-    /**
-     * @return validator behaviour
-     */
-    ValidatorBehaviour getValidatorBehaviour();
 }

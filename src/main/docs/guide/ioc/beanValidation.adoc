@@ -90,6 +90,8 @@ snippet::io.micronaut.docs.ioc.validation.iterableGenericParameters.BookInfoSpec
 <1> The violation on the 1-st index in List
 <2> The violation was found in Map's key
 
+NOTE: It is not yet supported in Groovy
+
 === Validating Configuration Properties
 
 You can also validate the properties of classes that are annotated with ann:context.annotation.ConfigurationProperties[] to ensure configuration is correct.

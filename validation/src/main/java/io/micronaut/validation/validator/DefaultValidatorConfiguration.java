@@ -62,8 +62,6 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
 
     private boolean enabled = true;
 
-    private ValidatorBehaviour validatorBehaviour = ValidatorBehaviour.DEFAULT;
-
     @Override
     @NonNull
     public ConstraintValidatorRegistry getConstraintValidatorRegistry() {
@@ -250,16 +248,5 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     @Override
     public Validator getValidator() {
         return new DefaultValidator(this);
-    }
-
-    @Override
-    public ValidatorContext setValidatorBehaviour(ValidatorBehaviour behaviour) {
-        this.validatorBehaviour = behaviour;
-        return null;
-    }
-
-    @Override
-    public ValidatorBehaviour getValidatorBehaviour() {
-        return validatorBehaviour;
     }
 }

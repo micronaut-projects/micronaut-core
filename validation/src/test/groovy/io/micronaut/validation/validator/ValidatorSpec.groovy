@@ -660,49 +660,12 @@ class ValidatorSpec extends Specification {
         !beanDescriptor.isBeanConstrained()
         beanDescriptor.getConstrainedProperties().size() == 0
     }
-
-    // KOTLIN
-
-    void "test kotlin validation"() {
-//        when:
-//        var b = new BookKotlin(["X", "Me", "TooLongName"])
-//        var violations = validator.validate(b)
-//
-//        then:
-//        violations.size() == 2
-    }
-}
-
-@Introspected
-class HiveOfBeeMap {
-    @Valid
-    Map<String, Bee> bees
-}
-
-@Introspected
-class HiveOfBeeList {
-    @Valid
-    List<Bee> bees
 }
 
 // not introspected, expect validation failure
 class Bee {
     @NotBlank
     String name
-}
-
-@Introspected
-class ListOfStrings {
-    @Valid
-    @Size(min=1, max=2)
-    @NotNull
-    List<String> strings
-}
-
-@Introspected
-class ListOfNames {
-    @NotNull
-    List<@Size(min=3, max=8) String> names;
 }
 
 @Introspected

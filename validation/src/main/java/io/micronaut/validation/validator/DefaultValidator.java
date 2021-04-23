@@ -29,7 +29,6 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.*;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -81,7 +80,6 @@ public class DefaultValidator implements
     private final TraversableResolver traversableResolver;
     private final ExecutionHandleLocator executionHandleLocator;
     private final MessageSource messageSource;
-    private final boolean disableIterableGenericParameters;
 
     /**
      * Default constructor.
@@ -97,8 +95,6 @@ public class DefaultValidator implements
         this.traversableResolver = configuration.getTraversableResolver();
         this.executionHandleLocator = configuration.getExecutionHandleLocator();
         this.messageSource = configuration.getMessageSource();
-        this.disableIterableGenericParameters = configuration.getValidatorBehaviour() ==
-                ValidatorConfiguration.ValidatorBehaviour.DISABLE_ITERABLE_GENERIC_PARAMETERS;
     }
 
     @SuppressWarnings("unchecked")
@@ -175,9 +171,10 @@ public class DefaultValidator implements
             //noinspection unchecked
             final Class<Object> rootClass = (Class<Object>) object.getClass();
 
+            Path.Node node = context.addPropertyNode(constrainedProperty.getName());
             validateElement(context, overallViolations, object,
                     rootClass, constrainedProperty, object, constrainedProperty.getType(),
-                    propertyValue, false, false, null, null);
+                    propertyValue, node, false, false, null);
 
             //noinspection unchecked
             return Collections.unmodifiableSet(overallViolations);
@@ -208,9 +205,11 @@ public class DefaultValidator implements
         final Set overallViolations = new HashSet<>(5);
         final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(groups);
 
+        // create node, that will be removed inside validateElement()
+        Path.Node node = context.addPropertyNode(beanProperty.getName());
         //noinspection unchecked
         validateElement(context, overallViolations, null, (Class<Object>) beanType, beanProperty, null,
-                beanProperty.getType(), value);
+                beanProperty.getType(), value, node);
 
         //noinspection unchecked
         return Collections.unmodifiableSet(overallViolations);
@@ -228,7 +227,9 @@ public class DefaultValidator implements
         final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext();
 
         Class<Object> type = value != null ? (Class<Object>) value.getClass() : Object.class;
-        validateElement(context, overallViolations, element, null, element, element, type, value);
+        // create node, that will be removed inside validateElement()
+        Path.Node node = context.addPropertyNode(element.getName());
+        validateElement(context, overallViolations, element, null, element, element, type, value, node);
 
         //noinspection unchecked
         return Collections.unmodifiableSet(overallViolations.stream()
@@ -304,7 +305,7 @@ public class DefaultValidator implements
             @SuppressWarnings("unchecked")
             final Class<T> rootClass = (Class<T>) object.getClass();
             validateParametersInternal(rootClass, object, parameterValues, arguments, argLen, context,
-                    overallViolations, node);
+                    overallViolations);
         } finally {
             context.removeLast();
         }
@@ -338,7 +339,7 @@ public class DefaultValidator implements
             final Class<T> rootClass = (Class<T>) object.getClass();
             validateParametersInternal(rootClass, object,
                     argumentValues.stream().map(ArgumentValue::getValue).toArray(), arguments, argLen,
-                    context, overallViolations, node);
+                    context, overallViolations);
         } finally {
             context.removeLast();
         }
@@ -402,8 +403,9 @@ public class DefaultValidator implements
         boolean hasValid = executableMethod.hasStereotype(Valid.class);
         boolean hasConstraint = executableMethod.hasStereotype(Constraint.class);
 
+        Path.Node node = context.addReturnValueNode(returnType.asArgument().getName());
         validateElement(context, overallViolations, object, rootClass, returnType, object,
-                returnType.getType(), returnValue, hasValid, hasConstraint, null, null);
+                returnType.getType(), returnValue, node, hasValid, hasConstraint, null);
 
         return overallViolations;
     }
@@ -459,8 +461,7 @@ public class DefaultValidator implements
                     constructorArguments,
                     argLength,
                     context,
-                    overallViolations,
-                    node);
+                    overallViolations);
         } finally {
             context.removeLast();
         }
@@ -529,8 +530,10 @@ public class DefaultValidator implements
                 rootClass.getName(), injectionPoint.getDeclaringBean().getConstructor().getArguments());
 
         // Handle cascade validation annotation
+        // create node, that will be removed inside validateElement()
+        Path.Node node = context.addPropertyNode(argument.getName());
         validateElement(context, overallViolations, null, rootClass, argument,
-                null, (Class<Object>) argument.getType(), value);
+                null, (Class<Object>) argument.getType(), value, node);
 
         failOnError(resolutionContext, overallViolations, rootClass);
     }
@@ -564,12 +567,12 @@ public class DefaultValidator implements
                         final boolean isValid = executableMethod.hasStereotype(Valid.class);
                         if (hasConstraint || isValid) {
                             final Object value = executableMethod.invoke(bean);
-                            final Argument<Object> annotatedReturnValue = executableMethod.getReturnType().asArgument();
+                            final ReturnType<Object> returnType = executableMethod.getReturnType();
 
-                            context.addPropertyNode(executableMethod.getName());
+                            Path.Node node = context.addPropertyNode(executableMethod.getName());
+                            // create node, that will be removed inside validateElement()
                             validateElement(context, violations, bean, (Class<Object>) beanType,
-                                    annotatedReturnValue, bean, annotatedReturnValue.getType(), value);
-                            context.removeLast();
+                                    returnType, bean, returnType.getType(), value, node);
                         }
                     }
                 }
@@ -624,53 +627,43 @@ public class DefaultValidator implements
             int argumentIndex,
             Argument argument,
             Class<?> parameterType,
-            AnnotationMetadata annotationMetadata,
-            Object parameterValue,
-            boolean isValid
+            Object parameterValue
     ) {
         final Flowable<Object> publisher = Publishers.convertPublisher(parameterValue, Flowable.class);
         PathImpl copiedPath = new PathImpl(context.currentPath);
 
-        final Flowable<Object> finalFlowable = publisher.flatMap(o -> {
+        final Flowable<Object> finalFlowable = publisher.flatMap(value -> {
             DefaultConstraintValidatorContext newContext =
                     new DefaultConstraintValidatorContext(object, copiedPath);
             Set newViolations = new HashSet();
 
-            BeanIntrospection<Object> beanIntrospection = null;
-            if (isValid && o != null && !ClassUtils.isJavaBasicType(o.getClass())) {
-                beanIntrospection = getBeanIntrospection(o);
+            // noinspection unchecked
+            Argument<Object>[] typeParameters = argument.getTypeParameters();
+
+            if (typeParameters.length == 0) {
+                // No validation if no parameters
+                return Flowable.just(value);
             }
+            Argument<Object> valueArgument = typeParameters[0];
 
-            if (beanIntrospection != null) {
-                try {
-                    context.addParameterNode(argument.getName(), argumentIndex);
-                    cascadeToObjectIntrospection(
-                            newContext,
-                            newViolations,
-                            object,
-                            o,
-                            beanIntrospection
-                    );
-                } finally {
-                    context.removeLast();
-                }
-            } else {
-                final Class t = argument.getFirstTypeVariable().map(Argument::getType).orElse(null);
-
-                context.addParameterNode(argument.getName(), argumentIndex);
-                try {
-                    validateConstrainedParameterInternal(rootClass, object, argumentValues, newContext,
-                            newViolations, t != null ? t : Object.class, annotationMetadata, o);
-                } finally {
-                    context.removeLast();
-                }
+            // Create the parameter node and the container element node
+            context.addParameterNode(argument.getName(), argumentIndex);
+            // noinspection unchecked
+            Path.Node node = context.addContainerElementNode(valueArgument,
+                    (Class<Object>) parameterValue.getClass(), null, null);
+            try {
+                // node is removed from context inside validateElement()
+                validateElement(newContext, newViolations, object, (Class<Object>) rootClass, valueArgument, object,
+                        valueArgument.getType(), value, node);
+            } finally {
+                context.removeLast();
             }
 
             if (!newViolations.isEmpty()) {
                 return Flowable.error(new ConstraintViolationException(newViolations));
             }
 
-            return Flowable.just(o);
+            return Flowable.just(value);
         });
 
         argumentValues[argumentIndex] = Publishers.convertPublisher(finalFlowable, parameterType);
@@ -683,53 +676,43 @@ public class DefaultValidator implements
             DefaultConstraintValidatorContext context,
             int argumentIndex,
             Argument argument,
-            AnnotationMetadata annotationMetadata,
-            Object parameterValue,
-            boolean isValid
+            Object parameterValue
     ) {
         final CompletionStage<Object> completionStage = (CompletionStage<Object>) parameterValue;
         PathImpl copiedPath = new PathImpl(context.currentPath);
 
-        final CompletionStage<Object> validatedStage = completionStage.thenApply(o -> {
+        final CompletionStage<Object> validatedStage = completionStage.thenApply(value -> {
             DefaultConstraintValidatorContext newContext =
                     new DefaultConstraintValidatorContext(object, copiedPath);
             Set newViolations = new HashSet();
 
-            BeanIntrospection<Object> beanIntrospection = null;
-            if (isValid && o != null && !ClassUtils.isJavaBasicType(o.getClass())) {
-                beanIntrospection = getBeanIntrospection(o);
+            // noinspection unchecked
+            Argument<Object>[] typeParameters = argument.getTypeParameters();
+
+            if (typeParameters.length == 0) {
+                // No validation if no parameters
+                return value;
             }
+            Argument<Object> valueArgument = typeParameters[0];
 
-            if (beanIntrospection != null) {
-                try {
-                    context.addParameterNode(argument.getName(), argumentIndex);
-                    cascadeToObjectIntrospection(
-                            newContext,
-                            newViolations,
-                            object,
-                            o,
-                            beanIntrospection
-                    );
-                } finally {
-                    context.removeLast();
-                }
-            } else {
-                final Class t = argument.getFirstTypeVariable().map(Argument::getType).orElse(null);
-
-                context.addParameterNode(argument.getName(), argumentIndex);
-                try {
-                    validateConstrainedParameterInternal(rootClass, object, argumentValues, newContext,
-                            newViolations, t != null ? t : Object.class, annotationMetadata, o);
-                } finally {
-                    context.removeLast();
-                }
+            // Create the parameter node and the container element node
+            context.addParameterNode(argument.getName(), argumentIndex);
+            // noinspection unchecked
+            Path.Node node = context.addContainerElementNode(valueArgument,
+                    (Class<Object>) parameterValue.getClass(), null, null);
+            try {
+                // node is removed from context inside validateElement()
+                validateElement(newContext, newViolations, object, (Class<Object>) rootClass, valueArgument, object,
+                        valueArgument.getType(), value, node);
+            } finally {
+                context.removeLast();
             }
 
             if (!newViolations.isEmpty()) {
                 throw new ConstraintViolationException(newViolations);
             }
 
-            return o;
+            return value;
         });
 
         argumentValues[argumentIndex] = validatedStage;
@@ -742,8 +725,7 @@ public class DefaultValidator implements
             Argument[] arguments,
             int argLen,
             DefaultConstraintValidatorContext context,
-            Set overallViolations,
-            Path.Node parentNode
+            Set overallViolations
     ) {
         for (int parameterIndex = 0; parameterIndex < argLen; parameterIndex++) {
             Argument<?> argument = arguments[parameterIndex];
@@ -762,89 +744,23 @@ public class DefaultValidator implements
             final boolean isPublisher = hasValue && Publishers.isConvertibleToPublisher(parameterType);
             if (isPublisher) {
                 instrumentPublisherArgumentWithValidation(
-                        rootClass,
-                        object,
-                        parameters,
-                        context,
-                        parameterIndex,
-                        argument,
-                        parameterType,
-                        annotationMetadata,
-                        parameterValue,
-                        hasValid
-                );
+                        rootClass, object, parameters, context, parameterIndex, argument, parameterType, parameterValue);
                 continue;
             }
 
             final boolean isCompletionStage = hasValue && CompletionStage.class.isAssignableFrom(parameterType);
             if (isCompletionStage) {
                 instrumentCompletionStageArgumentWithValidation(
-                        rootClass,
-                        object,
-                        parameters,
-                        context,
-                        parameterIndex,
-                        argument,
-                        annotationMetadata,
-                        parameterValue,
-                        hasValid
-                );
+                        rootClass, object, parameters, context, parameterIndex, argument, parameterValue);
                 continue;
             }
 
+            // create node, that will be removed inside validateElement()
+            Path.Node node = context.addParameterNode(argument.getName(), parameterIndex);
             //noinspection unchecked
             validateElement(context, overallViolations, object, (Class<Object>) rootClass, argument, object,
-                    (Class<Object>) argument.getType(), parameterValue,
-                    false, false, parameterIndex, parameters);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private <T> void validateConstrainedParameterInternal(
-            @NonNull Class<T> rootClass,
-            @Nullable T object,
-            @NonNull Object[] argumentValues,
-            @NonNull DefaultConstraintValidatorContext context,
-            @NonNull Set overallViolations,
-            @NonNull Class<?> parameterType,
-            @NonNull AnnotationMetadata annotationMetadata,
-            @Nullable Object parameterValue
-    ) {
-        final List<Class<? extends Annotation>> constraintTypes =
-                annotationMetadata.getAnnotationTypesByStereotype(Constraint.class);
-
-        // Constraints applied to the parameter
-        for (Class<? extends Annotation> constraintType : constraintTypes) {
-            final ConstraintValidator constraintValidator = constraintValidatorRegistry
-                    .findConstraintValidator(constraintType, parameterType).orElse(null);
-            if (constraintValidator != null) {
-                final AnnotationValue<? extends Annotation> annotationValue =
-                        annotationMetadata.getAnnotation(constraintType);
-                if (annotationValue != null && !constraintValidator.isValid(parameterValue, annotationValue, context)) {
-                    final String messageTemplate = buildMessageTemplate(annotationValue, annotationMetadata);
-                    final Map<String, Object> variables = newConstraintVariables(annotationValue, parameterValue, annotationMetadata);
-                    overallViolations.add(new DefaultConstraintViolation(
-                            object,
-                            rootClass,
-                            object,
-                            parameterValue,
-                            messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
-                            messageTemplate,
-                            new PathImpl(context.currentPath),
-                            new DefaultConstraintDescriptor(annotationMetadata, constraintType, annotationValue),
-                            argumentValues));
-                }
-            }
-        }
-
-        // Constraints applied to the class used as a parameter
-        final BeanIntrospection<Object> introspection = getBeanIntrospection(parameterType);
-        if (introspection != null) {
-            final List<Class<? extends Annotation>> pojoConstraints = introspection.getAnnotationTypesByStereotype(Constraint.class);
-
-            for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
-                validatePojoInternal(rootClass, object, argumentValues, context, overallViolations, parameterType, parameterValue, pojoConstraint, introspection.getAnnotation(pojoConstraint));
-            }
+                    (Class<Object>) argument.getType(), parameterValue, node,
+                    false, false, parameters);
         }
     }
 
@@ -909,11 +825,6 @@ public class DefaultValidator implements
         @SuppressWarnings("unchecked")
         final Class<Object> rootBeanClass = (Class<Object>) rootBean.getClass();
 
-        Set<BeanProperty<Object, Object>> cascadeIterableProperties = null;
-        if (disableIterableGenericParameters) {
-            cascadeIterableProperties = new HashSet<>(cascadeProperties.size());
-        }
-
         for (BeanProperty<Object, Object> cascadeProperty: cascadeProperties) {
             final Object propertyValue = cascadeProperty.get(object);
             //noinspection unchecked
@@ -922,22 +833,14 @@ public class DefaultValidator implements
 
             Path.Node node = context.addPropertyNode(cascadeProperty.getName());
             try {
-                final boolean cascadedToIterable = validateCascadeElement(context, overallViolations, rootBean,
-                        rootBeanClass, cascadeProperty, object, propertyType, propertyValue, null,
-                        node, false);
-
-                if (cascadedToIterable && disableIterableGenericParameters) {
-                    cascadeIterableProperties.add(cascadeProperty);
-                }
+                validateCascadeElement(context, overallViolations, rootBean, rootBeanClass, cascadeProperty,
+                        object, propertyType, propertyValue, null, node);
             } finally {
                 context.removeLast();
             }
         }
 
         for (BeanProperty<Object, Object> constrainedProperty: constrainedProperties) {
-            if (disableIterableGenericParameters && cascadeIterableProperties.contains(constrainedProperty)) {
-                continue;
-            }
             final Object propertyValue = constrainedProperty.get(object);
 
             context.addPropertyNode(constrainedProperty.getName());
@@ -997,17 +900,15 @@ public class DefaultValidator implements
      * ValidatesElement on @Valid and Constraint annotations.
      * Works for properties, method arguments and return values.
      * For iterables validates iterable items with generic parameter annotations and iterables themselves.
-     * If {@link #disableIterableGenericParameters} is set, @Valid cancels the validation of iterables and cascades
-     * the annotations to iterable values only.
      * NOTE: IntrospectedTypeVisitor adds @Valid on iterable if its arguments have any annotations.
+     * NOTE: Removes the element node
      *
-     * @param annotatedElement - element to validate - Argument, ReturnType or BeanProperty
+     * @param annotatedElement - element to validate - Argument, ReturnType, BeanProperty, etc.
      * @param annotatedElementType - the type of annotatedElement (not essentially value type)
      * @param elementValue - the value
      * @param hasValidCascade - if it has Valid that is cascaded from above (e.g. in ReturnType the annotations are on
      *                        the method itself and not on the ReturnType)
      * @param hasConstraintCascade - if it has Constraints that cascaded from above
-     * @param parameterIndex - the index of parameter (in case annotated element is a method parameter)
      * @param executableParameterValues - the values of method arguments (in case annotated element is a paramter)
      */
     private void validateElement(
@@ -1015,8 +916,8 @@ public class DefaultValidator implements
             Object rootBean, Class<Object> rootClass,
             AnnotationMetadataProvider annotatedElement, Object object,
             Class<Object> annotatedElementType, Object elementValue,
-            boolean hasValidCascade, boolean hasConstraintCascade,
-            @Nullable Integer parameterIndex, @Nullable Object[] executableParameterValues
+            @Nullable Path.Node elementNode, boolean hasValidCascade, boolean hasConstraintCascade,
+            @Nullable Object[] executableParameterValues
     ) {
         //noinspection unchecked
         final Class<Object> elementType = elementValue != null ?
@@ -1030,78 +931,62 @@ public class DefaultValidator implements
             return;
         }
 
-        Path.Node node;
-        if (annotatedElement instanceof Argument && parameterIndex != null) {
-            // noinspection unchecked
-            node = context.addParameterNode(((Argument<Object>) annotatedElement).getName(), parameterIndex);
-        } else if (annotatedElement instanceof ReturnType) {
-            // noinspection unchecked
-            node = context.addReturnValueNode(((ReturnType<Object>) annotatedElement).getSimpleName());
-        } else if (annotatedElement instanceof BeanProperty) {
-            // noinspection unchecked
-            node = context.addPropertyNode(((BeanProperty<Object, Object>) annotatedElement).getName());
-        } else {
-            throw new UnsupportedOperationException("Annotated element is not one of Argument, ReturnType & Property");
-        }
-
-        boolean cascadedToIterable = false;
         if (hasValid) {
             try {
-                cascadedToIterable = validateCascadeElement(context, overallViolations, rootBean,
+                validateCascadeElement(context, overallViolations, rootBean,
                         rootClass, annotatedElement, object, elementType,
-                        elementValue, executableParameterValues, node, false);
+                        elementValue, executableParameterValues, elementNode);
             } catch (Exception e) {
-                context.removeLast();
+                if (elementNode != null) {
+                    context.removeLast();
+                }
                 throw e;
             }
         }
 
-        if (hasConstraint && !(disableIterableGenericParameters && cascadedToIterable)) {
+        if (hasConstraint) {
             validateConstrainedElement(context, overallViolations, rootBean, rootClass, object,
                     annotatedElement, elementType, elementValue, executableParameterValues);
         }
 
-        context.removeLast();
+        if (elementNode != null) {
+            context.removeLast();
+        }
     }
 
     private void validateElement(
             DefaultConstraintValidatorContext context, Set overallViolations,
             Object rootBean, Class<Object> rootClass,
-            AnnotatedElement annotatedElement, Object object,
-            Class<Object> annotatedElementType, Object elementValue
+            AnnotationMetadataProvider annotatedElement, Object object,
+            Class<Object> annotatedElementType, Object elementValue, Path.Node elementNode
     ) {
         validateElement(context, overallViolations, rootBean, rootClass, annotatedElement, object,
-                annotatedElementType, elementValue, false, false, null, null);
+                annotatedElementType, elementValue, elementNode, false, false, null);
     }
 
     /**
      * Validates element when it has @Valid annotation.
      * Checks if it is an iterable and then validates its arguments.
      * Otherwise cascades validation to the element
-     * @param annotatedElement - the element to validate (can be method parameter, return type or property)
+     * @param annotatedElement - the element to validate
      * @param elementType - the type of the element (this type will be used for getting value extractor in case of
      *                    iterable and introspection in case of a cascade validation)
      * @param elementValue - the value
      * @param executableParameterValues - the method argument values (in case annotated element is a parameter)
      * @param node - the node of this annotated element in the path
-     * @param nestedIterableItem - whether validation was called is for an iterable item
-     *
-     * @return - whether element was an iterable
      */
-    private <T> boolean validateCascadeElement(
+    private void validateCascadeElement(
             DefaultConstraintValidatorContext context, Set overallViolations,
             Object rootBean, Class<Object> rootClass,
             AnnotationMetadataProvider annotatedElement, Object object,
             Class<Object> elementType, Object elementValue,
             @Nullable Object[] executableParameterValues,
-            Path.Node node, boolean nestedIterableItem
+            Path.Node node
     ) {
         boolean cascadedToIterable = false;
         // handle validation of iterables
-        if (!(disableIterableGenericParameters && nestedIterableItem)) {
-            cascadedToIterable = cascadeToIterable(context, overallViolations, rootBean,
-                    rootClass, object, annotatedElement, elementValue, elementType);
-        }
+        cascadedToIterable = cascadeToIterable(context, overallViolations, rootBean,
+                rootClass, object, annotatedElement, elementValue, elementType);
 
         // otherwise it needs cascading as a bean
         if (!cascadedToIterable && elementValue != null && !context.validatedObjects.contains(elementValue)) {
@@ -1109,15 +994,9 @@ public class DefaultValidator implements
 
             if (beanIntrospection == null) {
                 // Error if not introspected
-                // No error if has other constraints and disableIterableGenericParameters (because @Valid could
-                // have cascaded from the iterable
-                if (!(disableIterableGenericParameters && nestedIterableItem &&
-                        annotatedElement.getAnnotationMetadata().hasStereotype(Constraint.class))
-                ) {
-                    // noinspection unchecked
-                    overallViolations.add(createIntrospectionConstraintViolation(rootClass, object, context,
-                            elementType, elementValue, executableParameterValues));
-                }
+                // noinspection unchecked
+                overallViolations.add(createIntrospectionConstraintViolation(rootClass, object, context,
+                        elementType, elementValue, executableParameterValues));
             } else {
                 if (canCascade(rootClass, context, elementValue, node)) {
                     cascadeToObjectIntrospection(context, overallViolations, object,
@@ -1125,8 +1004,6 @@ public class DefaultValidator implements
                 }
             }
         }
-
-        return cascadedToIterable;
     }
 
     /**
@@ -1167,11 +1044,7 @@ public class DefaultValidator implements
 
         // Check if its values need validation
         final boolean keyValidation, valueValidation;
-        if (disableIterableGenericParameters) {
-            // Apply constraints defined on iterable when annotated with @Valid
-            keyValidation = false;
-            valueValidation = annotatedIterableAsArgument.getAnnotationMetadata().hasStereotype(Valid.class);
-        } else if (arguments.length == 1) {
+        if (arguments.length == 1) {
             // Iterable with one generic parameter
             keyValidation = false;
             valueValidation = doesRequireCascadeValidation(arguments[0].getAnnotationMetadata());
@@ -1190,35 +1063,32 @@ public class DefaultValidator implements
         }
 
         // extract and validate values
-        boolean argumentsPresent = arguments != null && arguments.length > 0;
-        Argument<?> valueArgument = argumentsPresent ? arguments[0] : null;
-        Class<?> valueType = argumentsPresent ? arguments[0].getType() : annotatedIterableAsArgument.getType();
-
+        Class<?> valueType = annotatedIterableAsArgument.getType();
         valueExtractor.extractValues(iterable, new ValueExtractor.ValueReceiver() {
             @Override
             public void value(String nodeName, Object object1) { }
 
             @Override
             public void iterableValue(String nodeName, Object iterableValue) {
-                cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object, annotatedIterable,
-                        iterableType, valueArgument, iterableValue, valueType, null, null);
+                cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object,
+                        iterableType, arguments[0], iterableValue, valueType, null, null);
             }
 
             @Override
             public void indexedValue(String nodeName, int i, Object iterableValue) {
-                cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object, annotatedIterable,
-                        iterableType, valueArgument, iterableValue, valueType, i, null);
+                cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object,
+                        iterableType, arguments[0], iterableValue, valueType, i, null);
             }
 
             @Override
             public void keyedValue(String nodeName, Object key, Object keyedValue) {
                 if (keyValidation) {
-                    cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object, annotatedIterable,
+                    cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object,
                             iterableType, arguments[0], key, arguments[0].getType(), null, key);
                 }
 
                 if (valueValidation) {
-                    cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object, annotatedIterable,
+                    cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object,
                             iterableType, arguments[1], keyedValue, arguments[1].getType(), null, key);
                 }
             }
@@ -1228,25 +1098,19 @@ public class DefaultValidator implements
     }
 
     /**
-     * Cascades to an element of iterable. Uses annotations either from valueArgument or
-     * annotatedIterable (if the {@link #disableIterableGenericParameters} is set.
+     * Cascades to an element of iterable.
      *
-     * @param annotatedIterable - the iterable
      * @param iterableType - the type of annotated iterable
      * @param valueArgument - the Argument representing iterable item
      */
     private <T> void cascadeToIterableValue(
             DefaultConstraintValidatorContext context, Set overallViolations,
             @Nullable T rootBean, @NonNull Class<T> rootClass, Object object,
-            AnnotationMetadataProvider annotatedIterable, Class<Object> iterableType, Argument<?> valueArgument,
+            Class<Object> iterableType, Argument<?> valueArgument,
             Object iterableValue, Class<?> iterableValueType,
             Integer index, Object key
     ) {
-        // Specifies where to take the annotations that will be checked
-        // In case flag set - takes from annotations from the iterable
-        AnnotationMetadataProvider appliedAnnotations = disableIterableGenericParameters ?
-                annotatedIterable : valueArgument;
-        AnnotationMetadata metadata = appliedAnnotations.getAnnotationMetadata();
+        AnnotationMetadata metadata = valueArgument.getAnnotationMetadata();
 
         boolean hasValid = metadata.hasStereotype(Valid.class);
         boolean hasConstraint = metadata.hasStereotype(Constraint.class);
@@ -1260,21 +1124,20 @@ public class DefaultValidator implements
         Class<Object> valueType = iterableValue != null ?
                 (Class<Object>) iterableValue.getClass() : (Class<Object>) iterableValueType;
 
-        boolean cascadedToIterable = false;
         if (hasValid) {
             try {
                 // noinspection unchecked
-                cascadedToIterable = validateCascadeElement(context, overallViolations, rootBean, (Class<Object>) rootClass,
-                        appliedAnnotations, object, valueType, iterableValue, null, node, true);
+                validateCascadeElement(context, overallViolations, rootBean, (Class<Object>) rootClass,
+                        valueArgument, object, valueType, iterableValue, null, node);
             } catch (Exception e) {
                 context.removeLast();
                 throw e;
             }
         }
 
-        if (hasConstraint && !(disableIterableGenericParameters && cascadedToIterable)) {
+        if (hasConstraint) {
             validateConstrainedElement(context, overallViolations, rootBean, rootClass, object,
-                    appliedAnnotations, valueType, iterableValue, null);
+                    valueArgument, valueType, iterableValue, null);
         }
 
         context.removeLast();
