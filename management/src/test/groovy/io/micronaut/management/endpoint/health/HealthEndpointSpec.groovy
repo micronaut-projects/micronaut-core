@@ -477,12 +477,6 @@ class HealthEndpointSpec extends Specification {
                 }
             }
         }
-
-        @Override
-        @Deprecated
-        boolean supportsSuperTypes() {
-            return false
-        }
     }
 
     @Singleton

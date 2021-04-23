@@ -17,7 +17,7 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jetbrains.annotations.NotNull;
+import io.micronaut.core.annotation.NonNull;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -118,7 +118,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         return Collections.unmodifiableList(elementPredicates);
     }
 
-    @NotNull
+    @NonNull
     @Override
     public ElementQuery<T> onlyDeclared() {
         return new DefaultElementQuery<>(
@@ -128,7 +128,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         );
     }
 
-    @NotNull
+    @NonNull
     @Override
     public ElementQuery<T> onlyConcrete() {
         return new DefaultElementQuery<>(
@@ -138,7 +138,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         );
     }
 
-    @NotNull
+    @NonNull
     @Override
     public ElementQuery<T> onlyAbstract() {
         return new DefaultElementQuery<>(
@@ -148,7 +148,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         );
     }
 
-    @NotNull
+    @NonNull
     @Override
     public ElementQuery<T> onlyAccessible() {
         return new DefaultElementQuery<>(
@@ -167,9 +167,9 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         );
     }
 
-    @NotNull
+    @NonNull
     @Override
-    public ElementQuery<T> named(@NotNull Predicate<String> predicate) {
+    public ElementQuery<T> named(@NonNull Predicate<String> predicate) {
         Objects.requireNonNull(predicate, "Predicate cannot be null");
         List<Predicate<String>> namePredicates;
         if (this.namePredicates != null) {
@@ -185,9 +185,9 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         );
     }
 
-    @NotNull
+    @NonNull
     @Override
-    public ElementQuery<T> annotated(@NotNull Predicate<AnnotationMetadata> predicate) {
+    public ElementQuery<T> annotated(@NonNull Predicate<AnnotationMetadata> predicate) {
         Objects.requireNonNull(predicate, "Predicate cannot be null");
         List<Predicate<AnnotationMetadata>> annotationPredicates;
         if (this.annotationPredicates != null) {
@@ -203,9 +203,9 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         );
     }
 
-    @NotNull
+    @NonNull
     @Override
-    public ElementQuery<T> modifiers(@NotNull Predicate<Set<ElementModifier>> predicate) {
+    public ElementQuery<T> modifiers(@NonNull Predicate<Set<ElementModifier>> predicate) {
         Objects.requireNonNull(predicate, "Predicate cannot be null");
         List<Predicate<Set<ElementModifier>>> modifierPredicates;
         if (this.modifiersPredicates != null) {
@@ -220,9 +220,9 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         );
     }
 
-    @NotNull
+    @NonNull
     @Override
-    public ElementQuery<T> filter(@NotNull Predicate<T> predicate) {
+    public ElementQuery<T> filter(@NonNull Predicate<T> predicate) {
         Objects.requireNonNull(predicate, "Predicate cannot be null");
         List<Predicate<T>> elementPredicates;
         if (this.elementPredicates != null) {
@@ -237,7 +237,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         );
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Result<T> result() {
         return this;

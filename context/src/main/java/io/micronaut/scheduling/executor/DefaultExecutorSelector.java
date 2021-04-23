@@ -30,7 +30,6 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 
 import javax.inject.Inject;
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -48,17 +47,6 @@ public class DefaultExecutorSelector implements ExecutorSelector {
     private static final String EXECUTE_ON = ExecuteOn.class.getName();
     private final BeanLocator beanLocator;
     private final Supplier<ExecutorService> ioExecutor;
-
-    /**
-     * Default constructor.
-     * @param beanLocator The bean locator
-     * @param ioExecutor The IO executor
-     */
-    @Deprecated
-    protected DefaultExecutorSelector(BeanLocator beanLocator, @javax.inject.Named(TaskExecutors.IO) Provider<ExecutorService> ioExecutor) {
-        this.beanLocator = beanLocator;
-        this.ioExecutor = SupplierUtil.memoized(ioExecutor::get);
-    }
 
     /**
      * Default constructor.

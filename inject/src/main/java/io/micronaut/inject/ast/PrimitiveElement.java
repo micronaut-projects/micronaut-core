@@ -21,14 +21,14 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 public final class PrimitiveElement implements ArrayableClassElement {
 
     public static final PrimitiveElement VOID = new PrimitiveElement("void");
-    private static final PrimitiveElement INT = new PrimitiveElement("int");
-    private static final PrimitiveElement CHAR = new PrimitiveElement("char");
-    private static final PrimitiveElement BOOLEAN = new PrimitiveElement("boolean");
-    private static final PrimitiveElement LONG = new PrimitiveElement("long");
-    private static final PrimitiveElement FLOAT = new PrimitiveElement("float");
-    private static final PrimitiveElement DOUBLE = new PrimitiveElement("double");
-    private static final PrimitiveElement SHORT = new PrimitiveElement("short");
-    private static final PrimitiveElement BYTE = new PrimitiveElement("byte");
+    public static final PrimitiveElement BOOLEAN = new PrimitiveElement("boolean");
+    public static final PrimitiveElement INT = new PrimitiveElement("int");
+    public static final PrimitiveElement CHAR = new PrimitiveElement("char");
+    public static final PrimitiveElement LONG = new PrimitiveElement("long");
+    public static final PrimitiveElement FLOAT = new PrimitiveElement("float");
+    public static final PrimitiveElement DOUBLE = new PrimitiveElement("double");
+    public static final PrimitiveElement SHORT = new PrimitiveElement("short");
+    public static final PrimitiveElement BYTE = new PrimitiveElement("byte");
     private static final PrimitiveElement[] PRIMITIVES = new PrimitiveElement[] {INT, CHAR, BOOLEAN, LONG, FLOAT, DOUBLE, SHORT, BYTE, VOID};
 
     private final String typeName;

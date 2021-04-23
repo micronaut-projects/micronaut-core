@@ -16,7 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Internal;
-import org.jetbrains.annotations.NotNull;
+import io.micronaut.core.annotation.NonNull;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Modifier;
@@ -114,7 +114,7 @@ class ReflectClassElement implements ClassElement {
         return new ReflectClassElement(type.getComponentType());
     }
 
-    @NotNull
+    @NonNull
     @Override
     public String getName() {
         return type.getName();
@@ -136,7 +136,7 @@ class ReflectClassElement implements ClassElement {
         return Modifier.isPublic(type.getModifiers());
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Object getNativeType() {
         return type;

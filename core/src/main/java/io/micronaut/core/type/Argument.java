@@ -16,6 +16,7 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.*;
+import io.micronaut.core.naming.Described;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -464,4 +465,5 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
         //noinspection unchecked
         return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
     }
+
 }

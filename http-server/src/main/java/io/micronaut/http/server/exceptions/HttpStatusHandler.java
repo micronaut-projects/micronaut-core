@@ -20,8 +20,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.HttpStatusException;
-import io.micronaut.http.hateoas.Link;
-import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 
@@ -41,11 +39,10 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
 
     private final ErrorResponseProcessor<?> responseProcessor;
 
-    @Deprecated
-    public HttpStatusHandler() {
-        this.responseProcessor = null;
-    }
-
+    /**
+     * Constructor.
+     * @param responseProcessor Error Response Processor
+     */
     @Inject
     public HttpStatusHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.responseProcessor = responseProcessor;
@@ -58,15 +55,10 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
         if (body.isPresent()) {
             return response.body(body.get());
         } else {
-            if (responseProcessor != null) {
-                return responseProcessor.processResponse(ErrorContext.builder(request)
-                        .cause(exception)
-                        .errorMessage(exception.getMessage())
-                        .build(), response);
-            } else {
-                return response.body(new JsonError(exception.getMessage())
-                        .link(Link.SELF, Link.of(request.getUri())));
-            }
+            return responseProcessor.processResponse(ErrorContext.builder(request)
+                    .cause(exception)
+                    .errorMessage(exception.getMessage())
+                    .build(), response);
         }
     }
 }

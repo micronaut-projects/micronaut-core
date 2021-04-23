@@ -12,7 +12,7 @@ To illustrate this, consider again the `PetOperations` interface declared earlie
 
 snippet::io.micronaut.docs.annotation.retry.PetFallback[tags="class", indent=0, title="Defining a Fallback"]
 
-TIP: If you only need fallbacks to help with testing against external Microservices, you can define fallbacks in the `src/test/java` directory so they are not included in production code.
+TIP: If you only need fallbacks to help with testing against external Microservices, you can define fallbacks in the `src/test/java` directory so they are not included in production code. You will have to specify `@Recoverable(api = PetOperations.class)` on the declarative client if you are using fallbacks without hystrix.
 
 As you can see the fallback does not perform any network operations and is quite simple, hence will provide a successful result in the case of an external system being down.
 

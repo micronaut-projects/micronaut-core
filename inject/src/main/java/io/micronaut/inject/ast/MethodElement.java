@@ -18,7 +18,6 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.ArrayUtils;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -125,13 +124,13 @@ public interface MethodElement extends MemberElement {
             @NonNull String name,
             ParameterElement...parameterElements) {
         return new MethodElement() {
-            @NotNull
+            @NonNull
             @Override
             public ClassElement getReturnType() {
                 return returnType;
             }
 
-            @NotNull
+            @NonNull
             @Override
             public ClassElement getGenericReturnType() {
                 return genericReturnType;
@@ -154,7 +153,7 @@ public interface MethodElement extends MemberElement {
                 );
             }
 
-            @NotNull
+            @NonNull
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
                 return annotationMetadata;
@@ -165,7 +164,7 @@ public interface MethodElement extends MemberElement {
                 return declaredType;
             }
 
-            @NotNull
+            @NonNull
             @Override
             public String getName() {
                 return name;
@@ -186,7 +185,7 @@ public interface MethodElement extends MemberElement {
                 return true;
             }
 
-            @NotNull
+            @NonNull
             @Override
             public Object getNativeType() {
                 throw new UnsupportedOperationException("No native method type present");

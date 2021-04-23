@@ -43,18 +43,6 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
     /**
      * Creates a NioEventLoopGroup.
      *
-     * @param threads The number of threads to use.
-     * @param ioRatio The io ratio.
-     * @return A NioEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
-        return withIoRatio(new NioEventLoopGroup(threads), ioRatio);
-    }
-
-    /**
-     * Creates a NioEventLoopGroup.
-     *
      * @param threads       The number of threads to use.
      * @param threadFactory The thread factory.
      * @param ioRatio       The io ratio.
@@ -76,17 +64,6 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
         return withIoRatio(new NioEventLoopGroup(threads, executor), ioRatio);
-    }
-
-    /**
-     * Creates a default NioEventLoopGroup.
-     *
-     * @param ioRatio The io ratio.
-     * @return A NioEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return withIoRatio(new NioEventLoopGroup(), ioRatio);
     }
 
     /**

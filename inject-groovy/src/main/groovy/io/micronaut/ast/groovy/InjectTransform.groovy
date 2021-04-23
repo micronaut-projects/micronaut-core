@@ -15,37 +15,23 @@
  */
 package io.micronaut.ast.groovy
 
-import io.micronaut.context.ProviderFactory
-import io.micronaut.core.annotation.Nullable
-import io.micronaut.ast.groovy.visitor.GroovyPackageElement
-import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
-import io.micronaut.context.ProviderUtils
-import io.micronaut.inject.ast.Element
-import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
-import io.micronaut.inject.writer.GeneratedFile
-import java.util.function.Predicate
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.config.GroovyConfigurationMetadataBuilder
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
-import io.micronaut.ast.groovy.utils.AstGenericUtils
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
+import io.micronaut.ast.groovy.visitor.GroovyPackageElement
+import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.annotation.Configuration
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.Nullable
+import io.micronaut.inject.ast.Element
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
-import io.micronaut.inject.writer.BeanConfigurationWriter
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
-import io.micronaut.inject.writer.BeanDefinitionVisitor
-import io.micronaut.inject.writer.ClassWriterOutputVisitor
-import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.AnnotatedNode
-import org.codehaus.groovy.ast.ClassNode
-import org.codehaus.groovy.ast.InnerClassNode
-import org.codehaus.groovy.ast.ModuleNode
-import org.codehaus.groovy.ast.PackageNode
+import io.micronaut.inject.writer.*
+import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -54,7 +40,7 @@ import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
 import java.lang.reflect.Modifier
-
+import java.util.function.Predicate
 /**
  * An AST transformation that produces metadata for use by the injection container
  *
@@ -137,17 +123,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             String beanTypeName = beanDefWriter.beanTypeName
             AnnotatedNode beanClassNode = entry.key
             try {
-                if (beanClassNode instanceof ClassNode) {
-                    ClassNode cn = (ClassNode) beanClassNode
-                    for (Class providerClass: ProviderFactory.getProviders()) {
-                        ClassNode providerType = AstGenericUtils.resolveInterfaceGenericType(cn, providerClass)
-                        if (providerType != null) {
-                            beanTypeName = providerType.name
-                            break
-                        }
-                    }
-                }
-
                 BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(
                         beanTypeName,
                         beanDefWriter

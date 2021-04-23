@@ -20,6 +20,7 @@ ioc:
   beanContext: The BeanContext
   types: Injectable Container Types
   qualifiers: Bean Qualifiers
+  typed: Limiting Injectable Types
   scopes:
     title: Scopes
     builtInScopes:
@@ -57,6 +58,7 @@ aop:
   aroundAdvice: Around Advice
   introductionAdvice: Introduction Advice
   adapterAdvice: Method Adapter Advice
+  lifecycleAdvice: Bean Life Cycle Advice
   validation:
     title: Validation Advice
   caching:

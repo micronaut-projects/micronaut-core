@@ -18,10 +18,7 @@ package io.micronaut.http.server.exceptions;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.hateoas.Link;
-import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.server.exceptions.response.Error;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
@@ -42,11 +39,10 @@ public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorE
 
     private final ErrorResponseProcessor<?> responseProcessor;
 
-    @Deprecated
-    public ConversionErrorHandler() {
-        this.responseProcessor = null;
-    }
-
+    /**
+     * Constructor.
+     * @param responseProcessor Error Response Processor
+     */
     @Inject
     public ConversionErrorHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.responseProcessor = responseProcessor;
@@ -54,26 +50,19 @@ public class ConversionErrorHandler implements ExceptionHandler<ConversionErrorE
 
     @Override
     public HttpResponse handle(HttpRequest request, ConversionErrorException exception) {
-        MutableHttpResponse<?> response = HttpResponse.badRequest();
-        if (responseProcessor != null) {
-            return responseProcessor.processResponse(ErrorContext.builder(request)
-                    .cause(exception)
-                    .error(new Error() {
-                        @Override
-                        public Optional<String> getPath() {
-                            return Optional.of('/' + exception.getArgument().getName());
-                        }
+        return responseProcessor.processResponse(ErrorContext.builder(request)
+                .cause(exception)
+                .error(new Error() {
+                    @Override
+                    public Optional<String> getPath() {
+                        return Optional.of('/' + exception.getArgument().getName());
+                    }
 
-                        @Override
-                        public String getMessage() {
-                            return exception.getMessage();
-                        }
-                    })
-                    .build(), response);
-        } else {
-            return response.body(new JsonError(exception.getMessage())
-                    .path('/' + exception.getArgument().getName())
-                    .link(Link.SELF, Link.of(request.getUri())));
-        }
+                    @Override
+                    public String getMessage() {
+                        return exception.getMessage();
+                    }
+                })
+                .build(), HttpResponse.badRequest());
     }
 }

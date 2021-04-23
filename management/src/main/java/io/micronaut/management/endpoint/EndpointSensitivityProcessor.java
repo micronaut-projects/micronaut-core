@@ -47,19 +47,6 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
      *
      * @param endpointConfigurations The endpoint configurations
      * @param defaultConfiguration   The default endpoint configuration
-     */
-    @Deprecated
-    public EndpointSensitivityProcessor(List<EndpointConfiguration> endpointConfigurations,
-                                        EndpointDefaultConfiguration defaultConfiguration) {
-        this(endpointConfigurations, defaultConfiguration, null);
-    }
-
-    /**
-     * Constructs with the existing and default endpoint configurations used to determine if a given endpoint is
-     * sensitive.
-     *
-     * @param endpointConfigurations The endpoint configurations
-     * @param defaultConfiguration   The default endpoint configuration
      * @param propertyResolver       The property resolver
      */
     @Inject

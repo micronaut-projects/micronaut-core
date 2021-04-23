@@ -46,19 +46,6 @@ import java.util.concurrent.ThreadFactory;
 @BootstrapContextCompatible
 public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
 
-
-    /**
-     * Creates a KQueueEventLoopGroup.
-     *
-     * @param threads The number of threads to use.
-     * @param ioRatio The io ratio.
-     * @return A KQueueEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
-        return withIoRatio(new KQueueEventLoopGroup(threads), ioRatio);
-    }
-
     /**
      * Creates a KQueueEventLoopGroup.
      *
@@ -83,17 +70,6 @@ public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
         return withIoRatio(new KQueueEventLoopGroup(threads, executor), ioRatio);
-    }
-
-    /**
-     * Creates a default KQueueEventLoopGroup.
-     *
-     * @param ioRatio The io ratio.
-     * @return A KQueueEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return withIoRatio(new KQueueEventLoopGroup(), ioRatio);
     }
 
     @Override

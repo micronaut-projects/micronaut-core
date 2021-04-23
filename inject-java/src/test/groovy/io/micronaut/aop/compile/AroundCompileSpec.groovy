@@ -163,11 +163,12 @@ class MyBean {
 
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
-@Around
+@InterceptorBinding
 @interface TestAnn {
 }
 
-@InterceptorBean(TestAnn.class)
+@Singleton
+@InterceptorBinding(TestAnn.class)
 class TestInterceptor implements Interceptor {
     boolean invoked = false;
     @Override

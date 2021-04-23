@@ -11,4 +11,12 @@ class CustomConstraintsValidatorFactory {
     ConstraintValidator<AlwaysInvalidConstraint, Object> alwaysInvalidConstraintValidator() {
         return (value, annotationMetadata, context) -> false;
     }
+
+    @Singleton
+    ConstraintValidator<CustomMessageConstraint, Object> customMessageConstraintValidator() {
+        return (value, annotationMetadata, context) -> {
+            context.messageTemplate("custom invalid");
+            return false;
+        };
+    }
 }

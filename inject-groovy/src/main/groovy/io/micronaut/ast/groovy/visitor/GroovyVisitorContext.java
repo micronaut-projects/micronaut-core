@@ -170,7 +170,7 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public void fail(String message, @Nullable Element element) {
         Message msg;
-        if (element != null) {
+        if (element instanceof AbstractGroovyElement) {
             msg = buildErrorMessage(message, element);
         } else {
             msg = new SimpleMessage(message, sourceUnit);
@@ -244,7 +244,7 @@ public class GroovyVisitorContext implements VisitorContext {
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                     classesDir
             );
-            return outputVisitor.visitMetaInfFile(path);
+            return outputVisitor.visitMetaInfFile(path, originatingElements);
         }
 
         return Optional.empty();

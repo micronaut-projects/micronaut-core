@@ -85,7 +85,7 @@ abstract class AbstractExecutable implements Executable {
     }
 
     @Override
-    public Argument[] getArguments() {
+    public Argument<?>[] getArguments() {
         return arguments;
     }
 

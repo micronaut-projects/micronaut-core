@@ -38,7 +38,6 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Provider;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -62,27 +61,9 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
      * @param beanLocator The bean locator
      * @param httpServerConfiguration The server configuration
      */
-    @Deprecated
-    public MultipartBodyArgumentBinder(BeanLocator beanLocator, Provider<HttpServerConfiguration> httpServerConfiguration) {
-        this.beanLocator = beanLocator;
-        this.httpServerConfiguration = httpServerConfiguration::get;
-    }
-
-    /**
-     * Default constructor.
-     *
-     * @param beanLocator The bean locator
-     * @param httpServerConfiguration The server configuration
-     */
     public MultipartBodyArgumentBinder(BeanLocator beanLocator, BeanProvider<HttpServerConfiguration> httpServerConfiguration) {
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;
-    }
-
-    @Override
-    @Deprecated
-    public boolean supportsSuperTypes() {
-        return false;
     }
 
     @Override

@@ -80,6 +80,7 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
             }
 
             @Override
+            @NonNull
             public Argument<T> asArgument() {
                 return returnType;
             }

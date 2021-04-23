@@ -25,7 +25,6 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.core.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -60,18 +59,6 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
         } else {
             this.additionalTypes = Collections.emptyList();
         }
-    }
-
-    /**
-     * @param objectMapper             To read/write JSON
-     * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
-     */
-    @Deprecated
-    public JsonStreamMediaTypeCodec(Provider<ObjectMapper> objectMapper,
-                                    ApplicationConfiguration applicationConfiguration,
-                                    @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        this((BeanProvider<ObjectMapper>) objectMapper::get, applicationConfiguration, codecConfiguration);
     }
 
     /**

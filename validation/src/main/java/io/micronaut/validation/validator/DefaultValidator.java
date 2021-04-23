@@ -789,7 +789,7 @@ public class DefaultValidator implements
                 AnnotationValue<? extends Annotation> annotationValue = beanAnnotationMetadata.getAnnotation(pojoConstraint);
 
                 final String propertyValue = "";
-                final String messageTemplate = buildMessageTemplate(annotationValue, beanAnnotationMetadata);
+                final String messageTemplate = buildMessageTemplate(context, annotationValue, beanAnnotationMetadata);
                 final Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, beanAnnotationMetadata);
                 overallViolations.add(new DefaultConstraintViolation(
                         object,
@@ -1233,14 +1233,13 @@ public class DefaultValidator implements
             for (AnnotationValue annotationValue : constraints) {
                 //noinspection unchecked
                 if (!validator.isValid(elementValue, annotationValue, context)) {
-                    final String messageTemplate = buildMessageTemplate(annotationValue, annotationMetadata);
+                    final String messageTemplate = buildMessageTemplate(context, annotationValue, annotationMetadata);
                     final Map<String, Object> variables = newConstraintVariables
                             (annotationValue, elementValue, annotationMetadata);
                     final String message = messageSource.interpolate
                             (messageTemplate, MessageSource.MessageContext.of(variables));
                     final ConstraintDescriptor<?> constraintDescriptor = new DefaultConstraintDescriptor
                             (annotationMetadata, constraintType, annotationValue);
-
                     //noinspection unchecked
                     overallViolations.add(
                         new DefaultConstraintViolation(rootBean, rootBeanClass, object, elementValue,
@@ -1276,12 +1275,12 @@ public class DefaultValidator implements
         return variables;
     }
 
-    private String buildMessageTemplate(AnnotationValue<?> annotationValue, AnnotationMetadata annotationMetadata) {
-        return annotationValue.stringValue("message")
-                .orElseGet(() ->
-                        annotationMetadata.getDefaultValue(annotationValue.getAnnotationName(), "message", String.class)
-                            .orElse("{" + annotationValue.getAnnotationName() + ".message}")
-                        );
+    private String buildMessageTemplate(final DefaultConstraintValidatorContext context, final AnnotationValue<?> annotationValue,
+                                        final AnnotationMetadata annotationMetadata) {
+        return context.getMessageTemplate()
+            .orElseGet(() -> annotationValue.stringValue("message")
+                .orElseGet(() -> annotationMetadata.getDefaultValue(annotationValue.getAnnotationName(), "message", String.class)
+                            .orElse("{" + annotationValue.getAnnotationName() + ".message}")));
     }
 
     private <T> void failOnError(@NonNull BeanResolutionContext resolutionContext,
@@ -1309,7 +1308,8 @@ public class DefaultValidator implements
         Object parameterValue,
         Object... parameters
     ) {
-        String messageTemplate = "{" + Introspected.class.getName() + ".message}";
+        final String messageTemplate = context.getMessageTemplate()
+            .orElseGet(() -> "{" + Introspected.class.getName() + ".message}");
         return new DefaultConstraintViolation<>(object, rootClass, object, parameterValue,
             messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(Collections.singletonMap("type", parameterType.getName()))),
             messageTemplate, new PathImpl(context.currentPath), null, parameters);
@@ -1322,6 +1322,7 @@ public class DefaultValidator implements
         final Set<Object> validatedObjects = new HashSet<>(20);
         final PathImpl currentPath;
         final List<Class> groups;
+        String messageTemplate = null;
 
         private <T> DefaultConstraintValidatorContext(T object, Class<?>... groups) {
             this(object, new PathImpl(), groups);
@@ -1368,22 +1369,19 @@ public class DefaultValidator implements
             return node;
         }
 
+        @Override
+        public void messageTemplate(@Nullable final String messageTemplate) {
+            this.messageTemplate = messageTemplate;
+        }
+
+        Optional<String> getMessageTemplate() {
+            return Optional.ofNullable(messageTemplate);
+        }
+
         Path.Node addReturnValueNode(String name) {
             final DefaultReturnValueNode returnValueNode = new DefaultReturnValueNode(name);
             currentPath.nodes.add(returnValueNode);
             return returnValueNode;
-        }
-
-        Path.Node addContainerNode(Path.Node node) {
-            if (node instanceof Path.PropertyNode) {
-                return this.addPropertyNode(node.getName());
-            } else if (node instanceof Path.ParameterNode) {
-                return this.addParameterNode(node.getName(), ((Path.ParameterNode) node).getParameterIndex());
-            } else if (node instanceof Path.ReturnValueNode) {
-                return this.addReturnValueNode(node.getName());
-            } else {
-                throw new UnsupportedOperationException("Node should be property, parameter or return value");
-            }
         }
 
         Path.Node addContainerElementNode(Argument<?> elementArgument,

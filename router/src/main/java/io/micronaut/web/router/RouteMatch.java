@@ -182,18 +182,6 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
     }
 
     /**
-     * Whether the specified content type is explicitly an accepted type.
-     *
-     * @param contentType The content type
-     * @return True if it is
-     * @deprecated Use {@link #explicitlyConsumes(MediaType)} instead
-     */
-    @Deprecated
-    default boolean explicitAccept(@Nullable MediaType contentType) {
-        return false;
-    }
-
-    /**
      * Is the given input satisfied.
      *
      * @param name The name of the input
@@ -202,17 +190,5 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
     default boolean isSatisfied(String name) {
         Object val = getVariableValues().get(name);
         return val != null && !(val instanceof UnresolvedArgument);
-    }
-
-    /**
-     * Whether the specified content type is an accepted type.
-     *
-     * @param contentType The content type
-     * @return True if it is
-     * @deprecated Use {@link #doesConsume(MediaType)} instead.
-     */
-    @Deprecated
-    default boolean accept(@Nullable MediaType contentType) {
-        return doesConsume(contentType);
     }
 }

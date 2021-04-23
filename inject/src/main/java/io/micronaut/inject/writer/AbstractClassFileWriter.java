@@ -29,7 +29,6 @@ import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.processing.JavaModelUtils;
-import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
@@ -119,14 +118,14 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         this.originatingElements = Objects.requireNonNull(originatingElements, "The originating elements cannot be null");
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Element[] getOriginatingElements() {
         return originatingElements.getOriginatingElements();
     }
 
     @Override
-    public void addOriginatingElement(@NotNull Element element) {
+    public void addOriginatingElement(@NonNull Element element) {
         originatingElements.addOriginatingElement(element);
     }
 
@@ -1003,6 +1002,21 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         for (Class<?> argumentType : argumentTypes) {
             builder.append(getTypeDescriptor(argumentType));
+        }
+
+        return builder.append(")V").toString();
+    }
+
+    /**
+     * @param argumentTypes The argument types
+     * @return The constructor descriptor
+     */
+    protected static String getConstructorDescriptor(Type[] argumentTypes) {
+        StringBuilder builder = new StringBuilder();
+        builder.append('(');
+
+        for (Type argumentType : argumentTypes) {
+            builder.append(argumentType.getDescriptor());
         }
 
         return builder.append(")V").toString();

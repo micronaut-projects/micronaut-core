@@ -54,6 +54,11 @@ public interface BoundExecutable<T, R> extends Executable<T, R> {
      */
     Object[] getBoundArguments();
 
+    @Override
+    default Class<T> getDeclaringType() {
+        return getTarget().getDeclaringType();
+    }
+
     /**
      * If the executable can only be partially bound then this method will return the arguments that have not been bound.
      *

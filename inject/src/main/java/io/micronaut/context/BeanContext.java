@@ -21,7 +21,6 @@ import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
-import org.jetbrains.annotations.NotNull;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -185,8 +184,9 @@ public interface BeanContext extends
      * Destroys the bean for the given type causing it to be re-created. If a singleton has been loaded it will be
      * destroyed and removed from the context, otherwise null will be returned.
      *
-     * @param beanType The bean type
-     * @param <T>      The concrete class
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param <T>       The concrete class
      * @return The destroy instance or null if no such bean exists
      * @since 3.0.0
      */
@@ -250,9 +250,9 @@ public interface BeanContext extends
         return registerSingleton(type, singleton, null, true);
     }
 
-    @NotNull
+    @NonNull
     @Override
-    default BeanContext registerSingleton(@NotNull Object singleton, boolean inject) {
+    default BeanContext registerSingleton(@NonNull Object singleton, boolean inject) {
         return (BeanContext) BeanDefinitionRegistry.super.registerSingleton(singleton, inject);
     }
 
