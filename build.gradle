@@ -519,6 +519,11 @@ ext {
                     group  : 'io.micronaut.reactor',
                     name   : 'micronaut-reactor'
             ],
+            'micronaut.problem': [
+                    version: micronautProblemJsonVersion,
+                    group  : 'io.micronaut.problem',
+                    modules: ['micronaut-problem-json']
+            ],
             reactor                    : [
                     version: reactorVersion,
                     group  : 'io.projectreactor',
