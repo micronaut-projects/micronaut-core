@@ -6,6 +6,7 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.netty.channel.EventLoopGroup
 import io.netty.util.NettyRuntime
+import io.netty.util.ResourceLeakDetector
 import spock.lang.Specification
 
 import java.time.Duration
@@ -22,12 +23,29 @@ class EventLoopGroupSpec extends Specification {
         then:
         !eventLoopGroup.isTerminated()
         eventLoopGroup.executorCount() == NettyRuntime.availableProcessors() * 2
+        ResourceLeakDetector.level == ResourceLeakDetector.Level.SIMPLE
 
         when:
         context.close()
 
         then:
         eventLoopGroup.isShuttingDown()
+    }
+
+    void "test configure resource leak detector"() {
+        given:
+        def context = ApplicationContext.run(
+                'netty.resource-leak-detector-level':'PARANOID'
+        )
+
+        when:
+        context.getBean(EventLoopGroup)
+
+        then:
+        ResourceLeakDetector.level == ResourceLeakDetector.Level.PARANOID
+
+        cleanup:
+        context.close()
     }
 
 

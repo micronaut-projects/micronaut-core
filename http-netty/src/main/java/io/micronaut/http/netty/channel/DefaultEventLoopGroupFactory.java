@@ -21,9 +21,11 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.util.ResourceLeakDetector;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -55,8 +57,25 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     public DefaultEventLoopGroupFactory(
             NioEventLoopGroupFactory nioEventLoopGroupFactory,
             @Nullable @Named(EventLoopGroupFactory.NATIVE) EventLoopGroupFactory nativeFactory) {
+        this(nioEventLoopGroupFactory, nativeFactory, null);
+    }
+
+    /**
+     * Default constructor.
+     * @param nioEventLoopGroupFactory The NIO factory
+     * @param nativeFactory The native factory if available
+     * @param nettyGlobalConfiguration The netty global configuration
+     */
+    @Inject
+    public DefaultEventLoopGroupFactory(
+            NioEventLoopGroupFactory nioEventLoopGroupFactory,
+            @Nullable @Named(EventLoopGroupFactory.NATIVE) EventLoopGroupFactory nativeFactory,
+            @Nullable NettyGlobalConfiguration nettyGlobalConfiguration) {
         this.defaultFactory = nioEventLoopGroupFactory;
         this.nativeFactory = nativeFactory != null ? nativeFactory : defaultFactory;
+        if (nettyGlobalConfiguration != null && nettyGlobalConfiguration.getResourceLeakDetectorLevel() != null) {
+            ResourceLeakDetector.setLevel(nettyGlobalConfiguration.getResourceLeakDetectorLevel());
+        }
     }
 
     /**
