@@ -46,7 +46,12 @@ final class RuntimeTypeInformation {
      * @return True if does
      */
     static boolean isSpecifiedSingle(AnnotationMetadataProvider annotationMetadata) {
-        return TYPE_INFORMATION_PROVIDERS.stream().anyMatch(provider -> provider.isSpecifiedSingle(annotationMetadata));
+        for (TypeInformationProvider provider : TYPE_INFORMATION_PROVIDERS) {
+            if (provider.isSpecifiedSingle(annotationMetadata)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -55,7 +60,12 @@ final class RuntimeTypeInformation {
      * @return True if it is single
      */
     static boolean isSingle(Class<?> type) {
-        return TYPE_INFORMATION_PROVIDERS.stream().anyMatch(provider -> provider.isSingle(type));
+        for (TypeInformationProvider provider : TYPE_INFORMATION_PROVIDERS) {
+            if (provider.isSingle(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -64,7 +74,12 @@ final class RuntimeTypeInformation {
      * @return True if it is reactive
      */
     static boolean isReactive(Class<?> type) {
-        return TYPE_INFORMATION_PROVIDERS.stream().anyMatch(provider -> provider.isReactive(type));
+        for (TypeInformationProvider provider : TYPE_INFORMATION_PROVIDERS) {
+            if (provider.isReactive(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -73,7 +88,12 @@ final class RuntimeTypeInformation {
      * @return True if it is completable
      */
     static boolean isCompletable(Class<?> type) {
-        return TYPE_INFORMATION_PROVIDERS.stream().anyMatch(provider -> provider.isCompletable(type));
+        for (TypeInformationProvider provider : TYPE_INFORMATION_PROVIDERS) {
+            if (provider.isCompletable(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -84,6 +104,11 @@ final class RuntimeTypeInformation {
      * @see TypeInformation#isWrapperType()
      */
     static <T> boolean isWrapperType(Class<T> type) {
-        return TYPE_INFORMATION_PROVIDERS.stream().anyMatch(provider -> provider.isWrapperType(type));
+        for (TypeInformationProvider provider : TYPE_INFORMATION_PROVIDERS) {
+            if (provider.isWrapperType(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
