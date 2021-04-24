@@ -293,6 +293,123 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty('random.shortuuid', String).get().length() == 10
     }
 
+    void "test random integer placeholders in range for properties"() {
+        given:
+        def values = [
+                'random.integer_lower'  : '${random.integer(10)}',
+                'random.integer_lower-negative'  : '${random.integer(-10)}',
+                'random.integer_lower_upper'  : '${random.integer[5,10]}',
+                'random.integer_lower-negative_upper'  : '${random.integer[-5,10]}',
+                'random.integer_lower-negative_upper-negative'  : '${random.integer[-10,-5]}',
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperty('random.integer_lower', String).isPresent()
+        resolver.getProperty('random.integer_lower', Integer).get() >= 0
+        resolver.getProperty('random.integer_lower', Integer).get() < 10
+
+        and:
+        resolver.getProperty('random.integer_lower-negative', String).isPresent()
+        resolver.getProperty('random.integer_lower-negative', Integer).get() <= 0
+        resolver.getProperty('random.integer_lower-negative', Integer).get() > -10
+
+        and:
+        resolver.getProperty('random.integer_lower_upper', String).isPresent()
+        resolver.getProperty('random.integer_lower_upper', Integer).get() < 10
+        resolver.getProperty('random.integer_lower_upper', Integer).get() >= 5
+
+        and:
+        resolver.getProperty('random.integer_lower-negative_upper', String).isPresent()
+        resolver.getProperty('random.integer_lower-negative_upper', Integer).get() < 10
+        resolver.getProperty('random.integer_lower-negative_upper', Integer).get() >= -5
+
+        and:
+        resolver.getProperty('random.integer_lower-negative_upper-negative', String).isPresent()
+        resolver.getProperty('random.integer_lower-negative_upper-negative', Integer).get() < -5
+        resolver.getProperty('random.integer_lower-negative_upper-negative', Integer).get() >= -10
+    }
+
+    void "test random long placeholders in range for properties"() {
+        given:
+        def values = [
+                'random.long_lower'  : '${random.long(10)}',
+                'random.long_lower-negative'  : '${random.long(-10)}',
+                'random.long_lower_upper'  : '${random.long[5,10]}',
+                'random.long_lower-negative_upper'  : '${random.long[-5,10]}',
+                'random.long_lower-negative_upper-negative'  : '${random.long[-10,-5]}',
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperty('random.long_lower', String).isPresent()
+        resolver.getProperty('random.long_lower', Long).get() >= 0
+        resolver.getProperty('random.long_lower', Long).get() < 10
+
+        and:
+        resolver.getProperty('random.long_lower-negative', String).isPresent()
+        resolver.getProperty('random.long_lower-negative', Long).get() <= 0
+        resolver.getProperty('random.long_lower-negative', Long).get() > -10
+
+        and:
+        resolver.getProperty('random.long_lower_upper', String).isPresent()
+        resolver.getProperty('random.long_lower_upper', Long).get() < 10
+        resolver.getProperty('random.long_lower_upper', Long).get() >= 5
+
+        and:
+        resolver.getProperty('random.long_lower-negative_upper', String).isPresent()
+        resolver.getProperty('random.long_lower-negative_upper', Long).get() < 10
+        resolver.getProperty('random.long_lower-negative_upper', Long).get() >= -5
+
+        and:
+        resolver.getProperty('random.long_lower-negative_upper-negative', String).isPresent()
+        resolver.getProperty('random.long_lower-negative_upper-negative', Long).get() < -5
+        resolver.getProperty('random.long_lower-negative_upper-negative', Long).get() >= -10
+    }
+
+    void "test random float placeholders in range for properties"() {
+        given:
+        def values = [
+                'random.float_lower'  : '${random.float(10.5)}',
+                'random.float_lower-negative'  : '${random.float(-10.5)}',
+                'random.float_lower_upper'  : '${random.float[5.5,10.5]}',
+                'random.float_lower-negative_upper'  : '${random.float[-5.5,10.5]}',
+                'random.float_lower-negative_upper-negative'  : '${random.float[-10.5,-5.5]}',
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperty('random.float_lower', String).isPresent()
+        resolver.getProperty('random.float_lower', Float).get() >= 0.5
+        resolver.getProperty('random.float_lower', Float).get() < 10.5
+
+        and:
+        resolver.getProperty('random.float_lower-negative', String).isPresent()
+        resolver.getProperty('random.float_lower-negative', Float).get() <= 0.5
+        resolver.getProperty('random.float_lower-negative', Float).get() > -10.5
+
+        and:
+        resolver.getProperty('random.float_lower_upper', String).isPresent()
+        resolver.getProperty('random.float_lower_upper', Float).get() < 10.5
+        resolver.getProperty('random.float_lower_upper', Float).get() >= 5.5
+
+        and:
+        resolver.getProperty('random.float_lower-negative_upper', String).isPresent()
+        resolver.getProperty('random.float_lower-negative_upper', Float).get() < 10.5
+        resolver.getProperty('random.float_lower-negative_upper', Float).get() >= -5.5
+
+        and:
+        resolver.getProperty('random.float_lower-negative_upper-negative', String).isPresent()
+        resolver.getProperty('random.float_lower-negative_upper-negative', Float).get() < -5.5
+        resolver.getProperty('random.float_lower-negative_upper-negative', Float).get() >= -10.5
+    }
+
     void "test invalid random placeholders for properties"() {
         when:
         def values = [
