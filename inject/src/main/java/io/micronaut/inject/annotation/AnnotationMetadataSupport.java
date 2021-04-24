@@ -94,7 +94,7 @@ public final class AnnotationMetadataSupport {
      */
     @UsedByGeneratedCode
     public static Map<String, Object> getDefaultValues(String annotation) {
-        return ANNOTATION_DEFAULTS.computeIfAbsent(annotation, s -> Collections.emptyMap());
+        return ANNOTATION_DEFAULTS.getOrDefault(annotation, Collections.emptyMap());
     }
 
     /**

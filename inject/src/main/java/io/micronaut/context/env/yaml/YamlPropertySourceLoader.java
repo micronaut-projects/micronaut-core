@@ -20,9 +20,13 @@ import io.micronaut.core.util.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.nodes.MappingNode;
+import org.yaml.snakeyaml.nodes.SequenceNode;
 
 import java.io.InputStream;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -35,6 +39,18 @@ import java.util.Set;
 public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
 
     private static final Logger LOG = LoggerFactory.getLogger(YamlPropertySourceLoader.class);
+
+    private static final SafeConstructor YAML_CONSTRUCTOR = new SafeConstructor() {
+        @Override
+        protected Map<Object, Object> newMap(MappingNode node) {
+            return createDefaultMap(node.getValue().size());
+        }
+
+        @Override
+        protected List<Object> newList(SequenceNode node) {
+            return createDefaultList(node.getValue().size());
+        }
+    };
 
     @Override
     public boolean isEnabled() {
@@ -53,7 +69,7 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
             System.setProperty("java.runtime.name", "Unknown");
         }
 
-        Yaml yaml = new Yaml();
+        Yaml yaml = new Yaml(YAML_CONSTRUCTOR);
         Iterable<Object> objects = yaml.loadAll(input);
         Iterator<Object> i = objects.iterator();
         if (i.hasNext()) {

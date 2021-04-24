@@ -18,6 +18,7 @@ package io.micronaut.core.util;
 import io.micronaut.core.annotation.Nullable;
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.function.IntFunction;
 
 /**
  * Utility methods for working with arrays.
@@ -156,6 +157,18 @@ public class ArrayUtils {
         } else {
             return Collections.emptyIterator();
         }
+    }
+
+    /**
+     * Returns an array containing all of the elements in this collection, using the provided generator function to allocate the returned array.
+     *
+     * @param collection The collection
+     * @param <T> The create array function
+     * @return The array
+     */
+    public static <T> T[] toArray(Collection<T> collection, IntFunction<T[]> createArrayFn) {
+        T[] array = createArrayFn.apply(collection.size());
+        return collection.toArray(array);
     }
 
     /**

@@ -38,6 +38,7 @@ import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.*;
 import java.io.*;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;

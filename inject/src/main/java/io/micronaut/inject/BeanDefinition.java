@@ -211,7 +211,15 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         } else {
             final List<Argument<?>> typeArguments = getTypeArguments(type);
-            return typeArguments.stream().map(Argument::getType).toArray(Class[]::new);
+            if (typeArguments.size() == 0) {
+                return ReflectionUtils.EMPTY_CLASS_ARRAY;
+            }
+            Class[] params = new Class[typeArguments.size()];
+            int i = 0;
+            for (Argument<?> argument : typeArguments) {
+                params[i++] = argument.getType();
+            }
+            return params;
         }
     }
 
