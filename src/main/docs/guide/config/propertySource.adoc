@@ -172,7 +172,7 @@ instance:
   count: ${random.int(5)}
 ----
 
-NOTE: The range could very from negative to positive as well.
+NOTE: The range could vary from negative to positive as well.
 
 === Fail Fast Property Injection
 
