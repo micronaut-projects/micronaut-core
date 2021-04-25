@@ -374,7 +374,7 @@ public class MediaType implements CharSequence {
      *
      * @param name The name of the media type. For example application/json
      */
-    private MediaType(String name) {
+    public MediaType(String name) {
         this(name, null, Collections.emptyMap());
     }
 
