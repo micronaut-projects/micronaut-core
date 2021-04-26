@@ -903,7 +903,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             int upperBound = Integer.parseInt(tokens[1]);
             return lowerBound + (int) (Math.random() * (upperBound - lowerBound));
         } catch (NumberFormatException ex) {
-            throw new ValueException("Invalid range: `" + range + "` found for type Integer while parsing property: " + property);
+            throw new ValueException("Invalid range: `" + range + "` found for type Integer while parsing property: " + property, ex);
         }
     }
 

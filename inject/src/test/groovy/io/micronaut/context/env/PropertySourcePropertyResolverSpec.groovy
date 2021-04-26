@@ -423,7 +423,8 @@ class PropertySourcePropertyResolverSpec extends Specification {
         then:
         def ex= thrown(ValueException)
         ex.message == 'Invalid range: `9999999999` found for type Integer while parsing property: random.integer'
-        ex.cause == null
+        ex.cause != null
+        ex.cause instanceof NumberFormatException
     }
 
     void "test invalid random Long range"() {
