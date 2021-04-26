@@ -55,7 +55,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private static final Pattern DOT_PATTERN = Pattern.compile("\\.");
     private static final String RANDOM_PREFIX = "\\s?random\\.(\\S+?)";
     private static final String RANDOM_UPPER_LIMIT = "(\\(-?\\d+(\\.\\d+)?\\))";
-    private static final String RANDOM_RANGE = "(\\[-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?])";
+    private static final String RANDOM_RANGE = "(\\[-?\\d+(\\.\\d+)?,\\s?-?\\d+(\\.\\d+)?])";
     private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{" + RANDOM_PREFIX + "(" + RANDOM_UPPER_LIMIT + "|" + RANDOM_RANGE + ")?}");
     private static final char[] DOT_DASH = new char[] {'.', '-'};
     private static final Object NO_VALUE = new Object();
@@ -672,13 +672,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         break;
                     case "int":
                     case "integer":
-                        randomValue = String.valueOf(range == null ? random.nextInt() : getNextIntegerInRange(range));
+                        randomValue = String.valueOf(range == null ? random.nextInt() : getNextIntegerInRange(range, property));
                         break;
                     case "long":
-                        randomValue = String.valueOf(range == null ? random.nextLong() : getNextLongInRange(range));
+                        randomValue = String.valueOf(range == null ? random.nextLong() : getNextLongInRange(range, property));
                         break;
                     case "float":
-                        randomValue = String.valueOf(range == null ? random.nextFloat() : getNextFloatInRange(range));
+                        randomValue = String.valueOf(range == null ? random.nextFloat() : getNextFloatInRange(range, property));
                         break;
                     case "shortuuid":
                         randomValue = UUID.randomUUID().toString().substring(25, 35);
@@ -892,34 +892,49 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         }
     }
 
-    private int getNextIntegerInRange(String range) {
-        String[] tokens = range.split(",");
-        int lowerBound = Integer.parseInt(tokens[0]);
-        if (tokens.length == 1) {
-            return lowerBound >= 0 ? 1 : -1  * (random.nextInt(Math.abs(lowerBound)));
+    private int getNextIntegerInRange(String range, String property) {
+        try {
+            String[] tokens = range.split(",");
+            int lowerBound = Integer.parseInt(tokens[0]);
+            if (tokens.length == 1) {
+                return lowerBound >= 0 ? 1 : -1  * (random.nextInt(Math.abs(lowerBound)));
+            }
+            int upperBound = Integer.parseInt(tokens[1]);
+            return lowerBound + (int) (Math.random() * (upperBound - lowerBound));
+        } catch (NumberFormatException ex) {
+            LOG.error("Invalid range: \"" + range + "\" found for type Integer while parsing property: ", property);
+            throw ex;
         }
-        int upperBound = Integer.parseInt(tokens[1]);
-        return lowerBound + (int) (Math.random() * (upperBound - lowerBound));
     }
 
-    private long getNextLongInRange(String range) {
-        String[] tokens = range.split(",");
-        long lowerBound = Long.parseLong(tokens[0]);
-        if (tokens.length == 1) {
-            return (long) (Math.random() * (lowerBound));
+    private long getNextLongInRange(String range, String property) {
+        try {
+            String[] tokens = range.split(",");
+            long lowerBound = Long.parseLong(tokens[0]);
+            if (tokens.length == 1) {
+                return (long) (Math.random() * (lowerBound));
+            }
+            long upperBound = Long.parseLong(tokens[1]);
+            return lowerBound + (long) (Math.random() * (upperBound - lowerBound));
+        } catch (NumberFormatException ex) {
+            LOG.error("Invalid range: \"" + range + "\" found for type Long while parsing property: ", property);
+            throw ex;
         }
-        long upperBound = Long.parseLong(tokens[1]);
-        return lowerBound + (long) (Math.random() * (upperBound - lowerBound));
     }
 
-    private float getNextFloatInRange(String range) {
-        String[] tokens = range.split(",");
-        float lowerBound = Float.parseFloat(tokens[0]);
-        if (tokens.length == 1) {
-            return (float) (Math.random() * (lowerBound));
+    private float getNextFloatInRange(String range, String property) {
+        try {
+            String[] tokens = range.split(",");
+            float lowerBound = Float.parseFloat(tokens[0]);
+            if (tokens.length == 1) {
+                return (float) (Math.random() * (lowerBound));
+            }
+            float upperBound = Float.parseFloat(tokens[1]);
+            return lowerBound + (float) (Math.random() * (upperBound - lowerBound));
+        } catch (NumberFormatException ex) {
+            LOG.error("Invalid range: \"" + range + "\" found for type Float while parsing property: ", property);
+            throw ex;
         }
-        float upperBound = Float.parseFloat(tokens[1]);
-        return lowerBound + (float) (Math.random() * (upperBound - lowerBound));
     }
 
     /**

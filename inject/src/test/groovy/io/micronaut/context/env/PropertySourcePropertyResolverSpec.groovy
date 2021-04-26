@@ -410,6 +410,32 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty('random.float_lower-negative_upper-negative', Float).get() >= -10.5
     }
 
+    void "test invalid random Integer range"() {
+        when:
+        def values = [
+            'random.integer' : '${random.integer(9999999999)}'
+        ]
+        new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        then:
+        thrown(NumberFormatException)
+    }
+
+    void "test invalid random Long range"() {
+        when:
+        def values = [
+                'random.integer' : '${random.integer(9999999999999999999)}'
+        ]
+        new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        then:
+        thrown(NumberFormatException)
+    }
+
     void "test invalid random placeholders for properties"() {
         when:
         def values = [
