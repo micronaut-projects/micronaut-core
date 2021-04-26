@@ -30,6 +30,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
+import io.micronaut.core.value.ValueException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
@@ -902,8 +903,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             int upperBound = Integer.parseInt(tokens[1]);
             return lowerBound + (int) (Math.random() * (upperBound - lowerBound));
         } catch (NumberFormatException ex) {
-            LOG.error("Invalid range: \"" + range + "\" found for type Integer while parsing property: ", property);
-            throw ex;
+            throw new ValueException("Invalid range: `" + range + "` found for type Integer while parsing property: " + property);
         }
     }
 
@@ -917,8 +917,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             long upperBound = Long.parseLong(tokens[1]);
             return lowerBound + (long) (Math.random() * (upperBound - lowerBound));
         } catch (NumberFormatException ex) {
-            LOG.error("Invalid range: \"" + range + "\" found for type Long while parsing property: ", property);
-            throw ex;
+            throw new ValueException("Invalid range: `" + range + "` found for type Long while parsing property: " + property, ex);
         }
     }
 
@@ -932,8 +931,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             float upperBound = Float.parseFloat(tokens[1]);
             return lowerBound + (float) (Math.random() * (upperBound - lowerBound));
         } catch (NumberFormatException ex) {
-            LOG.error("Invalid range: \"" + range + "\" found for type Float while parsing property: ", property);
-            throw ex;
+            throw new ValueException("Invalid range: `" + range + "` found for type Float while parsing property: " + property, ex);
         }
     }
 

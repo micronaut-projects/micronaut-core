@@ -23,6 +23,7 @@ import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
 import io.micronaut.core.value.MapPropertyResolver
 import io.micronaut.core.value.PropertyResolver
+import io.micronaut.core.value.ValueException
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -420,20 +421,25 @@ class PropertySourcePropertyResolverSpec extends Specification {
         )
 
         then:
-        thrown(NumberFormatException)
+        def ex= thrown(ValueException)
+        ex.message == 'Invalid range: `9999999999` found for type Integer while parsing property: random.integer'
+        ex.cause == null
     }
 
     void "test invalid random Long range"() {
         when:
         def values = [
-                'random.integer' : '${random.integer(9999999999999999999)}'
+                'random.long' : '${random.long(9999999999999999999)}'
         ]
         new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
         )
 
         then:
-        thrown(NumberFormatException)
+        def ex= thrown(ValueException)
+        ex.message == 'Invalid range: `9999999999999999999` found for type Long while parsing property: random.long'
+        ex.cause != null
+        ex.cause instanceof NumberFormatException
     }
 
     void "test invalid random placeholders for properties"() {
