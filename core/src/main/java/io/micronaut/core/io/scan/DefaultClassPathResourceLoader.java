@@ -21,6 +21,7 @@ import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -74,10 +75,57 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      */
     @Override
     public Optional<InputStream> getResourceAsStream(String path) {
-        if (!isDirectory(path)) {
-            return Optional.ofNullable(classLoader.getResourceAsStream(prefixPath(path)));
+        URL url = classLoader.getResource(prefixPath(path));
+        if (url != null) {
+            try {
+                URI uri = url.toURI();
+                if (uri.getScheme().equals("jar")) {
+                    synchronized (DefaultClassPathResourceLoader.class) {
+                        FileSystem fileSystem = null;
+                        try {
+                            try {
+                                fileSystem = FileSystems.getFileSystem(uri);
+                            } catch (FileSystemNotFoundException e) {
+                                //no-op
+                            }
+                            if (fileSystem == null || !fileSystem.isOpen()) {
+                                fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
+                            }
+                            Path pathObject = fileSystem.getPath(path);
+                            if (Files.isDirectory(pathObject)) {
+                                return Optional.empty();
+                            }
+                            return Optional.of(new ByteArrayInputStream(Files.readAllBytes(pathObject)));
+                        } finally {
+                            if (fileSystem != null && fileSystem.isOpen()) {
+                                try {
+                                    fileSystem.close();
+                                } catch (IOException e) {
+                                    if (LOG.isDebugEnabled()) {
+                                        LOG.debug("Error shutting down JAR file system [" + fileSystem + "]: " + e.getMessage(), e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (uri.getScheme().equals("file")) {
+                    Path pathObject = Paths.get(uri);
+                    if (Files.isDirectory(pathObject)) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(Files.newInputStream(pathObject));
+                }
+            } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
+                }
+            }
         }
-        return Optional.empty();
+        // fallback to less sophisticated approach
+        if (path.indexOf('.') == -1) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(classLoader.getResourceAsStream(prefixPath(path)));
     }
 
     /**
@@ -160,9 +208,8 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                 try {
                     URI uri = url.toURI();
                     Path pathObject;
-                    synchronized (DefaultClassPathResourceLoader.class) {
-
-                        if (uri.getScheme().equals("jar")) {
+                    if (uri.getScheme().equals("jar")) {
+                        synchronized (DefaultClassPathResourceLoader.class) {
                             FileSystem fileSystem = null;
                             try {
                                 try {
@@ -187,11 +234,10 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                                     }
                                 }
                             }
-                        } else if (uri.getScheme().equals("file")) {
-                            pathObject = Paths.get(uri);
-                            return pathObject == null || Files.isDirectory(pathObject);
                         }
-
+                    } else if (uri.getScheme().equals("file")) {
+                        pathObject = Paths.get(uri);
+                        return pathObject == null || Files.isDirectory(pathObject);
                     }
                 } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
                     if (LOG.isDebugEnabled()) {
