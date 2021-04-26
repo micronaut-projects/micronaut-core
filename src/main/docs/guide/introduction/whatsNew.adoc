@@ -10,6 +10,10 @@ It is now possible to define a body argument of a controller method with an Inpu
 
 If Dual Protocol is enabled, now it is possible to redirect all HTTP requests automatically to the HTTPS port. See more information <<dualProtocol, about how to enable and configure it>>.
 
+==== GraalVM 21.1.0 Support
+
+Micronaut has been updated to support the latest GraalVM 21.1.0 release with the Gradle and Maven plugins now defaulting to 21.1.0.
+
 ==== Support for JDK 16 and Gradle 7.0 in Micronaut Launch
 
 https://micronaut.io/launch/[Micronaut Launch] has been updated with support for JDK 16 and Gradle 7.0.
