@@ -15,6 +15,8 @@
  */
 package io.micronaut.inject.annotation.internal;
 
+import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
@@ -40,9 +42,10 @@ public class TimedAnnotationMapper implements NamedAnnotationMapper {
     @Override
     public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         return Collections.singletonList(
-                AnnotationValue.builder(
-                        "io.micronaut.configuration.metrics.micrometer.annotation.MircometerTimed"
-                ).build()
+                AnnotationValue.builder("io.micronaut.aop.InterceptorBinding")
+                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(getName()))
+                        .member("kind", "AROUND")
+                        .build()
         );
     }
 }

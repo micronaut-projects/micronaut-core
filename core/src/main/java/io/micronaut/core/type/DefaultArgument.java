@@ -146,7 +146,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     @Override
     public Optional<Argument<?>> getFirstTypeVariable() {
         if (!typeParameters.isEmpty()) {
-            return typeParameters.values().stream().findFirst();
+            return Optional.of(typeParameters.values().iterator().next());
         }
         return Optional.empty();
     }

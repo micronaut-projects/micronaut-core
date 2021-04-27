@@ -37,6 +37,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
 
 import javax.inject.Singleton;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -179,18 +180,18 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
             CharSequence key = entry.getKey();
             Object value = entry.getValue();
             String property = key.toString();
-            String[] tokens = property.split("\\.");
             JsonNode current = rootNode;
             String index = null;
-            for (int i = 0; i < tokens.length; i++) {
-                String token = tokens[i];
+            Iterator<String> tokenIterator = StringUtils.splitOmitEmptyStringsIterator(property, '.');
+            while (tokenIterator.hasNext()) {
+                String token = tokenIterator.next();
                 int j = token.indexOf('[');
                 if (j > -1 && token.endsWith("]")) {
                     index = token.substring(j + 1, token.length() - 1);
                     token = token.substring(0, j);
                 }
 
-                if (i == tokens.length - 1) {
+                if (!tokenIterator.hasNext()) {
                     if (current instanceof ObjectNode) {
                         ObjectNode objectNode = (ObjectNode) current;
                         if (index != null) {

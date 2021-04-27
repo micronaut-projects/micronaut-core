@@ -38,6 +38,11 @@ import java.util.stream.Collectors;
 public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
 
     /**
+     * The default GMT zone for date values.
+     */
+    ZoneId GMT = ZoneId.of("GMT");
+
+    /**
      * Add a header for the given name and value.
      *
      * @param header The header name
@@ -246,7 +251,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
      */
     default MutableHttpHeaders add(CharSequence header, ZonedDateTime value) {
         if (header != null && value != null) {
-            add(header, value.withZoneSameInstant(ZoneId.of("GMT")).format(DateTimeFormatter.RFC_1123_DATE_TIME));
+            add(header, value.withZoneSameInstant(GMT).format(DateTimeFormatter.RFC_1123_DATE_TIME));
         }
         return this;
     }

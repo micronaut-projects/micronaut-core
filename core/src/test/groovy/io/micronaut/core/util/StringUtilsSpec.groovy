@@ -103,4 +103,22 @@ class StringUtilsSpec extends Specification {
         'abc'    | 'd' | 'abc'
         '   abc' | ' ' | 'abc'
     }
+
+    @Unroll
+    void "test split string omit empty #string = #expected"() {
+        expect:
+        StringUtils.splitOmitEmptyStrings(string, ',' as char).toList() == expected
+        StringUtils.splitOmitEmptyStringsList(string, ',' as char) == expected
+
+        where:
+        string     | expected
+        ""         | []
+        ","        | []
+        "a"        | ["a"]
+        "a   "     | ["a   "]
+        ",,,"      | []
+        ",,a,,,"   | ['a']
+        ",a,b,,,c" | ['a', 'b', 'c']
+        "a,b,c"    | ['a', 'b', 'c']
+    }
 }

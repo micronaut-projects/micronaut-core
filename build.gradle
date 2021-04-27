@@ -5,7 +5,7 @@ buildscript {
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:6.1.0'
-        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:3.0.3"
+        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:3.0.4"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
@@ -518,6 +518,11 @@ ext {
                     version: micronautReactorVersion,
                     group  : 'io.micronaut.reactor',
                     name   : 'micronaut-reactor'
+            ],
+            'micronaut.problem': [
+                    version: micronautProblemJsonVersion,
+                    group  : 'io.micronaut.problem',
+                    modules: ['micronaut-problem-json']
             ],
             reactor                    : [
                     version: reactorVersion,

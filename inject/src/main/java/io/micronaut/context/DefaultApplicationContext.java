@@ -60,10 +60,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames The environment names
      */
     public DefaultApplicationContext(@NonNull String... environmentNames) {
-        this(() -> {
-            ArgumentUtils.requireNonNull("environmentNames", environmentNames);
-            return Arrays.asList(environmentNames);
-        });
+        this(ClassPathResourceLoader.defaultLoader(DefaultApplicationContext.class.getClassLoader()), environmentNames);
     }
 
     /**

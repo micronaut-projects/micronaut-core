@@ -47,7 +47,11 @@ public interface TypeVariableResolver {
      * @return Return the first type parameter if it is present
      */
     default Optional<Argument<?>> getFirstTypeVariable() {
-        return getTypeVariables().values().stream().findFirst();
+        Map<String, Argument<?>> typeVariables = getTypeVariables();
+        if (!typeVariables.isEmpty()) {
+            return Optional.of(typeVariables.values().iterator().next());
+        }
+        return Optional.empty();
     }
 
     /**

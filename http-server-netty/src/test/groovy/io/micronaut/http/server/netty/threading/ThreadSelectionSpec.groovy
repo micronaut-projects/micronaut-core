@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.core.annotation.NonBlocking
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
@@ -11,6 +12,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
+import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
@@ -32,26 +34,51 @@ class ThreadSelectionSpec extends Specification {
     @Unroll
     void "test thread selection strategy #strategy"() {
         given:
-            EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
-            ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+        ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
 
         expect:
-            client.blocking().contains(blocking)
-            client.nonblocking().contains(nonBlocking)
-            client.reactive().contains(reactive)
-            client.reactiveBlocking().contains(blockingReactive)
-            client.alterflowable().contains(scheduleBlocking)
+        client.blocking().contains(blocking)
+        client.nonblocking().contains(nonBlocking)
+        client.alterflowable().contains(scheduleBlocking)
+
         cleanup:
-            embeddedServer.close()
+        embeddedServer.close()
 
         where:
-            strategy               | blocking                    | nonBlocking                 | reactive                    | blockingReactive            | scheduleBlocking      | scheduleReactive
-            ThreadSelection.AUTO   | 'io-executor-thread-'       | 'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | 'io-executor-thread-'       | "io-executor-thread-" | "io-executor-thread-"
-            ThreadSelection.IO     | 'io-executor-thread-'       | 'io-executor-thread-'       | 'io-executor-thread-'       | 'io-executor-thread-'       | "io-executor-thread-" | "io-executor-thread-"
-            ThreadSelection.MANUAL | 'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | "io-executor-thread-" | "io-executor-thread-"
+        strategy               | blocking                    | nonBlocking                 | scheduleBlocking
+        ThreadSelection.AUTO   | 'io-executor-thread-'       | 'default-nioEventLoopGroup' | "io-executor-thread-"
+        ThreadSelection.IO     | 'io-executor-thread-'       | 'io-executor-thread-'       | "io-executor-thread-"
+        ThreadSelection.MANUAL | 'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | "io-executor-thread-"
 
 
     }
+
+    @Unroll
+    void "test thread selection strategy for reactive types #strategy"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+        ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
+
+
+        expect:
+        client.scheduleSse().contains(scheduleSse)
+        client.reactive().contains(reactive)
+        client.reactiveBlocking().contains(blockingReactive)
+        client.scheduleReactive().contains(scheduleReactive)
+
+        cleanup:
+        embeddedServer.close()
+
+        where:
+        strategy               |  reactive                    | blockingReactive            | scheduleSse           | scheduleReactive
+        ThreadSelection.AUTO   |  'default-nioEventLoopGroup' | 'io-executor-thread-'       | "io-executor-thread-" | "io-executor-thread-"
+        ThreadSelection.IO     |  'io-executor-thread-'       | 'io-executor-thread-'       | "io-executor-thread-" | "io-executor-thread-"
+        ThreadSelection.MANUAL |  'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | "io-executor-thread-" | "io-executor-thread-"
+
+
+    }
+
 
     @Client("/thread-selection")
     static interface ThreadSelectionClient {
@@ -62,10 +89,10 @@ class ThreadSelectionSpec extends Specification {
         String nonblocking()
 
         @Get("/reactive")
-        Single<String> reactive()
+        String reactive()
 
         @Get("/reactiveblocking")
-        Single<String> reactiveBlocking()
+        String reactiveBlocking()
 
         @Get("/scheduleblocking")
         String scheduleBlocking()
@@ -74,8 +101,10 @@ class ThreadSelectionSpec extends Specification {
         String alterflowable()
 
         @Get("/schedulereactive")
-        Single<String> scheduleReactive()
+        String scheduleReactive()
 
+        @Get(value = "/scheduleSse", consumes = MediaType.TEXT_EVENT_STREAM)
+        String scheduleSse()
     }
 
     @Controller("/thread-selection")
@@ -119,6 +148,16 @@ class ThreadSelectionSpec extends Specification {
         Single<String> scheduleReactive() {
             Single.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
         }
+
+        @ExecuteOn(TaskExecutors.IO)
+        @Get(uri = "/scheduleSse", produces = MediaType.TEXT_EVENT_STREAM)
+        Flowable<Event<String>> scheduleSse() {
+            return Flowable
+                    .<Event<String>>create(emitter -> {
+                        emitter.onNext( Event.of("thread: ${Thread.currentThread().name}".toString()))
+                        emitter.onComplete()
+                    }, BackpressureStrategy.BUFFER)
+        }
     }
 
     @Filter("/thread-selection/alter**")
@@ -133,7 +172,7 @@ class ThreadSelectionSpec extends Specification {
                     emitter.onComplete()
                 }
             }, BackpressureStrategy.LATEST).switchMap({ String it ->
-                    return chain.proceed()
+                return chain.proceed(request)
             })
         }
     }
