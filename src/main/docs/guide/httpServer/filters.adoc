@@ -51,3 +51,28 @@ snippet::io.micronaut.docs.server.filters.TraceFilter[tags="doFilter", indent=0,
 The previous example demonstrates some key concepts such as executing logic in a non-blocking manner before proceeding with the request and modifying the outgoing response.
 
 TIP: The examples use RxJava, however you can use any reactive framework that supports the Reactive streams specifications
+
+The api:http.annotation.Filter[] annotation uses api:core.util.AntPathMatcher[] for path matching. The mapping matches URLs using the following rules:
+
+* ? matches one character
+* * matches zero or more characters
+* ** matches zero or more subdirectories in a path
+
+.@Fitler Annotation Path Matching Examples
+|===
+|Pattern|Example Matched Paths
+
+|`/**`
+|any path
+
+|`customer/j?y`
+|customer/joy, customer/jay
+
+|`customer/*/id`
+|customer/adam/id, com/amy/id
+
+|`customer/**`
+|customer/adam, customer/adam/id, customer/adam/name
+
+|`customer/**/*.html`
+|customer/index.html, customer/adam/profile.html, customer/adam/job/description.html
