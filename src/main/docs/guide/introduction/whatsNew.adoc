@@ -18,6 +18,10 @@ Micronaut has been updated to support the latest GraalVM 21.1.0 release with the
 
 https://micronaut.io/launch/[Micronaut Launch] has been updated with support for JDK 16 and Gradle 7.0.
 
+==== Random Configuration Values
+
+It is now possible to set a max and a range for random numbers in configuration. For example to set an integer between 0 and 9, `${random.int(10)}` can be used as the configuration value. See the <<propertySource, documentation>> under "Using Random Properties" for more information.
+
 === Module Upgrades
 
 ==== Micronaut Data 2.4.0
