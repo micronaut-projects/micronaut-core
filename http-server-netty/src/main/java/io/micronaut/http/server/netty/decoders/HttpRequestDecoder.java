@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.decoders;
 
-import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.context.event.ApplicationTypedEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.Ordered;
@@ -23,7 +23,6 @@ import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -56,7 +55,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
     private final EmbeddedServer embeddedServer;
     private final ConversionService<?> conversionService;
     private final HttpServerConfiguration configuration;
-    private final boolean triggerRequestReceivedEvent;
+    private final ApplicationTypedEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher;
 
     /**
      * @param embeddedServer    The embedded service
@@ -67,7 +66,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
         this.embeddedServer = embeddedServer;
         this.conversionService = conversionService;
         this.configuration = configuration;
-        this.triggerRequestReceivedEvent = embeddedServer.getApplicationContext().getBeanDefinitions(ApplicationEventListener.class, Qualifiers.byTypeArguments(HttpRequestReceivedEvent.class)).size() > 0;
+        this.httpRequestReceivedEventPublisher = embeddedServer.getApplicationContext().findTypedEventPublisher(HttpRequestReceivedEvent.class).orElse(null);
     }
 
     @Override
@@ -77,11 +76,11 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
         }
         try {
             NettyHttpRequest<Object> request = new NettyHttpRequest<>(msg, ctx, conversionService, configuration);
-            if (triggerRequestReceivedEvent) {
+            if (httpRequestReceivedEventPublisher != null) {
                 try {
                     ctx.executor().execute(() -> {
                         try {
-                            embeddedServer.getApplicationContext().publishEvent(new HttpRequestReceivedEvent(request));
+                            httpRequestReceivedEventPublisher.publishEvent(new HttpRequestReceivedEvent(request));
                         } catch (Exception e) {
                             if (LOG.isErrorEnabled()) {
                                 LOG.error("Error publishing Http request received event: " + e.getMessage(), e);
