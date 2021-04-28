@@ -97,9 +97,6 @@ import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
 import io.micronaut.scheduling.executor.ExecutorSelector;
-import io.micronaut.scheduling.instrument.Instrumentation;
-import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.web.router.*;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
@@ -177,7 +174,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final String serverHeader;
     private final boolean multipartEnabled;
     private ExecutorService ioExecutor;
-    private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
 
     /**
      * @param beanContext                             The bean locator
@@ -191,7 +187,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
      * @param ioExecutor                              The IO executor
      * @param httpContentProcessorResolver            The http content processor resolver
      * @param errorResponseProcessor                  The factory to create error responses
-     * @param invocationInstrumenterFactories         The invocation instrumenter factories
      */
     RoutingInBoundHandler(
             BeanContext beanContext,
@@ -204,7 +199,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ExecutorSelector executorSelector,
             Supplier<ExecutorService> ioExecutor,
             HttpContentProcessorResolver httpContentProcessorResolver,
-            ErrorResponseProcessor<?> errorResponseProcessor, List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
+            ErrorResponseProcessor<?> errorResponseProcessor) {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.customizableResponseTypeHandlerRegistry = customizableResponseTypeHandlerRegistry;
         this.beanContext = beanContext;
@@ -217,7 +212,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.serverHeader = serverConfiguration.getServerHeader().orElse(null);
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.errorResponseProcessor = errorResponseProcessor;
-        this.invocationInstrumenterFactories = invocationInstrumenterFactories;
         Optional<Boolean> multipartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = !multipartEnabled.isPresent() || multipartEnabled.get();
     }
@@ -442,17 +436,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
             }
         }
-    }
-
-    private List<InvocationInstrumenter> getInvocationInstrumenter() {
-        List<InvocationInstrumenter> instrumenters = new ArrayList<>(invocationInstrumenterFactories.size() + 1);
-        for (InvocationInstrumenterFactory instrumenterFactory : invocationInstrumenterFactories) {
-            final InvocationInstrumenter instrumenter = instrumenterFactory.newInvocationInstrumenter();
-            if (instrumenter != null) {
-                instrumenters.add(instrumenter);
-            }
-        }
-        return instrumenters;
     }
 
     @Override
@@ -1277,7 +1260,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         bodyPublisher.subscribe(new CompletionAwareSubscriber<HttpResponse<?>>() {
                                             @Override
                                             protected void doOnSubscribe(Subscription subscription) {
-                                                subscription.request(Long.MAX_VALUE);
+                                                subscription.request(1);
                                             }
 
                                             @Override
@@ -1289,6 +1272,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                         message.body(),
                                                         defaultResponseMediaType
                                                 );
+                                                subscription.request(1);
                                             }
 
                                             @Override
@@ -1592,6 +1576,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 }
                                 if (o instanceof HttpResponse) {
                                     singleResponse = toMutableResponse((HttpResponse<?>) o);
+                                } else if (o instanceof HttpStatus) {
+                                    singleResponse = forStatus(routeMatch.getAnnotationMetadata(), (HttpStatus) o);
                                 } else {
                                     singleResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
                                             .body(o);
@@ -2164,13 +2150,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
 
             private void doSubscribe(Subscriber<? super MutableHttpResponse<?>> actualSubscriber, HttpRequest<?> request) {
-                try (Instrumentation instrumentation = InvocationInstrumenter.combine(getInvocationInstrumenter()).newInstrumentation()) {
-                    try {
-                        ServerRequestContext.set(request);
-                        upstreamResponsePublisher.subscribe(actualSubscriber);
-                    } finally {
-                        ServerRequestContext.set(null);
-                    }
+                try {
+                    ServerRequestContext.set(request);
+                    upstreamResponsePublisher.subscribe(actualSubscriber);
+                } finally {
+                    ServerRequestContext.set(null);
                 }
             }
         };

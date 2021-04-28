@@ -16,6 +16,7 @@
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
@@ -238,6 +239,7 @@ public class Publishers {
      * @param mapOrSupplyEmpty    The mapOrSupplyEmpty
      * @param <T>       The generic type
      * @param <R>       The result type
+     * @since 2.5.0
      * @return The mapped publisher
      */
     public static <T, R> Publisher<R> mapOrSupplyEmpty(Publisher<T> publisher, MapOrSupplyEmpty<T, R> mapOrSupplyEmpty) {
@@ -469,14 +471,14 @@ public class Publishers {
          * @param result The next value.
          * @return The mapped value.
          */
-        R map(T result);
+        @NonNull R map(@NonNull T result);
 
         /**
          * Supplies an empty value if there is no next value.
          *
          * @return The result.
          */
-        R supplyEmpty();
+        @NonNull R supplyEmpty();
 
     }
 

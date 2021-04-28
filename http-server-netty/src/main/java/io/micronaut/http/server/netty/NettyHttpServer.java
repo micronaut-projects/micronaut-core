@@ -62,7 +62,6 @@ import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.executor.ExecutorSelector;
-import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
@@ -176,7 +175,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param channelOptionFactory                    The channel option factory
      * @param errorResponseProcessor                  The factory to create error responses
      * @param hostResolver                            The HTTP host resolver
-     * @param invocationInstrumenterFactories         The invocation instrumenter factories
      */
     @SuppressWarnings("ParameterNumber")
     public NettyHttpServer(
@@ -198,8 +196,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             HttpContentProcessorResolver httpContentProcessorResolver,
             ChannelOptionFactory channelOptionFactory,
             ErrorResponseProcessor<?> errorResponseProcessor,
-            HttpHostResolver hostResolver,
-            List<InvocationInstrumenterFactory> invocationInstrumenterFactories
+            HttpHostResolver hostResolver
     ) {
         this.httpCompressionStrategy = httpCompressionStrategy;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
@@ -246,8 +243,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 executorSelector,
                 SupplierUtil.memoized(ioExecutor::get),
                 httpContentProcessorResolver,
-                errorResponseProcessor,
-                invocationInstrumenterFactories
+                errorResponseProcessor
         );
         this.channelOptionFactory = channelOptionFactory;
         this.hostResolver = hostResolver;
