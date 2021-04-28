@@ -44,6 +44,23 @@ The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micr
 
 Micronaut's https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/[Oracle Cloud Integration] has been updated with support for Cloud Monitoring and Tracing.
 
+==== Other Modules
+
+- Micronaut Security 2.4.2
+- Micronaut Azure 2.2.0
+- Micronaut Aws 2.6.0
+- Micronaut Grpc 2.4.0
+- Micronaut OpenApi 2.4.0
+- Micronaut Kafka 3.3.0
+- Micronaut Flyway 3.6.0
+- Micronaut Liquibase 3.3.1
+- Micronaut Discovery Client 2.4.0
+- Micronaut ElasticSearch 2.3.0
+
 === Dependency Upgrades
 
-TODO
+- Kafka 2.8.0
+- GraalVM 21.1.0
+- Liquibase 4.3.4
+- Flyway 7.7.3
+- Elasticsearch 7.12.0
