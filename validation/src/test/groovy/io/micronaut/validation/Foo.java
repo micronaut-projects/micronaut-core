@@ -37,28 +37,23 @@ public class Foo {
         return '$' + number;
     }
 
-    @NotNull
-    public String notNull() {
+    public @NotNull String notNull() {
         return null;
     }
 
-    @NotNull
-    public Bar notNullBar() {
+    public @NotNull Bar notNullBar() {
         return null;
     }
 
-    @Valid
-    public Bar cascadeValidateReturnValue() {
+    public @Valid Bar cascadeValidateReturnValue() {
         return new Bar();
     }
 
-    @Valid
-    public List<Bar> validateReturnList() {
+    public List<@Valid Bar> validateReturnList() {
         return Collections.singletonList(new Bar());
     }
 
-    @Valid
-    public Map<String, Bar> validateMap() {
+    public Map<String, @Valid Bar> validateMap() {
         return Collections.singletonMap("barObj", new Bar());
     }
 }

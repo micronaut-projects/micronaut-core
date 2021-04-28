@@ -348,6 +348,27 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         writers.put(writer.getBeanType().getClassName(), writer);
     }
 
+    boolean recurseProcessTypeArguments(ClassElement element) {
+        final Map<String, ClassElement> typeArguments = element.getTypeArguments();
+
+        boolean requiresValidation = false;
+        for (ClassElement typeArgument: typeArguments.values()) {
+            if (
+                    recurseProcessTypeArguments(typeArgument) ||
+                    typeArgument.hasDeclaredStereotype(JAVAX_VALIDATION_VALID) ||
+                    typeArgument.hasDeclaredStereotype(JAVAX_VALIDATION_CONSTRAINT)
+            ) {
+                requiresValidation = true;
+            }
+        }
+
+        if (requiresValidation) {
+            element.annotate(JAVAX_VALIDATION_VALID);
+        }
+
+        return requiresValidation;
+    }
+
     private void processBeanProperties(
             BeanIntrospectionWriter writer,
             Collection<? extends PropertyElement> beanProperties,
@@ -372,12 +393,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 continue;
             }
 
-            final Map<String, ClassElement> typeArguments = genericType.getTypeArguments();
-            for (ClassElement typeArgument: typeArguments.values()) {
-                if (typeArgument.hasDeclaredStereotype(JAVAX_VALIDATION_CONSTRAINT) ||
-                        typeArgument.hasDeclaredStereotype(JAVAX_VALIDATION_VALID)) {
-                    beanProperty.annotate(JAVAX_VALIDATION_VALID);
-                }
+            // Process the generic parameters
+            if (recurseProcessTypeArguments(genericType)) {
+                beanProperty.annotate(JAVAX_VALIDATION_VALID);
             }
 
             writer.visitProperty(

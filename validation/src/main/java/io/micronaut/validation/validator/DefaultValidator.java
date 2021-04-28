@@ -133,7 +133,8 @@ public class DefaultValidator implements
         final Collection<BeanProperty<Object, Object>> cascadeProperties =
                 ((BeanIntrospection<Object>) introspection).getIndexedProperties(Valid.class);
 
-        final List<Class<? extends Annotation>> pojoConstraints = introspection.getAnnotationTypesByStereotype(Constraint.class);
+        final List<Class<? extends Annotation>> pojoConstraints = introspection
+                .getAnnotationTypesByStereotype(Constraint.class);
 
         if (CollectionUtils.isNotEmpty(constrainedProperties)
                 || CollectionUtils.isNotEmpty(cascadeProperties)
@@ -516,7 +517,6 @@ public class DefaultValidator implements
         final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         final boolean hasValid = annotationMetadata.hasStereotype(Valid.class);
         final boolean hasConstraint = annotationMetadata.hasStereotype(Constraint.class);
-        final Class<T> parameterType = argument.getType();
         final Class rootClass = injectionPoint.getDeclaringBean().getBeanType();
 
         if (!hasConstraint && !hasValid) {
@@ -534,6 +534,9 @@ public class DefaultValidator implements
         Path.Node node = context.addPropertyNode(argument.getName());
         validateElement(context, overallViolations, null, rootClass, argument,
                 null, (Class<Object>) argument.getType(), value, node);
+
+        // remove constructor node
+        context.removeLast();
 
         failOnError(resolutionContext, overallViolations, rootClass);
     }
@@ -647,16 +650,16 @@ public class DefaultValidator implements
             Argument<Object> valueArgument = typeParameters[0];
 
             // Create the parameter node and the container element node
-            context.addParameterNode(argument.getName(), argumentIndex);
+            newContext.addParameterNode(argument.getName(), argumentIndex);
             // noinspection unchecked
-            Path.Node node = context.addContainerElementNode(valueArgument,
-                    (Class<Object>) parameterValue.getClass(), null, null);
+            Path.Node node = newContext.addContainerElementNode(valueArgument,
+                    (Class<Object>) parameterValue.getClass(), null, null, true);
             try {
                 // node is removed from context inside validateElement()
                 validateElement(newContext, newViolations, object, (Class<Object>) rootClass, valueArgument, object,
                         valueArgument.getType(), value, node);
             } finally {
-                context.removeLast();
+                newContext.removeLast();
             }
 
             if (!newViolations.isEmpty()) {
@@ -696,16 +699,16 @@ public class DefaultValidator implements
             Argument<Object> valueArgument = typeParameters[0];
 
             // Create the parameter node and the container element node
-            context.addParameterNode(argument.getName(), argumentIndex);
+            newContext.addParameterNode(argument.getName(), argumentIndex);
             // noinspection unchecked
-            Path.Node node = context.addContainerElementNode(valueArgument,
-                    (Class<Object>) parameterValue.getClass(), null, null);
+            Path.Node node = newContext.addContainerElementNode(valueArgument,
+                    (Class<Object>) parameterValue.getClass(), null, null, true);
             try {
                 // node is removed from context inside validateElement()
                 validateElement(newContext, newViolations, object, (Class<Object>) rootClass, valueArgument, object,
                         valueArgument.getType(), value, node);
             } finally {
-                context.removeLast();
+                newContext.removeLast();
             }
 
             if (!newViolations.isEmpty()) {
@@ -850,16 +853,10 @@ public class DefaultValidator implements
         }
 
         for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
-            validatePojoInternal(
-                    rootBeanClass,
-                    rootBean,
-                    null,
-                    context,
-                    overallViolations,
-                    rootBeanClass,
-                    object,
-                    pojoConstraint,
-                    introspection.getAnnotation(pojoConstraint));
+            // noinspection unchecked
+            Class<Object> objectType = (Class<Object>) introspection.getBeanType();
+            validatePojoInternal(rootBeanClass, rootBean, null, context, overallViolations,
+                    objectType, object, pojoConstraint, introspection.getAnnotation(pojoConstraint));
         }
 
         //noinspection unchecked
@@ -1063,33 +1060,35 @@ public class DefaultValidator implements
         }
 
         // extract and validate values
-        Class<?> valueType = annotatedIterableAsArgument.getType();
         valueExtractor.extractValues(iterable, new ValueExtractor.ValueReceiver() {
             @Override
-            public void value(String nodeName, Object object1) { }
+            public void value(String nodeName, Object value) {
+                cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object,
+                        iterableType, arguments[0], value, arguments[0].getType(), null, null, false);
+            }
 
             @Override
             public void iterableValue(String nodeName, Object iterableValue) {
                 cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object,
-                        iterableType, arguments[0], iterableValue, valueType, null, null);
+                        iterableType, arguments[0], iterableValue, arguments[0].getType(), null, null, true);
             }
 
             @Override
             public void indexedValue(String nodeName, int i, Object iterableValue) {
                 cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object,
-                        iterableType, arguments[0], iterableValue, valueType, i, null);
+                        iterableType, arguments[0], iterableValue, arguments[0].getType(), i, null, true);
             }
 
             @Override
             public void keyedValue(String nodeName, Object key, Object keyedValue) {
                 if (keyValidation) {
                     cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object,
-                            iterableType, arguments[0], key, arguments[0].getType(), null, key);
+                            iterableType, arguments[0], key, arguments[0].getType(), null, key, true);
                 }
 
                 if (valueValidation) {
                     cascadeToIterableValue(context, overallViolations, rootBean, rootClass, object,
-                            iterableType, arguments[1], keyedValue, arguments[1].getType(), null, key);
+                            iterableType, arguments[1], keyedValue, arguments[1].getType(), null, key, true);
                 }
             }
         });
@@ -1108,7 +1107,7 @@ public class DefaultValidator implements
             @Nullable T rootBean, @NonNull Class<T> rootClass, Object object,
             Class<Object> iterableType, Argument<?> valueArgument,
             Object iterableValue, Class<?> iterableValueType,
-            Integer index, Object key
+            Integer index, Object key, boolean isInIterable
     ) {
         AnnotationMetadata metadata = valueArgument.getAnnotationMetadata();
 
@@ -1119,7 +1118,7 @@ public class DefaultValidator implements
             return;
         }
 
-        Path.Node node = context.addContainerElementNode(valueArgument, iterableType, index, key);
+        Path.Node node = context.addContainerElementNode(valueArgument, iterableType, index, key, isInIterable);
         // noinspection unchecked
         Class<Object> valueType = iterableValue != null ?
                 (Class<Object>) iterableValue.getClass() : (Class<Object>) iterableValueType;
@@ -1384,17 +1383,10 @@ public class DefaultValidator implements
             return returnValueNode;
         }
 
-        Path.Node addContainerElementNode(Argument<?> elementArgument,
-                                          Class<Object> containerClass, Integer index, Object key) {
+        Path.Node addContainerElementNode(Argument<?> elementArgument, Class<Object> containerClass,
+                                          Integer index, Object key, boolean isInIterable) {
             final DefaultContainerElementNode node = new DefaultContainerElementNode(
-                    elementArgument, containerClass, index, key);
-            currentPath.nodes.add(node);
-            return node;
-        }
-
-        Path.Node addContainerElementNode(DefaultContainerElementNode other) {
-            final DefaultContainerElementNode node = new DefaultContainerElementNode(
-                    other.getName(), other.getContainerClass(), other.getIndex(), other.getKey());
+                    elementArgument, containerClass, index, key, isInIterable);
             currentPath.nodes.add(node);
             return node;
         }
@@ -1476,14 +1468,17 @@ public class DefaultValidator implements
             while (i.hasNext()) {
                 final Node node = i.next();
 
-                if (node.isInIterable()) {
-                    builder.append('[');
-                    if (node.getIndex() != null) {
-                        builder.append(node.getIndex());
-                    } else if (node.getKey() != null) {
-                        builder.append(node.getKey());
+                if (node.getKind() == ElementKind.CONTAINER_ELEMENT) {
+                    if (node.isInIterable()) {
+                        builder.append('[');
+                        if (node.getIndex() != null) {
+                            builder.append(node.getIndex());
+                        } else if (node.getKey() != null) {
+                            builder.append(node.getKey());
+                        }
+                        builder.append(']');
                     }
-                    builder.append(']');
+
                     if (node.getName() != null) {
                         builder.append('<').append(node.getName()).append('>');
                     }
@@ -1717,24 +1712,26 @@ public class DefaultValidator implements
         private final Class<?> containerClass;
         private final Integer index;
         private final Object key;
+        private final boolean isInIterable;
 
         DefaultContainerElementNode(@Nullable String name, Class<?> containerClass,
-                                    @Nullable Integer index, @Nullable Object key) {
+                                    @Nullable Integer index, @Nullable Object key, boolean isInIterable) {
             this.name = name;
             this.containerClass = containerClass;
             this.index = index;
             this.key = key;
+            this.isInIterable = isInIterable;
         }
 
         DefaultContainerElementNode(
                 @Nullable Argument<?> elementArgument, Class<?> containerClass,
-                @Nullable Integer index, @Nullable Object key
+                @Nullable Integer index, @Nullable Object key, boolean isInIterable
         ) {
-            this((String) null, containerClass, index, key);
+            this((String) null, containerClass, index, key, isInIterable);
 
             if (elementArgument != null) {
                 // It is not an Array
-                this.name = elementArgument.getName() + " " + elementArgument.getType().toString();
+                this.name = elementArgument.getName() + " " + elementArgument.getType().getSimpleName();
             }
         }
 
@@ -1755,7 +1752,7 @@ public class DefaultValidator implements
 
         @Override
         public boolean isInIterable() {
-            return true;
+            return isInIterable;
         }
 
         @Override

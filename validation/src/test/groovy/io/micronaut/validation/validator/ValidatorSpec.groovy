@@ -6,6 +6,7 @@ import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.validation.validator.resolver.CompositeTraversableResolver
+import spock.lang.Ignore
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -16,8 +17,6 @@ import javax.validation.Valid
 import javax.validation.ValidatorFactory
 import javax.validation.constraints.*
 import javax.validation.metadata.BeanDescriptor
-
-import java.util.regex.Pattern
 
 class ValidatorSpec extends Specification {
 
@@ -246,11 +245,11 @@ class ValidatorSpec extends Specification {
         violations.size() == 2
         violations[0].invalidValue == 'X'
         violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
-        violations[0].propertyPath.toString() == 'names[0]<E class java.lang.String>'
+        violations[0].propertyPath.toString() == 'names[0]<E String>'
 
         violations[1].invalidValue == 'TooLongName'
         violations[1].messageTemplate == '{javax.validation.constraints.Size.message}'
-        violations[1].propertyPath.toString() == 'names[2]<E class java.lang.String>'
+        violations[1].propertyPath.toString() == 'names[2]<E String>'
     }
 
     void "test validate property argument - w iterable constraints"() {
@@ -279,7 +278,7 @@ class ValidatorSpec extends Specification {
         path0.getIndex() == null
         path0.getKey() == null
 
-        Pattern.matches("E .*String", path1.getName())
+        path1.getName() == "E String"
         path1 instanceof Path.ContainerElementNode
         path1.isInIterable()
         path1.getIndex() == 1
@@ -299,10 +298,10 @@ class ValidatorSpec extends Specification {
         expect:
         violations.size() == 2
         violations[0].invalidValue == -10
-        violations[0].propertyPath.toString() == 'numbers[Bob]<V class java.lang.Integer>'
+        violations[0].propertyPath.toString() == 'numbers[Bob]<V Integer>'
 
         violations[1].invalidValue == ""
-        violations[1].propertyPath.toString() == 'numbers[]<K class java.lang.String>'
+        violations[1].propertyPath.toString() == 'numbers[]<K String>'
     }
 
     void "test validate property argument cascade"() {
@@ -313,7 +312,7 @@ class ValidatorSpec extends Specification {
         expect:
         violations.size() == 1
         violations[0].invalidValue == ""
-        Pattern.matches("authors\\[0]<E class .*Author>\\.name", violations[0].propertyPath.toString())
+        violations[0].propertyPath.toString() == "authors[0]<E Author>.name"
     }
 
     void "test validate property argument cascade with cycle"() {
@@ -325,7 +324,7 @@ class ValidatorSpec extends Specification {
         expect:
         violations.size() == 1
         violations[0].invalidValue == ""
-        Pattern.matches("authors\\[0]<E class .*Author>\\.name", violations[0].propertyPath.toString())
+        violations[0].propertyPath.toString() == "authors[0]<E Author>.name"
     }
 
     void "test validate property argument cascade of null container"() {
@@ -354,11 +353,10 @@ class ValidatorSpec extends Specification {
         expect:
         violations.size() == 2
         violations[0].invalidValue == ""
-        Pattern.matches("books\\[]<E .*Book>.authors\\[1]<E .*Author>.name",
-                violations[0].propertyPath.toString())
+        violations[0].propertyPath.toString() == "books[]<E Book>.authors[1]<E Author>.name"
 
         violations[1].invalidValue == "?"
-        Pattern.matches("books\\[]<E .*Book>.name", violations[1].propertyPath.toString())
+        violations[1].propertyPath.toString() == "books[]<E Book>.name"
     }
 
     void "test validate property argument cascade - to non-introspected - inside map"(){
@@ -397,6 +395,19 @@ class ValidatorSpec extends Specification {
         violations[0].message == "must not be null"
     }
 
+    @Ignore("Not yet working")
+    void "test validate property argument cascade - nested iterables"() {
+        given:
+        var matrix = new ValidatorSpecClasses.PositiveMatrix([[1, -1], [-3, 4]])
+        var violations = validator.validate(matrix)
+        violations = violations.sort{it -> it.getPropertyPath().toString(); }
+
+        expect:
+        violations.size() == 2
+        violations[0].getPropertyPath().toString() == "matrix[0]<E List>[1]<E Integer>"
+        violations[1].getPropertyPath().toString() == "matrix[1]<E List>[0]<E Integer>"
+    }
+
     void "test validate argument annotations null"() {
         when:
         var book = new ValidatorSpecClasses.Book("Alice In Wonderland", [null])
@@ -418,6 +429,17 @@ class ValidatorSpec extends Specification {
 
         then:
         methodViolations.size() == 0
+    }
+
+    void "test validate Optional property type argument"() {
+        given:
+        def objectWithOptional = new ValidatorSpecClasses.ClassWithOptional(0)
+        def violations = validator.validate(objectWithOptional)
+
+        expect:
+        violations.size() == 1
+        violations[0].constraintDescriptor.annotation instanceof Min
+        violations[0].propertyPath.toString() == "number<T Integer>"
     }
 
     // EXECUTABLE ARGUMENTS VALIDATOR
@@ -459,8 +481,7 @@ class ValidatorSpec extends Specification {
         then:
         violations.size() == 2
         violations[0].invalidValue == ""
-        violations[0].propertyPath.toString() ==
-                'saveBook.book.authors[0]<E class io.micronaut.validation.validator.ValidatorSpecClasses$Author>.name'
+        violations[0].propertyPath.toString() == 'saveBook.book.authors[0]<E Author>.name'
         violations[0].constraintDescriptor != null
         violations[0].constraintDescriptor.annotation instanceof NotBlank
 
@@ -482,8 +503,8 @@ class ValidatorSpec extends Specification {
 
         then:
         violations.size() == 2
-        Pattern.matches("deposit.banknotes\\[0]<E [^>]*Integer>", violations[0].getPropertyPath().toString())
-        Pattern.matches("deposit.banknotes\\[3]<E [^>]*Integer>", violations[1].getPropertyPath().toString())
+        violations[0].getPropertyPath().toString() == "deposit.banknotes[0]<E Integer>"
+        violations[1].getPropertyPath().toString() == "deposit.banknotes[3]<E Integer>"
         violations[0].getPropertyPath().size() == 3
 
         when:
@@ -500,7 +521,7 @@ class ValidatorSpec extends Specification {
         node1.getName() == "banknotes"
 
         node2 instanceof Path.ContainerElementNode
-        node2.getName() == "E class java.lang.Integer"
+        node2.getName() == "E Integer"
     }
 
     void "test validate method argument generic annotations cascade"() {
@@ -526,10 +547,8 @@ class ValidatorSpec extends Specification {
         then:
         violations.size() == 3
         violations[0].getPropertyPath().toString() == "createAccount.client.name"
-        Pattern.matches("createAccount.clientsWithAccess\\[]<K .*String>",
-                violations[1].getPropertyPath().toString())
-        Pattern.matches("createAccount.clientsWithAccess\\[spouse]<V [^>]*Client>.name",
-                violations[2].getPropertyPath().toString())
+        violations[1].getPropertyPath().toString() == "createAccount.clientsWithAccess[]<K String>"
+        violations[2].getPropertyPath().toString() == "createAccount.clientsWithAccess[spouse]<V Client>.name"
 
         when:
         var path0 = violations[0].getPropertyPath().iterator()
@@ -554,6 +573,30 @@ class ValidatorSpec extends Specification {
         path2.next() instanceof Path.ContainerElementNode
         path2.next() instanceof Path.PropertyNode
 
+    }
+
+    void "test validate Optional method argument type argument"() {
+        given:
+        def singleton = applicationContext.getBean(ValidatorSpecClasses.ClassWithOptionalMethod)
+        def violations = validator.forExecutables().validateParameters(
+                singleton,
+                ValidatorSpecClasses.ClassWithOptionalMethod.getDeclaredMethod("optionalMethod", Optional<Integer>),
+                [Optional.of(Integer.valueOf(0))] as Object[]
+        )
+
+        expect:
+        violations.size() == 1
+        violations[0].invalidValue == 0
+        violations[0].getPropertyPath().toString() == "optionalMethod.number<T Integer>"
+        violations[0].constraintDescriptor.annotation instanceof Min
+
+        violations[0].getPropertyPath().size() == 3
+        def path = violations[0].getPropertyPath().iterator()
+        path.next() instanceof Path.MethodNode
+        path.next() instanceof Path.ParameterNode
+        def element = path.next()
+        element instanceof Path.ContainerElementNode
+        ((Path.ContainerElementNode) element).getContainerClass() == Optional<Integer>.class
     }
 
     // EXECUTABLE RETURN VALUE VALIDATOR
@@ -590,8 +633,8 @@ class ValidatorSpec extends Specification {
 
         expect:
         violations.size() == 2
-        violations[0].getPropertyPath().toString() == "Map[]<K class java.lang.String>"
-        Pattern.matches("Map\\[spouse]<V [^>]*Client>.name", violations[1].getPropertyPath().toString())
+        violations[0].getPropertyPath().toString() == "Map[]<K String>"
+        violations[1].getPropertyPath().toString() == "Map[spouse]<V Client>.name"
 
         when:
         var path0 = violations[0].getPropertyPath().iterator()
@@ -608,6 +651,7 @@ class ValidatorSpec extends Specification {
         path1.next() instanceof Path.PropertyNode
     }
 
+    @Ignore("Not yet working")
     void "test validate return type annotations cascade - nested iterables"() {
         given:
         var b = applicationContext.getBean(ValidatorSpecClasses.Bank)

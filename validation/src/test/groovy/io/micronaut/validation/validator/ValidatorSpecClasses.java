@@ -9,10 +9,7 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 
 @Introspected
@@ -127,6 +124,20 @@ public class ValidatorSpecClasses {
         }
     }
 
+    // test validate Optional property type argument
+    @Introspected
+    public static class ClassWithOptional {
+        final private Optional<@Min(100) Integer> number;
+
+        public ClassWithOptional(Integer number) {
+            this.number = Optional.of(number);
+        }
+
+        public Optional<Integer> getNumber() {
+            return number;
+        }
+    }
+
     // test executable validator - cascade
     @Singleton
     public static class BookService {
@@ -183,6 +194,20 @@ public class ValidatorSpecClasses {
         }
     }
 
+    // test validate property argument cascade - nested iterables
+    @Introspected
+    public static class PositiveMatrix {
+        List<List<@Min(value=0) Integer>> matrix;
+
+        public PositiveMatrix(List<List<Integer>> matrix) {
+            this.matrix = matrix;
+        }
+
+        public List<List<Integer>> getMatrix() {
+            return matrix;
+        }
+    }
+
     // test validate method argument generic annotations
     // test validate method argument generic annotations cascade
     // test validate return type
@@ -229,8 +254,17 @@ public class ValidatorSpecClasses {
 
         // returns all accounts with a list of authorized clients
         @Executable
-        public Map<Integer, @Size(min=1) @Valid List<@Valid Client>> getAllAccounts() {
+        public Map<Integer, @Size(min=1) List<@Valid Client>> getAllAccounts() {
             return null;
+        }
+    }
+
+    // test validate Optional method argument type argument
+    @Singleton
+    public static class ClassWithOptionalMethod {
+        @Executable
+        void optionalMethod(Optional<@Min(100) Integer> number) {
+
         }
     }
 }

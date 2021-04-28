@@ -91,7 +91,6 @@ class Test {
         argumentMetadata.hasStereotype(Valid.class)
     }
 
-    //TODO Making the method @Validated creates a loop dependency
     void "test constraints on list generic parameters make method value @Validated"() {
         given:
         def definition = buildBeanDefinition('test.Test','''

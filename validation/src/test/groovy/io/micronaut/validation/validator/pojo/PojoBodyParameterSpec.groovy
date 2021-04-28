@@ -34,6 +34,7 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.validation.validator.Validator
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification

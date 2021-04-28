@@ -23,7 +23,6 @@ import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 import io.micronaut.core.annotation.NonNull;
 import javax.validation.ClockProvider;
 import javax.validation.TraversableResolver;
-import javax.validation.ValidatorContext;
 
 /**
  * Configuration for the {@link Validator}.
