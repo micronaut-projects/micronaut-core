@@ -59,6 +59,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private static final Method METHOD_INDEX_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "indexProperty", Class.class, String.class, String.class));
     private static final String REFERENCE_SUFFIX = "$IntrospectionRef";
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
+    private static final String FIELD_CONSTRUCTOR_ARGUMENTS = "$CONSTRUCTOR_ARGUMENTS";
 
     private final ClassWriter referenceWriter;
     private final String introspectionName;
@@ -285,6 +286,23 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                     int.class
             );
 
+            if (constructor != null && ArrayUtils.isNotEmpty(constructor.getParameters())) {
+                introspectionWriter.visitField(ACC_PRIVATE | ACC_FINAL, FIELD_CONSTRUCTOR_ARGUMENTS, Type.getDescriptor(Argument[].class), null, null);
+
+                constructorWriter.loadThis();
+
+                pushBuildArgumentsForMethod(
+                        introspectionType.getClassName(),
+                        introspectionType,
+                        introspectionWriter,
+                        constructorWriter,
+                        Arrays.asList(constructor.getParameters()),
+                        localLoadTypeMethods
+                );
+
+                constructorWriter.putField(introspectionType, FIELD_CONSTRUCTOR_ARGUMENTS, Type.getType(Argument[].class));
+            }
+
             // process the properties, creating them etc.
             for (BeanPropertyWriter propertyWriter : propertyDefinitions.values()) {
                 propertyWriter.accept(classWriterOutputVisitor);
@@ -355,17 +373,10 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     private void writeConstructorArguments() {
-        final GeneratorAdapter getConstructorArguments = startPublicMethodZeroArgs(introspectionWriter, Argument[].class, "getConstructorArguments");
         List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
-        pushBuildArgumentsForMethod(
-                introspectionType.getClassName(),
-                introspectionType,
-                introspectionWriter,
-                getConstructorArguments,
-                constructorArguments,
-                localLoadTypeMethods
-        );
-
+        final GeneratorAdapter getConstructorArguments = startPublicMethodZeroArgs(introspectionWriter, Argument[].class, "getConstructorArguments");
+        getConstructorArguments.loadThis();
+        getConstructorArguments.getField(introspectionType, FIELD_CONSTRUCTOR_ARGUMENTS, Type.getType(Argument[].class));
         getConstructorArguments.returnValue();
         getConstructorArguments.visitMaxs(1, 1);
         getConstructorArguments.endMethod();
