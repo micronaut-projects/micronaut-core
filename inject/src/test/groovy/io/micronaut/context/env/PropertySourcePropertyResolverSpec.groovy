@@ -387,12 +387,12 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         expect:
         resolver.getProperty('random.float_lower', String).isPresent()
-        resolver.getProperty('random.float_lower', Float).get() >= 0.5
+        resolver.getProperty('random.float_lower', Float).get() >= 0.0
         resolver.getProperty('random.float_lower', Float).get() < 10.5
 
         and:
         resolver.getProperty('random.float_lower-negative', String).isPresent()
-        resolver.getProperty('random.float_lower-negative', Float).get() <= 0.5
+        resolver.getProperty('random.float_lower-negative', Float).get() <= 0.0
         resolver.getProperty('random.float_lower-negative', Float).get() > -10.5
 
         and:
