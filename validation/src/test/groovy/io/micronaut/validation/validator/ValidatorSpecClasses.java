@@ -248,14 +248,18 @@ public class ValidatorSpecClasses {
         }
 
         @Executable
-        public Map<@NotBlank String, @Valid Client> getClientsWithAccess(String accountName) {
+        public Map<@NotBlank String, @Valid Client> getClientsWithAccess(Integer accountNumber) {
             return null;
         }
 
         // returns all accounts with a list of authorized clients
         @Executable
-        public Map<Integer, @Size(min=1) List<@Valid Client>> getAllAccounts() {
+        public Map<Integer, List<@Valid Client>> getAllAccounts() {
             return null;
+        }
+
+        public boolean setAllAccounts(Map<Integer, @Size(min=1) List<@Valid Client>> accounts) {
+            return true;
         }
     }
 

@@ -723,14 +723,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private boolean elementHasValidatedTypeArguments(TypedElement element) {
             final Map<String, ClassElement> typeArguments = element.getGenericType().getTypeArguments();
 
+            boolean validationRequired = false;
             for (ClassElement classElement: typeArguments.values()) {
+//                if (elementHasValidatedTypeArguments(classElement)) {
+//                    classElement.annotate(ANN_VALID);
+//                    validationRequired = true;
+//                }
                 if (classElement.hasDeclaredStereotype(ANN_CONSTRAINT) ||
                     classElement.hasDeclaredStereotype(ANN_VALID)) {
-                    return true;
+                    validationRequired = true;
                 }
             }
 
-            return false;
+            return validationRequired;
         }
 
         private boolean methodHasValidatedParameters(JavaMethodElement javaMethodElement) {
@@ -838,13 +843,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     methodAnnotationMetadata = javaMethodElement.annotate(ANN_CONSTRAINT);
                 }
 
-                /*
                 if (methodAnnotationMetadata.hasStereotype(ANN_VALID) ||
                         methodAnnotationMetadata.hasStereotype(ANN_CONSTRAINT)) {
-                    methodAnnotationMetadata = javaMethodElement.annotate(ANN_VALIDATED);
+                    // methodAnnotationMetadata = javaMethodElement.annotate(ANN_VALIDATED);
                     hasConstraints = true;
                 }
-                 */
             }
 
             if (isDeclaredBean && isExecutable) {

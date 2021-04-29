@@ -4,8 +4,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
-import javax.validation.ConstraintViolationException
-import java.util.regex.Pattern
 
 class PojoConfigurationPropertiesSpec extends Specification {
 

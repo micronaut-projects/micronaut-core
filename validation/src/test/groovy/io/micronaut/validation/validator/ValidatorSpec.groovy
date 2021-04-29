@@ -622,7 +622,7 @@ class ValidatorSpec extends Specification {
         var b = applicationContext.getBean(ValidatorSpecClasses.Bank)
         var violations = validator.forExecutables().validateReturnValue(
                 b,
-                ValidatorSpecClasses.Bank.getDeclaredMethod("getClientsWithAccess", String),
+                ValidatorSpecClasses.Bank.getDeclaredMethod("getClientsWithAccess", Integer),
                 [
                         "spouse": new ValidatorSpecClasses.Client(""),
                         "son": new ValidatorSpecClasses.Client("Joe"),
@@ -675,6 +675,24 @@ class ValidatorSpec extends Specification {
 
         expect:
         violations.size() == 3
+    }
+
+    @Ignore("Not yet working")
+    void "test validate argument type parameters cascade - nested iterables"() {
+        given:
+        var b = applicationContext.getBean(ValidatorSpecClasses.Bank)
+        var value = [
+                0: [new ValidatorSpecClasses.Client("")]
+        ]
+        var violations = validator.forExecutables().validateParameters(
+                b,
+                ValidatorSpecClasses.Bank.getDeclaredMethod("setAllAccounts", Map<Integer, List<ValidatorSpecClasses.Client>>),
+                [value] as Object[]
+        )
+        violations = violations.sort{it.getPropertyPath().toString()}
+
+        expect:
+        violations.size() == 1
     }
 
     // DESCRIPTOR
