@@ -26,7 +26,6 @@ import io.micronaut.inject.ConstructorInjectionPoint;
 /**
  * Represents an injection point for a bean produced from a field.
  *
- * @param <B> The declaring bean type
  * @param <T> The field type
  * @author Graeme Rocher
  * @since 3.0

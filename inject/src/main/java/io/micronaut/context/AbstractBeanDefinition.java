@@ -98,6 +98,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @param declaringType      The declaring type of the method
      * @param fieldName         The method name
      * @param fieldMetadata     The metadata for the method
+     * @param isFinal           Is the field final
      * @since 3.0
      */
     @SuppressWarnings({"WeakerAccess"})
