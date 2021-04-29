@@ -83,12 +83,45 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private final Class<T> type;
     private final boolean isAbstract;
     private final boolean isConfigurationProperties;
+    private final boolean singleton;
     private final Class<?> declaringType;
     private final ConstructorInjectionPoint<T> constructor;
     private final Collection<Class<?>> requiredComponents = new HashSet<>(3);
     private AnnotationMetadata beanAnnotationMetadata;
     private Environment environment;
     private Set<Class<?>> exposedTypes;
+
+    /**
+     * Constructs a bean definition that is produced from a method call on another type (factory bean).
+     *
+     * @param producedType       The produced type
+     * @param declaringType      The declaring type of the method
+     * @param fieldName         The method name
+     * @param fieldMetadata     The metadata for the method
+     * @since 3.0
+     */
+    @SuppressWarnings({"WeakerAccess"})
+    @Internal
+    @UsedByGeneratedCode
+    protected AbstractBeanDefinition(Class<T> producedType,
+                                     Class<?> declaringType,
+                                     String fieldName,
+                                     AnnotationMetadata fieldMetadata,
+                                     boolean isFinal) {
+        this.type = producedType;
+        this.isAbstract = false; // factory beans are never abstract
+        this.declaringType = declaringType;
+
+        this.constructor = new DefaultFieldConstructorInjectionPoint<>(
+                this,
+                declaringType,
+                producedType,
+                fieldName,
+                fieldMetadata
+        );
+        this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
+        this.singleton = isFinal;
+    }
 
     /**
      * Constructs a bean definition that is produced from a method call on another type (factory bean).
@@ -132,6 +165,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.addRequiredComponents(arguments);
+        this.singleton = getAnnotationMetadata().hasDeclaredStereotype(Singleton.class);
     }
 
     /**
@@ -168,6 +202,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.addRequiredComponents(arguments);
+        this.singleton = getAnnotationMetadata().hasDeclaredStereotype(Singleton.class);
     }
 
     @Override
@@ -264,7 +299,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     @Override
     public boolean isSingleton() {
-        return getAnnotationMetadata().hasDeclaredStereotype(Singleton.class);
+        return singleton;
     }
 
     @Override
