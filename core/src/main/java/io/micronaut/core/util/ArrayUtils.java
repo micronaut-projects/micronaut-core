@@ -163,7 +163,8 @@ public class ArrayUtils {
      * Returns an array containing all of the elements in this collection, using the provided generator function to allocate the returned array.
      *
      * @param collection The collection
-     * @param <T> The create array function
+     * @param createArrayFn The function to create the array
+     * @param <T> The type of the array
      * @return The array
      */
     public static <T> T[] toArray(Collection<T> collection, IntFunction<T[]> createArrayFn) {

@@ -16,7 +16,6 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.*;
-import io.micronaut.core.naming.Described;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;

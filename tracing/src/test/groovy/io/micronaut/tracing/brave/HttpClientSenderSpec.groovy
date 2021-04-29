@@ -75,15 +75,11 @@ class HttpClientSenderSpec extends Specification {
                 'tracing.zipkin.sampler.probability':1,
                 'tracing.zipkin.http.url':zipkinServer.getURL().toString()
         )
+
+        when:
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
         PollingConditions conditions = new PollingConditions(timeout: 10)
-        // mock Zipkin server
-        EmbeddedServer zipkinServer = ApplicationContext.run(
-                EmbeddedServer,
-                ['micronaut.server.port':9411]
-        )
-        SpanController spanController = zipkinServer.applicationContext.getBean(SpanController)
         StartedListener listener = zipkinServer.applicationContext.getBean(StartedListener)
 
         then:
@@ -136,6 +132,8 @@ class HttpClientSenderSpec extends Specification {
                 'tracing.zipkin.http.url':zipkinServer.getURL().toString(),
                 'tracing.zipkin.http.path':'/custom/path/spans'
         )
+
+        when:
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
