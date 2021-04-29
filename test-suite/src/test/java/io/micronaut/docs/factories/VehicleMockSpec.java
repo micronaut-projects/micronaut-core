@@ -13,7 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @MicronautTest
 public class VehicleMockSpec {
     @Requires(beans=VehicleMockSpec.class)
-    @Bean @Replaces(Engine.class) Engine mockEngine = () -> "Mock Started"; // <1>
+    @Bean @Replaces(Engine.class)
+    Engine mockEngine = () -> "Mock Started"; // <1>
 
     @Inject Vehicle vehicle; // <2>
 

@@ -11,7 +11,8 @@ import javax.inject.Inject
 @MicronautTest
 class VehicleMockSpec extends Specification {
     @Requires(beans=VehicleMockSpec.class)
-    @Bean @Replaces(Engine.class) Engine mockEngine = {-> "Mock Started" } as Engine  // <1>
+    @Bean @Replaces(Engine.class)
+    Engine mockEngine = {-> "Mock Started" } as Engine  // <1>
 
     @Inject Vehicle vehicle // <2>
 
