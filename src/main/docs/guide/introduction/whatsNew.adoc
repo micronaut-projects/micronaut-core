@@ -24,6 +24,14 @@ snippet::io.micronaut.docs.inject.typed.V8Engine[tags="class",indent=0]
 
 For more information see the section on <<typed, Limiting Injectable Types>>.
 
+==== Factories can produce bean from fields
+
+Beans defined with the ann:context.annotation.Factory[] annotation can now produce beans from public or package protected fields, for example:
+
+snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="class",indent=0]
+
+For more information see the <<factories, Bean Factories>> section of the documentation.
+
 === AOP Features
 
 ==== Support for Constructor Interception

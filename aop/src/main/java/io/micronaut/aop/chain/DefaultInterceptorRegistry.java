@@ -123,7 +123,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
 
     @Override
     @NonNull
-    public <T> Interceptor<T, T>[] resolveConstructorInterceptors(
+    public <T> Interceptor<T, T>[]  resolveConstructorInterceptors(
             @NonNull BeanConstructor<T> constructor,
             @NonNull Collection<BeanRegistration<Interceptor<T, T>>> interceptors) {
         instrumentAnnotationMetadata(beanContext, constructor);
