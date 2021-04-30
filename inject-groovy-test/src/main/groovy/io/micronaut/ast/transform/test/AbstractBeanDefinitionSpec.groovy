@@ -45,6 +45,8 @@ import org.codehaus.groovy.control.ErrorCollector
 import org.codehaus.groovy.control.SourceUnit
 import spock.lang.Specification
 
+import java.util.function.Predicate
+
 /**
  * @author graemerocher
  * @since 1.0
@@ -225,12 +227,12 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return new DefaultApplicationContext(
                 ClassPathResourceLoader.defaultLoader(classLoader),"test") {
             @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
                 return classLoader.generatedClasses.keySet().findAll {
                     it.endsWith("DefinitionClass")
                 }.collect {
                     classLoader.loadClass(it).newInstance()
-                }
+                }.findAll { predicate == null || predicate.test(it) }
             }
         }.start()
     }
