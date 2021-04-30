@@ -57,6 +57,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private static final Method METHOD_ADD_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "addProperty", BeanProperty.class));
     private static final Method METHOD_ADD_METHOD = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "addMethod", BeanMethod.class));
     private static final Method METHOD_INDEX_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "indexProperty", Class.class, String.class, String.class));
+    private static final Method METHOD_ARRAYS_COPY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(Arrays.class, "copyOf", Object[].class, int.class));
     private static final String REFERENCE_SUFFIX = "$IntrospectionRef";
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
     private static final String FIELD_CONSTRUCTOR_ARGUMENTS = "$CONSTRUCTOR_ARGUMENTS";
@@ -377,6 +378,8 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         final GeneratorAdapter getConstructorArguments = startPublicMethodZeroArgs(introspectionWriter, Argument[].class, "getConstructorArguments");
         getConstructorArguments.loadThis();
         getConstructorArguments.getField(introspectionType, FIELD_CONSTRUCTOR_ARGUMENTS, Type.getType(Argument[].class));
+        getConstructorArguments.push(constructor.getParameters().length);
+        getConstructorArguments.invokeStatic(Type.getType(Arrays.class), METHOD_ARRAYS_COPY);
         getConstructorArguments.returnValue();
         getConstructorArguments.visitMaxs(1, 1);
         getConstructorArguments.endMethod();
