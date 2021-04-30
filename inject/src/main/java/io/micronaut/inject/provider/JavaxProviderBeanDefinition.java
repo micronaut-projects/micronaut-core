@@ -17,6 +17,7 @@ package io.micronaut.inject.provider;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
@@ -44,6 +45,7 @@ final class JavaxProviderBeanDefinition extends AbstractProviderDefinition<Provi
 
     @Override
     protected Provider<Object> buildProvider(
+            BeanResolutionContext resolutionContext,
             BeanContext context,
             Argument<Object> argument,
             Qualifier<Object> qualifier,
@@ -55,13 +57,13 @@ final class JavaxProviderBeanDefinition extends AbstractProviderDefinition<Provi
                 @Override
                 public Object get() {
                     if (bean == null) {
-                        bean = context.getBean(argument, qualifier);
+                        bean = ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
                     }
                     return bean;
                 }
             };
         } else {
-            return () -> context.getBean(argument, qualifier);
+            return () -> ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
         }
     }
 }
