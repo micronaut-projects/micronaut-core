@@ -128,6 +128,15 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
         }
     }
 
+    @Override
+    public ServerSocketChannel serverSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        if (useNativeTransport || configuration != null && configuration.isPreferNativeTransport()) {
+            return this.nativeFactory.serverSocketChannelInstance(configuration);
+        } else {
+            return this.defaultFactory.serverSocketChannelInstance(configuration);
+        }
+    }
+
     @NonNull
     @Override
     public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
@@ -135,6 +144,16 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
             return this.nativeFactory.clientSocketChannelClass(configuration);
         } else {
             return this.defaultFactory.clientSocketChannelClass(configuration);
+        }
+    }
+
+    @NonNull
+    @Override
+    public SocketChannel clientSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+        if (useNativeTransport || configuration != null && configuration.isPreferNativeTransport()) {
+            return this.nativeFactory.clientSocketChannelInstance(configuration);
+        } else {
+            return this.defaultFactory.clientSocketChannelInstance(configuration);
         }
     }
 

@@ -99,10 +99,20 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
         return NioServerSocketChannel.class;
     }
 
+    @Override
+    public NioServerSocketChannel serverSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return new NioServerSocketChannel();
+    }
+
     @NonNull
     @Override
     public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return NioSocketChannel.class;
+    }
+
+    @Override
+    public SocketChannel clientSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return new NioSocketChannel();
     }
 
     private static NioEventLoopGroup withIoRatio(NioEventLoopGroup group, @Nullable Integer ioRatio) {
