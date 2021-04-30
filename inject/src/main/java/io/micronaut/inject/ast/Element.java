@@ -18,6 +18,7 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.naming.Described;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
@@ -32,7 +33,7 @@ import java.util.function.Consumer;
  * @author graemerocher
  * @since 1.0
  */
-public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
+public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, Described {
     /**
      * An empty array of elements.
      * @since 2.1.1
@@ -169,5 +170,21 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
      */
     default boolean isFinal() {
         return false;
+    }
+
+    @NonNull
+    @Override
+    default String getDescription() {
+        return getDescription(true);
+    }
+
+    @NonNull
+    @Override
+    default String getDescription(boolean simple) {
+        if (simple) {
+            return getSimpleName();
+        } else {
+            return getName();
+        }
     }
 }
