@@ -885,7 +885,8 @@ public class DefaultBeanContext implements BeanContext {
      * @param <T>               The bean concrete type
      * @return A stream
      */
-    protected <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
+    @Internal
+    public <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         return getBeanRegistrations(resolutionContext, beanType, qualifier).stream()
                 .map(BeanRegistration::getBean);
@@ -1305,7 +1306,8 @@ public class DefaultBeanContext implements BeanContext {
      * @param <T>               The bean type parameter
      * @return The found beans
      */
-    protected @NonNull
+    @Internal
+    public @NonNull
     <T> Collection<T> getBeansOfType(
             @Nullable BeanResolutionContext resolutionContext,
             @NonNull Argument<T> beanType,

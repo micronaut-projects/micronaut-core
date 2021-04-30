@@ -495,7 +495,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     factoryMethodElement
             )
 
-            if (hasAroundStereotype(methodAnnotationMetadata)) {
+            if (hasAroundStereotype(methodAnnotationMetadata) && !producedClassElement.isAssignable(Interceptor)) {
 
                 if (Modifier.isFinal(returnType.modifiers)) {
                     addError(

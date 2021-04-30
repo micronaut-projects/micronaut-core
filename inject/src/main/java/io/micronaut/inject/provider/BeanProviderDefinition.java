@@ -15,13 +15,11 @@
  */
 package io.micronaut.inject.provider;
 
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanProvider;
-import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.Qualifier;
+import io.micronaut.context.*;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 
@@ -49,9 +47,10 @@ final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvid
 
     @Override
     protected BeanProvider<Object> buildProvider(
-            BeanContext context,
-            Argument<Object> argument,
-            Qualifier<Object> qualifier,
+            @NonNull BeanResolutionContext resolutionContext,
+            @NonNull BeanContext context,
+            @NonNull Argument<Object> argument,
+            @Nullable Qualifier<Object> qualifier,
             boolean singleton) {
         return new BeanProvider<Object>() {
             private final Qualifier<Object> finalQualifier =
@@ -59,12 +58,12 @@ final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvid
 
             @Override
             public Object get() {
-                return context.getBean(argument, finalQualifier);
+                return ((DefaultBeanContext) context).getBean(resolutionContext, argument, finalQualifier);
             }
 
             @Override
             public Object get(Qualifier<Object> qualifier) {
-                return context.getBean(argument, qualifier);
+                return ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
             }
 
             @Override
@@ -85,12 +84,12 @@ final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvid
             @NonNull
             @Override
             public Iterator<Object> iterator() {
-                return context.getBeansOfType(argument, finalQualifier).iterator();
+                return ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argument, finalQualifier).iterator();
             }
 
             @Override
             public Stream<Object> stream() {
-                return context.streamOfType(argument, finalQualifier);
+                return ((DefaultBeanContext) context).streamOfType(resolutionContext, argument, finalQualifier);
             }
         };
     }

@@ -65,6 +65,8 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
 
     /**
      * Builds a provider implementation.
+     *
+     * @param resolutionContext The resolution context
      * @param context The context
      * @param argument The argument
      * @param qualifier The qualifier
@@ -72,6 +74,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
      * @return The provider
      */
     protected abstract @NonNull T buildProvider(
+            @NonNull BeanResolutionContext resolutionContext,
             @NonNull BeanContext context,
             @NonNull Argument<Object> argument,
             @Nullable Qualifier<Object> qualifier,
@@ -109,6 +112,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
                     boolean hasBean = context.containsBean(argument, qualifier);
                     if (hasBean) {
                         return buildProvider(
+                                resolutionContext,
                                 context,
                                 argument,
                                 qualifier,
@@ -122,6 +126,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
                         } else {
                             if (qualifier instanceof AnyQualifier) {
                                 return buildProvider(
+                                        resolutionContext,
                                         context,
                                         argument,
                                         qualifier,
