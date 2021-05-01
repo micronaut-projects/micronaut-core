@@ -17,6 +17,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
@@ -31,6 +32,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * Responsible for writing class files that are instances of {@link AnnotationMetadata}.
@@ -134,8 +137,47 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
-    private static final Type EMPTY_MAP_TYPE = Type.getType(Map.class);
+    private static final org.objectweb.asm.commons.Method[] MAP_OF;
+    private static final org.objectweb.asm.commons.Method[] LIST_OF;
+    private static final org.objectweb.asm.commons.Method MAP_OF_ENTRIES;
+    private static final org.objectweb.asm.commons.Method MAP_ENTRY;
+    private static final org.objectweb.asm.commons.Method LIST_OF_ARRAY;
+
+    static {
+        boolean mapListSupported;
+        try {
+            mapListSupported = ReflectionUtils.findMethod(Map.class, "of").isPresent();
+        } catch (Exception e) {
+            mapListSupported = false;
+        }
+        if (mapListSupported) {
+            MAP_OF = new Method[11];
+            LIST_OF = new Method[11];
+            for (int i = 0; i < MAP_OF.length; i++) {
+                Class[] mapArgs = new Class[i * 2];
+                Arrays.fill(mapArgs, Object.class);
+                MAP_OF[i] = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(Map.class, "of", mapArgs));
+                Class[] listArgs = new Class[i];
+                Arrays.fill(listArgs, Object.class);
+                LIST_OF[i] = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(List.class, "of", listArgs));
+            }
+            MAP_OF_ENTRIES = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(Map.class, "ofEntries", Map.Entry[].class));
+            MAP_ENTRY = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(Map.class, "entry", Object.class, Object.class));
+            LIST_OF_ARRAY = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(List.class, "of", Object[].class));
+        } else {
+            MAP_OF = null;
+            LIST_OF = null;
+            MAP_OF_ENTRIES = null;
+            MAP_ENTRY = null;
+            LIST_OF_ARRAY = null;
+        }
+    }
+
+    private static final Type MAP_TYPE = Type.getType(Map.class);
+    private static final Type LIST_TYPE = Type.getType(List.class);
     private static final String EMPTY_MAP = "EMPTY_MAP";
+    private static final String EMPTY_LIST = "EMPTY_LIST";
+
     private static final String LOAD_CLASS_PREFIX = "$micronaut_load_class_value_";
 
     private final String className;
@@ -357,7 +399,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 invokeLoadClassValueMethod(owningType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue(annotationName));
 
                 if (!typeOnly) {
-                    pushAnnotationAttributes(owningType, classWriter, staticInit, annotationValues, loadTypeMethods);
+                    pushMapOf(staticInit, annotationValues, true, null, v -> pushValue(owningType, classWriter, staticInit, v, loadTypeMethods));
                     staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_DEFAULTS);
                 } else {
                     staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_TYPE);
@@ -367,32 +409,110 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         }
     }
 
-    /**
-     * Writes annotation attributes to the given generator.
-     *
-     * @param declaringClassWriter The declaring class
-     * @param generatorAdapter     The generator adapter
-     * @param annotationData       The annotation data
-     * @param loadTypeMethods      Generated methods that load types
-     */
-    @Internal
-    private static void pushAnnotationAttributes(Type declaringType, ClassVisitor declaringClassWriter, GeneratorAdapter generatorAdapter, Map<? extends CharSequence, Object> annotationData, Map<String, GeneratorAdapter> loadTypeMethods) {
-        int totalSize = annotationData.size() * 2;
-        // start a new array
-        pushNewArray(generatorAdapter, Object.class, totalSize);
-        int i = 0;
-        for (Map.Entry<? extends CharSequence, Object> entry : annotationData.entrySet()) {
-            // use the property name as the key
-            String memberName = entry.getKey().toString();
-            pushStoreStringInArray(generatorAdapter, i++, totalSize, memberName);
-            // use the property type as the value
-            Object value = entry.getValue();
-            pushStoreInArray(generatorAdapter, i++, totalSize, () ->
-                    pushValue(declaringType, declaringClassWriter, generatorAdapter, value, loadTypeMethods)
-            );
+    private static <T> void pushMapOf(GeneratorAdapter generatorAdapter, Map<? extends CharSequence, T> annotationData,
+                                      boolean skipEmpty,
+                                      T empty,
+                                      Consumer<T> pushValue) {
+        Set<? extends Map.Entry<? extends CharSequence, T>> entrySet = annotationData != null ? annotationData.entrySet()
+                .stream()
+                .filter(e -> !skipEmpty || (e.getKey() != null && e.getValue() != null))
+                .map(e -> e.getValue() == null && empty != null ? new AbstractMap.SimpleEntry<>(e.getKey(), empty) : e)
+                .collect(Collectors.toSet()) : null;
+        if (entrySet == null || entrySet.isEmpty()) {
+            generatorAdapter.getStatic(Type.getType(Collections.class), EMPTY_MAP, MAP_TYPE);
+            return;
         }
-        // invoke the AbstractBeanDefinition.createMap method
-        generatorAdapter.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_MAP_OF);
+        if (MAP_OF != null) {
+            if (entrySet.size() < MAP_OF.length) {
+                for (Map.Entry<? extends CharSequence, T> entry : entrySet) {
+                    generatorAdapter.push(entry.getKey().toString());
+                    pushValue.accept(entry.getValue());
+                }
+                invokeStaticInterface(generatorAdapter, MAP_TYPE, MAP_OF[entrySet.size()]);
+            } else {
+                // use Map.ofEntries(entry(...), entry(...))
+                // start a new array
+                pushNewArray(generatorAdapter, Map.Entry.class, entrySet.size());
+                int i = 0;
+                Iterator<? extends Map.Entry<? extends CharSequence, T>> iterator = entrySet.iterator();
+                while (iterator.hasNext()) {
+                    generatorAdapter.push(i++);
+                    Map.Entry<? extends CharSequence, T> entry = iterator.next();
+                    // key
+                    generatorAdapter.push(entry.getKey().toString());
+                    // value
+                    pushValue.accept(entry.getValue());
+                    // entry
+                    invokeStaticInterface(generatorAdapter, MAP_TYPE, MAP_ENTRY);
+                    // store the entry in the position
+                    generatorAdapter.visitInsn(AASTORE);
+                    if (iterator.hasNext()) {
+                        // if we are not at the end of the array duplicate array onto the stack
+                        generatorAdapter.dup();
+                    }
+                }
+                invokeStaticInterface(generatorAdapter, MAP_TYPE, MAP_OF_ENTRIES);
+            }
+        } else {
+            int totalSize = entrySet.size() * 2;
+            // start a new array
+            pushNewArray(generatorAdapter, Object.class, totalSize);
+            int i = 0;
+            for (Map.Entry<? extends CharSequence, T> entry : entrySet) {
+                // use the property name as the key
+                String memberName = entry.getKey().toString();
+                pushStoreStringInArray(generatorAdapter, i++, totalSize, memberName);
+                // use the property type as the value
+                pushStoreInArray(generatorAdapter, i++, totalSize, () -> pushValue.accept(entry.getValue()));
+            }
+            // invoke the AbstractBeanDefinition.createMap method
+            generatorAdapter.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_MAP_OF);
+        }
+    }
+
+    private static void pushListOfString(GeneratorAdapter methodVisitor, List<String> names) {
+        if (names != null) {
+            names = names.stream().filter(Objects::nonNull).collect(Collectors.toList());
+        }
+        if (names == null || names.isEmpty()) {
+            methodVisitor.getStatic(Type.getType(Collections.class), EMPTY_LIST, LIST_TYPE);
+            return;
+        }
+        int totalSize = names.size();
+        if (LIST_OF != null) {
+            if (totalSize < LIST_OF.length) {
+                for (String name : names) {
+                    methodVisitor.push(name);
+                }
+                invokeStaticInterface(methodVisitor, LIST_TYPE, LIST_OF[totalSize]);
+            } else {
+                // start a new array
+                pushNewArray(methodVisitor, Object.class, totalSize);
+                int i = 0;
+                for (String name : names) {
+                    // use the property name as the key
+                    pushStoreStringInArray(methodVisitor, i++, totalSize, name);
+                    // use the property type as the value
+                }
+                // invoke the AbstractBeanDefinition.createMap method
+                invokeStaticInterface(methodVisitor, LIST_TYPE, LIST_OF_ARRAY);
+            }
+        } else {
+            // start a new array
+            pushNewArray(methodVisitor, Object.class, totalSize);
+            int i = 0;
+            for (String name : names) {
+                // use the property name as the key
+                pushStoreStringInArray(methodVisitor, i++, totalSize, name);
+                // use the property type as the value
+            }
+            // invoke the AbstractBeanDefinition.createMap method
+            methodVisitor.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_LIST_OF);
+        }
+    }
+
+    private static void invokeStaticInterface(GeneratorAdapter methodVisitor, Type type, Method method) {
+        methodVisitor.visitMethodInsn(Opcodes.INVOKESTATIC, type.getInternalName(), method.getName(), method.getDescriptor(), true);
     }
 
     private static void instantiateInternal(
@@ -417,7 +537,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         // 4th argument: all annotations
         pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.allAnnotations, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
         // 5th argument: annotations by stereotype
-        pushCreateAnnotationsByStereotypeData(generatorAdapter, annotationMetadata.annotationsByStereotype);
+        pushMapOf(generatorAdapter, annotationMetadata.annotationsByStereotype, false, Collections.emptyList(), list -> pushListOfString(generatorAdapter, list));
         // 6th argument: has property expressions
         generatorAdapter.push(annotationMetadata.hasPropertyExpressions());
 
@@ -456,48 +576,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         return classWriter;
     }
 
-    private static void pushCreateListCall(GeneratorAdapter methodVisitor, List<String> names) {
-        int totalSize = names == null ? 0 : names.size();
-        if (totalSize > 0) {
-
-            // start a new array
-            pushNewArray(methodVisitor, Object.class, totalSize);
-            int i = 0;
-            for (String name : names) {
-                // use the property name as the key
-                pushStoreStringInArray(methodVisitor, i++, totalSize, name);
-                // use the property type as the value
-            }
-            // invoke the AbstractBeanDefinition.createMap method
-            methodVisitor.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_LIST_OF);
-        } else {
-            methodVisitor.visitInsn(ACONST_NULL);
-        }
-    }
-
-    private static void pushCreateAnnotationsByStereotypeData(GeneratorAdapter methodVisitor, Map<String, List<String>> annotationData) {
-        int totalSize = annotationData == null ? 0 : annotationData.size() * 2;
-        if (totalSize > 0) {
-
-            // start a new array
-            pushNewArray(methodVisitor, Object.class, totalSize);
-            int i = 0;
-            for (Map.Entry<String, List<String>> entry : annotationData.entrySet()) {
-                // use the property name as the key
-                String annotationName = entry.getKey();
-                pushStoreStringInArray(methodVisitor, i++, totalSize, annotationName);
-                // use the property type as the value
-                pushStoreInArray(methodVisitor, i++, totalSize, () ->
-                        pushCreateListCall(methodVisitor, entry.getValue())
-                );
-            }
-            // invoke the AbstractBeanDefinition.createMap method
-            methodVisitor.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_MAP_OF);
-        } else {
-            methodVisitor.visitInsn(ACONST_NULL);
-        }
-    }
-
     private static void pushCreateAnnotationData(
             Type declaringType,
             ClassWriter declaringClassWriter,
@@ -511,38 +589,15 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 annotationData.remove(sourceRetentionAnnotation);
             }
         }
-        int totalSize = annotationData == null ? 0 : annotationData.size() * 2;
-        if (totalSize > 0) {
 
-            // start a new array
-            pushNewArray(methodVisitor, Object.class, totalSize);
-            int i = 0;
-            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationData.entrySet()) {
-                // use the property name as the key
-                String annotationName = entry.getKey();
-                pushStoreStringInArray(methodVisitor, i++, totalSize, annotationName);
-                // use the property type as the value
-                Map<CharSequence, Object> attributes = entry.getValue();
-                if (attributes.isEmpty()) {
-                    pushStoreInArray(methodVisitor, i++, totalSize, () ->
-                            methodVisitor.getStatic(Type.getType(Collections.class), EMPTY_MAP, EMPTY_MAP_TYPE)
-                    );
-                } else {
-                    pushStoreInArray(methodVisitor, i++, totalSize, () ->
-                            pushAnnotationAttributes(declaringType, declaringClassWriter, methodVisitor, attributes, loadTypeMethods)
-                    );
-                }
-            }
-            // invoke the StringUtils.mapOf method
-            methodVisitor.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_MAP_OF);
-        } else {
-            methodVisitor.visitInsn(ACONST_NULL);
-        }
+        pushMapOf(methodVisitor, annotationData, false, Collections.emptyMap(), attributes -> {
+            pushMapOf(methodVisitor, attributes, true, null, v -> pushValue(declaringType, declaringClassWriter, methodVisitor, v, loadTypeMethods));
+        });
     }
 
     private static void pushValue(Type declaringType, ClassVisitor declaringClassWriter, GeneratorAdapter methodVisitor, Object value, Map<String, GeneratorAdapter> loadTypeMethods) {
         if (value == null) {
-            methodVisitor.visitInsn(ACONST_NULL);
+            throw new IllegalStateException("Cannot map null value in: " + declaringType.getClassName());
         } else if (value instanceof Boolean) {
             methodVisitor.push((Boolean) value);
             pushBoxPrimitiveIfNecessary(boolean.class, methodVisitor);
@@ -568,19 +623,23 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         } else if (value.getClass().isArray()) {
             final Class<?> componentType = ReflectionUtils.getWrapperType(value.getClass().getComponentType());
             int len = Array.getLength(value);
-            pushNewArray(methodVisitor, componentType, len);
-            for (int i = 0; i < len; i++) {
-                final Object v = Array.get(value, i);
-                pushStoreInArray(methodVisitor, i, len, () ->
-                        pushValue(declaringType, declaringClassWriter, methodVisitor, v, loadTypeMethods)
-                );
+            if (Object.class == componentType && len == 0) {
+                pushEmptyObjectsArray(methodVisitor);
+            } else {
+                pushNewArray(methodVisitor, componentType, len);
+                for (int i = 0; i < len; i++) {
+                    final Object v = Array.get(value, i);
+                    pushStoreInArray(methodVisitor, i, len, () ->
+                            pushValue(declaringType, declaringClassWriter, methodVisitor, v, loadTypeMethods)
+                    );
+                }
             }
         } else if (value instanceof Collection) {
-            List array = Arrays.asList(((Collection) value).toArray());
-            int len = array.size();
-            if (len == 0) {
-                pushNewArray(methodVisitor, Object.class, len);
+            if (((Collection<?>) value).isEmpty()) {
+                pushEmptyObjectsArray(methodVisitor);
             } else {
+                List array = Arrays.asList(((Collection) value).toArray());
+                int len = array.size();
                 boolean first = true;
                 for (int i = 0; i < len; i++) {
                     Object v = array.get(i);
@@ -613,17 +672,18 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             methodVisitor.dup();
             methodVisitor.push(annotationName);
 
-            if (CollectionUtils.isNotEmpty(values)) {
-                pushAnnotationAttributes(declaringType, declaringClassWriter, methodVisitor, values, loadTypeMethods);
-            } else {
-                methodVisitor.getStatic(Type.getType(Collections.class), "EMPTY_MAP", Type.getType(Map.class));
-            }
+            pushMapOf(methodVisitor, values, true, null, v -> pushValue(declaringType, declaringClassWriter, methodVisitor, v, loadTypeMethods));
+
             methodVisitor.push(annotationName);
             methodVisitor.invokeStatic(Type.getType(AnnotationMetadataSupport.class), METHOD_GET_DEFAULT_VALUES);
             methodVisitor.invokeConstructor(annotationValueType, CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP);
         } else {
-            methodVisitor.visitInsn(ACONST_NULL);
+            throw new IllegalStateException("Cannot map unknown value: " + value + " in: " + declaringType.getClassName());
         }
+    }
+
+    private static void pushEmptyObjectsArray(GeneratorAdapter methodVisitor) {
+        methodVisitor.getStatic(Type.getType(ArrayUtils.class), "EMPTY_OBJECT_ARRAY", Type.getType(Object[].class));
     }
 
     private static void invokeLoadClassValueMethod(
