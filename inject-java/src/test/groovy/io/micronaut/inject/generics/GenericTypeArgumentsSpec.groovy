@@ -20,7 +20,7 @@ import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.core.annotation.AnnotationMetadataProvider
 import io.micronaut.core.type.Argument
 import io.micronaut.http.filter.HttpClientFilterResolver
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.MethodInjectionPoint

@@ -17,9 +17,7 @@ package io.micronaut.aop.compile
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.aop.Intercepted
-import io.micronaut.aop.simple.Mutating
-import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.inject.BeanDefinition
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 

@@ -7,7 +7,7 @@ import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.context.exceptions.NoSuchBeanException
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 

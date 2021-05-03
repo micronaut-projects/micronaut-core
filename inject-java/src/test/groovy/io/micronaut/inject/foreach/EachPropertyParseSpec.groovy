@@ -17,7 +17,7 @@ package io.micronaut.inject.foreach
 
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
 /**

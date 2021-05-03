@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.factory
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
 import java.util.function.Function

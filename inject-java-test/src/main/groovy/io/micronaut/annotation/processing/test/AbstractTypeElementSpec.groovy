@@ -15,22 +15,21 @@
  */
 package io.micronaut.annotation.processing.test
 
-import com.sun.tools.javac.model.JavacElements
-import com.sun.tools.javac.processing.JavacProcessingEnvironment
-import com.sun.tools.javac.util.Context
 import io.micronaut.aop.internal.InterceptorRegistryBean
-import io.micronaut.context.Qualifier
-import io.micronaut.core.annotation.NonNull
-import io.micronaut.core.annotation.Nullable
+import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AnnotationUtils
 import io.micronaut.annotation.processing.GenericUtils
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.Qualifier
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.io.scan.ClassPathResourceLoader
@@ -40,19 +39,16 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
-import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
-
 import javax.lang.model.element.Element
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
-
 /**
  * Base class to extend from to allow compilation of Java sources
  * at runtime to allow testing of compile time behavior.
@@ -68,12 +64,16 @@ abstract class AbstractTypeElementSpec extends Specification {
      * @return The class element
      */
     ClassElement buildClassElement(String cls) {
-        TypeElement typeElement = buildTypeElement(cls)
-        def env = JavacProcessingEnvironment.instance(new Context())
-        def elements = JavacElements.instance(new Context())
-        ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
-        GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, genericUtils, env.filer) {
+        TypeElementInfo typeElementInfo = buildTypeElementInfo(cls)
+        TypeElement typeElement = typeElementInfo.typeElement
+        def lastTask = typeElementInfo.javaParser.lastTask.get()
+        def elements = lastTask.elements
+        def types = lastTask.types
+        def processingEnv = typeElementInfo.javaParser.processingEnv
+        def messager = processingEnv.messager
+        ModelUtils modelUtils = new ModelUtils(elements, types) {}
+        GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
+        AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, genericUtils, processingEnv.filer) {
         }
         AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement)
 
@@ -81,14 +81,14 @@ abstract class AbstractTypeElementSpec extends Specification {
                 typeElement,
                 annotationMetadata,
                 new JavaVisitorContext(
-                      env,
-                      env.messager,
+                      processingEnv,
+                      messager,
                       elements,
                       annotationUtils,
-                        env.typeUtils,
+                        types,
                         modelUtils,
                         genericUtils,
-                        env.filer,
+                        processingEnv.filer,
                         new MutableConvertibleValuesMap<Object>()
                 )
         ) {
@@ -105,6 +105,23 @@ abstract class AbstractTypeElementSpec extends Specification {
         Element element = buildTypeElement(cls)
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        return metadata
+    }
+
+    AnnotationMetadata buildDeclaredMethodAnnotationMetadata(String cls, String methodName) {
+        TypeElement element = buildTypeElement(cls)
+        Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
+        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
+        AnnotationMetadata metadata = method != null ? builder.buildDeclared(method) : null
+        return metadata
+    }
+
+    AnnotationMetadata buildMethodArgumentAnnotationMetadata(String cls, String methodName, String argumentName) {
+        TypeElement element = buildTypeElement(cls)
+        ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
+        VariableElement argument = method.parameters.find() { it.simpleName.toString() == argumentName }
+        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
+        AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
         return metadata
     }
 
@@ -254,12 +271,30 @@ class Test {
     }
 
     protected TypeElement buildTypeElement(String cls) {
-        List<Element> elements = newJavaParser().parseLines("",
+        List<Element> elements = []
+
+        newJavaParser().parseLines("",
                 cls
-        ).toList()
+        ).each { elements.add(it) }
 
         def element = elements ? elements[0] : null
         return (TypeElement) element
+    }
+
+    protected TypeElementInfo buildTypeElementInfo(String cls) {
+        List<Element> elements = []
+
+
+        def parser = newJavaParser()
+        parser.parseLines("",
+                cls
+        ).each { elements.add(it) }
+
+        def element = elements ? elements[0] : null
+        return new TypeElementInfo(
+                typeElement: element,
+                javaParser: parser
+        )
     }
 
     protected BeanDefinition buildBeanDefinition(String className, String cls) {
@@ -268,7 +303,11 @@ class Test {
         String beanFullName = "${packageName}.${beanDefName}"
 
         ClassLoader classLoader = buildClassLoader(className, cls)
-        return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+        try {
+            return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
     }
 
     /**
@@ -343,7 +382,7 @@ class Test {
 
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
         def stream = new ByteArrayOutputStream()
-        new AnnotationMetadataWriter(className, toWrite)
+        new AnnotationMetadataWriter(className, null, toWrite, true)
                 .writeTo(stream)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
         ClassLoader classLoader = new ClassLoader() {
@@ -361,19 +400,22 @@ class Test {
         return metadata
     }
 
-    @CompileStatic
     private JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
-        def env = JavacProcessingEnvironment.instance(new Context())
-        def elements = JavacElements.instance(new Context())
-        ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
-        GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, genericUtils, env.filer) {
+        JavaParser parser = newJavaParser()
+        JavacTask javacTask = parser.getJavacTask()
+        def elements = javacTask.elements
+        def types = javacTask.types
+        def processingEnv = parser.processingEnv
+        def messager = processingEnv.messager
+        ModelUtils modelUtils = new ModelUtils(elements, types) {}
+        GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
+        AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, genericUtils, parser.filer) {
             @Override
             JavaAnnotationMetadataBuilder newAnnotationBuilder() {
                 return super.newAnnotationBuilder()
             }
         }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, modelUtils) {
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, messager, annotationUtils, modelUtils) {
             @Override
             protected List<AnnotationMapper<? extends Annotation>> getAnnotationMappers(@NonNull String annotationName) {
                 def loadedMappers = super.getAnnotationMappers(annotationName)
@@ -395,5 +437,10 @@ class Test {
             }
         }
         return builder
+    }
+
+    static class TypeElementInfo {
+        TypeElement typeElement
+        JavaParser javaParser
     }
 }

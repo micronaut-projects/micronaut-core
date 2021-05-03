@@ -1,7 +1,7 @@
 package io.micronaut.aop.compile
 
-import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.support.Parser
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.Parser
 import org.objectweb.asm.AnnotationVisitor
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
