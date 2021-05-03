@@ -626,4 +626,19 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getRequiredProperty('AAA', String) == "fonzie"
         resolver.getRequiredProperty('aaa', String) == "fonzie"
     }
+
+    void "test an inner list property is created"() {
+        given:
+        Map<String, Object> extra = ["stringval": "foo", "listval": ["item1", "item2"]];
+
+        PropertySource external = MapPropertySource.of("external", ["extra": extra])
+
+        when:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+               external
+        )
+
+        then:
+        resolver.containsProperty("extra.listval")
+    }
 }

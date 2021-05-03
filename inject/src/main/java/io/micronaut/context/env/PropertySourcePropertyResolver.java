@@ -642,6 +642,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     collapseProperty(prefix + "[" + i + "]", entries, item);
                 }
             }
+            entries.put(prefix, value);
         } else if (value instanceof Map) {
             for (Map.Entry<?, ?> entry: ((Map<?, ?>) value).entrySet()) {
                 Object key = entry.getKey();
