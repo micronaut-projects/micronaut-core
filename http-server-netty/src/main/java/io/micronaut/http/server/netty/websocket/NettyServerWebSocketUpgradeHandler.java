@@ -115,12 +115,8 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     public boolean acceptInboundMessage(Object msg) {
         if (msg instanceof NettyHttpRequest) {
             NettyHttpRequest<?> request = (NettyHttpRequest) msg;
-            HttpHeaders headers = request.getHeaders();
-            String connectValue = headers.get(HttpHeaderNames.CONNECTION, String.class).orElse("").toLowerCase(Locale.ENGLISH);
-            return connectValue.contains(HttpHeaderValues.UPGRADE) &&
-                    "WebSocket".equalsIgnoreCase(headers.get(HttpHeaderNames.UPGRADE));
+            return request.getNativeRequest().headers().contains(HttpHeaderNames.CONNECTION.toString(), HttpHeaderValues.UPGRADE, true);
         }
-
         return false;
     }
 

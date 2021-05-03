@@ -17,7 +17,7 @@ package io.micronaut.inject.beans
 
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
 /**

@@ -1,6 +1,6 @@
 package io.micronaut.inject.errors
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.aliasfor.TestAnnotation
 

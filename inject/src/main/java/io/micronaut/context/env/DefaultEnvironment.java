@@ -38,6 +38,7 @@ import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.*;
 import java.io.*;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
@@ -46,6 +47,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -934,7 +936,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private static String readFile(String path) {
         try {
-            return new String(Files.readAllBytes(Paths.get(path))).trim();
+            Path pathPath = Paths.get(path);
+            if (!Files.exists(pathPath)) {
+                return "";
+            }
+            return new String(Files.readAllBytes(pathPath)).trim();
         } catch (IOException e) {
             return "";
         }
@@ -968,12 +974,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static boolean isDigitalOcean() {
-        try {
-            String sysVendor = new String(Files.readAllBytes(Paths.get(DO_SYS_VENDOR_FILE)));
-            return "digitalocean".equalsIgnoreCase(sysVendor);
-        } catch (IOException e) {
-            return false;
-        }
+        return "digitalocean".equalsIgnoreCase(readFile(DO_SYS_VENDOR_FILE));
     }
 
 

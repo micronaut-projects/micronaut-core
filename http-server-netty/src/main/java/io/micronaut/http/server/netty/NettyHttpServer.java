@@ -52,6 +52,7 @@ import io.micronaut.http.server.netty.ssl.HttpRequestCertificateHandler;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
+import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -145,6 +146,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final ChannelOptionFactory channelOptionFactory;
+    private final HttpHostResolver hostResolver;
     private boolean shutdownWorker = false;
     private boolean shutdownParent = false;
     private EventLoopGroup workerGroup;
@@ -165,12 +167,13 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param executorSelector                        The executor selector
      * @param serverSslBuilder                        The Netty Server SSL builder
      * @param outboundHandlers                        The outbound handlers
-     * @param eventLoopGroupRegistry                  The event loop registry
      * @param eventLoopGroupFactory                   The EventLoopGroupFactory
+     * @param eventLoopGroupRegistry                  The event loop registry
      * @param httpCompressionStrategy                 The http compression strategy
      * @param httpContentProcessorResolver            The http content processor resolver
      * @param channelOptionFactory                    The channel option factory
      * @param errorResponseProcessor                  The factory to create error responses
+     * @param hostResolver                            The HTTP host resolver
      */
     @SuppressWarnings("ParameterNumber")
     public NettyHttpServer(
@@ -191,7 +194,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             HttpCompressionStrategy httpCompressionStrategy,
             HttpContentProcessorResolver httpContentProcessorResolver,
             ChannelOptionFactory channelOptionFactory,
-            ErrorResponseProcessor<?> errorResponseProcessor
+            ErrorResponseProcessor<?> errorResponseProcessor,
+            HttpHostResolver hostResolver
     ) {
         this.httpCompressionStrategy = httpCompressionStrategy;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
@@ -241,6 +245,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 errorResponseProcessor
         );
         this.channelOptionFactory = channelOptionFactory;
+        this.hostResolver = hostResolver;
     }
 
     /**
@@ -305,11 +310,11 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             workerGroup = createWorkerEventLoopGroup(workerConfig);
             parentGroup = createParentEventLoopGroup();
             ServerBootstrap serverBootstrap = createServerBootstrap();
+            serverBootstrap.channelFactory(() -> eventLoopGroupFactory.serverSocketChannelInstance(workerConfig));
 
             processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
             processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
-                    .channel(eventLoopGroupFactory.serverSocketChannelClass(workerConfig))
                     .childHandler(new NettyHttpServerInitializer());
 
             Optional<String> host = serverConfiguration.getHost();
@@ -742,6 +747,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             handlers.put(HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
             handlers.put(HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
             handlers.put(HttpRequestDecoder.ID, requestDecoder);
+            if (serverConfiguration.isDualProtocol() && serverConfiguration.isHttpToHttpsRedirect() && useSsl) {
+                handlers.put(HANDLER_HTTP_TO_HTTPS_REDIRECT, new HttpToHttpsRedirectHandler(sslConfiguration, hostResolver));
+            }
             if (useSsl) {
                 handlers.put("request-certificate-handler", requestCertificateHandler);
             }

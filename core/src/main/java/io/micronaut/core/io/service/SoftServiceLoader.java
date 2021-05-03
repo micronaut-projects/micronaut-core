@@ -25,13 +25,13 @@ import java.net.URL;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * <p>Variation of {@link java.util.ServiceLoader} that allows soft loading and conditional loading of
@@ -200,19 +200,25 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 URL url = serviceConfigs.nextElement();
                 try {
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
-                        List<String> lines = reader.lines()
-                            .filter(line -> line.length() != 0 && line.charAt(0) != '#')
-                            .filter(condition)
-                            .map(line -> {
-                                int i = line.indexOf('#');
-                                if (i > -1) {
-                                    line = line.substring(0, i);
-                                }
-                                return line;
-                            })
-                            .collect(Collectors.toList());
+                        List<String> lines = new LinkedList<>();
+                        while (true) {
+                            String line = reader.readLine();
+                            if (line == null) {
+                                break;
+                            }
+                            if (line.length() == 0 || line.charAt(0) == '#') {
+                                continue;
+                            }
+                            if (!condition.test(line)) {
+                                continue;
+                            }
+                            int i = line.indexOf('#');
+                            if (i > -1) {
+                                line = line.substring(0, i);
+                            }
+                            lines.add(line);
+                        }
                         unprocessed = lines.iterator();
-
                     }
                 } catch (IOException | UncheckedIOException e) {
                     // ignore, can't do anything here and can't log because class used in compiler

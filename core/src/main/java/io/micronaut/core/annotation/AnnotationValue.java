@@ -851,7 +851,10 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     public @NonNull
     final <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
-        return getAnnotations(member, type).stream().findFirst();
+        for (AnnotationValue<T> tAnnotationValue : getAnnotations(member, type)) {
+            return Optional.of(tAnnotationValue);
+        }
+        return Optional.empty();
     }
 
     @Override

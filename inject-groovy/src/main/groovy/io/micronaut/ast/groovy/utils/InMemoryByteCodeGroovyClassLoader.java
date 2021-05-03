@@ -91,7 +91,9 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
         if (loadedClasses.containsKey(name)) {
             return loadedClasses.get(name);
         } else if (generatedClasses.containsKey(name)) {
-            return loadedClasses.computeIfAbsent(name, className -> defineClass(className, generatedClasses.get(className)));
+            final Class cls = defineClass(name, generatedClasses.get(name));
+            loadedClasses.put(name, cls);
+            return cls;
         } else {
             return super.loadClass(name);
         }

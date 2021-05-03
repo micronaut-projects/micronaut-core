@@ -40,6 +40,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     protected List<UriMatchVariable> variables;
     private final Pattern matchPattern;
     private final boolean isRoot;
+    private final boolean exactMatch;
 
     /**
      * Construct a new URI template for the given template.
@@ -58,7 +59,14 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      */
     protected UriMatchTemplate(CharSequence templateString, Object... parserArguments) {
         super(templateString, parserArguments);
-        this.matchPattern = Pattern.compile(pattern.toString());
+        if (variables.isEmpty() && Pattern.quote(templateString.toString()).equals(pattern.toString())) {
+            // if there are no variables and a match pattern matches template we can assume it matches exactly
+            this.matchPattern = null;
+            this.exactMatch = true;
+        } else {
+            this.matchPattern = Pattern.compile(pattern.toString());
+            this.exactMatch = false;
+        }
         this.isRoot = isRoot();
         // cleanup / reduce memory consumption
         this.pattern = null;
@@ -72,9 +80,16 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      */
     protected UriMatchTemplate(CharSequence templateString, List<PathSegment> segments, Pattern matchPattern, List<UriMatchVariable> variables) {
         super(templateString.toString(), segments);
-        this.matchPattern = matchPattern;
         this.variables = variables;
         this.isRoot = isRoot();
+        if (variables.isEmpty() && matchPattern.matcher(templateString).matches()) {
+            // if there are no variables and match pattern matches template we can assume it matches exactly
+            this.matchPattern = null;
+            this.exactMatch = true;
+        } else {
+            this.matchPattern = matchPattern;
+            this.exactMatch = false;
+        }
     }
 
     /**
@@ -151,6 +166,12 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         if (uri.endsWith("/")) {
             uri = uri.substring(0, uri.length() - 1);
         }
+        if (exactMatch) {
+            if (uri.equals(templateString)) {
+                return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
+            }
+            return Optional.empty();
+        }
         Matcher matcher = matchPattern.matcher(uri);
         if (matcher.matches()) {
             if (variables.isEmpty()) {
@@ -190,7 +211,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
     @Override
     protected UriTemplate newUriTemplate(CharSequence uriTemplate, List<PathSegment> newSegments) {
-        Pattern newPattern = Pattern.compile(this.matchPattern.toString() + pattern.toString());
+        Pattern newPattern = Pattern.compile(exactMatch ? Pattern.quote(templateString) + pattern.toString() : matchPattern.pattern() + pattern.toString());
         pattern = null;
         return newUriMatchTemplate(normalizeNested(toString(), uriTemplate), newSegments, newPattern, new ArrayList<>(variables));
     }

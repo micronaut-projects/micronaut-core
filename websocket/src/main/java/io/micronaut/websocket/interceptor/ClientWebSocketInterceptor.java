@@ -60,7 +60,7 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
         } else {
             String methodName = context.getMethodName();
             if (methodName.startsWith("send") || methodName.startsWith("broadcast")) {
-                MediaType mediaType = context.stringValue(Produces.class).map(MediaType::new).orElse(MediaType.APPLICATION_JSON_TYPE);
+                MediaType mediaType = context.stringValue(Produces.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
                 validateSession();
 
                 InterceptedMethod interceptedMethod = InterceptedMethod.of(context);

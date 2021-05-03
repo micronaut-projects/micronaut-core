@@ -17,7 +17,6 @@ package io.micronaut.tracing.brave
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
-import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
@@ -35,12 +34,32 @@ import spock.util.concurrent.PollingConditions
 import zipkin2.Span
 
 import javax.inject.Singleton
-
 /**
  * @author graemerocher
  * @since 1.0
  */
+@Retry
 class HttpClientSenderSpec extends Specification {
+
+    void "test http client sender bean initialization with instrumented threads"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+          'tracing.zipkin.enabled':true,
+          'tracing.instrument-threads':true,
+          'tracing.zipkin.sampler.probability':1,
+          'tracing.zipkin.http.url':HttpClientSender.Builder.DEFAULT_SERVER_URL
+        )
+
+        when:
+        HttpClientSender httpClientSender = context.getBean(HttpClientSender)
+
+        then:
+        httpClientSender != null
+
+        cleanup:
+        httpClientSender.close()
+        context.close()
+    }
 
     void "test http client sender receives spans"() {
         given:
@@ -55,15 +74,11 @@ class HttpClientSenderSpec extends Specification {
                 'tracing.zipkin.sampler.probability':1,
                 'tracing.zipkin.http.url':zipkinServer.getURL().toString()
         )
+
+        when:
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
         PollingConditions conditions = new PollingConditions(timeout: 10)
-        // mock Zipkin server
-        EmbeddedServer zipkinServer = ApplicationContext.run(
-                EmbeddedServer,
-                ['micronaut.server.port':9411]
-        )
-        SpanController spanController = zipkinServer.applicationContext.getBean(SpanController)
         StartedListener listener = zipkinServer.applicationContext.getBean(StartedListener)
 
         then:
@@ -116,6 +131,8 @@ class HttpClientSenderSpec extends Specification {
                 'tracing.zipkin.http.url':zipkinServer.getURL().toString(),
                 'tracing.zipkin.http.path':'/custom/path/spans'
         )
+
+        when:
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 

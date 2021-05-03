@@ -85,33 +85,17 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         for (TypeElementVisitor<?, ?> visitor : typeElementVisitors) {
             TypeElementVisitor.VisitorKind visitorKind = visitor.getVisitorKind();
             TypeElementVisitor.VisitorKind incrementalProcessorKind = getIncrementalProcessorKind();
-            // workaround for Micronaut Data until it is upgraded to Micronaut 2.x
-            if (visitor.getClass().getName().startsWith("io.micronaut.data")) {
-                if (incrementalProcessorKind == TypeElementVisitor.VisitorKind.ISOLATING) {
-                    try {
-                        loadedVisitors.add(new LoadedVisitor(
-                                visitor,
-                                javaVisitorContext,
-                                genericUtils,
-                                processingEnv
-                        ));
-                    } catch (TypeNotPresentException | NoClassDefFoundError e) {
-                        // ignored, means annotations referenced are not on the classpath
-                    }
-                }
-            } else {
 
-                if (incrementalProcessorKind == visitorKind) {
-                    try {
-                        loadedVisitors.add(new LoadedVisitor(
-                                visitor,
-                                javaVisitorContext,
-                                genericUtils,
-                                processingEnv
-                        ));
-                    } catch (TypeNotPresentException | NoClassDefFoundError e) {
-                        // ignored, means annotations referenced are not on the classpath
-                    }
+            if (incrementalProcessorKind == visitorKind) {
+                try {
+                    loadedVisitors.add(new LoadedVisitor(
+                            visitor,
+                            javaVisitorContext,
+                            genericUtils,
+                            processingEnv
+                    ));
+                } catch (TypeNotPresentException | NoClassDefFoundError e) {
+                    // ignored, means annotations referenced are not on the classpath
                 }
             }
 
@@ -180,22 +164,38 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 
-        if (!loadedVisitors.isEmpty()) {
+        if (!loadedVisitors.isEmpty() && !(annotations.size() == 1
+                && Generated.class.getName().equals(annotations.iterator().next().getQualifiedName().toString()))) {
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
 
-            roundEnv.getRootElements()
+            List<TypeElement> elements = roundEnv.getRootElements()
                     .stream()
                     .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
                     .filter(element -> element.getAnnotation(Generated.class) == null)
                     .map(modelUtils::classElementFor)
                     .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
-                    .forEach(typeElement -> {
+                    .collect(Collectors.toList());
+
+            if (!elements.isEmpty()) {
+
+                // The visitor X with a higher priority should process elements of A before
+                // the visitor Y which is processing elements of B but also using elements A
+
+                // Micronaut Data use-case: EntityMapper with a higher priority needs to process entities first
+                // before RepositoryMapper is going to process repositories and read entities
+
+                for (LoadedVisitor loadedVisitor : loadedVisitors) {
+                    for (TypeElement typeElement : elements) {
+                        if (!loadedVisitor.matches(typeElement)) {
+                            continue;
+                        }
                         String className = typeElement.getQualifiedName().toString();
-                        List<LoadedVisitor> matchedVisitors = loadedVisitors.stream().filter(v -> v.matches(typeElement)).collect(Collectors.toList());
-                        typeElement.accept(new ElementVisitor(typeElement, matchedVisitors), className);
-                    });
+                        typeElement.accept(new ElementVisitor(typeElement, Collections.singletonList(loadedVisitor)), className);
+                    }
+                }
+            }
 
             for (LoadedVisitor loadedVisitor : loadedVisitors) {
                 try {

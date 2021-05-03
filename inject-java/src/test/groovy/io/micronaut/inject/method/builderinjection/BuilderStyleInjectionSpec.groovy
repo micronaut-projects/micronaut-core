@@ -17,7 +17,7 @@ package io.micronaut.inject.method.builderinjection
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.BeanFactory

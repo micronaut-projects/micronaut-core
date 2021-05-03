@@ -16,8 +16,6 @@
 package io.micronaut.annotation.processing.test;
 
 import com.sun.source.util.JavacTask;
-import com.sun.tools.javac.api.JavacTool;
-import com.sun.tools.javac.util.Context;
 import io.micronaut.annotation.processing.*;
 
 import io.micronaut.core.annotation.NonNull;
@@ -25,8 +23,16 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import spock.util.environment.Jvm;
 
+import javax.annotation.processing.Filer;
+import javax.annotation.processing.Messager;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.Processor;
+import javax.lang.model.SourceVersion;
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
+import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
 import javax.tools.*;
 import java.io.Closeable;
 import java.io.File;
@@ -48,7 +54,7 @@ public class JavaParser implements Closeable {
     private final JavaCompiler compiler;
     private final InMemoryJavaFileManager fileManager;
     private final DiagnosticCollector<JavaFileObject> diagnosticCollector;
-    private final Context context;
+    private JavacTask lastTask;
 
     /**
      * Default constructor.
@@ -59,7 +65,95 @@ public class JavaParser implements Closeable {
         this.fileManager =
                 new InMemoryJavaFileManager(
                         compiler.getStandardFileManager(diagnosticCollector, Locale.getDefault(), UTF_8));
-        this.context = new Context();
+    }
+
+    /**
+     * @return The compiler used
+     */
+    public JavaCompiler getCompiler() {
+        return compiler;
+    }
+
+    /**
+     * @return The file manager
+     */
+    public JavaFileManager getFileManager() {
+        return fileManager;
+    }
+
+    /**
+     * @return The filer
+     */
+    public Filer getFiler() {
+        return fileManager;
+    }
+
+    /**
+     * @return Dummy processing environment
+     */
+    public ProcessingEnvironment getProcessingEnv() {
+        return new ProcessingEnvironment() {
+            @Override
+            public Map<String, String> getOptions() {
+                return Collections.emptyMap();
+            }
+
+            @Override
+            public Messager getMessager() {
+                return new Messager() {
+                    @Override
+                    public void printMessage(Diagnostic.Kind kind, CharSequence msg) {
+
+                    }
+
+                    @Override
+                    public void printMessage(Diagnostic.Kind kind, CharSequence msg, Element e) {
+
+                    }
+
+                    @Override
+                    public void printMessage(Diagnostic.Kind kind, CharSequence msg, Element e, AnnotationMirror a) {
+
+                    }
+
+                    @Override
+                    public void printMessage(Diagnostic.Kind kind, CharSequence msg, Element e, AnnotationMirror a, AnnotationValue v) {
+
+                    }
+                };
+            }
+
+            @Override
+            public Filer getFiler() {
+                return JavaParser.this.fileManager;
+            }
+
+            @Override
+            public Elements getElementUtils() {
+                if (lastTask == null) {
+                    throw new IllegalStateException("Call parse first");
+                }
+                return lastTask.getElements();
+            }
+
+            @Override
+            public Types getTypeUtils() {
+                if (lastTask == null) {
+                    throw new IllegalStateException("Call parse first");
+                }
+                return lastTask.getTypes();
+            }
+
+            @Override
+            public SourceVersion getSourceVersion() {
+                return SourceVersion.RELEASE_8;
+            }
+
+            @Override
+            public Locale getLocale() {
+                return Locale.getDefault();
+            }
+        };
     }
 
     /**
@@ -82,20 +176,10 @@ public class JavaParser implements Closeable {
      * @return The elements
      */
     public Iterable<? extends Element> parse(JavaFileObject... sources) {
-        Set<String> options = getCompilerOptions();
-        JavacTask task =
-                ((JavacTool) compiler)
-                        .getTask(
-                                null, // explicitly use the default because old javac logs some output on stderr
-                                fileManager,
-                                diagnosticCollector,
-                                options,
-                                Collections.emptySet(),
-                                Arrays.asList(sources),
-                                context);
+        this.lastTask = getJavacTask(sources);
         try {
-            task.parse();
-            return task.analyze();
+            lastTask.parse();
+            return lastTask.analyze();
         } catch (IOException e) {
             throw new RuntimeException(e);
         } finally {
@@ -107,6 +191,31 @@ public class JavaParser implements Closeable {
                 }
             }
         }
+    }
+
+    /**
+     * @return The last task that was used
+     */
+    public Optional<JavacTask> getLastTask() {
+        return Optional.ofNullable(lastTask);
+    }
+
+    /**
+     * gets the javac task.
+     * @param sources The sources
+     * @return the task
+     */
+    public JavacTask getJavacTask(JavaFileObject... sources) {
+        Set<String> options = getCompilerOptions();
+        this.lastTask = (JavacTask) compiler.getTask(
+                null, // explicitly use the default because old javac logs some output on stderr
+                fileManager,
+                diagnosticCollector,
+                options,
+                Collections.emptySet(),
+                Arrays.asList(sources)
+        );
+        return lastTask;
     }
 
     /**
@@ -148,17 +257,7 @@ public class JavaParser implements Closeable {
      * @return The java file objects
      */
     public Iterable<? extends JavaFileObject> generate(JavaFileObject... sources) {
-        Set<String> options = getCompilerOptions();
-        JavacTask task =
-                ((JavacTool) compiler)
-                        .getTask(
-                                null, // explicitly use the default because old javac logs some output on stderr
-                                fileManager,
-                                diagnosticCollector,
-                                options,
-                                Collections.emptySet(),
-                                Arrays.asList(sources),
-                                context);
+        JavacTask task = getJavacTask(sources);
         try {
 
             List<Processor> processors = getAnnotationProcessors();
@@ -187,7 +286,7 @@ public class JavaParser implements Closeable {
             options = CollectionUtils.setOf(
                     "--enable-preview",
                     "-source",
-                    "15"
+                    Jvm.getCurrent().getJavaSpecificationVersion()
             );
         } else {
             options = Collections.emptySet();
@@ -239,7 +338,10 @@ public class JavaParser implements Closeable {
     public void close() {
         if (compiler != null) {
             try {
-                ((com.sun.tools.javac.main.JavaCompiler) compiler).close();
+                // avoid illegal access
+                if (!Jvm.getCurrent().isJava15Compatible()) {
+                    ((com.sun.tools.javac.main.JavaCompiler) compiler).close();
+                }
             } catch (Exception e) {
                 // ignore
             }

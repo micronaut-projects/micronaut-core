@@ -3,7 +3,7 @@ package io.micronaut.inject.records
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.DependencyInjectionException
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.validation.BeanDefinitionValidator
 import io.micronaut.validation.validator.DefaultValidator

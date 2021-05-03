@@ -56,6 +56,8 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     protected final DefaultRouteBuilder.AbstractRoute abstractRoute;
     protected final List<MediaType> consumedMediaTypes;
     protected final List<MediaType> producedMediaTypes;
+    protected final boolean consumedMediaTypesContainsAll;
+    protected final boolean producedMediaTypesContainsAll;
 
     /**
      * Constructor.
@@ -69,14 +71,19 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         this.executableMethod = (MethodExecutionHandle<T, R>) abstractRoute.targetMethod;
         this.conversionService = conversionService;
         Argument[] requiredArguments = executableMethod.getArguments();
-        this.requiredInputs = new LinkedHashMap<>(requiredArguments.length);
-        for (Argument requiredArgument : requiredArguments) {
-            String inputName = resolveInputName(requiredArgument);
-            requiredInputs.put(inputName, requiredArgument);
+        if (requiredArguments.length > 0) {
+            this.requiredInputs = new LinkedHashMap<>(requiredArguments.length);
+            for (Argument requiredArgument : requiredArguments) {
+                String inputName = resolveInputName(requiredArgument);
+                requiredInputs.put(inputName, requiredArgument);
+            }
+        } else {
+            this.requiredInputs = Collections.emptyMap();
         }
-
         this.consumedMediaTypes = abstractRoute.getConsumes();
         this.producedMediaTypes = abstractRoute.getProduces();
+        this.consumedMediaTypesContainsAll = consumedMediaTypes == null || consumedMediaTypes.isEmpty() || consumedMediaTypes.contains(MediaType.ALL_TYPE);
+        this.producedMediaTypesContainsAll = producedMediaTypes == null || producedMediaTypes.isEmpty() || producedMediaTypes.contains(MediaType.ALL_TYPE);
     }
 
     @Override
@@ -107,6 +114,11 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     @Override
     public final boolean isVoid() {
         return this.abstractRoute.isVoid();
+    }
+
+    @Override
+    public boolean isAsyncOrReactive() {
+        return abstractRoute.isAsyncOrReactive();
     }
 
     @Override
@@ -335,30 +347,26 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public boolean doesConsume(MediaType contentType) {
-        return consumedMediaTypes.isEmpty() || contentType == null || consumedMediaTypes.contains(MediaType.ALL_TYPE) || explicitlyConsumes(contentType);
+        return contentType == null || consumedMediaTypesContainsAll || explicitlyConsumes(contentType);
     }
 
     @Override
     public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
-        return producedMediaTypes == null || producedMediaTypes.isEmpty() || anyMediaTypesMatch(producedMediaTypes, acceptableTypes);
+        return producedMediaTypesContainsAll || anyMediaTypesMatch(producedMediaTypes, acceptableTypes);
     }
 
     @Override
     public boolean doesProduce(@Nullable MediaType acceptableType) {
-        return producedMediaTypes == null || producedMediaTypes.isEmpty() || producedMediaTypes.contains(acceptableType);
+        return producedMediaTypesContainsAll || acceptableType == null || acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType);
     }
 
     private boolean anyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
         if (CollectionUtils.isEmpty(acceptableTypes)) {
             return true;
-        } else {
-            if (producedMediaTypes.contains(MediaType.ALL_TYPE)) {
+        }
+        for (MediaType acceptableType : acceptableTypes) {
+            if (acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType)) {
                 return true;
-            }
-            for (MediaType acceptableType : acceptableTypes) {
-                if (acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType)) {
-                    return true;
-                }
             }
         }
         return false;
@@ -367,6 +375,11 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     @Override
     public boolean explicitlyConsumes(MediaType contentType) {
         return consumedMediaTypes.contains(contentType);
+    }
+
+    @Override
+    public boolean explicitlyProduces(MediaType contentType) {
+        return producedMediaTypes == null || producedMediaTypes.isEmpty() || producedMediaTypes.contains(contentType);
     }
 
     @Override

@@ -182,6 +182,17 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
     }
 
     /**
+     * Whether the specified content type is explicitly a producing type.
+     *
+     * @param contentType The content type
+     * @return True if it is
+     * @since 2.5.0
+     */
+    default boolean explicitlyProduces(@Nullable MediaType contentType) {
+        return false;
+    }
+
+    /**
      * Is the given input satisfied.
      *
      * @param name The name of the input

@@ -46,7 +46,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     public static final String HANDLER_BODY_PUBLISHER = "http-streams-codec-body-publisher";
     private static final Logger LOG = LoggerFactory.getLogger(HttpStreamsHandler.class);
 
-    private final Queue<Outgoing> outgoing = new LinkedList<>();
+    private final Queue<Outgoing<Out>> outgoing = new LinkedList<>();
     private final Class<In> inClass;
     private final Class<Out> outClass;
 
@@ -324,7 +324,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     public void write(final ChannelHandlerContext ctx, Object msg, final ChannelPromise promise) throws Exception {
         if (isValidOutMessage(msg)) {
 
-            Outgoing out = new Outgoing(outClass.cast(msg), promise);
+            Outgoing<Out> out = new Outgoing<>(outClass.cast(msg), promise);
             receivedOutMessage(ctx);
 
             if (outgoing.isEmpty()) {
@@ -348,7 +348,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
      * @param ctx The channel handler context
      * @param out The output stream
      */
-    protected void unbufferedWrite(final ChannelHandlerContext ctx, final Outgoing out) {
+    protected void unbufferedWrite(final ChannelHandlerContext ctx, final Outgoing<Out> out) {
 
         if (out.message instanceof FullHttpMessage) {
             // Forward as is
@@ -466,15 +466,15 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     /**
      * The outgoing class.
      */
-    class Outgoing {
-        final Out message;
+    static class Outgoing<O extends HttpMessage> {
+        final O message;
         final ChannelPromise promise;
 
         /**
          * @param message The output message
          * @param promise The channel promise
          */
-        Outgoing(Out message, ChannelPromise promise) {
+        Outgoing(O message, ChannelPromise promise) {
             this.message = message;
             this.promise = promise;
         }

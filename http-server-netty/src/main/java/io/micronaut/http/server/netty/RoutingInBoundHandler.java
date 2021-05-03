@@ -65,10 +65,10 @@ import io.micronaut.http.annotation.Status;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.multipart.PartData;
@@ -126,7 +126,6 @@ import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.*;
-import io.reactivex.functions.Consumer;
 import io.reactivex.functions.LongConsumer;
 import io.reactivex.processors.UnicastProcessor;
 import io.reactivex.schedulers.Schedulers;
@@ -160,7 +159,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
     private static final Argument ARGUMENT_PART_DATA = Argument.of(PartData.class);
     private static final Object NOT_FOUND = new Object();
-    private static final Single<Object> NOT_FOUND_SINGLE = Single.just(NOT_FOUND);
 
     private final Router router;
     private final ExecutorSelector executorSelector;
@@ -188,7 +186,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
      * @param executorSelector                        The executor selector
      * @param ioExecutor                              The IO executor
      * @param httpContentProcessorResolver            The http content processor resolver
-     * @param errorResponseProcessor                    The factory to create error responses
+     * @param errorResponseProcessor                  The factory to create error responses
      */
     RoutingInBoundHandler(
             BeanContext beanContext,
@@ -367,7 +365,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         ctx,
                         ctx.executor(),
                         true,
-                        nettyException
+                        nettyException,
+                        null
                 ).execute();
             } catch (Throwable e) {
                 writeDefaultErrorResponse(ctx, nettyHttpRequest, e, nettyException);
@@ -385,13 +384,28 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         Object result = handler.handle(nettyHttpRequest, cause);
                         return errorResultToResponse(result);
                     });
-                    Supplier<Flowable<? extends MutableHttpResponse<?>>> publisherSupplier = () -> routePublisher;
-                    filterPublisher(new AtomicReference<HttpRequest<?>>(nettyHttpRequest), publisherSupplier, ctx.executor(), nettyException)
-                            .firstOrError()
-                            .subscribe((mutableHttpResponse, throwable) -> {
-                                if (throwable != null) {
+                    filterPublisher(new AtomicReference<HttpRequest<?>>(nettyHttpRequest), routePublisher, ctx.executor(), nettyException)
+                            .subscribe(new CompletionAwareSubscriber<MutableHttpResponse<?>>() {
+
+                                MutableHttpResponse<?> mutableHttpResponse;
+
+                                @Override
+                                public void doOnSubscribe(Subscription s) {
+                                    s.request(1);
+                                }
+
+                                @Override
+                                public void doOnNext(MutableHttpResponse<?> mutableHttpResponse) {
+                                    this.mutableHttpResponse = mutableHttpResponse;
+                                }
+
+                                @Override
+                                public void doOnError(Throwable throwable) {
                                     writeDefaultErrorResponse(ctx, nettyHttpRequest, throwable, nettyException);
-                                } else {
+                                }
+
+                                @Override
+                                public void doOnComplete() {
                                     encodeHttpResponse(
                                             ctx,
                                             nettyHttpRequest,
@@ -635,18 +649,39 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
         filterPublisher(
                 requestReference,
-                () -> Flowable.just(finalResponse),
+                Publishers.just(finalResponse),
                 ctx.channel().eventLoop(),
                 skipOncePerRequest
-        ).singleOrError().subscribe((Consumer<MutableHttpResponse<?>>) mutableHttpResponse ->
-            encodeHttpResponse(
-                    ctx,
-                    nettyHttpRequest,
-                    mutableHttpResponse,
-                    mutableHttpResponse.body(),
-                    defaultResponseMediaType
-            )
-        , throwable -> exceptionCaughtInternal(ctx, throwable, nettyHttpRequest, false));
+        ).subscribe(new CompletionAwareSubscriber<MutableHttpResponse<?>>() {
+
+            MutableHttpResponse<?> mutableHttpResponse;
+
+            @Override
+            public void doOnSubscribe(Subscription s) {
+                s.request(1);
+            }
+
+            @Override
+            public void doOnNext(MutableHttpResponse<?> mutableHttpResponse) {
+                this.mutableHttpResponse = mutableHttpResponse;
+            }
+
+            @Override
+            public void doOnError(Throwable throwable) {
+                exceptionCaughtInternal(ctx, throwable, nettyHttpRequest, false);
+            }
+
+            @Override
+            public void doOnComplete() {
+                encodeHttpResponse(
+                        ctx,
+                        nettyHttpRequest,
+                        mutableHttpResponse,
+                        mutableHttpResponse.body(),
+                        defaultResponseMediaType
+                );
+            }
+        });
     }
 
     private Optional<? extends FileCustomizableResponseType> matchFile(String path) {
@@ -724,16 +759,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         // The request body is required, so at this point we must have a StreamedHttpRequest
         io.netty.handler.codec.http.HttpRequest nativeRequest = request.getNativeRequest();
+        HttpContentProcessor<?> contentProcessor = null;
         if (!route.isExecutable() &&
                 io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) &&
                 nativeRequest instanceof StreamedHttpRequest &&
                 (!bodyArgument.isPresent() || !route.isSatisfied(bodyArgument.get().getName()))) {
-            httpContentProcessorResolver.resolve(request, route).subscribe(buildSubscriber(request, context, route));
+            contentProcessor = httpContentProcessorResolver.resolve(request, route);
         } else {
             context.read();
-            route = prepareRouteForExecution(route, request, skipOncePerRequest);
-            route.execute();
         }
+        route = prepareRouteForExecution(route, request, skipOncePerRequest, contentProcessor);
+        route.execute();
     }
 
     private boolean isJsonFormattable(Argument<?> argument) {
@@ -747,8 +783,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private Subscriber<Object> buildSubscriber(NettyHttpRequest<?> request,
-                                               ChannelHandlerContext context,
-                                               RouteMatch<?> finalRoute) {
+                                               RouteMatch<?> finalRoute,
+                                               SingleEmitter<RouteMatch<?>> emitter) {
         boolean isFormData = request.isFormOrMultipartData();
         if (isFormData) {
             return new CompletionAwareSubscriber<Object>() {
@@ -866,14 +902,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     Object part = data;
 
                                     if (chunkedProcessing) {
-                                        HttpDataReference.Component component = dataReference.addComponent(e -> {
+                                        HttpDataReference.Component component;
+                                        try {
+                                            component = dataReference.addComponent();
+                                            if (component == null) {
+                                                s.request(1);
+                                                return;
+                                            }
+                                        } catch (IOException e) {
                                             subject.onError(e);
                                             s.cancel();
-                                        });
-                                        if (component == null) {
-                                            if (!executed) {
-                                                s.request(1);
-                                            }
                                             return;
                                         }
                                         part = new NettyPartData(dataReference, component);
@@ -965,13 +1003,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                 @Override
                 protected void doOnError(Throwable t) {
-                    try {
-                        s.cancel();
-                        exceptionCaught(context, t);
-                    } catch (Exception e) {
-                        // should never happen
-                        writeDefaultErrorResponse(context, request, e, false);
-                    }
+                    s.cancel();
+                    emitter.onError(t);
                 }
 
                 @Override
@@ -986,12 +1019,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                 private void executeRoute() {
                     if (executed.compareAndSet(false, true)) {
-                        try {
-                            routeMatch = prepareRouteForExecution(routeMatch, request, false);
-                            routeMatch.execute();
-                        } catch (Exception e) {
-                            context.pipeline().fireExceptionCaught(e);
-                        }
+                        emitter.onSuccess(routeMatch);
                     }
                 }
             };
@@ -1020,24 +1048,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                 @Override
                 protected void doOnError(Throwable t) {
-                    try {
-                        s.cancel();
-                        exceptionCaught(context, t);
-                    } catch (Exception e) {
-                        // should never happen
-                        writeDefaultErrorResponse(context, request, e, false);
-                    }
+                    s.cancel();
+                    emitter.onError(t);
                 }
 
                 @Override
                 protected void doOnComplete() {
                     if (executed.compareAndSet(false, true)) {
-                        try {
-                            routeMatch = prepareRouteForExecution(routeMatch, request, false);
-                            routeMatch.execute();
-                        } catch (Exception e) {
-                            context.pipeline().fireExceptionCaught(e);
-                        }
+                        emitter.onSuccess(routeMatch);
                     }
                 }
             };
@@ -1059,7 +1077,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return executor;
     }
 
-    private RouteMatch<?> prepareRouteForExecution(RouteMatch<?> route, NettyHttpRequest<?> request, boolean skipOncePerRequest) {
+    private RouteMatch<?> prepareRouteForExecution(RouteMatch<?> route,
+                                                   NettyHttpRequest<?> request,
+                                                   boolean skipOncePerRequest,
+                                                   HttpContentProcessor<?> contentProcessor) {
         ChannelHandlerContext context = request.getChannelHandlerContext();
         // Select the most appropriate Executor
         ExecutorService executor;
@@ -1076,7 +1097,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 context,
                 executor,
                 isErrorRoute,
-                skipOncePerRequest
+                skipOncePerRequest,
+                contentProcessor
         );
         return route;
     }
@@ -1092,20 +1114,22 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ChannelHandlerContext context,
             ExecutorService executor,
             boolean isErrorRoute,
-            boolean skipOncePerRequest) {
+            boolean skipOncePerRequest,
+            HttpContentProcessor<?> contentProcessor) {
         route = route.decorate(finalRoute -> {
             MediaType defaultResponseMediaType = resolveDefaultResponseContentType(
                     request,
                     finalRoute
             );
             AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
-            Flowable<? extends MutableHttpResponse<?>> filteredPublisher = buildResultEmitter(
+            Publisher<? extends MutableHttpResponse<?>> filteredPublisher = buildResultEmitter(
                     request,
                     requestReference,
                     finalRoute,
                     executor,
                     isErrorRoute,
-                    skipOncePerRequest
+                    skipOncePerRequest,
+                    contentProcessor
             );
 
             filteredPublisher.subscribe(new ContextCompletionAwareSubscriber<MutableHttpResponse<?>>(context) {
@@ -1130,7 +1154,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     context,
                                     executor,
                                     true,
-                                    true
+                                    true,
+                                    null
                             ).execute();
                         } else {
                             //noinspection unchecked
@@ -1151,94 +1176,107 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             boolean isCompletable = !isSingle && finalRoute.isVoid() && Publishers.isCompletable(bodyClass);
                             if (isSingle || isCompletable) {
                                 // full response case
-                                Single<Object> single = Publishers.convertPublisher(body, Maybe.class)
-                                        .switchIfEmpty(NOT_FOUND_SINGLE);
-                                single.subscribe((o, throwable) -> {
-                                    if (o == NOT_FOUND) {
-                                        if (isCompletable || finalRoute.isVoid() || finalRoute.isSuspended()) {
-                                            message.body(null);
-                                            message.header(HttpHeaders.CONTENT_LENGTH, HttpHeaderValues.ZERO);
-                                            writeFinalNettyResponse(
-                                                    message,
-                                                    request,
-                                                    context
-                                            );
-                                        } else if (!isErrorRoute) {
-                                            RouteMatch<Object> statusRoute = findStatusRoute(incomingRequest, HttpStatus.NOT_FOUND, finalRoute);
-                                            if (statusRoute != null) {
-                                                buildExecutableRoute(
-                                                        statusRoute,
-                                                        request,
-                                                        context,
-                                                        executor,
-                                                        true,
-                                                        true)
-                                                        .execute();
-                                            } else {
-                                                emitDefaultNotFoundResponse(context, requestReference.get(), skipOncePerRequest);
-                                            }
-                                        } else {
-                                            emitDefaultNotFoundResponse(context, requestReference.get(), skipOncePerRequest);
-                                        }
-                                    } else if (throwable != null) {
+                                Publisher<Object> publisher = Publishers.convertPublisher(body, Publisher.class);
+                                publisher.subscribe(new CompletionAwareSubscriber<Object>() {
+
+                                    Object result = NOT_FOUND;
+                                    
+                                    @Override
+                                    protected void doOnSubscribe(Subscription subscription) {
+                                        subscription.request(1);
+                                    }
+
+                                    @Override
+                                    protected void doOnNext(Object result) {
+                                        this.result = result;
+                                    }
+
+                                    @Override
+                                    protected void doOnError(Throwable throwable) {
                                         exceptionCaughtInternal(
                                                 context,
                                                 throwable,
                                                 request,
                                                 false
                                         );
-                                    } else {
-                                        MutableHttpResponse<?> finalResponse;
-                                        if (o instanceof HttpResponse) {
-                                            finalResponse = toMutableResponse((HttpResponse<?>) o);
-                                            o = finalResponse.body();
+                                    }
+
+                                    @Override
+                                    protected void doOnComplete() {
+                                        if (result == NOT_FOUND) {
+                                            if (isCompletable || finalRoute.isVoid() || finalRoute.isSuspended()) {
+                                                message.body(null);
+                                                message.header(HttpHeaders.CONTENT_LENGTH, HttpHeaderValues.ZERO);
+                                                writeFinalNettyResponse(
+                                                        message,
+                                                        request,
+                                                        context
+                                                );
+                                            } else if (!isErrorRoute) {
+                                                RouteMatch<Object> statusRoute = findStatusRoute(incomingRequest, HttpStatus.NOT_FOUND, finalRoute);
+                                                if (statusRoute != null) {
+                                                    buildExecutableRoute(
+                                                            statusRoute,
+                                                            request,
+                                                            context,
+                                                            executor,
+                                                            true,
+                                                            true,
+                                                            null)
+                                                            .execute();
+                                                } else {
+                                                    emitDefaultNotFoundResponse(context, requestReference.get(), skipOncePerRequest);
+                                                }
+                                            } else {
+                                                emitDefaultNotFoundResponse(context, requestReference.get(), skipOncePerRequest);
+                                            }
                                         } else {
-                                            finalResponse = message;
+                                            MutableHttpResponse<?> finalResponse;
+                                            if (result instanceof HttpResponse) {
+                                                finalResponse = toMutableResponse((HttpResponse<?>) result);
+                                                result = finalResponse.body();
+                                            } else {
+                                                finalResponse = message;
+                                            }
+                                            encodeHttpResponse(
+                                                    context,
+                                                    request,
+                                                    finalResponse,
+                                                    result,
+                                                    defaultResponseMediaType
+                                            );
                                         }
-                                        encodeHttpResponse(
-                                                context,
-                                                request,
-                                                finalResponse,
-                                                o,
-                                                defaultResponseMediaType
-                                        );
                                     }
                                 });
-
                             } else {
                                 // streaming case
                                 Argument<?> typeArgument = finalRoute.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                                 boolean isHttp2 = request.getHttpVersion() == io.micronaut.http.HttpVersion.HTTP_2_0;
                                 if (HttpResponse.class.isAssignableFrom(typeArgument.getType()) && !typeArgument.getFirstTypeVariable().map(Argument::isAsyncOrReactive).orElse(false)) {
                                     // a response stream
-                                    Flowable<HttpResponse<?>> bodyFlowable = Publishers.convertPublisher(body, Flowable.class);
-
+                                    Publisher<HttpResponse<?>> bodyPublisher = Publishers.convertPublisher(body, Publisher.class);
                                     // HTTP/2 allows sending multiple responses down a single stream
                                     if (isHttp2) {
-                                        bodyFlowable.subscribe(httpResponse -> encodeHttpResponse(
-                                                context,
-                                                request,
-                                                toNettyResponse(httpResponse),
-                                                httpResponse.body(),
-                                                defaultResponseMediaType
-                                        ), throwable -> exceptionCaughtInternal(
-                                                context,
-                                                throwable,
-                                                request,
-                                                false
-                                        ));
-                                    } else {
-                                        // HTTP/1 we take the first response or error
-                                        bodyFlowable.firstOrError().subscribe((httpResponse, throwable) -> {
-                                            if (throwable == null) {
+                                        bodyPublisher.subscribe(new CompletionAwareSubscriber<HttpResponse<?>>() {
+                                            @Override
+                                            protected void doOnSubscribe(Subscription subscription) {
+                                                subscription.request(1);
+                                            }
+
+                                            @Override
+                                            protected void doOnNext(HttpResponse<?> message) {
                                                 encodeHttpResponse(
                                                         context,
                                                         request,
-                                                        toNettyResponse(httpResponse),
-                                                        httpResponse.body(),
+                                                        toNettyResponse(message),
+                                                        message.body(),
                                                         defaultResponseMediaType
                                                 );
-                                            } else {
+                                                subscription.request(1);
+                                            }
+
+                                            @Override
+                                            protected void doOnError(Throwable throwable) {
                                                 exceptionCaughtInternal(
                                                         context,
                                                         throwable,
@@ -1246,14 +1284,60 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                         false
                                                 );
                                             }
+
+                                            @Override
+                                            protected void doOnComplete() {
+                                            }
+
+                                        });
+                                    } else {
+                                        // HTTP/1 we take the first response or error
+                                        bodyPublisher.subscribe(new CompletionAwareSubscriber<HttpResponse<?>>() {
+
+                                            final AtomicBoolean received = new AtomicBoolean();
+
+                                            @Override
+                                            protected void doOnSubscribe(Subscription subscription) {
+                                                subscription.request(1);
+                                            }
+
+                                            @Override
+                                            protected void doOnNext(HttpResponse<?> message) {
+                                                encodeHttpResponse(
+                                                        context,
+                                                        request,
+                                                        toNettyResponse(message),
+                                                        message.body(),
+                                                        defaultResponseMediaType
+                                                );
+                                                received.set(true);
+                                            }
+
+                                            @Override
+                                            protected void doOnError(Throwable throwable) {
+                                                exceptionCaughtInternal(
+                                                        context,
+                                                        throwable,
+                                                        request,
+                                                        false
+                                                );
+                                            }
+
+                                            @Override
+                                            protected void doOnComplete() {
+                                                if (!received.get()) {
+                                                    doOnError(new NoSuchElementException());
+                                                }
+                                            }
+
                                         });
                                     }
                                 } else {
                                     boolean isJson = mediaType.getExtension().equals(MediaType.EXTENSION_JSON) && isJsonFormattable(typeArgument);
-                                    Flowable<Object> bodyFlowable = Publishers.convertPublisher(body, Flowable.class);
+                                    Publisher<Object> bodyPublisher = applyExecutorToPublisher(Publishers.convertPublisher(body, Publisher.class), executor);
                                     NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
 
-                                    Publisher<HttpContent> httpContentPublisher = Publishers.map(bodyFlowable, new Function<Object, HttpContent>() {
+                                    Publisher<HttpContent> httpContentPublisher = Publishers.map(bodyPublisher, new Function<Object, HttpContent>() {
                                         boolean first = true;
 
                                         @Override
@@ -1382,28 +1466,76 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return route;
     }
 
-    private Flowable<? extends MutableHttpResponse<?>> buildResultEmitter(
+    private Publisher<? extends MutableHttpResponse<?>> buildResultEmitter(
             NettyHttpRequest<?> request,
             AtomicReference<HttpRequest<?>> requestReference,
             RouteMatch<?> finalRoute,
             ExecutorService executor,
             boolean isErrorRoute,
-            boolean skipOncePerRequest) {
+            boolean skipOncePerRequest,
+            HttpContentProcessor<?> contentProcessor) {
         // build the result emitter. This result emitter emits the response from a controller action
-        Supplier<Flowable<? extends MutableHttpResponse<?>>> resultEmitter = () -> {
-            final RouteMatch<?> routeMatch;
+        Publisher<? extends MutableHttpResponse<?>> executeRoutePublisher;
+        if (contentProcessor != null) {
+            executeRoutePublisher = Single.<RouteMatch<?>>create(emitter ->
+                    contentProcessor.subscribe(buildSubscriber(request, finalRoute, emitter)))
+                    .flatMapPublisher((route) -> createExecuteRoutePublisher(request, requestReference, route, isErrorRoute));
+        } else {
+            executeRoutePublisher = createExecuteRoutePublisher(request, requestReference, finalRoute, isErrorRoute);
+        }
 
-            // ensure the route requirements are completely satisfied
-            if (!finalRoute.isExecutable()) {
-                routeMatch = requestArgumentSatisfier
-                        .fulfillArgumentRequirements(finalRoute, requestReference.get(), true);
-            } else {
-                routeMatch = finalRoute;
+        // process the publisher through the available filters
+        return filterPublisher(
+                requestReference,
+                executeRoutePublisher,
+                executor,
+                skipOncePerRequest
+        );
+    }
+
+    private Publisher<? extends MutableHttpResponse<?>> createExecuteRoutePublisher(NettyHttpRequest<?> request,
+                                                                                    AtomicReference<HttpRequest<?>> requestReference,
+                                                                                    RouteMatch<?> routeMatch,
+                                                                                    boolean isErrorRoute) {
+        return subscriber -> subscriber.onSubscribe(new Subscription() {
+
+            boolean done;
+
+            @Override
+            public void request(long n) {
+                if (done) {
+                    return;
+                }
+                done = true;
+                emitRouteResponse((Subscriber<MutableHttpResponse<?>>) subscriber, request, requestReference, routeMatch, isErrorRoute);
             }
 
-            boolean isSuspended = routeMatch.isSuspended();
+            @Override
+            public void cancel() {
+            }
 
-            Object body = routeMatch.execute();
+        });
+    }
+
+    private void emitRouteResponse(Subscriber<MutableHttpResponse<?>> subscriber,
+                                   NettyHttpRequest<?> request,
+                                   AtomicReference<HttpRequest<?>> requestReference,
+                                   RouteMatch<?> routeMatch,
+                                   boolean isErrorRoute) {
+        try {
+            final RouteMatch<?> finalRoute;
+
+            // ensure the route requirements are completely satisfied
+            if (!routeMatch.isExecutable()) {
+                finalRoute = requestArgumentSatisfier
+                        .fulfillArgumentRequirements(routeMatch, requestReference.get(), true);
+            } else {
+                finalRoute = routeMatch;
+            }
+
+            boolean isSuspended = finalRoute.isSuspended();
+
+            Object body = finalRoute.execute();
             if (body instanceof Optional) {
                 body = ((Optional<?>) body).orElse(null);
             }
@@ -1412,8 +1544,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             MutableHttpResponse<?> outgoingResponse;
 
             if (body == null) {
-                if (routeMatch.isVoid()) {
-                    outgoingResponse = forStatus(routeMatch.getAnnotationMetadata());
+                if (finalRoute.isVoid()) {
+                    outgoingResponse = forStatus(finalRoute.getAnnotationMetadata());
                     if (HttpMethod.permitsRequestBody(request.getMethod())) {
                         outgoingResponse.header(HttpHeaders.CONTENT_LENGTH, HttpHeaderValues.ZERO);
                     }
@@ -1429,31 +1561,67 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     boolean isCompletable = !isSingle && finalRoute.isVoid() && Publishers.isCompletable(bodyClass);
                     if (isSingle || isCompletable) {
                         // full response case
-                        Single<Object> single = Publishers.convertPublisher(body, Maybe.class)
-                                .switchIfEmpty(NOT_FOUND_SINGLE);
-                        return single.map(o -> {
-                            MutableHttpResponse<?> singleResponse;
-                            if (o instanceof Optional) {
-                                o = ((Optional) o).orElse(NOT_FOUND);
+                        Publisher<Object> publisher = Publishers.convertPublisher(body, Publisher.class);
+                        Publishers.mapOrSupplyEmpty(publisher, new Publishers.MapOrSupplyEmpty<Object, MutableHttpResponse<?>>() {
+                            @Override
+                            public MutableHttpResponse<?>  map(Object o) {
+                                MutableHttpResponse<?> singleResponse;
+                                if (o instanceof Optional) {
+                                    Optional optional = (Optional) o;
+                                    if (optional.isPresent()) {
+                                        o = ((Optional<?>) o).get();
+                                    } else {
+                                        return supplyEmpty();
+                                    }
+                                }
+                                if (o instanceof HttpResponse) {
+                                    singleResponse = toMutableResponse((HttpResponse<?>) o);
+                                } else if (o instanceof HttpStatus) {
+                                    singleResponse = forStatus(routeMatch.getAnnotationMetadata(), (HttpStatus) o);
+                                } else {
+                                    singleResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
+                                            .body(o);
+                                }
+                                singleResponse.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
+                                return singleResponse;
                             }
-                            if (o == NOT_FOUND) {
+
+                            @Override
+                            public MutableHttpResponse<?> supplyEmpty() {
+                                MutableHttpResponse<?> singleResponse;
                                 if (isCompletable || finalRoute.isVoid()) {
                                     singleResponse = forStatus(routeMatch.getAnnotationMetadata(), HttpStatus.OK)
                                             .header(HttpHeaders.CONTENT_LENGTH, HttpHeaderValues.ZERO);
                                 } else {
                                     singleResponse = newNotFoundError(request);
                                 }
-                            } else {
-                                if (o instanceof HttpResponse) {
-                                    singleResponse = toMutableResponse((HttpResponse<?>) o);
-                                } else {
-                                    singleResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
-                                            .body(o);
-                                }
+                                singleResponse.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
+                                return singleResponse;
                             }
-                            singleResponse.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
-                            return singleResponse;
-                        }).toFlowable();
+
+                        }).subscribe(new CompletionAwareSubscriber<MutableHttpResponse<?>>() {
+
+                            @Override
+                            public void doOnSubscribe(Subscription s) {
+                                s.request(1);
+                            }
+
+                            @Override
+                            public void doOnNext(MutableHttpResponse<?> mutableHttpResponse) {
+                                subscriber.onNext(mutableHttpResponse);
+                            }
+
+                            @Override
+                            public void doOnError(Throwable t) {
+                                subscriber.onError(t);
+                            }
+
+                            @Override
+                            public void doOnComplete() {
+                                subscriber.onComplete();
+                            }
+                        });
+                        return;
                     }
                 }
                 // now we have the raw result, transform it as necessary
@@ -1462,35 +1630,34 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 } else {
                     if (isSuspended) {
                         boolean isKotlinFunctionReturnTypeUnit =
-                                routeMatch instanceof MethodBasedRouteMatch &&
-                                        isKotlinFunctionReturnTypeUnit(((MethodBasedRouteMatch) routeMatch).getExecutableMethod());
+                                finalRoute instanceof MethodBasedRouteMatch &&
+                                        isKotlinFunctionReturnTypeUnit(((MethodBasedRouteMatch) finalRoute).getExecutableMethod());
                         final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(incomingRequest);
                         if (isKotlinCoroutineSuspended(body)) {
-                            return Flowable.create(emitter -> {
-                                CompletableFuture<?> f = supplier.get();
-                                f.whenComplete((o, throwable) -> {
-                                    if (throwable != null) {
-                                        emitter.onError(throwable);
+                            CompletableFuture<?> f = supplier.get();
+                            f.whenComplete((o, throwable) -> {
+                                if (throwable != null) {
+                                    subscriber.onError(throwable);
+                                } else {
+                                    if (o == null) {
+                                        subscriber.onNext(newNotFoundError(request));
                                     } else {
-                                        if (o == null) {
-                                            emitter.onNext(newNotFoundError(request));
+                                        MutableHttpResponse<?> response;
+                                        if (o instanceof HttpResponse) {
+                                            response = toMutableResponse((HttpResponse<?>) o);
                                         } else {
-                                            MutableHttpResponse<?> response;
-                                            if (o instanceof HttpResponse) {
-                                                response = toMutableResponse((HttpResponse<?>) o);
-                                            } else {
-                                                response = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus);
-                                                if (!isKotlinFunctionReturnTypeUnit) {
-                                                    response = response.body(o);
-                                                }
+                                            response = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus);
+                                            if (!isKotlinFunctionReturnTypeUnit) {
+                                                response = response.body(o);
                                             }
-                                            response.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
-                                            emitter.onNext(response);
                                         }
-                                        emitter.onComplete();
+                                        response.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
+                                        subscriber.onNext(response);
                                     }
-                                });
-                            }, BackpressureStrategy.ERROR);
+                                    subscriber.onComplete();
+                                }
+                            });
+                            return;
                         } else {
                             Object suspendedBody;
                             if (isKotlinFunctionReturnTypeUnit) {
@@ -1501,7 +1668,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             if (suspendedBody instanceof HttpResponse) {
                                 outgoingResponse = toMutableResponse((HttpResponse<?>) suspendedBody);
                             } else {
-                                outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
+                                outgoingResponse = forStatus(finalRoute.getAnnotationMetadata(), defaultHttpStatus)
                                         .body(suspendedBody);
                             }
                         }
@@ -1510,7 +1677,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         if (body instanceof HttpResponse) {
                             outgoingResponse = toMutableResponse((HttpResponse<?>) body);
                         } else {
-                            outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), defaultHttpStatus)
+                            outgoingResponse = forStatus(finalRoute.getAnnotationMetadata(), defaultHttpStatus)
                                     .body(body);
                         }
                     }
@@ -1526,16 +1693,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
             }
             outgoingResponse.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
-            return Flowable.just(outgoingResponse);
-        };
 
-        // process the publisher through the available filters
-        return filterPublisher(
-                requestReference,
-                resultEmitter,
-                executor,
-                skipOncePerRequest
-        );
+            subscriber.onNext(outgoingResponse);
+            subscriber.onComplete();
+        } catch (Throwable e) {
+            subscriber.onError(e);
+        }
     }
 
     private void encodeHttpResponse(
@@ -1936,54 +2099,111 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         .orElse(defaultStatus));
     }
 
-    private Flowable<? extends MutableHttpResponse<?>> filterPublisher(
+    private Publisher<? extends MutableHttpResponse<?>> filterPublisher(
             AtomicReference<HttpRequest<?>> requestReference,
-            Supplier<? extends Publisher<? extends MutableHttpResponse<?>>> routePublisherSupplier,
+            Publisher<? extends MutableHttpResponse<?>> upstreamResponsePublisher,
             @Nullable ExecutorService executor,
             boolean skipOncePerRequest) {
-        Publisher<? extends io.micronaut.http.MutableHttpResponse<?>> finalPublisher;
-        List<HttpFilter> filters = new ArrayList<>(router.findFilters(requestReference.get()));
+        Publisher<MutableHttpResponse<?>> responsePublisher = new Publisher<MutableHttpResponse<?>>() {
+
+            @Override
+            public void subscribe(Subscriber<? super MutableHttpResponse<?>> actualSubscriber) {
+                HttpRequest<?> request = requestReference.get();
+                if (executor == null) {
+                    doSubscribe(actualSubscriber, request);
+                } else {
+                    Subscriber<? super MutableHttpResponse<?>> observedSubscriber = new CompletionAwareSubscriber<MutableHttpResponse<?>>() {
+
+                        AtomicBoolean received = new AtomicBoolean();
+
+                        @Override
+                        public void doOnSubscribe(Subscription s) {
+                            actualSubscriber.onSubscribe(s);
+                        }
+
+                        @Override
+                        public void doOnNext(MutableHttpResponse<?> mutableHttpResponse) {
+                            if (received.compareAndSet(false, true)) {
+                                executor.execute(() -> {
+                                    actualSubscriber.onNext(mutableHttpResponse);
+                                    actualSubscriber.onComplete();
+                                });
+                            } else {
+                                throw new IllegalStateException("Only single result expected");
+                            }
+                        }
+
+                        @Override
+                        public void doOnError(Throwable t) {
+                            executor.execute(() -> actualSubscriber.onError(t));
+                        }
+
+                        @Override
+                        public void doOnComplete() {
+                            if (!received.get()) {
+                                throw new IllegalStateException("No value published!");
+                            }
+                        }
+                    };
+                    executor.execute(() -> doSubscribe(observedSubscriber, request));
+                }
+            }
+
+            private void doSubscribe(Subscriber<? super MutableHttpResponse<?>> actualSubscriber, HttpRequest<?> request) {
+                try {
+                    ServerRequestContext.set(request);
+                    upstreamResponsePublisher.subscribe(actualSubscriber);
+                } finally {
+                    ServerRequestContext.set(null);
+                }
+            }
+        };
+        List<HttpFilter> httpFilters = router.findFilters(requestReference.get());
+        if (httpFilters.isEmpty()) {
+            return responsePublisher;
+        }
+        List<HttpFilter> filters = new ArrayList<>(httpFilters);
         if (skipOncePerRequest) {
             filters.removeIf(filter -> filter instanceof OncePerRequestHttpServerFilter);
         }
-        if (!filters.isEmpty()) {
-            // make the action executor the last filter in the chain
-            filters.add((HttpServerFilter) (req, chain) -> Flowable.defer(() ->
-                    applyExecutorToPublisher(Flowable.defer(routePublisherSupplier::get), executor)));
-            AtomicInteger integer = new AtomicInteger();
-            int len = filters.size();
-            ServerFilterChain filterChain = new ServerFilterChain() {
-                @SuppressWarnings("unchecked")
-                @Override
-                public Publisher<MutableHttpResponse<?>> proceed(io.micronaut.http.HttpRequest<?> request) {
-                    int pos = integer.incrementAndGet();
-                    if (pos > len) {
-                        throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
-                    }
-                    HttpFilter httpFilter = filters.get(pos);
-                    return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this);
-                }
-            };
-            HttpFilter httpFilter = filters.get(0);
-            Publisher<? extends HttpResponse<?>> resultingPublisher = httpFilter.doFilter(requestReference.get(), filterChain);
-            finalPublisher = (Publisher<? extends MutableHttpResponse<?>>) resultingPublisher;
-        } else {
-            finalPublisher = applyExecutorToPublisher(routePublisherSupplier.get(), executor);
+        if (filters.isEmpty()) {
+            return responsePublisher;
         }
-        return publisherToFlowable(finalPublisher);
+        AtomicInteger integer = new AtomicInteger();
+        int len = filters.size();
+        ServerFilterChain filterChain = new ServerFilterChain() {
+            @SuppressWarnings("unchecked")
+            @Override
+            public Publisher<MutableHttpResponse<?>> proceed(io.micronaut.http.HttpRequest<?> request) {
+                int pos = integer.incrementAndGet();
+                if (pos > len) {
+                    throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
+                }
+                if (pos == len) {
+                    return responsePublisher;
+                }
+                HttpFilter httpFilter = filters.get(pos);
+                return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this);
+            }
+        };
+        HttpFilter httpFilter = filters.get(0);
+        return (Publisher<? extends MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain);
     }
 
-    private <T extends MutableHttpResponse<?>> Publisher<T> applyExecutorToPublisher(
+    private <T> Publisher<T> applyExecutorToPublisher(
             Publisher<T> publisher,
             @Nullable ExecutorService executor) {
         if (executor != null) {
-            return publisherToFlowable(publisher).subscribeOn(Schedulers.from(executor));
+            final Scheduler scheduler = Schedulers.from(executor);
+            return publisherToFlowable(publisher)
+                        .subscribeOn(scheduler)
+                        .observeOn(scheduler);
         } else {
             return publisher;
         }
     }
 
-    private <T extends MutableHttpResponse<?>> Flowable<T> publisherToFlowable(
+    private <T> Flowable<T> publisherToFlowable(
             Publisher<T> publisher) {
         if (publisher instanceof Flowable) {
             return (Flowable<T>) publisher;

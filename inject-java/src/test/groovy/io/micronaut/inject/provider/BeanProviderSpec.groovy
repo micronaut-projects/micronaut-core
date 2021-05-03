@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.provider
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.TestCachePuts

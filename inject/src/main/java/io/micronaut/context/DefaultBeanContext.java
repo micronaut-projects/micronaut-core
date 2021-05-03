@@ -885,7 +885,8 @@ public class DefaultBeanContext implements BeanContext {
      * @param <T>               The bean concrete type
      * @return A stream
      */
-    protected <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
+    @Internal
+    public <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         return getBeanRegistrations(resolutionContext, beanType, qualifier).stream()
                 .map(BeanRegistration::getBean);
@@ -1305,7 +1306,8 @@ public class DefaultBeanContext implements BeanContext {
      * @param <T>               The bean type parameter
      * @return The found beans
      */
-    protected @NonNull
+    @Internal
+    public @NonNull
     <T> Collection<T> getBeansOfType(
             @Nullable BeanResolutionContext resolutionContext,
             @NonNull Argument<T> beanType,
@@ -1998,27 +2000,25 @@ public class DefaultBeanContext implements BeanContext {
 
         if (!beanDefinitionsClasses.isEmpty()) {
 
-            Stream<BeanDefinition<T>> candidateStream = beanDefinitionsClasses
-                    .stream()
-                    .filter(reference ->
-                            reference.isCandidateBean(beanType.getType()) && reference.isEnabled(this, resolutionContext)
-                    )
-                    .map(ref -> {
-                        BeanDefinition<T> loadedBean;
-                        try {
-                            loadedBean = ref.load(this);
-                        } catch (Throwable e) {
-                            throw new BeanContextException("Error loading bean [" + ref.getName() + "]: " + e.getMessage(), e);
-                        }
-                        return loadedBean;
-                    });
-
-            if (filter != null) {
-                candidateStream = candidateStream.filter(candidate -> !candidate.equals(filter));
+            Set<BeanDefinition<T>> candidates = new HashSet<>();
+            for (BeanDefinitionReference reference : beanDefinitionsClasses) {
+                if (!reference.isCandidateBean(beanType.getType()) || !reference.isEnabled(this, resolutionContext)) {
+                    continue;
+                }
+                BeanDefinition<T> loadedBean;
+                try {
+                    loadedBean = reference.load(this);
+                } catch (Throwable e) {
+                    throw new BeanContextException("Error loading bean [" + reference.getName() + "]: " + e.getMessage(), e);
+                }
+                if (filter != null && loadedBean.equals(filter)) {
+                    continue;
+                }
+                if (!loadedBean.isEnabled(this, resolutionContext)) {
+                    continue;
+                }
+                candidates.add(loadedBean);
             }
-            Set<BeanDefinition<T>> candidates = candidateStream
-                    .filter(candidate -> candidate.isEnabled(this, resolutionContext))
-                    .collect(Collectors.toSet());
 
             if (!candidates.isEmpty()) {
                 if (filterProxied) {
@@ -2398,31 +2398,32 @@ public class DefaultBeanContext implements BeanContext {
                     if (definition instanceof BeanDefinition) {
                         declaringType = ((BeanDefinition<?>) definition).getDeclaringType();
                     }
-                    Function<Class, Boolean> comparisonFunction = typeMatches(definition, annotationMetadata);
+                    Function<Class, Boolean> comparisonFunction = null;
 
-                    Optional<Class<?>> finalDeclaringType = declaringType;
-                    return replacementTypes.stream().anyMatch(replacingCandidate -> {
+                    for (BeanType<T> replacingCandidate : replacementTypes) {
                         if (definition == replacingCandidate) {
                             // don't replace yourself
-                            return false;
+                            continue;
                         }
                         if (replacingCandidate instanceof ProxyBeanDefinition && ((ProxyBeanDefinition<T>) replacingCandidate).getTargetDefinitionType() == definition.getClass()) {
-                            return false;
+                            continue;
                         }
 
                         final AnnotationValue<Replaces> replacesAnn = replacingCandidate.getAnnotation(Replaces.class);
                         Class beanType = replacesAnn.classValue().orElse(getCanonicalBeanType(replacingCandidate));
-                        Optional<Class<?>> factory = replacesAnn.classValue("factory");
                         if (replacesAnn.contains(NAMED_MEMBER)) {
-
                             final String qualifier = replacesAnn.stringValue(NAMED_MEMBER).orElse(null);
                             if (qualifier != null) {
                                 final Optional qualified = Qualifiers.<T>byName(qualifier)
                                         .qualify(beanType, Stream.of(definition));
-                                return qualified.isPresent();
+                                if (qualified.isPresent()) {
+                                    return true;
+                                }
+                                continue;
                             }
                         }
 
+                        Optional<Class<?>> factory = replacesAnn.classValue("factory");
                         if (LOG.isDebugEnabled()) {
                             if (factory.isPresent()) {
                                 LOG.debug("Bean [{}] replaces existing bean of type [{}] in factory type [{}]", replacingCandidate.getBeanType(), beanType, factory.get());
@@ -2430,16 +2431,24 @@ public class DefaultBeanContext implements BeanContext {
                                 LOG.debug("Bean [{}] replaces existing bean of type [{}]", replacingCandidate.getBeanType(), beanType);
                             }
                         }
-                        if (factory.isPresent() && finalDeclaringType.isPresent()) {
-                            if (factory.get() == finalDeclaringType.get()) {
-                                return comparisonFunction.apply(beanType);
+                        if (comparisonFunction == null) {
+                            comparisonFunction = typeMatches(definition, annotationMetadata);
+                        }
+                        if (factory.isPresent() && declaringType.isPresent()) {
+                            if (factory.get() == declaringType.get()) {
+                                if (comparisonFunction.apply(beanType)) {
+                                    return true;
+                                }
                             } else {
                                 return false;
                             }
                         } else {
-                            return comparisonFunction.apply(beanType);
+                            if (comparisonFunction.apply(beanType)) {
+                                return true;
+                            }
                         }
-                    });
+                    }
+                    return false;
                 });
             }
         }
@@ -3192,11 +3201,11 @@ public class DefaultBeanContext implements BeanContext {
                 }
             }
             BeanRegistration<T> registration = new BeanRegistration<>(key, beanDefinition, createdBean);
-          
+
             if (singleCandidate || key.beanType.getTypeParameters().length > 0) {
                 singletonObjects.put(key, registration);
             }
-          
+
             final Class<T> beanClass = beanType.getType();
 
             boolean isNotProxyTarget = qualifier != PROXY_TARGET_QUALIFIER;
