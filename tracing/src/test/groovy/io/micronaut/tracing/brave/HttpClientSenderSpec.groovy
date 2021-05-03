@@ -17,7 +17,6 @@ package io.micronaut.tracing.brave
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
-import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
@@ -35,11 +34,11 @@ import spock.util.concurrent.PollingConditions
 import zipkin2.Span
 
 import javax.inject.Singleton
-
 /**
  * @author graemerocher
  * @since 1.0
  */
+@Retry
 class HttpClientSenderSpec extends Specification {
 
     void "test http client sender bean initialization with instrumented threads"() {

@@ -1,6 +1,6 @@
 package io.micronaut.inject.context
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class NoPackageSpec extends AbstractTypeElementSpec {
 

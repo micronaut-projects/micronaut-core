@@ -15,8 +15,8 @@
  */
 package io.micronaut.aop.factory
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.reflect.ReflectionUtils
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import org.hibernate.Session

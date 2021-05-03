@@ -1,6 +1,6 @@
 package io.micronaut.inject.annotation
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 import javax.inject.Scope
 import javax.inject.Singleton
