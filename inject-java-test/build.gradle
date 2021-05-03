@@ -21,3 +21,8 @@ dependencies {
     api "com.blazebit:blaze-persistence-core-impl:1.6.0-Alpha1"
 }
 
+afterEvaluate {
+    sourcesJar {
+        from "$projectDir/src/main/groovy"
+    }
+}

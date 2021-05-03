@@ -8,3 +8,9 @@ dependencies {
     }
 }
 
+afterEvaluate {
+    sourcesJar {
+        from "$projectDir/src/main/groovy"
+    }
+}
+
