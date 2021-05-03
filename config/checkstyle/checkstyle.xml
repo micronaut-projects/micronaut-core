@@ -48,9 +48,9 @@
 
     <!-- Checks whether files end with a new line.                        -->
     <!-- See https://checkstyle.org/config_misc.html#NewlineAtEndOfFile -->
-    <!-- <module name="NewlineAtEndOfFile">
+    <module name="NewlineAtEndOfFile">
         <property name="lineSeparator" value="lf"/>
-    </module> -->
+    </module>
 
     <!-- Checks that property files contain the same keys.         -->
     <!-- See https://checkstyle.org/config_misc.html#Translation -->

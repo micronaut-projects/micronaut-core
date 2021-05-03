@@ -348,13 +348,21 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         writers.put(writer.getBeanType().getClassName(), writer);
     }
 
+    /**
+     * Recursively processes type arguments of element and returns if any of the type arguments need validation.
+     * If this element have a type argument that is annotated with constraint or @Valid, annotates all holder of this
+     * type argument with @Valid
+     *
+     * @param element - the element to recursively process type arguments for
+     * @return - weather it requires validation
+     */
     boolean recurseProcessTypeArguments(ClassElement element) {
         final Map<String, ClassElement> typeArguments = element.getTypeArguments();
 
         boolean requiresValidation = false;
         for (ClassElement typeArgument: typeArguments.values()) {
             if (
-                    recurseProcessTypeArguments(typeArgument) ||
+                    // recurseProcessTypeArguments(typeArgument) ||
                     typeArgument.hasDeclaredStereotype(JAVAX_VALIDATION_VALID) ||
                     typeArgument.hasDeclaredStereotype(JAVAX_VALIDATION_CONSTRAINT)
             ) {

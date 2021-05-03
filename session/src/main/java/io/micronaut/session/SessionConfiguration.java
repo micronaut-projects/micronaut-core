@@ -22,7 +22,6 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.core.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
-import javax.inject.Provider;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalInt;
