@@ -22,7 +22,7 @@ import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod

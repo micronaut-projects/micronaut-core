@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanResolutionContext
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.naming.Named
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.ValidatedBeanDefinition

@@ -160,6 +160,20 @@ micronaut:
 |Random UUID without dashes
 |===
 
+The `random.int`, `random.integer`, `random.long` and `random.float` properties supports a range suffix whose syntax is one of as follows:
+
+- `(max)` where max is an exclusive value
+- `[min,max]` where min being inclusive and max being exclusive values.
+
+[source,yaml]
+----
+instance:
+  id: ${random.int[5,10]}
+  count: ${random.int(5)}
+----
+
+NOTE: The range could vary from negative to positive as well.
+
 === Fail Fast Property Injection
 
 For beans that inject required properties, the injection and potential failure will not occur until the bean is requested. To verify at startup that the properties exist and can be injected, the bean can be annotated with ann:io.micronaut.context.annotation.Context[]. Context-scoped beans are injected at startup, and startup fails if any required properties are missing or cannot be converted to the required type.

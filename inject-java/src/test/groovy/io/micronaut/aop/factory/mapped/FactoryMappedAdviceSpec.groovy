@@ -1,7 +1,7 @@
 package io.micronaut.aop.factory.mapped
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
 
 class FactoryMappedAdviceSpec extends AbstractTypeElementSpec {
 

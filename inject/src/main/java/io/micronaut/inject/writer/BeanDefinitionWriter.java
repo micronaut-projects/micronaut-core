@@ -1431,7 +1431,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             );
         } else {
             buildArgumentWithGenerics(
-                    beanType,
+                    beanDefinitionType,
                     classWriter,
                     injectMethodVisitor,
                     propertyName,

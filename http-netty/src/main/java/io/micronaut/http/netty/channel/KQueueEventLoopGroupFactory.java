@@ -87,10 +87,20 @@ public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
         return KQueueServerSocketChannel.class;
     }
 
+    @Override
+    public KQueueServerSocketChannel serverSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return new KQueueServerSocketChannel();
+    }
+
     @NonNull
     @Override
     public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return KQueueSocketChannel.class;
+    }
+
+    @Override
+    public SocketChannel clientSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return new KQueueSocketChannel();
     }
 
     private static KQueueEventLoopGroup withIoRatio(KQueueEventLoopGroup group, @Nullable Integer ioRatio) {

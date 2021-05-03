@@ -15,12 +15,12 @@
  */
 package io.micronaut.aop.adapter
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.StartupEvent
 import io.micronaut.core.reflect.ReflectionUtils
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import org.atinject.javaxtck.auto.events.EventHandlerMultipleArguments

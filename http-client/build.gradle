@@ -27,6 +27,10 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
+
+    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
+        testImplementation('org.bouncycastle:bcpkix-jdk15on:1.65')
+    }
 }
 
 //tasks.withType(Test) {

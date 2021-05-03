@@ -15,11 +15,10 @@
  */
 package io.micronaut.aop.compile
 
-
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.exceptions.UnimplementedAdviceException
 import io.micronaut.aop.introduction.NotImplementedAdvice
 import io.micronaut.context.BeanContext
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory

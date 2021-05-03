@@ -18,7 +18,7 @@ package io.micronaut.inject.executable
 import io.micronaut.context.AbstractExecutableMethod
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.ExecutionHandle

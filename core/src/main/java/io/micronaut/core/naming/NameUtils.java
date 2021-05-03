@@ -19,11 +19,9 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 
 import io.micronaut.core.annotation.NonNull;
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * <p>Naming convention utilities.</p>
@@ -473,7 +471,12 @@ public class NameUtils {
      * @return The new string in camel case
      */
     public static String camelCase(String str, boolean lowerCaseFirstLetter) {
-        String result = Arrays.stream(str.split("[\\s_-]")).map(NameUtils::capitalize).collect(Collectors.joining(""));
+        StringBuilder sb = new StringBuilder(str.length());
+        for (String s : str.split("[\\s_-]")) {
+            String capitalize = capitalize(s);
+            sb.append(capitalize);
+        }
+        String result = sb.toString();
         if (lowerCaseFirstLetter) {
             return decapitalize(result);
         }

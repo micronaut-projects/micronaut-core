@@ -16,7 +16,7 @@
 package io.micronaut.visitors
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery

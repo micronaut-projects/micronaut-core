@@ -15,9 +15,9 @@
  */
 package io.micronaut.aop.introduction
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.event.ApplicationEventListener
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
