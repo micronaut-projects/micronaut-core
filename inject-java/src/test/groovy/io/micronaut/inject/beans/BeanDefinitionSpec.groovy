@@ -2,7 +2,7 @@ package io.micronaut.inject.beans
 
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.order.Ordered
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 

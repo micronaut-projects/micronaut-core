@@ -15,7 +15,7 @@
  */
 package io.micronaut.visitors
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class CustomVisitorSpec extends AbstractTypeElementSpec {
 
