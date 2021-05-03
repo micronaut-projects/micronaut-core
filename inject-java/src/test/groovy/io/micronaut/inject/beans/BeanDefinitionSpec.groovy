@@ -133,4 +133,19 @@ public class NumberThingManager extends AbstractThingManager<NumberThing<?>> {}
         definition != null
         definition.getTypeArguments("test.AbstractThingManager")[0].getTypeVariables().get("T").getType() == Object.class
     }
+
+    void "test a bean definition in a package with uppercase letters"() {
+        when:
+        def definition = buildBeanDefinition('test.A', 'TestBean', '''
+package test.A;
+
+@javax.inject.Singleton
+class TestBean {
+
+}
+''')
+        then:
+        noExceptionThrown()
+        definition != null
+    }
 }

@@ -308,6 +308,18 @@ class Test {
         }
     }
 
+    protected BeanDefinition buildBeanDefinition(String packageName, String className, String cls) {
+        def beanDefName= '$' + className + 'Definition'
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        try {
+            return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
+    }
+
     /**
      * Builds the bean definition for an AOP proxy bean.
      * @param className The class name
