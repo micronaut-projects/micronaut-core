@@ -161,8 +161,8 @@ class PropertySourcePropertyResolverSpec extends Specification {
         'my.property' | '${foo.bar}'                                         | 'my.property' | String  | '10'
         'my.property' | '${not.there:50}'                                    | 'my.property' | String  | '50'
         'my.property' | '${foo.bar} + ${foo.bar}'                            | 'my.property' | String  | '10 + 10'
-        'my.property' | '${foo.bar[0]}'                                      | 'my.property' | List    | ['10']
-        'my.property' | '${foo.bar[0]}'                                      | 'my.property' | Integer | 10
+        'my.property' | '${foo.bar}'                                         | 'my.property' | List    | ['10']
+        'my.property' | '${foo.bar}'                                         | 'my.property' | Integer | 10
         'my.property' | '${FOO_BAR}'                                         | 'my.property' | String  | 'foo bar'
         'my.property' | '${FOO_BAR_1}'                                       | 'my.property' | String  | 'foo bar 1'
         'my.property' | 'bolt://${NEO4J_HOST:localhost}:${NEO4J_PORT:32781}' | 'my.property' | String  | 'bolt://localhost:32781'
