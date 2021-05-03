@@ -1157,18 +1157,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     true,
                                     null
                             ).execute();
-                        } else {
-                            //noinspection unchecked
-                            MutableHttpResponse<Object> mutableHttpResponse = (MutableHttpResponse<Object>) message;
-                            encodeHttpResponse(
-                                    context,
-                                    request,
-                                    mutableHttpResponse,
-                                    mutableHttpResponse.body(),
-                                    defaultResponseMediaType
-                            );
+                            return;
                         }
-                    } else if (body != null) {
+                    }
+
+                    if (body != null) {
                         boolean isReactive = finalRoute.isAsyncOrReactive() || Publishers.isConvertibleToPublisher(body);
                         if (isReactive && Publishers.isConvertibleToPublisher(body)) {
                             Class<?> bodyClass = body.getClass();
@@ -1180,7 +1173,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 publisher.subscribe(new CompletionAwareSubscriber<Object>() {
 
                                     Object result = NOT_FOUND;
-                                    
+
                                     @Override
                                     protected void doOnSubscribe(Subscription subscription) {
                                         subscription.request(1);
