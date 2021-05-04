@@ -18,7 +18,7 @@ dependencies {
     testImplementation dependencyVersion("validation")
     testImplementation "javax.persistence:javax.persistence-api:2.2"
     testImplementation project(":runtime")
-    api "com.blazebit:blaze-persistence-core-impl:1.6.0-Alpha1"
+    api "com.blazebit:blaze-persistence-core-impl:1.6.0"
 }
 
 afterEvaluate {
