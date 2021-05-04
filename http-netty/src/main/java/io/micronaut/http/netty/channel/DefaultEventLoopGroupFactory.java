@@ -105,6 +105,11 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
         return getFactory(configuration).serverSocketChannelClass(configuration);
     }
 
+    @Override
+    public ServerSocketChannel serverSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return getFactory(configuration).serverSocketChannelInstance(configuration);
+    }
+
     @NonNull
     @Override
     public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
@@ -117,6 +122,12 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
         } else {
             return this.defaultFactory;
         }
+    }
+
+    @NonNull
+    @Override
+    public SocketChannel clientSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+        return getFactory(configuration).clientSocketChannelInstance(configuration);
     }
 
 }

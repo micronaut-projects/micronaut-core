@@ -195,7 +195,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             HttpContentProcessorResolver httpContentProcessorResolver,
             ChannelOptionFactory channelOptionFactory,
             ErrorResponseProcessor<?> errorResponseProcessor,
-            HttpHostResolver hostResolver) {
+            HttpHostResolver hostResolver
+    ) {
         this.httpCompressionStrategy = httpCompressionStrategy;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
         location.ifPresent(dir -> DiskFileUpload.baseDirectory = dir.getAbsolutePath());
@@ -309,11 +310,11 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             workerGroup = createWorkerEventLoopGroup(workerConfig);
             parentGroup = createParentEventLoopGroup();
             ServerBootstrap serverBootstrap = createServerBootstrap();
+            serverBootstrap.channelFactory(() -> eventLoopGroupFactory.serverSocketChannelInstance(workerConfig));
 
             processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
             processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
-                    .channel(eventLoopGroupFactory.serverSocketChannelClass(workerConfig))
                     .childHandler(new NettyHttpServerInitializer());
 
             Optional<String> host = serverConfiguration.getHost();

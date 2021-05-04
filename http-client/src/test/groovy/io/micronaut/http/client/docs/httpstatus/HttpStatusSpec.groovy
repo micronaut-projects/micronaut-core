@@ -36,6 +36,7 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 class HttpStatusSpec extends Specification {
+
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
@@ -100,5 +101,20 @@ class HttpStatusSpec extends Specification {
         HttpClientResponseException e = thrown()
         e.message == "success"
         e.status == HttpStatus.NOT_FOUND
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5348")
+    void "test returning a reactive stream of httpstatus"() {
+        when:
+        HttpResponse response = client.toBlocking().exchange(HttpRequest.GET("/status/reactive"))
+
+        then:
+        response.status() == HttpStatus.CREATED
+
+        when:
+        response = client.toBlocking().exchange(HttpRequest.GET("/status/single"))
+
+        then:
+        response.status() == HttpStatus.CREATED
     }
 }
