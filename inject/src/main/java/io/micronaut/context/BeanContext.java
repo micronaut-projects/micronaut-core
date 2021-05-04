@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.event.ApplicationTypedEventPublisherProvider;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.inject.BeanIdentifier;
@@ -44,6 +45,7 @@ public interface BeanContext extends
     BeanLocator,
     BeanDefinitionRegistry,
     ApplicationEventPublisher,
+    ApplicationTypedEventPublisherProvider,
     AnnotationMetadataResolver,
     MutableAttributeHolder {
 

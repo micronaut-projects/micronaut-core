@@ -64,6 +64,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -124,6 +125,7 @@ public class DefaultBeanContext implements BeanContext {
             new ConcurrentLinkedHashMap.Builder<BeanKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
     private final Map<Class, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Class, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
     private final Map<Class, Collection<BeanDefinitionReference>> beanIndex = new ConcurrentHashMap<>(12);
+    private final Map<Class, Optional<ApplicationTypedEventPublisher>> eventPublishers = new ConcurrentHashMap<>();
 
     private final ClassLoader classLoader;
     private final Set<Class> thisInterfaces = CollectionUtils.setOf(
@@ -152,6 +154,13 @@ public class DefaultBeanContext implements BeanContext {
     private final boolean eagerInitSingletons;
     private Set<Map.Entry<Class, List<BeanCreatedEventListener>>> beanCreationEventListeners;
     private BeanDefinitionValidator beanValidator;
+
+    private final Supplier<Executor> executorSupplier = SupplierUtil.memoized(new Supplier<Executor>() {
+        @Override
+        public Executor get() {
+            return findBean(Executor.class, Qualifiers.byName("scheduled")).orElseGet(ForkJoinPool::commonPool);
+        }
+    });
 
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class.
@@ -1293,69 +1302,92 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public void publishEvent(@NonNull Object event) {
-        //noinspection ConstantConditions
-        if (event != null) {
-            if (EVENT_LOGGER.isDebugEnabled()) {
-                EVENT_LOGGER.debug("Publishing event: {}", event);
+    public <T> Optional<ApplicationTypedEventPublisher<T>> findTypedEventPublisher(Class<T> eventType) {
+        Optional<ApplicationTypedEventPublisher> eventPublisher = eventPublishers.computeIfAbsent(eventType, et -> {
+            Collection<ApplicationEventListener> eventListeners = getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(et));
+            if (eventListeners.isEmpty()) {
+                return Optional.empty();
             }
-            Collection<ApplicationEventListener> eventListeners = getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()));
+            return Optional.of(new ApplicationTypedEventPublisher<T>() {
 
-            eventListeners = eventListeners.stream().sorted(OrderUtil.COMPARATOR).collect(Collectors.toList());
+                @Override
+                public void publishEvent(@NonNull T event) {
+                    Objects.requireNonNull(event, "Event cannot be null");
+                    if (EVENT_LOGGER.isDebugEnabled()) {
+                        EVENT_LOGGER.debug("Publishing event: {}", event);
+                    }
+                    notifyEventListeners(event, eventListeners);
+                }
 
-            notifyEventListeners(event, eventListeners);
-        }
-    }
-
-    private void notifyEventListeners(@NonNull Object event, Collection<ApplicationEventListener> eventListeners) {
-        if (!eventListeners.isEmpty()) {
-            if (EVENT_LOGGER.isTraceEnabled()) {
-                EVENT_LOGGER.trace("Established event listeners {} for event: {}", eventListeners, event);
-            }
-            for (ApplicationEventListener listener : eventListeners) {
-                if (listener.supports(event)) {
-                    try {
-                        if (EVENT_LOGGER.isTraceEnabled()) {
-                            EVENT_LOGGER.trace("Invoking event listener [{}] for event: {}", listener, event);
+                @Override
+                public @NonNull Future<Void> publishEventAsync(@NonNull T event) {
+                    Objects.requireNonNull(event, "Event cannot be null");
+                    if (EVENT_LOGGER.isDebugEnabled()) {
+                        EVENT_LOGGER.debug("Publishing event: {}", event);
+                    }
+                    CompletableFuture<Void> future = new CompletableFuture<>();
+                    executorSupplier.get().execute(() -> {
+                        try {
+                            notifyEventListeners(event, eventListeners);
+                            future.complete(null);
+                        } catch (Exception e) {
+                            future.completeExceptionally(e);
                         }
-                        listener.onApplicationEvent(event);
-                    } catch (ClassCastException ex) {
-                        String msg = ex.getMessage();
-                        if (msg == null || msg.startsWith(event.getClass().getName())) {
-                            if (EVENT_LOGGER.isDebugEnabled()) {
-                                EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
+                    });
+                    return future;
+                }
+
+                private void notifyEventListeners(@NonNull Object event, Collection<ApplicationEventListener> eventListeners) {
+                    if (!eventListeners.isEmpty()) {
+                        if (EVENT_LOGGER.isTraceEnabled()) {
+                            EVENT_LOGGER.trace("Established event listeners {} for event: {}", eventListeners, event);
+                        }
+                        for (ApplicationEventListener listener : eventListeners) {
+                            if (listener.supports(event)) {
+                                try {
+                                    if (EVENT_LOGGER.isTraceEnabled()) {
+                                        EVENT_LOGGER.trace("Invoking event listener [{}] for event: {}", listener, event);
+                                    }
+                                    listener.onApplicationEvent(event);
+                                } catch (ClassCastException ex) {
+                                    String msg = ex.getMessage();
+                                    if (msg == null || msg.startsWith(event.getClass().getName())) {
+                                        if (EVENT_LOGGER.isDebugEnabled()) {
+                                            EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
+                                        }
+                                    } else {
+                                        throw ex;
+                                    }
+                                }
                             }
-                        } else {
-                            throw ex;
+
                         }
                     }
                 }
 
-            }
+            });
+        });
+        return (Optional) eventPublisher;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public void publishEvent(@NonNull Object event) {
+        Optional<ApplicationTypedEventPublisher<Object>> eventPublisher = findTypedEventPublisher((Class) event.getClass());
+        if (eventPublisher.isPresent()) {
+            eventPublisher.get().publishEvent(event);
         }
     }
 
     @Override
     public @NonNull
     Future<Void> publishEventAsync(@NonNull Object event) {
-        Objects.requireNonNull(event, "Event cannot be null");
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        Collection<ApplicationEventListener> eventListeners = streamOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()))
-                .sorted(OrderUtil.COMPARATOR).collect(Collectors.toList());
-
-        Executor executor = findBean(Executor.class, Qualifiers.byName("scheduled"))
-                .orElseGet(ForkJoinPool::commonPool);
-        executor.execute(() -> {
-            try {
-                notifyEventListeners(event, eventListeners);
-                future.complete(null);
-            } catch (Exception e) {
-                future.completeExceptionally(e);
-            }
-        });
-        return future;
+        Optional<ApplicationTypedEventPublisher<Object>> eventPublisher = findTypedEventPublisher((Class) event.getClass());
+        if (eventPublisher.isPresent()) {
+            return eventPublisher.get().publishEventAsync(event);
+        }
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override

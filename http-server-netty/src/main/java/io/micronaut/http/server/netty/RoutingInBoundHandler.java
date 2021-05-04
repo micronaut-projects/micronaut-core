@@ -34,6 +34,7 @@ import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import io.micronaut.context.event.ApplicationTypedEventPublisher;
 import io.micronaut.core.annotation.Nullable;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
@@ -173,6 +174,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final Supplier<ExecutorService> ioExecutorSupplier;
     private final String serverHeader;
     private final boolean multipartEnabled;
+    private final ApplicationTypedEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     private ExecutorService ioExecutor;
 
     /**
@@ -214,6 +216,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.errorResponseProcessor = errorResponseProcessor;
         Optional<Boolean> multipartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = !multipartEnabled.isPresent() || multipartEnabled.get();
+        this.terminateEventPublisher = beanContext.findTypedEventPublisher(HttpRequestTerminatedEvent.class).orElse(null);
     }
 
     @Override
@@ -239,19 +242,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         try {
             request.release();
         } finally {
-            ctx.executor().execute(() -> {
-                try {
-                    beanContext.publishEvent(
-                            new HttpRequestTerminatedEvent(
-                                    request
-                            )
-                    );
-                } catch (Exception e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
+            if (terminateEventPublisher != null) {
+                ctx.executor().execute(() -> {
+                    try {
+                        terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));
+                    } catch (Exception e) {
+                        if (LOG.isErrorEnabled()) {
+                            LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
+                        }
                     }
-                }
-            });
+                });
+            }
         }
     }
 
