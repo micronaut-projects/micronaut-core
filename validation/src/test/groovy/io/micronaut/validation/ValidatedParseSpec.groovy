@@ -79,7 +79,7 @@ class Test {
         def method = definition.findMethod("setList", List<String>);
 
         then:
-        !method.isEmpty()
+        method.isPresent()
         method.get().hasStereotype(Validated.class)
         method.get().getArguments().size() == 1
 

@@ -27,7 +27,7 @@ public class BookInfoSpec {
                         bookInfoService.setBookAuthors("My Book", authors)
                 );
 
-        assertEquals("setBookAuthors.authors[1]<E class java.lang.String>: must not be blank",
+        assertEquals("setBookAuthors.authors[1]<E String>: must not be blank",
                 exception.getMessage()); // <1>
     }
 
@@ -41,7 +41,7 @@ public class BookInfoSpec {
                         bookInfoService.setBookSectionPages("My Book", sectionStartPages)
                 );
 
-        assertEquals("setBookSectionPages.sectionStartPages[]<K class java.lang.String>: must not be blank",
+        assertEquals("setBookSectionPages.sectionStartPages[]<K String>: must not be blank",
                 exception.getMessage()); // <2>
     }
 
