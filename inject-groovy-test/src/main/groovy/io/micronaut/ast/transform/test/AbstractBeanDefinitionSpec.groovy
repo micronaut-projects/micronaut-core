@@ -89,6 +89,20 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         }
     }
 
+    @CompileStatic
+    BeanDefinition buildBeanDefinition(String packageName, String className, String classStr) {
+        def beanDefName= '$' + className + 'Definition'
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        classLoader.parseClass(classStr)
+        try {
+            return (BeanDefinition) classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
+    }
+
     /**
      * Builds the bean definition for an AOP proxy bean.
      * @param className The class name
