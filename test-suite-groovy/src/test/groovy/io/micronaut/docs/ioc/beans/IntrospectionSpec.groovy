@@ -55,4 +55,21 @@ class IntrospectionSpec extends Specification {
         expect:
         "Apple" == business.name
     }
+
+    void testUser() {
+        when:
+        final BeanIntrospection<User> introspection = BeanIntrospection.getIntrospection(User.class)
+        User user = introspection.instantiate("Apple")
+
+        then:
+        user.name == "Apple"
+        user.age == 18
+        introspection.getBeanProperties().size() == 2
+
+        when:
+        introspection.getRequiredProperty("age", int).set(user, 23)
+
+        then:
+        user.age == 23
+    }
 }

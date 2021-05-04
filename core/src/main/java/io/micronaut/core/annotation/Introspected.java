@@ -60,10 +60,9 @@ public @interface Introspected {
     Class<?>[] classes() default {};
 
     /**
-     * <p>The default access type is {@link AccessKind#METHOD} which treats only public JavaBean getters or Java record components as properties,
-     *  by specifying {@link AccessKind#FIELD} public or package-protected fields will be used instead. </p>
+     * <p>The default access type is {@link AccessKind#METHOD} which treats only public JavaBean getters or Java record components as properties. By specifying {@link AccessKind#FIELD}, public or package-protected fields will be used instead. </p>
      *
-     *  <p>If both {@link AccessKind#FIELD} and {@link AccessKind#METHOD} are specified then the first viable method found will be used to access the property.</p>
+     *  <p>If both {@link AccessKind#FIELD} and {@link AccessKind#METHOD} are specified then the order as they appear in the annotation will be used to determine whether the field or method will be used in the case where both exist.</p>
      *
      * @return The access type. Defaults to {@link AccessKind#METHOD}
      * @since 3.0

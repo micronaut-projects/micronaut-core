@@ -32,9 +32,9 @@ snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="class",indent=0]
 
 For more information see the <<factories, Bean Factories>> section of the documentation.
 
-==== Support for Fields in Bean Introspections in Java
+==== Support for Fields in Bean Introspections
 
-Bean introspections on Java public or package protected fields are now supported:
+Bean introspections on public or package protected fields are now supported:
 
 snippet::io.micronaut.docs.ioc.beans.User[tags="class", indent=0]
 
