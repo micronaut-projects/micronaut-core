@@ -23,17 +23,143 @@ class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
         System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, IntrospectedTypeElementVisitor.name)
     }
 
+    void 'test favor method access'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
+package fieldaccess
+
+import io.micronaut.core.annotation.*
+
+@Introspected(accessKind=[Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD])
+class Test {
+    public String one
+    public boolean invoked = false
+    public String getOne() {
+        invoked = true
+        one
+    } 
+}
+''');
+        when:
+        def properties = introspection.getBeanProperties()
+        def instance = introspection.instantiate()
+
+        then:
+        properties.size() == 2
+
+        when:'a primitive is changed with copy constructor'
+        def one = introspection.getRequiredProperty("one", String)
+        instance.one = 'test'
+
+
+        then:'the new value is reflected'
+        one.get(instance) == 'test'
+        instance.invoked
+    }
+
+    void 'test favor field access'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
+package fieldaccess
+
+import io.micronaut.core.annotation.*
+
+@Introspected(accessKind=[Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD])
+class Test {
+    public String one
+    public boolean invoked = false
+    public String getOne() {
+        invoked = true
+        one
+    } 
+}
+''');
+        when:
+        def properties = introspection.getBeanProperties()
+        def instance = introspection.instantiate()
+        then:
+        properties.size() == 2
+
+
+        when:'a primitive is changed with copy constructor'
+        def one = introspection.getRequiredProperty("one", String)
+        one.set(instance, "test")
+
+
+        then:'the new value is reflected'
+        one.get(instance) == 'test'
+        !instance.invoked
+    }
+
+    // @PackageScope is commented out because type element visitors are run before it
+    // is processed because they visitors and the package scope transformation run in
+    // the same phase and there is no way to set the order
+    void 'test field access only'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
+package fieldaccess
+
+import io.micronaut.core.annotation.*
+
+@Introspected(accessKind=Introspected.AccessKind.FIELD)
+class Test {
+    public String one // read/write
+    public final int two // read-only
+    @groovy.transform.PackageScope String three // package protected
+    protected String four // not included since protected
+    private String five // not included since private
+    
+    Test(int two) {
+        this.two = two
+    }
+}
+''');
+        when:
+        def properties = introspection.getBeanProperties()
+
+        then:
+//        properties.size() == 3
+        properties.size() == 2
+
+        def one = introspection.getRequiredProperty("one", String)
+        one.isReadWrite()
+
+        def two = introspection.getRequiredProperty("two", int.class)
+        two.isReadOnly()
+
+//        def three = introspection.getRequiredProperty("three", String)
+//        three.isReadWrite()
+
+        when:'a field is set'
+        def instance = introspection.instantiate(10)
+        one.set(instance, "test")
+
+        then:'the value is set'
+        one.get(instance) == 'test'
+
+        when:'a primitive is changed with copy constructor'
+        instance = two.withValue(instance, 20)
+
+        then:'the new value is reflected'
+        two.get(instance) == 20
+    }
+
+    // @PackageScope is commented out because type element visitors are run before it
+    // is processed because they visitors and the package scope transformation run in
+    // the same phase and there is no way to set the order
     void "test copy constructor via mutate method"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.CopyMe','''\
-package test;
+package test
 
-import java.net.URL;
+import java.net.URL
 
 @io.micronaut.core.annotation.Introspected
 class CopyMe {
 
+    //@groovy.transform.PackageScope 
     URL url
+    //@groovy.transform.PackageScope 
     boolean enabled = false
     private final String name
     private final String another
@@ -43,16 +169,18 @@ class CopyMe {
         this.another = another;
     }
     
+    //@groovy.transform.PackageScope
     String getName() {
         return name
     }
     
+    //@groovy.transform.PackageScope
     String getAnother() {
         return another
     }
     
-    public CopyMe withAnother(String a) {
-        return this.another == a ? this : new CopyMe(this.name, a.toUpperCase())
+    CopyMe withAnother(String a) {
+        return this.another.is(a) ? this : new CopyMe(this.name, a.toUpperCase())
     }
 }
 ''')
@@ -65,7 +193,6 @@ class CopyMe {
         copyMe.name == 'Test'
         copyMe.another == "Another"
         copyMe.url == expectUrl
-
 
         when:
         def enabled = introspection.getRequiredProperty("enabled", boolean.class)
