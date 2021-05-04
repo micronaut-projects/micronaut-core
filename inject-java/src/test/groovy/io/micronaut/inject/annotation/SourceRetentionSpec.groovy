@@ -1,7 +1,7 @@
 package io.micronaut.inject.annotation
 
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
 import java.lang.annotation.Native

@@ -16,7 +16,7 @@
 package io.micronaut.inject.configproperties
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 

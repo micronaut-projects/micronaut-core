@@ -93,7 +93,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     }
 
     private static boolean isEclipseFiler(Filer filer) {
-        return filer.getClass().getTypeName().startsWith("org.eclipse.jdt");
+        return filer != null && filer.getClass().getTypeName().startsWith("org.eclipse.jdt");
     }
 
     @Override

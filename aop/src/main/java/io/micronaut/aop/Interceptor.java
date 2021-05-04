@@ -22,7 +22,7 @@ import io.micronaut.core.order.Ordered;
  * <p>An Interceptor intercepts the execution of a method allowing cross cutting behaviour to be applied to a
  * method's execution.</p>
  *
- * <p>All implementations should be thread safe and {@link javax.inject.Singleton} scoped beans</p>
+ * <p>All implementations should be thread safe beans</p>
  *
  * <p>In the case of {@link Around} advice the interceptor should invoke {@link InvocationContext#proceed()}
  * to proceed with the method invocation</p>

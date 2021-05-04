@@ -16,6 +16,7 @@
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
@@ -25,8 +26,14 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -226,6 +233,54 @@ public class Publishers {
     }
 
     /**
+     * Map the result from a publisher using the given mapper or supply empty value.
+     *
+     * @param publisher The publisher
+     * @param mapOrSupplyEmpty    The mapOrSupplyEmpty
+     * @param <T>       The generic type
+     * @param <R>       The result type
+     * @since 2.5.0
+     * @return The mapped publisher
+     */
+    public static <T, R> Publisher<R> mapOrSupplyEmpty(Publisher<T> publisher, MapOrSupplyEmpty<T, R> mapOrSupplyEmpty) {
+        return (MicronautPublisher<R>) actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
+
+            AtomicBoolean resultPresent = new AtomicBoolean();
+
+            @Override
+            protected void doOnSubscribe(Subscription subscription) {
+                actual.onSubscribe(subscription);
+            }
+
+            @Override
+            protected void doOnNext(T message) {
+                try {
+                    R result = Objects.requireNonNull(mapOrSupplyEmpty.map(message),
+                            "The mapper returned a null value.");
+                    actual.onNext(result);
+                    resultPresent.set(true);
+                } catch (Throwable e) {
+                    onError(e);
+                }
+
+            }
+
+            @Override
+            protected void doOnError(Throwable t) {
+                actual.onError(t);
+            }
+
+            @Override
+            protected void doOnComplete() {
+                if (!resultPresent.get()) {
+                    actual.onNext(mapOrSupplyEmpty.supplyEmpty());
+                }
+                actual.onComplete();
+            }
+        });
+    }
+
+    /**
      * Map the result from a publisher using the given mapper.
      *
      * @param publisher The publisher
@@ -399,6 +454,32 @@ public class Publishers {
 
     private static <T> IllegalArgumentException unconvertibleError(Object object, Class<T> publisherType) {
         return new IllegalArgumentException("Cannot convert reactive type [" + object.getClass() + "] to type [" + publisherType + "]. Ensure that you have the necessary Reactive module on your classpath. For example for Reactor you should have 'micronaut-reactor'.");
+    }
+
+    /**
+     * Maps the next result or supplies an empty result.
+     *
+     * @param <T> The next type
+     * @param <R> The mapped to type
+     * @since 2.5.0
+     */
+    public interface MapOrSupplyEmpty<T, R> {
+
+        /**
+         * Maps next result.
+         *
+         * @param result The next value.
+         * @return The mapped value.
+         */
+        @NonNull R map(@NonNull T result);
+
+        /**
+         * Supplies an empty value if there is no next value.
+         *
+         * @return The result.
+         */
+        @NonNull R supplyEmpty();
+
     }
 
     /**
