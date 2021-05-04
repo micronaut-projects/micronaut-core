@@ -1581,23 +1581,32 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     protected void addDeclaredAnnotation(String annotation, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         if (annotation != null) {
+            boolean hasOtherMembers = false;
             String repeatedName = getRepeatedName(annotation);
             if (repeatedName != null) {
-                Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
-                if (v instanceof io.micronaut.core.annotation.AnnotationValue[]) {
-                    io.micronaut.core.annotation.AnnotationValue[] avs = (io.micronaut.core.annotation.AnnotationValue[]) v;
-                    for (io.micronaut.core.annotation.AnnotationValue av : avs) {
-                        addDeclaredRepeatable(annotation, av);
-                    }
-                } else if (v instanceof Iterable) {
-                    Iterable i = (Iterable) v;
-                    for (Object o : i) {
-                        if (o instanceof io.micronaut.core.annotation.AnnotationValue) {
-                            addDeclaredRepeatable(annotation, ((io.micronaut.core.annotation.AnnotationValue) o));
+                for (Map.Entry<CharSequence, Object> entry: values.entrySet()) {
+                    if (entry.getKey().equals(AnnotationMetadata.VALUE_MEMBER)) {
+                        Object v = entry.getValue();
+                        if (v instanceof io.micronaut.core.annotation.AnnotationValue[]) {
+                            io.micronaut.core.annotation.AnnotationValue[] avs = (io.micronaut.core.annotation.AnnotationValue[]) v;
+                            for (io.micronaut.core.annotation.AnnotationValue av : avs) {
+                                addDeclaredRepeatable(annotation, av);
+                            }
+                        } else if (v instanceof Iterable) {
+                            Iterable i = (Iterable) v;
+                            for (Object o : i) {
+                                if (o instanceof io.micronaut.core.annotation.AnnotationValue) {
+                                    addDeclaredRepeatable(annotation, ((io.micronaut.core.annotation.AnnotationValue) o));
+                                }
+                            }
                         }
+                    } else {
+                        hasOtherMembers = true;
                     }
                 }
-            } else {
+            }
+
+            if (repeatedName == null || hasOtherMembers) {
                 Map<String, Map<CharSequence, Object>> declaredAnnotations = getDeclaredAnnotationsInternal();
                 Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
                 addAnnotation(annotation, values, declaredAnnotations, allAnnotations, true, retentionPolicy);
