@@ -48,24 +48,26 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached;
 public class GroovyClassElement extends AbstractGroovyElement implements ArrayableClassElement {
 
     private static final Predicate<MethodNode> JUNK_METHOD_FILTER = m -> {
-                String methodName = m.getName();
+        String methodName = m.getName();
 
-                return !m.isStaticConstructor() &&
-                        !methodName.startsWith("$") &&
-                        !methodName.contains("trait$") &&
-                        !methodName.startsWith("super$") &&
-                        !methodName.equals("setMetaClass") &&
-                        !m.getReturnType().getNameWithoutPackage().equals("MetaClass") &&
-                        !m.getDeclaringClass().equals(ClassHelper.GROOVY_OBJECT_TYPE) && !m.getDeclaringClass().equals(ClassHelper.OBJECT_TYPE);
-            };
+        return m.isStaticConstructor() ||
+                methodName.startsWith("$") ||
+                methodName.contains("trait$") ||
+                methodName.startsWith("super$") ||
+                methodName.equals("setMetaClass") ||
+                m.getReturnType().getNameWithoutPackage().equals("MetaClass") ||
+                m.getDeclaringClass().equals(ClassHelper.GROOVY_OBJECT_TYPE) ||
+                m.getDeclaringClass().equals(ClassHelper.OBJECT_TYPE);
+    };
     private static final Predicate<FieldNode> JUNK_FIELD_FILTER = m -> {
         String fieldName = m.getName();
 
-        return  !fieldName.startsWith("$") &&
-                !fieldName.startsWith("__$") &&
-                !fieldName.contains("trait$") &&
-                !fieldName.equals("metaClass") &&
-                !m.getDeclaringClass().equals(ClassHelper.GROOVY_OBJECT_TYPE) && !m.getDeclaringClass().equals(ClassHelper.OBJECT_TYPE);
+        return  fieldName.startsWith("$") ||
+                fieldName.startsWith("__$") ||
+                fieldName.contains("trait$") ||
+                fieldName.equals("metaClass") ||
+                m.getDeclaringClass().equals(ClassHelper.GROOVY_OBJECT_TYPE) ||
+                m.getDeclaringClass().equals(ClassHelper.OBJECT_TYPE);
     };
     protected final ClassNode classNode;
     private final int arrayDimensions;
@@ -122,18 +124,18 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             Map<String, MethodNode> declaredMethodsMap = classNode.getDeclaredMethodsMap();
             ClassNodeUtils.addDeclaredMethodsFromInterfaces(classNode, declaredMethodsMap);
             if (onlyDeclared) {
-                methods = classNode.getMethods()
-                        .stream().filter(JUNK_METHOD_FILTER)
-                        .collect(Collectors.toList());
+                methods = new ArrayList<>(classNode.getMethods());
             } else {
-                methods = classNode.getAllDeclaredMethods()
-                        .stream().filter(JUNK_METHOD_FILTER)
-                        .collect(Collectors.toList());
+                methods = new ArrayList<>(classNode.getAllDeclaredMethods());
             }
 
             Iterator<MethodNode> i = methods.iterator();
             while (i.hasNext()) {
                 MethodNode methodNode = i.next();
+                if (JUNK_METHOD_FILTER.test(methodNode)) {
+                    i.remove();
+                    continue;
+                }
                 if (onlyAbstract && !methodNode.isAbstract()) {
                     i.remove();
                     continue;
@@ -213,17 +215,37 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     private List<FieldNode> findRelevantFields(boolean onlyAccessible, List<FieldNode> initialFields, List<Predicate<String>> namePredicates, List<Predicate<Set<ElementModifier>>> modifierPredicates) {
-        Stream<FieldNode> fieldStream = initialFields.stream().filter(JUNK_FIELD_FILTER);
-        if (onlyAccessible) {
-            fieldStream = fieldStream.filter(fn -> !fn.isPrivate());
+        List<FieldNode> filteredFields = new ArrayList<>(initialFields.size());
+
+        elementLoop:
+        for (FieldNode fn: initialFields) {
+            if (JUNK_FIELD_FILTER.test(fn)) {
+                continue;
+            }
+            if (onlyAccessible && fn.isPrivate()) {
+                continue;
+            }
+            if (!modifierPredicates.isEmpty()) {
+                final Set<ElementModifier> elementModifiers = resolveModifiers(fn);
+                for (Predicate<Set<ElementModifier>> modifierPredicate : modifierPredicates) {
+                    if (!modifierPredicate.test(elementModifiers)) {
+                        continue elementLoop;
+                    }
+                }
+            }
+
+            if (!namePredicates.isEmpty()) {
+                String name = fn.getName();
+                for (Predicate<String> namePredicate : namePredicates) {
+                    if (!namePredicate.test(name)) {
+                        continue elementLoop;
+                    }
+                }
+            }
+
+            filteredFields.add(fn);
         }
-        if (!namePredicates.isEmpty()) {
-            fieldStream = fieldStream.filter(fn -> !namePredicates.stream().allMatch(p -> p.test(fn.getName())));
-        }
-        if (!modifierPredicates.isEmpty()) {
-            fieldStream = fieldStream.filter(fn -> !modifierPredicates.stream().allMatch(p -> p.test(resolveModifiers(fn))));
-        }
-        return fieldStream.collect(Collectors.toList());
+        return filteredFields;
     }
 
     private Set<ElementModifier> resolveModifiers(MethodNode methodNode) {

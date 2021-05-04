@@ -605,6 +605,30 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     /**
+     * Visits a bean field.
+     * @param beanField The field
+     */
+    public void visitBeanField(FieldElement beanField) {
+        final Type propertyType = JavaModelUtils.getTypeReference(beanField.getType());
+        final Type propertyGenericType = JavaModelUtils.getTypeReference(beanField.getGenericType());
+
+        DefaultAnnotationMetadata.contributeDefaults(
+                this.annotationMetadata,
+                beanField.getAnnotationMetadata()
+        );
+
+        propertyDefinitions.put(
+                beanField.getName(),
+                new BeanFieldWriter(
+                        this,
+                        propertyType,
+                        propertyGenericType,
+                        beanField,
+                        propertyIndex++
+                ));
+    }
+
+    /**
      * index to be created.
      */
     private class AnnotationValueIndex {
