@@ -32,6 +32,18 @@ snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="class",indent=0]
 
 For more information see the <<factories, Bean Factories>> section of the documentation.
 
+==== Enhanced `BeanProvider` Interface
+
+The api:context.BeanProvider[] interface has been enhanced with new methods such as `iterator()` and `stream()` as well as methods to check for bean existence and uniqueness.
+
+==== New `@Any` Qualifier for use in Bean Factories
+
+A new ann:context.annotation.Any[] qualifier has been introduced to allow injecting any available instance into an injection point and can be used in combination with the new `BeanProvider` interface mentioned above to allow more dynamic behaviour.
+
+snippet::io.micronaut.docs.qualifiers.any.Vehicle[tags="imports,clazz", indent=0, title="Using BeanProvider with Any"]
+
+The annotation can also be used on ann:context.annotation.Factory[] methods to allow customization of how objects are injected via the api:inject.InjectionPoint[] API.
+
 ==== Support for Fields in Bean Introspections
 
 Bean introspections on public or package protected fields are now supported:
