@@ -1,9 +1,8 @@
 package io.micronaut.inject.factory.named
 
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 
-class ImplicitNamedSpec extends AbstractTypeElementSpec {
-
+class ImplicitNamedSpec extends AbstractBeanDefinitionSpec {
     void 'test use of implicit @Named annotation'() {
         given:
         def context = buildContext('''
