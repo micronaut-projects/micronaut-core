@@ -1,0 +1,56 @@
+To use the logback library with link:http://logback.qos.ch/manual/configuration.html[logback.xml] placed in resources folder , you must include a dependency:
+
+.Configuring logback in Gradle
+[source,groovy]
+----
+implementation "ch.qos.logback:logback-classic"
+----
+
+Or if using Maven:
+
+.Configuring logback in Maven
+[source,xml]
+----
+<dependencies>
+  <dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+    </dependency>
+  </dependency>
+</dependencies>
+----
+
+If it does not exist yet, place a logback.xml file to resources folder and modify the content for your needs. Example:
+
+.logback.xml
+[source,xml]
+----
+<configuration>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <withJansi>true</withJansi>
+
+        <encoder>
+            <pattern>%cyan(%d{HH:mm:ss.SSS}) %gray([%thread]) %highlight(%-5level) %magenta(%logger{36}) - %msg%n
+            </pattern>
+        </encoder>
+    </appender>
+
+    <root level="info">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+</configuration>
+----
+
+To change the loglevel for specific classes or package names, you can add such a logger entry to the configuration section:
+
+[source,xml]
+----
+<configuration>
+    ...
+    <logger name="io.micronaut.context" level="TRACE"/>
+    ...
+</configuration>
+----

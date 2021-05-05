@@ -1,0 +1,1 @@
+Micronaut uses Slf4j and logback as the default logging implementation.

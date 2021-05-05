@@ -205,6 +205,15 @@ configurations:
     cassandraSupport: Configuring Cassandra
     liquibaseSupport: Configuring Liquibase
     flywaySupport: Configuring Flyway
+logging:
+  title: Logging
+    slf4j: Slf4j as default implementation for logging
+    logback: Enable logback
+    standardlogger: The standard way to get a logger
+    lomboklogger: Using lombok to get a logger
+    httplogging: Debugging and Tracing the HTTP Client
+    loglevelprop: Controlling Log Levels with Properties
+    custloggingsystem: Customize the logging system
 languageSupport:
   title: Language Support
   java:
