@@ -39,7 +39,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Represents a media type.
@@ -275,7 +274,7 @@ public class MediaType implements CharSequence {
      * PDF: application/pdf.
      */
     public static final MediaType APPLICATION_PDF_TYPE = new MediaType(APPLICATION_PDF);
-    
+
     /**
      * Png Image: image/png.
      */

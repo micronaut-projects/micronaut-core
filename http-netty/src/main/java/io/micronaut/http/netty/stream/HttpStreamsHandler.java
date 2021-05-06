@@ -477,6 +477,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     /**
      * The outgoing class.
+     *
+     * @param <O> The message type
      */
     static class Outgoing<O extends HttpMessage> {
         final O message;

@@ -15,7 +15,6 @@
  */
 package io.micronaut.context;
 
-import com.sun.org.apache.xpath.internal.Arg;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.event.*;
@@ -3625,7 +3624,6 @@ public class DefaultBeanContext implements BeanContext {
             beansOfTypeList.add(new BeanRegistration(null, candidate, bean));
         }
     }
-
 
     private <T> boolean isCandidatePresent(Argument<T> beanType, Qualifier<T> qualifier) {
         qualifier = getQualifierForBeanType(beanType, qualifier);

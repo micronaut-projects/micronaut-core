@@ -235,7 +235,7 @@ class Test {
                         .filter({ bdr -> predicate == null || predicate.test(bdr) })
                         .collect(Collectors.toList())
 
-                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : new InterceptorRegistryBean())
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : new InterceptorRegistryBean())
             }
         }.start()
     }

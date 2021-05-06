@@ -183,7 +183,6 @@ public class JavaModelUtils {
         }
     }
 
-
     /**
      * Get the class name for the given type element without the package. Handles {@link NestingKind}.
      *
