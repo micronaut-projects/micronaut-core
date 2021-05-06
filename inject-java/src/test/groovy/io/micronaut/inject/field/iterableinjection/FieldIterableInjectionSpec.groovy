@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,24 +15,41 @@
  */
 package io.micronaut.inject.field.iterableinjection
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import spock.lang.Specification
 
-class FieldIterableInjectionSpec extends Specification {
+class FieldIterableInjectionSpec extends AbstractTypeElementSpec {
 
-    void "test field injection that takes an Iterable"() {
+    void "test Iterable injection via field - field is private"() {
         given:
         BeanContext context = new DefaultBeanContext()
         context.start()
 
         when:
-        B b = context.getBean(B)
+
+        def instance = context.getBean(InjectedFieldIsPrivate)
 
         then:
-        b.all != null
-        b.all.size() == 2
-        b.all.contains(context.getBean(AImpl))
-        b.all.contains(context.getBean(AnotherImpl))
+        instance.all != null
+        instance.all.size() == 2
+        instance.all.contains(context.getBean(AImpl))
+        instance.all.contains(context.getBean(AnotherImpl))
     }
+
+    void "test Iterable injection via field - field is not private"() {
+        given:
+        BeanContext context = new DefaultBeanContext()
+        context.start()
+
+        when:
+        def instance = context.getBean(InjectedFieldNotPrivate)
+
+        then:
+        instance.all != null
+        instance.all.size() == 2
+        instance.all.contains(context.getBean(AImpl))
+        instance.all.contains(context.getBean(AnotherImpl))
+    }
+
 }
