@@ -190,6 +190,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         List<AnnotationMirror> expanded = new ArrayList<>(annotationMirrors.size());
         for (AnnotationMirror annotation: annotationMirrors) {
             boolean repeatable = false;
+            boolean hasOtherMembers = false;
             for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry: annotation.getElementValues().entrySet()) {
                 if (entry.getKey().getSimpleName().toString().equals("value")) {
                     Object value = entry.getValue().getValue();
@@ -205,9 +206,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                             }
                         }
                     }
+                } else {
+                    hasOtherMembers = true;
                 }
             }
-            if (!repeatable) {
+            if (!repeatable || hasOtherMembers) {
                 expanded.add(annotation);
             }
         }

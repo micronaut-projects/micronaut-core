@@ -50,6 +50,10 @@ import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
+import java.util.function.Predicate
+import java.util.stream.Collectors
+import java.util.stream.StreamSupport
+
 /**
  * Base class to extend from to allow compilation of Java sources
  * at runtime to allow testing of compile time behavior.
@@ -218,14 +222,18 @@ class Test {
 
         return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader), "test") {
             @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                def references = files.findAll { JavaFileObject jfo ->
-                    jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith("DefinitionClass.class")
-                }.collect { JavaFileObject jfo ->
-                    def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
-                    name = name.replace('/', '.') - '.class'
-                    return classLoader.loadClass(name).newInstance()
-                } as List<BeanDefinitionReference>
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+                def references = StreamSupport.stream(files.spliterator(), false)
+                        .filter({ JavaFileObject jfo ->
+                            jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith("DefinitionClass.class")
+                        })
+                        .map({ JavaFileObject jfo ->
+                            def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
+                            name = name.replace('/', '.') - '.class'
+                            return (BeanDefinitionReference) classLoader.loadClass(name).newInstance()
+                        })
+                        .filter({ bdr -> predicate == null || predicate.test(bdr) })
+                        .collect(Collectors.toList())
 
                 return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : new InterceptorRegistryBean())
             }
@@ -301,6 +309,18 @@ class Test {
     protected BeanDefinition buildBeanDefinition(String className, String cls) {
         def beanDefName= '$' + NameUtils.getSimpleName(className) + 'Definition'
         def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        try {
+            return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
+    }
+
+    protected BeanDefinition buildBeanDefinition(String packageName, String className, String cls) {
+        def beanDefName= '$' + className + 'Definition'
         String beanFullName = "${packageName}.${beanDefName}"
 
         ClassLoader classLoader = buildClassLoader(className, cls)

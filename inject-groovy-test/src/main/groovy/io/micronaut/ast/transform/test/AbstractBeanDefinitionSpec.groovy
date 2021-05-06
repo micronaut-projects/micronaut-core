@@ -46,6 +46,9 @@ import org.codehaus.groovy.control.ErrorCollector
 import org.codehaus.groovy.control.SourceUnit
 import spock.lang.Specification
 
+import java.util.function.Predicate
+import java.util.stream.Collectors
+
 /**
  * @author graemerocher
  * @since 1.0
@@ -79,6 +82,20 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     BeanDefinition buildBeanDefinition(String className, String classStr) {
         def beanDefName= '$' + NameUtils.getSimpleName(className) + 'Definition'
         def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        classLoader.parseClass(classStr)
+        try {
+            return (BeanDefinition) classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
+    }
+
+    @CompileStatic
+    BeanDefinition buildBeanDefinition(String packageName, String className, String classStr) {
+        def beanDefName= '$' + className + 'Definition'
         String beanFullName = "${packageName}.${beanDefName}"
 
         def classLoader = new InMemoryByteCodeGroovyClassLoader()
@@ -212,12 +229,13 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return new DefaultApplicationContext(
                 ClassPathResourceLoader.defaultLoader(classLoader),"test") {
             @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                def references = classLoader.generatedClasses.keySet().findAll {
-                    it.endsWith("DefinitionClass")
-                }.collect {
-                    classLoader.loadClass(it).newInstance()
-                }
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+                def references =  classLoader.generatedClasses.keySet()
+                    .stream()
+                    .filter({ name -> name.endsWith("DefinitionClass") })
+                    .map({ name -> (BeanDefinitionReference) classLoader.loadClass(name).newInstance() })
+                    .filter({ bdr -> predicate == null || predicate.test(bdr) })
+                    .collect(Collectors.toList())
                 return references + new InterceptorRegistryBean()
             }
         }.start()

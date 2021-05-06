@@ -55,6 +55,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private List<PropertyElement> beanProperties;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
     private List<? extends Element> enclosedElements;
+    private String simpleName;
+    private String name;
+    private String packageName;
 
     /**
      * @param classElement       The {@link TypeElement}
@@ -512,7 +515,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean hasNamePredicates = !namePredicates.isEmpty();
         boolean hasModifierPredicates = !modifierPredicates.isEmpty();
         boolean hasAnnotationPredicates = !annotationPredicates.isEmpty();
-        
+
         elementLoop:
         for (Element enclosedElement : enclosedElements) {
             ElementKind enclosedElementKind = enclosedElement.getKind();
@@ -648,8 +651,28 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
+    public String getSimpleName() {
+        if (simpleName == null) {
+            simpleName = JavaModelUtils.getClassNameWithoutPackage(classElement);
+        }
+        return simpleName;
+    }
+
+
+    @Override
     public String getName() {
-        return JavaModelUtils.getClassName(classElement);
+        if (name == null) {
+            name = JavaModelUtils.getClassName(classElement);
+        }
+        return name;
+    }
+
+    @Override
+    public String getPackageName() {
+        if (packageName == null) {
+            packageName = JavaModelUtils.getPackageName(classElement);
+        }
+        return packageName;
     }
 
     @Override

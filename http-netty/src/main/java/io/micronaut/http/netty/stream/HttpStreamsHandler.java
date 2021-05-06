@@ -353,11 +353,19 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         if (out.message instanceof FullHttpMessage) {
             // Forward as is
             ctx.writeAndFlush(out.message, out.promise);
-            out.promise.addListener(channelFuture -> executeInEventLoop(ctx, () -> {
-                sentOutMessage(ctx);
-                outgoing.remove();
-                flushNext(ctx);
-            }));
+            out.promise.addListener(channelFuture -> {
+                if (ctx.executor().inEventLoop()) {
+                    sentOutMessage(ctx);
+                    outgoing.remove();
+                    flushNext(ctx);
+                } else {
+                    ctx.executor().execute(() -> {
+                        sentOutMessage(ctx);
+                        outgoing.remove();
+                        flushNext(ctx);
+                    });
+                }
+            });
 
         } else if (out.message instanceof StreamedHttpMessage) {
 
@@ -379,7 +387,11 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
                 @Override
                 protected void complete() {
-                    executeInEventLoop(ctx, () -> completeBody(ctx));
+                    if (ctx.executor().inEventLoop()) {
+                        completeBody(ctx);
+                    } else {
+                        ctx.executor().execute(() -> completeBody(ctx));
+                    }
                 }
             };
 
@@ -400,11 +412,19 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         if (sendLastHttpContent) {
             ChannelPromise promise = outgoing.peek().promise;
             ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise).addListener(
-                channelFuture -> executeInEventLoop(ctx, () -> {
-                    outgoing.remove();
-                    sentOutMessage(ctx);
-                    flushNext(ctx);
-                })
+                    channelFuture -> {
+                        if (ctx.executor().inEventLoop()) {
+                            outgoing.remove();
+                            sentOutMessage(ctx);
+                            flushNext(ctx);
+                        } else {
+                            ctx.executor().execute(() -> {
+                                outgoing.remove();
+                                sentOutMessage(ctx);
+                                flushNext(ctx);
+                            });
+                        }
+                    }
             );
             ctx.read();
         } else {
@@ -436,14 +456,6 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             unbufferedWrite(ctx, outgoing.element());
         } else {
             ctx.fireChannelWritabilityChanged();
-        }
-    }
-
-    private void executeInEventLoop(ChannelHandlerContext ctx, Runnable runnable) {
-        if (ctx.executor().inEventLoop()) {
-            runnable.run();
-        } else {
-            ctx.executor().execute(runnable);
         }
     }
 
