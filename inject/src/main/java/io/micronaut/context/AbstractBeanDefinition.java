@@ -1671,7 +1671,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (beanType.isArray()) {
             Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, injectionPoint);
             return beansOfType.toArray((Object[]) Array.newInstance(beanType.getComponentType(), beansOfType.size()));
-        } else if (Collection.class.isAssignableFrom(beanType)) {
+        } else if (Iterable.class.isAssignableFrom(beanType)) {
             Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, injectionPoint);
             if (beanType.isInstance(beansOfType)) {
                 return beansOfType;
@@ -1878,7 +1878,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (argumentType.isArray()) {
             Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
             return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
-        } else if (Collection.class.isAssignableFrom(argumentType)) {
+        } else if (Iterable.class.isAssignableFrom(argumentType)) {
             Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
             return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
