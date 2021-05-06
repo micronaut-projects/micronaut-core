@@ -32,8 +32,8 @@ import java.util.Optional;
  */
 public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
 
-    Map<String, MediaTypeCodec> decodersByExtension = new LinkedHashMap<>(3);
-    Map<MediaType, MediaTypeCodec> decodersByType = new LinkedHashMap<>(3);
+    Map<String, Optional<MediaTypeCodec>> decodersByExtension = new LinkedHashMap<>(3);
+    Map<MediaType, Optional<MediaTypeCodec>> decodersByType = new LinkedHashMap<>(3);
 
     private final Collection<MediaTypeCodec> codecs;
 
@@ -54,8 +54,8 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
                 Collection<MediaType> mediaTypes = decoder.getMediaTypes();
                 for (MediaType mediaType : mediaTypes) {
                     if (mediaType != null) {
-                        decodersByExtension.put(mediaType.getExtension(), decoder);
-                        decodersByType.put(mediaType, decoder);
+                        decodersByExtension.put(mediaType.getExtension(), Optional.of(decoder));
+                        decodersByType.put(mediaType, Optional.of(decoder));
                     }
                 }
             }
@@ -69,11 +69,11 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
         if (mediaType == null) {
             return Optional.empty();
         }
-        MediaTypeCodec decoder = decodersByType.get(mediaType);
+        Optional<MediaTypeCodec> decoder = decodersByType.get(mediaType);
         if (decoder == null) {
             decoder = decodersByExtension.get(mediaType.getExtension());
         }
-        return Optional.ofNullable(decoder);
+        return decoder == null ? Optional.empty() : decoder;
     }
 
     @Override
