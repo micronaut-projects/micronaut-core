@@ -21,7 +21,7 @@ import spock.lang.Specification
 
 class ConstructorIterableInjectionSpec extends Specification {
 
-    void "test injection via constructor that takes an Iterable"() {
+    void "test Iterable injection via constructor"() {
         given:
         BeanContext context = new DefaultBeanContext()
         context.start()
@@ -35,4 +35,5 @@ class ConstructorIterableInjectionSpec extends Specification {
         b.all.contains(context.getBean(AImpl))
         b.all.contains(context.getBean(AnotherImpl))
     }
+
 }
