@@ -52,4 +52,19 @@ class OuterBean {
 
         definition.intValue(Order).getAsInt() == 10
     }
+
+    void "test a bean definition in a package with uppercase letters"() {
+        when:
+        def definition = buildBeanDefinition('test.A', 'TestBean', '''
+package test.A;
+
+@javax.inject.Singleton
+class TestBean {
+
+}
+''')
+        then:
+        noExceptionThrown()
+        definition != null
+    }
 }

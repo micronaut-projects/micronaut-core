@@ -45,6 +45,8 @@ import org.codehaus.groovy.control.ErrorCollector
 import org.codehaus.groovy.control.SourceUnit
 import spock.lang.Specification
 
+import java.util.function.Predicate
+
 /**
  * @author graemerocher
  * @since 1.0
@@ -78,6 +80,20 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     BeanDefinition buildBeanDefinition(String className, String classStr) {
         def beanDefName= '$' + NameUtils.getSimpleName(className) + 'Definition'
         def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        classLoader.parseClass(classStr)
+        try {
+            return (BeanDefinition) classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
+    }
+
+    @CompileStatic
+    BeanDefinition buildBeanDefinition(String packageName, String className, String classStr) {
+        def beanDefName= '$' + className + 'Definition'
         String beanFullName = "${packageName}.${beanDefName}"
 
         def classLoader = new InMemoryByteCodeGroovyClassLoader()
@@ -211,12 +227,12 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return new DefaultApplicationContext(
                 ClassPathResourceLoader.defaultLoader(classLoader),"test") {
             @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
                 return classLoader.generatedClasses.keySet().findAll {
                     it.endsWith("DefinitionClass")
                 }.collect {
                     classLoader.loadClass(it).newInstance()
-                }
+                }.findAll { predicate == null || predicate.test(it) }
             }
         }.start()
     }

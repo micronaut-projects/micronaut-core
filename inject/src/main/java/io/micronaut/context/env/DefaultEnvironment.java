@@ -28,7 +28,6 @@ import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.CachingClassPathAnnotationScanner;
 import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
-import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.order.OrderUtil;
@@ -38,7 +37,6 @@ import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.awt.*;
 import java.io.*;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
@@ -557,14 +555,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
         SoftServiceLoader<PropertySourceLoader> definitions = readPropertySourceLoaders();
         Collection<PropertySourceLoader> allLoaders = new ArrayList<>(10);
-        for (ServiceDefinition<PropertySourceLoader> definition : definitions) {
-            if (definition.isPresent()) {
-                PropertySourceLoader loader = definition.load();
-                allLoaders.add(loader);
-                Set<String> extensions = loader.getExtensions();
-                for (String extension : extensions) {
-                    loaderByFormatMap.put(extension, loader);
-                }
+        definitions.collectAll(allLoaders);
+        for (PropertySourceLoader propertySourceLoader : allLoaders) {
+            Set<String> extensions = propertySourceLoader.getExtensions();
+            for (String extension : extensions) {
+                loaderByFormatMap.put(extension, propertySourceLoader);
             }
         }
         return allLoaders;

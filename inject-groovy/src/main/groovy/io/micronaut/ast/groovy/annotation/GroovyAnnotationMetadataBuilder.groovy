@@ -256,7 +256,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                     }
                 }
             }
-            if (!repeatable) {
+            if (!repeatable || node.members.size() > 1) {
                 expanded.add(node)
             }
         }
