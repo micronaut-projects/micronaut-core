@@ -21,18 +21,34 @@ import spock.lang.Specification
 
 class SetterIterableInjectionSpec extends Specification {
 
-    void "test injection via setter that takes an Iterable"() {
+    void "test Iterable injection via setter - method is private"() {
         given:
         BeanContext context = new DefaultBeanContext()
         context.start()
 
         when:
-        B b = context.getBean(B)
+        def instance = context.getBean(InjectMethodIsPrivate)
 
         then:
-        b.all != null
-        b.all.size() == 2
-        b.all.contains(context.getBean(AImpl))
-        b.all.contains(context.getBean(AnotherImpl))
+        instance.all != null
+        instance.all.size() == 2
+        instance.all.contains(context.getBean(AImpl))
+        instance.all.contains(context.getBean(AnotherImpl))
     }
+
+    void "test Iterable injection via setter - method is not private"() {
+        given:
+        BeanContext context = new DefaultBeanContext()
+        context.start()
+
+        when:
+        def instance = context.getBean(InjectMethodNotPrivate)
+
+        then:
+        instance.all != null
+        instance.all.size() == 2
+        instance.all.contains(context.getBean(AImpl))
+        instance.all.contains(context.getBean(AnotherImpl))
+    }
+
 }

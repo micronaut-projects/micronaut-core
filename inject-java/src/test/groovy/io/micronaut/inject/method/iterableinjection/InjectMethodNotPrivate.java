@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,8 @@
 package io.micronaut.inject.method.iterableinjection;
 
 import javax.inject.Inject;
-import java.util.Collection;
 
-public class B {
+public class InjectMethodNotPrivate {
     private Iterable<A> all;
 
     @Inject
