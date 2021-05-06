@@ -15,11 +15,11 @@
  */
 package io.micronaut.inject.field.iterableinjection
 
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import spock.lang.Specification
 
-class FieldIterableInjectionSpec extends AbstractTypeElementSpec {
+class FieldIterableInjectionSpec extends Specification {
 
     void "test Iterable injection via field - field is private"() {
         given:
