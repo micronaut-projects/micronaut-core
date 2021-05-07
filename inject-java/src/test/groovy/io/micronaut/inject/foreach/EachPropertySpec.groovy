@@ -453,9 +453,9 @@ class EachPropertySpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(PropertySource.of('test', [
-                'outer-field.name': 'Outer',
+                'outer-field.name'           : 'Outer',
                 'outer-field.inner.sally.age': 20,
-                'outer-field.inner.joe.age': 30
+                'outer-field.inner.joe.age'  : 30
         ]))
         applicationContext.start()
 
@@ -469,11 +469,31 @@ class EachPropertySpec extends Specification {
         props.inner.any { it.age == 30 }
     }
 
+    void "test Iterable field injection eachproperty inner class of config props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'outer-field-iterable.name'           : 'Outer',
+                'outer-field-iterable.inner.sally.age': 20,
+                'outer-field-iterable.inner.joe.age'  : 30
+        ]))
+        applicationContext.start()
+
+        when:
+        OuterFieldIterableProperties props = applicationContext.getBean(OuterFieldIterableProperties)
+
+        then:
+        props.name == 'Outer'
+        props.inner.size() == 2
+        props.inner.any { it.age == 20 }
+        props.inner.any { it.age == 30 }
+    }
+
     void "test eachproperty list inner class of config props"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(PropertySource.of('test', [
-                'outer-list.name': 'Outer',
+                'outer-list.name'      : 'Outer',
                 'outer-list.inner-list': [['age': 20], ['age': 30]]
         ]))
         applicationContext.start()
