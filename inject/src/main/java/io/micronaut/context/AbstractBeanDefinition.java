@@ -980,7 +980,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         } else if (argumentType.isArray()) {
             Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
             return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
-        } else if (Collection.class.isAssignableFrom(argumentType)) {
+        } else if (Iterable.class.isAssignableFrom(argumentType)) {
             Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
             return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
