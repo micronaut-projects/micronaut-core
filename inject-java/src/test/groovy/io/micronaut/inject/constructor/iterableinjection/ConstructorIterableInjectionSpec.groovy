@@ -17,8 +17,10 @@ package io.micronaut.inject.constructor.iterableinjection
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import spock.lang.Issue
 import spock.lang.Specification
 
+@Issue("https://github.com/micronaut-projects/micronaut-core/issues/5187")
 class ConstructorIterableInjectionSpec extends Specification {
 
     void "test Iterable injection via constructor"() {

@@ -17,8 +17,10 @@ package io.micronaut.inject.field.iterableinjection
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import spock.lang.Issue
 import spock.lang.Specification
 
+@Issue("https://github.com/micronaut-projects/micronaut-core/issues/5187")
 class FieldIterableInjectionSpec extends Specification {
 
     void "test Iterable injection via field - field is private"() {

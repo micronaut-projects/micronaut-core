@@ -21,6 +21,7 @@ import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.inject.qualifiers.Qualifiers
+import spock.lang.Issue
 import spock.lang.Specification
 /**
  * @author Graeme Rocher
@@ -449,6 +450,7 @@ class EachPropertySpec extends Specification {
         props.inner.any { it.age == 30 }
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5187")
     void "test eachproperty inner class (Iterable) of config props"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
@@ -489,6 +491,7 @@ class EachPropertySpec extends Specification {
         props.inner.any { it.age == 30 }
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5187")
     void "test Iterable field injection eachproperty inner class of config props"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
