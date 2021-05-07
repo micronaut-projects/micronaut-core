@@ -770,7 +770,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
                 Class<?> argumentType;
                 boolean isCollection = false;
-                if (Collection.class.isAssignableFrom(argument.getType())) {
+                if (Iterable.class.isAssignableFrom(argument.getType())) {
                     argumentType = argument.getFirstTypeVariable().map(Argument::getType).orElse((Class) Object.class);
                     isCollection = true;
                 } else {
@@ -834,7 +834,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             ApplicationContext applicationContext = (ApplicationContext) context;
             Class type = argument.getType();
             boolean isConfigProps = type.isAnnotationPresent(ConfigurationProperties.class);
-            boolean result = isConfigProps || Map.class.isAssignableFrom(type) || Collection.class.isAssignableFrom(type) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
+            boolean result = isConfigProps || Map.class.isAssignableFrom(type) || Iterable.class.isAssignableFrom(type) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
             if (!result && isConfigurationProperties()) {
                 String cliOption = resolveCliOption(argument.getName());
                 if (cliOption != null) {

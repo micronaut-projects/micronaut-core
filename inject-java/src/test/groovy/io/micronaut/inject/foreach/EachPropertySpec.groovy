@@ -449,6 +449,26 @@ class EachPropertySpec extends Specification {
         props.inner.any { it.age == 30 }
     }
 
+    void "test eachproperty inner class (Iterable) of config props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'outer.name'                    : 'Outer',
+                'outer.iterable-inner.sally.age': 20,
+                'outer.iterable-inner.joe.age'  : 30
+        ]))
+        applicationContext.start()
+
+        when:
+        OuterWithIterableInnerProperties props = applicationContext.getBean(OuterWithIterableInnerProperties)
+
+        then:
+        props.name == 'Outer'
+        props.iterableInner.size() == 2
+        props.iterableInner.any { it.age == 20 }
+        props.iterableInner.any { it.age == 30 }
+    }
+
     void "test field injection eachproperty inner class of config props"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
