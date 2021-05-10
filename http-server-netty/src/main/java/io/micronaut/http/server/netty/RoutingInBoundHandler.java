@@ -1489,40 +1489,44 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                                                     RouteMatch<?> routeMatch,
                                                                                     boolean isErrorRoute,
                                                                                     Executor executor) {
-        return subscriber -> subscriber.onSubscribe(new Subscription() {
-
-            boolean done;
-
+        return new Publisher<MutableHttpResponse<?>>() {
             @Override
-            public void request(long n) {
-                if (done) {
-                    return;
-                }
-                done = true;
-                if (executor == null) {
+            public void subscribe(Subscriber<? super MutableHttpResponse<?>> subscriber) {
+                try {
                     ServerRequestContext.set(requestReference.get());
-                    try {
-                        emitRouteResponse((Subscriber<MutableHttpResponse<?>>) subscriber, request, requestReference, routeMatch, isErrorRoute);
-                    } finally {
-                        ServerRequestContext.set(null);
+                    if (executor == null) {
+                        doSubscribe(subscriber);
+                    } else {
+                        executor.execute(() -> {
+                            doSubscribe(subscriber);
+                        });
                     }
-                } else {
-                    executor.execute(() -> {
-                        ServerRequestContext.set(requestReference.get());
-                        try {
-                            emitRouteResponse((Subscriber<MutableHttpResponse<?>>) subscriber, request, requestReference, routeMatch, isErrorRoute);
-                        } finally {
-                            ServerRequestContext.set(null);
-                        }
-                    });
+                } finally {
+                    ServerRequestContext.set(null);
                 }
             }
 
-            @Override
-            public void cancel() {
-            }
+            private void doSubscribe(Subscriber<? super MutableHttpResponse<?>> subscriber) {
+                subscriber.onSubscribe(new Subscription() {
 
-        });
+                    boolean done;
+
+                    @Override
+                    public void request(long n) {
+                        if (done) {
+                            return;
+                        }
+                        done = true;
+                        emitRouteResponse((Subscriber<MutableHttpResponse<?>>) subscriber, request, requestReference, routeMatch, isErrorRoute);
+                    }
+
+                    @Override
+                    public void cancel() {
+                    }
+
+                });
+            }
+        };
     }
 
     private void emitRouteResponse(Subscriber<MutableHttpResponse<?>> subscriber,
