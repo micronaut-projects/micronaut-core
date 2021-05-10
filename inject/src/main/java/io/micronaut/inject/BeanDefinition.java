@@ -28,6 +28,7 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import javax.inject.Singleton;
@@ -345,13 +346,24 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The qualifier or null if this isn't one
      */
     default @Nullable Qualifier<T> getDeclaredQualifier() {
-        final String annotation = getAnnotationNameByStereotype(javax.inject.Qualifier.class).orElse(null);
-        if (annotation != null) {
-            if (annotation.equals(Qualifier.PRIMARY)) {
-                // primary is the same as null
-                return null;
+        final List<String> annotations = getAnnotationNamesByStereotype(javax.inject.Qualifier.class);
+        if (CollectionUtils.isNotEmpty(annotations)) {
+            if (annotations.size() == 1) {
+                final String annotation = annotations.iterator().next();
+                if (annotation.equals(Qualifier.PRIMARY)) {
+                    // primary is the same as null
+                    return null;
+                }
+                return Qualifiers.byAnnotation(this, annotation);
+            } else {
+                @SuppressWarnings("rawtypes") final Qualifier[] qualifiers = annotations.stream()
+                        .map((name) -> Qualifiers.byAnnotation(this, name))
+                        .toArray(Qualifier[]::new);
+                //noinspection unchecked
+                return Qualifiers.byQualifiers(
+                        qualifiers
+                );
             }
-            return Qualifiers.byAnnotation(this, annotation);
         } else {
             Qualifier<T> qualifier = resolveDynamicQualifier();
             if (qualifier == null) {
