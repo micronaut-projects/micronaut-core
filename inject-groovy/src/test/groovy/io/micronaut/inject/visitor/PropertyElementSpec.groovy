@@ -34,7 +34,7 @@ class PropertyElementSpec extends AbstractBeanDefinitionSpec {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -79,7 +79,7 @@ public class TestController {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends CharSequence> {
@@ -117,7 +117,7 @@ public class TestController<T extends CharSequence> {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {

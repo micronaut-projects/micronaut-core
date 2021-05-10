@@ -16,9 +16,8 @@
 package io.micronaut.http.client;
 
 import io.micronaut.http.client.annotation.Client;
-
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class MyJavaService {

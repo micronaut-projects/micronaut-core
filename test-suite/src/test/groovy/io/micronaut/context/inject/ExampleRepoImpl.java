@@ -16,8 +16,8 @@
 package io.micronaut.context.inject;
 
 import javax.annotation.PostConstruct;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class ExampleRepoImpl implements ExampleRepo {

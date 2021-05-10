@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.function.client.FunctionClient;
 import io.micronaut.http.annotation.Body;
 import io.reactivex.Single;
-import javax.inject.Named;
+import jakarta.inject.Named;
 //end::imports[]
 
 @Requires(property = "spec.name", value = "IsbnValidationSpec")

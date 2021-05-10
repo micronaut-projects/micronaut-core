@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.annotation.internal;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
@@ -22,8 +23,6 @@ import io.micronaut.inject.annotation.NamedAnnotationMapper;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import javax.inject.Inject;
-import javax.inject.Named;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -53,7 +52,7 @@ public class PersistenceContextAnnotationMapper implements NamedAnnotationMapper
         if (hibernateCurrentSession.isPresent()) {
             String name = annotation.stringValue("name").orElse(null);
             List<AnnotationValue<?>> annotationValues = new ArrayList<>(3);
-            annotationValues.add(AnnotationValue.builder(Inject.class).build());
+            annotationValues.add(AnnotationValue.builder(AnnotationMetadata.INJECT).build());
             annotationValues.add(
                     AnnotationValue.builder(TARGET_ANNOTATION)
                             .value(name)
@@ -62,7 +61,7 @@ public class PersistenceContextAnnotationMapper implements NamedAnnotationMapper
 
 
             if (StringUtils.isNotEmpty(name)) {
-                annotationValues.add(AnnotationValue.builder(Named.class).value(name).build());
+                annotationValues.add(AnnotationValue.builder(AnnotationMetadata.NAMED).value(name).build());
             }
             return annotationValues;
         }

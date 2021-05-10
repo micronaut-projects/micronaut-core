@@ -16,13 +16,16 @@
 package io.micronaut.http.server.netty.websocket;
 
 // tag::imports[]
+
 import io.micronaut.http.HttpRequest;
 import io.micronaut.websocket.WebSocketSession;
-import io.micronaut.websocket.annotation.*;
+import io.micronaut.websocket.annotation.ClientWebSocket;
+import io.micronaut.websocket.annotation.OnMessage;
+import io.micronaut.websocket.annotation.OnOpen;
 import io.reactivex.Single;
+
 import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
-// end::imports[]
 import java.util.concurrent.Future;
 
 // tag::class[]

@@ -1,12 +1,12 @@
 package io.micronaut.tracing.instrument
 
-import groovy.transform.InheritConstructors
+
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Secondary
 import io.micronaut.core.util.StringUtils
+import jakarta.inject.Named
+import jakarta.inject.Singleton
 
-import javax.inject.Named
-import javax.inject.Singleton
 import java.util.concurrent.AbstractExecutorService
 import java.util.concurrent.TimeUnit
 

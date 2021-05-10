@@ -16,13 +16,12 @@
 package io.micronaut.http.server.netty.binding
 
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.CookieValue
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.cookie.Cookies
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-
 import spock.lang.Unroll
 
 /**

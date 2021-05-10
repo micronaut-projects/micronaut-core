@@ -18,9 +18,9 @@ import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.reactivex.Flowable
 import io.reactivex.Single
+import jakarta.inject.Inject
 import spock.lang.Specification
 
-import javax.inject.Inject
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
 

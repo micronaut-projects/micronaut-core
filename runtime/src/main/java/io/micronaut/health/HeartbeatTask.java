@@ -20,8 +20,8 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.scheduling.annotation.Scheduled;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 

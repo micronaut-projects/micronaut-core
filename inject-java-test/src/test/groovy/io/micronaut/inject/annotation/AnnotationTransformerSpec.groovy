@@ -10,7 +10,7 @@ class AnnotationTransformerSpec extends AbstractTypeElementSpec {
 package test;
 
 @io.micronaut.inject.annotation.ToTransform
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -28,7 +28,7 @@ class Test {
 package test;
 
 @io.micronaut.inject.annotation.ToTransformRetention
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }

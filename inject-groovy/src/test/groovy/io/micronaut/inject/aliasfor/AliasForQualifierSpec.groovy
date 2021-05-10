@@ -18,8 +18,8 @@ package io.micronaut.inject.aliasfor
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
 
-import javax.inject.Named
-import javax.inject.Qualifier
+import jakarta.inject.Named
+import jakarta.inject.Qualifier
 
 class AliasForQualifierSpec extends AbstractBeanDefinitionSpec {
 

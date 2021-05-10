@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.server.netty.configuration;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -28,8 +28,8 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
+import jakarta.inject.Inject;
 
-import javax.inject.Inject;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;

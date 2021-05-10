@@ -21,7 +21,7 @@ import io.micronaut.scheduling.TaskExecutors
 import kotlinx.coroutines.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicInteger
-import javax.inject.Named
+import jakarta.inject.Named
 
 @Controller("/suspend")
 class SuspendController(

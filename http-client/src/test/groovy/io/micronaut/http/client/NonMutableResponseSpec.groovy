@@ -7,12 +7,12 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Single
+import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.inject.Inject
 import java.util.concurrent.CompletableFuture
 
 class NonMutableResponseSpec extends Specification {

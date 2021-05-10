@@ -21,11 +21,11 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.tracing.brave.BraveTracerConfiguration;
+import jakarta.inject.Provider;
+import jakarta.inject.Singleton;
 import zipkin2.reporter.Sender;
 
 import java.util.stream.Collectors;
-import javax.inject.Provider;
-import javax.inject.Singleton;
 
 /**
  * A Factory for creating a Zipkin {@link Sender} based on {@link io.micronaut.tracing.brave.BraveTracerConfiguration.HttpClientSenderConfiguration}.

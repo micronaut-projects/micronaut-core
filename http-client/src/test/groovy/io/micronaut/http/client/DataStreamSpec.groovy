@@ -15,10 +15,15 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.io.buffer.ByteBufferFactory
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.multipart.MultipartBody
@@ -28,11 +33,7 @@ import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.reactivex.Single
-import io.micronaut.core.io.buffer.ByteBuffer
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
+import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
@@ -41,7 +42,6 @@ import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.inject.Inject
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 

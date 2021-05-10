@@ -19,7 +19,8 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
+
 import java.util.concurrent.locks.Lock;
 
 /**

@@ -16,10 +16,11 @@
 package io.micronaut.management.endpoint.health;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
+import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.management.health.aggregator.HealthAggregator;
@@ -28,9 +29,8 @@ import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.management.health.indicator.annotation.Liveness;
 import io.reactivex.Single;
+import jakarta.inject.Inject;
 
-import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.HashMap;

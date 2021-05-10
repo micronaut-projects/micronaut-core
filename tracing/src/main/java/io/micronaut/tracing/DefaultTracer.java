@@ -21,8 +21,7 @@ import io.micronaut.context.annotation.Requires;
 import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracer;
 import io.opentracing.noop.NoopTracerFactory;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * Creates a default NoopTracer if no other tracer is present.

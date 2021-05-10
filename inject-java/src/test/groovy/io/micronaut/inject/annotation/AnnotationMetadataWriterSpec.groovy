@@ -194,7 +194,7 @@ class Test {
         // the stereotypes should include meta annotation stereotypes
         metadata.getAnnotationNamesByStereotype(Around.class).contains(Recoverable.class.getName())
     }
-    
+
     void "test read annotation with annotation value"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
@@ -503,7 +503,7 @@ import io.micronaut.context.annotation.*;
 @Property(name="prop1", value="value1")
 @Property(name="prop2", value="value2")
 @Property(name="prop3", value="value3")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Property(name="prop2", value="value2")    

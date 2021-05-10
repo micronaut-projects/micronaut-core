@@ -17,7 +17,7 @@ package io.micronaut.inject.generics.missing;
 
 import io.reactivex.Flowable;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.List;
 
 @Singleton

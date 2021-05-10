@@ -33,10 +33,10 @@ import io.micronaut.http.ssl.SslConfiguration
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.handler.ssl.SslHandler
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Singleton
 import java.security.cert.X509Certificate
 import java.time.Duration
 

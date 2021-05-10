@@ -18,7 +18,7 @@ package io.micronaut.docs.replaces;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.docs.requires.Book;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.Map;
 

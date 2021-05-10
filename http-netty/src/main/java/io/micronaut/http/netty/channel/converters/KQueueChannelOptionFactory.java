@@ -15,11 +15,6 @@
  */
 package io.micronaut.http.netty.channel.converters;
 
-import java.util.Map;
-import java.util.Optional;
-
-import javax.inject.Singleton;
-
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
@@ -31,6 +26,10 @@ import io.netty.channel.kqueue.AcceptFilter;
 import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueChannelOption;
 import io.netty.channel.unix.UnixChannelOption;
+import jakarta.inject.Singleton;
+
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Creates channel options.

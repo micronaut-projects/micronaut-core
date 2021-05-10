@@ -22,8 +22,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanType;
 
-import javax.inject.Named;
-import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -71,14 +69,14 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
             return candidates;
         }
         String name;
-        String v = annotationMetadata.stringValue(Named.class).orElse(null);
+        String v = annotationMetadata.stringValue(AnnotationMetadata.NAMED).orElse(null);
         if (StringUtils.isNotEmpty(v)) {
             name = Character.toUpperCase(v.charAt(0)) + v.substring(1);
             return reduceByName(beanType, candidates, name);
         } else {
             name = getName();
             final String qualifierName = annotationMetadata
-                    .getAnnotationNameByStereotype(Qualifier.class).orElse(null);
+                    .getAnnotationNameByStereotype(AnnotationMetadata.QUALIFIER).orElse(null);
             AnnotationValue<Annotation> qualifierAnn;
             if (qualifierName != null) {
                 Set<String> nonBinding = resolveNonBindingMembers(annotationMetadata);
@@ -128,7 +126,7 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     @NonNull
     private Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
-        final String[] nonBindingArray = annotationMetadata.stringValues(Qualifier.class, "nonBinding");
+        final String[] nonBindingArray = annotationMetadata.stringValues(AnnotationMetadata.QUALIFIER, "nonBinding");
         Set<String> nonBinding = ArrayUtils.isNotEmpty(nonBindingArray) ? new HashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();
         return nonBinding;
     }

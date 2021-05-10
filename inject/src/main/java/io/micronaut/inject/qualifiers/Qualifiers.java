@@ -20,8 +20,8 @@ import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
+import jakarta.inject.Named;
 
-import javax.inject.Named;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.Optional;
@@ -143,7 +143,7 @@ public class Qualifiers {
         } else if (Any.NAME.equals(type)) {
             //noinspection unchecked
             return AnyQualifier.INSTANCE;
-        } else if (Named.class.getName().equals(type)) {
+        } else if (Named.class.getName().equals(type) || AnnotationMetadata.NAMED.equals(type)) {
             String n = metadata.stringValue(type).orElse(null);
             if (n != null) {
                 return byName(n);

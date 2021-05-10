@@ -37,7 +37,7 @@ import org.junit.Test;
 import org.reactivestreams.Publisher;
 import spock.lang.Retry;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;

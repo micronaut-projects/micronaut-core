@@ -48,6 +48,8 @@ import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
+import jakarta.inject.Provider;
+import jakarta.inject.Singleton;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,9 +57,6 @@ import org.slf4j.LoggerFactory;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
-import javax.inject.Provider;
-import javax.inject.Scope;
-import javax.inject.Singleton;
 import java.io.Closeable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -209,10 +208,13 @@ public class DefaultBeanContext implements BeanContext {
         this.classLoader = contextConfiguration.getClassLoader();
         this.customScopeRegistry = new DefaultCustomScopeRegistry(this, classLoader);
         Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
-        this.eagerInitStereotypes = eagerInitAnnotated
-                .stream().map(Class::getName).toArray(String[]::new);
-        this.eagerInitStereotypesPresent = eagerInitStereotypes.length > 0;
-        this.eagerInitSingletons = eagerInitStereotypesPresent && eagerInitAnnotated.contains(Singleton.class);
+        List<String> eagerInitStereotypes = new ArrayList<>(eagerInitAnnotated.size());
+        for (Class<? extends Annotation> ann: eagerInitAnnotated) {
+            eagerInitStereotypes.add(ann.getName());
+        }
+        this.eagerInitStereotypes = eagerInitStereotypes.toArray(new String[0]);
+        this.eagerInitStereotypesPresent = !eagerInitStereotypes.isEmpty();
+        this.eagerInitSingletons = eagerInitStereotypesPresent && (eagerInitStereotypes.contains(AnnotationMetadata.SINGLETON) || eagerInitStereotypes.contains(Singleton.class.getName()));
     }
 
     @Override
@@ -1200,7 +1202,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Find an active {@link javax.inject.Singleton} bean for the given definition and qualifier.
+     * Find an active singleton bean for the given definition and qualifier.
      *
      * @param beanDefinition The bean definition
      * @param qualifier      The qualifier
@@ -2783,12 +2785,13 @@ public class DefaultBeanContext implements BeanContext {
 
             if (currentSegment.isPresent()) {
                 Argument argument = currentSegment.get().getArgument();
-                final Optional<Class<? extends Annotation>> scope = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class);
+                final Optional<Class<? extends Annotation>> scope = argument.getAnnotationMetadata()
+                        .getAnnotationTypeByStereotype(AnnotationMetadata.SCOPE);
                 registeredScope = scope.flatMap(customScopeRegistry::findScope);
             }
 
             if (!isProxy && isScopedProxyDefinition && !registeredScope.isPresent()) {
-                final List<Class<? extends Annotation>> scopeHierarchy = definition.getAnnotationTypesByStereotype(Scope.class);
+                final List<Class<? extends Annotation>> scopeHierarchy = definition.getAnnotationTypesByStereotype(AnnotationMetadata.SCOPE);
                 for (Class<? extends Annotation> scope : scopeHierarchy) {
                     registeredScope = customScopeRegistry.findScope(scope);
                     if (registeredScope.isPresent()) {

@@ -17,8 +17,8 @@ package io.micronaut.inject.property
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.convert.format.MapFormat
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 @Singleton
 class BeanWithProperty {

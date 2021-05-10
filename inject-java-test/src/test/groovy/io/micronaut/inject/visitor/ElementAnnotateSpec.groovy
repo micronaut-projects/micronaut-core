@@ -52,7 +52,7 @@ interface MyInterface{
         def definition = buildBeanDefinition('test.TestListener', '''
 package test;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class TestListener {

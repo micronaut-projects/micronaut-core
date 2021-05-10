@@ -16,8 +16,7 @@
 package io.micronaut.runtime.context.scope
 
 import io.micronaut.inject.BeanDefinition
-
-import javax.inject.Scope
+import jakarta.inject.Scope
 
 class ThreadLocalJavaParseSpec extends io.micronaut.annotation.processing.test.AbstractTypeElementSpec {
 

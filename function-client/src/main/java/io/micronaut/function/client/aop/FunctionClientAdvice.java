@@ -27,9 +27,9 @@ import io.micronaut.function.client.FunctionInvokerChooser;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 

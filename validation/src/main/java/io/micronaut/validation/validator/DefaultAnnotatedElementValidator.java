@@ -16,6 +16,7 @@
 package io.micronaut.validation.validator;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.GenericTypeUtils;
@@ -25,7 +26,6 @@ import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
 import io.micronaut.validation.validator.constraints.DefaultConstraintValidators;
 
-import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.HashMap;

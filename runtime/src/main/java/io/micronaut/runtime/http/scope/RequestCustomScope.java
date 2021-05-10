@@ -15,13 +15,14 @@
  */
 package io.micronaut.runtime.http.scope;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.scope.CustomScope;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.HttpRequest;
@@ -31,12 +32,11 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import jakarta.inject.Provider;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.micronaut.core.annotation.NonNull;
-import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 

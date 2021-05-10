@@ -15,9 +15,34 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.context.*;
-import io.micronaut.core.annotation.*;
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.AbstractBeanDefinition;
+import io.micronaut.context.AbstractConstructorInjectionPoint;
+import io.micronaut.context.AbstractExecutableMethod;
+import io.micronaut.context.AbstractParametrizedBeanDefinition;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DefaultBeanContext;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationInject;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Provided;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
@@ -36,6 +61,7 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
+import jakarta.inject.Singleton;
 import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -46,10 +72,6 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
 
-import javax.inject.Inject;
-import javax.inject.Qualifier;
-import javax.inject.Scope;
-import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
@@ -424,7 +446,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public boolean isSingleton() {
-        return annotationMetadata.hasDeclaredStereotype(Singleton.class);
+        return annotationMetadata.hasDeclaredStereotype(AnnotationMetadata.SINGLETON);
     }
 
     @Override
@@ -582,8 +604,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void applyConfigurationInjectionIfNecessary(MethodElement constructor) {
         final boolean isRecordConfig = isRecordConfig(constructor);
         if (isRecordConfig || constructor.hasAnnotation(ConfigurationInject.class)) {
-            final List<Class<? extends Annotation>> injectionTypes =
-                    Arrays.asList(Property.class, Value.class, Parameter.class, Qualifier.class, Inject.class);
+            final List<String> injectionTypes =
+                    Arrays.asList(Property.class.getName(), Value.class.getName(), Parameter.class.getName(), AnnotationMetadata.QUALIFIER, AnnotationMetadata.INJECT);
 
             if (isRecordConfig) {
                 final List<PropertyElement> beanProperties = constructor
@@ -613,7 +635,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     }
 
-    private void processConfigurationInjectionConstructor(MethodElement constructor, List<Class<? extends Annotation>> injectionTypes) {
+    private void processConfigurationInjectionConstructor(MethodElement constructor, List<String> injectionTypes) {
         ParameterElement[] parameters = constructor.getParameters();
         for (ParameterElement parameter : parameters) {
             AnnotationMetadata annotationMetadata = parameter.getAnnotationMetadata();
@@ -628,7 +650,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void processConfigurationConstructorParameter(ParameterElement parameter, AnnotationMetadata annotationMetadata) {
         ClassElement parameterType = parameter.getGenericType();
-        if (!parameterType.hasStereotype(Scope.class)) {
+        if (!parameterType.hasStereotype(AnnotationMetadata.SCOPE)) {
             final PropertyMetadata pm = metadataBuilder.visitProperty(
                     parameterType.getName(),
                     parameter.getName(), parameter.getDocumentation().orElse(null),
@@ -791,8 +813,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         AnnotationMetadata annotationMetadata = this.annotationMetadata != null ? this.annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         writeBooleanMethod(classWriter, "isSingleton", () ->
-                annotationMetadata.hasDeclaredStereotype(Singleton.class) ||
-                        annotationMetadata.classValue(DefaultScope.class).map(t -> t == Singleton.class).orElse(false));
+                annotationMetadata.hasDeclaredStereotype(AnnotationMetadata.SINGLETON) ||
+                        annotationMetadata.stringValue(DefaultScope.class)
+                                .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationMetadata.SINGLETON))
+                                .orElse(false));
 
         // method: boolean isIterable()
         writeBooleanMethod(classWriter, "isIterable", () ->
@@ -814,7 +838,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 "getScope"
         );
         getScopeMethod.loadThis();
-        Optional<String> scope = annotationMetadata.getDeclaredAnnotationNameByStereotype(Scope.class.getName());
+        Optional<String> scope = annotationMetadata.getDeclaredAnnotationNameByStereotype(AnnotationMetadata.SCOPE);
         if (scope.isPresent()) {
             getScopeMethod.push(getTypeReferenceForName(scope.get()));
             getScopeMethod.invokeStatic(

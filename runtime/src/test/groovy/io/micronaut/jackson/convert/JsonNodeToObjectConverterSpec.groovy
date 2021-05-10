@@ -15,7 +15,7 @@
  */
 package io.micronaut.jackson.convert
 
-import com.fasterxml.jackson.databind.ObjectMapper
+
 import com.fasterxml.jackson.databind.node.NullNode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService

@@ -20,8 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 import static io.micronaut.tracing.instrument.util.ThreadTracingInvocationInstrumenterFactory.PROPERTY_INSTRUMENT_THREADS;
 

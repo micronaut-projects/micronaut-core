@@ -16,14 +16,12 @@
 package io.micronaut.runtime.context.scope
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.support.AbstractBeanDefinitionSpec
+import jakarta.inject.Scope
+import jakarta.inject.Singleton
 
-import javax.inject.Scope
-import javax.inject.Singleton
-import java.lang.annotation.Documented
 import java.lang.annotation.ElementType
 import java.lang.annotation.Retention
 import java.lang.annotation.Target

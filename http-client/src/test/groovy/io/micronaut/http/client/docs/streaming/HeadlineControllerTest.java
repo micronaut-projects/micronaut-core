@@ -27,10 +27,8 @@ import org.reactivestreams.Subscription;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-import static io.micronaut.http.HttpRequest.*;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static io.micronaut.http.HttpRequest.GET;
+import static org.junit.Assert.*;
 
 /**
  * @author graemerocher

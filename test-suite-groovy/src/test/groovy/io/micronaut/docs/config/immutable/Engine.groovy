@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.config.immutable
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class Engine {

@@ -8,7 +8,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 class BeanDefinitionDelegateSpec extends Specification {
 

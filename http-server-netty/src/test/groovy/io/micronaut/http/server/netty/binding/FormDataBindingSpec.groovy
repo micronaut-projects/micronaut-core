@@ -20,12 +20,12 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Post
 import io.reactivex.Flowable
 import io.reactivex.Maybe
 import spock.lang.Issue
@@ -152,7 +152,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         response.body.isPresent()
         response.body.get() == "name=Fred&age=10"
     }
-    
+
     @Controller(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
     static class FormController {
 

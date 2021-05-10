@@ -24,11 +24,11 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import jakarta.inject.Singleton;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
-import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.OutputStream;
 
@@ -222,8 +222,10 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
 
         writeGetAnnotationMetadataMethod(classWriter);
         writeBooleanMethod(classWriter, "isSingleton", () ->
-                annotationMetadata.hasDeclaredStereotype(Singleton.class) ||
-                        annotationMetadata.classValue(DefaultScope.class).map(t -> t == Singleton.class).orElse(false));
+                annotationMetadata.hasDeclaredStereotype(AnnotationMetadata.SINGLETON) ||
+                        annotationMetadata.stringValue(DefaultScope.class)
+                                .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationMetadata.SINGLETON))
+                                .orElse(false));
         writeBooleanMethod(classWriter, "isConfigurationProperties", () ->
                 annotationMetadata.hasDeclaredStereotype(ConfigurationReader.class));
 

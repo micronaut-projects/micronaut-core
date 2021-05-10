@@ -17,8 +17,7 @@ package io.micronaut.web.router.version;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.exceptions.ConfigurationException;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * Implementation of {@link DefaultVersionProvider} which uses configuration.

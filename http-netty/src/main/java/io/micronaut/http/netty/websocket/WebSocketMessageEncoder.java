@@ -27,8 +27,8 @@ import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.nio.ByteBuffer;
 import java.util.Optional;
 

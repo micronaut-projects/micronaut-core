@@ -51,6 +51,12 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     AnnotationMetadata EMPTY_METADATA = new EmptyAnnotationMetadata();
 
+    String INJECT = "javax.inject.Inject";
+    String SCOPE = "javax.inject.Scope";
+    String SINGLETON = "javax.inject.Singleton";
+    String QUALIFIER = "javax.inject.Qualifier";
+    String NAMED = "javax.inject.Named";
+
     /**
      * The default <tt>value()</tt> member.
      */
@@ -528,9 +534,19 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return A set of annotation names
      */
     default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
+        return getAnnotationTypesByStereotype(stereotype.getName());
+    }
+
+    /**
+     * Resolve all of the annotation names that feature the given stereotype.
+     *
+     * @param stereotype The annotation names
+     * @return A set of annotation names
+     */
+    default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull String stereotype) {
         ArgumentUtils.requireNonNull("stereotype", stereotype);
 
-        List<String> names = getAnnotationNamesByStereotype(stereotype.getName());
+        List<String> names = getAnnotationNamesByStereotype(stereotype);
         List<Class<? extends Annotation>> list = new ArrayList<>(names.size());
         for (String name : names) {
             Optional<Class<? extends Annotation>> opt = getAnnotationType(name);
@@ -1045,6 +1061,27 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return The string values if it is present
      */
     default @NonNull String[] stringValues(@NonNull Class<? extends Annotation> annotation) {
+        return stringValues(annotation, VALUE_MEMBER);
+    }
+
+    /**
+     * The values as string array for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @param member     The member
+     * @return The string values if it is present
+     */
+    default @NonNull String[] stringValues(@NonNull String annotation, @NonNull String member) {
+        return StringUtils.EMPTY_STRING_ARRAY;
+    }
+
+    /**
+     * The values as string array for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @return The string values if it is present
+     */
+    default @NonNull String[] stringValues(@NonNull String annotation) {
         return stringValues(annotation, VALUE_MEMBER);
     }
 

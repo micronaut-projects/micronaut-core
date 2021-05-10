@@ -27,8 +27,8 @@ import io.micronaut.runtime.EmbeddedApplication;
 import io.micronaut.runtime.event.ApplicationShutdownEvent;
 import io.micronaut.runtime.event.ApplicationStartupEvent;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Collection;
 
 /**

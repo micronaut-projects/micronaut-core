@@ -19,8 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.support.AbstractBeanDefinitionSpec
-
-import javax.inject.Scope
+import jakarta.inject.Scope
 
 /**
  * @author Marcel Overdijk

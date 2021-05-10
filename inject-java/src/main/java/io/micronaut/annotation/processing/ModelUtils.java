@@ -23,7 +23,6 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
-import javax.inject.Inject;
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
@@ -232,7 +231,7 @@ public class ModelUtils {
     private Optional<ExecutableElement> findAnnotatedConstructor(AnnotationUtils annotationUtils, List<ExecutableElement> constructors) {
         return constructors.stream().filter(ctor -> {
                     final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
-                    return annotationMetadata.hasStereotype(Inject.class) || annotationMetadata.hasStereotype(Creator.class);
+                    return annotationMetadata.hasStereotype(AnnotationMetadata.INJECT) || annotationMetadata.hasStereotype(Creator.class);
                 }
         ).findFirst();
     }

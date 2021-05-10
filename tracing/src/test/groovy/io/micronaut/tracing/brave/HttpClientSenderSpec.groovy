@@ -28,12 +28,12 @@ import io.micronaut.runtime.server.event.ServerStartupEvent
 import io.micronaut.tracing.brave.sender.HttpClientSender
 import io.reactivex.Flowable
 import io.reactivex.Single
+import jakarta.inject.Singleton
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import zipkin2.Span
 
-import javax.inject.Singleton
 /**
  * @author graemerocher
  * @since 1.0

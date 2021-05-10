@@ -19,12 +19,7 @@ import io.micronaut.context.annotation.AliasFor
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.http.HttpAttributes
-import io.micronaut.http.HttpMethod
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MutableHttpResponse
+import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.FilterMatcher
@@ -37,10 +32,9 @@ import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.reactivex.Single
+import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import spock.lang.Specification
-
-import javax.inject.Inject
 
 /**
  * @author Graeme Rocher

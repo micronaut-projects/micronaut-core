@@ -92,7 +92,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Executable
@@ -122,7 +122,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class GenericsTest1 implements java.util.function.Function<String, Integer>{
 
     public Integer apply(String str) {
@@ -149,7 +149,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class GenericsTest2 implements Foo {
 
     public Integer apply(String str) {

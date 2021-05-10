@@ -20,10 +20,10 @@ import io.micronaut.retry.CircuitState
 import io.micronaut.retry.annotation.CircuitBreaker
 import io.micronaut.retry.annotation.RetryPredicate
 import io.reactivex.Single
+import jakarta.inject.Singleton
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.inject.Singleton
 import java.time.Duration
 
 /**

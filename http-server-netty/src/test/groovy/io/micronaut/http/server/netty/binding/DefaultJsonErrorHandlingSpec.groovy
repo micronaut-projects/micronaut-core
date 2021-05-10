@@ -4,10 +4,10 @@ import groovy.json.JsonSlurper
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
-import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.server.netty.AbstractMicronautSpec
 
 class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 

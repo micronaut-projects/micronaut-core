@@ -17,6 +17,8 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
@@ -26,10 +28,8 @@ import io.micronaut.http.server.cors.CorsOriginConfiguration;
 import io.micronaut.http.server.util.locale.HttpLocaleResolutionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import jakarta.inject.Inject;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
 import java.io.File;
 import java.nio.charset.Charset;
 import java.time.Duration;
@@ -494,7 +494,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
     /**
      * @param httpToHttpsRedirect Set to true to enable redirecting all http requests to the same URL but with
-                                  https instead. This should only be used when {@code dualProtocol} is enabled. 
+                                  https instead. This should only be used when {@code dualProtocol} is enabled.
                                   Default value ({@value #DEFAULT_HTTP_TO_HTTPS_REDIRECT}). This feature uses
                                   the host resolution capabilities to determine the host to redirect to.
      */

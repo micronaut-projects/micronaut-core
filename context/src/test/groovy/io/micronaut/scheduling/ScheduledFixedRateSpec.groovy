@@ -21,7 +21,7 @@ import io.micronaut.scheduling.annotation.Scheduled
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import java.util.concurrent.atomic.AtomicInteger
 
 /**

@@ -2,9 +2,9 @@ ext {
     shadowJarEnabled = true
 }
 dependencies {
-    api dependencyVersion("javax.annotation-api")
-    api group: 'javax.inject', name: 'javax.inject', version: '1'
-    compileOnly "jakarta.inject:jakarta.inject-api:2.0.0"
+    //api dependencyVersion("javax.annotation-api")
+    compileOnly group: 'javax.inject', name: 'javax.inject', version: '1'
+    api "jakarta.inject:jakarta.inject-api:2.0.0"
     api project(':core')
     api dependencyVersion("snakeyaml")
 

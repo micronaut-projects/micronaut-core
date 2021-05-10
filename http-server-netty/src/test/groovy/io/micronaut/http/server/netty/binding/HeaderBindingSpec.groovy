@@ -19,10 +19,10 @@ import io.micronaut.core.convert.format.Format
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
+import io.micronaut.http.server.netty.AbstractMicronautSpec
 import spock.lang.Shared
 import spock.lang.Unroll
 

@@ -15,14 +15,14 @@
  */
 package io.micronaut.http.server.netty.java;
 
-import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.QueryValue;
 
-import io.micronaut.core.annotation.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

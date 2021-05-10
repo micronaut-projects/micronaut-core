@@ -16,8 +16,8 @@
 package io.micronaut.tracing.brave;
 
 import io.micronaut.scheduling.annotation.Scheduled;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;

@@ -2,7 +2,7 @@ package io.micronaut.docs.inject.typed;
 
 import io.micronaut.context.annotation.Bean;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 // tag::class[]
 @Singleton

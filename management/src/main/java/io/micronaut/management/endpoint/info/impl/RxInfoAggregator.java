@@ -26,9 +26,9 @@ import io.micronaut.management.endpoint.info.InfoEndpoint;
 import io.micronaut.management.endpoint.info.InfoSource;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Singleton;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;

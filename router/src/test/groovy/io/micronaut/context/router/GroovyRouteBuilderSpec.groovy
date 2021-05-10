@@ -27,8 +27,8 @@ import io.micronaut.web.router.Router
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher

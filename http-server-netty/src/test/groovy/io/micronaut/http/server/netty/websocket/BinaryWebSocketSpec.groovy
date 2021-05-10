@@ -18,7 +18,6 @@ package io.micronaut.http.server.netty.websocket
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.RxWebSocketClient
-import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import spock.lang.Retry
 import spock.lang.Specification

@@ -22,7 +22,7 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.function.client.FunctionClient;
 import org.junit.Test;
 
-import javax.inject.Named;
+import jakarta.inject.Named;
 import static org.junit.Assert.assertEquals;
 //end::import[]
 

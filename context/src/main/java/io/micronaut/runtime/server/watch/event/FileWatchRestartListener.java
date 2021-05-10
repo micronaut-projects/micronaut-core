@@ -21,10 +21,9 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 import io.micronaut.scheduling.io.watch.event.FileChangedEvent;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.inject.Singleton;
 
 /**
  * Listener that stops the server if a file changes. Relies on external service like {@code gradle run --continuous} or Kubernetes replication controller is required to restart the container.

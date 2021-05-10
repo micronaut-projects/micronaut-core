@@ -23,9 +23,9 @@ import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.reactivex.Flowable;
 import io.reactivex.functions.Function;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Singleton;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;

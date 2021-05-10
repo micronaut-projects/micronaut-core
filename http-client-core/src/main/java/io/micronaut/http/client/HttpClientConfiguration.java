@@ -15,9 +15,9 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
@@ -27,12 +27,22 @@ import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import java.net.*;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.ServiceLoader;
 import java.util.concurrent.ThreadFactory;
 
 /**

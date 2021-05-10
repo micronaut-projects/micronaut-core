@@ -27,7 +27,7 @@ import io.micronaut.aop.proxytarget.*;
 import io.micronaut.context.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 final class FinalModifierMyBean1 {
 
     private String myValue;
@@ -56,7 +56,7 @@ import io.micronaut.aop.proxytarget.*;
 import io.micronaut.context.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class FinalModifierMyBean2 {
 
     private String myValue;
@@ -84,7 +84,7 @@ package test;
 import io.micronaut.aop.proxytarget.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class FinalModifierMyBean2 {
 
     private String myValue;

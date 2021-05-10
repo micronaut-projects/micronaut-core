@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.annotation.PostConstruct
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 class RefreshEventSpec {
 

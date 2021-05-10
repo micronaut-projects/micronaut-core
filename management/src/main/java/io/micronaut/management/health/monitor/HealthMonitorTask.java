@@ -27,12 +27,12 @@ import io.micronaut.scheduling.annotation.Scheduled;
 import io.reactivex.Flowable;
 import io.reactivex.MaybeObserver;
 import io.reactivex.disposables.Disposable;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;

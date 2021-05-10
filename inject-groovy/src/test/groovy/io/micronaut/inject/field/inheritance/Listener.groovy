@@ -17,7 +17,7 @@ package io.micronaut.inject.field.inheritance
 
 import io.micronaut.inject.field.inheritance.AbstractListener
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class Listener extends AbstractListener {

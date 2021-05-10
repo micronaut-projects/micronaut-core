@@ -15,14 +15,12 @@
  */
 package io.micronaut.jackson.bind
 
-
 import com.fasterxml.jackson.databind.PropertyNamingStrategy
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionError
 import io.micronaut.core.convert.ConversionService
-import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 

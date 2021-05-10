@@ -21,9 +21,10 @@ import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.http.MediaType;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

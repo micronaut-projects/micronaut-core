@@ -17,8 +17,8 @@ package io.micronaut.validation.validator.messages;
 
 import io.micronaut.context.StaticMessageSource;
 import io.micronaut.core.annotation.Introspected;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import javax.validation.constraints.*;
 
 /**

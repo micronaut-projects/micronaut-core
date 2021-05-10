@@ -19,7 +19,11 @@ import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.tracing.interceptor.TraceInterceptor;
 
-import java.lang.annotation.*;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * <p>Indicates that a new Open Tracing span should be started.</p>

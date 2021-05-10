@@ -15,15 +15,18 @@
  */
 package io.micronaut.inject.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import jakarta.inject.Inject;
 
-import javax.inject.Inject;
 import java.util.*;
 
-public class InjectVisitor implements TypeElementVisitor<Object, Inject> {
+public class InjectVisitor implements TypeElementVisitor<Object, Object> {
+
     private static List<String> VISITED_ELEMENTS = new ArrayList<>();
     private static Map<VisitorContext, Boolean> started = new LinkedHashMap<>();
     private static Map<VisitorContext, Boolean> finished = new LinkedHashMap<>();
@@ -34,6 +37,11 @@ public class InjectVisitor implements TypeElementVisitor<Object, Inject> {
 
     public static void clearVisited() {
         VISITED_ELEMENTS = new ArrayList<>();
+    }
+
+    @Override
+    public Set<String> getSupportedAnnotationNames() {
+        return CollectionUtils.setOf(AnnotationMetadata.INJECT, Inject.class.getName());
     }
 
     @Override

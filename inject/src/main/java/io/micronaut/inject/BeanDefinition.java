@@ -29,8 +29,8 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
@@ -66,8 +66,17 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      */
     default boolean isSingleton() {
         AnnotationMetadata am = getAnnotationMetadata();
-        return am.hasDeclaredStereotype(Singleton.class) ||
-                am.classValue(DefaultScope.class).map(t -> t == Singleton.class).orElse(false);
+        if (am.hasDeclaredStereotype(AnnotationMetadata.SINGLETON)) {
+            return true;
+        } else {
+            Optional<String> scopeValue = am.stringValue(DefaultScope.class);
+            if (scopeValue.isPresent()) {
+                String scope = scopeValue.get();
+                return scope.equals(AnnotationMetadata.SINGLETON) || scope.equals(Singleton.class.getName());
+            } else {
+                return false;
+            }
+        }
     }
 
     /**
@@ -345,7 +354,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The qualifier or null if this isn't one
      */
     default @Nullable Qualifier<T> getDeclaredQualifier() {
-        final String annotation = getAnnotationNameByStereotype(javax.inject.Qualifier.class).orElse(null);
+        final String annotation = getAnnotationNameByStereotype(AnnotationMetadata.QUALIFIER).orElse(null);
         if (annotation != null) {
             if (annotation.equals(Qualifier.PRIMARY)) {
                 // primary is the same as null
@@ -355,7 +364,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
         } else {
             Qualifier<T> qualifier = resolveDynamicQualifier();
             if (qualifier == null) {
-                String name = stringValue(javax.inject.Named.class).orElse(null);
+                String name = stringValue(AnnotationMetadata.NAMED).orElse(null);
                 qualifier = name != null ? Qualifiers.byAnnotation(this, name) : null;
             }
             return qualifier;

@@ -17,10 +17,11 @@ package io.micronaut.websocket.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.websocket.WebSocketVersion;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

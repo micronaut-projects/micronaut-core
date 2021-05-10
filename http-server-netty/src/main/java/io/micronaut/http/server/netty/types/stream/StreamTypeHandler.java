@@ -21,8 +21,8 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.netty.channel.ChannelHandlerContext;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.io.InputStream;
 import java.util.Arrays;
 
