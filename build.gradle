@@ -897,6 +897,9 @@ allprojects {
         module {
             outputDir file('build/classes/java/main')
             testOutputDir file('build/classes/groovy/test')
+
+            downloadJavadoc = false
+            downloadSources = false
         }
     }
 }
