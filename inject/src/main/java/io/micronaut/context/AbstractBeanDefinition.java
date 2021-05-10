@@ -1008,8 +1008,15 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     if (Qualifier.class.isAssignableFrom(argumentType)) {
                         bean = qualifier;
                     } else {
-                        //noinspection unchecked
-                        bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
+                        Object previous = !argument.isAnnotationPresent(Parameter.class) ? resolutionContext.removeAttribute(NAMED_ATTRIBUTE) : null;
+                        try {
+                            //noinspection unchecked
+                            bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
+                        } finally {
+                            if (previous != null) {
+                                resolutionContext.setAttribute(NAMED_ATTRIBUTE, previous);
+                            }
+                        }
                     }
                     path.pop();
                     return bean;
