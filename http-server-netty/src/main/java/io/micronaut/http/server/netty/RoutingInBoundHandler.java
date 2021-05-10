@@ -1492,17 +1492,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return new Publisher<MutableHttpResponse<?>>() {
             @Override
             public void subscribe(Subscriber<? super MutableHttpResponse<?>> subscriber) {
-                try {
-                    ServerRequestContext.set(requestReference.get());
-                    if (executor == null) {
+                if (executor == null) {
+                    doSubscribe(subscriber);
+                } else {
+                    executor.execute(() -> {
                         doSubscribe(subscriber);
-                    } else {
-                        executor.execute(() -> {
-                            doSubscribe(subscriber);
-                        });
-                    }
-                } finally {
-                    ServerRequestContext.set(null);
+                    });
                 }
             }
 
@@ -1517,7 +1512,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             return;
                         }
                         done = true;
-                        emitRouteResponse((Subscriber<MutableHttpResponse<?>>) subscriber, request, requestReference, routeMatch, isErrorRoute);
+                        try {
+                            ServerRequestContext.set(requestReference.get());
+                            emitRouteResponse((Subscriber<MutableHttpResponse<?>>) subscriber, request, requestReference, routeMatch, isErrorRoute);
+                        } finally {
+                            ServerRequestContext.set(null);
+                        }
                     }
 
                     @Override
