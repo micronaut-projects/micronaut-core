@@ -1075,7 +1075,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                     boolean isDeclared,
                                     List<? extends A> annotationHierarchy,
                                     boolean allowAliases) {
-        final ListIterator<? extends A> listIterator = new ArrayList<>(annotationHierarchy).listIterator();
+        final ArrayList<? extends A> hierarchyCopy = new ArrayList<>(annotationHierarchy);
+        final ListIterator<? extends A> listIterator = hierarchyCopy.listIterator();
         while (listIterator.hasNext()) {
             A annotationMirror = listIterator.next();
             String annotationName = getAnnotationTypeName(annotationMirror);
@@ -1117,7 +1118,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         annotationMetadata::addAnnotation);
             }
         }
-        for (A annotationMirror : annotationHierarchy) {
+        for (A annotationMirror : hierarchyCopy) {
             String annotationTypeName = getAnnotationTypeName(annotationMirror);
             String packageName = NameUtils.getPackageName(annotationTypeName);
             if (!AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName)) {

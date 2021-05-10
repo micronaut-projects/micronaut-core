@@ -18,6 +18,7 @@ package io.micronaut.inject;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Provided;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanContext;
@@ -28,6 +29,7 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import jakarta.inject.Singleton;
 
@@ -66,13 +68,13 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      */
     default boolean isSingleton() {
         AnnotationMetadata am = getAnnotationMetadata();
-        if (am.hasDeclaredStereotype(AnnotationMetadata.SINGLETON)) {
+        if (am.hasDeclaredStereotype(AnnotationUtil.SINGLETON)) {
             return true;
         } else {
             Optional<String> scopeValue = am.stringValue(DefaultScope.class);
             if (scopeValue.isPresent()) {
                 String scope = scopeValue.get();
-                return scope.equals(AnnotationMetadata.SINGLETON) || scope.equals(Singleton.class.getName());
+                return scope.equals(AnnotationUtil.SINGLETON) || scope.equals(Singleton.class.getName());
             } else {
                 return false;
             }
@@ -354,17 +356,28 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The qualifier or null if this isn't one
      */
     default @Nullable Qualifier<T> getDeclaredQualifier() {
-        final String annotation = getAnnotationNameByStereotype(AnnotationMetadata.QUALIFIER).orElse(null);
-        if (annotation != null) {
-            if (annotation.equals(Qualifier.PRIMARY)) {
-                // primary is the same as null
-                return null;
+        final List<String> annotations = getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
+        if (CollectionUtils.isNotEmpty(annotations)) {
+            if (annotations.size() == 1) {
+                final String annotation = annotations.iterator().next();
+                if (annotation.equals(Qualifier.PRIMARY)) {
+                    // primary is the same as null
+                    return null;
+                }
+                return Qualifiers.byAnnotation(this, annotation);
+            } else {
+                @SuppressWarnings("rawtypes") final Qualifier[] qualifiers = annotations.stream()
+                        .map((name) -> Qualifiers.byAnnotation(this, name))
+                        .toArray(Qualifier[]::new);
+                //noinspection unchecked
+                return Qualifiers.byQualifiers(
+                        qualifiers
+                );
             }
-            return Qualifiers.byAnnotation(this, annotation);
         } else {
             Qualifier<T> qualifier = resolveDynamicQualifier();
             if (qualifier == null) {
-                String name = stringValue(AnnotationMetadata.NAMED).orElse(null);
+                String name = stringValue(AnnotationUtil.NAMED).orElse(null);
                 qualifier = name != null ? Qualifiers.byAnnotation(this, name) : null;
             }
             return qualifier;

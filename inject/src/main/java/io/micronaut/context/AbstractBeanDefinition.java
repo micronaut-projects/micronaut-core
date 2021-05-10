@@ -163,7 +163,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.addRequiredComponents(arguments);
-        this.singleton = getAnnotationMetadata().hasDeclaredStereotype(AnnotationMetadata.SINGLETON);
+        this.singleton = getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.SINGLETON);
     }
 
     /**
@@ -200,7 +200,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.addRequiredComponents(arguments);
-        this.singleton = getAnnotationMetadata().hasDeclaredStereotype(AnnotationMetadata.SINGLETON);
+        this.singleton = getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.SINGLETON);
     }
 
     @Override
@@ -302,7 +302,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     @Override
     public Optional<Class<? extends Annotation>> getScope() {
-        return getAnnotationMetadata().getDeclaredAnnotationTypeByStereotype(AnnotationMetadata.SCOPE);
+        return getAnnotationMetadata().getDeclaredAnnotationTypeByStereotype(AnnotationUtil.SCOPE);
     }
 
     @Override
@@ -458,7 +458,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected final Object getProxiedBean(BeanContext beanContext) {
         DefaultBeanContext defaultBeanContext = (DefaultBeanContext) beanContext;
-        Optional<String> qualifier = getAnnotationMetadata().getAnnotationNameByStereotype(AnnotationMetadata.QUALIFIER);
+        Optional<String> qualifier = getAnnotationMetadata().getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER);
         return defaultBeanContext.getProxyTargetBean(
                 getBeanType(),
                 (Qualifier<T>) qualifier.map(q -> Qualifiers.byAnnotation(getAnnotationMetadata(), q)).orElse(null)
@@ -504,7 +504,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Argument[] typeArguments,
             boolean requiresReflection) {
-        if (annotationMetadata != null && annotationMetadata.hasDeclaredAnnotation(AnnotationMetadata.INJECT)) {
+        if (annotationMetadata != null && annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
             requiredComponents.add(fieldType);
         }
         if (requiresReflection) {
@@ -764,7 +764,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected final void injectBeanField(BeanResolutionContext resolutionContext, DefaultBeanContext context, int index, Object bean) {
         FieldInjectionPoint fieldInjectionPoint = fieldInjectionPoints.get(index);
-        boolean isInject = fieldInjectionPoint.getAnnotationMetadata().hasDeclaredAnnotation(AnnotationMetadata.INJECT);
+        boolean isInject = fieldInjectionPoint.getAnnotationMetadata().hasDeclaredAnnotation(AnnotationUtil.INJECT);
         try {
             Object value;
             if (isInject) {
@@ -2165,12 +2165,21 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             boolean innerConfiguration) {
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
-        Class<? extends Annotation> qualifierType = hasMetadata ? annotationMetadata.getAnnotationTypeByStereotype(AnnotationMetadata.QUALIFIER).orElse(null) : null;
-        if (qualifierType != null) {
-            return Qualifiers.byAnnotation(
-                    annotationMetadata,
-                    qualifierType
-            );
+        List<Class<? extends Annotation>> qualifierTypes = hasMetadata ? annotationMetadata.getAnnotationTypesByStereotype(AnnotationUtil.QUALIFIER) : null;
+        if (CollectionUtils.isNotEmpty(qualifierTypes)) {
+            if (qualifierTypes.size() == 1) {
+                return Qualifiers.byAnnotation(
+                        annotationMetadata,
+                        qualifierTypes.iterator().next()
+                );
+            } else {
+                final Qualifier[] qualifiers = qualifierTypes
+                        .stream().map((type) -> Qualifiers.byAnnotation(annotationMetadata, type))
+                        .toArray(Qualifier[]::new);
+                return Qualifiers.byQualifiers(
+                        qualifiers
+                );
+            }
         } else {
             if (hasMetadata && annotationMetadata.hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)) {
                 return Qualifiers.byInterceptorBinding(annotationMetadata);
@@ -2182,7 +2191,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 Qualifier qualifier = null;
                 boolean isIterable = isIterable() || resolutionContext.get(EachProperty.class.getName(), Class.class).map(getBeanType()::equals).orElse(false);
                 if (isIterable) {
-                    Optional<Qualifier> optional = resolutionContext.get(AnnotationMetadata.QUALIFIER, Map.class)
+                    Optional<Qualifier> optional = resolutionContext.get(AnnotationUtil.QUALIFIER, Map.class)
                             .map(map -> (Qualifier) map.get(argument));
                     qualifier = optional.orElse(null);
                 }
