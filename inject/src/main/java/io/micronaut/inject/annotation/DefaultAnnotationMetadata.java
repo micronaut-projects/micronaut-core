@@ -1200,6 +1200,24 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return OptionalValues.empty();
     }
 
+    @NonNull
+    @Override
+    public Map<CharSequence, Object> getValues(@NonNull String annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
+            Map<CharSequence, Object> values = allAnnotations.get(annotation);
+            if (values != null) {
+                return Collections.unmodifiableMap(values);
+            } else if (allStereotypes != null) {
+                values = allStereotypes.get(annotation);
+                if (values != null) {
+                    return Collections.unmodifiableMap(values);
+                }
+            }
+        }
+        return Collections.emptyMap();
+    }
+
     @Override
     public @NonNull
     <T> Optional<T> getDefaultValue(@NonNull String annotation, @NonNull String member, @NonNull Argument<T> requiredType) {

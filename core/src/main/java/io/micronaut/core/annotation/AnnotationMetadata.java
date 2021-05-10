@@ -125,6 +125,21 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * Get all of the values for the given annotation and type of the underlying values.
+     *
+     * @param annotation The annotation name
+     * @return An immutable map of values
+     */
+    default @NonNull Map<CharSequence, Object> getValues(@NonNull String annotation) {
+        final AnnotationValue<Annotation> ann = getAnnotation(annotation);
+        if (ann != null) {
+            return ann.getValues();
+        } else {
+            return Collections.emptyMap();
+        }
+    }
+
+    /**
      * Return the default value for the given annotation member.
      *
      * @param annotation   The annotation
