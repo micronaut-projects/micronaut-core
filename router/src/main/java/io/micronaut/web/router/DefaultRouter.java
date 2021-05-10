@@ -31,6 +31,7 @@ import io.micronaut.web.router.exceptions.RoutingException;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URI;
@@ -53,25 +54,33 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private final List<StatusRoute> statusRoutes = new ArrayList<>();
     private final List<ErrorRoute> errorRoutes = new ArrayList<>();
     private final Set<Integer> exposedPorts;
-    private final List<FilterRoute> alwaysMatchesFilterRoutes = new LinkedList<>();
-    private final List<FilterRoute> allFilterRoutesSorted;
-    private final boolean hasPreconditionFilters;
+    private final List<FilterRoute> filterRoutes;
 
-    private final Supplier<List<HttpFilter>> alwaysMatchesHttpFilters = SupplierUtil.memoized(new Supplier<List<HttpFilter>>() {
-
-        @Override
-        public List<HttpFilter> get() {
-            if (alwaysMatchesFilterRoutes.isEmpty()) {
-                return Collections.emptyList();
+    private final Supplier<List<FilterRoute>> alwaysMatchesRoutes = SupplierUtil.memoized(() -> {
+        List<FilterRoute> routes = new LinkedList<>();
+        ArrayList<FilterRoute> filterRoutes = new ArrayList<>(DefaultRouter.this.filterRoutes);
+        filterRoutes.sort(Comparator.comparing(FilterRoute::getOrder));
+        for (FilterRoute filterRoute : filterRoutes) {
+            if (isMatchesAll(filterRoute)) {
+                routes.add(filterRoute);
             }
-            List<HttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size());
-            for (FilterRoute filterRoute : alwaysMatchesFilterRoutes) {
-                if (isMatchesAll(filterRoute)) {
-                    httpFilters.add(filterRoute.getFilter());
-                }
-            }
-            return httpFilters;
         }
+        return routes;
+    });
+
+    private final Supplier<List<HttpFilter>> alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
+        List<FilterRoute> allMatchesFilterRoutes = alwaysMatchesRoutes.get();
+        List<HttpFilter> httpFilters = new ArrayList<>(allMatchesFilterRoutes.size());
+        for (FilterRoute filterRoute : allMatchesFilterRoutes) {
+            httpFilters.add(filterRoute.getFilter());
+        }
+        return httpFilters;
+    });
+
+    private final Supplier<List<FilterRoute>> allFilterRoutesSorted = SupplierUtil.memoized(() -> {
+        ArrayList<FilterRoute> filterRoutes = new ArrayList<>(DefaultRouter.this.filterRoutes);
+        filterRoutes.sort(Comparator.comparing(FilterRoute::getOrder));
+        return filterRoutes;
     });
 
     /**
@@ -82,7 +91,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @Inject
     public DefaultRouter(Collection<RouteBuilder> builders) {
         Set<Integer> exposedPorts = new HashSet<>(5);
-        List<FilterRoute> filterRoutes = new ArrayList<>();
+        filterRoutes = new ArrayList<>();
         for (RouteBuilder builder : builders) {
             List<UriRoute> constructedRoutes = builder.getUriRoutes();
             for (UriRoute route : constructedRoutes) {
@@ -114,20 +123,6 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             this.exposedPorts = Collections.emptySet();
         }
         routesByMethod.values().forEach(this::finalizeRoutes);
-        for (FilterRoute filterRoute : filterRoutes) {
-            if (isMatchesAll(filterRoute)) {
-                alwaysMatchesFilterRoutes.add(filterRoute);
-            }
-        }
-        alwaysMatchesFilterRoutes.sort(Comparator.comparing(FilterRoute::getOrder));
-        if (alwaysMatchesFilterRoutes.size() == filterRoutes.size()) {
-            allFilterRoutesSorted = alwaysMatchesFilterRoutes;
-            hasPreconditionFilters = false;
-        } else {
-            hasPreconditionFilters = true;
-            allFilterRoutesSorted = new ArrayList<>(filterRoutes);
-            allFilterRoutesSorted.sort(Comparator.comparing(FilterRoute::getOrder));
-        }
     }
 
     private boolean isMatchesAll(FilterRoute filterRoute) {
@@ -444,14 +439,14 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @NonNull
     @Override
     public List<HttpFilter> findFilters(@NonNull HttpRequest<?> request) {
-        if (!hasPreconditionFilters) {
+        if (alwaysMatchesRoutes.get().size() == filterRoutes.size()) {
             return alwaysMatchesHttpFilters.get();
         }
         List<HttpFilter> httpFilters = new LinkedList<>();
         RouteMatch routeMatch = (RouteMatch) request.getAttribute(HttpAttributes.ROUTE_MATCH).filter(o -> o instanceof RouteMatch).orElse(null);
         HttpMethod method = request.getMethod();
         URI uri = request.getUri();
-        for (FilterRoute filterRoute : allFilterRoutesSorted) {
+        for (FilterRoute filterRoute : allFilterRoutesSorted.get()) {
             if (routeMatch != null) {
                 if (!matchesFilterMatcher(filterRoute, routeMatch)) {
                     continue;
@@ -537,11 +532,12 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public List<FilterEntry<HttpFilter>> resolveFilterEntries(RouteMatch<?> routeMatch) {
-        if (!hasPreconditionFilters) {
-            return (List) alwaysMatchesFilterRoutes;
+        List<FilterRoute> allMatchesRoutes = alwaysMatchesRoutes.get();
+        if (allMatchesRoutes.size() == filterRoutes.size()) {
+            return (List) allMatchesRoutes;
         }
         List<FilterEntry<HttpFilter>> filterEntries = new LinkedList<>();
-        for (FilterRoute filterRoute : allFilterRoutesSorted) {
+        for (FilterRoute filterRoute : allFilterRoutesSorted.get()) {
             if (!matchesFilterMatcher(filterRoute, routeMatch)) {
                 filterEntries.add(filterRoute);
             }
