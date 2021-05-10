@@ -60,4 +60,10 @@ public interface FilterRoute extends HttpFilterResolver.FilterEntry<HttpFilter> 
      * @return This route
      */
     FilterRoute methods(HttpMethod... methods);
+
+    @Override
+    default int getOrder() {
+        int order = getFilter().getOrder();
+        return order == 0 ? HttpFilterResolver.FilterEntry.super.getOrder() : order;
+    }
 }

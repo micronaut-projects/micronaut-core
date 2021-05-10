@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.Order;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
@@ -89,6 +90,13 @@ public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMe
          */
         default boolean hasPatterns() {
             return ArrayUtils.isNotEmpty(getPatterns());
+        }
+
+        /**
+         * @return The order
+         */
+        default int getOrder() {
+            return getAnnotationMetadata().intValue(Order.class).orElse(0);
         }
 
         /**
