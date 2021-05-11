@@ -166,20 +166,26 @@ class FiltersSpec extends Specification {
     @Controller
     static class FiltersController {
         @Get("/filters-get")
-        String get() {
+        String get(HttpRequest<?> request) {
             if (!ServerRequestContext.currentRequest().isPresent()) {
                 throw new IllegalStateException("Server request not present in the context!")
+            }
+            if (!ServerRequestContext.currentRequest().get().is(request)) {
+                throw new IllegalStateException("Server request not the correct request!")
             }
             "OK"
         }
 
         @Get("/filters-reactive-get")
-        Single<String> getReactive() {
+        Single<String> getReactive(HttpRequest<?> request) {
             return Single.fromCallable(new Callable<String>() {
                 @Override
                 String call() throws Exception {
                     if (!ServerRequestContext.currentRequest().isPresent()) {
                         throw new IllegalStateException("Server request not present in the context!")
+                    }
+                    if (!ServerRequestContext.currentRequest().get().is(request)) {
+                        throw new IllegalStateException("Server request not the correct request!")
                     }
                     "OK"
                 }
@@ -294,12 +300,18 @@ class FiltersSpec extends Specification {
             if (!ServerRequestContext.currentRequest().isPresent()) {
                 throw new IllegalStateException("Server request not present in the context!")
             }
+            if (!ServerRequestContext.currentRequest().get().is(request)) {
+                throw new IllegalStateException("Server request not the correct request!")
+            }
             doFilterExecutedOn = Thread.currentThread().name
             filterOrder = FiltersOrderCounters.counter.incrementAndGet()
             Publishers.map(chain.proceed(request), { response ->
                 {
                     if (!ServerRequestContext.currentRequest().isPresent()) {
                         throw new IllegalStateException("Server request not present in the context!")
+                    }
+                    if (!ServerRequestContext.currentRequest().get().is(request)) {
+                        throw new IllegalStateException("Server request not the correct request!")
                     }
                     mapExecutedOn = Thread.currentThread().name
                     response
