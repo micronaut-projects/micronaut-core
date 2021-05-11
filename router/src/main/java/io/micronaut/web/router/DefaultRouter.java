@@ -59,7 +59,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private final Supplier<List<FilterRoute>> alwaysMatchesRoutes = SupplierUtil.memoized(() -> {
         List<FilterRoute> routes = new LinkedList<>();
         ArrayList<FilterRoute> filterRoutes = new ArrayList<>(DefaultRouter.this.filterRoutes);
-        filterRoutes.sort(Comparator.comparing(FilterRoute::getOrder));
+        filterRoutes.sort(Comparator.comparing(route -> route.getFilter().getOrder()));
         for (FilterRoute filterRoute : filterRoutes) {
             if (isMatchesAll(filterRoute)) {
                 routes.add(filterRoute);
@@ -79,7 +79,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     private final Supplier<List<FilterRoute>> allFilterRoutesSorted = SupplierUtil.memoized(() -> {
         ArrayList<FilterRoute> filterRoutes = new ArrayList<>(DefaultRouter.this.filterRoutes);
-        filterRoutes.sort(Comparator.comparing(FilterRoute::getOrder));
+        filterRoutes.sort(Comparator.comparing(route -> route.getFilter().getOrder()));
         return filterRoutes;
     });
 

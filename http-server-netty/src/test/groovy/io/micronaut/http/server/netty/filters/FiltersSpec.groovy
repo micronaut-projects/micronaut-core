@@ -192,6 +192,7 @@ class FiltersSpec extends Specification {
         public static AtomicInteger counter = new AtomicInteger(0)
     }
 
+    @Order(100) //to show that @Order is not supported
     @Filter(Filter.MATCH_ALL_PATTERN)
     static class Filter1 extends AbstractFilter {
 
@@ -211,7 +212,6 @@ class FiltersSpec extends Specification {
     }
 
     @Requires(property = 'enableFilter3', value = 'true')
-    @Order(3)
     @Filter("/filters**")
     static class Filter3 extends AbstractFilter {
 
@@ -223,10 +223,14 @@ class FiltersSpec extends Specification {
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Flowable.fromPublisher(super.doFilter(request, chain)).subscribeOn(Schedulers.from(executor))
         }
+
+        @Override
+        int getOrder() {
+            return 3
+        }
     }
 
     @Requires(property = 'badFilter', value = 'true')
-    @Order(3)
     @Filter("/filters**")
     static class FilterBadFilter3 extends AbstractFilter {
 
@@ -234,16 +238,29 @@ class FiltersSpec extends Specification {
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             throw new RuntimeException("BAM!")
         }
+
+        @Override
+        int getOrder() {
+            return 3
+        }
     }
 
-    @Order(4)
     @Filter(Filter.MATCH_ALL_PATTERN)
     static class Filter4 extends AbstractFilter {
+
+        @Override
+        int getOrder() {
+            return 4
+        }
     }
 
-    @Order(5)
     @Filter("/filters**")
     static class Filter5 extends AbstractFilter {
+
+        @Override
+        int getOrder() {
+            return 5
+        }
     }
 
     @Filter(Filter.MATCH_ALL_PATTERN)

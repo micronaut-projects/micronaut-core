@@ -90,10 +90,4 @@ final class DefaultFilterEntry<T extends HttpFilter> implements HttpFilterResolv
     public boolean hasPatterns() {
         return hasPatterns;
     }
-
-    @Override
-    public int getOrder() {
-        int order = httpFilter.getOrder();
-        return order == 0 ? HttpFilterResolver.FilterEntry.super.getOrder() : order;
-    }
 }

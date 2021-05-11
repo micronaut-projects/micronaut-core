@@ -93,13 +93,6 @@ public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMe
         }
 
         /**
-         * @return The order
-         */
-        default int getOrder() {
-            return getAnnotationMetadata().intValue(Order.class).orElse(0);
-        }
-
-        /**
          * Creates a filter entry for the given arguments.
          * @param filter The filter
          * @param annotationMetadata The annotation metadata
