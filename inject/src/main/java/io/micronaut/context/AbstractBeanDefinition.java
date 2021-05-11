@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -770,7 +770,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
                 Class<?> argumentType;
                 boolean isCollection = false;
-                if (Collection.class.isAssignableFrom(argument.getType())) {
+                if (Iterable.class.isAssignableFrom(argument.getType())) {
                     argumentType = argument.getFirstTypeVariable().map(Argument::getType).orElse((Class) Object.class);
                     isCollection = true;
                 } else {
@@ -834,7 +834,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             ApplicationContext applicationContext = (ApplicationContext) context;
             Class type = argument.getType();
             boolean isConfigProps = type.isAnnotationPresent(ConfigurationProperties.class);
-            boolean result = isConfigProps || Map.class.isAssignableFrom(type) || Collection.class.isAssignableFrom(type) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
+            boolean result = isConfigProps || Map.class.isAssignableFrom(type) || Iterable.class.isAssignableFrom(type) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
             if (!result && isConfigurationProperties()) {
                 String cliOption = resolveCliOption(argument.getName());
                 if (cliOption != null) {
@@ -980,7 +980,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         } else if (argumentType.isArray()) {
             Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
             return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
-        } else if (Collection.class.isAssignableFrom(argumentType)) {
+        } else if (Iterable.class.isAssignableFrom(argumentType)) {
             Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
             return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
@@ -1488,7 +1488,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
                 Class<?> argumentType;
                 boolean isCollection = false;
-                if (Collection.class.isAssignableFrom(injectionPoint.getType())) {
+                if (Iterable.class.isAssignableFrom(injectionPoint.getType())) {
                     argumentType = fieldArgument.getFirstTypeVariable().map(Argument::getType).orElse((Class) Object.class);
                     isCollection = true;
                 } else {
@@ -1602,7 +1602,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             ApplicationContext applicationContext = (ApplicationContext) context;
             Class fieldType = injectionPoint.getType();
             boolean isConfigProps = fieldType.isAnnotationPresent(ConfigurationProperties.class);
-            boolean result = isConfigProps || Map.class.isAssignableFrom(fieldType) || Collection.class.isAssignableFrom(fieldType) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
+            boolean result = isConfigProps || Map.class.isAssignableFrom(fieldType) || Iterable.class.isAssignableFrom(fieldType) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
             if (!result && isConfigurationProperties()) {
                 String cliOption = resolveCliOption(injectionPoint.getName());
                 if (cliOption != null) {
@@ -1678,7 +1678,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (beanType.isArray()) {
             Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, injectionPoint);
             return beansOfType.toArray((Object[]) Array.newInstance(beanType.getComponentType(), beansOfType.size()));
-        } else if (Collection.class.isAssignableFrom(beanType)) {
+        } else if (Iterable.class.isAssignableFrom(beanType)) {
             Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, injectionPoint);
             if (beanType.isInstance(beansOfType)) {
                 return beansOfType;
@@ -1885,7 +1885,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (argumentType.isArray()) {
             Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
             return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
-        } else if (Collection.class.isAssignableFrom(argumentType)) {
+        } else if (Iterable.class.isAssignableFrom(argumentType)) {
             Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
             return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
