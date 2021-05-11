@@ -371,7 +371,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void autoApplyNamedToBeanProducingElement(Element beanProducingElement) {
         final AnnotationMetadata annotationMetadata = beanProducingElement.getAnnotationMetadata();
         if (!annotationMetadata.hasAnnotation(EachProperty.class) && !annotationMetadata.hasAnnotation(EachBean.class)) {
-            autoApplyNamed(beanProducingElement);
+            autoApplyNamedIfPresent(beanProducingElement, annotationMetadata);
         }
     }
 

@@ -15,12 +15,14 @@ import javax.inject.*;
 class TestFactory {
     
     @Singleton
+    @Named
     Foo foo1() {
         return ()-> "one";
     }
     
     @Singleton
     @Primary
+    @Named
     Foo fooPrimary() {
         return ()-> "primary";
     }
