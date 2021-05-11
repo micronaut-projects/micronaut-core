@@ -18,7 +18,7 @@ package io.micronaut.inject.annotation
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
-import javax.inject.Named
+import jakarta.inject.Named
 import javax.validation.constraints.Size
 
 class ArgumentAnnotationMetadataSpec extends AbstractTypeElementSpec {

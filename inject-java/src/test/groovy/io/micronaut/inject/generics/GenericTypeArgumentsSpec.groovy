@@ -96,7 +96,7 @@ class Outer {
         BeanDefinition definition = buildBeanDefinition('inheritedfields.UserDaoClient', '''
 package inheritedfields;
 
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 class UserDaoClient extends DaoClient<User>{
@@ -221,7 +221,7 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import io.micronaut.core.convert.value.ConvertibleValues;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.util.Map;
 import io.micronaut.context.annotation.Executable;

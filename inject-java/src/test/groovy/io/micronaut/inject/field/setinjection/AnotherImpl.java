@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.field.setinjection;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class AnotherImpl implements A {

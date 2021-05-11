@@ -821,7 +821,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             methodNode = nonPrivateConstructors.stream()
                     .filter(cn -> {
                         AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn);
-                        return annotationMetadata.hasAnnotation(AnnotationMetadata.INJECT) ||
+                        return annotationMetadata.hasAnnotation(AnnotationUtil.INJECT) ||
                                 annotationMetadata.hasAnnotation(Creator.class);
                     })
                     .findFirst().orElse(null);

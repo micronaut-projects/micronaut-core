@@ -15,7 +15,7 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.ConfigurationReader;
 import jakarta.inject.Singleton;
@@ -47,7 +47,7 @@ public interface BeanContextConfiguration {
      */
     default boolean isEagerInitSingletons() {
         for (Class<? extends Annotation> ann: getEagerInitAnnotated()) {
-            if (ann == Singleton.class || ann.getName().equals(AnnotationMetadata.SINGLETON)) {
+            if (ann == Singleton.class || ann.getName().equals(AnnotationUtil.SINGLETON)) {
                 return true;
             }
         }

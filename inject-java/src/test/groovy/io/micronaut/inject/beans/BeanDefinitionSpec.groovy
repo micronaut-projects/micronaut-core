@@ -6,8 +6,8 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 
-import javax.inject.Named
-import javax.inject.Qualifier
+import jakarta.inject.Named
+import jakarta.inject.Qualifier
 
 class BeanDefinitionSpec extends AbstractTypeElementSpec {
 
@@ -16,7 +16,7 @@ class BeanDefinitionSpec extends AbstractTypeElementSpec {
         def definition = buildBeanDefinition('genctor.Test', '''
 package genctor;
 
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 class Test {
@@ -37,7 +37,7 @@ class Test {
 package limittypes;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 @Bean(typed = Runnable.class)
@@ -56,7 +56,7 @@ class Test implements Runnable {
 package limittypes;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 @Bean(typed = Runnable.class)
@@ -75,7 +75,7 @@ class Test implements Runnable {
 package limittypes;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 @Bean(typed = Runnable.class)
@@ -96,7 +96,7 @@ package test;
 
 import io.micronaut.core.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
 @Singleton
@@ -194,7 +194,7 @@ class Test {
         def definition = buildBeanDefinition('test.NumberThingManager', '''
 package test;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 interface Thing<T> {}
 

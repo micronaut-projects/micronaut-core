@@ -40,7 +40,7 @@ import io.micronaut.aop.Adapter;
 import java.lang.annotation.*;
 import static java.lang.annotation.ElementType.*;
 import static java.lang.annotation.RetentionPolicy.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 
 @Singleton
@@ -103,7 +103,7 @@ package adapteroverloading;
 import io.micronaut.context.event.*;
 import io.micronaut.scheduling.annotation.Async;
 import io.reactivex.Completable;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 import io.micronaut.runtime.event.annotation.*;
 
@@ -153,7 +153,7 @@ package adapteraround;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.scheduling.annotation.Async;
 import io.reactivex.Completable;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 import io.micronaut.runtime.event.annotation.*;
 

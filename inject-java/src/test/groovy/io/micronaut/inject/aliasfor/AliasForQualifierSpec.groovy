@@ -19,8 +19,8 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 
-import javax.inject.Named
-import javax.inject.Qualifier
+import jakarta.inject.Named
+import jakarta.inject.Qualifier
 import java.util.function.Function
 
 class AliasForQualifierSpec extends AbstractTypeElementSpec {

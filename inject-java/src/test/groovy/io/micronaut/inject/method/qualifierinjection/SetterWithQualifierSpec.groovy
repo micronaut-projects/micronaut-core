@@ -20,7 +20,7 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
-import javax.inject.Qualifier
+import jakarta.inject.Qualifier
 
 class SetterWithQualifierSpec extends AbstractTypeElementSpec {
 
@@ -31,9 +31,9 @@ class SetterWithQualifierSpec extends AbstractTypeElementSpec {
 package test;
 import io.micronaut.inject.qualifiers.One;
 
-import javax.inject.Singleton;
-import javax.inject.Inject;
-import javax.inject.Named;
+import jakarta.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 @Singleton
 class MyBean {

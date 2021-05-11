@@ -29,9 +29,9 @@ import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.ScopedProxy
 import spock.lang.Unroll
 
-import javax.inject.Qualifier
-import javax.inject.Scope
-import javax.inject.Singleton
+import jakarta.inject.Qualifier
+import jakarta.inject.Scope
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher

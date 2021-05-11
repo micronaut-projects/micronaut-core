@@ -19,6 +19,7 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import jakarta.inject.Named;
 
@@ -143,7 +144,7 @@ public class Qualifiers {
         } else if (Any.NAME.equals(type)) {
             //noinspection unchecked
             return AnyQualifier.INSTANCE;
-        } else if (Named.class.getName().equals(type) || AnnotationMetadata.NAMED.equals(type)) {
+        } else if (Named.class.getName().equals(type) || AnnotationUtil.NAMED.equals(type)) {
             String n = metadata.stringValue(type).orElse(null);
             if (n != null) {
                 return byName(n);

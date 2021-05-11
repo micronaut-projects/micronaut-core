@@ -16,7 +16,7 @@
 package io.micronaut.inject.constructor.factoryinjection;
 
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class AImpl implements A {
     final C c;

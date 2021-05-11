@@ -21,6 +21,7 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameResolver;
@@ -64,7 +65,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
             AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
             // here we resolved the declared Qualifier of the bean
             Optional<String> beanQualifier = annotationMetadata
-                    .findDeclaredAnnotation(AnnotationMetadata.NAMED)
+                    .findDeclaredAnnotation(AnnotationUtil.NAMED)
                     .flatMap(AnnotationValue::stringValue);
             typeName = beanQualifier.orElseGet(() -> {
                 if (candidate instanceof NameResolver) {
@@ -125,7 +126,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
                 if (candidate instanceof NameResolver) {
                     candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
                 } else {
-                    Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(AnnotationMetadata.NAMED);
+                    Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(AnnotationUtil.NAMED);
                     candidateName = annotation.orElse(candidate.getBeanType().getSimpleName());
                 }
 
@@ -159,7 +160,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
                     if (candidate instanceof NameResolver) {
                         candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
                     } else {
-                        Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(AnnotationMetadata.NAMED);
+                        Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(AnnotationUtil.NAMED);
                         candidateName = annotation.orElse(candidate.getBeanType().getSimpleName());
                     }
 

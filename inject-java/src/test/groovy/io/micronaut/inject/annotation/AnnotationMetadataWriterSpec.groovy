@@ -30,9 +30,9 @@ import io.micronaut.core.annotation.TypeHint
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.retry.annotation.Recoverable
 
-import javax.inject.Qualifier
-import javax.inject.Scope
-import javax.inject.Singleton
+import jakarta.inject.Qualifier
+import jakarta.inject.Scope
+import jakarta.inject.Singleton
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
 

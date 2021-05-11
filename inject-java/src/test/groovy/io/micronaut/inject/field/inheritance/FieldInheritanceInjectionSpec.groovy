@@ -10,8 +10,8 @@ class FieldInheritanceInjectionSpec extends AbstractTypeElementSpec {
         ApplicationContext context = buildContext('test.Listener', '''
 package test;
 
-import javax.inject.Singleton;
-import javax.inject.Inject;
+import jakarta.inject.Singleton;
+import jakarta.inject.Inject;
 
 abstract class AbstractListener  {
 @Inject protected SomeBean someBean;

@@ -51,12 +51,6 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     AnnotationMetadata EMPTY_METADATA = new EmptyAnnotationMetadata();
 
-    String INJECT = "javax.inject.Inject";
-    String SCOPE = "javax.inject.Scope";
-    String SINGLETON = "javax.inject.Singleton";
-    String QUALIFIER = "javax.inject.Qualifier";
-    String NAMED = "javax.inject.Named";
-
     /**
      * The default <tt>value()</tt> member.
      */

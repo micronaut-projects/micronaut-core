@@ -19,7 +19,9 @@ import io.micronaut.core.reflect.ReflectionUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -34,6 +36,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     private final String annotationName;
     private final Map<CharSequence, Object> values = new HashMap<>(5);
     private final RetentionPolicy retentionPolicy;
+    private final List<AnnotationValue<?>> stereotypes = new ArrayList<>();
 
     /**
      * Default constructor.
@@ -88,6 +91,14 @@ public class AnnotationValueBuilder<T extends Annotation> {
     @NonNull
     public AnnotationValue<T> build() {
         return new AnnotationValue<>(annotationName, values, retentionPolicy);
+    }
+
+    @NonNull
+    public AnnotationValueBuilder<T> stereotype(AnnotationValue<?> annotation) {
+        if (annotation != null) {
+            stereotypes.add(annotation);
+        }
+        return this;
     }
 
     /**

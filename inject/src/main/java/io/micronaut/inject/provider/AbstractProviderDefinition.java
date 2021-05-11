@@ -24,6 +24,7 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Named;
@@ -56,7 +57,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
         metadata.addDeclaredAnnotation(Any.class.getName(), Collections.emptyMap());
         metadata.addDeclaredStereotype(
                 Collections.singletonList(Any.class.getName()),
-                AnnotationMetadata.QUALIFIER,
+                AnnotationUtil.QUALIFIER,
                 Collections.emptyMap()
         );
         metadata.addDeclaredAnnotation(BootstrapContextCompatible.class.getName(), Collections.emptyMap());

@@ -147,6 +147,12 @@ public class AnnotationUtil {
      */
     public static final String ANN_INTERCEPTOR_BINDINGS = "io.micronaut.aop.InterceptorBindingDefinitions";
 
+    public static final String INJECT = "javax.inject.Inject";
+    public static final String SCOPE = "javax.inject.Scope";
+    public static final String SINGLETON = "javax.inject.Singleton";
+    public static final String QUALIFIER = "javax.inject.Qualifier";
+    public static final String NAMED = "javax.inject.Named";
+
     private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();
 

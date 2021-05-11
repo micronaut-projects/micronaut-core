@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.context;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class B {
     @Inject

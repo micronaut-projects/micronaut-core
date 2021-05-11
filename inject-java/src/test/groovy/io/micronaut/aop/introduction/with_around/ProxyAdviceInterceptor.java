@@ -20,7 +20,7 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.inject.ExecutableMethod;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class ProxyAdviceInterceptor implements MethodInterceptor<Object, Object> {

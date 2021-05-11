@@ -3,7 +3,7 @@ package io.micronaut.aop;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.scheduling.annotation.Scheduled;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Requires(property = "spec.name", value = "CombinedBeanSpec")
 @Singleton

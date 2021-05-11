@@ -214,7 +214,7 @@ public class DefaultBeanContext implements BeanContext {
         }
         this.eagerInitStereotypes = eagerInitStereotypes.toArray(new String[0]);
         this.eagerInitStereotypesPresent = !eagerInitStereotypes.isEmpty();
-        this.eagerInitSingletons = eagerInitStereotypesPresent && (eagerInitStereotypes.contains(AnnotationMetadata.SINGLETON) || eagerInitStereotypes.contains(Singleton.class.getName()));
+        this.eagerInitSingletons = eagerInitStereotypesPresent && (eagerInitStereotypes.contains(AnnotationUtil.SINGLETON) || eagerInitStereotypes.contains(Singleton.class.getName()));
     }
 
     @Override
@@ -2786,12 +2786,12 @@ public class DefaultBeanContext implements BeanContext {
             if (currentSegment.isPresent()) {
                 Argument argument = currentSegment.get().getArgument();
                 final Optional<Class<? extends Annotation>> scope = argument.getAnnotationMetadata()
-                        .getAnnotationTypeByStereotype(AnnotationMetadata.SCOPE);
+                        .getAnnotationTypeByStereotype(AnnotationUtil.SCOPE);
                 registeredScope = scope.flatMap(customScopeRegistry::findScope);
             }
 
             if (!isProxy && isScopedProxyDefinition && !registeredScope.isPresent()) {
-                final List<Class<? extends Annotation>> scopeHierarchy = definition.getAnnotationTypesByStereotype(AnnotationMetadata.SCOPE);
+                final List<Class<? extends Annotation>> scopeHierarchy = definition.getAnnotationTypesByStereotype(AnnotationUtil.SCOPE);
                 for (Class<? extends Annotation> scope : scopeHierarchy) {
                     registeredScope = customScopeRegistry.findScope(scope);
                     if (registeredScope.isPresent()) {

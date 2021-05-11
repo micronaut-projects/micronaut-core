@@ -119,7 +119,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.order.Ordered;
 import java.lang.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 interface ContractService {
 

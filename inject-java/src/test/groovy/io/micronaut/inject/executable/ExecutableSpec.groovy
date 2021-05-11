@@ -24,7 +24,7 @@ import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.ExecutionHandle
 import io.micronaut.inject.MethodExecutionHandle
 
-import javax.inject.Named
+import jakarta.inject.Named
 
 class ExecutableSpec extends AbstractTypeElementSpec {
 

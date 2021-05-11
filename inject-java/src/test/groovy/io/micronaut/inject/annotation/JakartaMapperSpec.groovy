@@ -1,10 +1,7 @@
 package io.micronaut.inject.annotation
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-
-import javax.inject.Qualifier
-import javax.inject.Scope
-import javax.inject.Singleton
+import io.micronaut.core.annotation.AnnotationUtil
 
 class JakartaMapperSpec extends AbstractTypeElementSpec {
 
@@ -21,9 +18,34 @@ class Test {
 
         expect:
         metadata != null
-        metadata.hasDeclaredAnnotation(Singleton)
-        metadata.hasDeclaredStereotype(Scope)
-        metadata.getAnnotationNamesByStereotype(Scope.class).size() == 1
-        metadata.getAnnotationNamesByStereotype(Qualifier.class).size() == 1
+        metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
+        metadata.hasDeclaredStereotype(AnnotationUtil.SCOPE)
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER).size() == 1
+    }
+
+    void "test factory methods"() {
+        def metadata = buildMethodAnnotationMetadata('''
+package test;
+
+@io.micronaut.context.annotation.Factory
+class TestFactory {
+    
+    @jakarta.inject.Singleton
+    Test test() {
+        return new Test();
+    }
+
+}
+
+class Test {
+
+}
+''', 'test')
+
+        expect:
+        metadata != null
+        metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
+        metadata.hasDeclaredStereotype(AnnotationUtil.SCOPE)
     }
 }

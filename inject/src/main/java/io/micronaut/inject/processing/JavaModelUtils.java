@@ -224,6 +224,8 @@ public class JavaModelUtils {
         }
         if (enclosingElement == null) {
             return StringUtils.EMPTY_STRING;
+        } else if (enclosingElement instanceof PackageElement) {
+            return ((PackageElement) enclosingElement).getQualifiedName().toString();
         } else {
             return enclosingElement.toString();
         }

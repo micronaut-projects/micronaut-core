@@ -19,6 +19,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import jakarta.inject.Singleton;
 
@@ -89,13 +90,13 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
      */
     default boolean isSingleton() {
         AnnotationMetadata am = getAnnotationMetadata();
-        if (am.hasDeclaredStereotype(AnnotationMetadata.SINGLETON)) {
+        if (am.hasDeclaredStereotype(AnnotationUtil.SINGLETON)) {
             return true;
         } else {
             Optional<String> scopeValue = am.stringValue(DefaultScope.class);
             if (scopeValue.isPresent()) {
                 String scope = scopeValue.get();
-                return scope.equals(AnnotationMetadata.SINGLETON) || scope.equals(Singleton.class.getName());
+                return scope.equals(AnnotationUtil.SINGLETON) || scope.equals(Singleton.class.getName());
             } else {
                 return false;
             }

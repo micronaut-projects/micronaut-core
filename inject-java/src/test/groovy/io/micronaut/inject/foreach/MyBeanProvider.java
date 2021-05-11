@@ -17,7 +17,7 @@ package io.micronaut.inject.foreach;
 
 import io.micronaut.context.annotation.EachBean;
 
-import javax.inject.Provider;
+import jakarta.inject.Provider;
 
 @EachBean(MyConfiguration.class)
 public class MyBeanProvider {

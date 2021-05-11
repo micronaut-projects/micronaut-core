@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -41,7 +41,7 @@ public class InjectVisitor implements TypeElementVisitor<Object, Object> {
 
     @Override
     public Set<String> getSupportedAnnotationNames() {
-        return CollectionUtils.setOf(AnnotationMetadata.INJECT, Inject.class.getName());
+        return CollectionUtils.setOf(AnnotationUtil.INJECT, Inject.class.getName());
     }
 
     @Override

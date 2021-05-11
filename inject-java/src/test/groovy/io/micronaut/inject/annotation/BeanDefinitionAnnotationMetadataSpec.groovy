@@ -28,8 +28,8 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import spock.lang.Issue
 
-import javax.inject.Scope
-import javax.inject.Singleton
+import jakarta.inject.Scope
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher
@@ -236,7 +236,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 import java.util.concurrent.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Factory
 class Test {
@@ -268,7 +268,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 import java.util.concurrent.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Factory
 class Test {

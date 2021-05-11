@@ -20,7 +20,7 @@ package test;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.convert.ConversionService;
 import javax.validation.constraints.Min;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import io.micronaut.context.BeanContext;
 
 @ConfigurationProperties("foo")

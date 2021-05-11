@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.Prototype
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * @author graemerocher

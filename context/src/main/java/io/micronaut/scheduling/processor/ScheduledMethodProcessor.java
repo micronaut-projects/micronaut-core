@@ -18,7 +18,7 @@ package io.micronaut.scheduling.processor;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -113,7 +113,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
             Runnable task = () -> {
                 io.micronaut.context.Qualifier<Object> qualifer = beanDefinition
-                    .getAnnotationTypeByStereotype(AnnotationMetadata.QUALIFIER)
+                    .getAnnotationTypeByStereotype(AnnotationUtil.QUALIFIER)
                     .map(type -> Qualifiers.byAnnotation(beanDefinition, type))
                     .orElse(null);
 

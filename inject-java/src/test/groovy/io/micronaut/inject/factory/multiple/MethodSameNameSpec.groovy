@@ -24,12 +24,12 @@ package test;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Factory
 class AFactory {
 
-    @Bean
+    @Singleton
     @Requires(beans=X.class, missingBeans=Y.class)
     A a(X x) {
         return new A();

@@ -19,6 +19,7 @@ import io.micronaut.context.AbstractBeanDefinitionReference;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.AdvisedBeanType;
@@ -222,9 +223,9 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
 
         writeGetAnnotationMetadataMethod(classWriter);
         writeBooleanMethod(classWriter, "isSingleton", () ->
-                annotationMetadata.hasDeclaredStereotype(AnnotationMetadata.SINGLETON) ||
+                annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SINGLETON) ||
                         annotationMetadata.stringValue(DefaultScope.class)
-                                .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationMetadata.SINGLETON))
+                                .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
                                 .orElse(false));
         writeBooleanMethod(classWriter, "isConfigurationProperties", () ->
                 annotationMetadata.hasDeclaredStereotype(ConfigurationReader.class));

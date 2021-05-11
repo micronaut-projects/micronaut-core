@@ -6,7 +6,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 class AnnotationMetadataHierarchySpec extends AbstractTypeElementSpec{
 

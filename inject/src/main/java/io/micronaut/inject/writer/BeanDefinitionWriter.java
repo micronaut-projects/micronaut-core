@@ -446,7 +446,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public boolean isSingleton() {
-        return annotationMetadata.hasDeclaredStereotype(AnnotationMetadata.SINGLETON);
+        return annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SINGLETON);
     }
 
     @Override
@@ -605,7 +605,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         final boolean isRecordConfig = isRecordConfig(constructor);
         if (isRecordConfig || constructor.hasAnnotation(ConfigurationInject.class)) {
             final List<String> injectionTypes =
-                    Arrays.asList(Property.class.getName(), Value.class.getName(), Parameter.class.getName(), AnnotationMetadata.QUALIFIER, AnnotationMetadata.INJECT);
+                    Arrays.asList(Property.class.getName(), Value.class.getName(), Parameter.class.getName(), AnnotationUtil.QUALIFIER, AnnotationUtil.INJECT);
 
             if (isRecordConfig) {
                 final List<PropertyElement> beanProperties = constructor
@@ -650,7 +650,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void processConfigurationConstructorParameter(ParameterElement parameter, AnnotationMetadata annotationMetadata) {
         ClassElement parameterType = parameter.getGenericType();
-        if (!parameterType.hasStereotype(AnnotationMetadata.SCOPE)) {
+        if (!parameterType.hasStereotype(AnnotationUtil.SCOPE)) {
             final PropertyMetadata pm = metadataBuilder.visitProperty(
                     parameterType.getName(),
                     parameter.getName(), parameter.getDocumentation().orElse(null),
@@ -813,9 +813,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         AnnotationMetadata annotationMetadata = this.annotationMetadata != null ? this.annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         writeBooleanMethod(classWriter, "isSingleton", () ->
-                annotationMetadata.hasDeclaredStereotype(AnnotationMetadata.SINGLETON) ||
+                annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SINGLETON) ||
                         annotationMetadata.stringValue(DefaultScope.class)
-                                .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationMetadata.SINGLETON))
+                                .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
                                 .orElse(false));
 
         // method: boolean isIterable()
@@ -838,7 +838,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 "getScope"
         );
         getScopeMethod.loadThis();
-        Optional<String> scope = annotationMetadata.getDeclaredAnnotationNameByStereotype(AnnotationMetadata.SCOPE);
+        Optional<String> scope = annotationMetadata.getDeclaredAnnotationNameByStereotype(AnnotationUtil.SCOPE);
         if (scope.isPresent()) {
             getScopeMethod.push(getTypeReferenceForName(scope.get()));
             getScopeMethod.invokeStatic(

@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Creator;
@@ -231,7 +232,7 @@ public class ModelUtils {
     private Optional<ExecutableElement> findAnnotatedConstructor(AnnotationUtils annotationUtils, List<ExecutableElement> constructors) {
         return constructors.stream().filter(ctor -> {
                     final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
-                    return annotationMetadata.hasStereotype(AnnotationMetadata.INJECT) || annotationMetadata.hasStereotype(Creator.class);
+                    return annotationMetadata.hasStereotype(AnnotationUtil.INJECT) || annotationMetadata.hasStereotype(Creator.class);
                 }
         ).findFirst();
     }
