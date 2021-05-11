@@ -207,12 +207,22 @@ public class DefaultBeanContext implements BeanContext {
         // enable classloader logging
         System.setProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING, "true");
         this.classLoader = contextConfiguration.getClassLoader();
-        this.customScopeRegistry = new DefaultCustomScopeRegistry(this, classLoader);
+        this.customScopeRegistry = Objects.requireNonNull(createCustomScopeRegistry(), "Scope registry cannot be null");
         Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
         this.eagerInitStereotypes = eagerInitAnnotated
                 .stream().map(Class::getName).toArray(String[]::new);
         this.eagerInitStereotypesPresent = eagerInitStereotypes.length > 0;
         this.eagerInitSingletons = eagerInitStereotypesPresent && eagerInitAnnotated.contains(Singleton.class);
+    }
+
+    /**
+     * Allows customizing the custom scope registry.
+     * @return The custom scope registry to use.
+     * @since 3.0.0
+     */
+    @NonNull
+    protected CustomScopeRegistry createCustomScopeRegistry() {
+        return new DefaultCustomScopeRegistry(this, classLoader);
     }
 
     @Override
