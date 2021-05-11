@@ -311,7 +311,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         for (ErrorRoute errorRoute : errorRoutes) {
             Optional<RouteMatch<R>> match = errorRoute.match(originatingClass, error);
             match.ifPresent(m ->
-                matchedRoutes.put(errorRoute, m)
+                    matchedRoutes.put(errorRoute, m)
             );
         }
         return findRouteMatch(matchedRoutes, error);
