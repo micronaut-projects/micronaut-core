@@ -422,7 +422,7 @@ ext {
             picocli                    : [
                     version: picocliVersion,
                     group  : 'info.picocli',
-                    modules: ['picocli', 'picocli-codegen']                    
+                    modules: ['picocli', 'picocli-codegen']
             ],
             lettuce                    : [
                     version: lettuceVersion,
@@ -898,8 +898,14 @@ allprojects {
             outputDir file('build/classes/java/main')
             testOutputDir file('build/classes/groovy/test')
 
-            downloadJavadoc = false
-            downloadSources = false
+            boolean downloadJavadocValue = System.getenv('MICRONAUT_DOWNLOAD_JAVADOC') != null ?
+                    (System.getenv('MICRONAUT_DOWNLOAD_JAVADOC') == 'true') : (project.properties['micronautDownloadJavadoc'] == 'true')
+
+            boolean downloadSourcesValue = System.getenv('MICRONAUT_DOWNLOAD_SOURCES') != null ?
+                    (System.getenv('MICRONAUT_DOWNLOAD_SOURCES') == 'true') : (project.properties['micronautDownloadSources'] == 'true')
+
+            downloadJavadoc = downloadJavadocValue
+            downloadSources = downloadSourcesValue
         }
     }
 }
