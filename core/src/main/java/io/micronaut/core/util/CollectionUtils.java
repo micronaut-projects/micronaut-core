@@ -113,18 +113,6 @@ public class CollectionUtils {
         return Optional.empty();
     }
 
-    public static <T> Optional<Iterable<T>> convertCollection(Class<? extends Iterable<T>> iterableType, Iterable<T> collection) {
-        if (iterableType.isInstance(collection)) {
-            return Optional.of(collection);
-        }
-        List<T> list = new ArrayList<>();
-        Iterator<T> iterator = collection.iterator();
-        while (iterator.hasNext()) {
-            list.add(iterator.next());
-        }
-        return convertCollection(iterableType, list);
-    }
-
     /**
      * Create a {@link LinkedHashMap} from an array of values.
      *
