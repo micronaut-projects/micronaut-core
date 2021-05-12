@@ -6,9 +6,11 @@ import io.micronaut.core.annotation.NonBlocking
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpResponse
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
@@ -36,6 +38,7 @@ class ThreadSelectionSpec extends Specification {
         client.blocking().contains(blocking)
         client.nonblocking().contains(nonBlocking)
         client.alterflowable().contains(scheduleBlocking)
+        client.alterflowablePost("test").contains(scheduleBlocking)
 
         cleanup:
         embeddedServer.close()
@@ -45,8 +48,6 @@ class ThreadSelectionSpec extends Specification {
         ThreadSelection.AUTO   | 'io-executor-thread-'       | 'default-nioEventLoopGroup' | "io-executor-thread-"
         ThreadSelection.IO     | 'io-executor-thread-'       | 'io-executor-thread-'       | "io-executor-thread-"
         ThreadSelection.MANUAL | 'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | "io-executor-thread-"
-
-
     }
 
     @Unroll
@@ -95,6 +96,9 @@ class ThreadSelectionSpec extends Specification {
         @Get("/alterflowable")
         String alterflowable()
 
+        @Post(uri = "/alterflowablePost", produces = MediaType.TEXT_PLAIN)
+        String alterflowablePost(String body)
+
         @Get("/schedulereactive")
         String scheduleReactive()
 
@@ -135,6 +139,12 @@ class ThreadSelectionSpec extends Specification {
         @Get("/alterflowable")
         @ExecuteOn(TaskExecutors.IO)
         String alterflowable() {
+            return "thread: ${Thread.currentThread().name}"
+        }
+
+        @Post(uri = "/alterflowablePost", consumes = MediaType.TEXT_PLAIN)
+        @ExecuteOn(TaskExecutors.IO)
+        String alterflowablePost(@Body String body) {
             return "thread: ${Thread.currentThread().name}"
         }
 
