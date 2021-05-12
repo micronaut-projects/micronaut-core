@@ -15,22 +15,16 @@
  */
 package io.micronaut.inject.configuration
 
-import com.sun.tools.javac.model.JavacElements
-import com.sun.tools.javac.model.JavacTypes
-import com.sun.tools.javac.processing.JavacProcessingEnvironment
-import com.sun.tools.javac.util.Context
+
 import groovy.json.JsonSlurper
 import io.micronaut.annotation.processing.AnnotationUtils
 import io.micronaut.annotation.processing.GenericUtils
 import io.micronaut.annotation.processing.JavaConfigurationMetadataBuilder
 import io.micronaut.annotation.processing.ModelUtils
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.JavaParser
 
 import javax.lang.model.element.TypeElement
-import javax.tools.*
-
-import static java.nio.charset.StandardCharsets.UTF_8
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -464,21 +458,13 @@ class GrandParentProperties {
     }
 
     protected JavaConfigurationMetadataBuilder createBuilder() {
-        def context = new Context()
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler()
-        DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>()
-        context.put(JavaFileManager, compiler.getStandardFileManager(diagnosticCollector, Locale.getDefault(), UTF_8))
-        def elements = JavacElements.instance(context)
-        def types = JavacTypes.instance(context)
-        def env = JavacProcessingEnvironment.instance(context)
-        try {
-            final com.sun.tools.javac.main.JavaCompiler jc = com.sun.tools.javac.main.JavaCompiler.instance(context);
-            jc?.initModules(com.sun.tools.javac.util.List.nil())
-        } catch (e) {
-            // ignore, must be JDK 8
-        }
-        ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
-        GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
+        def javaParser = new JavaParser()
+        def javacTask = javaParser.getJavacTask()
+        def elements = javacTask.elements
+        def types = javacTask.types
+        def env = javaParser.processingEnv
+        ModelUtils modelUtils = new ModelUtils(elements, types) {}
+        GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
         AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils,genericUtils, env.filer) {
         }
 

@@ -2,7 +2,7 @@ package io.micronaut.inject.configuration
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class ConfigurationBuilderSpec extends AbstractTypeElementSpec {
 

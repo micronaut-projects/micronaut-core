@@ -581,8 +581,8 @@ public class RequiresCondition implements Condition {
                     final Collection<? extends BeanDefinition<?>> beanDefinitions = beanContext.findBeanCandidates(
                             context.getBeanResolutionContext(),
                             type,
-                            bd,
-                            true
+                            true,
+                            candidate -> !bd.equals(candidate)
                     );
                     for (BeanDefinition<?> beanDefinition : beanDefinitions) {
                         if (!beanDefinition.isAbstract()) {

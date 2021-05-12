@@ -21,7 +21,10 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Status;
+import io.reactivex.Flowable;
 import io.reactivex.Maybe;
+import io.reactivex.Single;
+import org.reactivestreams.Publisher;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -63,5 +66,15 @@ public class StatusController {
     @Get(value = "/simple404", produces = MediaType.TEXT_PLAIN)
     public String simple404() {
         return "success";
+    }
+
+    @Get("/single")
+    public Single<HttpStatus> single() {
+        return Single.just(HttpStatus.CREATED);
+    }
+
+    @Get(value = "/reactive", single = true)
+    public Publisher<HttpStatus> reactive() {
+        return Flowable.just(HttpStatus.CREATED);
     }
 }

@@ -37,7 +37,7 @@ class DurationPatternValidatorSpec {
                 holidayService.startHoliday("Fred", "junk") // <1>
             );
 
-        assertEquals("startHoliday.duration: invalid duration (junk)", exception.getMessage()); // <2>
+        assertEquals("startHoliday.duration: invalid duration (junk), additional custom message", exception.getMessage()); // <2>
     }
     // end::test[]
 }

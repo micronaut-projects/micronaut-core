@@ -17,7 +17,6 @@ package io.micronaut.tracing.brave
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
-import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
@@ -29,17 +28,38 @@ import io.micronaut.runtime.server.event.ServerStartupEvent
 import io.micronaut.tracing.brave.sender.HttpClientSender
 import io.reactivex.Flowable
 import io.reactivex.Single
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import zipkin2.Span
 
 import javax.inject.Singleton
-
 /**
  * @author graemerocher
  * @since 1.0
  */
+@Retry
 class HttpClientSenderSpec extends Specification {
+
+    void "test http client sender bean initialization with instrumented threads"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+          'tracing.zipkin.enabled':true,
+          'tracing.instrument-threads':true,
+          'tracing.zipkin.sampler.probability':1,
+          'tracing.zipkin.http.url':HttpClientSender.Builder.DEFAULT_SERVER_URL
+        )
+
+        when:
+        HttpClientSender httpClientSender = context.getBean(HttpClientSender)
+
+        then:
+        httpClientSender != null
+
+        cleanup:
+        httpClientSender.close()
+        context.close()
+    }
 
     void "test http client sender receives spans"() {
         given:

@@ -184,7 +184,6 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
                     LOG.error(e.getMessage());
                 }
             }
-
         } else {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Encoding emitted response object [{}] using codec: {}", body, codec);

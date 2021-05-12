@@ -131,31 +131,31 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
             }
             context.write(finalResponse, context.voidPromise());
 
-            ChannelFuture sendFileFuture;
-            // Write the content.
-            if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(nettyResponse)) {
-                // SSL not enabled - can use zero-copy file transfer.
-                sendFileFuture = context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise());
-                context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
-            } else {
-                // SSL enabled - cannot use zero-copy file transfer.
-                try {
-                    // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-                    sendFileFuture = context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K)),
-                        context.newProgressivePromise());
-                } catch (IOException e) {
-                    throw new CustomizableResponseTypeException("Could not read file", e);
-                }
-            }
-
-            sendFileFuture.addListener(future -> {
+            ChannelFutureListener closeListener = (future) -> {
                 try {
                     raf.close();
                 } catch (IOException e) {
                     LOG.warn("An error occurred closing the file reference: " + getFile().getAbsolutePath(), e);
                 }
-            });
+            };
 
+            // Write the content.
+            if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(nettyResponse)) {
+                // SSL not enabled - can use zero-copy file transfer.
+                context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise())
+                        .addListener(closeListener);
+                context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+            } else {
+                // SSL enabled - cannot use zero-copy file transfer.
+                try {
+                    // HttpChunkedInput will write the end marker (LastHttpContent) for us.
+                    final HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K));
+                    context.writeAndFlush(chunkedInput, context.newProgressivePromise())
+                            .addListener(closeListener);
+                } catch (IOException e) {
+                    throw new CustomizableResponseTypeException("Could not read file", e);
+                }
+            }
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
         }

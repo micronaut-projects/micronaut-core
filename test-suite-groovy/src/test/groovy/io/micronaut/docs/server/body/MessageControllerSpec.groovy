@@ -16,7 +16,7 @@ class MessageControllerSpec extends Specification {
     @Shared @AutoCleanup HttpClient httpClient =
             embeddedServer.getApplicationContext()
                           .createBean(HttpClient, embeddedServer.getURL())
-    
+
     void "test echo response"() {
         given:
         String body = "My Text"
@@ -41,4 +41,5 @@ class MessageControllerSpec extends Specification {
         expect:
         response == body
     }
+
 }

@@ -2,7 +2,7 @@ package io.micronaut.inject.annotation
 
 import io.micronaut.context.annotation.Parameter
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.annotation.repeatable.Topic
 

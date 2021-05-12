@@ -21,13 +21,11 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.convert.value.ConvertibleValues
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
 
 class RepeatableAnnotationSpec extends AbstractTypeElementSpec {
-
-
 
     void "test repeatable annotation properties with alias"() {
         given:
@@ -345,5 +343,27 @@ class Test {
         requirements != null
         requirements.size() == 3
         requires.size() == 3
+    }
+
+    void "test members in repeatable parent are retained"() {
+        when:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@Topics(connectionName = "test", value = {@Topic("hello"), @Topic("world")})
+@javax.inject.Singleton
+class Test {
+
+}
+''')
+
+        then:
+        definition.getValue(Topics, "connectionName", String).get() == "test"
+        definition.getAnnotationValuesByType(Topic).size() == 2
+        definition.getAnnotationValuesByType(Topic)[0].getValue(String).get() == "hello"
+        definition.getAnnotationValuesByType(Topic)[1].getValue(String).get() == "world"
     }
 }

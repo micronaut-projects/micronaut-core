@@ -52,3 +52,5 @@ micronaut:
       default:
         prefer-native-transport: true
 ----
+
+NOTE: Netty enables simplistic sampling resource leak detection which reports there is a leak or not, at the cost of small overhead. You can disable it or enable more advanced detection by setting property `netty.resource-leak-detector-level` to one of: `SIMPLE` (default), `DISABLED`, `PARANOID` or `ADVANCED`.

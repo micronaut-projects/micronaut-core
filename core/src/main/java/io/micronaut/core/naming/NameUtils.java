@@ -19,11 +19,9 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 
 import io.micronaut.core.annotation.NonNull;
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * <p>Naming convention utilities.</p>
@@ -134,14 +132,16 @@ public class NameUtils {
      * @return The camel case form
      */
     public static String dehyphenate(String name) {
-        return Arrays.stream(name.split("-"))
-            .map(str -> {
-                if (str.length() > 0 && Character.isLetter(str.charAt(0))) {
-                    return Character.toUpperCase(str.charAt(0)) + str.substring(1);
-                }
-                return str;
-            })
-            .collect(Collectors.joining(""));
+        StringBuilder sb = new StringBuilder(name.length());
+        for (String token : StringUtils.splitOmitEmptyStrings(name, '-')) {
+            if (token.length() > 0 && Character.isLetter(token.charAt(0))) {
+                sb.append(Character.toUpperCase(token.charAt(0)));
+                sb.append(token.substring(1));
+            } else {
+                sb.append(token);
+            }
+        }
+        return sb.toString();
     }
 
     /**
@@ -464,7 +464,12 @@ public class NameUtils {
      * @return The new string in camel case
      */
     public static String camelCase(String str, boolean lowerCaseFirstLetter) {
-        String result = Arrays.stream(str.split("[\\s_-]")).map(NameUtils::capitalize).collect(Collectors.joining(""));
+        StringBuilder sb = new StringBuilder(str.length());
+        for (String s : str.split("[\\s_-]")) {
+            String capitalize = capitalize(s);
+            sb.append(capitalize);
+        }
+        String result = sb.toString();
         if (lowerCaseFirstLetter) {
             return decapitalize(result);
         }

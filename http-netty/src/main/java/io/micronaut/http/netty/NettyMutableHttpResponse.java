@@ -36,6 +36,7 @@ import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 
@@ -78,7 +79,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
      */
     @SuppressWarnings("MagicNumber")
     public NettyMutableHttpResponse(ConversionService conversionService) {
-        this.nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        this.nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.EMPTY_BUFFER);
         this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
         this.conversionService = conversionService;
     }

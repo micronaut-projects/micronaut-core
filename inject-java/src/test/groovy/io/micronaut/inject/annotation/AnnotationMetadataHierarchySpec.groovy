@@ -4,7 +4,7 @@ import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 import javax.inject.Singleton
 
