@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2021 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.*;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -37,8 +37,11 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import org.jetbrains.annotations.NotNull;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
@@ -1163,7 +1166,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         Method methodToInvoke;
 
         final ClassElement genericType = fieldElement.getGenericType();
-        if (genericType.isAssignable(Iterable.class) || genericType.isArray()) {
+        if (genericType.isAssignable(Collection.class) || genericType.isArray()) {
             ClassElement typeArgument = genericType.isArray() ? genericType.fromArray() : genericType.getFirstTypeArgument().orElse(null);
             if (typeArgument != null) {
                 if (typeArgument.isAssignable(BeanRegistration.class)) {
@@ -1678,7 +1681,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private Method getInjectMethodForParameter(ParameterElement parameterElement) {
         final ClassElement genericType = parameterElement.getGenericType();
         Method methodToInvoke;
-        if (genericType.isAssignable(Iterable.class) || genericType.isArray()) {
+        if (genericType.isAssignable(Collection.class) || genericType.isArray()) {
             ClassElement typeArgument = genericType.isArray() ? genericType.fromArray() : genericType.getFirstTypeArgument().orElse(null);
             if (typeArgument != null) {
                 if (typeArgument.isAssignable(BeanRegistration.class)) {
@@ -2027,7 +2030,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 methodToInvoke = GET_VALUE_FOR_CONSTRUCTOR_ARGUMENT;
             } else {
                 final ClassElement genericType = argumentType.getGenericType();
-                if (genericType.isAssignable(Iterable.class) || genericType.isArray()) {
+                if (genericType.isAssignable(Collection.class) || genericType.isArray()) {
                     ClassElement typeArgument = genericType.isArray() ? genericType.fromArray() : genericType.getFirstTypeArgument().orElse(null);
                     if (typeArgument != null) {
                         if (typeArgument.isAssignable(BeanRegistration.class)) {
