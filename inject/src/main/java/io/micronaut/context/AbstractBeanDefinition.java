@@ -888,7 +888,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
-    protected final Collection getBeansOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
+    protected final Iterable getBeansOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
         return resolveBeanWithGenericsFromMethodArgument(resolutionContext, injectionPoint, argument, (beanType, qualifier) -> {
                     boolean hasNoGenerics = !argument.getType().isArray() && argument.getTypeVariables().isEmpty();
                     if (hasNoGenerics) {
@@ -978,10 +978,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (argumentType == BeanResolutionContext.class) {
             return resolutionContext;
         } else if (argumentType.isArray()) {
-            Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
-            return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
+            Iterable beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
+            return coerceCollectionToArray(argumentType.getComponentType(), beansOfType);
         } else if (Iterable.class.isAssignableFrom(argumentType)) {
-            Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
+            Iterable beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
             return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
             return streamOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
@@ -1143,7 +1143,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
-    protected final Collection getBeansOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, @SuppressWarnings("unused") ConstructorInjectionPoint<T> constructorInjectionPoint, Argument argument) {
+    protected final Iterable getBeansOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, @SuppressWarnings("unused") ConstructorInjectionPoint<T> constructorInjectionPoint, Argument argument) {
         return resolveBeanWithGenericsFromConstructorArgument(resolutionContext, argument, (beanType, qualifier) -> {
                     boolean hasNoGenerics = !argument.getType().isArray() && argument.getTypeVariables().isEmpty();
                     if (hasNoGenerics) {
@@ -1676,16 +1676,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     protected final Object getBeanForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
         Class beanType = injectionPoint.getType();
         if (beanType.isArray()) {
-            Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, injectionPoint);
-            return beansOfType.toArray((Object[]) Array.newInstance(beanType.getComponentType(), beansOfType.size()));
+            Iterable beansOfType = getBeansOfTypeForField(resolutionContext, context, injectionPoint);
+            return coerceCollectionToArray(beanType.getComponentType(), beansOfType);
         } else if (Iterable.class.isAssignableFrom(beanType)) {
-            Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, injectionPoint);
-            if (beanType.isInstance(beansOfType)) {
-                return beansOfType;
-            } else {
-                //noinspection unchecked
-                return CollectionUtils.convertCollection(beanType, beansOfType).orElse(null);
-            }
+            Iterable beansOfType = getBeansOfTypeForField(resolutionContext, context, injectionPoint);
+            return coerceCollectionToCorrectType(beanType, beansOfType);
         } else if (Stream.class.isAssignableFrom(beanType)) {
             return getStreamOfTypeForField(resolutionContext, context, injectionPoint);
         } else if (ProviderFactory.isProvider(beanType)) {
@@ -1777,7 +1772,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
-    protected final Collection getBeansOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
+    protected final Iterable getBeansOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
         return resolveBeanWithGenericsForField(resolutionContext, injectionPoint, (beanType, qualifier) -> {
                     boolean hasNoGenerics = !injectionPoint.getType().isArray() && injectionPoint.asArgument().getTypeVariables().isEmpty();
                     if (hasNoGenerics) {
@@ -1883,10 +1878,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
         Class argumentType = argument.getType();
         if (argumentType.isArray()) {
-            Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
-            return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
+            Iterable beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
+            return coerceCollectionToArray(argumentType.getComponentType(), beansOfType);
         } else if (Iterable.class.isAssignableFrom(argumentType)) {
-            Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
+            Iterable beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
             return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
             return streamOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
@@ -2253,12 +2248,21 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     @SuppressWarnings("unchecked")
-    private Object coerceCollectionToCorrectType(Class collectionType, Collection beansOfType) {
+    private Object coerceCollectionToCorrectType(Class collectionType, Iterable beansOfType) {
         if (collectionType.isInstance(beansOfType)) {
             return beansOfType;
         } else {
             return CollectionUtils.convertCollection(collectionType, beansOfType).orElse(null);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private T[] coerceCollectionToArray(Class<T> componentType, Iterable<T> beansOfType) {
+        List<T> list = new ArrayList<>();
+        for (T t : beansOfType) {
+            list.add(t);
+        }
+        return list.toArray((T[]) Array.newInstance(componentType, 0));
     }
 
     private void addRequiredComponents(Argument... arguments) {
