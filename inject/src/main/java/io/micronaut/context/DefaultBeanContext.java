@@ -38,7 +38,6 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.type.TypeInformation;
 import io.micronaut.core.util.*;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.core.value.PropertyResolver;
@@ -48,7 +47,6 @@ import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1191,22 +1189,9 @@ public class DefaultBeanContext implements BeanContext {
 
     @NonNull
     private <T extends EventListener> List<T> resolveListeners(Class<T> type, Argument<?> genericType) {
-        final Collection<BeanDefinition<T>> preDestroyListeners =
-                getBeanDefinitions(type);
-
-        if (CollectionUtils.isNotEmpty(preDestroyListeners)) {
-
-            final Qualifier<T> q =
-                    Qualifiers.byGenerics(genericType.getType());
-            final Stream<BeanDefinition<T>> listenerStream = preDestroyListeners
-                    .stream();
-            return q.reduce(type, listenerStream)
-                    .map(this::getBean)
-                    .sorted(OrderUtil.COMPARATOR)
-                    .collect(Collectors.toList());
-        } else {
-            return Collections.emptyList();
-        }
+        return streamOfType(Argument.of(type, genericType))
+            .sorted(OrderUtil.COMPARATOR)
+            .collect(Collectors.toList());
     }
 
     /**
@@ -3163,14 +3148,6 @@ public class DefaultBeanContext implements BeanContext {
                 return definition;
             }
         }
-    }
-
-    @NotNull
-    private <T> Qualifier<T> getTypeArgumentQualifier(Argument[] typeParameters) {
-        return Qualifiers.byGenerics(
-                Arrays.stream(typeParameters).map(TypeInformation::getType)
-                        .toArray(Class[]::new)
-        );
     }
 
     private <T> T createAndRegisterSingleton(

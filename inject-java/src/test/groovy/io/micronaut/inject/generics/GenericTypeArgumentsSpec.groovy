@@ -34,44 +34,6 @@ import java.util.stream.Stream
 
 class GenericTypeArgumentsSpec extends AbstractTypeElementSpec {
 
-    void 'test inject with generic inheritance'() {
-        given:
-        def context = buildContext('genericinheritance.Test', '''
-package genericinheritance;
-
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.http.filter.HttpClientFilterResolver;
-import io.micronaut.http.filter.HttpFilterResolver.FilterEntry;
-import io.micronaut.http.filter.HttpClientFilter;
-import io.micronaut.http.HttpRequest;
-import java.util.List;
-
-@javax.inject.Singleton
-public class Test implements HttpClientFilterResolver<TestMetadata> {
-    public List<FilterEntry<HttpClientFilter>> resolveFilterEntries(TestMetadata context) {
-        return java.util.Collections.emptyList();
-    }
-    
-    public List<HttpClientFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry<HttpClientFilter>> filterEntries) {
-    return java.util.Collections.emptyList();
-    }
-}
-
-interface TestMetadata extends AnnotationMetadataProvider {} 
-''')
-
-        expect:
-        context != null
-
-        Qualifiers.byGenerics(AnnotationMetadataProvider)
-            .reduce(HttpClientFilterResolver,
-                Stream.of(context.getBeanDefinition(context.classLoader.loadClass('genericinheritance.Test')))
-            ).findFirst().isPresent()
-
-        cleanup:
-        context.close()
-    }
-
     void "test generic type arguments with inner classes resolve"() {
         given:
         def definition = buildBeanDefinition('innergenerics.Outer$FooImpl', '''
