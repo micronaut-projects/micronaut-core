@@ -115,7 +115,7 @@ class TestOrder {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-@javax.inject.Named("foo")
+@jakarta.inject.Named("foo")
 class Test {
 
 }
@@ -129,7 +129,7 @@ class Test {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -154,7 +154,7 @@ class Test {
 @interface MockBean {
 
     @AliasFor(annotation = Replaces.class, member = "named")
-    @AliasFor(annotation = javax.inject.Named.class, member = "value")
+    @AliasFor(annotation = jakarta.inject.Named.class, member = "value")
     String named() default "";
 }
 ''')
@@ -175,11 +175,11 @@ class Test {
 
 }
 
-@javax.inject.Qualifier
+@jakarta.inject.Qualifier
 @interface MyQualifier {
 
     @AliasFor(annotation = Replaces.class, member = "named")
-    @AliasFor(annotation = javax.inject.Named.class, member = "value")
+    @AliasFor(annotation = jakarta.inject.Named.class, member = "value")
     String named() default "";
 }
 ''')
@@ -217,7 +217,7 @@ public class NumberThingManager extends AbstractThingManager<NumberThing<?>> {}
         def definition = buildBeanDefinition('test.A', 'TestBean', '''
 package test.A;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class TestBean {
 
 }

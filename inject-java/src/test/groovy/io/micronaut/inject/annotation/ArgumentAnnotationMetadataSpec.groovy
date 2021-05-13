@@ -28,10 +28,10 @@ class ArgumentAnnotationMetadataSpec extends AbstractTypeElementSpec {
         AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
-    void test(@javax.inject.Named("foo") String id) {
+    void test(@jakarta.inject.Named("foo") String id) {
     
     }
 }
@@ -49,7 +49,7 @@ class Test {
         AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.context.annotation.Executable
@@ -70,7 +70,7 @@ class Test {
         AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements TestApi {
 
     @javax.annotation.PostConstruct
@@ -82,7 +82,7 @@ class Test implements TestApi {
 
 interface TestApi {
 
-    void test(@javax.inject.Named("foo") String id);
+    void test(@jakarta.inject.Named("foo") String id);
 
 }
 ''', 'test', 'id')

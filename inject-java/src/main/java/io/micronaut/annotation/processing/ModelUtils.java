@@ -309,6 +309,16 @@ public class ModelUtils {
     }
 
     /**
+     * Return whether the given element is the java.lang.Object class.
+     *
+     * @param element The element
+     * @return True if it is java.lang.Object
+     */
+    public boolean isObjectClass(TypeElement element) {
+        return element.getSuperclass().getKind() == NONE;
+    }
+
+    /**
      * @param classElement The {@link TypeElement}
      * @return A list of {@link ExecutableElement}
      */
@@ -390,16 +400,6 @@ public class ModelUtils {
         }
         DeclaredType kind = (DeclaredType) superclass;
         return (TypeElement) kind.asElement();
-    }
-
-    /**
-     * Return whether the given element is the java.lang.Object class.
-     *
-     * @param element The element
-     * @return True if it is java.lang.Object
-     */
-    boolean isObjectClass(TypeElement element) {
-        return element.getSuperclass().getKind() == NONE;
     }
 
     /**

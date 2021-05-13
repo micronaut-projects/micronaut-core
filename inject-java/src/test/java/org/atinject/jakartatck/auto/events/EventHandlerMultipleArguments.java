@@ -1,4 +1,4 @@
-package org.atinject.javaxtck.auto.events;
+package org.atinject.jakartatck.auto.events;
 
 import io.micronaut.core.annotation.Indexed;
 

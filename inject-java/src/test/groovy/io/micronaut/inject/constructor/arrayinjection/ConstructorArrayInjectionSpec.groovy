@@ -45,7 +45,7 @@ class ConstructorArrayInjectionSpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 class B {
     private A[] all;
 

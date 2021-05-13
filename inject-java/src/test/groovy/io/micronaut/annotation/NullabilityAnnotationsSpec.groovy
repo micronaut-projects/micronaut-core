@@ -10,7 +10,7 @@ class NullabilityAnnotationsSpec extends AbstractTypeElementSpec {
         def element = buildClassElement("""
 package test;
 import ${packageName}.*;
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
     @Nullable
     String nullableMethod(@Nullable String test) {

@@ -4,7 +4,7 @@ import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
 import org.junit.jupiter.api.Assertions;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class CDestroyedListener implements BeanDestroyedEventListener<C> {

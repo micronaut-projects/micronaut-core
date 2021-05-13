@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.field.arrayinjection;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.util.Arrays;
 import java.util.List;
 

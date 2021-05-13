@@ -90,7 +90,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      */
     @NonNull
     public AnnotationValue<T> build() {
-        return new AnnotationValue<>(annotationName, values, retentionPolicy);
+        return new AnnotationValue<>(annotationName, values, retentionPolicy, stereotypes);
     }
 
     @NonNull

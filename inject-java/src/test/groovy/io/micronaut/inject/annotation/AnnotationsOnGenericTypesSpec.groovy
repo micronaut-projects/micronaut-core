@@ -63,7 +63,7 @@ class Test {
     }
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Foo {
 
 }
@@ -97,7 +97,7 @@ class Test {
     }
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Foo {
 
 }

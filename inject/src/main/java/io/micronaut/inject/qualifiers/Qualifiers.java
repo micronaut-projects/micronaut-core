@@ -112,7 +112,7 @@ public class Qualifiers {
             if (aClass.isPresent()) {
                 return byType(aClass.get());
             }
-        } else if (Named.class == type) {
+        } else if (Named.class == type || AnnotationUtil.NAMED.equals(type.getName())) {
             Optional<String> value = metadata.stringValue(type);
             if (value.isPresent()) {
                 return byName(value.get());

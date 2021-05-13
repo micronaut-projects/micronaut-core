@@ -16,10 +16,12 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.GenericUtils;
+import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
+import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import io.micronaut.core.annotation.Nullable;
@@ -46,6 +48,8 @@ public class LoadedVisitor implements Ordered {
     private final JavaElementFactory elementFactory;
     private JavaClassElement rootClassElement;
 
+    private static final String OBJECT_CLASS = Object.class.getName();
+
     /**
      * @param visitor               The {@link TypeElementVisitor}
      * @param visitorContext        The visitor context
@@ -64,13 +68,33 @@ public class LoadedVisitor implements Ordered {
         TypeElement typeElement = processingEnvironment.getElementUtils().getTypeElement(aClass.getName());
         if (typeElement != null) {
             List<? extends TypeMirror> generics = genericUtils.interfaceGenericTypesFor(typeElement, TypeElementVisitor.class.getName());
-            classAnnotation = generics.get(0).toString();
-            elementAnnotation = generics.get(1).toString();
+            String typeName = generics.get(0).toString();
+            if (typeName.equals(OBJECT_CLASS)) {
+                classAnnotation = visitor.getClassType();
+            } else {
+                classAnnotation = typeName;
+            }
+            String elementName = generics.get(1).toString();
+            if (elementName.equals(OBJECT_CLASS)) {
+                elementAnnotation = visitor.getElementType();
+            } else {
+                elementAnnotation = elementName;
+            }
         } else {
             Class[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(aClass, TypeElementVisitor.class);
             if (classes != null && classes.length == 2) {
-                classAnnotation = classes[0].getName();
-                elementAnnotation = classes[1].getName();
+                Class classGeneric = classes[0];
+                if (classGeneric == Object.class) {
+                    classAnnotation = visitor.getClassType();
+                } else {
+                    classAnnotation = classGeneric.getName();
+                }
+                Class elementGeneric = classes[1];
+                if (elementGeneric == Object.class) {
+                    elementAnnotation = visitor.getElementType();
+                } else {
+                    elementAnnotation = elementGeneric.getName();
+                }
             } else {
                 classAnnotation = Object.class.getName();
                 elementAnnotation = Object.class.getName();

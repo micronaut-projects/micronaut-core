@@ -8,7 +8,6 @@ dependencies {
     compileOnly "jakarta.inject:jakarta.inject-api:2.0.0"
     compileOnly dependencyVersion("validation")
 
-    testCompileOnly group: 'javax.inject', name: 'javax.inject', version: '1'
     testImplementation project(':aop')
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject-java-test")
@@ -28,7 +27,6 @@ dependencies {
     testImplementation dependencyModuleVersion("micrometer", "micrometer-core")
     testImplementation project(":validation")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
-    testImplementation "jakarta.inject:jakarta.inject-api:2.0.0"
     testImplementation dependencyVersion("zipkin.reporter")
 
     testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'

@@ -38,7 +38,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean extends MyInterface {
 
     @Override
@@ -71,7 +71,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean implements MyInterface {
 
     private String myValue;

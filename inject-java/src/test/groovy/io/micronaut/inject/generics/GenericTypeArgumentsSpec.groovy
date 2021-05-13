@@ -46,7 +46,7 @@ import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.HttpRequest;
 import java.util.List;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 public class Test implements HttpClientFilterResolver<TestMetadata> {
     public List<FilterEntry<HttpClientFilter>> resolveFilterEntries(TestMetadata context) {
         return java.util.Collections.emptyList();
@@ -81,7 +81,7 @@ class Outer {
 
     interface Foo<T extends CharSequence> {}
     
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     class FooImpl implements Foo<String> {}
 }
 ''')
@@ -189,7 +189,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import java.util.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Executable
@@ -263,7 +263,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 final class TrackedSortedSet<T extends java.lang.Comparable<? super T>> {
  public TrackedSortedSet(java.util.Collection<? extends T> initial) {
         super();
@@ -283,7 +283,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements java.util.function.Function<String, Integer>{
 
     public Integer apply(String str) {
@@ -310,7 +310,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements Foo {
 
     public Integer apply(String str) {
@@ -337,7 +337,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements Bar {
 
     public Integer apply(String str) {
@@ -365,7 +365,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements Bar {
 
     public Integer apply(String str) {
@@ -394,7 +394,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test extends Foo {
 
     public Integer apply(String str) {
@@ -421,7 +421,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test extends Foo<String, Integer> {
 
     public Integer apply(String str) {
@@ -512,7 +512,7 @@ import zipkin2.*;
 @Factory
 class Test {
 
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     AsyncReporter<Span> asyncReporter() {
         return null;
     }

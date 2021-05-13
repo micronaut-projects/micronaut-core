@@ -14,7 +14,7 @@ class SingletonOnEnumSpec extends AbstractTypeElementSpec {
         buildBeanDefinition('test.Test','''\
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 enum Test {
 }
 

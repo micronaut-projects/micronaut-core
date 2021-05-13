@@ -23,7 +23,7 @@ import io.reactivex.Flowable;
 import io.reactivex.Maybe;
 
 import jakarta.inject.Named;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.concurrent.TimeUnit;
 
 @Factory

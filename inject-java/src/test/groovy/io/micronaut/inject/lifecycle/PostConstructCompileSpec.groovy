@@ -32,7 +32,7 @@ class Test {
 package test;
 
 import javax.annotation.PostConstruct;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 class Test {
 
@@ -56,7 +56,7 @@ class Test {
 package test;
 
 import javax.annotation.PostConstruct;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 class Test {
 

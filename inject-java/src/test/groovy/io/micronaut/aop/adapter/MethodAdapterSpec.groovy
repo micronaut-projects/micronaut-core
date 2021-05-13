@@ -23,9 +23,9 @@ import io.micronaut.context.event.StartupEvent
 import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
-import org.atinject.javaxtck.auto.events.EventHandlerMultipleArguments
-import org.atinject.javaxtck.auto.events.Metadata
-import org.atinject.javaxtck.auto.events.SomeEvent
+import org.atinject.jakartatck.auto.events.EventHandlerMultipleArguments
+import org.atinject.jakartatck.auto.events.Metadata
+import org.atinject.jakartatck.auto.events.SomeEvent
 
 import java.nio.charset.StandardCharsets
 
@@ -78,7 +78,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @io.micronaut.context.annotation.Requires(property="foo.bar")
 class Test {
 
@@ -194,7 +194,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Adapter(ApplicationEventListener.class)
@@ -222,7 +222,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements TestContract {
 
     @Override
@@ -255,7 +255,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Adapter(Foo.class)
@@ -284,7 +284,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Adapter(Foo.class)
@@ -310,7 +310,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Adapter(ApplicationEventListener.class)
@@ -329,9 +329,9 @@ class Test {
     void  "test method adapter argument order"() {
         when:"An adapter method is parsed"
         BeanDefinition definition = buildBeanDefinition('org.atinject.javaxtck.auto.events.EventListener$EventHandlerMultipleArguments$onEvent1$Intercepted','''\
-package org.atinject.javaxtck.auto.events;
+package org.atinject.jakartatck.auto.events;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class EventListener {
 
     @EventHandler
