@@ -57,6 +57,7 @@ class AnyProviderSpec extends Specification {
         boolean called = false
         terrierProvider2.ifPresent({ Dog dog ->
             assert dog in Dog
+            assert dog instanceof Terrier
             called = true
         })
 

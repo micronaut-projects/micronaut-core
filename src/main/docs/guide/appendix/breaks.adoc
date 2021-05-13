@@ -26,6 +26,43 @@ In several places in Micronaut, it is required to get a map representation of yo
 
 In Micronaut 2.x it was possible to inject a `List<javax.inject.Provider>`, although this was undocumented behaviour. In Micronaut 3.x injecting a list of `Provider` instances is no longer possible and you should instead use the api:context.BeanProvider[] API which provides `stream()` and `iterator()` methods to provide the same functionality.
 
+==== Only the Exported Type from Factories is Injectable
+
+It is no longer possible to inject the internal implementation type from beans produced via factories. For example in the following example:
+
+[source,java]
+----
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ExecutorService;
+import javax.inject.Singleton;
+
+public class ExecutorFactory {
+    @Singleton
+    public ExecutorService executorService() {
+        return ForkJoinPool.commonPool();
+    }
+}
+----
+
+In the above case, if the `ExecutorService` had been created previously a call to `context.getBean(ForkJoinPool.class)` would locate the already created bean. This behaviour was inconsistent because if the bean had not yet been created then this lookup would not work. In Micronaut 3 for consistency this is no longer possible.
+
+You can however restore the behaviour by using the new `typed` member of the ann:context.annotation.Bean[] annotation:
+
+[source,java]
+----
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ExecutorService;
+import javax.inject.Singleton;
+import io.micronaut.context.annotation.Bean;
+public class ExecutorFactory {
+    @Singleton
+    @Bean(typed = { ExecutorService.class, ForkJoinPool.class })
+    public ExecutorService executorService() {
+        return ForkJoinPool.commonPool();
+    }
+}
+----
+
 ==== Implementations of `javax.inject.Provider` No Longer Generate Factories
 
 In Micronaut 2.x if you defined a bean that implemented the `javax.inject.Provider` interface then the return type of the `get` method also automatically became a bean.
