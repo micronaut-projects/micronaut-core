@@ -2173,24 +2173,12 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             BeanResolutionContext resolutionContext,
             Argument argument,
             boolean innerConfiguration) {
-        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
-        List<Class<? extends Annotation>> qualifierTypes = hasMetadata ? annotationMetadata.getAnnotationTypesByStereotype(javax.inject.Qualifier.class) : null;
-        if (CollectionUtils.isNotEmpty(qualifierTypes)) {
-            if (qualifierTypes.size() == 1) {
-                return Qualifiers.byAnnotation(
-                        annotationMetadata,
-                        qualifierTypes.iterator().next()
-                );
-            } else {
-                final Qualifier[] qualifiers = qualifierTypes
-                        .stream().map((type) -> Qualifiers.byAnnotation(annotationMetadata, type))
-                        .toArray(Qualifier[]::new);
-                return Qualifiers.byQualifiers(
-                        qualifiers
-                );
-            }
+        final Qualifier<Object> argumentQualifier = Qualifiers.forArgument(argument);
+        if (argumentQualifier != null) {
+            return argumentQualifier;
         } else {
+            final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+            boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
             if (hasMetadata && annotationMetadata.hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)) {
                 return Qualifiers.byInterceptorBinding(annotationMetadata);
             }
