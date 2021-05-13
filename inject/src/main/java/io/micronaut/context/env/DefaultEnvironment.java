@@ -453,7 +453,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                             }
                             order++;
                         } else {
-                            throw new ConfigurationException("Unsupported properties file format: " + extension);
+                            throw new ConfigurationException("Unsupported properties file: " + filePath +
+                                    " Extension " + extension + " is not supported for properties file");
                         }
                     }
                 }
