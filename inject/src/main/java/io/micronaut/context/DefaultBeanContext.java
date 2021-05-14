@@ -1087,9 +1087,7 @@ public class DefaultBeanContext implements BeanContext {
                         LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", bean, beanKey);
                     }
 
-                    singletonObjects.remove(beanKey);
-                    BeanKey<?> concreteKey = new BeanKey<>(bean.getClass(), null);
-                    singletonObjects.remove(concreteKey);
+                    purgeBeanRegistrations(bean);
                 }
             }
         }
@@ -1098,7 +1096,7 @@ public class DefaultBeanContext implements BeanContext {
             Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(
                     null,
                     beanKey.beanType,
-                    null,
+                    qualifier,
                     false,
                     true
             );
@@ -1106,8 +1104,29 @@ public class DefaultBeanContext implements BeanContext {
             concreteCandidate.ifPresent(definition -> {
                 disposeBean(beanType, finalBean, definition);
             });
+        } else {
+            final BeanDefinition<T> candidate = findConcreteCandidate(
+                    null,
+                    beanKey.beanType,
+                    qualifier,
+                    false,
+                    true
+            ).orElse(null);
+            if (candidate != null) {
+                bean = findExistingCompatibleSingleton(beanType, null, qualifier, candidate);
+                if (bean != null) {
+                    purgeBeanRegistrations(bean);
+                    disposeBean(beanType, bean, candidate);
+                }
+            }
         }
         return bean;
+    }
+
+    private <T> void purgeBeanRegistrations(T bean) {
+        synchronized (singletonObjects) {
+            singletonObjects.entrySet().removeIf(entry -> entry.getValue().bean == bean);
+        }
     }
 
     @Override
