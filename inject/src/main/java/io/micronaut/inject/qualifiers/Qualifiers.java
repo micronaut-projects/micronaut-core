@@ -70,7 +70,7 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byName(String name) {
-        return new NameQualifier<>(name);
+        return new NameQualifier<>(null, name);
     }
 
     /**

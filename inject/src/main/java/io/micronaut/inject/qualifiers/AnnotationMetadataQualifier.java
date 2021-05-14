@@ -21,6 +21,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.annotation.AnnotationMetadataSupport;
 import jakarta.inject.Named;
 
 import java.lang.annotation.Annotation;
@@ -40,7 +41,6 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     private static final String NAMED_SIMPLE = "Named";
     private final AnnotationMetadata annotationMetadata;
-    private final Class<? extends Annotation> annotationType;
     private final String qualifiedName;
     private final AnnotationValue<Annotation> qualifierAnn;
     private final Set<String> nonBinding;
@@ -50,11 +50,13 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
      * @param name     The name
      */
     AnnotationMetadataQualifier(AnnotationMetadata metadata, String name) {
-        super(name);
+        super(metadata, name);
         this.annotationMetadata = metadata;
-        this.annotationType = null;
-        this.qualifiedName = name;
+        this.qualifiedName = annotationType != null ? annotationType.getName() : name;
         if (AnnotationUtil.NAMED.equals(name) || Named.class.getName().equals(name)) {
+            this.nonBinding = null;
+            qualifierAnn = null;
+        } else {
             this.nonBinding = resolveNonBindingMembers(annotationMetadata);
             Map<CharSequence, Object> bindingValues = resolveBindingValues(annotationMetadata, qualifiedName, nonBinding);
             if (CollectionUtils.isNotEmpty(bindingValues)) {
@@ -62,9 +64,6 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
             } else {
                 qualifierAnn = null;
             }
-        } else {
-            this.nonBinding = null;
-            qualifierAnn = null;
         }
     }
 
@@ -73,9 +72,8 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
      * @param annotationType     The name
      */
     AnnotationMetadataQualifier(AnnotationMetadata metadata, Class<? extends Annotation> annotationType) {
-        super(annotationType.getSimpleName());
+        super(annotationType);
         this.annotationMetadata = metadata;
-        this.annotationType = annotationType;
         this.qualifiedName = annotationType.getName();
         if (!getName().equals(NAMED_SIMPLE)) {
             this.nonBinding = resolveNonBindingMembers(annotationMetadata);

@@ -1,5 +1,6 @@
 package io.micronaut.inject.beans
 
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.order.Ordered
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
@@ -160,7 +161,7 @@ class Test {
 ''')
         expect:
         definition.getDeclaredQualifier() == Qualifiers.byName("foo")
-        definition.getAnnotationNameByStereotype(Qualifier).get() == Named.name
+        definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == AnnotationUtil.NAMED
     }
 
     void 'test qualifier annotation'() {

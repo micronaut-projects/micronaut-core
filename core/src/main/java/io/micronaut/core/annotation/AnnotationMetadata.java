@@ -341,6 +341,31 @@ public interface AnnotationMetadata extends AnnotationSource {
         return hasDeclaredAnnotation(annotationClass);
     }
 
+
+    /**
+     * @see AnnotationSource#isAnnotationPresent(String)
+     */
+    @Override
+    default boolean isAnnotationPresent(@NonNull String annotationName) {
+        //noinspection ConstantConditions
+        if (annotationName == null) {
+            return false;
+        }
+        return hasAnnotation(annotationName);
+    }
+
+    /**
+     * @see AnnotationSource#isAnnotationPresent(String)
+     */
+    @Override
+    default boolean isDeclaredAnnotationPresent(@NonNull String annotationName) {
+        //noinspection ConstantConditions
+        if (annotationName == null) {
+            return false;
+        }
+        return hasDeclaredAnnotation(annotationName);
+    }
+
     /**
      * Return the default value for the given annotation member.
      *

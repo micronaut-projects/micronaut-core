@@ -18,6 +18,7 @@ package io.micronaut.inject.method.qualifierinjection
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 
 import jakarta.inject.Qualifier
@@ -81,8 +82,8 @@ class TwoA implements A {
 ''')
         then:"the state is correct"
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[0].arguments[0].getAnnotationMetadata().getAnnotationTypeByStereotype(Qualifier).isPresent()
-        beanDefinition.injectedMethods[1].arguments[0].getAnnotationMetadata().getAnnotationTypeByStereotype(Qualifier).isPresent()
+        beanDefinition.injectedMethods[0].arguments[0].getAnnotationMetadata().getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).isPresent()
+        beanDefinition.injectedMethods[1].arguments[0].getAnnotationMetadata().getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).isPresent()
     }
 
     void "test that a property with a qualifier is injected correctly"() {

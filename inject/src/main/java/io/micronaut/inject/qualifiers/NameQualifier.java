@@ -27,6 +27,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.inject.BeanType;
 
+import java.lang.annotation.Annotation;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -42,12 +43,19 @@ import java.util.stream.Stream;
 class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
 
     private final String name;
+    protected final Class<? extends Annotation> annotationType;
 
     /**
      * @param name The qualifier name
      */
-    NameQualifier(String name) {
-        this.name = Objects.requireNonNull(name, "Argument [name] cannot be null");
+    NameQualifier(AnnotationMetadata annotationMetadata, String name) {
+        this.annotationType = annotationMetadata != null ? annotationMetadata.getAnnotationType(name).orElse(null) : null;
+        this.name = Objects.requireNonNull(annotationType == null ? name : annotationType.getSimpleName(), "Argument [name] cannot be null");
+    }
+
+    NameQualifier(Class<? extends Annotation> annotationType) {
+        this.name = Objects.requireNonNull(annotationType.getSimpleName(), "Argument [name] cannot be null");
+        this.annotationType = annotationType;
     }
 
     @Override

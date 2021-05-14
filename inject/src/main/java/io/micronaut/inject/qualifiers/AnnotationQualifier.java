@@ -37,7 +37,7 @@ class AnnotationQualifier<T> extends NameQualifier<T> {
      * @param qualifier The qualifier
      */
     AnnotationQualifier(Annotation qualifier) {
-        super(qualifier.annotationType().getSimpleName());
+        super(qualifier.annotationType());
         this.qualifier = qualifier;
     }
 

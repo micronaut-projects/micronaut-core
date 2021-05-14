@@ -17,7 +17,7 @@ package io.micronaut.inject.annotation
 
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-
+import io.micronaut.core.annotation.AnnotationUtil
 import jakarta.inject.Named
 import javax.validation.constraints.Size
 
@@ -40,8 +40,8 @@ class Test {
         expect:
         metadata != null
         !metadata.empty
-        metadata.hasDeclaredAnnotation(Named)
-        metadata.getValue(Named).get() == "foo"
+        metadata.hasDeclaredAnnotation(AnnotationUtil.NAMED)
+        metadata.getValue(AnnotationUtil.NAMED).get() == "foo"
     }
 
     void "test basic annotation on a byte[] in executable method"() {
@@ -90,9 +90,9 @@ interface TestApi {
         expect:
         metadata != null
         !metadata.empty
-        !metadata.hasDeclaredAnnotation(Named)
-        metadata.hasAnnotation(Named)
-        metadata.getValue(Named).get() == "foo"
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.NAMED)
+        metadata.hasAnnotation(AnnotationUtil.NAMED)
+        metadata.getValue(AnnotationUtil.NAMED).get() == "foo"
     }
 
 }
