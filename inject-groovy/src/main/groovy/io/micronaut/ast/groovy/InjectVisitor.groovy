@@ -704,6 +704,12 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 )
                 return
             }
+            MethodElement constructor = producedClassElement.getPrimaryConstructor().orElse(null)
+            if (!producedClassElement.isInterface() && constructor != null && constructor.getParameters().length > 0) {
+                final ASTNode nativeElement = (ASTNode) constructor.getNativeType()
+                addError("The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor", nativeElement);
+                return;
+            }
 
             AnnotationValue<?>[] interceptorTypeReferences = InterceptedMethodUtil
                     .resolveInterceptorBinding(methodAnnotationMetadata, InterceptorKind.AROUND)

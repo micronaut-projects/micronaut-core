@@ -1339,13 +1339,20 @@ public class DefaultBeanContext implements BeanContext {
     public @NonNull
     <T> T getProxyTargetBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        Qualifier<T> proxyQualifier = qualifier != null ? Qualifiers.byQualifiers(qualifier, PROXY_TARGET_QUALIFIER) : PROXY_TARGET_QUALIFIER;
+        return getProxyTargetBean(Argument.of(beanType), qualifier);
+    }
+
+    @NonNull
+    @Override
+    public <T> T getProxyTargetBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, qualifier);
+        @SuppressWarnings("unchecked")
+        Qualifier<T> proxyQualifier = qualifier != null ? Qualifiers.byQualifiers(qualifier, PROXY_TARGET_QUALIFIER) : PROXY_TARGET_QUALIFIER;
         try (BeanResolutionContext resolutionContext = newResolutionContext(definition, null)) {
 
             return getBeanForDefinition(
                     resolutionContext,
-                    Argument.of(beanType),
+                    beanType,
                     proxyQualifier,
                     true,
                     definition
@@ -1371,6 +1378,14 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
+    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Argument<T> beanType, Qualifier<T> qualifier, String method, Class... arguments) {
+        ArgumentUtils.requireNonNull("beanType", beanType);
+        ArgumentUtils.requireNonNull("method", method);
+        BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, qualifier);
+        return definition.findMethod(method, arguments);
+    }
+
+    @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public @NonNull
     <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
@@ -1383,6 +1398,7 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(Argument<T> beanType, Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
+        @SuppressWarnings("unchecked")
         Qualifier<T> proxyQualifier = qualifier != null ? Qualifiers.byQualifiers(qualifier, PROXY_TARGET_QUALIFIER) : PROXY_TARGET_QUALIFIER;
         BeanKey<T> key = new BeanKey<>(beanType, proxyQualifier);
 
