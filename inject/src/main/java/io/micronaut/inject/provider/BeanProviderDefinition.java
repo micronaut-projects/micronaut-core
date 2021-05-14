@@ -69,8 +69,7 @@ final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvid
             @Override
             public boolean isUnique() {
                 try {
-                    context.getBeanDefinition(argument, finalQualifier);
-                    return true;
+                    return context.getBeanDefinitions(argument, finalQualifier).size() == 1;
                 } catch (NoSuchBeanException e) {
                     return false;
                 }

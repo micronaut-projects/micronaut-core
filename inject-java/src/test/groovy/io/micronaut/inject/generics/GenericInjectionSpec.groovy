@@ -1,6 +1,7 @@
 package io.micronaut.inject.generics
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.type.Argument
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -15,7 +16,9 @@ class GenericInjectionSpec extends Specification {
         when:
         def beanType = Argument.of(Engine, V8)
         def bean = context.getBean(Vehicle)
-
+        def nonExistent = Argument.of(Engine, V10)
+        def present = Argument.of(Shop, Book)
+        def notPresent = Argument.of(Shop, String)
 
         then:
         bean.start() == 'Starting V8'
@@ -23,10 +26,21 @@ class GenericInjectionSpec extends Specification {
         bean.v6Engines.first().start() == 'Starting V6'
         bean.anotherV8.start() == 'Starting V8'
         bean.anotherV8.is(bean.engine)
+        context.findBeanDefinition(present).isPresent()
+        !context.findBeanDefinition(notPresent).isPresent()
+        !context.findBeanDefinition(nonExistent).isPresent()
+        !context.findBean(nonExistent).isPresent()
+        context.getBeansOfType(nonExistent).size() == 0
         context.getBeanDefinition(beanType)
         context.containsBean(beanType)
         context.streamOfType(beanType).collect(Collectors.toList()).size() == 1
         context.getBeansOfType(beanType).size() == 1
+
+        when:
+        context.getBean(nonExistent)
+
+        then:
+        thrown(NoSuchBeanException)
 
         when:
         context.destroyBean(beanType)

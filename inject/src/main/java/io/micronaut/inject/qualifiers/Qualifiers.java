@@ -20,10 +20,15 @@ import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 
 import javax.inject.Named;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -48,6 +53,36 @@ public class Qualifiers {
     @SuppressWarnings("unchecked")
     public static <T> Qualifier<T> any() {
         return AnyQualifier.INSTANCE;
+    }
+
+    /**
+     * Build a qualifier for the given argument.
+     * @param argument The argument
+     * @param <T> The type
+     * @return The resolved qualifier
+     */
+    @SuppressWarnings("unchecked")
+    public static @Nullable <T> Qualifier<T> forArgument(@NonNull Argument<?> argument) {
+        AnnotationMetadata annotationMetadata = Objects.requireNonNull(argument, "Argument cannot be null").getAnnotationMetadata();
+        boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
+
+        List<Class<? extends Annotation>> qualifierTypes = hasMetadata ? annotationMetadata.getAnnotationTypesByStereotype(javax.inject.Qualifier.class) : null;
+        if (CollectionUtils.isNotEmpty(qualifierTypes)) {
+            if (qualifierTypes.size() == 1) {
+                return Qualifiers.byAnnotation(
+                        annotationMetadata,
+                        qualifierTypes.iterator().next()
+                );
+            } else {
+                final Qualifier[] qualifiers = qualifierTypes
+                        .stream().map((type) -> Qualifiers.byAnnotation(annotationMetadata, type))
+                        .toArray(Qualifier[]::new);
+                return Qualifiers.<T>byQualifiers(
+                        qualifiers
+                );
+            }
+        }
+        return null;
     }
 
     /**
@@ -172,18 +207,6 @@ public class Qualifiers {
      */
     public static <T> Qualifier<T> byTypeArguments(Class... typeArguments) {
         return new TypeArgumentQualifier<>(typeArguments);
-    }
-
-    /**
-     * Build a qualifier for the given generic type arguments.
-     *
-     * @param typeArguments The generic type arguments
-     * @param <T>           The component type
-     * @return The qualifier
-     * @since 3.0.0
-     */
-    public static <T> Qualifier<T> byGenerics(Class<?>... typeArguments) {
-        return new GenericTypeArgumentQualifier<>(typeArguments);
     }
 
     /**
