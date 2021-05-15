@@ -31,9 +31,18 @@ public final class ProviderTypeInformationProvider implements TypeInformationPro
     public boolean isWrapperType(Class<?> type) {
         if (BeanProvider.class == type || Provider.class == type) {
             return true;
-        } else if (JakartaProviderBeanDefinitionReference.isTypePresent()) {
+        } else if (isTypePresent()) {
             return jakarta.inject.Provider.class == type;
         }
         return false;
+    }
+
+    private static boolean isTypePresent() {
+        try {
+            return jakarta.inject.Provider.class.isInterface();
+        } catch (Throwable e) {
+            // class not present
+            return false;
+        }
     }
 }

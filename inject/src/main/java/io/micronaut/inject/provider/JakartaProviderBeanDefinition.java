@@ -30,16 +30,21 @@ import jakarta.inject.Provider;
  * @since 3.0.0
  */
 @Internal
-final class JakartaProviderBeanDefinition extends AbstractProviderDefinition<Provider<Object>> {
+public final class JakartaProviderBeanDefinition extends AbstractProviderDefinition<Provider<Object>> {
     @Override
     public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
-        return JakartaProviderBeanDefinitionReference.isTypePresent();
+        return isTypePresent();
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     @Override
     public Class<Provider<Object>> getBeanType() {
         return (Class) Provider.class;
+    }
+
+    @Override
+    public boolean isPresent() {
+        return isTypePresent();
     }
 
     @Override
@@ -58,6 +63,15 @@ final class JakartaProviderBeanDefinition extends AbstractProviderDefinition<Pro
             };
         } else {
             return () -> ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
+        }
+    }
+
+    static boolean isTypePresent() {
+        try {
+            return Provider.class.isInterface();
+        } catch (Throwable e) {
+            // class not present
+            return false;
         }
     }
 }
