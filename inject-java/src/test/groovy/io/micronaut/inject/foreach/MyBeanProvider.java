@@ -16,6 +16,7 @@
 package io.micronaut.inject.foreach;
 
 import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.Parameter;
 
 import jakarta.inject.Provider;
 
@@ -24,7 +25,7 @@ public class MyBeanProvider {
 
     final Provider<MyConfiguration> configuration;
 
-    MyBeanProvider(Provider<MyConfiguration> configuration) {
+    MyBeanProvider(@Parameter Provider<MyConfiguration> configuration) {
         this.configuration = configuration;
     }
 

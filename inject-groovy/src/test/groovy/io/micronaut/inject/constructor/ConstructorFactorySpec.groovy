@@ -66,7 +66,7 @@ class ConstructorFactorySpec extends Specification {
     static class AImpl implements A {
         final C c
         final C c2
-        @Inject protected D d
+        protected D d
 
         AImpl(C c, C c2) {
             this.c = c

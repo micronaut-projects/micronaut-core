@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Provided;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -79,6 +80,37 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
                 return false;
             }
         }
+    }
+
+    @Override
+    default boolean isCandidateBean(@Nullable Argument<?> beanType) {
+        if (BeanType.super.isCandidateBean(beanType)) {
+            if (hasStereotype(Any.class)) {
+                return true;
+            }
+            final Argument<?>[] typeArguments = beanType.getTypeParameters();
+            final int len = typeArguments.length;
+            if (len == 0) {
+                return true;
+            } else {
+                final Class<?>[] beanTypeParameters = getTypeParameters(beanType.getType());
+                if (len != beanTypeParameters.length) {
+                    return false;
+                }
+
+                for (int i = 0; i < beanTypeParameters.length; i++) {
+                    Class<?> candidateParameter = beanTypeParameters[i];
+                    final Argument<?> requestedParameter = typeArguments[i];
+
+                    if (!requestedParameter.isAssignableFrom(candidateParameter)) {
+                        return false;
+                    }
+
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

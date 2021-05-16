@@ -153,6 +153,9 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
 
     @Override
     public Argument[] getTypeParameters() {
+        if (typeParameterArray == null) {
+            return Argument.ZERO_ARGUMENTS;
+        }
         return typeParameterArray;
     }
 

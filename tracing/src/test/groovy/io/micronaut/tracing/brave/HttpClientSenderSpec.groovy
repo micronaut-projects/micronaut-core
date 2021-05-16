@@ -33,6 +33,7 @@ import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import zipkin2.Span
+import zipkin2.reporter.Sender
 
 /**
  * @author graemerocher
@@ -51,10 +52,11 @@ class HttpClientSenderSpec extends Specification {
         )
 
         when:
-        HttpClientSender httpClientSender = context.getBean(HttpClientSender)
+        Sender httpClientSender = context.getBean(Sender)
 
         then:
         httpClientSender != null
+        httpClientSender instanceof HttpClientSender
 
         cleanup:
         httpClientSender.close()
