@@ -33,7 +33,7 @@ import java.util.stream.Stream;
  * @since 3.0.0
  */
 @Internal
-final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvider<Object>> {
+public final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvider<Object>> {
     @Override
     public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
         return true;
@@ -43,6 +43,11 @@ final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvid
     @Override
     public Class<BeanProvider<Object>> getBeanType() {
         return (Class) BeanProvider.class;
+    }
+
+    @Override
+    public boolean isPresent() {
+        return true;
     }
 
     @Override

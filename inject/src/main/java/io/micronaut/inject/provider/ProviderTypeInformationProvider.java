@@ -26,6 +26,7 @@ import jakarta.inject.Provider;
  * @since 3.0.0
  */
 public final class ProviderTypeInformationProvider implements TypeInformationProvider {
+
     @Override
     public boolean isWrapperType(Class<?> type) {
         return BeanProvider.class == type ||
