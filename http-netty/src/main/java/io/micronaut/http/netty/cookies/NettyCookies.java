@@ -17,12 +17,15 @@ package io.micronaut.http.netty.cookies;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
+import org.slf4j.Logger;
 
 import java.util.*;
 
@@ -33,6 +36,8 @@ import java.util.*;
  * @since 1.0
  */
 public class NettyCookies implements Cookies {
+
+    private static final Logger LOG = ClassUtils.getLogger(NettyCookies.class);
 
     private final ConversionService<?> conversionService;
     private final Map<CharSequence, Cookie> cookies;
@@ -77,6 +82,10 @@ public class NettyCookies implements Cookies {
                     io.netty.handler.codec.http.cookie.Cookie nettyCookie = ClientCookieDecoder.STRICT.decode(value);
                     if (nettyCookie != null) {
                         cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
+                    } else {
+                        if (LOG.isTraceEnabled()) {
+                            LOG.trace("Failed to decode cookie value [{}]", value);
+                        }
                     }
                 }
             } else {
