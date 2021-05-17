@@ -130,7 +130,7 @@ class DefaultEnvironmentSpec extends Specification {
 
         then: "should throw exception"
         def e = thrown(ConfigurationException)
-        e.message == "Unsupported properties file: ${unsupportedFile.absolutePath} " +
+        e.message == "Unsupported properties file: ${unsupportedFile.name} " +
                 "Extension ${NameUtils.extension(unsupportedFile.absolutePath)} is not supported for properties file"
 
         when: "file from system property source loader does not override the key"
@@ -198,7 +198,7 @@ class DefaultEnvironmentSpec extends Specification {
 
         then: "should throw exception"
         def e = thrown(ConfigurationException)
-        e.message == "Unsupported properties file: ${unsupportedFile.absolutePath} " +
+        e.message == "Unsupported properties file: ${unsupportedFile.name} " +
                 "Extension ${NameUtils.extension(unsupportedFile.absolutePath)} is not supported for properties file"
 
         when: "file from system property source loader does not override the key"
