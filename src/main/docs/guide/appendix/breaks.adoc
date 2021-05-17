@@ -101,3 +101,7 @@ public class AProvider implements Provider<A> {
 }
 ----
 
+==== New package for Micronaut Cassandra
+
+The classes in Micronaut Cassandra have been moved from `io.micronaut.configuration.cassandra` to `io.micronaut.cassandra` package.
+
