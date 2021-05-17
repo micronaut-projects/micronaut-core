@@ -17,7 +17,6 @@ package io.micronaut.http.netty.cookies;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -25,6 +24,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -36,7 +36,7 @@ import java.util.*;
  */
 public class NettyCookies implements Cookies {
 
-    private static final Logger LOG = ClassUtils.getLogger(NettyCookies.class);
+    private static final Logger LOG = LoggerFactory.getLogger(NettyCookies.class);
 
     private final ConversionService<?> conversionService;
     private final Map<CharSequence, Cookie> cookies;
