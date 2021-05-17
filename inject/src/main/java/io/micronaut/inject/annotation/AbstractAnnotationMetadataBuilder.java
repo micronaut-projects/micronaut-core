@@ -897,6 +897,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private void processAnnotationDefaults(T originatingElement, DefaultAnnotationMetadata metadata, String annotationName, Map<? extends T, ?> elementDefaultValues) {
+        final Map<String, Object> annotationDefaults = getAnnotationDefaults(originatingElement, metadata, annotationName, elementDefaultValues);
+        if (annotationDefaults != null) {
+            DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults);
+        } else {
+            metadata.addDefaultAnnotationValues(annotationName, Collections.emptyMap());
+        }
+    }
+
+    private Map<String, Object> getAnnotationDefaults(T originatingElement, DefaultAnnotationMetadata metadata, String annotationName, Map<? extends T, ?> elementDefaultValues) {
         if (elementDefaultValues != null) {
             Map<CharSequence, Object> defaultValues = new LinkedHashMap<>();
             for (Map.Entry<? extends T, ?> entry : elementDefaultValues.entrySet()) {
@@ -912,9 +921,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             for (Map.Entry<CharSequence, Object> entry : defaultValues.entrySet()) {
                 annotationDefaults.put(entry.getKey().toString(), entry.getValue());
             }
-            DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults);
+            return annotationDefaults;
         } else {
-            metadata.addDefaultAnnotationValues(annotationName, Collections.emptyMap());
+            return null;
         }
     }
 
@@ -948,7 +957,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 Object v = readAnnotationValue(originatingElement, member, aliasedMemberName, annotationValue);
 
                 if (v != null) {
-                    for (String aliasedAnnotationName: remapAnnotation(aliasedAnnotation)) {
+                    final List<AnnotationValue<?>> remappedValues = remapAnnotation(aliasedAnnotation);
+                    for (AnnotationValue<?> remappedAnnotation: remappedValues) {
+                        String aliasedAnnotationName = remappedAnnotation.getAnnotationName();
                         Optional<T> annotationMirror = getAnnotationMirror(aliasedAnnotationName);
                         RetentionPolicy retentionPolicy = RetentionPolicy.RUNTIME;
                         String repeatableName = null;
@@ -997,13 +1008,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             }
                         }
 
-                        annotationMirror.ifPresent(annMirror -> processAnnotationStereotype(
-                                Collections.singletonList(aliasedAnnotationName),
-                                annMirror,
-                                aliasedAnnotationName,
-                                metadata,
-                                isDeclared
-                        ));
+                        if (annotationMirror.isPresent()) {
+                            processAnnotationStereotype(
+                                    Collections.singletonList(aliasedAnnotationName),
+                                    annotationMirror.get(),
+                                    aliasedAnnotationName,
+                                    metadata,
+                                    isDeclared);
+                        } else {
+                            processAnnotationStereotype(
+                                    Collections.singletonList(aliasedAnnotationName),
+                                    remappedAnnotation,
+                                    metadata,
+                                    isDeclared);
+                        }
                     }
                 }
             }
@@ -1545,12 +1563,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
-    private List<String> remapAnnotation(String annotationName) {
+    private List<AnnotationValue<?>> remapAnnotation(String annotationName) {
         String packageName = NameUtils.getPackageName(annotationName);
         List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
-        List<String> mappedAnnotations = new ArrayList<>();
+        List<AnnotationValue<?>> mappedAnnotations = new ArrayList<>();
         if (annotationRemappers == null || annotationRemappers.isEmpty()) {
-            mappedAnnotations.add(annotationName);
+            mappedAnnotations.add(AnnotationValue.builder(annotationName).build());
             return mappedAnnotations;
         }
 
@@ -1565,7 +1583,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         // bail, the re-mapper just returned the same annotation
                         break;
                     } else {
-                        mappedAnnotations.add(annotationValue.getAnnotationName());
+                        mappedAnnotations.add(annotationValue);
                     }
                 }
             }

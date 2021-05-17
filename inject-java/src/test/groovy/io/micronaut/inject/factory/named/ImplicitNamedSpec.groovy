@@ -10,7 +10,7 @@ class ImplicitNamedSpec extends AbstractTypeElementSpec {
 package implicitnamed;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Factory
 class TestFactory {

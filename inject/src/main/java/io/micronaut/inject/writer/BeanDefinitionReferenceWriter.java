@@ -224,9 +224,9 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         writeGetAnnotationMetadataMethod(classWriter);
         writeBooleanMethod(classWriter, "isSingleton", () ->
                 annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SINGLETON) ||
-                        annotationMetadata.stringValue(DefaultScope.class)
+                        (!annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SCOPE) && annotationMetadata.stringValue(DefaultScope.class)
                                 .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
-                                .orElse(false));
+                                .orElse(false)));
         writeBooleanMethod(classWriter, "isConfigurationProperties", () ->
                 annotationMetadata.hasDeclaredStereotype(ConfigurationReader.class));
 

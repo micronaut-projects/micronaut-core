@@ -40,8 +40,8 @@ public class InjectVisitor implements TypeElementVisitor<Object, Object> {
     }
 
     @Override
-    public Set<String> getSupportedAnnotationNames() {
-        return CollectionUtils.setOf(AnnotationUtil.INJECT, Inject.class.getName());
+    public String getElementType() {
+        return AnnotationUtil.INJECT;
     }
 
     @Override

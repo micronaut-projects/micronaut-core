@@ -16,6 +16,7 @@
 package io.micronaut.inject.aliasfor
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 
 import jakarta.inject.Named
@@ -45,8 +46,8 @@ class AliasForQualifierTest {
 ''')
         expect:
         definition != null
-        definition.getAnnotationTypeByStereotype(Qualifier).isPresent()
-        definition.getAnnotationTypeByStereotype(Qualifier).get() == Named
-        definition.getValue(Named, String).get() == 'foo'
+        definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).isPresent()
+        definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == AnnotationUtil.NAMED
+        definition.getValue(AnnotationUtil.NAMED, String).get() == 'foo'
     }
 }

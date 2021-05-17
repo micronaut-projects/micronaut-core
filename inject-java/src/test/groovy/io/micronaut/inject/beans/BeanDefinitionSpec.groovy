@@ -186,7 +186,7 @@ class Test {
 ''')
         expect:
         definition.getDeclaredQualifier() == Qualifiers.byAnnotation(definition.getAnnotationMetadata(), "test.MyQualifier")
-        definition.getAnnotationNameByStereotype(Qualifier).get() == "test.MyQualifier"
+        definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == "test.MyQualifier"
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5001")

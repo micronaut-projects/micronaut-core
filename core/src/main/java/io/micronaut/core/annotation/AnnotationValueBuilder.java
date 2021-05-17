@@ -21,6 +21,7 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,9 +35,10 @@ import java.util.Map;
 public class AnnotationValueBuilder<T extends Annotation> {
 
     private final String annotationName;
-    private final Map<CharSequence, Object> values = new HashMap<>(5);
+    private final Map<CharSequence, Object> values = new LinkedHashMap<>(5);
     private final RetentionPolicy retentionPolicy;
     private final List<AnnotationValue<?>> stereotypes = new ArrayList<>();
+    private final Map<String, Object> defaultValues = new LinkedHashMap<>();
 
     /**
      * Default constructor.
@@ -90,7 +92,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      */
     @NonNull
     public AnnotationValue<T> build() {
-        return new AnnotationValue<>(annotationName, values, retentionPolicy, stereotypes);
+        return new AnnotationValue<>(annotationName, values, defaultValues, retentionPolicy, stereotypes);
     }
 
     @NonNull
@@ -100,6 +102,15 @@ public class AnnotationValueBuilder<T extends Annotation> {
         }
         return this;
     }
+
+    @NonNull
+    public AnnotationValueBuilder<T> defaultValues(Map<String, Object> defaultValues) {
+        if (defaultValues != null) {
+            this.defaultValues.putAll(defaultValues);
+        }
+        return this;
+    }
+
 
     /**
      * Sets the value member to the given integer value.

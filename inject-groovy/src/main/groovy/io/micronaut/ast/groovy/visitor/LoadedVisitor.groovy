@@ -55,6 +55,8 @@ class LoadedVisitor implements Ordered {
     private ClassElement currentClassElement
     private final CompilationUnit compilationUnit
 
+    private static final String OBJECT_CLASS = Object.class.getName()
+
     LoadedVisitor(SourceUnit source, CompilationUnit compilationUnit, TypeElementVisitor visitor) {
         this.compilationUnit = compilationUnit
         this.sourceUnit = source
@@ -65,8 +67,18 @@ class LoadedVisitor implements Ordered {
         }
         GenericsType[] generics = definition.getGenericsTypes()
         if (generics) {
-            classAnnotation = generics[0].type.name
-            elementAnnotation = generics[1].type.name
+            String typeName = generics[0].type.name
+            if (typeName == OBJECT_CLASS) {
+                classAnnotation = visitor.getClassType()
+            } else {
+                classAnnotation = typeName
+            }
+            String elementName = generics[1].type.name
+            if (elementName == OBJECT_CLASS) {
+                elementAnnotation = visitor.getElementType()
+            } else {
+                elementAnnotation = elementName
+            }
         } else {
             classAnnotation = ClassHelper.OBJECT
             elementAnnotation = ClassHelper.OBJECT

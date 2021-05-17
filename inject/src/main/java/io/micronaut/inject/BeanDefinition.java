@@ -73,7 +73,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             return true;
         } else {
             Optional<String> scopeValue = am.stringValue(DefaultScope.class);
-            if (scopeValue.isPresent()) {
+            if (!am.hasDeclaredStereotype(AnnotationUtil.SCOPE) && scopeValue.isPresent()) {
                 String scope = scopeValue.get();
                 return scope.equals(AnnotationUtil.SINGLETON) || scope.equals(Singleton.class.getName());
             } else {

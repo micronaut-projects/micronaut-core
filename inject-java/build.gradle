@@ -5,7 +5,6 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    compileOnly "jakarta.inject:jakarta.inject-api:2.0.0"
     compileOnly dependencyVersion("validation")
 
     testImplementation project(':aop')

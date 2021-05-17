@@ -328,7 +328,7 @@ class Test {
 
     void  "test method adapter argument order"() {
         when:"An adapter method is parsed"
-        BeanDefinition definition = buildBeanDefinition('org.atinject.javaxtck.auto.events.EventListener$EventHandlerMultipleArguments$onEvent1$Intercepted','''\
+        BeanDefinition definition = buildBeanDefinition('org.atinject.jakartatck.auto.events.EventListener$EventHandlerMultipleArguments$onEvent1$Intercepted','''\
 package org.atinject.jakartatck.auto.events;
 
 @jakarta.inject.Singleton
