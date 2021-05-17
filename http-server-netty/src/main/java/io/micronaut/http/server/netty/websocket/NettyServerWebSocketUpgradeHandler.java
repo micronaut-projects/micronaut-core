@@ -50,6 +50,7 @@ import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.AsciiString;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
@@ -77,6 +78,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     public static final String SCHEME_SECURE_WEBSOCKET = "wss://";
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyServerWebSocketUpgradeHandler.class);
+    private static final AsciiString WEB_SOCKET_HEADER_VALUE = AsciiString.cached("websocket");
 
     private final Router router;
     private final RequestBinderRegistry binderRegistry;
@@ -115,9 +117,11 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     public boolean acceptInboundMessage(Object msg) {
         if (msg instanceof NettyHttpRequest) {
             NettyHttpRequest<?> request = (NettyHttpRequest) msg;
-            return request.getNativeRequest().headers().contains(HttpHeaderNames.CONNECTION.toString(), HttpHeaderValues.UPGRADE, true);
+            if (request.getNativeRequest().headers().contains(HttpHeaderNames.CONNECTION.toString(), HttpHeaderValues.UPGRADE, true)) {
+                return request.getNativeRequest().headers().containsValue(HttpHeaderNames.UPGRADE, WEB_SOCKET_HEADER_VALUE, true);
+            }
         }
-        return false;
+    return false;
     }
 
     @Override
