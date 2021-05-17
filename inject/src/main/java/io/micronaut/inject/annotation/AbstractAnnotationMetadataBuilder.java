@@ -1455,7 +1455,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     @Internal
     public static boolean isAnnotationMapped(@Nullable String annotationName) {
-        return annotationName != null && ANNOTATION_MAPPERS.containsKey(annotationName);
+        return annotationName != null &&
+                (ANNOTATION_MAPPERS.containsKey(annotationName) ||
+                        ANNOTATION_TRANSFORMERS.containsKey(annotationName) ||
+                        ANNOTATION_TRANSFORMERS.keySet().stream().anyMatch(pkg -> annotationName.startsWith(pkg)));
     }
 
     /**
@@ -1463,7 +1466,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     @Internal
     public static Set<String> getMappedAnnotationNames() {
-        return ANNOTATION_MAPPERS.keySet();
+        final HashSet<String> all = new HashSet<>(ANNOTATION_MAPPERS.keySet());
+        all.addAll(ANNOTATION_TRANSFORMERS.keySet());
+        return all;
+    }
+
+    /**
+     * @return Additional mapped annotation names
+     */
+    @Internal
+    public static Set<String> getMappedAnnotationPackages() {
+        return ANNOTATION_REMAPPERS.keySet();
     }
 
     /**
