@@ -479,11 +479,7 @@ class Test {
                     newList.addAll(localTransfomers)
                     return newList
                 } else {
-                    if (localTransfomers) {
-                        return loadedTransformers
-                    } else {
-                        return Collections.emptyList()
-                    }
+                    return loadedTransformers
                 }
             }
         }
