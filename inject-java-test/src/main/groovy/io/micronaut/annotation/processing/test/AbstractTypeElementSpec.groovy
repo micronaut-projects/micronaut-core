@@ -39,6 +39,7 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
+import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -356,6 +357,15 @@ class Test {
     }
 
     /**
+     * Retrieve additional annotation transformers  to apply
+     * @param annotationName The annotation name
+     * @return The transformers for the annotation
+     */
+    protected List<AnnotationTransformer<? extends Annotation>> getLocalAnnotationTransformers(@NonNull String annotationName) {
+        return Collections.emptyList()
+    }
+
+    /**
      * Builds the bean definition reference for an AOP proxy bean.
      * @param className The class name
      * @param cls The class source
@@ -451,6 +461,26 @@ class Test {
                 } else {
                     if (localMappers) {
                         return loadedMappers
+                    } else {
+                        return Collections.emptyList()
+                    }
+                }
+            }
+
+            @Override
+            protected List<AnnotationTransformer<Annotation>> getAnnotationTransformers(@NonNull String annotationName) {
+                def loadedTransformers = super.getAnnotationTransformers(annotationName)
+                def localTransfomers = getLocalAnnotationTransformers(annotationName)
+                if (localTransfomers) {
+                    def newList = []
+                    if (loadedTransformers) {
+                        newList.addAll(loadedTransformers)
+                    }
+                    newList.addAll(localTransfomers)
+                    return newList
+                } else {
+                    if (localTransfomers) {
+                        return loadedTransformers
                     } else {
                         return Collections.emptyList()
                     }
