@@ -1394,9 +1394,23 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     final List<AnnotationValue<?>> transformedValues = annotationTransformer.transform(av, visitorContext);
                     for (AnnotationValue<?> transformedValue : transformedValues) {
                         final String transformedAnnotationName = transformedValue.getAnnotationName();
-                        final String transformedRepeatableName = getAnnotationMirror(transformedAnnotationName)
-                                                                        .map(this::getRepeatableNameForType)
-                                                                        .orElse(null);
+                        final String transformedRepeatableName;
+
+                        if (isPotentionalRepeatable(transformedAnnotationName)) {
+                            String resolvedName = null;
+                            // wrap with exception handling just in case there is any problems loading the type
+                            try {
+                                resolvedName = getAnnotationMirror(transformedAnnotationName)
+                                        .map(this::getRepeatableNameForType)
+                                        .orElse(null);
+                            } catch (Exception e) {
+                                // ignore
+                            }
+                            transformedRepeatableName = resolvedName;
+                        } else {
+                            transformedRepeatableName = null;
+                        }
+
                         if (transformedRepeatableName != null) {
                             addRepeatableAnnotation.accept(transformedRepeatableName, transformedValue);
                         } else {
@@ -1409,6 +1423,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
         }
+    }
+
+    private boolean isPotentionalRepeatable(String transformedAnnotationName) {
+        return !AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(transformedAnnotationName) &&
+                !AnnotationUtil.NULLABLE.equals(transformedAnnotationName) &&
+                !AnnotationUtil.NON_NULL.equals(transformedAnnotationName);
     }
 
     private void addTransformedStereotypes(DefaultAnnotationMetadata annotationMetadata, boolean isDeclared, String transformedAnnotationName) {
