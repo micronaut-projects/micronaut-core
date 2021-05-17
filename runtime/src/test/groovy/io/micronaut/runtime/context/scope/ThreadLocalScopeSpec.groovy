@@ -17,6 +17,7 @@ package io.micronaut.runtime.context.scope
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Factory
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.support.AbstractBeanDefinitionSpec
 import jakarta.inject.Scope
@@ -48,7 +49,7 @@ class ThreadLocalBean {
 ''')
 
         then:
-        beanDefinition.getAnnotationNameByStereotype(Scope).get() == ThreadLocal.name
+        beanDefinition.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).get() == ThreadLocal.name
 
     }
 
@@ -58,8 +59,8 @@ class ThreadLocalBean {
         BeanDefinition aDefinition = applicationContext.getBeanDefinition(A)
 
         expect:
-        aDefinition.getAnnotationNameByStereotype(Scope).isPresent()
-        aDefinition.getAnnotationNameByStereotype(Scope).get() == ThreadLocal.name
+        aDefinition.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).isPresent()
+        aDefinition.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).get() == ThreadLocal.name
 
     }
 

@@ -13,7 +13,6 @@ dependencies {
     api project(':http-client')
     api project(':runtime')
 
-    testCompileOnly group: 'javax.inject', name: 'javax.inject', version: '1'
     testImplementation "org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion"
     testImplementation "org.jetbrains.kotlin:kotlin-test:$kotlinVersion"
     testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-rx2:$kotlinCoroutinesVersion"
@@ -45,6 +44,8 @@ dependencies {
     testImplementation project(':tracing')
     kaptTest project(':inject-java')
     kaptTest project(':validation')
+    testImplementation('javax.inject:javax.inject:1')
+
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junitVersion"
     testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.920'
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {

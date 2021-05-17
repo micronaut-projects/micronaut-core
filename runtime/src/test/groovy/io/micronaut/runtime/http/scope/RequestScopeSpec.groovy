@@ -17,6 +17,7 @@ package io.micronaut.runtime.http.scope
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.support.AbstractBeanDefinitionSpec
 import jakarta.inject.Scope
@@ -41,7 +42,7 @@ class RequestBean {
 """)
 
         then:
-        beanDefinition.getAnnotationNameByStereotype(Scope).get() == RequestScope.name
+        beanDefinition.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).get() == RequestScope.name
     }
 
     void "test bean definition data"() {
@@ -50,8 +51,8 @@ class RequestBean {
         BeanDefinition aDefinition = applicationContext.getBeanDefinition(RequestBean)
 
         expect:
-        aDefinition.getAnnotationNameByStereotype(Scope).isPresent()
-        aDefinition.getAnnotationNameByStereotype(Scope).get() == RequestScope.name
+        aDefinition.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).isPresent()
+        aDefinition.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).get() == RequestScope.name
     }
 
     @RequestScope

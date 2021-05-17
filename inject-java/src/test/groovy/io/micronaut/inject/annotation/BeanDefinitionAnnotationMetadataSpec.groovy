@@ -57,7 +57,7 @@ class Test {
         !definition.isIterable()
         definition.isPrimary()
         !definition.isProvided()
-        definition.getScope().get() == Singleton
+        definition.getScopeName().get() == AnnotationUtil.SINGLETON
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1607')

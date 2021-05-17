@@ -3990,7 +3990,12 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public Optional<Class<? extends Annotation>> getScope() {
-            return Optional.of(Singleton.class);
+            return Optional.of(javax.inject.Singleton.class);
+        }
+
+        @Override
+        public Optional<String> getScopeName() {
+            return Optional.of(AnnotationUtil.SINGLETON);
         }
 
         @NonNull

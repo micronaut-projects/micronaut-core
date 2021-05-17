@@ -68,7 +68,7 @@ public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String,
      * @return The scope for the bean
      */
     protected String getScope(BeanDefinition<?> beanDefinition) {
-        return beanDefinition.getScope().map(Class::getSimpleName).map(String::toLowerCase).orElse(null);
+        return beanDefinition.getScopeName().orElse(null);
     }
 
     /**

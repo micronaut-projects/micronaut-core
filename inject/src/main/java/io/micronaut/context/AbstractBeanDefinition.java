@@ -306,6 +306,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     @Override
+    public Optional<String> getScopeName() {
+        return getAnnotationMetadata().getDeclaredAnnotationNameByStereotype(AnnotationUtil.SCOPE);
+    }
+
+    @Override
     public final Class<T> getBeanType() {
         return type;
     }

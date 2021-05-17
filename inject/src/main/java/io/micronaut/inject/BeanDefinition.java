@@ -65,6 +65,13 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     }
 
     /**
+     * @return The name of the scope
+     */
+    default Optional<String> getScopeName() {
+        return Optional.empty();
+    }
+
+    /**
      * @return Whether the scope is singleton
      */
     default boolean isSingleton() {
