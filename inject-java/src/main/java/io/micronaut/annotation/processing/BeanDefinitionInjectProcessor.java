@@ -720,6 +720,44 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }, aopProxyWriter);
         }
 
+        private boolean elementHasValidatedTypeArguments(TypedElement element) {
+            final Map<String, ClassElement> typeArguments = element.getGenericType().getTypeArguments();
+
+            boolean validationRequired = false;
+            for (ClassElement classElement: typeArguments.values()) {
+//                if (elementHasValidatedTypeArguments(classElement)) {
+//                    classElement.annotate(ANN_VALID);
+//                    validationRequired = true;
+//                }
+                if (classElement.hasDeclaredStereotype(ANN_CONSTRAINT) ||
+                    classElement.hasDeclaredStereotype(ANN_VALID)) {
+                    validationRequired = true;
+                }
+            }
+
+            return validationRequired;
+        }
+
+        private boolean methodHasValidatedParameters(JavaMethodElement javaMethodElement) {
+            boolean validated = false;
+            final ParameterElement[] parameters = javaMethodElement.getParameters();
+            for (ParameterElement parameter: parameters) {
+                if (parameter.hasStereotype(ANN_VALID)) {
+                    validated = true;
+                    continue;
+                }
+                if (parameter.hasStereotype(ANN_CONSTRAINT)) {
+                    validated = true;
+                }
+                if (elementHasValidatedTypeArguments(parameter)) {
+                    validated = true;
+                    parameter.annotate(ANN_VALID);
+                }
+            }
+
+            return validated;
+        }
+
         @Override
         public Object visitExecutable(ExecutableElement method, Object o) {
             if (method.getKind() == ElementKind.CONSTRUCTOR) {
@@ -751,7 +789,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-
             boolean injected = methodAnnotationMetadata.hasDeclaredStereotype(Inject.class);
             boolean postConstruct = methodAnnotationMetadata.hasDeclaredStereotype(ProcessedTypes.POST_CONSTRUCT);
             boolean preDestroy = methodAnnotationMetadata.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY);
@@ -777,12 +814,32 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             (isExecutableThroughType(method.getEnclosingElement(), methodAnnotationMetadata, annotationMetadata, modifiers, isPublic) ||
                                     hasAroundStereotype(annotationMetadata));
 
+            // Check if it has Validated Parameters
             boolean hasConstraints = false;
-            if (isDeclaredBean && !methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
-                    Arrays.stream(javaMethodElement.getParameters())
-                            .anyMatch(p -> p.hasStereotype(ANN_CONSTRAINT) || p.hasStereotype(ANN_VALID))) {
+            if (isDeclaredBean && methodHasValidatedParameters(javaMethodElement)) {
                 hasConstraints = true;
                 methodAnnotationMetadata = javaMethodElement.annotate(ANN_VALIDATED);
+            }
+
+            // Check if it has Validated Return Value
+            if (isDeclaredBean) {
+                ClassElement returnType = javaMethodElement.getReturnType();
+                if (returnType.hasStereotype(ANN_VALID)) {
+                    methodAnnotationMetadata = javaMethodElement.annotate(ANN_VALID);
+                } else if (elementHasValidatedTypeArguments(returnType)) {
+                    returnType.annotate(ANN_VALID);
+                    methodAnnotationMetadata = javaMethodElement.annotate(ANN_VALID);
+                }
+
+                if (returnType.hasStereotype(ANN_CONSTRAINT)) {
+                    methodAnnotationMetadata = javaMethodElement.annotate(ANN_CONSTRAINT);
+                }
+
+                if (methodAnnotationMetadata.hasStereotype(ANN_VALID) ||
+                        methodAnnotationMetadata.hasStereotype(ANN_CONSTRAINT)) {
+                    // methodAnnotationMetadata = javaMethodElement.annotate(ANN_VALIDATED);
+                    hasConstraints = true;
+                }
             }
 
             if (isDeclaredBean && isExecutable) {

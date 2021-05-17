@@ -398,6 +398,35 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         writers.put(writer.getBeanType().getClassName(), writer);
     }
 
+    /**
+     * Recursively processes type arguments of element and returns if any of the type arguments need validation.
+     * If this element have a type argument that is annotated with constraint or @Valid, annotates all holder of this
+     * type argument with @Valid
+     *
+     * @param element - the element to recursively process type arguments for
+     * @return - weather it requires validation
+     */
+    boolean recurseProcessTypeArguments(ClassElement element) {
+        final Map<String, ClassElement> typeArguments = element.getTypeArguments();
+
+        boolean requiresValidation = false;
+        for (ClassElement typeArgument: typeArguments.values()) {
+            if (
+                    // recurseProcessTypeArguments(typeArgument) ||
+                    typeArgument.hasDeclaredStereotype(JAVAX_VALIDATION_VALID) ||
+                    typeArgument.hasDeclaredStereotype(JAVAX_VALIDATION_CONSTRAINT)
+            ) {
+                requiresValidation = true;
+            }
+        }
+
+        if (requiresValidation) {
+            element.annotate(JAVAX_VALIDATION_VALID);
+        }
+
+        return requiresValidation;
+    }
+
     private void processBeanProperties(
             BeanIntrospectionWriter writer,
             Collection<? extends PropertyElement> beanProperties,
@@ -420,6 +449,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
             if (!ignored.isEmpty() && ignored.stream().anyMatch(beanProperty::hasAnnotation)) {
                 continue;
+            }
+
+            // Process the generic parameters
+            if (recurseProcessTypeArguments(genericType)) {
+                beanProperty.annotate(JAVAX_VALIDATION_VALID);
             }
 
             writer.visitProperty(

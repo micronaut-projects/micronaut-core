@@ -5,6 +5,8 @@ import io.micronaut.aop.Around
 import io.micronaut.inject.ProxyBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
+import javax.validation.Constraint
+import javax.validation.Valid
 import java.time.LocalDate
 
 class ValidatedParseSpec extends AbstractTypeElementSpec {
@@ -55,5 +57,77 @@ interface ExchangeRates {
 
         expect:
         definition.findMethod("rate", LocalDate).get().hasStereotype(Validated)
+    }
+
+    void "test constraints on list generic parameters make method parameters @Validated"() {
+        given:
+        def definition = buildBeanDefinition('test.Test','''
+package test;
+
+import java.util.List;
+import javax.validation.constraints.NotBlank;
+
+@javax.inject.Singleton
+class Test {
+    @io.micronaut.context.annotation.Executable
+    public void setList(List<@NotBlank String> list) {
+    
+    }
+}
+''')
+        when:
+        def method = definition.findMethod("setList", List<String>);
+
+        then:
+        !method.isEmpty()
+        method.get().hasStereotype(Validated.class)
+        method.get().getArguments().size() == 1
+
+        when:
+        def argument = method.get().getArguments()[0]
+        def argumentMetadata = argument.getAnnotationMetadata()
+
+        then:
+        argumentMetadata.hasStereotype(Valid.class)
+    }
+
+    void "test constraints on list generic parameters make method value @Validated"() {
+        given:
+        def definition = buildBeanDefinition('test.Test','''
+package test;
+
+import java.util.List;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
+import io.micronaut.context.annotation.Executable;
+
+@javax.inject.Singleton
+class Test {
+
+    @Executable
+    public @Min(value=10) Integer getValue() {
+        return 1;
+    }
+    
+    @Executable
+    public List<@NotNull String> getStrings() {
+        return null;
+    }
+}
+''')
+        var method = definition.findMethod("getValue")
+
+        expect:
+        method.isPresent()
+        //method.get().hasStereotype(Validated.class)
+        method.get().hasStereotype(Constraint.class)
+
+        when:
+        var method2 = definition.findMethod("getStrings")
+
+        then:
+        method2.isPresent()
+        //method.get().hasStereotype(Validated.class)
+        method2.get().hasStereotype(Valid.class)
     }
 }

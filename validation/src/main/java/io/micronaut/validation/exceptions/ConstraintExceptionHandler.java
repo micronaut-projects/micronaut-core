@@ -86,15 +86,32 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
         Path propertyPath = violation.getPropertyPath();
         StringBuilder message = new StringBuilder();
         Iterator<Path.Node> i = propertyPath.iterator();
+        boolean firstNode = true;
+
         while (i.hasNext()) {
             Path.Node node = i.next();
             if (node.getKind() == ElementKind.METHOD || node.getKind() == ElementKind.CONSTRUCTOR) {
                 continue;
             }
-            message.append(node.getName());
-            if (i.hasNext()) {
-                message.append('.');
+
+            if (node.getKind() == ElementKind.CONTAINER_ELEMENT) {
+                if (node.isInIterable()) {
+                    message.append('[');
+                    if (node.getKey() != null) {
+                        message.append(node.getKey());
+                    } else if (node.getIndex() != null) {
+                        message.append(node.getIndex());
+                    }
+                    message.append(']');
+                }
+            } else {
+                if (!firstNode) {
+                    message.append('.');
+                }
+                message.append(node.getName());
             }
+
+            firstNode = false;
         }
         message.append(": ").append(violation.getMessage());
         return message.toString();

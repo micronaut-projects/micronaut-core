@@ -160,7 +160,9 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(ConstraintViolationException)
-        e.message == "List[0].prop: must not be null"
+        e != null
+        e.message == "List[0]<E Bar>.prop: must not be null"
+        // e.message == "List[0].prop: must not be null"
 
         cleanup:
         beanContext.close()
@@ -176,7 +178,8 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(ConstraintViolationException)
-        e.message == "Map[barObj].prop: must not be null"
+        e != null
+        e.message == "Map[barObj]<V Bar>.prop: must not be null"
 
         cleanup:
         beanContext.close()
@@ -368,7 +371,7 @@ class ValidatedSpec extends Specification {
         Map result = e.response.getBody(Argument.of(Map, String, Object)).get()
 
         then:
-        result.message == 'limit: must be greater than or equal to 1'
+        result.message.toString() == "limit: must be greater than or equal to 1"
 
         cleanup:
         server.close()

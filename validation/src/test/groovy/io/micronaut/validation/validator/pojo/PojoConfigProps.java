@@ -9,8 +9,7 @@ import java.util.List;
 @ConfigurationProperties("test.valid")
 public class PojoConfigProps {
 
-    @Valid
-    private List<Pojo> pojos;
+    private List<@Valid Pojo> pojos;
 
     public List<Pojo> getPojos() {
         return pojos;

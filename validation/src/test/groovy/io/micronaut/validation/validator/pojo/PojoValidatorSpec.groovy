@@ -17,6 +17,7 @@
 package io.micronaut.validation.validator.pojo
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
@@ -28,6 +29,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Singleton
+import javax.validation.Valid
 
 class PojoValidatorSpec extends Specification {
 
@@ -52,6 +54,29 @@ class PojoValidatorSpec extends Specification {
         constraintViolations.size() == 1
         constraintViolations.first().message == "Both name and lastName can't be null"
     }
+
+    void "test custom constraint validator on Pojo as method argument"() {
+        given:
+        SearchService service = applicationContext.getBean(SearchService)
+        var violations = validator.forExecutables().validateParameters(
+                service,
+                SearchService.getMethod("performSearch", Search),
+                [new Search()] as Object[]
+        )
+
+        expect:
+        violations.size() == 1
+        violations[0].getPropertyPath().toString() == "performSearch.search"
+        violations[0].message == "Both name and lastName can't be null"
+    }
+}
+
+@Singleton
+class SearchService {
+    @Executable
+    String performSearch(@Valid Search search) {
+        return "Not found"
+    }
 }
 
 @Introspected
@@ -64,7 +89,6 @@ class Search {
 @Factory
 @Requires(property = "spec.name", value = "customValidatorPOJO")
 class NameAndLastNameValidatorFactory {
-
     @Singleton
     ConstraintValidator<NameAndLastNameValidator, Search> nameAndLastNameValidator() {
         return { value, annotationMetadata, context ->
