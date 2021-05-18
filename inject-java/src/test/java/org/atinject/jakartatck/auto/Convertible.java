@@ -256,6 +256,7 @@ public class Convertible implements Car {
 
         @Test
         public void testQualifiersNotInheritedFromOverriddenMethod() {
+            assertTrue(engine.overriddenMethodInjected);
             assertFalse(engine.qualifiersInheritedFromOverriddenMethod);
         }
 

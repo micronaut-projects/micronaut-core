@@ -41,6 +41,7 @@ class V8Engine extends GasEngine {
     @Override
     void injectQualifiers(Seat seatA, @Drivers Seat seatB,
                           Tire tireA, @Named("spare") Tire tireB) {
+        overriddenMethodInjected = true
         if ((seatA instanceof DriversSeat)
                 || !(seatB instanceof DriversSeat)
                 || (tireA instanceof SpareTire)

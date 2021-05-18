@@ -38,6 +38,7 @@ abstract class Engine {
 
     var overriddenPackagePrivateMethodInjectedTwice: Boolean = false
     var qualifiersInheritedFromOverriddenMethod: Boolean = false
+    var overriddenMethodInjected: Boolean = false
 
     @Inject internal open fun injectPackagePrivateMethod() {
         superPackagePrivateMethodInjected = true
@@ -50,6 +51,7 @@ abstract class Engine {
     @Inject
     open fun injectQualifiers(@Drivers seatA: Seat, seatB: Seat,
                               @Named("spare") tireA: Tire, tireB: Tire) {
+        overriddenMethodInjected = true
         if (seatA !is DriversSeat
                 || seatB is DriversSeat
                 || tireA !is SpareTire

@@ -37,6 +37,7 @@ class V8Engine : GasEngine() {
      */
     override fun injectQualifiers(seatA: Seat, @Drivers seatB: Seat,
                                   tireA: Tire, @Named("spare") tireB: Tire) {
+        overriddenMethodInjected = true
         if (seatA is DriversSeat
                 || seatB !is DriversSeat
                 || tireA is SpareTire

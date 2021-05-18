@@ -15,11 +15,11 @@
  */
 package io.micronaut.inject.inheritance
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import spock.lang.Specification
 
-class AbstractInheritanceSpec extends Specification {
+class AbstractInheritanceSpec extends AbstractTypeElementSpec {
 
     void "test values are injected for abstract parent class"() {
         given:

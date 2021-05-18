@@ -189,6 +189,7 @@ open class Convertible : Car {
         // injected values
 
         fun testQualifiersNotInheritedFromOverriddenMethod() {
+            TestCase.assertTrue(engine!!.overriddenMethodInjected)
             TestCase.assertFalse(engine!!.qualifiersInheritedFromOverriddenMethod)
         }
 

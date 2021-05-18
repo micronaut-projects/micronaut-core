@@ -253,6 +253,7 @@ class Convertible implements Car {
 
         void testQualifiersNotInheritedFromOverriddenMethod() {
             expect:
+            engine.overriddenMethodInjected
             !engine.qualifiersInheritedFromOverriddenMethod
         }
 
