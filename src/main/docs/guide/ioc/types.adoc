@@ -67,3 +67,9 @@ The ann:core.annotation.Order[] annotation is especially useful for ordering bea
 snippet::io.micronaut.docs.config.env.RateLimitsFactory[tags="clazz", indent=0, title="Factory with @Order"]
 
 When a collection of `RateLimit` beans are requested from the context, they are returned in ascending order based on the value in the annotation.
+
+=== Injecting a Bean by Order
+
+When injecting a single instance of a bean the ann:core.annotation.Order[] annotation can also be used to define which bean has the highest precedence and hence should be injected.
+
+NOTE: The api:core.order.Ordered[] interface is not taken into account when selecting a single instance as this would require instantiating the bean to resolve the order.

@@ -3159,8 +3159,8 @@ public class DefaultBeanContext implements BeanContext {
                     // pick the bean with the highest priority
                     final Iterator<BeanDefinition<T>> i = candidates.stream()
                             .sorted((bean1, bean2) -> {
-                                int order1 = OrderUtil.getOrder(bean1, bean1);
-                                int order2 = OrderUtil.getOrder(bean2, bean1);
+                                int order1 = OrderUtil.getOrder(bean1.getAnnotationMetadata());
+                                int order2 = OrderUtil.getOrder(bean2.getAnnotationMetadata());
                                 return Integer.compare(order1, order2);
                             })
                             .iterator();
@@ -3169,7 +3169,7 @@ public class DefaultBeanContext implements BeanContext {
                         if (i.hasNext()) {
                             // check there are not 2 beans with the same order
                             final BeanDefinition<T> next = i.next();
-                            if (OrderUtil.getOrder(bean, bean) == OrderUtil.getOrder(next, next)) {
+                            if (OrderUtil.getOrder(bean.getAnnotationMetadata()) == OrderUtil.getOrder(next.getAnnotationMetadata())) {
                                 throw new NonUniqueBeanException(beanType.getType(), candidates.iterator());
                             }
                         }
