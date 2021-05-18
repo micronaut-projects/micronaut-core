@@ -502,10 +502,16 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.producesMediaTypesContainsAll = producesMediaTypes == null || producesMediaTypes.isEmpty() || producesMediaTypes.contains(MediaType.ALL_TYPE);
         }
 
-        protected String resolveInputName(Argument requiredArgument) {
-            String inputName = requiredArgument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(null);
+        /**
+         * Resolves the name for an argument.
+         *
+         * @param argument the argument
+         * @return the name
+         */
+        protected @NonNull String resolveInputName(@NonNull Argument argument) {
+            String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(null);
             if (StringUtils.isEmpty(inputName)) {
-                inputName = requiredArgument.getName();
+                inputName = argument.getName();
             }
             return inputName;
         }
