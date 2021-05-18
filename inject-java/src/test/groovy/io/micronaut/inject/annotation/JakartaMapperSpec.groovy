@@ -21,7 +21,10 @@ class Test {
         metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
         metadata.hasDeclaredStereotype(AnnotationUtil.SCOPE)
         metadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).contains(AnnotationUtil.SINGLETON)
         metadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER).size() == 1
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER).contains(AnnotationUtil.NAMED)
+
     }
 
     void "test factory methods"() {
@@ -47,5 +50,36 @@ class Test {
         metadata != null
         metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
         metadata.hasDeclaredStereotype(AnnotationUtil.SCOPE)
+    }
+
+    void "test annotation mapper map stereotypes correctly with meta annotations"() {
+        def metadata = buildTypeAnnotationMetadata('''
+package test;
+
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.*;
+
+@Meta
+class Test {
+
+}
+
+@jakarta.inject.Singleton
+@jakarta.inject.Named("test")
+@Retention(RUNTIME)
+@interface Meta {
+
+}
+''')
+
+        expect:
+        metadata != null
+        metadata.hasDeclaredStereotype(AnnotationUtil.SINGLETON)
+        !metadata.hasStereotype(jakarta.inject.Singleton)
+        metadata.hasDeclaredStereotype(AnnotationUtil.SCOPE)
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).contains(AnnotationUtil.SINGLETON)
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER).size() == 1
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER).contains(AnnotationUtil.NAMED)
     }
 }

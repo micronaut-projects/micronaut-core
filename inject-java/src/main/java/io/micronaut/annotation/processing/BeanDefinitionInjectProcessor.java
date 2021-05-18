@@ -995,6 +995,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 MethodElement constructor = producedClassElement.getPrimaryConstructor().orElse(null);
+                if (!producedClassElement.isInterface() && constructor != null && constructor.getParameters().length > 0) {
+                    final Element nativeElement = (Element) constructor.getNativeType();
+                    error(nativeElement, "The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor: " + nativeElement);
+                    return;
+                }
                 OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean.class);
                 Map<CharSequence, Boolean> finalSettings = new LinkedHashMap<>();
                 for (CharSequence setting : aopSettings) {

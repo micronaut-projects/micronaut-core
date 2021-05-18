@@ -277,19 +277,35 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         generatorAdapter.invokeConstructor(TYPE_DEFAULT_ANNOTATION_METADATA_HIERARCHY, CONSTRUCTOR_ANNOTATION_METADATA_HIERARCHY);
     }
 
-    private static void pushNewAnnotationMetadataOrReference(Type owningType, ClassWriter classWriter, GeneratorAdapter generatorAdapter, Map<String, GeneratorAdapter> loadTypeMethods, AnnotationMetadata declaredMetadata) {
-        if (declaredMetadata instanceof DefaultAnnotationMetadata) {
+    /**
+     * Pushes an annotation metadata reference.
+     * @param generatorAdapter The generator adapter
+     * @param annotationMetadata The metadata
+     */
+    @Internal
+    public static void pushAnnotationMetadataReference(GeneratorAdapter generatorAdapter, AnnotationMetadataReference annotationMetadata) {
+        final String className = annotationMetadata.getClassName();
+        final Type type = getTypeReferenceForName(className);
+        generatorAdapter.getStatic(type, AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+    }
+
+    @Internal
+    private static void pushNewAnnotationMetadataOrReference(
+            Type owningType,
+            ClassWriter classWriter,
+            GeneratorAdapter generatorAdapter,
+            Map<String, GeneratorAdapter> loadTypeMethods,
+            AnnotationMetadata annotationMetadata) {
+        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             instantiateNewMetadata(
                     owningType,
                     classWriter,
                     generatorAdapter,
-                    (DefaultAnnotationMetadata) declaredMetadata,
+                    (DefaultAnnotationMetadata) annotationMetadata,
                     loadTypeMethods
             );
-        } else if (declaredMetadata instanceof AnnotationMetadataReference) {
-            final String className = ((AnnotationMetadataReference) declaredMetadata).getClassName();
-            final Type type = getTypeReferenceForName(className);
-            generatorAdapter.getStatic(type, AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+        } else if (annotationMetadata instanceof AnnotationMetadataReference) {
+            pushAnnotationMetadataReference(generatorAdapter, (AnnotationMetadataReference) annotationMetadata);
         } else {
             generatorAdapter.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
         }

@@ -63,6 +63,32 @@ public class ExecutorFactory {
 }
 ----
 
+==== No Longer Possible to Define AOP Advice on a Bean Produced from a Factory with Constructor arguments
+
+In previous versions of Micronaut it was possible to define AOP advice to a factory method that returned a class that featured constructor arguments. This could lead to undefined behaviour since the argument of the generated proxy which would be dependency injected by the framework may be different from manually constructed proxy target.
+
+The following definition is now invalid in Micronaut 3 and above and will lead to a compilation error:
+
+[source,java]
+----
+import io.micronaut.context.annotation.*;
+import io.micronaut.runtime.context.scope.*;
+
+@Factory
+class ExampleFactory {
+
+    @ThreadLocal
+    Test test() {
+        return new Test("foo");
+    }
+}
+
+class Test {
+    // illegally defines constructor arguments
+    Test(String name) {}
+}
+----
+
 ==== Implementations of `javax.inject.Provider` No Longer Generate Factories
 
 In Micronaut 2.x if you defined a bean that implemented the `javax.inject.Provider` interface then the return type of the `get` method also automatically became a bean.
@@ -100,4 +126,8 @@ public class AProvider implements Provider<A> {
     }
 }
 ----
+
+==== New package for Micronaut Cassandra
+
+The classes in Micronaut Cassandra have been moved from `io.micronaut.configuration.cassandra` to `io.micronaut.cassandra` package.
 

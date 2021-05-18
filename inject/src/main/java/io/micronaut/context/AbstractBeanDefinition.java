@@ -32,6 +32,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.*;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
+import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -2199,8 +2200,14 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     if ((hasMetadata && argument.isAnnotationPresent(Parameter.class)) ||
                             (innerConfiguration && isIterable) ||
                             Qualifier.class == argument.getType()) {
-                        final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, ConversionContext.STRING);
-                        qualifier = n.map(Qualifiers::byName).orElse(null);
+                        final Qualifier<?> currentQualifier = resolutionContext.getCurrentQualifier();
+                        if (currentQualifier != null && currentQualifier.getClass() != InterceptorBindingQualifier.class) {
+                            qualifier = currentQualifier;
+
+                        } else {
+                            final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, ConversionContext.STRING);
+                            qualifier = n.map(Qualifiers::byName).orElse(null);
+                        }
                     }
                 }
                 return qualifier;

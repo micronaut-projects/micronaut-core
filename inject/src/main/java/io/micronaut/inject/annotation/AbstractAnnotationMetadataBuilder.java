@@ -885,6 +885,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
+     * Obtain the transformers mappers for the given annotation name.
+     * @param annotationName The annotation name
+     * @return The transformers
+     */
+    protected @NonNull List<AnnotationTransformer<Annotation>> getAnnotationTransformers(@NonNull String annotationName) {
+        return ANNOTATION_TRANSFORMERS.get(annotationName);
+    }
+
+    /**
      * Creates the visitor context for this implementation.
      *
      * @return The visitor context
@@ -1243,6 +1252,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     }
                 }
             }
+            // remove any annotations stripped out by transformations
+            topLevel.removeIf((a) -> !annotationMirrors.contains(a));
             // now add meta annotations
             for (A annotationMirror : topLevel) {
                 processAnnotationStereotype(parents, annotationMirror, metadata, isDeclared);
@@ -1441,7 +1452,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         final T annotationType = getTypeForAnnotation(annotationMirror);
         RetentionPolicy retentionPolicy = getRetentionPolicy(annotationType);
         List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
-        List<AnnotationTransformer<Annotation>> annotationTransformers = ANNOTATION_TRANSFORMERS.get(annotationName);
+        List<AnnotationTransformer<Annotation>> annotationTransformers = getAnnotationTransformers(annotationName);
         boolean remapped = CollectionUtils.isNotEmpty(annotationRemappers);
         boolean transformed = CollectionUtils.isNotEmpty(annotationTransformers);
 
@@ -1484,7 +1495,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 io.micronaut.core.annotation.AnnotationValue<Annotation> av =
                         new io.micronaut.core.annotation.AnnotationValue<>(annotationName, data);
                 AnnotationValue<Annotation> repeatableAnn = AnnotationValue.builder(repeatableName).values(av).build();
-                final List<AnnotationTransformer<Annotation>> repeatableTransformers = ANNOTATION_TRANSFORMERS.get(repeatableName);
+                final List<AnnotationTransformer<Annotation>> repeatableTransformers = getAnnotationTransformers(repeatableName);
                 hierarchyIterator.remove();
                 if (CollectionUtils.isNotEmpty(repeatableTransformers)) {
                     for (AnnotationTransformer<Annotation> repeatableTransformer : repeatableTransformers) {
@@ -1549,14 +1560,31 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     final List<AnnotationValue<?>> transformedValues = annotationTransformer.transform(av, visitorContext);
                     for (AnnotationValue<?> transformedValue : transformedValues) {
                         final String transformedAnnotationName = transformedValue.getAnnotationName();
-                        addAnnotation.accept(transformedAnnotationName,
-                                transformedValue.getValues(),
-                                transformedValue.getRetentionPolicy());
-                        if (CollectionUtils.isNotEmpty(transformedValue.getStereotypes())) {
-                            addTransformedStereotypes(annotationMetadata, isDeclared, transformedValue);
+                        final String transformedRepeatableName;
+
+                        if (isRepeatableCandidate(transformedAnnotationName)) {
+                            String resolvedName = null;
+                            // wrap with exception handling just in case there is any problems loading the type
+                            try {
+                                resolvedName = getAnnotationMirror(transformedAnnotationName)
+                                        .map(this::getRepeatableNameForType)
+                                        .orElse(null);
+                            } catch (Exception e) {
+                                // ignore
+                            }
+                            transformedRepeatableName = resolvedName;
                         } else {
-                            addTransformedStereotypes(annotationMetadata, isDeclared, transformedAnnotationName);
+                            transformedRepeatableName = null;
                         }
+
+                        if (transformedRepeatableName != null) {
+                            addRepeatableAnnotation.accept(transformedRepeatableName, transformedValue);
+                        } else {
+                            addAnnotation.accept(transformedAnnotationName,
+                                    transformedValue.getValues(),
+                                    transformedValue.getRetentionPolicy());
+                        }
+                        addTransformedStereotypes(annotationMetadata, isDeclared, transformedAnnotationName);
                     }
                 }
             }
@@ -1589,6 +1617,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         }
         return mappedAnnotations;
+    }
+
+    private boolean isRepeatableCandidate(String transformedAnnotationName) {
+        return !AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(transformedAnnotationName) &&
+                !AnnotationUtil.NULLABLE.equals(transformedAnnotationName) &&
+                !AnnotationUtil.NON_NULL.equals(transformedAnnotationName);
     }
 
     private void addTransformedStereotypes(DefaultAnnotationMetadata annotationMetadata, boolean isDeclared, String transformedAnnotationName) {
@@ -1665,7 +1699,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     @Internal
     public static boolean isAnnotationMapped(@Nullable String annotationName) {
-        return annotationName != null && ANNOTATION_MAPPERS.containsKey(annotationName);
+        return annotationName != null &&
+                (ANNOTATION_MAPPERS.containsKey(annotationName) ||
+                        ANNOTATION_TRANSFORMERS.containsKey(annotationName) ||
+                        ANNOTATION_TRANSFORMERS.keySet().stream().anyMatch(pkg -> annotationName.startsWith(pkg)));
     }
 
     /**
@@ -1673,7 +1710,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     @Internal
     public static Set<String> getMappedAnnotationNames() {
-        return ANNOTATION_MAPPERS.keySet();
+        final HashSet<String> all = new HashSet<>(ANNOTATION_MAPPERS.keySet());
+        all.addAll(ANNOTATION_TRANSFORMERS.keySet());
+        return all;
+    }
+
+    /**
+     * @return Additional mapped annotation names
+     */
+    @Internal
+    public static Set<String> getMappedAnnotationPackages() {
+        return ANNOTATION_REMAPPERS.keySet();
     }
 
     /**

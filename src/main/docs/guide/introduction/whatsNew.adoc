@@ -92,6 +92,11 @@ The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micr
 
 Micronaut's https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/[Oracle Cloud Integration] has been updated with support for Cloud Monitoring and Tracing.
 
+
+==== Micronaut Cassandra 4.0.0
+
+The https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micronaut Cassandra] integration now includes support for GraalVM out of the box.
+
 ==== Other Modules
 
 - Micronaut Security 2.4.2
@@ -107,6 +112,7 @@ Micronaut's https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/g
 
 === Dependency Upgrades
 
+- Cassandra 4.11.1
 - Kafka 2.8.0
 - GraalVM 21.1.0
 - Liquibase 4.3.4

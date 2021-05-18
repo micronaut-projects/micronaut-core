@@ -27,12 +27,14 @@ import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
+import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
@@ -73,7 +75,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             ReflectionUtils.getRequiredInternalMethod(
                     ExecutionHandleLocator.class,
                     "getProxyTargetMethod",
-                    Class.class,
+                    Argument.class,
                     Qualifier.class,
                     String.class,
                     Class[].class
@@ -82,7 +84,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public static final Method METHOD_GET_PROXY_TARGET_BEAN = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
             BeanLocator.class,
             "getProxyTargetBean",
-            Class.class,
+            Argument.class,
             Qualifier.class
     ));
 
@@ -861,7 +863,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     // context.getProxyTargetMethod("test", new Class[]{String.class});
                     proxyConstructorGenerator.loadArg(beanContextArgumentIndex);
 
-                    proxyConstructorGenerator.push(targetType);
+
+                    buildProxyLookupArgument(proxyConstructorGenerator, targetType);
                     proxyConstructorGenerator.loadArg(qualifierIndex);
 
                     pushMethodNameAndTypesArguments(proxyConstructorGenerator, methodRef.name, methodRef.argumentTypes);
@@ -927,6 +930,18 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         proxyClassWriter.visitEnd();
     }
 
+    private void buildProxyLookupArgument(GeneratorAdapter proxyConstructorGenerator, Type targetType) {
+        buildArgumentWithGenerics(
+                proxyConstructorGenerator,
+                targetType,
+            new AnnotationMetadataReference(
+                    getBeanDefinitionReferenceClassName(),
+                    getAnnotationMetadata()
+            ),
+            parentWriter != null ? parentWriter.getTypeArguments() : proxyBeanDefinitionWriter.getTypeArguments()
+        );
+    }
+
     /**
      * Write the proxy to the given compilation directory.
      *
@@ -936,6 +951,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public void writeTo(File compilationDir) throws IOException {
         accept(newClassWriterOutputVisitor(compilationDir));
+    }
+
+    @NonNull
+    @Override
+    public ClassElement[] getTypeArguments() {
+        return proxyBeanDefinitionWriter.getTypeArguments();
     }
 
     /**
@@ -1189,7 +1210,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         resolveTargetMethod.getField(proxyType, FIELD_BEAN_LOCATOR, TYPE_BEAN_LOCATOR);
 
         // 1st argument: the type
-        resolveTargetMethod.push(targetType);
+        buildProxyLookupArgument(resolveTargetMethod, targetType);
         // 2nd argument: null qualifier
         resolveTargetMethod.loadThis();
         // the bean qualifier
