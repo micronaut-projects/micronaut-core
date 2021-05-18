@@ -443,28 +443,28 @@ public class Convertible implements Car {
 
         @Test
         public void testOverriddingMixedWithPackagePrivate2() {
-            assertTrue(spareTire.getSpareTirePackagePrivateMethod2Injected());
-            assertTrue(((Tire) spareTire).tirePackagePrivateMethod2Injected);
-            assertFalse(((RoundThing) spareTire).getRoundThingPackagePrivateMethod2Injected());
+            assertTrue(spareTire.packagePrivateMethod2Injected);
+            assertTrue(((Tire) spareTire).packagePrivateMethod2Injected);
+            assertFalse(((RoundThing) spareTire).packagePrivateMethod2Injected);
 
-            assertTrue(plainTire.tirePackagePrivateMethod2Injected);
-            assertTrue(((RoundThing) plainTire).getRoundThingPackagePrivateMethod2Injected());
+            assertTrue(plainTire.packagePrivateMethod2Injected);
+            assertTrue(((RoundThing) plainTire).packagePrivateMethod2Injected);
         }
 
         @Test
         public void testOverriddingMixedWithPackagePrivate3() {
-            assertFalse(spareTire.getSpareTirePackagePrivateMethod3Injected());
-            assertTrue(((Tire) spareTire).tirePackagePrivateMethod3Injected);
-            assertFalse(((RoundThing) spareTire).getRoundThingPackagePrivateMethod3Injected());
+            assertFalse(spareTire.packagePrivateMethod3Injected);
+            assertTrue(((Tire) spareTire).packagePrivateMethod3Injected);
+            assertFalse(((RoundThing) spareTire).packagePrivateMethod3Injected);
 
-            assertTrue(plainTire.tirePackagePrivateMethod3Injected);
-            assertTrue(((RoundThing) plainTire).getRoundThingPackagePrivateMethod3Injected());
+            assertTrue(plainTire.packagePrivateMethod3Injected);
+            assertTrue(((RoundThing) plainTire).packagePrivateMethod3Injected);
         }
 
         @Test
         public void testOverriddingMixedWithPackagePrivate4() {
-            assertFalse(plainTire.tirePackagePrivateMethod4Injected);
-            assertTrue(((RoundThing) plainTire).getRoundThingPackagePrivateMethod4Injected());
+            assertFalse(plainTire.packagePrivateMethod4Injected);
+            assertTrue(((RoundThing) plainTire).packagePrivateMethod4Injected);
         }
 
         // inject only once

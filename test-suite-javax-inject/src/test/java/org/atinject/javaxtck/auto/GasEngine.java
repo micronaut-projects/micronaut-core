@@ -19,12 +19,10 @@ import javax.inject.Inject;
 
 public abstract class GasEngine extends Engine {
 
-    @Override
     public void injectTwiceOverriddenWithOmissionInMiddle() {
         overriddenTwiceWithOmissionInMiddleInjected = true;
     }
 
-    @Override
     @Inject
     public void injectTwiceOverriddenWithOmissionInSubclass() {
         overriddenTwiceWithOmissionInSubclassInjected = true;

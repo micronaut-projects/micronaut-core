@@ -29,7 +29,7 @@ public class Tire extends RoundThing {
     protected static final Set<String> moreProblems = new LinkedHashSet<String>();
 
     FuelTank constructorInjection = NEVER_INJECTED;
-    @Inject protected FuelTank fieldInjection = NEVER_INJECTED;
+    @Inject FuelTank fieldInjection = NEVER_INJECTED;
     FuelTank methodInjection = NEVER_INJECTED;
     @Inject static FuelTank staticFieldInjection = NEVER_INJECTED;
     static FuelTank staticMethodInjection = NEVER_INJECTED;
@@ -63,8 +63,7 @@ public class Tire extends RoundThing {
     public boolean overriddenProtectedMethodInjectedTwice;
     public boolean overriddenPublicMethodInjectedTwice;
 
-    @Inject
-    public Tire(FuelTank constructorInjection) {
+    @Inject public Tire(FuelTank constructorInjection) {
         this.constructorInjection = constructorInjection;
     }
 
@@ -115,8 +114,7 @@ public class Tire extends RoundThing {
         superProtectedMethodInjected = true;
     }
 
-    @Inject
-    public void injectPublicMethod() {
+    @Inject public void injectPublicMethod() {
         if (superPublicMethodInjected) {
             overriddenPublicMethodInjectedTwice = true;
         }
@@ -135,8 +133,7 @@ public class Tire extends RoundThing {
         protectedMethodForOverrideInjected = true;
     }
 
-    @Inject
-    public void injectPublicMethodForOverride() {
+    @Inject public void injectPublicMethodForOverride() {
         publicMethodForOverrideInjected = true;
     }
 
@@ -164,33 +161,21 @@ public class Tire extends RoundThing {
         return false;
     }
 
-    public boolean tirePackagePrivateMethod2Injected;
-
-    public boolean getTirePackagePrivateMethod2Injected() {
-        return tirePackagePrivateMethod2Injected;
-    }
+    boolean packagePrivateMethod2Injected;
 
     @Inject void injectPackagePrivateMethod2() {
-        tirePackagePrivateMethod2Injected = true;
+        packagePrivateMethod2Injected = true;
     }
 
-    public boolean tirePackagePrivateMethod3Injected;
-
-    public boolean getTirePackagePrivateMethod3Injected() {
-        return tirePackagePrivateMethod3Injected;
-    }
+    public boolean packagePrivateMethod3Injected;
 
     @Inject void injectPackagePrivateMethod3() {
-        tirePackagePrivateMethod3Injected = true;
+        packagePrivateMethod3Injected = true;
     }
 
-    public boolean tirePackagePrivateMethod4Injected;
-
-    public boolean getTirePackagePrivateMethod4Injected() {
-        return tirePackagePrivateMethod4Injected;
-    }
+    public boolean packagePrivateMethod4Injected;
 
     void injectPackagePrivateMethod4() {
-        tirePackagePrivateMethod4Injected = true;
+        packagePrivateMethod4Injected = true;
     }
 }

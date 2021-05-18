@@ -27,7 +27,6 @@ class V8Engine extends GasEngine {
         publicNoArgsConstructorInjected = true
     }
 
-    @Override
     @Inject @PackageScope void injectPackagePrivateMethod() {
         if (subPackagePrivateMethodInjected) {
             overriddenPackagePrivateMethodInjectedTwice = true
@@ -38,7 +37,6 @@ class V8Engine extends GasEngine {
     /**
      * Qualifiers are swapped from how they appear in the superclass.
      */
-    @Override
     void injectQualifiers(Seat seatA, @Drivers Seat seatB,
                           Tire tireA, @Named("spare") Tire tireB) {
         overriddenMethodInjected = true
@@ -50,18 +48,15 @@ class V8Engine extends GasEngine {
         }
     }
 
-    @Override
     @PackageScope void injectPackagePrivateMethodForOverride() {
         subPackagePrivateMethodForOverrideInjected = true
     }
 
-    @Override
     @Inject
     void injectTwiceOverriddenWithOmissionInMiddle() {
         overriddenTwiceWithOmissionInMiddleInjected = true
     }
 
-    @Override
     void injectTwiceOverriddenWithOmissionInSubclass() {
         overriddenTwiceWithOmissionInSubclassInjected = true
     }
