@@ -1220,6 +1220,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     }
                 }
             }
+            // remove any annotations stripped out by transformations
+            topLevel.removeIf((a) -> !annotationMirrors.contains(a));
             // now add meta annotations
             for (A annotationMirror : topLevel) {
                 processAnnotationStereotype(parents, annotationMirror, metadata, isDeclared);
@@ -1396,7 +1398,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         final String transformedAnnotationName = transformedValue.getAnnotationName();
                         final String transformedRepeatableName;
 
-                        if (isPotentionalRepeatable(transformedAnnotationName)) {
+                        if (isRepeatableCandidate(transformedAnnotationName)) {
                             String resolvedName = null;
                             // wrap with exception handling just in case there is any problems loading the type
                             try {
@@ -1425,7 +1427,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
-    private boolean isPotentionalRepeatable(String transformedAnnotationName) {
+    private boolean isRepeatableCandidate(String transformedAnnotationName) {
         return !AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(transformedAnnotationName) &&
                 !AnnotationUtil.NULLABLE.equals(transformedAnnotationName) &&
                 !AnnotationUtil.NON_NULL.equals(transformedAnnotationName);
