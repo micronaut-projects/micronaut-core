@@ -394,6 +394,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return packageName + ".$" + className + "Definition";
     }
 
+    @NonNull
+    @Override
+    public ClassElement[] getTypeArguments() {
+        final Map<String, ClassElement> args = this.typeArguments.get(this.getBeanTypeName());
+        if (CollectionUtils.isNotEmpty(args)) {
+            return args.values().toArray(new ClassElement[0]);
+        }
+        return BeanDefinitionVisitor.super.getTypeArguments();
+    }
+
     /**
      * @return The name of the bean definition reference class.
      */

@@ -259,7 +259,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     static <T> Argument<T> of(
             @NonNull Class<T> type,
             @Nullable AnnotationMetadata annotationMetadata,
-            @Nullable Argument... typeParameters) {
+            @Nullable Argument<?>... typeParameters) {
         return new DefaultArgument<>(type, annotationMetadata, typeParameters);
     }
 
@@ -363,8 +363,24 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(@NonNull Class<T> type, @Nullable Class<?>... typeParameters) {
+        return of(type, AnnotationMetadata.EMPTY_METADATA, typeParameters);
+    }
+
+    /**
+     * Creates a new argument for the given type and name.
+     *
+     * @param type           The type
+     * @param annotationMetadata The annotation metadata
+     * @param typeParameters The parameters type
+     * @param <T>            The generic type
+     * @return The argument instance
+     * @since 3.0.0
+     */
+    @UsedByGeneratedCode
+    @NonNull
+    static <T> Argument<T> of(@NonNull Class<T> type, @Nullable AnnotationMetadata annotationMetadata, @Nullable Class<?>[] typeParameters) {
         if (ArrayUtils.isEmpty(typeParameters)) {
-            return of(type);
+            return of(type, annotationMetadata);
         }
 
         TypeVariable<Class<T>>[] parameters = type.getTypeParameters();
@@ -372,12 +388,12 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
         if (parameters.length != len) {
             throw new IllegalArgumentException("Type parameter length does not match. Required: " + parameters.length + ", Specified: " + len);
         }
-        Argument[] typeArguments = new Argument[len];
+        Argument<?>[] typeArguments = new Argument[len];
         for (int i = 0; i < parameters.length; i++) {
             TypeVariable<Class<T>> parameter = parameters[i];
             typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
         }
-        return new DefaultArgument<>(type, AnnotationMetadata.EMPTY_METADATA, typeArguments);
+        return new DefaultArgument<>(type, annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA, typeArguments);
     }
 
     /**

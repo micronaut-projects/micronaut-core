@@ -224,11 +224,11 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
         return Objects.hash(type, getName(), typeParameters);
     }
 
-    private static Map<String, Argument<?>> initializeTypeParameters(Argument[] genericTypes) {
+    private static Map<String, Argument<?>> initializeTypeParameters(Argument<?>[] genericTypes) {
         Map<String, Argument<?>> typeParameters;
         if (genericTypes != null && genericTypes.length > 0) {
             typeParameters = new LinkedHashMap<>(genericTypes.length);
-            for (Argument genericType : genericTypes) {
+            for (Argument<?> genericType : genericTypes) {
                 typeParameters.put(genericType.getName(), genericType);
             }
         } else {

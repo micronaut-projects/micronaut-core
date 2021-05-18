@@ -14,12 +14,20 @@
  * limitations under the License.
  */
 package io.micronaut.aop.factory
+
+import io.micronaut.core.annotation.Creator
+
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 class ConcreteClass {
     final AnotherClass anotherClass
+
+    @Creator
+    ConcreteClass() {
+        this.anotherClass = null
+    }
 
     ConcreteClass(AnotherClass anotherClass) {
         this.anotherClass = anotherClass
