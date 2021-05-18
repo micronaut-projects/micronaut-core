@@ -1439,8 +1439,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 exceptionCaughtInternal(context, t, nettyHttpRequest, false);
             }
         });
-
-        routeMatch.execute();
     }
 
     private Publisher<? extends MutableHttpResponse<?>> buildResultEmitter(
