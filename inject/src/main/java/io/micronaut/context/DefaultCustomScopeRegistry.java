@@ -18,10 +18,15 @@ package io.micronaut.context;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanType;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import javax.inject.Scope;
 import java.lang.annotation.Annotation;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,9 +53,27 @@ class DefaultCustomScopeRegistry implements CustomScopeRegistry {
         this.classLoader = classLoader;
     }
 
+    @Override
+    public Optional<CustomScope<?>> findDeclaredScope(@NonNull Argument<?> argument) {
+        return argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class).flatMap(this::findScope);
+    }
+
+    @Override
+    public Optional<CustomScope<?>> findDeclaredScope(@NonNull BeanType<?> beanType) {
+        final List<Class<? extends Annotation>> scopeHierarchy = beanType.getAnnotationMetadata().getAnnotationTypesByStereotype(Scope.class);
+        Optional<CustomScope<?>> registeredScope = Optional.empty();
+        for (Class<? extends Annotation> scope : scopeHierarchy) {
+            registeredScope = findScope(scope);
+            if (registeredScope.isPresent()) {
+                break;
+            }
+        }
+        return registeredScope;
+    }
+
     @SuppressWarnings("unchecked")
     @Override
-    public Optional<CustomScope> findScope(Class<? extends Annotation> scopeAnnotation) {
+    public Optional<CustomScope<?>> findScope(Class<? extends Annotation> scopeAnnotation) {
         return scopes.computeIfAbsent(scopeAnnotation.getName(), s -> {
             final Qualifier qualifier = Qualifiers.byTypeArguments(scopeAnnotation);
             return beanLocator.findBean(CustomScope.class, qualifier);
@@ -59,7 +82,7 @@ class DefaultCustomScopeRegistry implements CustomScopeRegistry {
 
     @SuppressWarnings("unchecked")
     @Override
-    public Optional<CustomScope> findScope(String scopeAnnotation) {
+    public Optional<CustomScope<?>> findScope(String scopeAnnotation) {
         return scopes.computeIfAbsent(scopeAnnotation, type -> {
             final Optional<Class> scopeClass = ClassUtils.forName(type, classLoader);
             if (scopeClass.isPresent()) {

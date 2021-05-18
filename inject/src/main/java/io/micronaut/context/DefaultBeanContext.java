@@ -2810,25 +2810,18 @@ public class DefaultBeanContext implements BeanContext {
             })).get();
         } else {
             Optional<BeanResolutionContext.Segment<?>> currentSegment = resolutionContext.getPath().currentSegment();
-            Optional<CustomScope> registeredScope = Optional.empty();
+            Optional<CustomScope<?>> registeredScope = Optional.empty();
 
             if (currentSegment.isPresent()) {
-                Argument argument = currentSegment.get().getArgument();
-                final Optional<Class<? extends Annotation>> scope = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class);
-                registeredScope = scope.flatMap(customScopeRegistry::findScope);
+                Argument<?> argument = currentSegment.get().getArgument();
+                registeredScope =  customScopeRegistry.findDeclaredScope(argument);;
             }
 
             if (!isProxy && isScopedProxyDefinition && !registeredScope.isPresent()) {
-                final List<Class<? extends Annotation>> scopeHierarchy = definition.getAnnotationTypesByStereotype(Scope.class);
-                for (Class<? extends Annotation> scope : scopeHierarchy) {
-                    registeredScope = customScopeRegistry.findScope(scope);
-                    if (registeredScope.isPresent()) {
-                        break;
-                    }
-                }
+                registeredScope = customScopeRegistry.findDeclaredScope(definition);
             }
             if (registeredScope.isPresent()) {
-                CustomScope customScope = registeredScope.get();
+                CustomScope<?> customScope = registeredScope.get();
                 if (isProxy) {
                     definition = getProxyTargetBeanDefinition(
                             beanType,
