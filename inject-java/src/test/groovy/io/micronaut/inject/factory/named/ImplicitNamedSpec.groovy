@@ -2,7 +2,48 @@ package io.micronaut.inject.factory.named
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
+import javax.inject.Named
+
 class ImplicitNamedSpec extends AbstractTypeElementSpec {
+
+    void 'test implicit named on type'() {
+        given:
+        def definition = buildBeanDefinition('implicitnamed.FooBar', '''
+package implicitnamed;
+
+import io.micronaut.context.annotation.*;
+import javax.inject.*;
+
+@Named
+class FooBar {}
+''')
+        expect:
+        definition.stringValue(Named).get() == 'fooBar'
+    }
+
+    void 'test implicit named on type via stereotype'() {
+        given:
+        def definition = buildBeanDefinition('implicitnamed.FooBar', '''
+package implicitnamed;
+
+import io.micronaut.context.annotation.*;
+import javax.inject.*;
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.*;
+
+@Meta
+@Singleton
+class FooBar {}
+
+@Named
+@Retention(RUNTIME)
+@interface Meta {
+
+}
+''')
+        expect:
+        definition.stringValue(Named).get() == 'fooBar'
+    }
 
     void 'test use of implicit @Named annotation'() {
         given:

@@ -314,6 +314,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.beanProducingElement = beanProducingElement;
         if (beanProducingElement instanceof ClassElement) {
             ClassElement classElement = (ClassElement) beanProducingElement;
+            autoApplyNamedToBeanProducingElement(classElement);
             this.beanTypeElement = classElement;
             this.packageName = classElement.getPackageName();
             this.isInterface = classElement.isInterface();
@@ -1673,14 +1674,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void autoApplyNamedIfPresent(Element element, AnnotationMetadata annotationMetadata) {
-        if (annotationMetadata.hasAnnotation(Named.class)) {
+        if (annotationMetadata.hasAnnotation(Named.class) || annotationMetadata.hasStereotype(Named.class)) {
             autoApplyNamed(element);
         }
     }
 
     private void autoApplyNamed(Element element) {
         if (!element.stringValue(Named.class).isPresent()) {
-            element.annotate(Named.class, (builder) -> builder.value(element.getName()));
+            element.annotate(Named.class, (builder) -> {
+                final String name = element instanceof ClassElement ? NameUtils.decapitalize(element.getSimpleName()) : element.getName();
+                builder.value(name);
+            });
         }
     }
 
