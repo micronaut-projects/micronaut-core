@@ -23,12 +23,10 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
-import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -36,9 +34,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.annotation.Status;
 import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanDefinition;
@@ -427,11 +423,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected List<MediaType> producesMediaTypes;
         protected String bodyArgumentName;
         protected Argument<?> bodyArgument;
-        protected final Map<String, Argument> requiredInputs;
-        protected boolean consumesMediaTypesContainsAll;
-        protected boolean producesMediaTypesContainsAll;
-        protected final HttpStatus definedStatus;
-        protected final boolean isWebSocketRoute;
         private final boolean isVoid;
         private final boolean suspended;
         private final boolean reactive;
@@ -451,19 +442,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.consumesMediaTypes = mediaTypes;
 
             MediaType[] types = MediaType.of(targetMethod.stringValues(Produces.class));
-            Optional<Argument<?>> firstTypeVariable = targetMethod.getReturnType().getFirstTypeVariable();
-            if (firstTypeVariable.isPresent() && Event.class.isAssignableFrom(firstTypeVariable.get().getType())) {
-                producesMediaTypes = Collections.singletonList(MediaType.TEXT_EVENT_STREAM_TYPE);
-            } else if (ArrayUtils.isNotEmpty(types)) {
-                this.producesMediaTypes = Collections.unmodifiableList(Arrays.asList(types));
-            } else {
-                this.producesMediaTypes = DEFAULT_PRODUCES;
+            if (ArrayUtils.isNotEmpty(types)) {
+                this.producesMediaTypes = Arrays.asList(types);
             }
             types = MediaType.of(targetMethod.stringValues(Consumes.class));
             if (ArrayUtils.isNotEmpty(types)) {
-                this.consumesMediaTypes = Collections.unmodifiableList(Arrays.asList(types));
-            } else {
-                this.consumesMediaTypes = Collections.emptyList();
+                this.consumesMediaTypes = Arrays.asList(types);
             }
             suspended = targetMethod.getExecutableMethod().isSuspend();
             reactive = RouteInfo.super.isReactive();
@@ -477,43 +461,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                     this.bodyArgument = argument;
                 }
             }
-            Argument[] requiredArguments = targetMethod.getArguments();
-            if (requiredArguments.length > 0) {
-                Map<String, Argument> requiredInputs = new LinkedHashMap<>(requiredArguments.length);
-                for (Argument requiredArgument : requiredArguments) {
-                    String inputName = resolveInputName(requiredArgument);
-                    requiredInputs.put(inputName, requiredArgument);
-                }
-                this.requiredInputs = Collections.unmodifiableMap(requiredInputs);
-            } else {
-                this.requiredInputs = Collections.emptyMap();
-            }
-            setConsumesMediaTypesContainsAll();
-            setProducesMediaTypesContainsAll();
-            this.definedStatus = targetMethod.enumValue(Status.class, HttpStatus.class).orElse(null);
-            this.isWebSocketRoute = targetMethod.hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
-        }
-
-        private void setConsumesMediaTypesContainsAll() {
-            this.consumesMediaTypesContainsAll = consumesMediaTypes == null || consumesMediaTypes.isEmpty() || consumesMediaTypes.contains(MediaType.ALL_TYPE);
-        }
-
-        private void setProducesMediaTypesContainsAll() {
-            this.producesMediaTypesContainsAll = producesMediaTypes == null || producesMediaTypes.isEmpty() || producesMediaTypes.contains(MediaType.ALL_TYPE);
-        }
-
-        /**
-         * Resolves the name for an argument.
-         *
-         * @param argument the argument
-         * @return the name
-         */
-        protected @NonNull String resolveInputName(@NonNull Argument argument) {
-            String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(null);
-            if (StringUtils.isEmpty(inputName)) {
-                inputName = argument.getName();
-            }
-            return inputName;
         }
 
         @NonNull
@@ -566,20 +513,22 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public Route consumes(MediaType... mediaTypes) {
             if (mediaTypes != null) {
                 this.consumesMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaTypes));
-                setConsumesMediaTypesContainsAll();
             }
             return this;
         }
 
         @Override
         public List<MediaType> getConsumes() {
-            return consumesMediaTypes;
+            if (consumesMediaTypes != null) {
+                return consumesMediaTypes;
+            } else {
+                return Collections.emptyList();
+            }
         }
 
         @Override
         public Route consumesAll() {
             this.consumesMediaTypes = Collections.emptyList();
-            setConsumesMediaTypesContainsAll();
             return this;
         }
 
@@ -606,15 +555,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Route produces(MediaType... mediaType) {
             if (mediaType != null) {
-                this.producesMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaType));
-                setProducesMediaTypesContainsAll();
+                this.producesMediaTypes = Arrays.asList(mediaType);
             }
             return this;
         }
 
         @Override
         public List<MediaType> getProduces() {
-            return producesMediaTypes;
+            if (producesMediaTypes != null) {
+                return Collections.unmodifiableList(producesMediaTypes);
+            } else {
+                return DEFAULT_PRODUCES;
+            }
         }
 
         @Override

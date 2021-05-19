@@ -55,9 +55,9 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     protected final String httpMethodName;
 
     private NettyHttpParameters httpParameters;
-    private Optional<MediaType> mediaType;
+    private MediaType mediaType;
     private Charset charset;
-    private Optional<Locale> locale;
+    private Locale locale;
     private String path;
     private Collection<MediaType> accept;
 
@@ -159,34 +159,62 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
 
     @Override
     public Collection<MediaType> accept() {
+        Collection<MediaType> accept = this.accept;
         if (accept == null) {
-            accept = HttpRequest.super.accept();
+            synchronized (this) { // double check
+                accept = this.accept;
+                if (accept == null) {
+                    accept = HttpRequest.super.accept();
+                    this.accept = accept;
+                }
+            }
         }
         return accept;
     }
 
     @Override
     public Optional<MediaType> getContentType() {
-        if (mediaType == null) {
-            mediaType = HttpRequest.super.getContentType();
+        MediaType contentType = this.mediaType;
+        if (contentType == null) {
+            synchronized (this) { // double check
+                contentType = this.mediaType;
+                if (contentType == null) {
+                    contentType = HttpRequest.super.getContentType().orElse(null);
+                    this.mediaType = contentType;
+                }
+            }
         }
-        return mediaType;
+        return Optional.ofNullable(contentType);
     }
 
     @Override
     public Charset getCharacterEncoding() {
+        Charset charset = this.charset;
         if (charset == null) {
-            charset = initCharset(HttpRequest.super.getCharacterEncoding());
+            synchronized (this) { // double check
+                charset = this.charset;
+                if (charset == null) {
+                    charset = initCharset(HttpRequest.super.getCharacterEncoding());
+                    this.charset = charset;
+                }
+            }
         }
         return charset;
     }
 
     @Override
     public Optional<Locale> getLocale() {
+        Locale locale = this.locale;
         if (locale == null) {
-            locale = HttpRequest.super.getLocale();
+            synchronized (this) { // double check
+                locale = this.locale;
+                if (locale == null) {
+                    locale = HttpRequest.super.getLocale().orElse(null);
+                    this.locale = locale;
+                }
+            }
         }
-        return locale;
+        return Optional.ofNullable(locale);
     }
 
     @Override

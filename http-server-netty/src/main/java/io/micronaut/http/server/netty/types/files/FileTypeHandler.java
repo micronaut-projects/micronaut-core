@@ -159,7 +159,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         MutableHttpResponse response = HttpResponse.notModified();
         copyNonEntityHeaders(originalResponse, response);
         setDateHeader(response);
-        return ((NettyMutableHttpResponse) response).toFullHttpResponse();
+        return ((NettyMutableHttpResponse) response).getNativeResponse();
     }
 
 }
