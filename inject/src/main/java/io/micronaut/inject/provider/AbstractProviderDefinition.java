@@ -64,6 +64,11 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
     }
 
     @Override
+    public boolean isContainerType() {
+        return false;
+    }
+
+    @Override
     public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return isPresent();
     }

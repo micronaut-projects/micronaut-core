@@ -201,6 +201,18 @@ public class Qualifiers {
     }
 
     /**
+     * Build a qualifier for the given annotation.
+     *
+     * @param stereotype The stereotype
+     * @param <T>        The component type
+     * @return The qualifier
+     * @since 3.0.0
+     */
+    public static <T> Qualifier<T> byStereotype(String stereotype) {
+        return new NamedAnnotationStereotypeQualifier<>(stereotype);
+    }
+
+    /**
      * Build a qualifier for the given generic type arguments.
      *
      * @param typeArguments The generic type arguments

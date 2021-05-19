@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
@@ -50,6 +51,15 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
      * @return The underlying bean type
      */
     Class<T> getBeanType();
+
+    /**
+     * Checks whether the bean type is a container type.
+     * @return Whether the type is a container type like {@link Iterable}.
+     * @since 3.0.0
+     */
+    default boolean isContainerType() {
+        return DefaultArgument.CONTAINER_TYPES.contains(getBeanType());
+    }
 
     /**
      * Returns a potentially limited subset of bean types exposed by this bean.
@@ -85,7 +95,7 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
             return exposedTypes.contains(beanType.getType());
         } else {
             final Class<T> exposedType = getBeanType();
-            return beanType.isAssignableFrom(exposedType) || beanType.getType() == exposedType;
+            return beanType.isAssignableFrom(exposedType) || beanType.getType() == exposedType || isContainerType();
         }
     }
 

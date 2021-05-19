@@ -41,6 +41,7 @@ import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
@@ -236,7 +237,10 @@ class Test {
                         .filter({ bdr -> predicate == null || predicate.test(bdr) })
                         .collect(Collectors.toList())
 
-                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : new InterceptorRegistryBean())
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : [
+                        new InterceptorRegistryBean(),
+                        new BeanProviderDefinition()
+                ])
             }
         }.start()
     }

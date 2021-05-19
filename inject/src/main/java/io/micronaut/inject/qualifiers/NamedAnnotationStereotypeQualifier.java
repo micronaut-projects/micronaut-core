@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,27 +19,25 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
-import java.lang.annotation.Annotation;
 import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
- * A {@link Qualifier} that qualifies based on a bean stereotype.
- *
- * @param <T> The type
- * @author Graeme Rocher
- * @since 1.0
+ * Qualifiers for a named stereotype.
+ * @param <T> The generic type
+ * @since 3.0.0
+ * @author graemerocher
  */
 @Internal
-final class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
+final class NamedAnnotationStereotypeQualifier<T> implements Qualifier<T> {
 
-    final Class<? extends Annotation> stereotype;
+    final String stereotype;
 
     /**
      * @param stereotype The stereotype
      */
-    AnnotationStereotypeQualifier(Class<? extends Annotation> stereotype) {
-        this.stereotype = stereotype;
+    NamedAnnotationStereotypeQualifier(String stereotype) {
+        this.stereotype = Objects.requireNonNull(stereotype, "Stereotype cannot be null");
     }
 
     @Override
@@ -49,7 +47,7 @@ final class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
 
     @Override
     public String toString() {
-        return "@" + stereotype.getSimpleName();
+        return "@" + stereotype;
     }
 
     @Override
@@ -60,16 +58,16 @@ final class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
         if (o == null) {
             return false;
         }
-        if (o instanceof AnnotationStereotypeQualifier) {
-            AnnotationStereotypeQualifier<?> that = (AnnotationStereotypeQualifier<?>) o;
-            return Objects.equals(stereotype.getName(), that.stereotype.getName());
-        } else if (o instanceof NamedAnnotationStereotypeQualifier) {
+        if (o instanceof NamedAnnotationStereotypeQualifier) {
             NamedAnnotationStereotypeQualifier<?> that = (NamedAnnotationStereotypeQualifier<?>) o;
-            return Objects.equals(stereotype.getName(), that.stereotype);
+            return Objects.equals(stereotype, that.stereotype);
+        } else if (o instanceof AnnotationStereotypeQualifier) {
+            AnnotationStereotypeQualifier<?> that = (AnnotationStereotypeQualifier<?>) o;
+            return Objects.equals(stereotype, that.stereotype.getName());
         } else if (o instanceof AnnotationMetadataQualifier) {
             AnnotationMetadataQualifier<?> that = (AnnotationMetadataQualifier<?>) o;
             if (that.qualifierAnn == null) {
-                return Objects.equals(stereotype.getName(), that.qualifiedName);
+                return Objects.equals(stereotype, that.qualifiedName);
             }
         }
         return false;
@@ -77,6 +75,6 @@ final class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(stereotype.getName());
+        return Objects.hash(stereotype);
     }
 }

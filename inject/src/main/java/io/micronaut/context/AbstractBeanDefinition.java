@@ -91,6 +91,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private AnnotationMetadata beanAnnotationMetadata;
     private Environment environment;
     private Set<Class<?>> exposedTypes;
+    private Argument<?> containerElement;
 
     /**
      * Constructs a bean definition that is produced from a method call on another type (factory bean).
@@ -123,6 +124,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         );
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.singleton = isFinal;
+        initContainerElement();
     }
 
     /**
@@ -168,6 +170,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.addRequiredComponents(arguments);
         this.singleton = getAnnotationMetadata().hasDeclaredStereotype(Singleton.class);
+        initContainerElement();
     }
 
     /**
@@ -205,6 +208,21 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.addRequiredComponents(arguments);
         this.singleton = getAnnotationMetadata().hasDeclaredStereotype(Singleton.class);
+        initContainerElement();
+    }
+
+    private void initContainerElement() {
+        if (isContainerType()) {
+            final List<Argument<?>> iterableArguments = getTypeArguments(Iterable.class);
+            if (!iterableArguments.isEmpty()) {
+                this.containerElement = iterableArguments.iterator().next();
+            }
+        }
+    }
+
+    @Override
+    public Optional<Argument<?>> getContainerElement() {
+        return Optional.ofNullable(this.containerElement);
     }
 
     @Override
