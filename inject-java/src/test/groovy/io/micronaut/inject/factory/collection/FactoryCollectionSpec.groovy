@@ -27,7 +27,7 @@ class Catalogue {
     
     @WishList
     @Inject
-    List<Product> wishlist;
+    Set<Product> wishlist;
     
     @Any
     @Inject
@@ -124,7 +124,7 @@ class Catalogue {
     
     @WishList
     @Inject
-    List<Product> wishlist;
+    Set<Product> wishlist;
     
     @Any
     @Inject
