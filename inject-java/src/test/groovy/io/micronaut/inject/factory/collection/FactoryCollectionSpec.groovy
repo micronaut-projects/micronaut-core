@@ -73,9 +73,12 @@ class Product {
 ''')
         when:
         def productClass = context.classLoader.loadClass('test.Product')
+        def shopClass = context.classLoader.loadClass('test.Shop')
         def bean = getBean(context, 'test.Catalogue')
 
         then:
+        context.getBeanDefinitions(shopClass).size() == 1
+        context.getBeanDefinitions(shopClass, Qualifiers.byStereotype("test.WishList")).size() == 0
         bean.wishlist.size() == 2
         bean.wishlist.find { it.name == 'four' }
         bean.all.size() == 3

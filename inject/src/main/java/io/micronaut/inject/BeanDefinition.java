@@ -86,15 +86,29 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             if (hasStereotype(Any.class)) {
                 return true;
             } else {
-                final Optional<Argument<?>> containerElement = getContainerElement();
                 final Argument<?>[] typeArguments = beanType.getTypeParameters();
                 final int len = typeArguments.length;
                 if (len == 0) {
-                    return true;
+                    if (isContainerType()) {
+                        final Optional<Argument<?>> containerElement = getContainerElement();
+                        if (containerElement.isPresent()) {
+                            final Class<?> t = containerElement.get().getType();
+                            return beanType.isAssignableFrom(t) || beanType.getType() == t;
+                        } else {
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
                 } else {
                     final Class<?>[] beanTypeParameters;
-                    if (!Iterable.class.isAssignableFrom(beanType.getType()) && containerElement.isPresent()) {
-                        beanTypeParameters = Argument.toClassArray(containerElement.get().getTypeParameters());
+                    if (!Iterable.class.isAssignableFrom(beanType.getType())) {
+                        final Optional<Argument<?>> containerElement = getContainerElement();
+                        if (containerElement.isPresent()) {
+                            beanTypeParameters = Argument.toClassArray(containerElement.get().getTypeParameters());
+                        } else {
+                            beanTypeParameters = getTypeParameters(beanType.getType());
+                        }
                     } else {
                         beanTypeParameters = getTypeParameters(beanType.getType());
                     }
