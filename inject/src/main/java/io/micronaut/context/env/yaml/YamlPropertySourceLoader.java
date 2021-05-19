@@ -40,18 +40,6 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
 
     private static final Logger LOG = LoggerFactory.getLogger(YamlPropertySourceLoader.class);
 
-    private static final SafeConstructor YAML_CONSTRUCTOR = new SafeConstructor() {
-        @Override
-        protected Map<Object, Object> newMap(MappingNode node) {
-            return createDefaultMap(node.getValue().size());
-        }
-
-        @Override
-        protected List<Object> newList(SequenceNode node) {
-            return createDefaultList(node.getValue().size());
-        }
-    };
-
     @Override
     public boolean isEnabled() {
         return isSnakeYamlPresent();
@@ -69,7 +57,7 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
             System.setProperty("java.runtime.name", "Unknown");
         }
 
-        Yaml yaml = new Yaml(YAML_CONSTRUCTOR);
+        Yaml yaml = new Yaml(new CustomSafeConstructor());
         Iterable<Object> objects = yaml.loadAll(input);
         Iterator<Object> i = objects.iterator();
         if (i.hasNext()) {
