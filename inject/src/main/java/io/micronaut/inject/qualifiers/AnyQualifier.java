@@ -50,4 +50,9 @@ public final class AnyQualifier<T> implements Qualifier<T> {
     public <BT extends BeanType<T>> Optional<BT> qualify(Class<T> beanType, Stream<BT> candidates) {
         return candidates.findFirst();
     }
+
+    @Override
+    public String toString() {
+        return "@Any";
+    }
 }
