@@ -15,7 +15,7 @@ import java.util.*;
 import java.lang.annotation.Retention;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import jakarta.inject.*;
-
+import io.micronaut.context.BeanProvider;
 @Singleton
 class Catalogue {
     @All
@@ -28,7 +28,7 @@ class Catalogue {
     
     @Any
     @Inject
-    Product product;
+    BeanProvider<Product> product;
 }
 
 @Factory
