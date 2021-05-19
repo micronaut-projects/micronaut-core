@@ -95,7 +95,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
                             final Class<?> t = containerElement.get().getType();
                             return beanType.isAssignableFrom(t) || beanType.getType() == t;
                         } else {
-                            return true;
+                            return false;
                         }
                     } else {
                         return true;
@@ -104,6 +104,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
                     final Class<?>[] beanTypeParameters;
                     if (!Iterable.class.isAssignableFrom(beanType.getType())) {
                         final Optional<Argument<?>> containerElement = getContainerElement();
+                        //noinspection OptionalIsPresent
                         if (containerElement.isPresent()) {
                             beanTypeParameters = Argument.toClassArray(containerElement.get().getTypeParameters());
                         } else {
