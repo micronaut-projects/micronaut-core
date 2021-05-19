@@ -2365,7 +2365,7 @@ public class DefaultBeanContext implements BeanContext {
      *
      * @param beanType   The bean type
      * @param qualifier  The qualifier
-     * @param candidates The candidates
+     * @param candidates The candidates, always more than 1
      * @param <T>        The generic time
      * @return The concrete bean definition
      */
@@ -3075,7 +3075,6 @@ public class DefaultBeanContext implements BeanContext {
                 definition = lastChanceResolve(
                         beanType,
                         qualifier,
-                        qualifier,
                         throwNonUnique,
                         beanDefinitionList
                 );
@@ -3091,7 +3090,6 @@ public class DefaultBeanContext implements BeanContext {
                         }
                         definition = lastChanceResolve(
                                 beanType,
-                                null,
                                 qualifier,
                                 throwNonUnique,
                                 candidates
@@ -3153,7 +3151,6 @@ public class DefaultBeanContext implements BeanContext {
     private <T> BeanDefinition<T> lastChanceResolve(
             Argument<T> beanType,
             Qualifier<T> qualifier,
-            Qualifier<T> specifiedQualifier,
             boolean throwNonUnique,
             Collection<BeanDefinition<T>> candidates) {
         final Class<T> beanClass = beanType.getType();
@@ -3174,13 +3171,40 @@ public class DefaultBeanContext implements BeanContext {
             if (candidates.size() == 1) {
                 return candidates.iterator().next();
             } else {
-                Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanClass, candidates);
-                if (exactMatches.size() == 1) {
-                    definition = exactMatches.iterator().next();
-                } else if (throwNonUnique) {
-                    definition = findConcreteCandidate(beanClass, specifiedQualifier, candidates);
+                if (candidates.stream().anyMatch(candidate -> candidate.hasAnnotation(Order.class))) {
+                    // pick the bean with the highest priority
+                    final Iterator<BeanDefinition<T>> i = candidates.stream()
+                            .sorted((bean1, bean2) -> {
+                                int order1 = OrderUtil.getOrder(bean1.getAnnotationMetadata());
+                                int order2 = OrderUtil.getOrder(bean2.getAnnotationMetadata());
+                                return Integer.compare(order1, order2);
+                            })
+                            .iterator();
+                    if (i.hasNext()) {
+                        final BeanDefinition<T> bean = i.next();
+                        if (i.hasNext()) {
+                            // check there are not 2 beans with the same order
+                            final BeanDefinition<T> next = i.next();
+                            if (OrderUtil.getOrder(bean.getAnnotationMetadata()) == OrderUtil.getOrder(next.getAnnotationMetadata())) {
+                                throw new NonUniqueBeanException(beanType.getType(), candidates.iterator());
+                            }
+                        }
+
+                        LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, qualifier);
+                        return bean;
+                    } else {
+                        throw new NonUniqueBeanException(beanType.getType(), candidates.iterator());
+                    }
+                } else {
+
+                    Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanClass, candidates);
+                    if (exactMatches.size() == 1) {
+                        definition = exactMatches.iterator().next();
+                    } else if (throwNonUnique) {
+                        definition = findConcreteCandidate(beanClass, qualifier, candidates);
+                    }
+                    return definition;
                 }
-                return definition;
             }
         }
     }
