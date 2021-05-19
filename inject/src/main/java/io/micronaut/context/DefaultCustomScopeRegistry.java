@@ -19,7 +19,6 @@ import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -42,27 +41,24 @@ class DefaultCustomScopeRegistry implements CustomScopeRegistry {
 
     private final BeanLocator beanLocator;
     private final Map<String, Optional<CustomScope<?>>> scopes = new ConcurrentHashMap<>(2);
-    private final ClassLoader classLoader;
 
     /**
      * @param beanLocator The bean locator
-     * @param classLoader The class loader
      */
-    DefaultCustomScopeRegistry(BeanLocator beanLocator, ClassLoader classLoader) {
+    DefaultCustomScopeRegistry(BeanLocator beanLocator) {
         this.beanLocator = beanLocator;
-        this.classLoader = classLoader;
     }
 
     @Override
     public Optional<CustomScope<?>> findDeclaredScope(@NonNull Argument<?> argument) {
-        return argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class).flatMap(this::findScope);
+        return argument.getAnnotationMetadata().getAnnotationNameByStereotype(Scope.class).flatMap(this::findScope);
     }
 
     @Override
     public Optional<CustomScope<?>> findDeclaredScope(@NonNull BeanType<?> beanType) {
-        final List<Class<? extends Annotation>> scopeHierarchy = beanType.getAnnotationMetadata().getAnnotationTypesByStereotype(Scope.class);
+        final List<String> scopeHierarchy = beanType.getAnnotationMetadata().getAnnotationNamesByStereotype(Scope.class);
         Optional<CustomScope<?>> registeredScope = Optional.empty();
-        for (Class<? extends Annotation> scope : scopeHierarchy) {
+        for (String scope : scopeHierarchy) {
             registeredScope = findScope(scope);
             if (registeredScope.isPresent()) {
                 break;
@@ -84,12 +80,8 @@ class DefaultCustomScopeRegistry implements CustomScopeRegistry {
     @Override
     public Optional<CustomScope<?>> findScope(String scopeAnnotation) {
         return scopes.computeIfAbsent(scopeAnnotation, type -> {
-            final Optional<Class> scopeClass = ClassUtils.forName(type, classLoader);
-            if (scopeClass.isPresent()) {
-                final Qualifier qualifier = Qualifiers.byTypeArguments(scopeClass.get());
-                return beanLocator.findBean(CustomScope.class, qualifier);
-            }
-            return Optional.empty();
+            final Qualifier qualifier = Qualifiers.byExactTypeArgumentName(scopeAnnotation);
+            return beanLocator.findBean(CustomScope.class, qualifier);
         });
     }
 

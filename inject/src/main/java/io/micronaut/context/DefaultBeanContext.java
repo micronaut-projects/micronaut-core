@@ -54,7 +54,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 import javax.inject.Provider;
-import javax.inject.Scope;
 import javax.inject.Singleton;
 import java.io.Closeable;
 import java.lang.annotation.Annotation;
@@ -220,7 +219,7 @@ public class DefaultBeanContext implements BeanContext {
      */
     @NonNull
     protected CustomScopeRegistry createCustomScopeRegistry() {
-        return new DefaultCustomScopeRegistry(this, classLoader);
+        return new DefaultCustomScopeRegistry(this);
     }
 
     @Override
@@ -2814,7 +2813,7 @@ public class DefaultBeanContext implements BeanContext {
 
             if (currentSegment.isPresent()) {
                 Argument<?> argument = currentSegment.get().getArgument();
-                registeredScope =  customScopeRegistry.findDeclaredScope(argument);;
+                registeredScope =  customScopeRegistry.findDeclaredScope(argument);
             }
 
             if (!isProxy && isScopedProxyDefinition && !registeredScope.isPresent()) {

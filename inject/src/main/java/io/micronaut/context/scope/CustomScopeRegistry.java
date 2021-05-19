@@ -41,7 +41,6 @@ public interface CustomScopeRegistry {
         return Optional.empty();
     }
 
-
     /**
      * Finds the declared scope for the given bean type.
      *
