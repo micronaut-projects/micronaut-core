@@ -18,6 +18,7 @@ package io.micronaut.web.router;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.ArgumentBinder;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -26,15 +27,15 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.sse.Event;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
 import io.micronaut.core.annotation.NonNull;
-
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.function.Predicate;
@@ -51,9 +52,12 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     protected final MethodExecutionHandle<T, R> executableMethod;
     protected final ConversionService<?> conversionService;
+    protected final Map<String, Argument> requiredInputs;
     protected final DefaultRouteBuilder.AbstractRoute abstractRoute;
     protected final List<MediaType> consumedMediaTypes;
     protected final List<MediaType> producedMediaTypes;
+    protected final boolean consumedMediaTypesContainsAll;
+    protected final boolean producedMediaTypesContainsAll;
 
     /**
      * Constructor.
@@ -66,8 +70,20 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         //noinspection unchecked
         this.executableMethod = (MethodExecutionHandle<T, R>) abstractRoute.targetMethod;
         this.conversionService = conversionService;
+        Argument[] requiredArguments = executableMethod.getArguments();
+        if (requiredArguments.length > 0) {
+            this.requiredInputs = new LinkedHashMap<>(requiredArguments.length);
+            for (Argument requiredArgument : requiredArguments) {
+                String inputName = resolveInputName(requiredArgument);
+                requiredInputs.put(inputName, requiredArgument);
+            }
+        } else {
+            this.requiredInputs = Collections.emptyMap();
+        }
         this.consumedMediaTypes = abstractRoute.getConsumes();
         this.producedMediaTypes = abstractRoute.getProduces();
+        this.consumedMediaTypesContainsAll = consumedMediaTypes == null || consumedMediaTypes.isEmpty() || consumedMediaTypes.contains(MediaType.ALL_TYPE);
+        this.producedMediaTypesContainsAll = producedMediaTypes == null || producedMediaTypes.isEmpty() || producedMediaTypes.contains(MediaType.ALL_TYPE);
     }
 
     @Override
@@ -118,7 +134,12 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public List<MediaType> getProduces() {
-        return abstractRoute.getProduces();
+        Optional<Argument<?>> firstTypeVariable = executableMethod.getReturnType().getFirstTypeVariable();
+        if (firstTypeVariable.isPresent() && Event.class.isAssignableFrom(firstTypeVariable.get().getType())) {
+            return Collections.singletonList(MediaType.TEXT_EVENT_STREAM_TYPE);
+        } else {
+            return abstractRoute.getProduces();
+        }
     }
 
     @Override
@@ -137,26 +158,26 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
         String bodyArgument = abstractRoute.bodyArgumentName;
         if (bodyArgument != null) {
-            return Optional.ofNullable(abstractRoute.requiredInputs.get(bodyArgument));
+            return Optional.ofNullable(requiredInputs.get(bodyArgument));
         }
         return Optional.empty();
     }
 
     @Override
     public boolean isRequiredInput(String name) {
-        return abstractRoute.requiredInputs.containsKey(name);
+        return requiredInputs.containsKey(name);
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public Optional<Argument<?>> getRequiredInput(String name) {
-        return Optional.ofNullable(abstractRoute.requiredInputs.get(name));
+        return Optional.ofNullable(requiredInputs.get(name));
     }
 
     @Override
     public boolean isExecutable() {
         Map<String, Object> variables = getVariableValues();
-        for (Map.Entry<String, Argument> entry : abstractRoute.requiredInputs.entrySet()) {
+        for (Map.Entry<String, Argument> entry : requiredInputs.entrySet()) {
             Object value = variables.get(entry.getKey());
             if (value == null || value instanceof UnresolvedArgument) {
                 return false;
@@ -249,7 +270,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             Map<String, Object> uriVariables = getVariableValues();
             List<Object> argumentList = new ArrayList<>(argumentValues.size());
 
-            for (Map.Entry<String, Argument> entry : abstractRoute.requiredInputs.entrySet()) {
+            for (Map.Entry<String, Argument> entry : requiredInputs.entrySet()) {
                 Argument argument = entry.getValue();
                 String name = entry.getKey();
                 Object value = DefaultRouteBuilder.NO_VALUE;
@@ -326,17 +347,17 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public boolean doesConsume(MediaType contentType) {
-        return contentType == null || abstractRoute.consumesMediaTypesContainsAll || explicitlyConsumes(contentType);
+        return contentType == null || consumedMediaTypesContainsAll || explicitlyConsumes(contentType);
     }
 
     @Override
     public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
-        return abstractRoute.producesMediaTypesContainsAll || anyMediaTypesMatch(producedMediaTypes, acceptableTypes);
+        return producedMediaTypesContainsAll || anyMediaTypesMatch(producedMediaTypes, acceptableTypes);
     }
 
     @Override
     public boolean doesProduce(@Nullable MediaType acceptableType) {
-        return abstractRoute.producesMediaTypesContainsAll || acceptableType == null || acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType);
+        return producedMediaTypesContainsAll || acceptableType == null || acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType);
     }
 
     private boolean anyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
@@ -387,7 +408,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                     }
 
                     if (value != null) {
-                        String name = abstractRoute.resolveInputName(requiredArgument);
+                        String name = resolveInputName(requiredArgument);
                         if (value instanceof UnresolvedArgument || value instanceof NullArgument) {
                             newVariables.put(name, value);
                         } else {
@@ -408,16 +429,6 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             }
             return newFulfilled(newVariables, (List<Argument>) requiredArguments);
         }
-    }
-
-    @Override
-    public HttpStatus findStatus(HttpStatus defaultStatus) {
-        return abstractRoute.definedStatus == null ? defaultStatus : abstractRoute.definedStatus;
-    }
-
-    @Override
-    public boolean isWebSocketRoute() {
-        return abstractRoute.isWebSocketRoute;
     }
 
     /**
@@ -447,4 +458,11 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
      */
     protected abstract RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments);
 
+    private String resolveInputName(Argument requiredArgument) {
+        String inputName = requiredArgument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(null);
+        if (StringUtils.isEmpty(inputName)) {
+            inputName = requiredArgument.getName();
+        }
+        return inputName;
+    }
 }

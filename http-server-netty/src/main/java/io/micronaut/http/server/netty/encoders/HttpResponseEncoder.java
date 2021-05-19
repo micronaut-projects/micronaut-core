@@ -104,7 +104,7 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
         }
 
         if (response instanceof NettyMutableHttpResponse) {
-            out.add(((NettyMutableHttpResponse) response).toHttpResponse());
+            out.add(((NettyMutableHttpResponse) response).getNativeResponse());
         } else {
             io.netty.handler.codec.http.HttpHeaders nettyHeaders = new DefaultHttpHeaders();
             for (Map.Entry<String, List<String>> header : response.getHeaders()) {

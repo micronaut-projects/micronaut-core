@@ -58,7 +58,6 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
         return returnType.isSingleResult() ||
                 (isReactive() && returnType.getFirstTypeVariable()
                         .filter(t -> HttpResponse.class.isAssignableFrom(t.getType())).isPresent()) ||
-                returnType.isAsync() ||
                 returnType.isSuspended();
     }
 

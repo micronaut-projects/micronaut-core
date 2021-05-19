@@ -15,9 +15,9 @@
  */
 package io.micronaut.http.netty;
 
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -37,21 +37,10 @@ import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.DecoderResult;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.DefaultHttpHeaders;
-import io.netty.handler.codec.http.DefaultLastHttpContent;
-import io.netty.handler.codec.http.EmptyHttpHeaders;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -66,119 +55,33 @@ import java.util.concurrent.ConcurrentHashMap;
 public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
     private static final ServerCookieEncoder DEFAULT_SERVER_COOKIE_ENCODER = ServerCookieEncoder.LAX;
 
-    private final HttpVersion httpVersion;
-    private HttpResponseStatus httpResponseStatus;
-    private final NettyHttpHeaders headers;
-    private Object body;
-    private Optional<Object> optionalBody;
-    private Optional<MediaType> contentType;
-    private final HttpHeaders nettyHeaders;
-    private final HttpHeaders trailingNettyHeaders;
-    private final DecoderResult decoderResult;
+    protected FullHttpResponse nettyResponse;
+    final NettyHttpHeaders headers;
     private final ConversionService conversionService;
+    private Object body;
+    private final Map<Class, Optional> convertedBodies = Collections.synchronizedMap(new LinkedHashMap<>(1));
     private MutableConvertibleValues<Object> attributes;
     private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
-
-    private final BodyConvertor bodyConvertor = newBodyConvertor();
 
     /**
      * @param nettyResponse     The {@link FullHttpResponse}
      * @param conversionService The conversion service
      */
+    @SuppressWarnings("MagicNumber")
     public NettyMutableHttpResponse(FullHttpResponse nettyResponse, ConversionService conversionService) {
-        this(nettyResponse.protocolVersion(), nettyResponse.status(), nettyResponse.headers(), nettyResponse.trailingHeaders(), nettyResponse.content(), nettyResponse.decoderResult(), conversionService);
-    }
-
-    /**
-     * @param conversionService The conversion service
-     */
-    public NettyMutableHttpResponse(ConversionService conversionService) {
-        this(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, null, conversionService);
-    }
-
-    /**
-     * Creates a new instance.
-     *
-     * @param httpVersion The http version
-     * @param httpResponseStatus THe http response status
-     * @param conversionService The conversion service
-     */
-    public NettyMutableHttpResponse(HttpVersion httpVersion, HttpResponseStatus httpResponseStatus, ConversionService conversionService) {
-        this(httpVersion, httpResponseStatus, null, conversionService);
-    }
-
-    /**
-     * Creates a new instance.
-     *
-     * @param httpVersion The http version
-     * @param httpResponseStatus THe http response status
-     * @param body The body
-     * @param conversionService The conversion service
-     */
-    public NettyMutableHttpResponse(HttpVersion httpVersion, HttpResponseStatus httpResponseStatus, Object body, ConversionService conversionService) {
-        this(httpVersion, httpResponseStatus, new DefaultHttpHeaders(), body, conversionService);
-    }
-
-    /**
-     * Creates a new instance.
-     *
-     * @param httpVersion The http version
-     * @param httpResponseStatus THe http response status
-     * @param nettyHeaders The http headers
-     * @param body The body
-     * @param conversionService The conversion service
-     */
-    public NettyMutableHttpResponse(HttpVersion httpVersion,
-                                    HttpResponseStatus httpResponseStatus,
-                                    HttpHeaders nettyHeaders,
-                                    Object body,
-                                    ConversionService conversionService) {
-        this(httpVersion, httpResponseStatus, nettyHeaders, EmptyHttpHeaders.INSTANCE, body, null, conversionService);
-    }
-
-    private NettyMutableHttpResponse(HttpVersion httpVersion,
-                                     HttpResponseStatus httpResponseStatus,
-                                     HttpHeaders nettyHeaders,
-                                     HttpHeaders trailingNettyHeaders,
-                                     Object body,
-                                     DecoderResult decoderResult,
-                                     ConversionService conversionService) {
-        this.httpVersion = httpVersion;
-        this.httpResponseStatus = httpResponseStatus;
-        this.nettyHeaders = nettyHeaders;
-        this.trailingNettyHeaders = trailingNettyHeaders;
-        this.body = body;
-        this.optionalBody = Optional.ofNullable(body);
-        this.decoderResult = decoderResult;
+        this.nettyResponse = nettyResponse;
+        this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
         this.conversionService = conversionService;
-        this.headers = new NettyHttpHeaders(nettyHeaders, conversionService);
     }
 
     /**
-     * The netty http version.
-     *
-     * @return http version
+     * @param conversionService The conversion service
      */
-    public HttpVersion getNettyHttpVersion() {
-        return httpVersion;
-    }
-
-    /**
-     * The netty http response status.
-     *
-     * @return http response status
-     */
-    public HttpResponseStatus getNettyHttpStatus() {
-        return httpResponseStatus;
-    }
-
-    /**
-     * The netty headers.
-     *
-     * @return netty headers
-     */
-    public HttpHeaders getNettyHeaders() {
-        return nettyHeaders;
+    @SuppressWarnings("MagicNumber")
+    public NettyMutableHttpResponse(ConversionService conversionService) {
+        this.nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.EMPTY_BUFFER);
+        this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
+        this.conversionService = conversionService;
     }
 
     @Override
@@ -189,18 +92,16 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
 
     @Override
     public Optional<MediaType> getContentType() {
-        if (contentType == null) {
-            contentType = MutableHttpResponse.super.getContentType();
-            if (!contentType.isPresent()) {
-                Optional<B> body = getBody();
-                if (body.isPresent()) {
-                    contentType = MediaType.fromType(body.get().getClass());
-                } else {
-                    contentType = Optional.empty();
-                }
+        Optional<MediaType> contentType = MutableHttpResponse.super.getContentType();
+        if (contentType.isPresent()) {
+            return contentType;
+        } else {
+            Optional<B> body = getBody();
+            if (body.isPresent()) {
+                return MediaType.fromType(body.get().getClass());
             }
         }
-        return contentType;
+        return Optional.empty();
     }
 
     @Override
@@ -225,7 +126,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
 
     @Override
     public HttpStatus getStatus() {
-        return HttpStatus.valueOf(httpResponseStatus.code());
+        return HttpStatus.valueOf(nettyResponse.status().code());
     }
 
     @Override
@@ -245,7 +146,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
         if (cookies == null || cookies.isEmpty()) {
             return this;
         }
-        for (Cookie cookie : cookies) {
+        for (Cookie cookie: cookies) {
             cookie(cookie);
         }
         return this;
@@ -253,7 +154,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
 
     @Override
     public Optional<B> getBody() {
-        return (Optional) optionalBody;
+        return (Optional<B>) Optional.ofNullable(body);
     }
 
     @Override
@@ -264,14 +165,27 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> getBody(Argument<T> type) {
-        return bodyConvertor.convert(type, body);
+        return convertedBodies.computeIfAbsent(type.getType(), aClass -> getBody().flatMap(b -> {
+            ArgumentConversionContext<T> context = ConversionContext.of(type);
+            if (b instanceof ByteBuffer) {
+                return conversionService.convert(((ByteBuffer) b).asNativeBuffer(), context);
+            }
+            return conversionService.convert(b, context);
+        }));
     }
 
     @Override
     public MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
         message = message == null ? status.getReason() : message;
-        httpResponseStatus = new HttpResponseStatus(status.getCode(), message.toString());
+        nettyResponse.setStatus(new HttpResponseStatus(status.getCode(), message.toString()));
         return this;
+    }
+
+    /**
+     * @return The Netty {@link FullHttpResponse}
+     */
+    public FullHttpResponse getNativeResponse() {
+        return nettyResponse;
     }
 
     @Override
@@ -281,14 +195,25 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
                 ((ByteBuf) this.body).release();
             }
             this.body = body;
-            this.optionalBody = Optional.ofNullable(body);
-            this.contentType = null;
-            bodyConvertor.cleanup();
+            if (body instanceof ByteBuf) {
+                replace((ByteBuf) body);
+            }
         }
         return (MutableHttpResponse<T>) this;
     }
 
     /**
+     * @param body The body to replace
+     * @return The current instance
+     */
+    public NettyMutableHttpResponse replace(ByteBuf body) {
+        this.nettyResponse = this.nettyResponse.replace(body);
+        this.headers.setNettyHeaders(this.nettyResponse.headers());
+        return this;
+    }
+
+    /**
+     *
      * @return Server cookie encoder
      */
     public ServerCookieEncoder getServerCookieEncoder() {
@@ -296,6 +221,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     }
 
     /**
+     *
      * @param serverCookieEncoder Server cookie encoder
      */
     public void setServerCookieEncoder(ServerCookieEncoder serverCookieEncoder) {
@@ -305,109 +231,31 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     @NonNull
     @Override
     public FullHttpResponse toFullHttpResponse() {
-        ByteBuf content;
-        if (body == null) {
-            content = Unpooled.EMPTY_BUFFER;
-        } else if (body instanceof ByteBuf) {
-            content = (ByteBuf) body;
-        } else {
-            throw new IllegalStateException("Body needs to be converted to ByteBuf from " + body.getClass());
-        }
-        DefaultFullHttpResponse defaultFullHttpResponse = new DefaultFullHttpResponse(httpVersion,
-                httpResponseStatus,
-                content,
-                nettyHeaders,
-                trailingNettyHeaders);
-        if (decoderResult != null) {
-            defaultFullHttpResponse.setDecoderResult(decoderResult);
-        }
-        return defaultFullHttpResponse;
+        return this.nettyResponse;
     }
 
     @NonNull
     @Override
     public StreamedHttpResponse toStreamHttpResponse() {
-        ByteBuf content;
-        if (body == null) {
-            content = Unpooled.EMPTY_BUFFER;
-        } else if (body instanceof ByteBuf) {
-            content = (ByteBuf) body;
-        } else {
-            throw new IllegalStateException("Body needs to be converted to ByteBuf from " + body.getClass());
-        }
         DefaultStreamedHttpResponse streamedHttpResponse = new DefaultStreamedHttpResponse(
                 HttpVersion.HTTP_1_1,
-                httpResponseStatus,
+                this.nettyResponse.status(),
                 true,
-                Publishers.just(new DefaultLastHttpContent(content))
+                Publishers.just(new DefaultLastHttpContent(this.nettyResponse.content()))
         );
-        streamedHttpResponse.headers().setAll(nettyHeaders);
+        streamedHttpResponse.headers().setAll(this.nettyResponse.headers());
         return streamedHttpResponse;
     }
 
     @NonNull
     @Override
     public HttpResponse toHttpResponse() {
-        return toFullHttpResponse();
+        return this.nettyResponse;
     }
 
     @Override
     public boolean isStream() {
         return false;
-    }
-
-    private BodyConvertor newBodyConvertor() {
-        return new BodyConvertor() {
-
-            @Override
-            public Optional convert(Argument valueType, Object value) {
-                if (value == null) {
-                    return Optional.empty();
-                }
-                if (Argument.OBJECT_ARGUMENT.equalsType(valueType)) {
-                    return Optional.of(value);
-                }
-                return convertFromNext(conversionService, valueType, value);
-            }
-
-        };
-    }
-
-    private abstract static class BodyConvertor<T> {
-
-        private BodyConvertor<T> nextConvertor;
-
-        public abstract Optional<T> convert(Argument<T> valueType, T value);
-
-        protected synchronized Optional<T> convertFromNext(ConversionService conversionService, Argument<T> conversionValueType, T value) {
-            if (nextConvertor == null) {
-                Optional<T> conversion;
-                ArgumentConversionContext<T> context = ConversionContext.of(conversionValueType);
-                if (value instanceof ByteBuffer) {
-                    conversion = conversionService.convert(((ByteBuffer) value).asNativeBuffer(), context);
-                } else {
-                    conversion = conversionService.convert(value, context);
-                }
-                nextConvertor = new BodyConvertor<T>() {
-
-                    @Override
-                    public Optional<T> convert(Argument<T> valueType, T value) {
-                        if (conversionValueType.equalsType(valueType)) {
-                            return conversion;
-                        }
-                        return convertFromNext(conversionService, valueType, value);
-                    }
-
-                };
-                return conversion;
-            }
-            return nextConvertor.convert(conversionValueType, value);
-        }
-
-        public void cleanup() {
-            nextConvertor = null;
-        }
-
     }
 
 }

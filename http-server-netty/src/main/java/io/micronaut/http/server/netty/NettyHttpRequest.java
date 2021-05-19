@@ -17,13 +17,13 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -59,7 +59,6 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -77,6 +76,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
+    private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
@@ -85,8 +85,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private Supplier<Optional<T>> body;
     private RouteMatch<?> matchedRoute;
     private boolean bodyRequired;
-
-    private final BodyConvertor bodyConvertor = newBodyConvertor();
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
@@ -263,13 +261,15 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @SuppressWarnings("unchecked")
     @Override
     public <T1> Optional<T1> getBody(Class<T1> type) {
-        return getBody(Argument.of(type));
+        Optional<T> body = getBody();
+        return body.flatMap(t -> convertedBodies.computeIfAbsent(type, aClass -> conversionService.convert(t, aClass)));
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T1> Optional<T1> getBody(Argument<T1> type) {
-        return getBody().flatMap(t -> bodyConvertor.convert(type, t));
+        Optional<T> body = getBody();
+        return body.flatMap(t -> convertedBodies.computeIfAbsent(type.getType(), aClass -> conversionService.convert(t, ConversionContext.of(type))));
     }
 
     /**
@@ -277,16 +277,22 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void release() {
-        Consumer<Object> releaseIfNecessary = this::releaseIfNecessary;
-        getBody().ifPresent(releaseIfNecessary);
-        receivedContent.forEach(releaseIfNecessary);
-        receivedData.values().forEach(releaseIfNecessary);
+        Object body = getBody().orElse(null);
+        releaseIfNecessary(body);
+        for (ByteBufHolder byteBuf : receivedContent) {
+            releaseIfNecessary(byteBuf);
+        }
+        for (ByteBufHolder byteBuf : receivedData.values()) {
+            releaseIfNecessary(byteBuf);
+        }
         if (this.body instanceof ReferenceCounted) {
             ReferenceCounted referenceCounted = (ReferenceCounted) this.body;
             releaseIfNecessary(referenceCounted);
         }
         if (attributes != null) {
-            attributes.values().forEach(releaseIfNecessary);
+            for (Object value : attributes.values()) {
+                releaseIfNecessary(value);
+            }
         }
         if (nettyRequest instanceof StreamedHttpRequest) {
             ((StreamedHttpRequest) nettyRequest).closeIfNoSubscriber();
@@ -314,7 +320,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     public void setBody(T body) {
         this.body = () -> Optional.ofNullable(body);
-        bodyConvertor.cleanup();
+        this.convertedBodies.clear();
     }
 
     /**
@@ -410,23 +416,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(KEY);
         return attr.getAndSet(null);
-    }
-
-    private BodyConvertor newBodyConvertor() {
-        return new BodyConvertor() {
-
-            @Override
-            public Optional convert(Argument valueType, Object value) {
-                if (value == null) {
-                    return Optional.empty();
-                }
-                if (Argument.OBJECT_ARGUMENT.equalsType(valueType)) {
-                    return Optional.of(value);
-                }
-                return convertFromNext(conversionService, valueType, value);
-            }
-
-        };
     }
 
     /**
@@ -576,37 +565,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         public MutableHttpRequest<T> mutate() {
             return new NettyMutableHttpRequest();
         }
-    }
-
-    private abstract static class BodyConvertor<T> {
-
-        private BodyConvertor<T> nextConvertor;
-
-        public abstract Optional<T> convert(Argument<T> valueType, T value);
-
-        protected synchronized Optional<T> convertFromNext(ConversionService conversionService, Argument<T> conversionValueType, T value) {
-            if (nextConvertor == null) {
-                Optional<T> conversion = conversionService.convert(value, ConversionContext.of(conversionValueType));
-                nextConvertor = new BodyConvertor<T>() {
-
-                    @Override
-                    public Optional<T> convert(Argument<T> valueType, T value) {
-                        if (conversionValueType.equalsType(valueType)) {
-                            return conversion;
-                        }
-                        return convertFromNext(conversionService, valueType, value);
-                    }
-
-                };
-                return conversion;
-            }
-            return nextConvertor.convert(conversionValueType, value);
-        }
-
-        public void cleanup() {
-            nextConvertor = null;
-        }
-
     }
 
 }
