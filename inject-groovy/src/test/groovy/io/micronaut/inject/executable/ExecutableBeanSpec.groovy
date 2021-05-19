@@ -20,6 +20,29 @@ import io.micronaut.inject.BeanDefinition
 
 class ExecutableBeanSpec extends AbstractBeanDefinitionSpec {
 
+    void "test executable on stereotype"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.ExecutableController','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.http.annotation.Get;
+
+@javax.inject.Singleton
+class ExecutableController {
+
+    @Get("/round")
+    public int round(float num) {
+        return Math.round(num);
+    }
+}
+''')
+        expect:
+        definition != null
+        definition.findMethod("round", float.class).get().returnType.type == int.class
+    }
+
     void "test executable method return types"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.ExecutableBean1','''\

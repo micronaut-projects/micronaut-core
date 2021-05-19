@@ -40,7 +40,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target(ElementType.TYPE)
-@Executable
 public @interface Filter {
 
     /**

@@ -42,7 +42,6 @@ import java.lang.annotation.Target;
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Bean
-@Executable
 @DefaultScope(Singleton.class)
 public @interface Controller {
 
