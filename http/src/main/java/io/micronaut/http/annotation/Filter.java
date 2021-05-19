@@ -16,7 +16,6 @@
 package io.micronaut.http.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.http.HttpMethod;
 
 import javax.inject.Singleton;
