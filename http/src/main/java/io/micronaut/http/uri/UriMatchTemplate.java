@@ -42,6 +42,10 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     private final boolean isRoot;
     private final boolean exactMatch;
 
+    // Matches cache
+    private Optional<UriMatchInfo> rootMatchInfo;
+    private Optional<UriMatchInfo> exactMatchInfo;
+
     /**
      * Construct a new URI template for the given template.
      *
@@ -156,7 +160,10 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         }
 
         if (isRoot && (length == 0 || (length == 1 && uri.charAt(0) == '/'))) {
-            return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
+            if (rootMatchInfo == null) {
+                rootMatchInfo = Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
+            }
+            return rootMatchInfo;
         }
         //Remove any url parameters before matching
         int parameterIndex = uri.indexOf('?');
@@ -168,7 +175,10 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         }
         if (exactMatch) {
             if (uri.equals(templateString)) {
-                return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
+                if (exactMatchInfo == null) {
+                    exactMatchInfo = Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
+                }
+                return exactMatchInfo;
             }
             return Optional.empty();
         }
