@@ -41,7 +41,7 @@ import java.util.concurrent.ConcurrentHashMap;
 class DefaultCustomScopeRegistry implements CustomScopeRegistry {
 
     private final BeanLocator beanLocator;
-    private final Map<String, Optional<CustomScope>> scopes = new ConcurrentHashMap<>(2);
+    private final Map<String, Optional<CustomScope<?>>> scopes = new ConcurrentHashMap<>(2);
     private final ClassLoader classLoader;
 
     /**
