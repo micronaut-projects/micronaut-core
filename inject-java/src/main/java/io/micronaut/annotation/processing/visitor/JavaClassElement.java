@@ -104,6 +104,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
+    public String toString() {
+        return getName();
+    }
+
+    @Override
     public boolean isInner() {
         return classElement.getNestingKind().isNested();
     }

@@ -26,7 +26,7 @@ package annreplaces;
 import io.micronaut.inject.qualifiers.replaces.TestProduces;
 import io.micronaut.inject.qualifiers.replaces.TestSpecializes;
 import jakarta.inject.*;
-
+import io.micronaut.context.annotation.Factory;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -37,6 +37,7 @@ class Catalog {
     public PaymentProcessor paymentProcessor;   
 }
 @Singleton
+@Factory
 class Shop {
     @TestProduces
     PaymentProcessor getPaymentProcessor() {
@@ -52,6 +53,7 @@ class Shop {
 }
 
 @TestSpecializes
+@Factory
 class MockShop extends Shop {
     @Override @TestSpecializes
     @TestProduces
@@ -84,6 +86,8 @@ class Product {
 
         expect:
         bean
+        getBean(context, 'annreplaces.MockShop')
+        bean.paymentProcessor.getClass().name.contains("Mock")
 
     }
 
@@ -101,7 +105,7 @@ class Product {
     static class MyTypeElementVisitorProcessor extends TypeElementVisitorProcessor {
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
-            return [new MyProducesVisitor(), new MySpecializesVisitor()]
+            return [new MySpecializesVisitor(), new MyProducesVisitor()]
         }
     }
     static class MySpecializesVisitor implements TypeElementVisitor<Object, TestSpecializes> {
@@ -130,8 +134,8 @@ class Product {
         void visitMethod(MethodElement element, VisitorContext context) {
             if (!this.currentClass.hasAnnotation(Factory.class)) {
                 this.currentClass.annotate(Factory.class);
-                element.annotate(Bean)
             }
+            element.annotate(Bean)
         }
 
         @Override
