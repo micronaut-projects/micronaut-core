@@ -380,10 +380,18 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         @Override
         public Object visitExecutable(ExecutableElement executableElement, Object o) {
-            AnnotationMetadata methodAnnotationMetadata = new AnnotationMetadataHierarchy(
-                    annotationUtils.getAnnotationMetadata(executableElement.getEnclosingElement()),
-                    annotationUtils.getAnnotationMetadata(executableElement)
-            );
+            final AnnotationMetadata resolvedMethodMetadata = annotationUtils.getAnnotationMetadata(executableElement);
+
+            AnnotationMetadata methodAnnotationMetadata;
+
+            if (resolvedMethodMetadata instanceof AnnotationMetadataHierarchy) {
+                methodAnnotationMetadata = resolvedMethodMetadata;
+            } else {
+                methodAnnotationMetadata = new AnnotationMetadataHierarchy(
+                        annotationUtils.getAnnotationMetadata(executableElement.getEnclosingElement()),
+                        resolvedMethodMetadata
+                );
+            }
             if (executableElement.getSimpleName().toString().equals("<init>")) {
                 for (LoadedVisitor visitor : visitors) {
                     final io.micronaut.inject.ast.Element resultingElement = visitor.visit(executableElement, methodAnnotationMetadata);
