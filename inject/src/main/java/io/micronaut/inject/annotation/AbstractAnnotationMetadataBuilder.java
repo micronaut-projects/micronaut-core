@@ -349,6 +349,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
             annotationMetadata = ((DefaultAnnotationMetadata) existing).clone();
+        } else if (existing instanceof AnnotationMetadataHierarchy) {
+            final AnnotationMetadata declaredMetadata = ((AnnotationMetadataHierarchy) existing).getDeclaredMetadata();
+            if (declaredMetadata instanceof DefaultAnnotationMetadata) {
+                annotationMetadata = ((DefaultAnnotationMetadata) declaredMetadata).clone();
+            } else {
+                annotationMetadata = new MutableAnnotationMetadata();
+            }
         } else {
             annotationMetadata = new MutableAnnotationMetadata();
         }
