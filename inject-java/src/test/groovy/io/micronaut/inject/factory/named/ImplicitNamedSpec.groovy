@@ -69,6 +69,11 @@ class TestFactory {
         return ()-> "primary";
     }
     
+    @Singleton
+    @Named
+    Foo getFooGetter() {
+        return ()-> "getter";
+    }
 }
 
 class Test {
@@ -86,6 +91,10 @@ class Test {
     @Named
     @Inject
     public Foo fooPrimary;
+    
+    @Named("fooGetter")
+    @Inject
+    public Foo getter;
     
     Foo foo1Ctor; 
     Foo foo1Method;
@@ -114,6 +123,7 @@ interface Foo {
         bean.fooPrimary.name() == 'primary'
         bean.foo1Ctor.name() == 'one'
         bean.foo1Method.name() == 'one'
+        bean.getter.name() == 'getter'
         cleanup:
         context.close()
     }
