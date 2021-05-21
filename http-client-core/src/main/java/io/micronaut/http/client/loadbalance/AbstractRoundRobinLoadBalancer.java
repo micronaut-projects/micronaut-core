@@ -59,7 +59,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
         }
     }
 
-    private int getServiceIndex(int len){
+    private int getServiceIndex(int len) {
         return index.getAndAccumulate(len, (cur, n) -> cur >= n - 1 ? 0 : cur + 1);
     }
 }
