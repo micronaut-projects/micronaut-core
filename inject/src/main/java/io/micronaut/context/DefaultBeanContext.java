@@ -2948,7 +2948,6 @@ public class DefaultBeanContext implements BeanContext {
                     Optional<BeanDefinition<T>> candidate = ((Qualifier) qualifier).qualify(beanClass, Stream.of(registration.beanDefinition));
                     if (candidate.isPresent()) {
                         synchronized (singletonObjects) {
-                            bean = (T) existing;
                             final BeanDefinition<T> beanDefinition = candidate.get();
                             final Set<Class<?>> exposedTypes = beanDefinition.getExposedTypes();
                             if (!exposedTypes.isEmpty() && !exposedTypes.contains(beanClass)) {
@@ -2957,6 +2956,7 @@ public class DefaultBeanContext implements BeanContext {
                             if (!beanDefinition.isCandidateBean(resolvedBeanType)) {
                                 continue;
                             }
+                            bean = (T) existing;
                             registerSingletonBean(
                                     beanDefinition,
                                     resolvedBeanType,
