@@ -1682,7 +1682,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void autoApplyNamed(Element element) {
         if (!element.stringValue(Named.class).isPresent()) {
             element.annotate(Named.class, (builder) -> {
-                final String name = element instanceof ClassElement ? NameUtils.decapitalize(element.getSimpleName()) : element.getName();
+                final String name;
+
+                if (element instanceof ClassElement) {
+                   name = NameUtils.decapitalize(element.getSimpleName());
+                } else {
+                    if (element instanceof MethodElement) {
+                        final String n = element.getName();
+                        if (NameUtils.isGetterName(n)) {
+                            name = NameUtils.getPropertyNameForGetter(n);
+                        } else {
+                            name = n;
+                        }
+                    } else {
+                        name = element.getName();
+                    }
+                }
                 builder.value(name);
             });
         }
