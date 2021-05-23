@@ -2127,7 +2127,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     return upstreamResponsePublisher;
                 }
                 HttpFilter httpFilter = filters.get(pos);
-                return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this);
+                requestReference.set(request);
+                return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), this);
             }
         };
         Optional<HttpRequest<Object>> prevRequest = ServerRequestContext.currentRequest();
