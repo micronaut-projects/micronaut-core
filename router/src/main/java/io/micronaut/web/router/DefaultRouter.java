@@ -66,6 +66,15 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         httpFilters.sort(OrderUtil.COMPARATOR);
         return httpFilters;
     });
+    
+    /**
+     * Construct a new router for the given route builders.
+     *
+     * @param builders The builders
+     */
+    public DefaultRouter(RouteBuilder... builders) {
+        this(Arrays.asList(builders));
+    }
 
     /**
      * Construct a new router for the given route builders.
@@ -132,15 +141,6 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             }
         }
         return true;
-    }
-
-    /**
-     * Construct a new router for the given route builders.
-     *
-     * @param builders The builders
-     */
-    public DefaultRouter(RouteBuilder... builders) {
-        this(Arrays.asList(builders));
     }
 
     @Override

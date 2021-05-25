@@ -58,12 +58,14 @@ public class Qualifiers {
 
     /**
      * Build a qualifier for the given argument.
+     *
      * @param argument The argument
-     * @param <T> The type
+     * @param <T>      The type
      * @return The resolved qualifier
      */
     @SuppressWarnings("unchecked")
-    public static @Nullable <T> Qualifier<T> forArgument(@NonNull Argument<?> argument) {
+    public static @Nullable
+    <T> Qualifier<T> forArgument(@NonNull Argument<?> argument) {
         AnnotationMetadata annotationMetadata = Objects.requireNonNull(argument, "Argument cannot be null").getAnnotationMetadata();
         boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
 
@@ -212,6 +214,18 @@ public class Qualifiers {
     }
 
     /**
+     * Build a qualifier for the given generic type argument name.
+     *
+     * @param typeName The name of the generic type argument
+     * @param <T>      The component type
+     * @return The qualifier
+     * @since 3.0.0
+     */
+    public static @NonNull <T> Qualifier<T> byExactTypeArgumentName(@NonNull String typeName) {
+        return new ExactTypeArgumentNameQualifier<>(typeName);
+    }
+
+    /**
      * Build a qualifier for the given generic type arguments. Only the closest
      * matches will be returned.
      *
@@ -236,22 +250,26 @@ public class Qualifiers {
 
     /**
      * Reduces bean definitions by the given interceptor binding.
+     *
      * @param annotationMetadata The annotation metadata
-     * @param <T> The bean type
+     * @param <T>                The bean type
      * @return The qualifier
      */
-    public static @NonNull <T> Qualifier<T> byInterceptorBinding(@NonNull AnnotationMetadata annotationMetadata) {
+    public static @NonNull
+    <T> Qualifier<T> byInterceptorBinding(@NonNull AnnotationMetadata annotationMetadata) {
         return new InterceptorBindingQualifier<>(annotationMetadata);
     }
 
     /**
      * Reduces bean definitions by the given interceptor binding.
+     *
      * @param bindingAnnotationNames The binding annotation names
-     * @param <T> The bean type
+     * @param <T>                    The bean type
      * @return The qualifier
      * @since 3.0.0
      */
-    public static @NonNull <T> Qualifier<T> byInterceptorBinding(@NonNull Collection<String> bindingAnnotationNames) {
+    public static @NonNull
+    <T> Qualifier<T> byInterceptorBinding(@NonNull Collection<String> bindingAnnotationNames) {
         return new InterceptorBindingQualifier<>(bindingAnnotationNames);
     }
 }

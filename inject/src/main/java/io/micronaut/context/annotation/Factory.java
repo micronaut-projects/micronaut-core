@@ -58,7 +58,7 @@ import java.lang.annotation.RetentionPolicy;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
+@DefaultScope(Singleton.class)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface Factory {

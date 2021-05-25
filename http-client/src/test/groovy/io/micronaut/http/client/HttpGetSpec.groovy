@@ -838,6 +838,7 @@ class HttpGetSpec extends Specification {
 
     @Client("/get")
     static interface MyGetClient {
+
         @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
         String simple()
 
@@ -916,6 +917,7 @@ class HttpGetSpec extends Specification {
 
     @jakarta.inject.Singleton
     static class MyGetHelper {
+
         private final RxStreamingHttpClient rxClientSlash
         private final RxStreamingHttpClient rxClient
 

@@ -24,7 +24,6 @@ import io.micronaut.http.server.netty.types.NettyCustomizableResponseType;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -51,10 +50,10 @@ public interface NettyStreamedCustomizableResponseType extends NettyCustomizable
     @Override
     default void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
         if (response instanceof NettyMutableHttpResponse) {
-            FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
+            NettyMutableHttpResponse nettyResponse = ((NettyMutableHttpResponse) response);
 
             // Write the request data
-            final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), nettyResponse.headers());
+            final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
             final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
             final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
             if (isHttp2 && request instanceof NettyHttpRequest) {
