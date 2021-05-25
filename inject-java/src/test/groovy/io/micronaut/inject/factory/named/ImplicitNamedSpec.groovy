@@ -42,7 +42,7 @@ class FooBar {}
 }
 ''')
         expect:
-        definition.stringValue(Named).get() == 'fooBar'
+        definition.stringValue(AnnotationUtil.NAMED).get() == 'fooBar'
     }
 
     void 'test use of implicit @Named annotation'() {

@@ -835,9 +835,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         AnnotationMetadata annotationMetadata = this.annotationMetadata != null ? this.annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         writeBooleanMethod(classWriter, "isSingleton", () ->
                 annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SINGLETON) ||
-                        (!annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SCOPE) && annotationMetadata.stringValue(DefaultScope.class)
-                                .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
-                                .orElse(false)));
+                        (!annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SCOPE) &&
+                                annotationMetadata.hasDeclaredStereotype(DefaultScope.class) &&
+                                annotationMetadata.stringValue(DefaultScope.class)
+                                        .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
+                                        .orElse(false)));
 
         // method: boolean isIterable()
         writeBooleanMethod(classWriter, "isIterable", () ->

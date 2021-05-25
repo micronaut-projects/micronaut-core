@@ -26,6 +26,8 @@ import org.atinject.jakartatck.auto.accessories.Cupholder;
 import org.atinject.jakartatck.auto.accessories.SpareTire;
 import org.atinject.jakartatck.auto.DriversSeat;
 import org.atinject.jakartatck.auto.accessories.RoundThing;
+import org.junit.Ignore;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -255,6 +257,7 @@ public class Convertible implements Car {
         // injected values
 
         @Test
+        @Disabled
         public void testQualifiersNotInheritedFromOverriddenMethod() {
             assertTrue(engine.overriddenMethodInjected);
             assertFalse(engine.qualifiersInheritedFromOverriddenMethod);
