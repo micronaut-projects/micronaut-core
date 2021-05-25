@@ -324,14 +324,11 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     public void write(final ChannelHandlerContext ctx, Object msg, final ChannelPromise promise) throws Exception {
         if (isValidOutMessage(msg)) {
 
-            Outgoing<Out> out = new Outgoing<>(outClass.cast(msg), promise);
             receivedOutMessage(ctx);
-
-            if (outgoing.isEmpty()) {
-                outgoing.add(out);
-                flushNext(ctx);
+            if (ctx.channel().isWritable()) {
+                unbufferedWrite(ctx, (Out) msg, promise);
             } else {
-                outgoing.add(out);
+                outgoing.add(new Outgoing<>((Out) msg, promise));
             }
 
         } else if (msg instanceof LastHttpContent) {
@@ -344,24 +341,28 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         }
     }
 
+    @Override
+    public void channelWritabilityChanged(ChannelHandlerContext ctx) {
+        while (ctx.channel().isWritable() && !outgoing.isEmpty()) {
+            Outgoing<Out> out = outgoing.remove();
+            unbufferedWrite(ctx, out.message, out.promise);
+        }
+    }
+
     /**
      * @param ctx The channel handler context
-     * @param out The output stream
+     * @param message The message
+     * @param promise The promise
      */
-    protected void unbufferedWrite(final ChannelHandlerContext ctx, final Outgoing<Out> out) {
+    protected void unbufferedWrite(final ChannelHandlerContext ctx, final Out message, ChannelPromise promise) {
 
-        if (out.message instanceof FullHttpMessage) {
+        if (message instanceof FullHttpMessage) {
             // Forward as is
-            ctx.writeAndFlush(out.message, out.promise);
-            out.promise.addListener(channelFuture -> executeInEventLoop(ctx, () -> {
-                sentOutMessage(ctx);
-                outgoing.remove();
-                flushNext(ctx);
-            }));
+            ctx.writeAndFlush(message, promise);
+            sentOutMessage(ctx);
+        } else if (message instanceof StreamedHttpMessage) {
 
-        } else if (out.message instanceof StreamedHttpMessage) {
-
-            StreamedHttpMessage streamed = (StreamedHttpMessage) out.message;
+            StreamedHttpMessage streamed = (StreamedHttpMessage) message;
             HandlerSubscriber<HttpContent> subscriber = new HandlerSubscriber<HttpContent>(ctx.executor()) {
                 @Override
                 protected void error(Throwable error) {
@@ -379,14 +380,18 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
                 @Override
                 protected void complete() {
-                    executeInEventLoop(ctx, () -> completeBody(ctx));
+                    if (ctx.executor().inEventLoop()) {
+                        completeBody(ctx, promise);
+                    } else {
+                        ctx.executor().execute(() -> completeBody(ctx, promise));
+                    }
                 }
             };
 
             sendLastHttpContent = true;
 
             // DON'T pass the promise through, create a new promise instead.
-            ctx.writeAndFlush(out.message);
+            ctx.writeAndFlush(message);
 
             ctx.pipeline().addAfter(ctx.name(), ctx.name() + "-body-subscriber", subscriber);
             subscribeSubscriberToStream(streamed, subscriber);
@@ -394,25 +399,16 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     }
 
-    private void completeBody(final ChannelHandlerContext ctx) {
+    private void completeBody(final ChannelHandlerContext ctx, ChannelPromise promise) {
         removeHandlerIfActive(ctx, ctx.name() + "-body-subscriber");
 
         if (sendLastHttpContent) {
-            ChannelPromise promise = outgoing.peek().promise;
-            ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise).addListener(
-                channelFuture -> executeInEventLoop(ctx, () -> {
-                    outgoing.remove();
-                    sentOutMessage(ctx);
-                    flushNext(ctx);
-                })
-            );
-            ctx.read();
+            ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise);
         } else {
-            outgoing.remove().promise.setSuccess();
-            sentOutMessage(ctx);
-            flushNext(ctx);
-            ctx.read();
+            promise.setSuccess();
         }
+        sentOutMessage(ctx);
+        ctx.read();
     }
 
     /**
@@ -428,22 +424,6 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             if (handler != null) {
                 pipeline.remove(name);
             }
-        }
-    }
-
-    private void flushNext(ChannelHandlerContext ctx) {
-        if (!outgoing.isEmpty()) {
-            unbufferedWrite(ctx, outgoing.element());
-        } else {
-            ctx.fireChannelWritabilityChanged();
-        }
-    }
-
-    private void executeInEventLoop(ChannelHandlerContext ctx, Runnable runnable) {
-        if (ctx.executor().inEventLoop()) {
-            runnable.run();
-        } else {
-            ctx.executor().execute(runnable);
         }
     }
 

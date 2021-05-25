@@ -2,7 +2,7 @@ package io.micronaut.inject.beans
 
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.order.Ordered
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 
@@ -132,5 +132,20 @@ public class NumberThingManager extends AbstractThingManager<NumberThing<?>> {}
         noExceptionThrown()
         definition != null
         definition.getTypeArguments("test.AbstractThingManager")[0].getTypeVariables().get("T").getType() == Object.class
+    }
+
+    void "test a bean definition in a package with uppercase letters"() {
+        when:
+        def definition = buildBeanDefinition('test.A', 'TestBean', '''
+package test.A;
+
+@javax.inject.Singleton
+class TestBean {
+
+}
+''')
+        then:
+        noExceptionThrown()
+        definition != null
     }
 }

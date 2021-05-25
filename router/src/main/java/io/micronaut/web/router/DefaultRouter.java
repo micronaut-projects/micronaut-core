@@ -55,20 +55,26 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private final Set<Integer> exposedPorts;
     private final List<FilterRoute> alwaysMatchesFilterRoutes = new ArrayList<>();
     private final List<FilterRoute> preconditionFilterRoutes = new ArrayList<>();
-    private final Supplier<List<HttpFilter>> alwaysMatchesHttpFilters = SupplierUtil.memoized(new Supplier<List<HttpFilter>>() {
-
-        @Override
-        public List<HttpFilter> get() {
-            if (alwaysMatchesFilterRoutes.isEmpty()) {
-                return Collections.emptyList();
-            }
-            List<HttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size());
-            for (FilterRoute filterRoute : alwaysMatchesFilterRoutes) {
-                httpFilters.add(filterRoute.getFilter());
-            }
-            return httpFilters;
+    private final Supplier<List<HttpFilter>> alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
+        if (alwaysMatchesFilterRoutes.isEmpty()) {
+            return Collections.emptyList();
         }
+        List<HttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size());
+        for (FilterRoute filterRoute : alwaysMatchesFilterRoutes) {
+            httpFilters.add(filterRoute.getFilter());
+        }
+        httpFilters.sort(OrderUtil.COMPARATOR);
+        return httpFilters;
     });
+    
+    /**
+     * Construct a new router for the given route builders.
+     *
+     * @param builders The builders
+     */
+    public DefaultRouter(RouteBuilder... builders) {
+        this(Arrays.asList(builders));
+    }
 
     /**
      * Construct a new router for the given route builders.
@@ -135,15 +141,6 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             }
         }
         return true;
-    }
-
-    /**
-     * Construct a new router for the given route builders.
-     *
-     * @param builders The builders
-     */
-    public DefaultRouter(RouteBuilder... builders) {
-        this(Arrays.asList(builders));
     }
 
     @Override
@@ -311,7 +308,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         for (ErrorRoute errorRoute : errorRoutes) {
             Optional<RouteMatch<R>> match = errorRoute.match(originatingClass, error);
             match.ifPresent(m ->
-                matchedRoutes.put(errorRoute, m)
+                    matchedRoutes.put(errorRoute, m)
             );
         }
         return findRouteMatch(matchedRoutes, error);

@@ -143,8 +143,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 for (PropertyCatalog convention : CONVENTIONS) {
                     Map<String, Object> entries = resolveEntriesForKey(name, false, convention);
                     if (entries != null) {
-                        String finalName = trimIndex(name);
-                        if (entries.containsKey(finalName)) {
+                        if (entries.containsKey(name)) {
                             result = true;
                             break;
                         }
@@ -165,11 +164,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             for (PropertyCatalog propertyCatalog : CONVENTIONS) {
                 Map<String, Object> entries = resolveEntriesForKey(name, false, propertyCatalog);
                 if (entries != null) {
-                    String trimmedName = trimIndex(name);
-                    if (entries.containsKey(trimmedName)) {
+                    if (entries.containsKey(name)) {
                         return true;
                     } else {
-                        String finalName = trimmedName + ".";
+                        String finalName = name + ".";
                         for (String key : entries.keySet()) {
                             if (key.startsWith(finalName)) {
                                 return true;
@@ -642,6 +640,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     collapseProperty(prefix + "[" + i + "]", entries, item);
                 }
             }
+            entries.put(prefix, value);
         } else if (value instanceof Map) {
             for (Map.Entry<?, ?> entry: ((Map<?, ?>) value).entrySet()) {
                 Object key = entry.getKey();

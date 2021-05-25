@@ -1,10 +1,7 @@
 package io.micronaut.annotation
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.ast.ElementQuery
-import io.micronaut.inject.ast.MethodElement
-
-import javax.lang.model.element.TypeElement
 
 class NullabilityAnnotationsSpec extends AbstractTypeElementSpec {
 
