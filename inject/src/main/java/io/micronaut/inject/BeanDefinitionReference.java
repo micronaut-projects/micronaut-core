@@ -23,8 +23,6 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import jakarta.inject.Singleton;
 
-import java.util.Optional;
-
 /**
  * <p>A bean definition reference provides a reference to a {@link BeanDefinition} thus
  * allowing for soft loading of bean definitions without loading the actual types.</p>

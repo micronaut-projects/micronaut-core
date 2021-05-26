@@ -16,12 +16,10 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.GenericUtils;
-import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
-import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import io.micronaut.core.annotation.Nullable;
@@ -41,14 +39,14 @@ import java.util.List;
 @Internal
 public class LoadedVisitor implements Ordered {
 
+    private static final String OBJECT_CLASS = Object.class.getName();
+
     private final TypeElementVisitor visitor;
     private final String classAnnotation;
     private final String elementAnnotation;
     private final JavaVisitorContext visitorContext;
     private final JavaElementFactory elementFactory;
     private JavaClassElement rootClassElement;
-
-    private static final String OBJECT_CLASS = Object.class.getName();
 
     /**
      * @param visitor               The {@link TypeElementVisitor}

@@ -45,9 +45,6 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
     private final String name;
     protected final Class<? extends Annotation> annotationType;
 
-    /**
-     * @param name The qualifier name
-     */
     NameQualifier(AnnotationMetadata annotationMetadata, String name) {
         this.annotationType = annotationMetadata != null ? annotationMetadata.getAnnotationType(name).orElse(null) : null;
         this.name = Objects.requireNonNull(annotationType == null ? name : annotationType.getSimpleName(), "Argument [name] cannot be null");

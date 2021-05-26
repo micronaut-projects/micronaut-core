@@ -78,6 +78,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param annotationName  The annotation name
      * @param values          The values
      * @param retentionPolicy The retention policy
+     * @param stereotypes     The stereotypes of the annotation
      */
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
         this(annotationName, values, Collections.emptyMap(), retentionPolicy, stereotypes);
@@ -99,6 +100,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param values          The values
      * @param defaultValues   The default values
      * @param retentionPolicy The retention policy
+     * @param stereotypes     The stereotypes of the annotation
      */
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
@@ -167,6 +169,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return retentionPolicy;
     }
 
+    /**
+     * @return The stereotypes of the annotation
+     */
     @Nullable
     public List<AnnotationValue<?>> getStereotypes() {
         return stereotypes;

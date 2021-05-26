@@ -21,7 +21,6 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanType;
-import io.micronaut.inject.annotation.AnnotationMetadataSupport;
 import jakarta.inject.Named;
 
 import java.lang.annotation.Annotation;

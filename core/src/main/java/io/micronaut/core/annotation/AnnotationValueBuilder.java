@@ -20,7 +20,6 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -95,6 +94,12 @@ public class AnnotationValueBuilder<T extends Annotation> {
         return new AnnotationValue<>(annotationName, values, defaultValues, retentionPolicy, stereotypes);
     }
 
+    /**
+     * Adds a stereotype of the annotation.
+     *
+     * @param annotation The stereotype
+     * @return This builder
+     */
     @NonNull
     public AnnotationValueBuilder<T> stereotype(AnnotationValue<?> annotation) {
         if (annotation != null) {
@@ -103,6 +108,12 @@ public class AnnotationValueBuilder<T extends Annotation> {
         return this;
     }
 
+    /**
+     * Sets the default values of the annotation.
+     *
+     * @param defaultValues The default values
+     * @return This builder
+     */
     @NonNull
     public AnnotationValueBuilder<T> defaultValues(Map<String, Object> defaultValues) {
         if (defaultValues != null) {

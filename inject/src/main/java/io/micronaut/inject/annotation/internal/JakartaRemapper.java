@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.AnnotationRemapper;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Named;
-import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
 
 import java.util.Collections;

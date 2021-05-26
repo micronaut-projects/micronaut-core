@@ -240,7 +240,6 @@ public interface AnnotationSource {
         return false;
     }
 
-
     /**
      * Return whether an annotation is present.
      *
