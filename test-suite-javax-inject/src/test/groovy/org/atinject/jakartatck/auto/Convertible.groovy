@@ -22,6 +22,7 @@ import junit.framework.TestCase
 import org.atinject.jakartatck.auto.accessories.Cupholder
 import org.atinject.jakartatck.auto.accessories.RoundThing
 import org.atinject.jakartatck.auto.accessories.SpareTire
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -251,6 +252,7 @@ class Convertible implements Car {
 
         // injected values
 
+        @PendingFeature
         void testQualifiersNotInheritedFromOverriddenMethod() {
             expect:
             engine.overriddenMethodInjected

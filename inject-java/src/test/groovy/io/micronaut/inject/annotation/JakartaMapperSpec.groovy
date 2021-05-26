@@ -77,9 +77,11 @@ class Test {
         metadata.hasDeclaredStereotype(AnnotationUtil.SINGLETON)
         !metadata.hasStereotype(jakarta.inject.Singleton)
         metadata.hasDeclaredStereotype(AnnotationUtil.SCOPE)
-        metadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 2
         metadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).contains(AnnotationUtil.SINGLETON)
-        metadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER).size() == 1
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).contains("test.Meta")
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER).size() == 2
         metadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER).contains(AnnotationUtil.NAMED)
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER).contains("test.Meta")
     }
 }
