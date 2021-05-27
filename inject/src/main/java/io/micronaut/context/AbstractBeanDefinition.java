@@ -34,6 +34,7 @@ import io.micronaut.inject.*;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.inject.qualifiers.TypeAnnotationQualifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -2199,7 +2200,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                             (innerConfiguration && isIterable) ||
                             Qualifier.class == argument.getType()) {
                         final Qualifier<?> currentQualifier = resolutionContext.getCurrentQualifier();
-                        if (currentQualifier != null && currentQualifier.getClass() != InterceptorBindingQualifier.class) {
+                        if (currentQualifier != null &&
+                                currentQualifier.getClass() != InterceptorBindingQualifier.class &&
+                                currentQualifier.getClass() != TypeAnnotationQualifier.class) {
                             qualifier = currentQualifier;
 
                         } else {
