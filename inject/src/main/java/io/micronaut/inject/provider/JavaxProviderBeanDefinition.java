@@ -32,6 +32,7 @@ import javax.inject.Provider;
  */
 @Internal
 public final class JavaxProviderBeanDefinition extends AbstractProviderDefinition<Provider<Object>> {
+
     @Override
     public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
         return isTypePresent();

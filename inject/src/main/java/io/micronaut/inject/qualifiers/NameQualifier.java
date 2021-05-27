@@ -42,8 +42,8 @@ import java.util.stream.Stream;
 @Internal
 class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
 
-    private final String name;
     protected final Class<? extends Annotation> annotationType;
+    private final String name;
 
     NameQualifier(AnnotationMetadata annotationMetadata, String name) {
         this.annotationType = annotationMetadata != null ? annotationMetadata.getAnnotationType(name).orElse(null) : null;
