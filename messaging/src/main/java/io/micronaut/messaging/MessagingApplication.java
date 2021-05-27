@@ -40,7 +40,7 @@ import java.util.Collection;
  */
 @Singleton
 @Requires(missingBeans = EmbeddedApplication.class)
-public class MessagingApplication implements EmbeddedApplication, Described {
+public class MessagingApplication implements EmbeddedApplication<MessagingApplication>, Described {
 
     private final ApplicationContext applicationContext;
     private final ApplicationConfiguration configuration;
@@ -91,7 +91,7 @@ public class MessagingApplication implements EmbeddedApplication, Described {
     }
 
     @Override
-    public ApplicationContextLifeCycle stop() {
+    public MessagingApplication stop() {
         ApplicationContext applicationContext = getApplicationContext();
         if (applicationContext != null && applicationContext.isRunning()) {
             applicationContext.stop();
