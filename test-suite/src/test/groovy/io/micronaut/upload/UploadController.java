@@ -226,8 +226,12 @@ public class UploadController {
         return data.subscribeOn(Schedulers.io())
                 .map((pd) -> {
                     try {
-                        return pd.getBytes();
+                        final byte[] bytes = pd.getBytes();
+                        System.out.println("received " + bytes.length + " bytes");
+                        return bytes;
                     } catch (IOException e) {
+                        System.out.println("caught exception");
+                        System.out.println(e);
                         throw Exceptions.propagate(e);
                     }
                 })
