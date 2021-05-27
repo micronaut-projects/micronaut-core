@@ -2204,7 +2204,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                                 currentQualifier.getClass() != InterceptorBindingQualifier.class &&
                                 currentQualifier.getClass() != TypeAnnotationQualifier.class) {
                             qualifier = currentQualifier;
-
                         } else {
                             final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, ConversionContext.STRING);
                             qualifier = n.map(Qualifiers::byName).orElse(null);
