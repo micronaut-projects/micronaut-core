@@ -1,9 +1,8 @@
 package io.micronaut.messaging.annotation;
 
 import io.micronaut.runtime.EmbeddedApplication;
-
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 @Singleton
 class SomeBean {
