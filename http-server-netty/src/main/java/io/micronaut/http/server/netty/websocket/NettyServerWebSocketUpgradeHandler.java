@@ -117,8 +117,17 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     public boolean acceptInboundMessage(Object msg) {
         if (msg instanceof NettyHttpRequest) {
             NettyHttpRequest<?> request = (NettyHttpRequest) msg;
-            if (request.getNativeRequest().headers().contains(HttpHeaderNames.CONNECTION.toString(), HttpHeaderValues.UPGRADE, true)) {
-                return request.getNativeRequest().headers().containsValue(HttpHeaderNames.UPGRADE, WEB_SOCKET_HEADER_VALUE, true);
+            io.netty.handler.codec.http.HttpHeaders headers = request.getNativeRequest().headers();
+            Optional<Map.Entry<String, String>> connectionHeader = headers.entries().stream()
+                    .filter(entry -> HttpHeaderNames.CONNECTION.toString().equalsIgnoreCase(entry.getKey()))
+                    .findAny();
+            if (connectionHeader.isPresent()) {
+                String[] values = StringUtils.tokenizeToStringArray(connectionHeader.get().getValue(), ",", true, true);
+                Boolean upgradeHopHeaderAllowed = Arrays.stream(values).map(val -> HttpHeaderNames.UPGRADE.toString().equalsIgnoreCase(val))
+                        .reduce(false, (curr, nxt) -> curr || nxt);
+                if (upgradeHopHeaderAllowed) {
+                    return headers.containsValue(HttpHeaderNames.UPGRADE, WEB_SOCKET_HEADER_VALUE, true);
+                }
             }
         }
     return false;
