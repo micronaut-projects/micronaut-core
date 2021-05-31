@@ -658,7 +658,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return simpleName;
     }
 
-
     @Override
     public String getName() {
         if (name == null) {
