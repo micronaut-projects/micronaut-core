@@ -113,7 +113,7 @@ class PojoWebSocketSpec extends Specification {
                 new DefaultConversionService(),
                 new HttpServerConfiguration())
 
-        expect: "The handler should consider this an upgrade request"
+        then: "The handler should consider this an upgrade request"
         handler.acceptInboundMessage(message) == true
     }
 
