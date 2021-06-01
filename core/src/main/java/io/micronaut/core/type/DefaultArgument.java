@@ -36,16 +36,16 @@ import java.util.*;
 @Internal
 public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
 
-    static final Set<Class<?>> CONTAINER_TYPES = CollectionUtils.setOf(
+    public static final Set<Class<?>> CONTAINER_TYPES = CollectionUtils.setOf(
         List.class,
         Set.class,
-        Map.class,
         Collection.class,
         Queue.class,
         SortedSet.class,
         Deque.class,
         Vector.class,
-        ArrayList.class);
+        ArrayList.class
+    );
 
     private final Class<T> type;
     private final String name;

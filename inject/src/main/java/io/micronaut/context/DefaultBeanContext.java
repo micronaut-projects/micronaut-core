@@ -2702,6 +2702,10 @@ public class DefaultBeanContext implements BeanContext {
             if (concreteCandidate.isPresent()) {
                 BeanDefinition<T> definition = concreteCandidate.get();
 
+                if (definition.isContainerType() && beanClass != definition.getBeanType()) {
+                    throw new NonUniqueBeanException(beanClass, Collections.singletonList(definition).iterator());
+                }
+
                 bean = findExistingCompatibleSingleton(
                         definition.asArgument(),
                         beanType,
@@ -3599,6 +3603,7 @@ public class DefaultBeanContext implements BeanContext {
             Qualifier<T> qualifier,
             boolean singleCandidate) {
         T bean = null;
+        final boolean isContainerType = candidate.isContainerType();
         try {
             if (candidate.isSingleton()) {
                 synchronized (singletonObjects) {
@@ -3621,13 +3626,24 @@ public class DefaultBeanContext implements BeanContext {
                                     true,
                                     null
                             );
-                            registerSingletonBean(
-                                    candidate,
-                                    beanType,
-                                    bean,
-                                    qualifier,
-                                    singleCandidate
-                            );
+
+                            if (candidate.getBeanType() != beanType.getType() && isContainerType) {
+                                registerSingletonBean(
+                                        candidate,
+                                        candidate.asArgument(),
+                                        bean,
+                                        qualifier,
+                                        singleCandidate
+                                );
+                            } else {
+                                registerSingletonBean(
+                                        candidate,
+                                        beanType,
+                                        bean,
+                                        qualifier,
+                                        singleCandidate
+                                );
+                            }
                         }
                     }
                 }
@@ -3643,7 +3659,22 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         if (bean != null) {
-            beansOfTypeList.add(new BeanRegistration(null, candidate, bean));
+            if (isContainerType && bean instanceof Iterable) {
+                Iterable<Object> iterable = (Iterable<Object>) bean;
+                int i = 0;
+                for (Object o : iterable) {
+                    if (o == null || !beanType.isInstance(o)) {
+                        continue;
+                    }
+                    beansOfTypeList.add(new BeanRegistration(
+                            new BeanKey(beanType, Qualifiers.byQualifiers(Qualifiers.byName(String.valueOf(i++)), qualifier)),
+                            candidate,
+                            o
+                    ));
+                }
+            } else {
+                beansOfTypeList.add(new BeanRegistration(null, candidate, bean));
+            }
         }
     }
 

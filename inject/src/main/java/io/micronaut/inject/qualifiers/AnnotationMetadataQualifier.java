@@ -39,9 +39,9 @@ import java.util.stream.Stream;
 class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     private static final String NAMED_SIMPLE = "Named";
+    final AnnotationValue<Annotation> qualifierAnn;
+    final String qualifiedName;
     private final AnnotationMetadata annotationMetadata;
-    private final String qualifiedName;
-    private final AnnotationValue<Annotation> qualifierAnn;
     private final Set<String> nonBinding;
 
     /**
@@ -138,14 +138,21 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        if (o == null) {
             return false;
         }
         if (!super.equals(o)) {
             return false;
         }
-        AnnotationMetadataQualifier<?> that = (AnnotationMetadataQualifier<?>) o;
-        return qualifiedName.equals(that.qualifiedName) && Objects.equals(qualifierAnn, that.qualifierAnn);
+
+        if (o instanceof AnnotationMetadataQualifier) {
+            AnnotationMetadataQualifier<?> that = (AnnotationMetadataQualifier<?>) o;
+            return qualifiedName.equals(that.qualifiedName) && Objects.equals(qualifierAnn, that.qualifierAnn);
+        } else if (qualifierAnn == null && o instanceof NamedAnnotationStereotypeQualifier) {
+            NamedAnnotationStereotypeQualifier<?> that = (NamedAnnotationStereotypeQualifier<?>) o;
+            return qualifiedName.equals(that.stereotype);
+        }
+        return false;
     }
 
     @Override
