@@ -24,8 +24,8 @@ import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
 import javax.annotation.PostConstruct
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher

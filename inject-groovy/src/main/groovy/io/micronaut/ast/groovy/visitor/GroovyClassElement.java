@@ -29,12 +29,10 @@ import org.apache.groovy.ast.tools.ClassNodeUtils;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 
-import javax.inject.Inject;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.codehaus.groovy.ast.ClassHelper.makeCached;
 
@@ -820,9 +818,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         if (nonPrivateConstructors.size() == 1) {
             methodNode = nonPrivateConstructors.get(0);
         } else {
-            methodNode = nonPrivateConstructors.stream().filter(cn ->
-                    !cn.getAnnotations(makeCached(Inject.class)).isEmpty() ||
-                            !cn.getAnnotations(makeCached(Creator.class)).isEmpty()).findFirst().orElse(null);
+            methodNode = nonPrivateConstructors.stream()
+                    .filter(cn -> {
+                        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn);
+                        return annotationMetadata.hasAnnotation(AnnotationUtil.INJECT) ||
+                                annotationMetadata.hasAnnotation(Creator.class);
+                    })
+                    .findFirst().orElse(null);
             if (methodNode == null) {
                 methodNode = nonPrivateConstructors.stream().filter(cn -> Modifier.isPublic(cn.getModifiers())).findFirst().orElse(null);
             }

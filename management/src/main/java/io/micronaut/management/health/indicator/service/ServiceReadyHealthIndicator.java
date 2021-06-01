@@ -28,9 +28,8 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.event.annotation.EventListener;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
-
-import javax.inject.Singleton;
 
 /**
  * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} that signals when the service is ready to

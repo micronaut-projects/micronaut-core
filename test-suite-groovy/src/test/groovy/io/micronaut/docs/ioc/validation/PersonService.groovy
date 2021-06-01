@@ -16,7 +16,7 @@
 package io.micronaut.docs.ioc.validation
 
 // tag::imports[]
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.validation.constraints.NotBlank
 // end::imports[]
 

@@ -27,10 +27,10 @@ import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.Flowable;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;

@@ -21,12 +21,7 @@ import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.ServiceInstanceList
 import io.micronaut.http.BasicAuth
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.Post
-import io.micronaut.http.annotation.Put
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification

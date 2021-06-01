@@ -18,7 +18,7 @@ package io.micronaut.docs.aop.introduction.generics;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import java.lang.reflect.Method;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public final class PublisherIntroduction implements MethodInterceptor<GenericPublisher<?>, Object> {

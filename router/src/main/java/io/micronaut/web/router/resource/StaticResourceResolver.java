@@ -20,8 +20,8 @@ import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.List;

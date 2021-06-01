@@ -1,8 +1,7 @@
 package io.micronaut.inject.ordered;
 
 import io.micronaut.core.annotation.Order;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 @Order(5)

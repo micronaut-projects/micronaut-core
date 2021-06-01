@@ -16,9 +16,9 @@
 package io.micronaut.discovery;
 
 import io.micronaut.context.annotation.Primary;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.util.List;
 
 /**

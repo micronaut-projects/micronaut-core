@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.qualifiers.bytypespec;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class Three implements Foo {

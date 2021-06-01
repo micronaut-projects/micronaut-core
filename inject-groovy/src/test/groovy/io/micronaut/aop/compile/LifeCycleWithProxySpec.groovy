@@ -16,10 +16,10 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.convert.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
-    @javax.inject.Inject public ConversionService conversionService;
+    @jakarta.inject.Inject public ConversionService conversionService;
     public int count = 0;
     
     public String someMethod() {
@@ -66,10 +66,10 @@ package test;
 import io.micronaut.aop.interceptors.*;
 import io.micronaut.core.convert.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
-    @javax.inject.Inject public ConversionService conversionService;
+    @jakarta.inject.Inject public ConversionService conversionService;
 
     public int count = 0;
     
@@ -118,10 +118,10 @@ import io.micronaut.aop.interceptors.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.convert.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
-    @javax.inject.Inject public ConversionService conversionService;
+    @jakarta.inject.Inject public ConversionService conversionService;
     public int count = 0;
     
     @javax.annotation.PostConstruct

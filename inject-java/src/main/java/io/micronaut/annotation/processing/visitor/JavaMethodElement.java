@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,26 +17,23 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.PrimitiveElement;
 
-import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.WildcardType;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * A method element returning data from a {@link ExecutableElement}.
@@ -199,8 +196,10 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         VariableElement varElement = CollectionUtils.last(executableElement.getParameters());
         if (isSuspend(varElement)) {
             DeclaredType dType = (DeclaredType) varElement.asType();
-            WildcardType wType = (WildcardType) dType.getTypeArguments().iterator().next();
-            TypeMirror tm = wType.getSuperBound();
+            TypeMirror tm = dType.getTypeArguments().iterator().next();
+            if (tm.getKind() == TypeKind.WILDCARD) {
+                tm = ((WildcardType) tm).getSuperBound();
+            }
             // check Void
             if ((tm instanceof DeclaredType) && sameType("kotlin.Unit", (DeclaredType) tm)) {
                 return PrimitiveElement.VOID;

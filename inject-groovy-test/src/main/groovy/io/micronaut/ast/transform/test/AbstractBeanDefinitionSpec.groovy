@@ -157,7 +157,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     AnnotationMetadata buildMethodAnnotationMetadata(String cls, String source, String methodName) {
         ClassNode element = buildClassNode(source, cls)
         MethodNode method = element.getMethods(methodName)[0]
-        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
+        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(Stub(SourceUnit) {
+            getErrorCollector() >> null
+        }, null)
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
         return metadata
     }

@@ -23,8 +23,7 @@ import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * Adds custom support for {@link Maybe} to handle NOT_FOUND results.

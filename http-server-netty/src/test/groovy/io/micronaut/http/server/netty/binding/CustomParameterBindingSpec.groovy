@@ -8,7 +8,6 @@ import io.micronaut.http.annotation.CustomHttpMethod
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.reactivex.Flowable
-import org.junit.Ignore
 import spock.lang.Unroll
 
 import javax.annotation.Nullable

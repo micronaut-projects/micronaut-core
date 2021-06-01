@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop.introduction;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @ListenerAdvice
 @Singleton

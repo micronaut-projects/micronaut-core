@@ -1,13 +1,14 @@
 package io.micronaut.inject.beans
 
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.order.Ordered
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 
-import javax.inject.Named
-import javax.inject.Qualifier
+import jakarta.inject.Named
+import jakarta.inject.Qualifier
 
 class BeanDefinitionSpec extends AbstractTypeElementSpec {
 
@@ -16,7 +17,7 @@ class BeanDefinitionSpec extends AbstractTypeElementSpec {
         def definition = buildBeanDefinition('genctor.Test', '''
 package genctor;
 
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 class Test {
@@ -37,7 +38,7 @@ class Test {
 package limittypes;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 @Bean(typed = Runnable.class)
@@ -56,7 +57,7 @@ class Test implements Runnable {
 package limittypes;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 @Bean(typed = Runnable.class)
@@ -75,7 +76,7 @@ class Test implements Runnable {
 package limittypes;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 @Bean(typed = Runnable.class)
@@ -96,7 +97,7 @@ package test;
 
 import io.micronaut.core.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
 @Singleton
@@ -115,7 +116,7 @@ class TestOrder {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-@javax.inject.Named("foo")
+@jakarta.inject.Named("foo")
 class Test {
 
 }
@@ -129,7 +130,7 @@ class Test {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -154,13 +155,13 @@ class Test {
 @interface MockBean {
 
     @AliasFor(annotation = Replaces.class, member = "named")
-    @AliasFor(annotation = javax.inject.Named.class, member = "value")
+    @AliasFor(annotation = jakarta.inject.Named.class, member = "value")
     String named() default "";
 }
 ''')
         expect:
         definition.getDeclaredQualifier() == Qualifiers.byName("foo")
-        definition.getAnnotationNameByStereotype(Qualifier).get() == Named.name
+        definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == AnnotationUtil.NAMED
     }
 
     void 'test qualifier annotation'() {
@@ -175,17 +176,17 @@ class Test {
 
 }
 
-@javax.inject.Qualifier
+@jakarta.inject.Qualifier
 @interface MyQualifier {
 
     @AliasFor(annotation = Replaces.class, member = "named")
-    @AliasFor(annotation = javax.inject.Named.class, member = "value")
+    @AliasFor(annotation = jakarta.inject.Named.class, member = "value")
     String named() default "";
 }
 ''')
         expect:
         definition.getDeclaredQualifier() == Qualifiers.byAnnotation(definition.getAnnotationMetadata(), "test.MyQualifier")
-        definition.getAnnotationNameByStereotype(Qualifier).get() == "test.MyQualifier"
+        definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == "test.MyQualifier"
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5001")
@@ -194,7 +195,7 @@ class Test {
         def definition = buildBeanDefinition('test.NumberThingManager', '''
 package test;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 interface Thing<T> {}
 
@@ -217,7 +218,7 @@ public class NumberThingManager extends AbstractThingManager<NumberThing<?>> {}
         def definition = buildBeanDefinition('test.A', 'TestBean', '''
 package test.A;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class TestBean {
 
 }

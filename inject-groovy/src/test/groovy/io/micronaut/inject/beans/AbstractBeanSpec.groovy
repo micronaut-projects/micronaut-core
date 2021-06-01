@@ -31,7 +31,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class AbstractBean {
     @Value("server.host")
     String host

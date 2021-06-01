@@ -24,9 +24,9 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
+import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import spock.lang.Specification
-import javax.inject.Singleton
 
 class InfoEndpointSpec extends Specification {
 

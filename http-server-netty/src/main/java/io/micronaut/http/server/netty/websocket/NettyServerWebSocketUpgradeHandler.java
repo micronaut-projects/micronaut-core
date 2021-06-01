@@ -18,14 +18,20 @@ package io.micronaut.http.server.netty.websocket;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.netty.NettyHttpHeaders;
-import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.netty.NettyHttpRequest;
@@ -50,6 +56,7 @@ import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.AsciiString;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
@@ -59,7 +66,10 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -77,6 +87,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     public static final String SCHEME_SECURE_WEBSOCKET = "wss://";
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyServerWebSocketUpgradeHandler.class);
+    private static final AsciiString WEB_SOCKET_HEADER_VALUE = AsciiString.cached("websocket");
 
     private final Router router;
     private final RequestBinderRegistry binderRegistry;
@@ -115,9 +126,11 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     public boolean acceptInboundMessage(Object msg) {
         if (msg instanceof NettyHttpRequest) {
             NettyHttpRequest<?> request = (NettyHttpRequest) msg;
-            return request.getNativeRequest().headers().contains(HttpHeaderNames.CONNECTION.toString(), HttpHeaderValues.UPGRADE, true);
+            if (request.getNativeRequest().headers().contains(HttpHeaderNames.CONNECTION.toString(), HttpHeaderValues.UPGRADE, true)) {
+                return request.getNativeRequest().headers().containsValue(HttpHeaderNames.UPGRADE, WEB_SOCKET_HEADER_VALUE, true);
+            }
         }
-        return false;
+    return false;
     }
 
     @Override

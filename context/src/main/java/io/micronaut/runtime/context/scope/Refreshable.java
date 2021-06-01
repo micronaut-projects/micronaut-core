@@ -27,7 +27,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * <p>A custom {@link javax.inject.Scope} that allows target beans to be refreshed.</p>
+ * <p>A custom scope that allows target beans to be refreshed.</p>
  *
  * @author Graeme Rocher
  * @since 1.0

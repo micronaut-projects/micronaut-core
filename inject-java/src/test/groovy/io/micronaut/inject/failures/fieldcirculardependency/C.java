@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.failures.fieldcirculardependency;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class C {
     @Inject

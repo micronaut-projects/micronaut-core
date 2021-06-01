@@ -21,10 +21,10 @@ import io.micronaut.tracing.annotation.ContinueSpan
 import io.micronaut.tracing.annotation.NewSpan
 import io.micronaut.tracing.annotation.SpanTag
 import io.reactivex.Single
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
 
 /**

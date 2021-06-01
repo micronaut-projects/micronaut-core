@@ -3,9 +3,9 @@ package io.micronaut.inject.qualifiers.multiple;
 import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.Test;
 
-import javax.inject.Inject;
-import javax.inject.Qualifier;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Qualifier;
+import jakarta.inject.Singleton;
 import java.lang.annotation.Retention;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;

@@ -7,27 +7,20 @@ import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MutableHttpResponse
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Filter
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.PathVariable
-import io.micronaut.http.annotation.QueryValue
-import io.micronaut.http.annotation.RequestBean
+import io.micronaut.http.annotation.*
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
+import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.annotation.Nullable
-import javax.inject.Singleton
 import javax.validation.Valid
 import javax.validation.constraints.Pattern
 

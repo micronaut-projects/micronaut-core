@@ -15,19 +15,18 @@
  */
 package io.micronaut.runtime.http.scope
 
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Factory
+
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import spock.util.concurrent.PollingConditions
 
 import javax.annotation.PreDestroy
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * @author Marcel Overdijk

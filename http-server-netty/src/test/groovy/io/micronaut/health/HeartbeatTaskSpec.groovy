@@ -18,10 +18,9 @@ package io.micronaut.health
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.runtime.server.EmbeddedServer
+import jakarta.inject.Singleton
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
-import javax.inject.Singleton
 
 /**
  * @author graemerocher

@@ -20,7 +20,7 @@ import io.micronaut.core.reflect.exception.InvocationException;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.annotation.Scheduled;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 @Requires(property = "scheduled-exception1.task3.enabled", value = StringUtils.TRUE)

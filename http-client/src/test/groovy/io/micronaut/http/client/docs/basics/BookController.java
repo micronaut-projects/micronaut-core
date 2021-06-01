@@ -17,7 +17,9 @@ package io.micronaut.http.client.docs.basics;
 
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Status;
 
 /**
  * @author graemerocher

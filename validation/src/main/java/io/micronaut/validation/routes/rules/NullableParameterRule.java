@@ -15,6 +15,16 @@
  */
 package io.micronaut.validation.routes.rules;
 
+import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.naming.NameUtils;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.validation.InternalUriMatchTemplate;
+import io.micronaut.validation.InternalUriMatchVariable;
+import io.micronaut.validation.routes.RouteValidationResult;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -25,16 +35,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.validation.InternalUriMatchTemplate;
-import io.micronaut.validation.InternalUriMatchVariable;
-import io.micronaut.validation.routes.RouteValidationResult;
 
 /**
  * Validates route parameters are nullable or optional for optional

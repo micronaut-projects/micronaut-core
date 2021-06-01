@@ -17,8 +17,7 @@ package io.micronaut.inject.provider;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.type.TypeInformationProvider;
-
-import javax.inject.Provider;
+import jakarta.inject.Provider;
 
 /**
  * Makes {@link io.micronaut.core.type.Argument#isWrapperType()} return true for Providers.
@@ -27,22 +26,11 @@ import javax.inject.Provider;
  * @since 3.0.0
  */
 public final class ProviderTypeInformationProvider implements TypeInformationProvider {
+
     @Override
     public boolean isWrapperType(Class<?> type) {
-        if (BeanProvider.class == type || Provider.class == type) {
-            return true;
-        } else if (isTypePresent()) {
-            return jakarta.inject.Provider.class == type;
-        }
-        return false;
-    }
-
-    private static boolean isTypePresent() {
-        try {
-            return jakarta.inject.Provider.class.isInterface();
-        } catch (Throwable e) {
-            // class not present
-            return false;
-        }
+        return BeanProvider.class == type ||
+                Provider.class == type ||
+                type.getName().equals("javax.inject.Provider");
     }
 }

@@ -36,7 +36,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean extends MyInterface {
     @Override
     public String someMethod();
@@ -67,7 +67,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean2 implements MyInterface2 {
 
     private String myValue;
@@ -107,7 +107,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.order.Ordered;
 import java.lang.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 interface ContractService {
 

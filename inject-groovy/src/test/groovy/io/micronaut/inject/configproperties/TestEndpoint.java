@@ -17,8 +17,8 @@ package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.ConfigurationReader;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

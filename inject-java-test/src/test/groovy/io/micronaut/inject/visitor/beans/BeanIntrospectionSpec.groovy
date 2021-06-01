@@ -34,7 +34,7 @@ import spock.lang.Issue
 import spock.lang.Requires
 
 import javax.annotation.processing.SupportedAnnotationTypes
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id

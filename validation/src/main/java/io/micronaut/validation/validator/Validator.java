@@ -15,10 +15,9 @@
  */
 package io.micronaut.validation.validator;
 
-import io.micronaut.core.beans.BeanIntrospection;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.beans.BeanIntrospection;
 
 import javax.validation.Constraint;
 import javax.validation.ConstraintViolation;

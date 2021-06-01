@@ -35,8 +35,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Factory
 class MyBeanFactory {
     @Mutating("someVal")
-    @javax.inject.Singleton
-    @javax.inject.Named("myMapper")
+    @jakarta.inject.Singleton
+    @jakarta.inject.Named("myMapper")
     ObjectMapper myMapper() {
         return new ObjectMapper();
     }
@@ -70,7 +70,7 @@ abstract class BaseRepositoryImpl {
 interface CountryRepository {    
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
     
@@ -102,7 +102,7 @@ abstract class BaseRepositoryImpl {
 interface CountryRepository {    
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
     
@@ -136,7 +136,7 @@ interface CountryRepository {
     public String someMethod();  
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
     
     @Override
@@ -160,7 +160,7 @@ import io.micronaut.context.annotation.*;
 @Factory
 class MyBeanFactory {
     @Mutating("someVal")
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     MyBean myBean() {
         return new MyBean();
     }
@@ -187,7 +187,7 @@ import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 final class MyBean {
 
     private String myValue;
@@ -216,7 +216,7 @@ import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
     private String myValue;
@@ -244,7 +244,7 @@ package test;
 import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
     private String myValue;

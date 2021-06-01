@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.retry.event.RetryEvent
 import io.micronaut.retry.event.RetryEventListener
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

@@ -19,7 +19,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.aop.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.inject.factory.enummethod.TestEnum;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Factory
 class TestFactory$TestField {
@@ -98,7 +98,7 @@ package testprim;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Factory
 class TestFactory {
@@ -120,7 +120,7 @@ package invalidmod;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Factory
 class TestFactory {

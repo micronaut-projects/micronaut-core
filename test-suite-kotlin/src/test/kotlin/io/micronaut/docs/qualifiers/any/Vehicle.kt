@@ -4,7 +4,7 @@ import io.micronaut.docs.qualifiers.annotationmember.Engine
 // tag::imports[]
 import io.micronaut.context.BeanProvider
 import io.micronaut.context.annotation.Any
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::clazz[]

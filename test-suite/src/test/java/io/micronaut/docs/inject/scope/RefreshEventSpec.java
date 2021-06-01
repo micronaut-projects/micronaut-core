@@ -32,7 +32,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import javax.annotation.PostConstruct;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;

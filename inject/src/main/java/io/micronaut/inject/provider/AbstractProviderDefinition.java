@@ -55,7 +55,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
         metadata.addDeclaredAnnotation(Any.class.getName(), Collections.emptyMap());
         metadata.addDeclaredStereotype(
                 Collections.singletonList(Any.class.getName()),
-                javax.inject.Qualifier.class.getName(),
+                AnnotationUtil.QUALIFIER,
                 Collections.emptyMap()
         );
         metadata.addDeclaredAnnotation(BootstrapContextCompatible.class.getName(), Collections.emptyMap());

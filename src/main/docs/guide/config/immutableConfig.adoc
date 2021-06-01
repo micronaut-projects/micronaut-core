@@ -39,6 +39,7 @@ There are a few exceptions to this rule. Micronaut will not perform configuratio
 * The parameter is annotated with `@Value` (explicit binding)
 * The parameter is annotated with `@Property` (explicit binding)
 * The parameter is annotated with `@Parameter` (parameterized bean handling)
+* The parameter is annotated with `@Inject` (generic bean injection)
 * The type of the parameter is annotated with a bean scope (such as `@Singleton`)
 
 Once you have prepared a type-safe configuration it can be injected into your beans like any other bean:

@@ -5,9 +5,8 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import spock.lang.Specification
-
-import javax.inject.Inject
 
 @MicronautTest
 class ClientBindSpec extends Specification {

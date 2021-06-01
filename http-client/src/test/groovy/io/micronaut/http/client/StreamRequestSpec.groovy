@@ -23,23 +23,15 @@ import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.BackpressureStrategy
-import io.reactivex.Flowable
-import io.reactivex.FlowableEmitter
-import io.reactivex.FlowableOnSubscribe
-import io.reactivex.Single
+import io.reactivex.*
 import io.reactivex.annotations.NonNull
+import jakarta.inject.Inject
 import spock.lang.Specification
 
-import javax.inject.Inject
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 

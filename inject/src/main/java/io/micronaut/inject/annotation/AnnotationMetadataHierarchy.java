@@ -192,6 +192,12 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+        return stringValues(annotation.getName(), member);
+    }
+
+    @NonNull
+    @Override
+    public String[] stringValues(@NonNull String annotation, @NonNull String member) {
         String[] values = hierarchy[0].stringValues(annotation, member);
         for (int i = 1; i < hierarchy.length; i++) {
             AnnotationMetadata annotationMetadata = hierarchy[i];
@@ -693,6 +699,19 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper) {
+        List<String> strings = new ArrayList<>();
+        for (AnnotationMetadata am : hierarchy) {
+            if (am instanceof EnvironmentAnnotationMetadata) {
+                strings.addAll(Arrays.asList(((EnvironmentAnnotationMetadata) am).stringValues(annotation, member, valueMapper)));
+            } else {
+                strings.addAll(Arrays.asList(am.stringValues(annotation, member)));
+            }
+        }
+        return ArrayUtils.toArray(strings, String[]::new);
+    }
+
+    @Override
+    public String[] stringValues(String annotation, String member, Function<Object, Object> valueMapper) {
         List<String> strings = new ArrayList<>();
         for (AnnotationMetadata am : hierarchy) {
             if (am instanceof EnvironmentAnnotationMetadata) {

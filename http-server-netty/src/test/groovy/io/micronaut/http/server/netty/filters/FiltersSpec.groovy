@@ -18,13 +18,13 @@ import io.micronaut.scheduling.TaskExecutors
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
+import jakarta.inject.Inject
+import jakarta.inject.Named
 import org.reactivestreams.Publisher
 import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.inject.Inject
-import javax.inject.Named
 import java.util.concurrent.Callable
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger

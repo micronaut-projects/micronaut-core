@@ -30,7 +30,7 @@ package adapteroverloading;
 import io.micronaut.context.event.*;
 import io.micronaut.scheduling.annotation.Async;
 import io.reactivex.Completable;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 import io.micronaut.runtime.event.annotation.*;
 
@@ -82,7 +82,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MethodAdapterTest {
 
     @Adapter(ApplicationEventListener.class)
@@ -109,7 +109,7 @@ import io.micronaut.inject.annotation.*
 import io.micronaut.context.annotation.*
 import io.micronaut.context.event.*
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MethodAdapterTest implements Contract {
 
     @Override
@@ -140,7 +140,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MethodAdapterTest2 {
 
     @Adapter(Foo.class)
@@ -169,7 +169,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MethodAdapterTest3 {
 
     @Adapter(Foo.class)
@@ -195,7 +195,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MethodAdapterTest4 {
 
     @Adapter(ApplicationEventListener.class)

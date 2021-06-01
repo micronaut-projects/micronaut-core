@@ -14,7 +14,7 @@ class ValidatedParseSpec extends AbstractBeanDefinitionSpec {
         def definition = buildBeanDefinition('test.$TestDefinition' + BeanDefinitionVisitor.PROXY_SUFFIX,'''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.context.annotation.Executable

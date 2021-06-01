@@ -15,8 +15,6 @@
  */
 package io.micronaut.retry.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.retry.intercept.RecoveryInterceptor;
@@ -25,6 +23,8 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>AOP around advice that can be applied to any type or method that requires {@link Fallback} handling.</p>

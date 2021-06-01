@@ -19,12 +19,13 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
+import jakarta.inject.Named;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 
-import javax.inject.Named;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
@@ -68,7 +69,7 @@ public class Qualifiers {
         AnnotationMetadata annotationMetadata = Objects.requireNonNull(argument, "Argument cannot be null").getAnnotationMetadata();
         boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
 
-        List<Class<? extends Annotation>> qualifierTypes = hasMetadata ? annotationMetadata.getAnnotationTypesByStereotype(javax.inject.Qualifier.class) : null;
+        List<String> qualifierTypes = hasMetadata ? annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER) : null;
         if (CollectionUtils.isNotEmpty(qualifierTypes)) {
             if (qualifierTypes.size() == 1) {
                 return Qualifiers.byAnnotation(
@@ -79,11 +80,12 @@ public class Qualifiers {
                 final Qualifier[] qualifiers = qualifierTypes
                         .stream().map((type) -> Qualifiers.byAnnotation(annotationMetadata, type))
                         .toArray(Qualifier[]::new);
-                return Qualifiers.<T>byQualifiers(
+                return Qualifiers.byQualifiers(
                         qualifiers
                 );
             }
         }
+
         return null;
     }
 
@@ -106,7 +108,7 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byName(String name) {
-        return new NameQualifier<>(name);
+        return new NameQualifier<>(null, name);
     }
 
     /**
@@ -148,7 +150,7 @@ public class Qualifiers {
             if (aClass.isPresent()) {
                 return byType(aClass.get());
             }
-        } else if (Named.class == type) {
+        } else if (Named.class == type || AnnotationUtil.NAMED.equals(type.getName())) {
             Optional<String> value = metadata.stringValue(type);
             if (value.isPresent()) {
                 return byName(value.get());
@@ -180,7 +182,7 @@ public class Qualifiers {
         } else if (Any.NAME.equals(type)) {
             //noinspection unchecked
             return AnyQualifier.INSTANCE;
-        } else if (Named.class.getName().equals(type)) {
+        } else if (Named.class.getName().equals(type) || AnnotationUtil.NAMED.equals(type)) {
             String n = metadata.stringValue(type).orElse(null);
             if (n != null) {
                 return byName(n);

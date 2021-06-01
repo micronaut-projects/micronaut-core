@@ -17,7 +17,7 @@ package io.micronaut.inject.context;
 
 import io.micronaut.inject.annotation.ScopeOne;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 @ScopeOne

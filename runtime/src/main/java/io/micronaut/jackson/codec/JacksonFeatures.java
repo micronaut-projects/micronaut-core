@@ -15,12 +15,12 @@
  */
 package io.micronaut.jackson.codec;
 
-import java.util.EnumMap;
-import java.util.Map;
-
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.core.annotation.Internal;
+
+import java.util.EnumMap;
+import java.util.Map;
 
 /**
  * Stores features to later configure an {@link com.fasterxml.jackson.databind.ObjectMapper}.

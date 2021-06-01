@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.configuration.beans;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class B {

@@ -15,7 +15,6 @@
  */
 package io.micronaut.retry.intercept
 
-import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.retry.annotation.CircuitBreaker
@@ -23,10 +22,10 @@ import io.micronaut.retry.event.CircuitClosedEvent
 import io.micronaut.retry.event.CircuitOpenEvent
 import io.micronaut.retry.event.RetryEvent
 import io.micronaut.retry.event.RetryEventListener
+import io.reactivex.Single
+import jakarta.inject.Singleton
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
-import javax.inject.Singleton
 
 /**
  * @author graemerocher

@@ -22,7 +22,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo", notEquals="bar")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -63,7 +63,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(classes=String.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -80,7 +80,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(classes=String.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -98,7 +98,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.inject.requires.*;
 
 @MetaRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -116,7 +116,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.inject.requires.*;
 
 @MetaRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -143,7 +143,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(missingBeans=String.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -160,7 +160,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(missingBeans=String.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -183,7 +183,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(beans=String.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -200,7 +200,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(beans=String.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -225,7 +225,7 @@ import io.micronaut.inject.requires.*;
 import io.micronaut.context.annotation.*;
 
 @Requires(beans=Outer.Inner.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -248,7 +248,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(env="foo")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -270,7 +270,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(env="foo")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -292,7 +292,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(notEnv="foo")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -314,7 +314,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(notEnv={"foo", "bar"})
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -336,7 +336,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(notEnv="foo")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -358,7 +358,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(notEnv={"foo", "bar"})
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -380,7 +380,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -410,7 +410,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="mybean.foo.bar")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -437,7 +437,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar", value="test")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -463,7 +463,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar", value="test")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -490,7 +490,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar", value="test")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -519,7 +519,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar", pattern="\\\\d+")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -545,7 +545,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar", pattern="\\\\d+")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -572,7 +572,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar", pattern="\\\\d+")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -599,7 +599,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(os = {Requires.Family.WINDOWS, Requires.Family.MAC_OS})
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -638,7 +638,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(notOs = {Requires.Family.WINDOWS, Requires.Family.MAC_OS})
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')

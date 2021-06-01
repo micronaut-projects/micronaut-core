@@ -15,7 +15,11 @@
  */
 package io.micronaut.session;
 
-import com.github.benmanes.caffeine.cache.*;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Expiry;
+import com.github.benmanes.caffeine.cache.RemovalListener;
+import com.github.benmanes.caffeine.cache.Scheduler;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
@@ -23,8 +27,8 @@ import io.micronaut.session.event.SessionCreatedEvent;
 import io.micronaut.session.event.SessionDeletedEvent;
 import io.micronaut.session.event.SessionDestroyedEvent;
 import io.micronaut.session.event.SessionExpiredEvent;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;

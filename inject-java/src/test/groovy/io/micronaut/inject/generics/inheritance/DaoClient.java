@@ -1,6 +1,6 @@
 package io.micronaut.inject.generics.inheritance;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class DaoClient<T> {
 

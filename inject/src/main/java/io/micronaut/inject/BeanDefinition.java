@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Provided;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanContext;
@@ -31,8 +32,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
@@ -64,12 +65,29 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     }
 
     /**
+     * @return The name of the scope
+     */
+    default Optional<String> getScopeName() {
+        return Optional.empty();
+    }
+
+    /**
      * @return Whether the scope is singleton
      */
     default boolean isSingleton() {
         AnnotationMetadata am = getAnnotationMetadata();
-        return am.hasDeclaredStereotype(Singleton.class) ||
-                am.classValue(DefaultScope.class).map(t -> t == Singleton.class).orElse(false);
+        if (am.hasDeclaredStereotype(AnnotationUtil.SINGLETON)) {
+            return true;
+        } else {
+            if (!am.hasDeclaredStereotype(AnnotationUtil.SCOPE) &&
+                    am.hasDeclaredStereotype(DefaultScope.class)) {
+                return am.stringValue(DefaultScope.class)
+                        .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
+                        .orElse(false);
+            } else {
+                return false;
+            }
+        }
     }
 
     /**
@@ -409,7 +427,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The qualifier or null if this isn't one
      */
     default @Nullable Qualifier<T> getDeclaredQualifier() {
-        final List<String> annotations = getAnnotationNamesByStereotype(javax.inject.Qualifier.class);
+        final List<String> annotations = getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
         if (CollectionUtils.isNotEmpty(annotations)) {
             if (annotations.size() == 1) {
                 final String annotation = annotations.iterator().next();
@@ -430,7 +448,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
         } else {
             Qualifier<T> qualifier = resolveDynamicQualifier();
             if (qualifier == null) {
-                String name = stringValue(javax.inject.Named.class).orElse(null);
+                String name = stringValue(AnnotationUtil.NAMED).orElse(null);
                 qualifier = name != null ? Qualifiers.byAnnotation(this, name) : null;
             }
             return qualifier;

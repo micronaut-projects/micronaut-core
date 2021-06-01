@@ -22,9 +22,9 @@ import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.micronaut.health.HealthStatus;
 import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Singleton;
 import java.net.URI;
 import java.util.Collection;
 import java.util.HashMap;

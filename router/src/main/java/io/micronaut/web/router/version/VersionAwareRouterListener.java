@@ -21,8 +21,7 @@ import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.filter.FilteredRouter;
-import javax.inject.Singleton;
-
+import jakarta.inject.Singleton;
 
 import static io.micronaut.web.router.version.RoutesVersioningConfiguration.PREFIX;
 

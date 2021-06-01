@@ -15,16 +15,15 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.core.io.socket.SocketUtils
-import io.reactivex.Flowable
-import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.AutoCleanup
+import io.reactivex.Flowable
 import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification

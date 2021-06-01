@@ -19,17 +19,19 @@ import brave.CurrentSpanCustomizer;
 import brave.SpanCustomizer;
 import brave.Tracing;
 import brave.opentracing.BraveTracer;
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Nullable;
 import io.opentracing.Tracer;
 import io.opentracing.util.GlobalTracer;
+import jakarta.inject.Singleton;
 import zipkin2.Span;
 import zipkin2.reporter.AsyncReporter;
 import zipkin2.reporter.Reporter;
-
-import io.micronaut.core.annotation.Nullable;
 import zipkin2.reporter.brave.ZipkinSpanHandler;
-
-import javax.inject.Singleton;
 
 /**
  * Builds a {@link io.opentracing.Tracer} for Brave using {@link brave.opentracing.BraveTracer}.

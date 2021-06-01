@@ -24,10 +24,9 @@ import io.micronaut.session.SessionStore;
 import io.micronaut.websocket.event.WebSocketEvent;
 import io.micronaut.websocket.event.WebSocketMessageProcessedEvent;
 import io.micronaut.websocket.event.WebSocketSessionClosedEvent;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.inject.Singleton;
 
 /**
  * Persists the session in the background on web socket events.

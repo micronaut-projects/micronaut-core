@@ -239,4 +239,26 @@ public interface AnnotationSource {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         return false;
     }
+
+    /**
+     * Return whether an annotation is present.
+     *
+     * @param annotationName The annotation name
+     * @return True if it is
+     */
+    default boolean isAnnotationPresent(@NonNull String annotationName) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationName);
+        return false;
+    }
+
+    /**
+     * Variation of {@link #isAnnotationPresent(String)} for declared annotations.
+     *
+     * @param annotationName The annotation name
+     * @return True if it is
+     */
+    default boolean isDeclaredAnnotationPresent(@NonNull String annotationName) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationName);
+        return false;
+    }
 }

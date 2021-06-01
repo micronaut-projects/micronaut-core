@@ -23,11 +23,10 @@ import io.micronaut.context.env.Environment
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.validation.validator.Validator
 import io.micronaut.validation.validator.constraints.ConstraintValidator
+import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Singleton
 
 class PojoValidatorSpec extends Specification {
 

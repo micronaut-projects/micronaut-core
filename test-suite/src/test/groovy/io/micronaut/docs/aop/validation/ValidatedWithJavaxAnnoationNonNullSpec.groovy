@@ -23,7 +23,7 @@ import io.micronaut.validation.Validated
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.validation.ConstraintViolationException
 import javax.validation.constraints.NotNull
 

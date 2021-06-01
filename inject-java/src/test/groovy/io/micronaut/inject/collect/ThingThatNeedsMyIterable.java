@@ -1,6 +1,6 @@
 package io.micronaut.inject.collect;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class ThingThatNeedsMyIterable {

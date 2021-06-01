@@ -22,9 +22,9 @@ import io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector;
 import io.micronaut.management.endpoint.beans.BeansEndpoint;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;

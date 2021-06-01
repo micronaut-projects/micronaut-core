@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.client;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.LifeCycle;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
