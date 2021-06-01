@@ -23,11 +23,9 @@ import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.util.ReferenceCountUtil;
 
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
- * Customized multipart decoder for custom destroy behavior
+ * Customized multipart decoder for custom destroy behavior.
  *
  * @author James Kleeh
  * @since 2.5.5

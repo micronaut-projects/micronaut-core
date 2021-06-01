@@ -163,6 +163,7 @@ public class ArrayUtils {
      * Returns an array containing all of the elements in this collection, using the provided generator function to allocate the returned array.
      *
      * @param collection The collection
+     * @param createArrayFn The function to create the array
      * @param <T> The create array function
      * @return The array
      */
