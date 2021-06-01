@@ -15,6 +15,7 @@
  */
 package io.micronaut.runtime.jbang;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.runtime.Micronaut;
 
@@ -31,6 +32,7 @@ import java.util.Map;
  * @since 2.5.5
  */
 @Internal
+@Experimental
 public final class JBangIntegration {
 
     public static final String CONFIG = "//M:CONFIG ";
