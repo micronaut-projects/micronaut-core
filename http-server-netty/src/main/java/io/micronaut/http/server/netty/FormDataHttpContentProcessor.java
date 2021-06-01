@@ -22,13 +22,8 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
-import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
-import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
-import io.netty.handler.codec.http.multipart.InterfaceHttpData;
-import io.netty.util.ReferenceCountUtil;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.multipart.*;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -49,7 +44,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Internal
 public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<HttpData> {
 
-    private final HttpPostRequestDecoder decoder;
+    private final InterfaceHttpPostRequestDecoder decoder;
     private final boolean enabled;
     private AtomicLong extraMessages = new AtomicLong(0);
     private final long partMaxSize;
@@ -71,7 +66,12 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
             factory = new DefaultHttpDataFactory(false, characterEncoding);
         }
         factory.setMaxLimit(multipart.getMaxFileSize());
-        this.decoder = new HttpPostRequestDecoder(factory, nettyHttpRequest.getNativeRequest(), characterEncoding);
+        final HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
+        if (HttpPostRequestDecoder.isMultipart(nativeRequest)) {
+            this.decoder = new MicronautHttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding);
+        } else {
+            this.decoder = new HttpPostStandardRequestDecoder(factory, nativeRequest, characterEncoding);
+        }
         this.enabled = nettyHttpRequest.getContentType().map(type -> type.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false) ||
             multipart.isEnabled();
         this.partMaxSize = multipart.getMaxFileSize();
@@ -115,7 +115,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
             List<InterfaceHttpData> messages = new ArrayList<>(1);
 
             try {
-                HttpPostRequestDecoder postRequestDecoder = this.decoder;
+                InterfaceHttpPostRequestDecoder postRequestDecoder = this.decoder;
                 postRequestDecoder.offer(httpContent);
 
                 while (postRequestDecoder.hasNext()) {
@@ -175,10 +175,6 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     @Override
     protected void doAfterOnError(Throwable throwable) {
         decoder.destroy();
-        final InterfaceHttpData data = decoder.currentPartialHttpData();
-        if (data != null && data.refCnt() != 0) {
-            ReferenceCountUtil.safeRelease(data);
-        }
     }
 
     @Override
