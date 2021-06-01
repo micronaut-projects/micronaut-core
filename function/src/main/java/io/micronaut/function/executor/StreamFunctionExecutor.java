@@ -23,7 +23,6 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
-import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.exception.InvocationException;
