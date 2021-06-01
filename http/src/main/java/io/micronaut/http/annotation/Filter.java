@@ -16,7 +16,6 @@
 package io.micronaut.http.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.http.HttpMethod;
 import jakarta.inject.Singleton;
 
@@ -40,7 +39,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target(ElementType.TYPE)
-@Executable
 public @interface Filter {
 
     /**

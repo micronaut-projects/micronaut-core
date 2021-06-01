@@ -127,6 +127,16 @@ public class AProvider implements Provider<A> {
 }
 ----
 
+==== Fewer Executable Methods Generated for Controllers and Message Listeners
+
+Previous versions of Micronaut specified the ann:context.annotation.Executable[] annotation as a meta-annotation on the ann:http.annotation.Controller[], ann:http.annotation.Filter[] and ann:messaging.annotation.MessageListener[] annotations. This resulted in generating executable method all non-private methods of classes annotated with these annotations.
+
+In Micronaut 3.x and above the ann:context.annotation.Executable[] has been moved to a meta-annotation of ann:http.annotation.HttpMethodMapping[] and ann:messaging.annotation.MessageMapping[] instead to reduce memory consumption and improve efficiency.
+
+If you were relying on the present of these executable methods you will need to annotate explicitly methods in your classes with ann:context.annotation.Executable[] to restore this behaviour.
+
+=== Module Changes
+
 ==== New package for Micronaut Cassandra
 
 The classes in Micronaut Cassandra have been moved from `io.micronaut.configuration.cassandra` to `io.micronaut.cassandra` package.

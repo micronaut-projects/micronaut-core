@@ -15,6 +15,7 @@
  */
 package io.micronaut.messaging.annotation;
 
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.EntryPoint;
 
 import java.lang.annotation.Documented;
@@ -34,6 +35,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE, ElementType.METHOD})
 @EntryPoint
+@Executable(processOnStartup = true)
 public @interface MessageMapping {
 
     /**
