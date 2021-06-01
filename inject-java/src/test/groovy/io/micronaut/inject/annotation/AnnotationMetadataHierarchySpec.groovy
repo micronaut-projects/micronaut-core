@@ -3,10 +3,11 @@ package io.micronaut.inject.annotation
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 class AnnotationMetadataHierarchySpec extends AbstractTypeElementSpec{
 
@@ -18,7 +19,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Executable
@@ -30,19 +31,18 @@ class Test {
         AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(typeMetadata, methodMetadata)
 
         expect:
-        annotationMetadata.getAnnotationNamesByStereotype(javax.inject.Scope).contains(Singleton.name)
+        annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).contains(AnnotationUtil.SINGLETON)
         annotationMetadata.declaredAnnotationNames.contains(Executable.name)
         annotationMetadata.annotationNames.contains(Executable.name)
-        annotationMetadata.annotationNames.contains(Singleton.name)
-        !annotationMetadata.declaredAnnotationNames.contains(Singleton.name)
-        !annotationMetadata.getDeclaredAnnotationNamesByStereotype(javax.inject.Scope.name).contains(Singleton.name)
-        !annotationMetadata.isDeclaredAnnotationPresent(Singleton)
-        annotationMetadata.isAnnotationPresent(Singleton)
-        annotationMetadata.hasAnnotation(Singleton)
+        annotationMetadata.annotationNames.contains(AnnotationUtil.SINGLETON)
+        !annotationMetadata.declaredAnnotationNames.contains(AnnotationUtil.SINGLETON)
+        !annotationMetadata.getDeclaredAnnotationNamesByStereotype(AnnotationUtil.SCOPE).contains(AnnotationUtil.SINGLETON)
+        !annotationMetadata.isDeclaredAnnotationPresent(AnnotationUtil.SINGLETON)
+        annotationMetadata.isAnnotationPresent(AnnotationUtil.SINGLETON)
+        annotationMetadata.hasAnnotation(AnnotationUtil.SINGLETON)
         annotationMetadata.hasDeclaredAnnotation(Executable)
-        !annotationMetadata.hasDeclaredAnnotation(Singleton)
-        annotationMetadata.findAnnotation(Singleton).isPresent()
-        annotationMetadata.synthesize(Singleton)
+        !annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
+        annotationMetadata.findAnnotation(AnnotationUtil.SINGLETON).isPresent()
     }
 
     void "test repeatable annotations are combined"() {

@@ -4,8 +4,7 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
-
-import javax.inject.Named;
+import jakarta.inject.Named;
 
 @Factory
 @Prototype

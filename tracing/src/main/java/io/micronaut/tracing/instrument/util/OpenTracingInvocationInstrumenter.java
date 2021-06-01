@@ -22,8 +22,7 @@ import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * Tracing invocation instrument for OpenTracing.

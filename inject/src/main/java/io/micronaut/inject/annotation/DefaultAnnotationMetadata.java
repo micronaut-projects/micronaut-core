@@ -639,6 +639,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @NonNull
     @Override
     public String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+        return stringValues(annotation.getName(), member, null);
+    }
+
+    @NonNull
+    @Override
+    public String[] stringValues(@NonNull String annotation, @NonNull String member) {
         return stringValues(annotation, member, null);
     }
 
@@ -666,6 +672,24 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             String[] strings = AnnotationValue.resolveStringValues(v, valueMapper);
             return strings != null ? strings : StringUtils.EMPTY_STRING_ARRAY;
         }
+    }
+
+
+    /**
+     * Retrieve the string value and optionally map its value.
+     *
+     * @param annotation  The annotation
+     * @param member      The member
+     * @param valueMapper The value mapper
+     * @return The int value
+     */
+    @Override
+    @NonNull
+    public String[] stringValues(@NonNull String annotation, @NonNull String member, Function<Object, Object> valueMapper) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        Object v = getRawValue(annotation, member);
+        String[] strings = AnnotationValue.resolveStringValues(v, valueMapper);
+        return strings != null ? strings : StringUtils.EMPTY_STRING_ARRAY;
     }
 
     @NonNull

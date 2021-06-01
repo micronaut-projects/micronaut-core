@@ -20,7 +20,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 import java.util.Base64
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 class ThirdPartyClientFilterSpec: StringSpec() {
     private var result: String? = null

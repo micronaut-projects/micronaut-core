@@ -17,13 +17,13 @@ package io.micronaut.context;
 
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
-import javax.inject.Scope;
 import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Map;
@@ -51,12 +51,12 @@ class DefaultCustomScopeRegistry implements CustomScopeRegistry {
 
     @Override
     public Optional<CustomScope<?>> findDeclaredScope(@NonNull Argument<?> argument) {
-        return argument.getAnnotationMetadata().getAnnotationNameByStereotype(Scope.class).flatMap(this::findScope);
+        return argument.getAnnotationMetadata().getAnnotationNameByStereotype(AnnotationUtil.SCOPE).flatMap(this::findScope);
     }
 
     @Override
     public Optional<CustomScope<?>> findDeclaredScope(@NonNull BeanType<?> beanType) {
-        final List<String> scopeHierarchy = beanType.getAnnotationMetadata().getAnnotationNamesByStereotype(Scope.class);
+        final List<String> scopeHierarchy = beanType.getAnnotationMetadata().getAnnotationNamesByStereotype(AnnotationUtil.SCOPE);
         Optional<CustomScope<?>> registeredScope = Optional.empty();
         for (String scope : scopeHierarchy) {
             registeredScope = findScope(scope);

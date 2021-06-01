@@ -13,11 +13,11 @@ class SourceRetentionSpec extends AbstractTypeElementSpec {
         BeanDefinition definition = buildBeanDefinition('test.Test','''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
     
     
-    @javax.inject.Inject
+    @jakarta.inject.Inject
     @java.lang.annotation.Native
     String someField;
     

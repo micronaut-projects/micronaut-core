@@ -6,8 +6,8 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.Issue
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Named
+import jakarta.inject.Inject
+import jakarta.inject.Named
 import java.util.function.Supplier
 
 @MicronautTest

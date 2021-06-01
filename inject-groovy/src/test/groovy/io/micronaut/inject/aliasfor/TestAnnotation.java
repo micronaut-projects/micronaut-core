@@ -17,9 +17,9 @@ package io.micronaut.inject.aliasfor;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Executable;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

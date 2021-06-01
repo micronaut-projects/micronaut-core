@@ -17,12 +17,11 @@ package io.micronaut.session;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.scheduling.TaskExecutors;
-
 import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Provider;
+import io.micronaut.scheduling.TaskExecutors;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalInt;

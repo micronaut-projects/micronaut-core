@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.field.inheritance
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class SomeBean {

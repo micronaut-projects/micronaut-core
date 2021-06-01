@@ -17,11 +17,10 @@ package io.micronaut.validation.routes;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
-
-import io.micronaut.core.annotation.NonNull;
 
 /**
  * Models a route parameter.

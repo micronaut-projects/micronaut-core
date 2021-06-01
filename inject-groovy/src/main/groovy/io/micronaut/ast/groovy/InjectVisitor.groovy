@@ -92,9 +92,6 @@ import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 import org.codehaus.groovy.syntax.SyntaxException
 
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Scope
 import java.lang.reflect.Modifier
 import java.time.Duration
 import java.util.concurrent.TimeUnit
@@ -171,12 +168,12 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
         if (isAopProxyType && Modifier.isFinal(targetClassNode.modifiers)) {
             addError("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + targetClassNode.name, targetClassNode)
-        } else if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean, Scope)) {
+        } else if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean.getName(), AnnotationUtil.SCOPE)) {
             defineBeanDefinition(concreteClass)
         }
-        this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasStereotype(Scope.class) || annotationMetadata.hasStereotype(DefaultScope.class) || annotationMetadata.hasDeclaredStereotype(Bean) ||concreteClass.declaredConstructors.any {
+        this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasStereotype(AnnotationUtil.SCOPE) || annotationMetadata.hasStereotype(DefaultScope) || annotationMetadata.hasDeclaredStereotype(Bean) ||concreteClass.declaredConstructors.any {
             AnnotationMetadata constructorMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, it)
-            constructorMetadata.hasStereotype(Inject)
+            constructorMetadata.hasStereotype(AnnotationUtil.INJECT)
         }
     }
 
@@ -413,7 +410,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     )
 
                     final ClassNode typeElement = !ClassUtils.isJavaBasicType(propertyType) ? methodNode.returnType : null
-                    if (typeElement != null && AstAnnotationUtils.hasStereotype(source, unit, typeElement, Scope.class)) {
+                    if (typeElement != null && AstAnnotationUtils.hasStereotype(source, unit, typeElement, AnnotationUtil.SCOPE)) {
                         annotationMetadata = addBeanConfigAdvise(annotationMetadata)
                     } else {
                         annotationMetadata = addAnnotation(groovyMethodElement, InjectTransform.ANN_CONFIGURATION_ADVICE)
@@ -468,11 +465,11 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 declaringClass,
                 AnnotationMetadata.EMPTY_METADATA
         )
-        if (isFactoryClass && !isConstructor && methodAnnotationMetadata.hasDeclaredStereotype(Bean, Scope)) {
+        if (isFactoryClass && !isConstructor && methodAnnotationMetadata.hasDeclaredStereotype(Bean.getName(), AnnotationUtil.SCOPE)) {
             methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildForParent(methodNode.returnType, methodNode, true)
             visitBeanFactoryElement(declaringClass, methodNode, methodAnnotationMetadata, methodName)
-        } else if (methodAnnotationMetadata.hasStereotype(Inject.name, ProcessedTypes.POST_CONSTRUCT, ProcessedTypes.PRE_DESTROY)) {
-            if (isConstructor && methodAnnotationMetadata.hasStereotype(Inject)) {
+        } else if (methodAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT, ProcessedTypes.POST_CONSTRUCT, ProcessedTypes.PRE_DESTROY)) {
+            if (isConstructor && methodAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)) {
                 // constructor with explicit @Inject
                 defineBeanDefinition(concreteClass)
             } else if (!isConstructor) {
@@ -494,7 +491,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     boolean packagesDiffer = overriddenMethod.declaringClass.packageName != declaringClass.packageName
                     boolean isPackagePrivateAndPackagesDiffer = overridden && packagesDiffer && isPackagePrivate
                     boolean requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
-                    boolean overriddenInjected = overridden && AstAnnotationUtils.hasStereotype(sourceUnit, compilationUnit, overriddenMethod, Inject)
+                    boolean overriddenInjected = overridden && AstAnnotationUtils.hasStereotype(sourceUnit, compilationUnit, overriddenMethod, AnnotationUtil.INJECT)
 
                     if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && overriddenInjected) {
                         // bail out if the method has been overridden by another method annotated with @INject
@@ -539,7 +536,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                 requiresReflection,
                                 groovyVisitorContext
                         )
-                    } else if (methodAnnotationMetadata.hasStereotype(Inject.class)) {
+                    } else if (methodAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)) {
                         defineBeanDefinition(concreteClass)
                         getBeanWriter().visitMethodInjectionPoint(
                                 declaringElement,
@@ -1006,7 +1003,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
             return
         }
-        boolean isInject = fieldAnnotationMetadata.hasStereotype(Inject)
+        boolean isInject = fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)
         boolean isValue = isValueInjection(fieldNode, fieldAnnotationMetadata)
         FieldElement fieldElement = elementFactory.newFieldElement(fieldNode, fieldAnnotationMetadata)
 
@@ -1110,7 +1107,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
             return
         }
-        boolean isInject = fieldNode != null && fieldAnnotationMetadata.hasStereotype(Inject)
+        boolean isInject = fieldNode != null && fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)
         boolean isValue = isValueInjection(fieldNode, fieldAnnotationMetadata)
 
         String propertyName = propertyNode.name
@@ -1311,7 +1308,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             )
 
             if (annotationMetadata.hasStereotype(Singleton)) {
-                addError("Class annotated with groovy.lang.Singleton instead of javax.inject.Singleton. Import javax.inject.Singleton to use Micronaut Dependency Injection.", classNode)
+                addError("Class annotated with groovy.lang.Singleton instead of jakarta.inject.Singleton. Import jakarta.inject.Singleton to use Micronaut Dependency Injection.", classNode)
             }
 
             beanWriter = new BeanDefinitionWriter(groovyClassElement, configurationMetadataBuilder, groovyVisitorContext)
@@ -1469,7 +1466,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                 )
                             }
 
-                            String qualifier = concreteClassAnnotationMetadata.getValue(Named.class, String.class).orElse(null)
+                            String qualifier = concreteClassAnnotationMetadata.getValue(AnnotationUtil.NAMED, String.class).orElse(null)
                             MethodElement groovyMethodElement = elementFactory.newMethodElement(
                                     concreteClassElement,
                                     targetMethod,

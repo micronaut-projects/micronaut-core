@@ -17,7 +17,7 @@ package io.micronaut.docs.factories;
 
 import io.micronaut.context.annotation.Factory;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * @author Graeme Rocher

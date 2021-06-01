@@ -23,13 +23,14 @@ import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import spock.lang.Issue
 
-import javax.inject.Scope
-import javax.inject.Singleton
+import jakarta.inject.Scope
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher
@@ -44,7 +45,7 @@ package test;
 
 import io.micronaut.context.annotation.Primary;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Primary
 class Test {
 
@@ -56,7 +57,7 @@ class Test {
         !definition.isIterable()
         definition.isPrimary()
         !definition.isProvided()
-        definition.getScope().get() == Singleton
+        definition.getScopeName().get() == AnnotationUtil.SINGLETON
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1607')
@@ -67,7 +68,7 @@ package test;
 
 import io.micronaut.inject.annotation.RecursiveGenerics;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test extends RecursiveGenerics<Test> {
 
 }
@@ -86,7 +87,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @TestCachePut("test")
 @TestCachePut("blah")
 class Test {
@@ -109,7 +110,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @TestCachePut("test")
 class Test {
 
@@ -128,7 +129,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Requires(property="foo", value="bar")
 @Requires(property="baz", value="stuff")
 class Test {
@@ -152,7 +153,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Executable
@@ -163,8 +164,8 @@ class Test {
 
         expect:
         definition != null
-        definition.hasDeclaredAnnotation(Singleton)
-        method.annotationMetadata.hasAnnotation(Singleton)
+        definition.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
+        method.annotationMetadata.hasAnnotation(AnnotationUtil.SINGLETON)
         method.annotationMetadata.hasDeclaredAnnotation(Executable)
     }
 
@@ -187,16 +188,16 @@ import io.micronaut.context.annotation.*;
         BeanDefinition definition = buildBeanDefinition("test.Test", '''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
 ''')
         expect:
         definition != null
-        definition.hasDeclaredAnnotation(Singleton)
-        definition.hasDeclaredStereotype(Scope)
-        definition.hasStereotype(Scope)
+        definition.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
+        definition.hasDeclaredStereotype(AnnotationUtil.SCOPE)
+        definition.hasStereotype(AnnotationUtil.SCOPE)
         !definition.hasStereotype(Primary)
     }
 
@@ -224,7 +225,7 @@ class Test {
         definition != null
         definition.hasStereotype(Factory) // inherits the factory annotations as stereotypes
         !definition.hasDeclaredAnnotation(Factory)
-        !definition.hasDeclaredAnnotation(Singleton)
+        !definition.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
         definition.hasDeclaredAnnotation(Bean)
         definition.hasDeclaredAnnotation(EachBean)
     }
@@ -236,7 +237,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 import java.util.concurrent.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Factory
 class Test {
@@ -256,7 +257,7 @@ interface Foo {
         BeanDefinition definition = classLoader.loadClass('test.$Test$Foo0Definition').newInstance()
         expect:
         definition != null
-        definition.hasStereotype(Singleton)
+        definition.hasStereotype(AnnotationUtil.SINGLETON)
         definition.hasDeclaredAnnotation(Bean)
     }
 
@@ -268,7 +269,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 import java.util.concurrent.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Factory
 class Test {
@@ -293,7 +294,7 @@ interface Bar {
         BeanDefinition definition = classLoader.loadClass('test.$Test$Foo0Definition').newInstance()
         expect:
         definition != null
-        definition.hasStereotype(Singleton)
+        definition.hasStereotype(AnnotationUtil.SINGLETON)
         definition.hasDeclaredAnnotation(Bean)
     }
 }

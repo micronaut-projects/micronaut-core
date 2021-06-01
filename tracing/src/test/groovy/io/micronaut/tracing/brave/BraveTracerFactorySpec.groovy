@@ -21,7 +21,6 @@ import brave.http.HttpServerHandler
 import brave.http.HttpTracing
 import io.micronaut.context.ApplicationContext
 import io.micronaut.tracing.brave.sender.HttpClientSender
-import io.opentracing.Span
 import io.opentracing.Tracer
 import io.opentracing.noop.NoopTracer
 import spock.lang.Specification

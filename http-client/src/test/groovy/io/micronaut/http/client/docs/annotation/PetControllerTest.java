@@ -16,7 +16,6 @@
 package io.micronaut.http.client.docs.annotation;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.Rule;
 import org.junit.Test;

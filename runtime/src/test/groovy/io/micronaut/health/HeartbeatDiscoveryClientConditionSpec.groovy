@@ -1,11 +1,10 @@
 package io.micronaut.health
 
-import io.micronaut.context.ApplicationContext
+
 import io.micronaut.context.condition.ConditionContext
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.discovery.CompositeDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
-import io.micronaut.inject.BeanDefinition
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.util.environment.Jvm

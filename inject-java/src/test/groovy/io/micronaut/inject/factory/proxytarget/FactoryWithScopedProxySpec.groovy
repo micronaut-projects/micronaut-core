@@ -45,7 +45,7 @@ import java.lang.annotation.*;
 @Factory
 class TestFactory {
 
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     @TestAnn
     Test test() {
         return new Test();
@@ -118,7 +118,7 @@ class Test {
 }
 
 @Retention(RUNTIME)
-@javax.inject.Qualifier
+@jakarta.inject.Qualifier
 @interface TestQ {
 }
 
@@ -151,13 +151,13 @@ import java.lang.annotation.*;
 @Factory
 class TestFactory {
 
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     @TestAnn
     Test<String> testString() {
         return new StringTest();
     }
     
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     @TestAnn
     Test<Integer> testInteger() {
         return new IntegerTest();

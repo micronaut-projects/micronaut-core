@@ -19,12 +19,11 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.RxWebSocketClient
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
-import javax.inject.Inject
-import javax.inject.Singleton
 
 class SimpleTextWebSocketSpec extends Specification {
 

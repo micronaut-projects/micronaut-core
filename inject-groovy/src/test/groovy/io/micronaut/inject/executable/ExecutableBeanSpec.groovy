@@ -29,7 +29,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.http.annotation.Get;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class ExecutableController {
 
     @Get("/round")
@@ -51,7 +51,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Executable
 class ExecutableBean1 {
 
@@ -97,7 +97,7 @@ import io.micronaut.inject.annotation.*
 import io.micronaut.context.annotation.*
 import io.micronaut.inject.executable.*
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean  {
 
     @RepeatableExecutables([

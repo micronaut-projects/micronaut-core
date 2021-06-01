@@ -23,7 +23,7 @@ import java.lang.annotation.Retention;
 import static java.lang.annotation.RetentionPolicy.*;
 
 @MapSingleRepeatable
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MapSingle {
 
 }

@@ -17,7 +17,7 @@ package io.micronaut.docs.lifecycle;
 
 // tag::class[]
 import javax.annotation.PreDestroy; // <1>
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Singleton

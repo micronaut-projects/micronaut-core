@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.constructor.nullableinjection;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class C {
 

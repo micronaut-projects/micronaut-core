@@ -21,9 +21,8 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanType;
+import jakarta.inject.Named;
 
-import javax.inject.Named;
-import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -41,7 +40,6 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     private static final String NAMED_SIMPLE = "Named";
     private final AnnotationMetadata annotationMetadata;
-    private final Class<? extends Annotation> annotationType;
     private final String qualifiedName;
     private final AnnotationValue<Annotation> qualifierAnn;
     private final Set<String> nonBinding;
@@ -51,11 +49,13 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
      * @param name     The name
      */
     AnnotationMetadataQualifier(AnnotationMetadata metadata, String name) {
-        super(name);
+        super(metadata, name);
         this.annotationMetadata = metadata;
-        this.annotationType = null;
-        this.qualifiedName = name;
-        if (Named.class.getName().equals(name)) {
+        this.qualifiedName = annotationType != null ? annotationType.getName() : name;
+        if (AnnotationUtil.NAMED.equals(name) || Named.class.getName().equals(name)) {
+            this.nonBinding = null;
+            qualifierAnn = null;
+        } else {
             this.nonBinding = resolveNonBindingMembers(annotationMetadata);
             Map<CharSequence, Object> bindingValues = resolveBindingValues(annotationMetadata, qualifiedName, nonBinding);
             if (CollectionUtils.isNotEmpty(bindingValues)) {
@@ -63,9 +63,6 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
             } else {
                 qualifierAnn = null;
             }
-        } else {
-            this.nonBinding = null;
-            qualifierAnn = null;
         }
     }
 
@@ -74,9 +71,8 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
      * @param annotationType     The name
      */
     AnnotationMetadataQualifier(AnnotationMetadata metadata, Class<? extends Annotation> annotationType) {
-        super(annotationType.getSimpleName());
+        super(annotationType);
         this.annotationMetadata = metadata;
-        this.annotationType = annotationType;
         this.qualifiedName = annotationType.getName();
         if (!getName().equals(NAMED_SIMPLE)) {
             this.nonBinding = resolveNonBindingMembers(annotationMetadata);
@@ -98,13 +94,12 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
             return candidates;
         }
         String name;
-        String v = annotationMetadata.stringValue(Named.class).orElse(null);
+        String v = annotationMetadata.stringValue(AnnotationUtil.NAMED).orElse(null);
         if (StringUtils.isNotEmpty(v)) {
             name = Character.toUpperCase(v.charAt(0)) + v.substring(1);
             return reduceByName(beanType, candidates, name);
         } else {
             name = getName();
-
             final Stream<BT> reduced = reduceByAnnotation(beanType, candidates, name, qualifiedName);
             if (qualifierAnn != null) {
                 return reduced
@@ -160,7 +155,7 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     @NonNull
     private Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
-        final String[] nonBindingArray = annotationMetadata.stringValues(Qualifier.class, "nonBinding");
+        final String[] nonBindingArray = annotationMetadata.stringValues(AnnotationUtil.QUALIFIER, "nonBinding");
         return ArrayUtils.isNotEmpty(nonBindingArray) ? new HashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();
     }
 

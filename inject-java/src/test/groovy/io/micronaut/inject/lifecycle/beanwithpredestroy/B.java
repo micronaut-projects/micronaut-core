@@ -16,8 +16,8 @@
 package io.micronaut.inject.lifecycle.beanwithpredestroy;
 
 import javax.annotation.PreDestroy;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.io.Closeable;
 
 @Singleton

@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.constructor.nullableinjection
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 class B @Inject
 internal constructor(val a: A?)

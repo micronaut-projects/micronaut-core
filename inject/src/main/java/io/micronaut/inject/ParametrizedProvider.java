@@ -15,7 +15,8 @@
  */
 package io.micronaut.inject;
 
-import javax.inject.Provider;
+import jakarta.inject.Provider;
+
 import java.util.Map;
 
 /**

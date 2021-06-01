@@ -21,22 +21,17 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Head
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.QueryValue
-import io.micronaut.http.annotation.Status
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.functions.Consumer
+import jakarta.inject.Inject
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.inject.Inject
 import java.time.LocalDate
 
 /**
@@ -545,7 +540,7 @@ class HttpHeadSpec extends Specification {
         String noContent()
     }
 
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     static class MyGetHelper {
         private final RxStreamingHttpClient rxClientSlash
         private final RxStreamingHttpClient rxClient

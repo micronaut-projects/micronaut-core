@@ -18,7 +18,7 @@ import io.micronaut.context.annotation.*;
 class TestFactory {
 
     @Bean(preDestroy="close")
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     Test testBean() {
         return new Test();
     }
@@ -62,7 +62,7 @@ import io.micronaut.context.annotation.*;
 class TestFactory {
 
     @Bean(preDestroy="close")
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     Test testBean() {
         return new Test();
     }
@@ -105,7 +105,7 @@ import io.micronaut.context.annotation.*;
 class TestFactory {
 
     @Bean(preDestroy="shutdown")
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     java.util.concurrent.ExecutorService myService() {
         return java.util.concurrent.Executors.newFixedThreadPool(1);
     }
@@ -140,7 +140,7 @@ import io.micronaut.context.annotation.*;
 class TestFactory {
 
     @Bean(preDestroy="shutdown")
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     Test testBean() {
         return new Test();
     }
@@ -180,7 +180,7 @@ import io.micronaut.context.annotation.*;
 class TestFactory2 {
 
     @Bean(preDestroy="shutdown")
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     Test2 testBean() {
         return new Test2();
     }
@@ -221,7 +221,7 @@ import io.micronaut.context.annotation.*;
 class TestFactory2 {
 
     @Bean(preDestroy="notthere")
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     Test2 testBean() {
         return new Test2();
     }

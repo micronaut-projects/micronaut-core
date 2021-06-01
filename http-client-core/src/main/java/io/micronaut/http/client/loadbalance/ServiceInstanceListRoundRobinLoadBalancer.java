@@ -15,12 +15,11 @@
  */
 package io.micronaut.http.client.loadbalance;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
-
-import io.micronaut.core.annotation.Nullable;
 
 import java.util.Optional;
 

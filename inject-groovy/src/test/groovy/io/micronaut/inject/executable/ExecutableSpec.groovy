@@ -24,8 +24,9 @@ import io.micronaut.inject.MethodExecutionHandle
 import io.micronaut.context.annotation.Executable
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
+
 /**
  * @author Graeme Rocher
  * @since 1.0

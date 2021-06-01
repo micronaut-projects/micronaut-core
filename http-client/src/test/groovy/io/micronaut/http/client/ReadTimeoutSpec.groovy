@@ -30,13 +30,13 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.pool.AbstractChannelPoolMap
 import io.netty.channel.pool.FixedChannelPool
 import io.reactivex.Flowable
+import jakarta.inject.Inject
 import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.inject.Inject
 import java.lang.reflect.Field
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicInteger

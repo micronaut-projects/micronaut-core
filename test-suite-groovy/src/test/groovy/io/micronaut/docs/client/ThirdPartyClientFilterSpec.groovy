@@ -23,7 +23,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Retry
 class ThirdPartyClientFilterSpec extends Specification {

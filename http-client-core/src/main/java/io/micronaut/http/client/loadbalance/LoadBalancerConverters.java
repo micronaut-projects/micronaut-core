@@ -18,8 +18,8 @@ package io.micronaut.http.client.loadbalance;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.http.client.LoadBalancer;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;

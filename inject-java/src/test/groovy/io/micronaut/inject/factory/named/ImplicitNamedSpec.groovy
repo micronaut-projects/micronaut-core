@@ -1,8 +1,7 @@
 package io.micronaut.inject.factory.named
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-
-import javax.inject.Named
+import io.micronaut.core.annotation.AnnotationUtil
 
 class ImplicitNamedSpec extends AbstractTypeElementSpec {
 
@@ -12,13 +11,13 @@ class ImplicitNamedSpec extends AbstractTypeElementSpec {
 package implicitnamed;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.Named;
 
 @Named
 class FooBar {}
 ''')
         expect:
-        definition.stringValue(Named).get() == 'fooBar'
+        definition.stringValue(AnnotationUtil.NAMED).get() == 'fooBar'
     }
 
     void 'test implicit named on type via stereotype'() {
@@ -27,7 +26,8 @@ class FooBar {}
 package implicitnamed;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 import java.lang.annotation.Retention;
 import static java.lang.annotation.RetentionPolicy.*;
 
@@ -42,7 +42,7 @@ class FooBar {}
 }
 ''')
         expect:
-        definition.stringValue(Named).get() == 'fooBar'
+        definition.stringValue(AnnotationUtil.NAMED).get() == 'fooBar'
     }
 
     void 'test use of implicit @Named annotation'() {
@@ -51,7 +51,7 @@ class FooBar {}
 package implicitnamed;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Factory
 class TestFactory {

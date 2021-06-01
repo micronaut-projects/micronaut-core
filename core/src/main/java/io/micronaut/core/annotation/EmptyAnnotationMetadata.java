@@ -240,6 +240,12 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
         return Collections.emptyList();
     }
 
+    @NonNull
+    @Override
+    public List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull String stereotype) {
+        return Collections.emptyList();
+    }
+
     @Override
     public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@NonNull Class<T> annotationClass) {
         return Optional.empty();
@@ -402,6 +408,18 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @NonNull
     @Override
     public String[] stringValues(@NonNull Class<? extends Annotation> annotation) {
+        return StringUtils.EMPTY_STRING_ARRAY;
+    }
+
+    @NonNull
+    @Override
+    public String[] stringValues(@NonNull String annotation, @NonNull String member) {
+        return StringUtils.EMPTY_STRING_ARRAY;
+    }
+
+    @NonNull
+    @Override
+    public String[] stringValues(@NonNull String annotation) {
         return StringUtils.EMPTY_STRING_ARRAY;
     }
 

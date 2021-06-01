@@ -17,7 +17,7 @@ package io.micronaut.inject.beans;
 
 import io.micronaut.scheduling.annotation.Async;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class InterceptedBean {

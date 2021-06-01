@@ -19,13 +19,8 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.scheduling.executor.ThreadSelection
-import io.reactivex.BackpressureStrategy
-import io.reactivex.Flowable
-import io.reactivex.FlowableEmitter
-import io.reactivex.FlowableOnSubscribe
-import io.reactivex.Single
+import io.reactivex.*
 import io.reactivex.annotations.NonNull
-import io.reactivex.functions.Function
 import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
 import spock.lang.Specification

@@ -20,7 +20,7 @@ import io.micronaut.docs.context.events.SampleEvent
 import io.micronaut.runtime.event.annotation.EventListener
 import io.micronaut.scheduling.annotation.Async
 // end::imports[]
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import java.util.concurrent.atomic.AtomicInteger
 
 // tag::class[]

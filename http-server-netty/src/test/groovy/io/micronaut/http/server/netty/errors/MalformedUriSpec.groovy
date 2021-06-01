@@ -14,15 +14,12 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
-import io.netty.channel.ChannelDuplexHandler
-import io.netty.channel.ChannelHandlerContext
+import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Singleton
 
 @Retry
 // Retry added because we need to use java.net.URL to test not the Micronaut HTTP client and URL.text from Groovy is unreliable

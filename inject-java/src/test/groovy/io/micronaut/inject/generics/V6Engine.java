@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.generics;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 // tag::class[]
 @Singleton

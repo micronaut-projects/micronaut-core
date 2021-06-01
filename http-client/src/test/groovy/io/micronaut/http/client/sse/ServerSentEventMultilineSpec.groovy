@@ -1,10 +1,10 @@
 package io.micronaut.http.client.sse
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.client.sse.ServerSentEventStreamingSpec.Product
+import io.micronaut.http.client.sse.ServerSentEventStreamingSpec.ProductClient
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.http.client.sse.ServerSentEventStreamingSpec.ProductClient
-import io.micronaut.http.client.sse.ServerSentEventStreamingSpec.Product
 import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Shared

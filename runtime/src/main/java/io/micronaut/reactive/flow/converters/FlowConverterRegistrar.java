@@ -19,11 +19,10 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 import kotlinx.coroutines.flow.Flow;
 import kotlinx.coroutines.reactive.ReactiveFlowKt;
 import org.reactivestreams.Publisher;
-
-import javax.inject.Singleton;
 
 /**
  * Converts between a {@link Flow} and a {@link Publisher}.

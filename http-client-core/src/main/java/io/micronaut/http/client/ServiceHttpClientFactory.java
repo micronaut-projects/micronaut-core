@@ -16,7 +16,10 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.BeanProvider;
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.Internal;

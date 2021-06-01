@@ -18,8 +18,8 @@ package io.micronaut.runtime.context.scope;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.aop.Around;
+import jakarta.inject.Scope;
 
-import javax.inject.Scope;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

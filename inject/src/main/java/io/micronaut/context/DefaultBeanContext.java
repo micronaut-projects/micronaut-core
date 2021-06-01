@@ -47,14 +47,11 @@ import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
+import jakarta.inject.Provider;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-
-import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.io.Closeable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -206,10 +203,13 @@ public class DefaultBeanContext implements BeanContext {
         this.classLoader = contextConfiguration.getClassLoader();
         this.customScopeRegistry = Objects.requireNonNull(createCustomScopeRegistry(), "Scope registry cannot be null");
         Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
-        this.eagerInitStereotypes = eagerInitAnnotated
-                .stream().map(Class::getName).toArray(String[]::new);
-        this.eagerInitStereotypesPresent = eagerInitStereotypes.length > 0;
-        this.eagerInitSingletons = eagerInitStereotypesPresent && eagerInitAnnotated.contains(Singleton.class);
+        List<String> eagerInitStereotypes = new ArrayList<>(eagerInitAnnotated.size());
+        for (Class<? extends Annotation> ann: eagerInitAnnotated) {
+            eagerInitStereotypes.add(ann.getName());
+        }
+        this.eagerInitStereotypes = eagerInitStereotypes.toArray(new String[0]);
+        this.eagerInitStereotypesPresent = !eagerInitStereotypes.isEmpty();
+        this.eagerInitSingletons = eagerInitStereotypesPresent && (eagerInitStereotypes.contains(AnnotationUtil.SINGLETON) || eagerInitStereotypes.contains(Singleton.class.getName()));
     }
 
     /**
@@ -1213,7 +1213,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Find an active {@link javax.inject.Singleton} bean for the given definition and qualifier.
+     * Find an active singleton bean for the given definition and qualifier.
      *
      * @param beanDefinition The bean definition
      * @param qualifier      The qualifier
@@ -4019,7 +4019,12 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public Optional<Class<? extends Annotation>> getScope() {
-            return Optional.of(Singleton.class);
+            return Optional.of(javax.inject.Singleton.class);
+        }
+
+        @Override
+        public Optional<String> getScopeName() {
+            return Optional.of(AnnotationUtil.SINGLETON);
         }
 
         @NonNull

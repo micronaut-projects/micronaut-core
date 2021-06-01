@@ -18,8 +18,8 @@ package io.micronaut.aop;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Internal;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

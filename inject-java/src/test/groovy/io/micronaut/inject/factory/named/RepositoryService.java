@@ -19,8 +19,8 @@ import com.github.benmanes.caffeine.cache.Cache;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class RepositoryService {

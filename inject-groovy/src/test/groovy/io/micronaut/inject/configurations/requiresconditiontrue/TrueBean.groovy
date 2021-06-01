@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.configurations.requiresconditiontrue;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class TrueBean {

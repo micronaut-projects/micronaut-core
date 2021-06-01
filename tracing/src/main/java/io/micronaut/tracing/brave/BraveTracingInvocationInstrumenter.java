@@ -25,8 +25,8 @@ import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.function.Supplier;
 
 /**

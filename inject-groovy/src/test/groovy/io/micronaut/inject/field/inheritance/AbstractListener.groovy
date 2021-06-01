@@ -16,7 +16,7 @@
 package io.micronaut.inject.field.inheritance
 
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 abstract class AbstractListener {
     @Inject protected SomeBean someBean

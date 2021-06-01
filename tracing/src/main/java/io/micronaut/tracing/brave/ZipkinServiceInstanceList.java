@@ -18,8 +18,8 @@ package io.micronaut.tracing.brave;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.net.URI;
 import java.util.List;
 import java.util.stream.Collectors;

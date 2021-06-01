@@ -17,7 +17,7 @@ package io.micronaut.inject.qualifiers.replaces;
 
 import io.micronaut.aop.simple.Mutating;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Mutating("name")
 @Singleton

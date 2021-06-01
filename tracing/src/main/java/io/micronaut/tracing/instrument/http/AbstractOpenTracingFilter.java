@@ -15,7 +15,10 @@
  */
 package io.micronaut.tracing.instrument.http;
 
-import io.micronaut.http.*;
+import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.filter.HttpFilter;
 import io.opentracing.Span;
 import io.opentracing.SpanContext;

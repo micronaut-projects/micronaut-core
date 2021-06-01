@@ -14,7 +14,7 @@ class AnnotationRemapperSpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.core.annotation.Nullable;
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     void test(@Nullable String id) {
@@ -36,7 +36,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.NonNull;
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     void test(@NonNull String id) {
@@ -58,7 +58,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.NonNull;
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.context.annotation.Executable

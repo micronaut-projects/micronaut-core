@@ -1,9 +1,10 @@
 package io.micronaut.inject.qualifiers.annotationmember
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 
-import javax.inject.Qualifier
+import jakarta.inject.Qualifier
 
 class NonBindingQualifierSpec extends AbstractTypeElementSpec {
 
@@ -13,7 +14,7 @@ class NonBindingQualifierSpec extends AbstractTypeElementSpec {
 package annotationmember;
 
 import io.micronaut.context.annotation.NonBinding;
-import javax.inject.Qualifier;
+import jakarta.inject.Qualifier;
 import java.lang.annotation.Retention;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
@@ -38,10 +39,10 @@ class Test {
         definition != null
         definition
                 .getAnnotationMetadata()
-                .getAnnotation(Qualifier)
+                .getAnnotation(AnnotationUtil.QUALIFIER)
                 .stringValues("nonBinding") as Set == ['description'] as Set
         definition
             .annotationMetadata
-            .getAnnotationNameByStereotype(Qualifier).get() == 'annotationmember.Cylinders'
+            .getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == 'annotationmember.Cylinders'
     }
 }

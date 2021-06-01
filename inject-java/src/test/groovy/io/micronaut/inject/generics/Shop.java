@@ -2,7 +2,7 @@ package io.micronaut.inject.generics;
 
 import io.micronaut.context.annotation.Bean;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 public interface Shop<T> {
 }

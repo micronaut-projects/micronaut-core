@@ -22,11 +22,10 @@ import io.micronaut.http.server.netty.converters.DuplicateRouteHandler
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.web.router.UriRouteMatch
 import io.micronaut.web.router.exceptions.DuplicateRouteException
+import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Singleton
 
 class VersionControllerSpec extends Specification {
     @AutoCleanup

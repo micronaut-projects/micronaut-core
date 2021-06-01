@@ -3,10 +3,10 @@ package io.micronaut.test.issue5379;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 import org.apache.groovy.internal.util.Supplier;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.util.List;
 
 @Singleton

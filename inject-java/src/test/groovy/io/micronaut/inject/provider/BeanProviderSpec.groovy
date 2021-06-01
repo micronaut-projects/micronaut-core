@@ -30,8 +30,8 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
-class Test implements javax.inject.Provider<Foo>{
+@jakarta.inject.Singleton
+class Test implements jakarta.inject.Provider<Foo>{
 
     public Foo get() {
         return new Foo();
@@ -54,10 +54,10 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
-    javax.inject.Provider<Foo> provider;
-    Test(javax.inject.Provider<Foo> provider) {
+    jakarta.inject.Provider<Foo> provider;
+    Test(jakarta.inject.Provider<Foo> provider) {
         this.provider = provider;
     }
     public Foo get() {
@@ -65,7 +65,7 @@ class Test {
     }
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Foo {}
 ''')
         def definition = ref.load()
