@@ -287,6 +287,16 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     /**
+     * Run the application for the given arguments. Classes for the application will be discovered automatically
+     *
+     * @param args The arguments
+     * @since 2.5.5
+     */
+    public static void main(String... args) {
+        run(new Class[0], args);
+    }
+
+    /**
      * Run the application for the given arguments.
      *
      * @param cls  The application class
