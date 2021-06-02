@@ -290,7 +290,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private void exceptionCaughtInternal(ChannelHandlerContext ctx,
                                          Throwable t,
                                          NettyHttpRequest nettyHttpRequest,
-                                         boolean nettyException) {
+                                         boolean skipOncePerRequest) {
         RouteMatch<?> errorRoute = null;
         // find the origination of of the route
         RouteMatch<?> originalRoute = nettyHttpRequest.getMatchedRoute();
@@ -361,11 +361,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         ctx,
                         ctx.executor(),
                         true,
-                        nettyException,
+                        skipOncePerRequest,
                         null
                 );
             } catch (Throwable e) {
-                writeDefaultErrorResponse(ctx, nettyHttpRequest, e, nettyException);
+                writeDefaultErrorResponse(ctx, nettyHttpRequest, e, skipOncePerRequest);
             }
         } else {
 
@@ -379,7 +379,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         Object result = handler.handle(nettyHttpRequest, cause);
                         return errorResultToResponse(result);
                     });
-                    filterPublisher(new AtomicReference<HttpRequest<?>>(nettyHttpRequest), routePublisher, nettyException)
+                    filterPublisher(new AtomicReference<HttpRequest<?>>(nettyHttpRequest), routePublisher, skipOncePerRequest)
                             .subscribe(new CompletionAwareSubscriber<MutableHttpResponse<?>>() {
 
                                 MutableHttpResponse<?> mutableHttpResponse;
@@ -396,7 +396,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                                 @Override
                                 public void doOnError(Throwable throwable) {
-                                    writeDefaultErrorResponse(ctx, nettyHttpRequest, throwable, nettyException);
+                                    writeDefaultErrorResponse(ctx, nettyHttpRequest, throwable, skipOncePerRequest);
                                 }
 
                                 @Override
@@ -416,7 +416,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         logException(cause);
                     }
                 } catch (Throwable e) {
-                    writeDefaultErrorResponse(ctx, nettyHttpRequest, e, nettyException);
+                    writeDefaultErrorResponse(ctx, nettyHttpRequest, e, skipOncePerRequest);
                 }
             } else {
                 if (isIgnorable(cause)) {
@@ -427,7 +427,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             ctx,
                             nettyHttpRequest,
                             cause,
-                            nettyException);
+                            skipOncePerRequest);
                 }
             }
         }
@@ -1436,7 +1436,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             @Override
             protected void doOnError(Throwable t) {
                 final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
-                exceptionCaughtInternal(context, t, nettyHttpRequest, false);
+                exceptionCaughtInternal(context, t, nettyHttpRequest, true);
             }
         });
     }
