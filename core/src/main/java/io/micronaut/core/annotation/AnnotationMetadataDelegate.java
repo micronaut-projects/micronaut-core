@@ -583,6 +583,18 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
         return getAnnotationMetadata().synthesize(annotationClass);
     }
 
+    @Nullable
+    @Override
+    default <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        return getAnnotationMetadata().synthesize(annotationClass, sourceAnnotation);
+    }
+
+    @Nullable
+    @Override
+    default <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        return getAnnotationMetadata().synthesizeDeclared(annotationClass, sourceAnnotation);
+    }
+
     @Override
     default @NonNull Annotation[] synthesizeAll() {
         return getAnnotationMetadata().synthesizeAll();

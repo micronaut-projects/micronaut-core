@@ -220,7 +220,7 @@ public final class AnnotationMetadataSupport {
     @SuppressWarnings("unchecked")
     static Optional<Constructor<InvocationHandler>> getProxyClass(Class<? extends Annotation> annotation) {
         return ANNOTATION_PROXY_CACHE.computeIfAbsent(annotation, aClass -> {
-            Class proxyClass = Proxy.getProxyClass(annotation.getClassLoader(), annotation);
+            Class proxyClass = Proxy.getProxyClass(annotation.getClassLoader(), annotation, AnnotationValueProvider.class);
             return ReflectionUtils.findConstructor(proxyClass, InvocationHandler.class);
         });
     }
@@ -252,12 +252,12 @@ public final class AnnotationMetadataSupport {
     /**
      * Annotation proxy handler.
      */
-    private static class AnnotationProxyHandler implements InvocationHandler {
+    private static class AnnotationProxyHandler<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
         private final int hashCode;
-        private final Class<?> annotationClass;
-        private final AnnotationValue<?> annotationValue;
+        private final Class<A> annotationClass;
+        private final AnnotationValue<A> annotationValue;
 
-        AnnotationProxyHandler(int hashCode, Class<?> annotationClass, @Nullable AnnotationValue<?> annotationValue) {
+        AnnotationProxyHandler(int hashCode, Class<A> annotationClass, @Nullable AnnotationValue<A> annotationValue) {
             this.hashCode = hashCode;
             this.annotationClass = annotationClass;
             this.annotationValue = annotationValue;
@@ -309,10 +309,22 @@ public final class AnnotationMetadataSupport {
                 return equals(args[0]);
             } else if ("annotationType".equals(name)) {
                 return annotationClass;
+            } else if (method.getReturnType() == AnnotationValue.class) {
+                return annotationValue;
             } else if (annotationValue != null && annotationValue.contains(name)) {
                 return annotationValue.getRequiredValue(name, method.getReturnType());
             }
             return method.getDefaultValue();
+        }
+
+        @NonNull
+        @Override
+        public AnnotationValue<A> annotationValue() {
+            if (annotationValue != null) {
+                return this.annotationValue;
+            } else {
+                return new AnnotationValue<A>(annotationClass.getName());
+            }
         }
     }
 }
