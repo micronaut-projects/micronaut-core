@@ -63,7 +63,8 @@ public class JaegerConfiguration implements Toggleable  {
      */
     public JaegerConfiguration(
             ApplicationConfiguration applicationConfiguration) {
-        if (StringUtils.isEmpty(System.getProperty(JAEGER_SERVICE_NAME))) {
+		if (StringUtils.isEmpty(System.getProperty(JAEGER_SERVICE_NAME))
+				&& StringUtils.isEmpty(System.getenv(JAEGER_SERVICE_NAME))) {
             System.setProperty(JAEGER_SERVICE_NAME, applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME));
         }
         configuration = Configuration.fromEnv();
