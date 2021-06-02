@@ -131,6 +131,24 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Nullable
     @Override
+    public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        for (AnnotationMetadata annotationMetadata : hierarchy) {
+            final T a = annotationMetadata.synthesize(annotationClass, sourceAnnotation);
+            if (a != null) {
+                return a;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        return hierarchy[0].synthesize(annotationClass, sourceAnnotation);
+    }
+
+    @Nullable
+    @Override
     public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass) {
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             final T a = annotationMetadata.synthesize(annotationClass);

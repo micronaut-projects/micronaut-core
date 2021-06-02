@@ -24,9 +24,11 @@ import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.annotation.AnnotationValueProvider
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
+import jakarta.inject.Named
 import spock.lang.Issue
 
 import jakarta.inject.Scope
@@ -37,6 +39,29 @@ import jakarta.inject.Singleton
  * @since 1.0
  */
 class BeanDefinitionAnnotationMetadataSpec extends AbstractTypeElementSpec {
+
+    void "test synthesize annotation from different source annotation"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import jakarta.inject.*;
+
+@Singleton
+@Named("test")
+class Test {
+
+}
+''')
+
+
+        expect:
+        def ann = definition.synthesize(Named, "javax.inject.Named")
+        ann.value() == 'test'
+        definition.synthesizeDeclared(Named, "javax.inject.Named").value() == 'test'
+        ann instanceof AnnotationValueProvider
+        ann.annotationValue()
+    }
 
     void "test bean definition computed state"() {
         given:
