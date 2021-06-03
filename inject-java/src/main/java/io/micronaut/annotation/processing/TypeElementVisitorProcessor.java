@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
@@ -63,12 +64,28 @@ import static javax.lang.model.element.ElementKind.FIELD;
         VisitorContext.MICRONAUT_PROCESSING_MODULE
 })
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
-    private static final Collection<TypeElementVisitor> TYPE_ELEMENT_VISITORS;
+    private static final SoftServiceLoader<TypeElementVisitor> SERVICE_LOADER = SoftServiceLoader.load(TypeElementVisitor.class, TypeElementVisitorProcessor.class.getClassLoader());
     private static final Set<String> VISITOR_WARNINGS;
+    private static final Set<String> SUPPORTED_ANNOTATION_NAMES;
 
     static {
+
         final HashSet<String> warnings = new HashSet<>();
-        TYPE_ELEMENT_VISITORS = findCoreTypeElementVisitors(warnings);
+        Set<String> names = new HashSet<>();
+        for (TypeElementVisitor<?, ?> typeElementVisitor : findCoreTypeElementVisitors(SERVICE_LOADER, warnings)) {
+            final Set<String> supportedAnnotationNames;
+            try {
+                supportedAnnotationNames = typeElementVisitor.getSupportedAnnotationNames();
+            } catch (Throwable e) {
+                // ignore if annotations are not on the classpath
+                continue;
+            }
+            if (!supportedAnnotationNames.equals(Collections.singleton("*"))) {
+                names.addAll(supportedAnnotationNames);
+            }
+        }
+        SUPPORTED_ANNOTATION_NAMES = names;
+
         if (warnings.isEmpty()) {
             VISITOR_WARNINGS = Collections.emptySet();
         } else {
@@ -83,20 +100,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      * @return The names of all the visited annotations.
      */
     static Set<String> getVisitedAnnotationNames() {
-        Set<String> names = new HashSet<>();
-        for (TypeElementVisitor<?, ?> typeElementVisitor : TYPE_ELEMENT_VISITORS) {
-            final Set<String> supportedAnnotationNames;
-            try {
-                supportedAnnotationNames = typeElementVisitor.getSupportedAnnotationNames();
-            } catch (Throwable e) {
-                // ignore if annotations are not on the classpath
-                continue;
-            }
-            if (!supportedAnnotationNames.equals(Collections.singleton("*"))) {
-                names.addAll(supportedAnnotationNames);
-            }
-        }
-        return names;
+        return SUPPORTED_ANNOTATION_NAMES;
     }
 
     @Override
@@ -254,20 +258,24 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         for (String visitorWarning : VISITOR_WARNINGS) {
             warning(visitorWarning);
         }
-        return TYPE_ELEMENT_VISITORS;
+        return findCoreTypeElementVisitors(SERVICE_LOADER, null);
     }
 
     private static @NonNull
-    Collection<TypeElementVisitor> findCoreTypeElementVisitors(Set<String> warnings) {
+    Collection<TypeElementVisitor> findCoreTypeElementVisitors(
+            SoftServiceLoader<TypeElementVisitor> serviceLoader,
+            @Nullable Set<String> warnings) {
         Map<String, TypeElementVisitor> typeElementVisitors = new HashMap<>(10);
-        SoftServiceLoader<TypeElementVisitor> serviceLoader = SoftServiceLoader.load(TypeElementVisitor.class, TypeElementVisitorProcessor.class.getClassLoader());
-        for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
+
+        for (ServiceDefinition<TypeElementVisitor> definition : SERVICE_LOADER) {
             if (definition.isPresent()) {
                 TypeElementVisitor visitor;
                 try {
                     visitor = definition.load();
                 } catch (Throwable e) {
-                    warnings.add("TypeElementVisitor [" + definition.getName() + "] will be ignored due to loading error: " + e.getMessage());
+                    if (warnings != null) {
+                        warnings.add("TypeElementVisitor [" + definition.getName() + "] will be ignored due to loading error: " + e.getMessage());
+                    }
                     continue;
                 }
                 if (visitor == null || !visitor.isEnabled()) {
@@ -281,7 +289,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                         final String version = requires.version();
                         if (StringUtils.isNotEmpty(version) && !VersionUtils.isAtLeastMicronautVersion(version)) {
                             try {
-                                warnings.add("TypeElementVisitor [" + definition.getName() + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version);
+                                if (warnings != null) {
+                                    warnings.add("TypeElementVisitor [" + definition.getName() + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version);
+                                }
                                 continue;
                             } catch (IllegalArgumentException e) {
                                 // shouldn't happen, thrown when invalid version encountered
