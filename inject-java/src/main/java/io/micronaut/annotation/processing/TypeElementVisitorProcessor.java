@@ -63,9 +63,41 @@ import static javax.lang.model.element.ElementKind.FIELD;
         VisitorContext.MICRONAUT_PROCESSING_MODULE
 })
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
+    private static final Collection<TypeElementVisitor> TYPE_ELEMENT_VISITORS;
+    private static final Set<String> VISITOR_WARNINGS;
 
+    static {
+        final HashSet<String> warnings = new HashSet<>();
+        TYPE_ELEMENT_VISITORS = findCoreTypeElementVisitors(warnings);
+        if (warnings.isEmpty()) {
+            VISITOR_WARNINGS = Collections.emptySet();
+        } else {
+            VISITOR_WARNINGS = Collections.unmodifiableSet(warnings);
+        }
+    }
     private List<LoadedVisitor> loadedVisitors;
     private Collection<TypeElementVisitor> typeElementVisitors;
+
+    /**
+     * The visited annotation names.
+     * @return The names of all the visited annotations.
+     */
+    static Set<String> getVisitedAnnotationNames() {
+        Set<String> names = new HashSet<>();
+        for (TypeElementVisitor<?, ?> typeElementVisitor : TYPE_ELEMENT_VISITORS) {
+            final Set<String> supportedAnnotationNames;
+            try {
+                supportedAnnotationNames = typeElementVisitor.getSupportedAnnotationNames();
+            } catch (Throwable e) {
+                // ignore if annotations are not on the classpath
+                continue;
+            }
+            if (!supportedAnnotationNames.equals(Collections.singleton("*"))) {
+                names.addAll(supportedAnnotationNames);
+            }
+        }
+        return names;
+    }
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -219,15 +251,23 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      */
     protected @NonNull
     Collection<TypeElementVisitor> findTypeElementVisitors() {
+        for (String visitorWarning : VISITOR_WARNINGS) {
+            warning(visitorWarning);
+        }
+        return TYPE_ELEMENT_VISITORS;
+    }
+
+    private static @NonNull
+    Collection<TypeElementVisitor> findCoreTypeElementVisitors(Set<String> warnings) {
         Map<String, TypeElementVisitor> typeElementVisitors = new HashMap<>(10);
-        SoftServiceLoader<TypeElementVisitor> serviceLoader = SoftServiceLoader.load(TypeElementVisitor.class, getClass().getClassLoader());
+        SoftServiceLoader<TypeElementVisitor> serviceLoader = SoftServiceLoader.load(TypeElementVisitor.class, TypeElementVisitorProcessor.class.getClassLoader());
         for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
             if (definition.isPresent()) {
                 TypeElementVisitor visitor;
                 try {
                     visitor = definition.load();
                 } catch (Throwable e) {
-                    warning("TypeElementVisitor [" + definition.getName() + "] will be ignored due to loading error: " + e.getMessage());
+                    warnings.add("TypeElementVisitor [" + definition.getName() + "] will be ignored due to loading error: " + e.getMessage());
                     continue;
                 }
                 if (visitor == null || !visitor.isEnabled()) {
@@ -241,7 +281,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                         final String version = requires.version();
                         if (StringUtils.isNotEmpty(version) && !VersionUtils.isAtLeastMicronautVersion(version)) {
                             try {
-                                warning("TypeElementVisitor [" + definition.getName() + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version);
+                                warnings.add("TypeElementVisitor [" + definition.getName() + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version);
                                 continue;
                             } catch (IllegalArgumentException e) {
                                 // shouldn't happen, thrown when invalid version encountered
