@@ -89,7 +89,11 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                                 //no-op
                             }
                             if (fileSystem == null || !fileSystem.isOpen()) {
-                                fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
+                                try {
+                                    fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
+                                } catch (FileSystemAlreadyExistsException e) {
+                                    fileSystem = FileSystems.getFileSystem(uri);
+                                }
                             }
                             Path pathObject = fileSystem.getPath(path);
                             if (Files.isDirectory(pathObject)) {
