@@ -1,6 +1,6 @@
 Configuration in Micronaut takes inspiration from both Spring Boot and Grails, integrating configuration properties from multiple sources directly into the core IoC container.
 
-Configuration can by default be provided in Java properties, YAML, JSON, or Groovy files. The convention is to search for a file named `application.yml`, `application.properties`, `application.json` or `application.groovy`.
+Configuration can by default be provided in Java properties, YAML, JSON, or Groovy files. The convention is to search for a file named `application.yml`, `application.properties`, `application.json` or `application.groovy` in the `config` directory from the `user.dir`.
 
 In addition, like Spring and Grails, Micronaut allows overriding any property via system properties or environment variables.
 
