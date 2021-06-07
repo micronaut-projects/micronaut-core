@@ -27,7 +27,6 @@ import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.codec.http2.HttpConversionUtil;
-import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapter;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -44,7 +43,7 @@ import static io.netty.util.internal.ObjectUtil.checkNotNull;
  * This implementation does not buffer the data. If you need data buffering a {@link io.netty.handler.flow.FlowControlHandler}
  * can be placed after this implementation so that downstream handlers can control flow.
  *
- * Based on code in {@link InboundHttp2ToHttpAdapter}.
+ * Based on code in {@link io.netty.handler.codec.http2.InboundHttp2ToHttpAdapter}.
  *
  * @author graemerocher
  * @since 2.0

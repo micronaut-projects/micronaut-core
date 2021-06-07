@@ -20,6 +20,8 @@ In the case of a response being created as a result of an exception, the origina
 
 The api:http.filter.OncePerRequestHttpServerFilter[] class is now deprecated and will be removed in the next major release. The api:http.filter.OncePerRequestHttpServerFilter[] stores a request attribute when the filter is executed and some functionality may rely on that attribute existing. The class will still create the attribute but it is recommended to instead create a custom attribute in your filter class and use that instead of the one created by api:http.filter.OncePerRequestHttpServerFilter[].
 
+There is also a minor behavior change in when the response gets written. Any modifications to the response after the underlying `onNext` call is made will not have any effect as the response has already been written.
+
 ==== Decapitalization Strategy
 
 For many cases, one common one being introspections, getter names like `getXForwarded()` would result in the bean property being `XForwarded`. The name will now be `xForwarded`. This can affect many areas of the framework where names like `XForwarded` are used.

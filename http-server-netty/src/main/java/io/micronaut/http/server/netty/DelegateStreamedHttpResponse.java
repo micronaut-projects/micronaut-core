@@ -16,11 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
-import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpResponse;
 import org.reactivestreams.Publisher;
