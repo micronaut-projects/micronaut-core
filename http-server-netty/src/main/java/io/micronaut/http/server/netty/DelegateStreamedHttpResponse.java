@@ -16,7 +16,11 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.netty.AbstractNettyHttpRequest;
+import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpResponse;
 import org.reactivestreams.Publisher;
@@ -37,7 +41,8 @@ final class DelegateStreamedHttpResponse extends DelegateHttpResponse implements
      * @param response The {@link HttpResponse}
      * @param stream The {@link Publisher} for {@link HttpContent}
      */
-    DelegateStreamedHttpResponse(HttpResponse response, Publisher<HttpContent> stream) {
+    DelegateStreamedHttpResponse(HttpResponse response,
+                                 Publisher<HttpContent> stream) {
         super(response);
         this.stream = stream;
     }
@@ -46,4 +51,5 @@ final class DelegateStreamedHttpResponse extends DelegateHttpResponse implements
     public void subscribe(Subscriber<? super HttpContent> subscriber) {
         stream.subscribe(subscriber);
     }
+
 }

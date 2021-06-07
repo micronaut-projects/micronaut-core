@@ -39,18 +39,18 @@ class MalformedUriSpec extends Specification {
         result == 'Exception: Illegal character in path at index 11: /malformed/[]'
     }
 
-    void "test the once per filter is ignored"() {
+    void "test filters are called in case of error"() {
         given:
         OncePerFilter filter = embeddedServer.applicationContext.getBean(OncePerFilter)
 
         expect:
-        !filter.filterCalled
+        filter.filterCalled
 
         when:
         def result = new URL("$embeddedServer.URL/malformed/[]").text
 
         then:
-        !filter.filterCalled
+        filter.filterCalled
         result == 'Exception: Illegal character in path at index 11: /malformed/[]'
     }
 

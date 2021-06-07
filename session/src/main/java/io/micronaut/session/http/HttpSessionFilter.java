@@ -22,6 +22,7 @@ import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
+import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
@@ -44,7 +45,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Filter("/**")
-public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
+public class HttpSessionFilter implements HttpServerFilter {
 
     /**
      * The order of the filter.
@@ -79,7 +80,8 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
     }
 
     @Override
-    protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+    public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+        request.setAttribute(HttpSessionFilter.class.getName(), true);
         for (HttpSessionIdResolver resolver : resolvers) {
             List<String> ids = resolver.resolveIds(request);
             if (CollectionUtils.isNotEmpty(ids)) {

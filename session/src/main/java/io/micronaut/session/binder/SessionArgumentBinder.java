@@ -62,7 +62,7 @@ public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session
 
     @Override
     public ArgumentBinder.BindingResult<Session> bind(ArgumentConversionContext<Session> context, HttpRequest<?> source) {
-        if (!source.getAttributes().contains(OncePerRequestHttpServerFilter.getKey(HttpSessionFilter.class))) {
+        if (!source.getAttributes().contains(HttpSessionFilter.class.getName())) {
             // the filter hasn't been executed
             //noinspection unchecked
             return ArgumentBinder.BindingResult.EMPTY;
