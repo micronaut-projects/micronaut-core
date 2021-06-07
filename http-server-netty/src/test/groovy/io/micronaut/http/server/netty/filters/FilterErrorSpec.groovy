@@ -54,7 +54,6 @@ class FilterErrorSpec extends Specification {
         ctx.close()
     }
 
-    @Ignore
     void "test non once per request filter throwing error does not loop"() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '2'])
         def ctx = server.applicationContext
@@ -76,10 +75,10 @@ class FilterErrorSpec extends Specification {
 
     @Requires(property = 'spec.name', value = 'FilterErrorSpec')
     @Filter("/**")
-    static class First extends OncePerRequestHttpServerFilter {
+    static class First implements HttpServerFilter {
 
         @Override
-        protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+        public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             if (StringUtils.isTrue(request.getHeaders().get("X-Passthru"))) {
                 return chain.proceed(request)
             }
@@ -94,10 +93,10 @@ class FilterErrorSpec extends Specification {
 
     @Requires(property = 'spec.name', value = 'FilterErrorSpec')
     @Filter("/**")
-    static class Next extends OncePerRequestHttpServerFilter {
+    static class Next implements HttpServerFilter {
 
         @Override
-        protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+        public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Publishers.just(new NextFilterException())
         }
 
