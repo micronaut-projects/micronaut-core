@@ -33,6 +33,7 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -1843,6 +1844,122 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 return new AnnotationMetadataHierarchy(ref, newMetadata);
             } else {
                 return newMetadata;
+            }
+        }
+        return annotationMetadata;
+    }
+
+    /**
+     * Removes an annotation from the given annotation metadata.
+     * @param annotationMetadata The annotation metadata
+     * @param annotationType The annotation type
+     * @return The updated metadata
+     * @since 3.0.0
+     */
+    public AnnotationMetadata removeAnnotation(AnnotationMetadata annotationMetadata, String annotationType) {
+        // we only care if the metadata is an hierarchy or default mutable
+        final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
+        AnnotationMetadata declaredMetadata = annotationMetadata;
+        if (isHierarchy) {
+            declaredMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).getDeclaredMetadata();
+        }
+        // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
+        // in which case nothing needs to be done
+        if (declaredMetadata instanceof DefaultAnnotationMetadata) {
+            final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) declaredMetadata;
+            T annotationMirror = getAnnotationMirror(annotationType).orElse(null);
+            if (annotationMirror != null) {
+                String repeatableName = getRepeatableNameForType(annotationMirror);
+                if (repeatableName != null) {
+                    defaultMetadata.removeAnnotation(repeatableName);
+                } else {
+                    defaultMetadata.removeAnnotation(annotationType);
+                }
+            } else {
+                defaultMetadata.removeAnnotation(annotationType);
+            }
+
+            if (isHierarchy) {
+                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(
+                        declaredMetadata
+                );
+            } else {
+                return declaredMetadata;
+            }
+        }
+        return annotationMetadata;
+    }
+
+    /**
+     * Removes an annotation from the given annotation metadata.
+     * @param annotationMetadata The annotation metadata
+     * @param annotationType The annotation type
+     * @return The updated metadata
+     * @since 3.0.0
+     */
+    public AnnotationMetadata removeStereotype(AnnotationMetadata annotationMetadata, String annotationType) {
+        // we only care if the metadata is an hierarchy or default mutable
+        final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
+        AnnotationMetadata declaredMetadata = annotationMetadata;
+        if (isHierarchy) {
+            declaredMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).getDeclaredMetadata();
+        }
+        // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
+        // in which case nothing needs to be done
+        if (declaredMetadata instanceof DefaultAnnotationMetadata) {
+            final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) declaredMetadata;
+            T annotationMirror = getAnnotationMirror(annotationType).orElse(null);
+            if (annotationMirror != null) {
+                String repeatableName = getRepeatableNameForType(annotationMirror);
+                if (repeatableName != null) {
+                    defaultMetadata.removeStereotype(repeatableName);
+                } else {
+                    defaultMetadata.removeStereotype(annotationType);
+                }
+            } else {
+                defaultMetadata.removeStereotype(annotationType);
+            }
+
+            if (isHierarchy) {
+                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(
+                        declaredMetadata
+                );
+            } else {
+                return declaredMetadata;
+            }
+        }
+        return annotationMetadata;
+    }
+
+    /**
+     * Removes an annotation from the metadata for the given predicate.
+     * @param annotationMetadata The annotation metadata
+     * @param predicate The predicate
+     * @param <T1> The annotation type
+     * @return The potentially modified metadata
+     */
+    public @NonNull <T1 extends Annotation> AnnotationMetadata removeAnnotationIf(
+            @NonNull AnnotationMetadata annotationMetadata,
+            @NonNull Predicate<AnnotationValue<T1>> predicate) {
+        // we only care if the metadata is an hierarchy or default mutable
+        final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
+        AnnotationMetadata declaredMetadata = annotationMetadata;
+        if (isHierarchy) {
+            declaredMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).getDeclaredMetadata();
+        }
+        // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
+        // in which case nothing needs to be done
+        if (declaredMetadata instanceof DefaultAnnotationMetadata) {
+            final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) declaredMetadata;
+
+            defaultMetadata.removeAnnotationIf(predicate);
+
+            if (isHierarchy) {
+                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(
+                        declaredMetadata
+                );
+            } else {
+                return declaredMetadata;
             }
         }
         return annotationMetadata;

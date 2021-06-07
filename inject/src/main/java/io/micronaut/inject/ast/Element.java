@@ -17,14 +17,17 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.naming.Described;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Stores data about a compile time element. The underlying object can be a class, field, or method.
@@ -84,6 +87,66 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
     @NonNull
     default <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
+    }
+
+    /**
+     * Removes an annotation of the given type from the element.
+     *
+     * <p>If the annotation features any stereotypes these will also be removed unless there are other
+     * annotations that reference the stereotype to be removed.</p>
+     *
+     * <p>In the case of repeatable annotations this method will remove all repeated annotations, effectively
+     * clearing out all declared repeated annotations of the given type.</p>
+     *
+     * @param annotationType The annotation type
+     * @return This element
+     * @since 3.0.0
+     */
+    default  Element removeAnnotation(@NonNull String annotationType) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
+    }
+
+    /**
+     * @see #removeAnnotation(String)
+     * @param annotationType The annotation type
+     * @param <T> The annotation generic type
+     * @return This element
+     * @since 3.0.0
+     */
+    default <T extends Annotation> Element removeAnnotation(@NonNull Class<T> annotationType) {
+        return removeAnnotation(Objects.requireNonNull(annotationType).getName());
+    }
+
+    /**
+     * Removes all annotations that pass the given predicate.
+     * @param predicate The predicate
+     * @param <T> The annotation generic type
+     * @return This element
+     * @since 3.0.0
+     */
+    default <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
+    }
+
+    /**
+     * Removes a stereotype of the given name from the element.
+     * @param annotationType The annotation type
+     * @return This element
+     * @since 3.0.0
+     */
+    default  Element removeStereotype(@NonNull String annotationType) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
+    }
+
+    /**
+     * Removes a stereotype annotation of the given type from the element.
+     * @param annotationType The annotation type
+     * @param <T> The annotation generic type
+     * @return This element
+     * @since 3.0.0
+     */
+    default <T extends Annotation> Element removeStereotype(@NonNull Class<T> annotationType) {
+        return removeStereotype(Objects.requireNonNull(annotationType).getName());
     }
 
     /**

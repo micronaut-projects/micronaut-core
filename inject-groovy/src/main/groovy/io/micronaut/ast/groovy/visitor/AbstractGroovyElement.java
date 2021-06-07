@@ -41,6 +41,7 @@ import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Abstract Groovy element.
@@ -95,15 +96,50 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
                     this.annotationMetadata,
                     av
             );
-            String declaringTypeName = this instanceof MemberElement ? ((MemberElement) this).getOwningType().getName() : getName();
-            AbstractAnnotationMetadataBuilder.addMutatedMetadata(
-                    declaringTypeName,
-                    annotatedNode,
-                    this.annotationMetadata
-            );
-            AstAnnotationUtils.invalidateCache(annotatedNode);
+            updateAnnotationCaches();
         }
         return this;
+    }
+
+    @Override
+    public Element removeAnnotation(@NonNull String annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeAnnotation(
+                this.annotationMetadata, annotationType
+        );
+        updateAnnotationCaches();
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+        ArgumentUtils.requireNonNull("predicate", predicate);
+        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeAnnotationIf(
+                this.annotationMetadata, predicate
+        );
+        updateAnnotationCaches();
+        return this;
+
+    }
+
+    @Override
+    public Element removeStereotype(@NonNull String annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeStereotype(
+                this.annotationMetadata, annotationType
+        );
+        updateAnnotationCaches();
+        return this;
+    }
+
+    private void updateAnnotationCaches() {
+        String declaringTypeName = this instanceof MemberElement ? ((MemberElement) this).getOwningType().getName() : getName();
+        AbstractAnnotationMetadataBuilder.addMutatedMetadata(
+                declaringTypeName,
+                annotatedNode,
+                this.annotationMetadata
+        );
+        AstAnnotationUtils.invalidateCache(annotatedNode);
     }
 
     /**
