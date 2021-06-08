@@ -1364,27 +1364,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             .lift((FlowableOperator<HttpContent, HttpContent>) ArrayBracketSubscriber::new);
                                 }
 
-                                if (mediaType.equals(MediaType.TEXT_EVENT_STREAM_TYPE)) {
-                                    httpContentPublisher = Publishers.onComplete(httpContentPublisher, () -> {
-                                        CompletableFuture<Void> future = new CompletableFuture<>();
-                                        if (!request.getHeaders().isKeepAlive()) {
-                                            if (context.channel().isOpen()) {
-                                                context.pipeline()
-                                                        .writeAndFlush(new DefaultLastHttpContent())
-                                                        .addListener(f -> {
-                                                                    if (f.isSuccess()) {
-                                                                        future.complete(null);
-                                                                    } else {
-                                                                        future.completeExceptionally(f.cause());
-                                                                    }
-                                                                }
-                                                        );
-                                            }
-                                        }
-                                        return future;
-                                    });
-                                }
-
                                 httpContentPublisher = Publishers.then(httpContentPublisher, httpContent ->
                                     // once an http content is written, read the next item if it is available
                                     context.read()

@@ -391,6 +391,14 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
                 @Override
                 protected void complete() {
+                    if (messageWritten.compareAndSet(false, true)) {
+                        ctx.writeAndFlush(message).addListener(future -> doOnComplete());
+                    } else {
+                        doOnComplete();
+                    }
+                }
+
+                private void doOnComplete() {
                     if (ctx.executor().inEventLoop()) {
                         completeBody(ctx, promise);
                     } else {
