@@ -804,6 +804,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             (isExecutableThroughType(method.getEnclosingElement(), methodAnnotationMetadata, annotationMetadata, modifiers, isPublic) ||
                                     hasAroundStereotype(annotationMetadata));
 
+            if (javaMethodElement.isPrivate() && hasAroundStereotype(annotationMetadata)) {
+                error(method, "Method defines AOP advice but is declared private. Change the method to be non-private in order for AOP advice to be applied.");
+            }
+
             boolean hasConstraints = false;
             if (isDeclaredBean && !methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
                     Arrays.stream(javaMethodElement.getParameters())
