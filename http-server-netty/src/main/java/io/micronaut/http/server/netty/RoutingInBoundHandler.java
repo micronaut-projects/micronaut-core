@@ -294,11 +294,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             return;
         }
 
-        exceptionCaughtInternal(ctx, cause, nettyHttpRequest)
-                .subscribe(response -> filterAndEncodeResponse(ctx, nettyHttpRequest, response, MediaType.APPLICATION_JSON_TYPE));
+        filterAndEncodeResponse(
+                ctx,
+                nettyHttpRequest,
+                exceptionCaughtInternal(ctx, cause, nettyHttpRequest),
+                MediaType.APPLICATION_JSON_TYPE);
     }
 
-    private Flowable<MutableHttpResponse<?>> exceptionCaughtInternal(ChannelHandlerContext ctx,
+    private Publisher<MutableHttpResponse<?>> exceptionCaughtInternal(ChannelHandlerContext ctx,
                                                                       Throwable t,
                                                                       NettyHttpRequest<?> nettyHttpRequest) {
         // find the origination of of the route
@@ -348,15 +351,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     if (serverConfiguration.isLogHandledExceptions()) {
                         logException(cause);
                     }
-                    return Flowable.<MutableHttpResponse<?>>fromCallable(() -> {
-                        Object result = handler.handle(nettyHttpRequest, cause);
-                        final MutableHttpResponse<?> response = errorResultToResponse(result);
-                        if (!response.getContentType().isPresent()) {
-                            MediaType.fromType(handler.getClass()).ifPresent(response::contentType);
-                        }
-                        response.setAttribute(HttpAttributes.EXCEPTION, cause);
-                        return response;
-                    }).onErrorResumeNext((Throwable throwable) -> createDefaultErrorResponsePublisher(nettyHttpRequest, throwable));
+
+                    Object result = handler.handle(nettyHttpRequest, cause);
+                    final MutableHttpResponse<?> response = errorResultToResponse(result);
+                    if (!response.getContentType().isPresent()) {
+                        MediaType.fromType(handler.getClass()).ifPresent(response::contentType);
+                    }
+                    response.setAttribute(HttpAttributes.EXCEPTION, cause);
+                    return Publishers.just(response);
                 } catch (Throwable e) {
                     return createDefaultErrorResponsePublisher(nettyHttpRequest, e);
                 }
@@ -364,7 +366,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (isIgnorable(cause)) {
                     logIgnoredException(cause);
                     ctx.read();
-                    return Flowable.empty();
+                    return Publishers.empty();
                 } else {
                     return createDefaultErrorResponsePublisher(
                             nettyHttpRequest,
@@ -574,7 +576,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (statusRoute.isPresent()) {
                     route = statusRoute.get();
                 } else {
-                    emitDefaultNotFoundResponse(ctx, nettyHttpRequest, true);
+                    emitDefaultNotFoundResponse(ctx, nettyHttpRequest);
                     return;
                 }
             }
@@ -622,7 +624,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             filterAndEncodeResponse(
                     ctx,
                     nettyHttpRequest,
-                    defaultResponse,
+                    Publishers.just(defaultResponse),
                     MediaType.APPLICATION_JSON_TYPE
             );
         }
@@ -631,18 +633,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private void filterAndEncodeResponse(
             ChannelHandlerContext ctx,
             NettyHttpRequest<?> request,
-            MutableHttpResponse<?> finalResponse,
+            Publisher<MutableHttpResponse<?>> responsePublisher,
             MediaType defaultResponseMediaType) {
 
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
-        Flowable<MutableHttpResponse<?>> responsePublisher = Flowable.fromPublisher(filterPublisher(
-                requestReference,
-                Flowable.just(finalResponse)
-        ));
 
-        responsePublisher
+        Flowable.fromPublisher(filterPublisher(requestReference, responsePublisher))
                 .onErrorResumeNext((Throwable t) -> exceptionCaughtInternal(ctx, t, request))
-                .singleOrError()
                 .subscribe(response -> {
                     encodeHttpResponse(
                             ctx,
@@ -676,23 +673,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return Optional.empty();
     }
 
-    private void emitDefaultNotFoundResponse(ChannelHandlerContext ctx, NettyHttpRequest<?> request, boolean executeFilters) {
+    private void emitDefaultNotFoundResponse(ChannelHandlerContext ctx, NettyHttpRequest<?> request) {
         MutableHttpResponse<?> res = newNotFoundError(request);
-        if (executeFilters) {
-            filterAndEncodeResponse(
-                    ctx,
-                    request,
-                    res,
-                    MediaType.APPLICATION_JSON_TYPE);
-        } else {
-            encodeHttpResponse(
-                    ctx,
-                    request,
-                    res,
-                    res.body(),
-                    () -> MediaType.APPLICATION_JSON_TYPE
-            );
-        }
+        filterAndEncodeResponse(
+                ctx,
+                request,
+                Publishers.just(res),
+                MediaType.APPLICATION_JSON_TYPE);
     }
 
     private MutableHttpResponse<?> newNotFoundError(HttpRequest<?> request) {
@@ -1182,7 +1169,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             if (isCompletable || routeMatch.isVoid() || routeMatch.isSuspended()) {
                                                 message.body(null);
                                                 message.header(HttpHeaders.CONTENT_LENGTH, HttpHeaderValues.ZERO);
-                                                return Flowable.just(message);
+                                                return Publishers.just(message);
                                             } else if (!isErrorRoute) {
                                                 RouteMatch<Object> statusRoute = findStatusRoute(incomingRequest, HttpStatus.NOT_FOUND, routeMatch);
                                                 if (statusRoute != null) {
@@ -1197,7 +1184,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                             () -> resolveDefaultResponseContentType(request, statusRoute));
                                                 }
                                             }
-                                            return Flowable.just(newNotFoundError(request));
+                                            return Publishers.just(newNotFoundError(request));
                                         }))
                                         .map((Object result) -> {
                                             if (result instanceof HttpResponse) {
@@ -1293,7 +1280,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             // once an http content is written, read the next item if it is available
                                             context.read()
                                     );
-
                                     httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
                                             .doAfterTerminate(() -> cleanupRequest(context, request));
 
@@ -1304,7 +1290,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             }
                         }
                     }
-                    return Flowable.just(message);
+                    return Publishers.just(message);
                 });
     }
 
@@ -2052,9 +2038,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
     }
 
-    private Flowable<MutableHttpResponse<?>> createDefaultErrorResponsePublisher(NettyHttpRequest<?> nettyHttpRequest,
+    private Publisher<MutableHttpResponse<?>> createDefaultErrorResponsePublisher(NettyHttpRequest<?> nettyHttpRequest,
                                                                                  Throwable cause) {
-        return Flowable.just(createDefaultErrorResponse(nettyHttpRequest, cause));
+        return Publishers.just(createDefaultErrorResponse(nettyHttpRequest, cause));
     }
 
     private MutableHttpResponse<?> createDefaultErrorResponse(NettyHttpRequest<?> nettyHttpRequest,
