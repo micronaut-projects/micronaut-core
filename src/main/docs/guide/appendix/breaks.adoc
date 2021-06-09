@@ -26,6 +26,10 @@ In several places in Micronaut, it is required to get a map representation of yo
 
 In Micronaut 2.x it was possible to inject a `List<javax.inject.Provider>`, although this was undocumented behaviour. In Micronaut 3.x injecting a list of `Provider` instances is no longer possible and you should instead use the api:context.BeanProvider[] API which provides `stream()` and `iterator()` methods to provide the same functionality.
 
+==== Injecting ExecutorService
+
+In previous versions of Micronaut it was possible to inject an link:{jdkapi}/java/util/concurrent/ExecutorService.html[ExecutorService] without any qualifiers and the default Netty event loop group would be injected. Because the event loop should not be used for general purpose use cases, the injection will now fail by default with a non unique bean exception. The injection point should be qualified for which executor service is desired.
+
 ==== Only the Exported Type from Factories is Injectable
 
 It is no longer possible to inject the internal implementation type from beans produced via factories. For example in the following example:
