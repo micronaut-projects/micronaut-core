@@ -1964,7 +1964,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     }
                 });
             } else {
-                context.writeAndFlush(nettyResponse).addListener(requestCompletor);
+                context.writeAndFlush(nettyResponse)
+                        .addListener(requestCompletor);
 
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Response {} - {} {}",
