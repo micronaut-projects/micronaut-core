@@ -251,6 +251,8 @@ public final class AnnotationMetadataSupport {
 
     /**
      * Annotation proxy handler.
+     *
+     * @param <A> The annotation type
      */
     private static class AnnotationProxyHandler<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
         private final int hashCode;

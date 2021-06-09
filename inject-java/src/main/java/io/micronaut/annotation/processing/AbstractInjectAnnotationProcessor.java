@@ -126,6 +126,12 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
             for (String annotationPackage : annotationPackages) {
                 types.add(annotationPackage + ".*");
             }
+            Set<String> visitedAnnotationNames = TypeElementVisitorProcessor.getVisitedAnnotationNames();
+            for (String visitedAnnotationName : visitedAnnotationNames) {
+                if (!"*".equals(visitedAnnotationName)) {
+                    visitedAnnotationName.equals(visitedAnnotationName);
+                }
+            }
             return types;
         } else {
             return Collections.singleton("*");
