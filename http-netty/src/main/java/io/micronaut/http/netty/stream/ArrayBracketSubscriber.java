@@ -24,7 +24,7 @@ import org.reactivestreams.Subscription;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Internal
-public class ArrayBracketSubscriber implements Subscriber<HttpContent> {
+public final class ArrayBracketSubscriber implements Subscriber<HttpContent> {
 
     private final AtomicBoolean empty = new AtomicBoolean(true);
     private final Subscriber<? super HttpContent> upstream;
