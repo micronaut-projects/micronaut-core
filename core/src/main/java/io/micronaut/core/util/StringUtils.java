@@ -367,7 +367,7 @@ public final class StringUtils {
      * @return A combined uri string
      */
     public static String prependUri(String baseUri, String uri) {
-        if (!uri.startsWith("/")) {
+        if (!uri.startsWith("/") && !uri.startsWith("?")) {
             uri = "/" + uri;
         }
         if (uri.length() == 1 && uri.charAt(0) == '/') {
