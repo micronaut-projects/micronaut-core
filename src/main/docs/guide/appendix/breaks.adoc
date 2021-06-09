@@ -22,6 +22,10 @@ Classes, constructors, etc that have been deprecated in previous versions of Mic
 
 In several places in Micronaut, it is required to get a map representation of your object. In previous versions, a reflection based strategy was used to retrieve that information if the class was not annotated with `@Introspected`. That functionality has been removed and it is now required to annotate classes with `@Introspected` that are being used in this way. Any class may be affected if it is passed as an argument or returned from any controller or client, among other use cases.
 
+==== Cookie Secure Configuration
+
+Previously the `secure` configuration for cookies was only respected if the request was determined to be sent over https. Due to a number of factors including proxies, HTTPS requests can be presented to the server as if they are HTTP. In those cases the setting was not having any effect. The setting is now respected regardless of the status of the request. If the setting is not set, cookies will be secure if the request is determined to be HTTPS.
+
 ==== No Longer Possible to Inject a `List` of `Provider`
 
 In Micronaut 2.x it was possible to inject a `List<javax.inject.Provider>`, although this was undocumented behaviour. In Micronaut 3.x injecting a list of `Provider` instances is no longer possible and you should instead use the api:context.BeanProvider[] API which provides `stream()` and `iterator()` methods to provide the same functionality.
