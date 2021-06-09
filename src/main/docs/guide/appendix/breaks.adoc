@@ -143,6 +143,12 @@ In Micronaut 3.x and above the ann:context.annotation.Executable[] has been move
 
 If you were relying on the present of these executable methods you will need to annotate explicitly methods in your classes with ann:context.annotation.Executable[] to restore this behaviour.
 
+
+==== GraalVM resources not created anymore
+
+In previous versions of Micronaut adding a dependency on `io.micronaut:micronaut-graal` triggered the generation of the GraalVM `resource-config.json` that included all the resources in `src/main/resources` so they were included in the native image. Starting in Micronaut 3.x that is done in either the Gradle or Maven plugins.
+
+
 === Module Changes
 
 ==== New package for Micronaut Cassandra
