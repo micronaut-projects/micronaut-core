@@ -101,7 +101,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public static final int DEFAULT_COMPRESSIONLEVEL = 6;
 
     /**
-     * The default configuration for adding keep alive header.
+     * The default configuration for boolean flag indicating whether to add connection header `keep-alive` to responses with HttpStatus > 499.
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = false;
