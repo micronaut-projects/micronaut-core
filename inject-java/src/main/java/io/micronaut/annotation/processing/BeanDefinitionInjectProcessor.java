@@ -746,7 +746,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-// [MOSS] Preventing handling lower down... commenting this out breaks many things.
             if (modelUtils.isStatic(method) || modelUtils.isAbstract(method)) {
                 return null;
             }
