@@ -244,7 +244,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         ApplicationContext applicationContext = Micronaut.run()
         EmbeddedServer embeddedServer = applicationContext.run(EmbeddedServer, [
           (SPEC_NAME_PROPERTY):getClass().simpleName,
-          'micronaut.server.netty.keepAlive':true
+          'micronaut.server.netty.keepAliveOnServerError':true
         ])
         RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), config)
 
@@ -273,7 +273,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         ApplicationContext applicationContext = Micronaut.run()
         EmbeddedServer embeddedServer = applicationContext.run(EmbeddedServer, [
           (SPEC_NAME_PROPERTY):getClass().simpleName,
-          'micronaut.server.netty.keepAlive':false
+          'micronaut.server.netty.keepAliveOnServerError':false
         ])
         RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), config)
 

@@ -104,7 +104,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * The default configuration for adding keep alive header.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final boolean DEFAULT_KEEP_ALIVE = false;
+    public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = false;
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
 
@@ -125,7 +125,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
     private AccessLogger accessLogger;
     private Http2Settings http2Settings = new Http2Settings();
-    private boolean keepAlive = DEFAULT_KEEP_ALIVE;
+    private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
 
     /**
      * Default empty constructor.
@@ -335,20 +335,13 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Setting defaults to False.
-     * @return Configuration to enable or disable adding keep alive header by default
+     * Default value ({@value DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR})
+     * @return Configuration to add `keep-alive` connection header to responses with HttpStatus > 499
+     * @param keepAliveOnServerError boolean flag indicating whether to add connection header `keep-alive` to responses with HttpStatus > 499
+     * @see io.micronaut.http.server.netty.RoutingInBoundHandler#writeFinalNettyResponse()
      */
-    public boolean isKeepAlive() {
-        return keepAlive;
-    }
-
-    /**
-     * Sets the Configuration to enable or disable adding keep alive header by default.
-     *
-     * @param keepAlive flag
-     */
-    public void setKeepAlive(boolean keepAlive) {
-        this.keepAlive = keepAlive;
+    public boolean isKeepAliveOnServerError() {
+        return keepAliveOnServerError;
     }
 
     /**
@@ -463,6 +456,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setCompressionLevel(@ReadableBytes int compressionLevel) {
         this.compressionLevel = compressionLevel;
+    }
+
+    /**
+     * Sets the Configuration to add keep-alive connection header to responses with HttpStatus > 499.
+     * @param keepAliveOnServerError boolean flag indicating whether to add connection header `keep-alive` to responses with HttpStatus > 499
+     * @see io.micronaut.http.server.netty.RoutingInBoundHandler#writeFinalNettyResponse()
+     */
+    public void setKeepAliveOnServerError(boolean keepAliveOnServerError) {
+        this.keepAliveOnServerError = keepAliveOnServerError;
     }
 
     /**

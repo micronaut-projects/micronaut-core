@@ -478,7 +478,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
 
         then:
-        !config.keepAlive
+        !config.keepAliveOnServerError
 
         cleanup:
         beanContext.close()
@@ -488,7 +488,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         given:
         ApplicationContext beanContext = new DefaultApplicationContext("test")
         beanContext.environment.addPropertySource(PropertySource.of("test",
-          ['micronaut.server.netty.keepAlive': true]
+          ['micronaut.server.netty.keepAliveOnServerError': true]
         ))
         beanContext.start()
 
@@ -496,7 +496,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
 
         then:
-        config.keepAlive
+        config.keepAliveOnServerError
 
         cleanup:
         beanContext.close()
