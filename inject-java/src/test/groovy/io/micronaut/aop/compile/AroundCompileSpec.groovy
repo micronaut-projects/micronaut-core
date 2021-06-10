@@ -286,7 +286,7 @@ class MyBean {
 
         then:
         Throwable t = thrown()
-        t.message.contains 'Method defines AOP advice but is declared private'
+        t.message.contains 'Method annotated as executable but is declared private'
     }
 
     void 'test byte[] return compile'() {
