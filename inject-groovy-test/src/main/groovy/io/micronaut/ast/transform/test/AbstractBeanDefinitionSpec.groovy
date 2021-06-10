@@ -19,6 +19,7 @@ import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
+import io.micronaut.ast.groovy.visitor.GroovyElementFactory
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
@@ -68,12 +69,29 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
             def compilationUnit = new CompilationUnit()
             def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)
-            return new GroovyClassElement(
-                    new GroovyVisitorContext(sourceUnit, compilationUnit ), cn, metadata
-            )
+            def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
+            return elementFactory.newClassElement(cn, metadata)
         } else {
             throw new IllegalArgumentException("No class found in passed source code")
         }
+    }
+
+    ClassElement buildClassElement(String className, String source) {
+        def builder = new AstBuilder()
+        ASTNode[] nodes = builder.buildFromString(source)
+        for (ASTNode node: nodes) {
+            if (node instanceof ClassNode) {
+                if (node.getName() == className) {
+                    def cc = new CompilerConfiguration()
+                    def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
+                    def compilationUnit = new CompilationUnit()
+                    def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, node)
+                    def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
+                    return elementFactory.newClassElement(node, metadata)
+                }
+            }
+        }
+        throw new IllegalArgumentException("No class found in passed source code")
     }
 
     @CompileStatic

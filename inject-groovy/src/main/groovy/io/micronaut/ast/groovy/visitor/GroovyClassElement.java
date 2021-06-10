@@ -28,6 +28,7 @@ import io.micronaut.inject.ast.*;
 import org.apache.groovy.ast.tools.ClassNodeUtils;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
+import org.codehaus.groovy.util.ArrayIterator;
 
 import javax.inject.Inject;
 import java.lang.reflect.Modifier;
@@ -197,6 +198,41 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     fieldNode,
                     AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, fieldNode)
             )).collect(Collectors.toList());
+        } else if (elementType == ClassElement.class) {
+            Iterator<InnerClassNode> i = classNode.getInnerClasses();
+            List<InnerClassNode> innerClasses = new ArrayList<>();
+            while (i.hasNext()) {
+                InnerClassNode innerClassNode = i.next();
+                if (onlyAbstract && !innerClassNode.isAbstract()) {
+                    continue;
+                }
+                if (onlyConcrete && innerClassNode.isAbstract()) {
+                    continue;
+                }
+                if (onlyAccessible) {
+                    if (Modifier.isPrivate(innerClassNode.getModifiers())) {
+                        continue;
+                    }
+                }
+                if (!modifierPredicates.isEmpty()) {
+                    Set<ElementModifier> elementModifiers = resolveModifiers(innerClassNode);
+                    if (!modifierPredicates.stream().allMatch(p -> p.test(elementModifiers))) {
+                        continue;
+                    }
+                }
+
+                if (!namePredicates.isEmpty()) {
+                    if (!namePredicates.stream().allMatch(p -> p.test(innerClassNode.getName()))) {
+                        continue;
+                    }
+                }
+                innerClasses.add(innerClassNode);
+            }
+            elements = innerClasses.stream()
+                    .map(icn -> visitorContext.getElementFactory()
+                            .newClassElement(icn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, icn)))
+                    .map(ce -> (T) ce)
+                    .collect(Collectors.toList());
         } else {
             elements = Collections.emptyList();
         }
@@ -227,38 +263,32 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     private Set<ElementModifier> resolveModifiers(MethodNode methodNode) {
-        Set<ElementModifier> modifiers = new HashSet<>(5);
-        if (methodNode.isPrivate()) {
-            modifiers.add(ElementModifier.PRIVATE);
-        } else if (methodNode.isProtected()) {
-            modifiers.add(ElementModifier.PROTECTED);
-        } else if (methodNode.isPublic()) {
-            modifiers.add(ElementModifier.PUBLIC);
-        }
-        if (methodNode.isAbstract()) {
-            modifiers.add(ElementModifier.ABSTRACT);
-        } else if (methodNode.isStatic()) {
-            modifiers.add(ElementModifier.STATIC);
-        }
-        if (methodNode.isFinal()) {
-            modifiers.add(ElementModifier.FINAL);
-        }
-        return modifiers;
+        return resolveModifiers(methodNode.getModifiers());
     }
 
     private Set<ElementModifier> resolveModifiers(FieldNode fieldNode) {
+        return resolveModifiers(fieldNode.getModifiers());
+    }
+
+    private Set<ElementModifier> resolveModifiers(ClassNode classNode) {
+        return resolveModifiers(classNode.getModifiers());
+    }
+
+    private Set<ElementModifier> resolveModifiers(int mod) {
         Set<ElementModifier> modifiers = new HashSet<>(5);
-        if (fieldNode.isPrivate()) {
+        if (Modifier.isPrivate(mod)) {
             modifiers.add(ElementModifier.PRIVATE);
-        } else if (fieldNode.isProtected()) {
+        } else if (Modifier.isProtected(mod)) {
             modifiers.add(ElementModifier.PROTECTED);
-        } else if (fieldNode.isPublic()) {
+        } else if (Modifier.isPublic(mod)) {
             modifiers.add(ElementModifier.PUBLIC);
         }
-        if (fieldNode.isStatic()) {
+        if (Modifier.isAbstract(mod)) {
+            modifiers.add(ElementModifier.ABSTRACT);
+        } else if (Modifier.isStatic(mod)) {
             modifiers.add(ElementModifier.STATIC);
         }
-        if (fieldNode.isFinal()) {
+        if (Modifier.isFinal(mod)) {
             modifiers.add(ElementModifier.FINAL);
         }
         return modifiers;
