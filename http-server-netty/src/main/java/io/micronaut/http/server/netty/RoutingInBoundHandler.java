@@ -106,6 +106,7 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
+import io.reactivex.FlowableOperator;
 import io.reactivex.Scheduler;
 import io.reactivex.Single;
 import io.reactivex.SingleEmitter;
