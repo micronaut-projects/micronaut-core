@@ -99,6 +99,13 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_COMPRESSIONLEVEL = 6;
+
+    /**
+     * The default configuration for adding keep alive header.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_KEEP_ALIVE = false;
+
     private final List<ChannelPipelineListener> pipelineCustomizers;
 
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
@@ -118,6 +125,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
     private AccessLogger accessLogger;
     private Http2Settings http2Settings = new Http2Settings();
+    private boolean keepAlive = DEFAULT_KEEP_ALIVE;
 
     /**
      * Default empty constructor.
@@ -324,6 +332,23 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public Parent getParent() {
         return parent;
+    }
+
+    /**
+     * Setting defaults to False.
+     * @return Configuration to enable or disable adding keep alive header by default
+     */
+    public boolean isKeepAlive() {
+        return keepAlive;
+    }
+
+    /**
+     * Sets the Configuration to enable or disable adding keep alive header by default.
+     *
+     * @param keepAlive flag
+     */
+    public void setKeepAlive(boolean keepAlive) {
+        this.keepAlive = keepAlive;
     }
 
     /**

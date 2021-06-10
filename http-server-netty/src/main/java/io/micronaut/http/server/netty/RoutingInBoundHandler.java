@@ -81,7 +81,6 @@ import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.netty.async.ContextCompletionAwareSubscriber;
-import io.micronaut.http.server.netty.configuration.DefaultConnectionHeaderConfiguration;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
@@ -171,7 +170,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final String serverHeader;
     private final boolean multipartEnabled;
     private ExecutorService ioExecutor;
-    private DefaultConnectionHeaderConfiguration defaultConnectionHeaderConfiguration = new DefaultConnectionHeaderConfiguration();
 
     /**
      * @param beanContext                             The bean locator
@@ -1869,7 +1867,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             // default Connection header if not set explicitly
             if (!isHttp2) {
                 if (!message.getHeaders().contains(HttpHeaders.CONNECTION)) {
-                    if (httpStatus.getCode() > 499 && !defaultConnectionHeaderConfiguration.isKeepAlive()) {
+                    if (httpStatus.getCode() > 499 && !serverConfiguration.isKeepAlive()) {
                         message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.CLOSE);
                     } else {
                         message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
@@ -1887,7 +1885,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (!isHttp2) {
                 if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
                     boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || request.getHeaders().isKeepAlive();
-                    if ((!expectKeepAlive || httpStatus.getCode() > 499) && !defaultConnectionHeaderConfiguration.isKeepAlive()) {
+                    if ((!expectKeepAlive || httpStatus.getCode() > 499) && !serverConfiguration.isKeepAlive()) {
                         nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
                     } else {
                         nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
