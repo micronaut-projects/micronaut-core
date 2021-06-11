@@ -143,6 +143,14 @@ In Micronaut 3.x and above the ann:context.annotation.Executable[] has been move
 
 If you were relying on the present of these executable methods you will need to annotate explicitly methods in your classes with ann:context.annotation.Executable[] to restore this behaviour.
 
+
+==== GraalVM changes
+
+In previous versions of Micronaut annotating a class with `@Introspected` automatically added it to the GraalVM `reflect-config.json` file. The original intended usage of the annotation is to generate <<introspection, Bean Introspection Metadata>> so Micronaut can instantiate the class and call getters and setters without using reflection.
+
+Starting in Micronaut 3.x the `@Introspected` annotation doesn't add the class to the GraalVM `reflect-config.json` file anymore, because in most of the cases is not really necessary. If you need to declare a class to be accessed by reflection, use the `@ReflectiveAccess` annotation instead.
+
+
 === Module Changes
 
 ==== New package for Micronaut Cassandra
