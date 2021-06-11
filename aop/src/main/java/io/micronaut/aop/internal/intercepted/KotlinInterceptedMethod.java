@@ -148,14 +148,6 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
         }
         completionStageResult.whenComplete((value, throwable) -> {
             if (throwable == null) {
-                if (value == null) {
-                    if (isUnitValueType) {
-                        value = kotlin.Unit.INSTANCE;
-                    } else {
-                        CompletableFutureContinuation.Companion.completeExceptionally(continuation, new IllegalStateException("Cannot complete Kotlin coroutine with null: " + returnTypeValue.getType()));
-                        return;
-                    }
-                }
                 CompletableFutureContinuation.Companion.completeSuccess(continuation, value);
             } else {
                 CompletableFutureContinuation.Companion.completeExceptionally(continuation, (Throwable) throwable);
