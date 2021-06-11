@@ -31,7 +31,9 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.util.VisitorContextUtils;
+import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.GeneratedFile;
 
 import javax.annotation.processing.Filer;
@@ -72,7 +74,9 @@ public class JavaVisitorContext implements VisitorContext {
     private final GenericUtils genericUtils;
     private final ProcessingEnvironment processingEnv;
     private final List<String> generatedResources = new ArrayList<>();
+    private final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = new ArrayList<>();
     private final JavaElementFactory elementFactory;
+    private final TypeElementVisitor.VisitorKind visitorKind;
     private @Nullable
     JavaFileManager standardFileManager;
 
@@ -88,6 +92,7 @@ public class JavaVisitorContext implements VisitorContext {
      * @param genericUtils      The generic type utils
      * @param filer             The filer
      * @param visitorAttributes The attributes
+     * @param visitorKind       The visitor kind
      */
     public JavaVisitorContext(
             ProcessingEnvironment processingEnv,
@@ -98,7 +103,8 @@ public class JavaVisitorContext implements VisitorContext {
             ModelUtils modelUtils,
             GenericUtils genericUtils,
             Filer filer,
-            MutableConvertibleValues<Object> visitorAttributes) {
+            MutableConvertibleValues<Object> visitorAttributes,
+            TypeElementVisitor.VisitorKind visitorKind) {
         this.messager = messager;
         this.elements = elements;
         this.annotationUtils = annotationUtils;
@@ -109,6 +115,14 @@ public class JavaVisitorContext implements VisitorContext {
         this.visitorAttributes = visitorAttributes;
         this.processingEnv = processingEnv;
         this.elementFactory = new JavaElementFactory(this);
+        this.visitorKind = visitorKind;
+    }
+
+    /**
+     * @return The visitor kind
+     */
+    public TypeElementVisitor.VisitorKind getVisitorKind() {
+        return visitorKind;
     }
 
     /**
@@ -397,5 +411,24 @@ public class JavaVisitorContext implements VisitorContext {
     @Override
     public void addGeneratedResource(@NonNull String resource) {
         generatedResources.add(resource);
+    }
+
+    /**
+     * @return Gets the produced bean definition builders.
+     */
+    @Internal
+    public List<AbstractBeanDefinitionBuilder> getBeanElementBuilders() {
+        final ArrayList<AbstractBeanDefinitionBuilder> current = new ArrayList<>(beanDefinitionBuilders);
+        beanDefinitionBuilders.clear();
+        return current;
+    }
+
+    /**
+     * Adds a java bean definition builder.
+     * @param javaBeanDefinitionBuilder The bean builder
+     */
+    @Internal
+    void addBeanDefinitionBuilder(JavaBeanDefinitionBuilder javaBeanDefinitionBuilder) {
+        this.beanDefinitionBuilders.add(javaBeanDefinitionBuilder);
     }
 }

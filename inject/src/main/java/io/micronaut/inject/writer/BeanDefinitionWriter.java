@@ -57,6 +57,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
@@ -378,6 +379,27 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             }
             final ClassElement declaringType = factoryMethodElement.getDeclaringType();
             this.beanDefinitionName = declaringType.getPackageName() + ".$" + declaringType.getSimpleName() + "$" + fieldName + uniqueIdentifier + "Definition";
+        } else if (beanProducingElement instanceof BeanElementBuilder) {
+            BeanElementBuilder beanElementBuilder = (BeanElementBuilder) beanProducingElement;
+            this.beanTypeElement = beanElementBuilder.getBeanType();
+            this.packageName = this.beanTypeElement.getPackageName();
+            this.isInterface = this.beanTypeElement.isInterface();
+            this.beanFullClassName = this.beanTypeElement.getName();
+            this.beanSimpleClassName = this.beanTypeElement.getSimpleName();
+            this.providedBeanClassName = this.beanFullClassName;
+            if (uniqueIdentifier == null) {
+                throw new IllegalArgumentException("Beans produced by addAssociatedBean(..) require passing a unique identifier");
+            }
+            final Element originatingElement = beanElementBuilder.getOriginatingElement();
+            if (originatingElement instanceof ClassElement) {
+                ClassElement originatingClass = (ClassElement) originatingElement;
+                this.beanDefinitionName = getAssociatedBeanName(uniqueIdentifier, originatingClass);
+            } else if (originatingElement instanceof MethodElement) {
+                ClassElement originatingClass = ((MethodElement) originatingElement).getDeclaringType();
+                this.beanDefinitionName = getAssociatedBeanName(uniqueIdentifier, originatingClass);
+            } else {
+                throw new IllegalArgumentException("Unsupported originating element");
+            }
         } else {
             throw new IllegalArgumentException("Unsupported element type: " + beanProducingElement.getClass().getName());
         }
@@ -391,6 +413,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.isConfigurationProperties = annotationMetadata.hasDeclaredStereotype(ConfigurationProperties.class);
         validateExposedTypes(annotationMetadata, visitorContext);
 
+    }
+
+    @NonNull
+    private String getAssociatedBeanName(@NonNull Integer uniqueIdentifier, ClassElement originatingClass) {
+        return originatingClass.getPackageName() + ".$" + originatingClass.getSimpleName() + "$" + beanSimpleClassName + uniqueIdentifier + "Definition";
     }
 
     private void autoApplyNamedToBeanProducingElement(Element beanProducingElement) {

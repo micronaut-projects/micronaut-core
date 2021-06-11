@@ -138,7 +138,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     }
 
     InMemoryByteCodeGroovyClassLoader buildClassLoader(String classStr) {
-        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        def classLoader = new InMemoryByteCodeGroovyClassLoader(getClass().getClassLoader())
         classLoader.parseClass(classStr)
         return classLoader
     }
