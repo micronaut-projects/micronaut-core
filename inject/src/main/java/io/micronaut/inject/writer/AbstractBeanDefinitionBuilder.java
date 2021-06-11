@@ -288,15 +288,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             if (constructorElement instanceof ConstructorElement) {
                 finalConstructor = new InternalConstructorElement(beanElementParameters);
             } else {
-                // TODO: Fix static constructors
-                finalConstructor = MethodElement.of(
-                     constructorElement.getDeclaringType(),
-                     constructorElement.getAnnotationMetadata(),
-                     beanType,
-                     beanType,
-                     constructorElement.getName(),
-                     beanElementParameters
-                );
+                finalConstructor = new InternalBeanElementMethod(constructorElement, beanElementParameters);
             }
             beanDefinitionWriter.visitBeanDefinitionConstructor(
                     finalConstructor,
@@ -469,9 +461,58 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         private BeanParameterElement[] beanParameters;
 
         private InternalBeanElementMethod(MethodElement methodElement) {
+            this(methodElement, initBeanParameters(methodElement.getParameters()));
+        }
+
+        private InternalBeanElementMethod(MethodElement methodElement, BeanParameterElement[] beanParameters) {
             super(methodElement);
             this.methodElement = methodElement;
-            this.beanParameters = initBeanParameters(methodElement.getParameters());
+            this.beanParameters = beanParameters;
+        }
+
+        @Override
+        public boolean isPackagePrivate() {
+            return methodElement.isPackagePrivate();
+        }
+
+        @Override
+        public boolean isAbstract() {
+            return methodElement.isAbstract();
+        }
+
+        @Override
+        public boolean isStatic() {
+            return methodElement.isStatic();
+        }
+
+        @Override
+        public boolean isPrivate() {
+            return methodElement.isPrivate();
+        }
+
+        @Override
+        public boolean isFinal() {
+            return methodElement.isFinal();
+        }
+
+        @Override
+        public boolean isSuspend() {
+            return methodElement.isSuspend();
+        }
+
+        @Override
+        public boolean isDefault() {
+            return methodElement.isDefault();
+        }
+
+        @Override
+        public boolean isProtected() {
+            return methodElement.isProtected();
+        }
+
+        @Override
+        public boolean isPublic() {
+            return methodElement.isPublic();
         }
 
         @NonNull

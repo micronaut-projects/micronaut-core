@@ -58,6 +58,12 @@ class SomeBean {
 
         then:
         interceptorForBean.registration.bean.invoked
+
+        when:"A bean is retrieved that uses a custom createWith from a static method"
+        def bean = context.getBean(TestBeanWithStaticCreator)
+
+        then:"The bean was created"
+        bean
     }
 
     @Override

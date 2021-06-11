@@ -2449,11 +2449,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 final int parametersIndex = createParameterArray(parameters, buildMethodVisitor);
                 invokeConstructorChain(buildMethodVisitor, constructorIndex, parametersIndex, parameters);
             } else {
-                buildMethodVisitor.visitTypeInsn(NEW, beanType.getInternalName());
-                buildMethodVisitor.visitInsn(DUP);
-                pushConstructorArguments(buildMethodVisitor, parameterArray);
-                String constructorDescriptor = getConstructorDescriptor(parameters);
-                buildMethodVisitor.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
+                if (constructor.isStatic()) {
+                    pushConstructorArguments(buildMethodVisitor, parameterArray);
+                    final String methodDescriptor = getMethodDescriptor(constructor.getReturnType(), parameters);
+                    buildMethodVisitor.invokeStatic(
+                            getTypeReference(constructor.getDeclaringType()),
+                            new org.objectweb.asm.commons.Method(constructor.getName(), methodDescriptor)
+                    );
+                } else {
+                    buildMethodVisitor.visitTypeInsn(NEW, beanType.getInternalName());
+                    buildMethodVisitor.visitInsn(DUP);
+                    pushConstructorArguments(buildMethodVisitor, parameterArray);
+                    String constructorDescriptor = getConstructorDescriptor(parameters);
+                    buildMethodVisitor.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
+                }
             }
 
             // store a reference to the bean being built at index 3

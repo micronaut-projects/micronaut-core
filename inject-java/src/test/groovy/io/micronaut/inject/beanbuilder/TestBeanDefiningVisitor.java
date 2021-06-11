@@ -11,6 +11,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.beans.BeanFieldElement;
@@ -33,6 +34,18 @@ public class TestBeanDefiningVisitor implements TypeElementVisitor<SomeIntercept
         element.removeAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
         element.annotate(Bean.class);
 
+        context.getClassElement(TestBeanWithStaticCreator.class)
+                .ifPresent(e ->
+                        element.addAssociatedBean(e)
+                               .createWith(e.getEnclosedElement(
+                                       ElementQuery.ALL_METHODS
+                                               .onlyDeclared()
+                                               .modifiers((modifiers) -> modifiers.contains(ElementModifier.STATIC))
+                                               .onlyAccessible(element)
+                                               .typed((returnType) -> returnType.equals(e))
+                               ).get()
+                       )
+                );
         this.classElement = element;
     }
 
