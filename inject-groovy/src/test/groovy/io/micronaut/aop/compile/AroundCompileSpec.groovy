@@ -289,6 +289,26 @@ class MyBean {
         t.message.contains 'Method annotated as executable but is declared private'
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5522')
+    void 'based on http-client StreamSpec; allow private method with Executable stereotype as long as not declared'() {
+        when:
+        buildContext('''
+package stream.spec;
+
+import io.micronaut.http.annotation.*;
+
+    @Controller('/stream')
+    class StreamEchoController {
+        private static String helper(String s) {
+            s.toUpperCase()
+        }
+    }
+''')
+
+        then:
+        noExceptionThrown()
+    }
+
     void 'test byte[] return compile'() {
         given:
         ApplicationContext context = buildContext('''

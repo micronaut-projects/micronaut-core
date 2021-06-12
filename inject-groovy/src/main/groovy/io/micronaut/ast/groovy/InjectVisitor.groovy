@@ -667,7 +667,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
             if (isDeclaredBean && isExecutable) {
                 if (hasInvalidModifiers) {
-                    if (isPrivate) {
+                    if (isPrivate && (methodAnnotationMetadata.hasDeclaredStereotype(Executable) || hasDeclaredAroundStereotype(methodAnnotationMetadata))) {
                         addError("Method annotated as executable but is declared private. Change the method to be non-private in order for AOP advice to be applied.", methodNode)
                     }
                 } else {
