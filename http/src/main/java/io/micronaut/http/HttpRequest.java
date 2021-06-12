@@ -299,7 +299,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#POST} request for the given URI.
      *
      * @param uri  The URI
-     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @param <T> The Http request type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
@@ -339,7 +339,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PUT} request for the given URI.
      *
      * @param uri  The URI
-     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
      * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
@@ -380,7 +379,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PATCH} request for the given URI.
      *
      * @param uri  The URI
-     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @param <T> The Http request type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
