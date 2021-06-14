@@ -22,8 +22,8 @@ import io.micronaut.context.annotation.Factory;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 import java.util.concurrent.TimeUnit;
 
 @Factory

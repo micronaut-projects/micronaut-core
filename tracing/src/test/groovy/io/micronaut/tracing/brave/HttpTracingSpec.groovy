@@ -22,18 +22,17 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
+import jakarta.inject.Inject
 import spock.lang.Specification
 import zipkin2.Span
 import zipkin2.Span.Kind
-
-import javax.inject.Inject
 
 /**
  * @author graemerocher

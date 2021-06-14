@@ -17,13 +17,16 @@ package io.micronaut.annotation.processing.test
 
 import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
+import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
 import io.micronaut.annotation.processing.AnnotationUtils
 import io.micronaut.annotation.processing.GenericUtils
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.annotation.processing.ModelUtils
+import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
+import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
@@ -39,7 +42,10 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
+import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.provider.BeanProviderDefinition
+import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
@@ -51,6 +57,8 @@ import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
 import java.util.function.Predicate
+import java.util.stream.Collectors
+import java.util.stream.StreamSupport
 
 /**
  * Base class to extend from to allow compilation of Java sources
@@ -199,7 +207,7 @@ class Test {
      * @param cls The class data
      * @return The context. Should be shutdown after use
      */
-    ApplicationContext buildContext(String className, String cls) {
+    ApplicationContext buildContext(String className, String cls, boolean includeAllBeans = false) {
         def files = newJavaParser().generate(className, cls)
         ClassLoader classLoader = new ClassLoader() {
             @Override
@@ -217,13 +225,22 @@ class Test {
         return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader), "test") {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
-                files.findAll { JavaFileObject jfo ->
-                    jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith("DefinitionClass.class")
-                }.collect { JavaFileObject jfo ->
-                    def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
-                    name = name.replace('/', '.') - '.class'
-                    return classLoader.loadClass(name).newInstance()
-                }.findAll { predicate == null || predicate.test(it) } as List<BeanDefinitionReference>
+                def references = StreamSupport.stream(files.spliterator(), false)
+                        .filter({ JavaFileObject jfo ->
+                            jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith("DefinitionClass.class")
+                        })
+                        .map({ JavaFileObject jfo ->
+                            def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
+                            name = name.replace('/', '.') - '.class'
+                            return (BeanDefinitionReference) classLoader.loadClass(name).newInstance()
+                        })
+                        .filter({ bdr -> predicate == null || predicate.test(bdr) })
+                        .collect(Collectors.toList())
+
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : [
+                        new InterceptorRegistryBean(),
+                        new BeanProviderDefinition()
+                ])
             }
         }.start()
     }
@@ -232,9 +249,33 @@ class Test {
      * Create and return a new Java parser.
      * @return The java parser to use
      */
-    @CompileStatic
     protected JavaParser newJavaParser() {
-        return new JavaParser()
+        def visitors = getLocalTypeElementVisitors()
+        if (visitors) {
+            return new JavaParser() {
+                @Override
+                protected TypeElementVisitorProcessor getTypeElementVisitorProcessor() {
+                    return new TypeElementVisitorProcessor() {
+                        @Override
+                        protected Collection<TypeElementVisitor> findTypeElementVisitors() {
+                            return visitors
+                        }
+                    }
+                }
+
+                @Override
+                protected AggregatingTypeElementVisitorProcessor getAggregatingTypeElementVisitorProcessor() {
+                    return new AggregatingTypeElementVisitorProcessor() {
+                        @Override
+                        protected Collection<TypeElementVisitor> findTypeElementVisitors() {
+                            return visitors
+                        }
+                    }
+                }
+            }
+        } else {
+            return new JavaParser()
+        }
     }
 
     /**
@@ -344,6 +385,23 @@ class Test {
     }
 
     /**
+     * Retrieve additional annotation transformers  to apply
+     * @param annotationName The annotation name
+     * @return The transformers for the annotation
+     */
+    protected List<AnnotationTransformer<? extends Annotation>> getLocalAnnotationTransformers(@NonNull String annotationName) {
+        return Collections.emptyList()
+    }
+
+    /**
+     * Retrieve additional type element visitors for this test.
+     * @return the visitors
+     */
+    protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
+        return Collections.emptyList()
+    }
+
+    /**
      * Builds the bean definition reference for an AOP proxy bean.
      * @param className The class name
      * @param cls The class source
@@ -442,6 +500,22 @@ class Test {
                     } else {
                         return Collections.emptyList()
                     }
+                }
+            }
+
+            @Override
+            protected List<AnnotationTransformer<Annotation>> getAnnotationTransformers(@NonNull String annotationName) {
+                def loadedTransformers = super.getAnnotationTransformers(annotationName)
+                def localTransfomers = getLocalAnnotationTransformers(annotationName)
+                if (localTransfomers) {
+                    def newList = []
+                    if (loadedTransformers) {
+                        newList.addAll(loadedTransformers)
+                    }
+                    newList.addAll(localTransfomers)
+                    return newList
+                } else {
+                    return loadedTransformers
                 }
             }
         }

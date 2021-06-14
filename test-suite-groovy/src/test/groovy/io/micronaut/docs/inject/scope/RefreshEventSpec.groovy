@@ -34,7 +34,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.annotation.PostConstruct
-import javax.inject.Inject
+import jakarta.inject.Inject
 import java.text.SimpleDateFormat
 
 import static io.micronaut.http.HttpResponse.ok

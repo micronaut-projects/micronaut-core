@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -27,9 +28,8 @@ import io.micronaut.http.annotation.Patch
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Flowable
+import jakarta.inject.Inject
 import spock.lang.Specification
-
-import javax.inject.Inject
 
 /**
  * @author Graeme Rocher
@@ -188,6 +188,7 @@ class HttpPatchSpec extends Specification {
     }
 
     @EqualsAndHashCode
+    @Introspected
     static class Book {
         String title
         Integer pages

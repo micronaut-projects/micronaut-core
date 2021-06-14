@@ -22,12 +22,19 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.visitor.*;
+import io.micronaut.inject.visitor.TypeElementVisitor;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.validation.InternalUriMatchTemplate;
-import io.micronaut.websocket.annotation.*;
+import io.micronaut.websocket.annotation.WebSocketComponent;
+import io.micronaut.websocket.annotation.WebSocketMapping;
 
 import javax.annotation.processing.SupportedOptions;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * A {@link io.micronaut.inject.visitor.TypeElementVisitor} that validates WebSocket implementations at compile time.

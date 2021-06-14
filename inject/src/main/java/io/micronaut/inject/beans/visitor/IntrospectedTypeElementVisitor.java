@@ -35,6 +35,8 @@ import io.micronaut.core.annotation.Nullable;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * A {@link TypeElementVisitor} that visits classes annotated with {@link Introspected} and produces
@@ -59,6 +61,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     private static final AnnotationValue<Introspected.IndexedAnnotation> ANN_VALID = AnnotationValue.builder(Introspected.IndexedAnnotation.class)
             .member("annotation", new AnnotationClassValue<>(JAVAX_VALIDATION_VALID))
             .build();
+    private static final Introspected.AccessKind[] DEFAULT_ACCESS_KIND = { Introspected.AccessKind.METHOD };
 
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
     private List<AbstractIntrospection> abstractIntrospections = new ArrayList<>();
@@ -164,6 +167,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         final Set<AnnotationValue> indexedAnnotations;
 
         final Set<AnnotationValue> toIndex = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
+        Introspected.AccessKind[] accessKinds = introspected.enumValues("accessKind", Introspected.AccessKind.class);
+        if (ArrayUtils.isEmpty(accessKinds)) {
+            accessKinds = DEFAULT_ACCESS_KIND;
+        }
+        Introspected.AccessKind[] finalAccessKinds = accessKinds;
 
         if (CollectionUtils.isEmpty(toIndex)) {
             indexedAnnotations = CollectionUtils.setOf(
@@ -184,6 +192,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             AtomicInteger index = new AtomicInteger(0);
             for (AnnotationClassValue aClass : classes) {
                 final Optional<ClassElement> classElement = context.getClassElement(aClass.getName());
+
                 classElement.ifPresent(ce -> {
                     if (ce.isPublic() && !isIntrospected(context, ce)) {
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
@@ -194,7 +203,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 metadata ? element.getAnnotationMetadata() : null
                         );
 
-                        processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, ce, writer);
+                        processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, ce, writer, finalAccessKinds);
                     }
                 });
             }
@@ -218,7 +227,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 metadata ? element.getAnnotationMetadata() : null
                         );
 
-                        processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, classElement, writer);
+                        processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, classElement, writer, finalAccessKinds);
                     }
                 }
             }
@@ -229,7 +238,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     metadata ? element.getAnnotationMetadata() : null
             );
 
-            processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, element, writer);
+            processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, element, writer, finalAccessKinds);
         }
     }
 
@@ -282,7 +291,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             Set<String> excludedAnnotations,
             Set<AnnotationValue> indexedAnnotations,
             ClassElement ce,
-            BeanIntrospectionWriter writer) {
+            BeanIntrospectionWriter writer,
+            Introspected.AccessKind...accessKinds) {
         Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
         if (ce.isAbstract() && !constructorElement.isPresent() && ce.hasStereotype(Introspected.class)) {
             currentAbstractIntrospection = new AbstractIntrospection(
@@ -295,7 +305,42 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             );
             abstractIntrospections.add(currentAbstractIntrospection);
         } else {
-            final List<PropertyElement> beanProperties = ce.getBeanProperties();
+            final List<Introspected.AccessKind> accessKindList = Arrays.asList(accessKinds);
+            List<PropertyElement> beanProperties = accessKindList.contains(Introspected.AccessKind.METHOD) ? ce.getBeanProperties() : Collections.emptyList();
+
+            final List<FieldElement> beanFields;
+
+            if (accessKindList.contains(Introspected.AccessKind.FIELD)) {
+                Predicate<String> nameFilter = null;
+                if (accessKindList.iterator().next() == Introspected.AccessKind.METHOD) {
+                    // prioritize methods
+                    List<PropertyElement> finalBeanProperties = beanProperties;
+                    nameFilter = (name) -> {
+                        for (PropertyElement beanProperty : finalBeanProperties) {
+                            if (name.equals(beanProperty.getName())) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    };
+                }
+                ElementQuery<FieldElement> query = ElementQuery.of(FieldElement.class)
+                        .onlyAccessible()
+                        .modifiers((modifiers) -> !modifiers.contains(ElementModifier.STATIC) && !modifiers.contains(ElementModifier.PROTECTED));
+                if (nameFilter != null) {
+                    query = query.named(nameFilter);
+                }
+                beanFields = ce.getEnclosedElements(query);
+            } else {
+                beanFields = Collections.emptyList();
+            }
+
+            if (!beanFields.isEmpty() && !beanProperties.isEmpty()) {
+                // filter out properties that use field access
+                beanProperties = beanProperties.stream().filter(pe ->
+                                beanFields.stream().noneMatch(fieldElement -> fieldElement.getName().equals(pe.getName()))
+                            ).collect(Collectors.toList());
+            }
 
             final MethodElement constructor = constructorElement.orElse(null);
             process(
@@ -309,6 +354,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     indexedAnnotations,
                     metadata
             );
+
+            for (FieldElement beanField : beanFields) {
+                writer.visitBeanField(beanField);
+            }
 
             ElementQuery<MethodElement> query = ElementQuery.of(MethodElement.class)
                     .onlyConcrete()
@@ -331,7 +380,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             Set<String> excludes,
             Set<String> ignored,
             Set<AnnotationValue> indexedAnnotations,
-            boolean metadata) {
+            boolean metadata,
+            Introspected.AccessKind...accessKind) {
 
         if (constructorElement != null) {
             final ParameterElement[] parameters = constructorElement.getParameters();

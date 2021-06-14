@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import java.util.Set;
-
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
+
+import java.util.Set;
 
 /**
  * RequestProtocolElement LogElement. The request protocol.

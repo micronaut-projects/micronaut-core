@@ -15,21 +15,20 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.context.BeanProvider;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanLocator;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
 import io.reactivex.Flowable;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * A binder registrar that requests Netty related binders.

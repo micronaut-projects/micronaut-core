@@ -104,6 +104,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
+    public String toString() {
+        return getName();
+    }
+
+    @Override
     public boolean isInner() {
         return classElement.getNestingKind().isNested();
     }
@@ -117,7 +122,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public Map<String, ClassElement> getTypeArguments(@NonNull String type) {
         if (StringUtils.isNotEmpty(type)) {
-            Map<String, Map<String, TypeMirror>> data = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement);
+            Map<String, Map<String, TypeMirror>> data = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, getBoundTypeMirrors());
             Map<String, TypeMirror> forType = data.get(type);
             if (forType != null) {
                 Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
@@ -156,7 +161,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                 parameterizedClassElement(
                                     superclass,
                                     visitorContext,
-                                    visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement)));
+                                    visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, getBoundTypeMirrors())));
                     }
                     return Optional.of(
                             new JavaClassElement(
@@ -770,10 +775,31 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return Collections.unmodifiableMap(map);
     }
 
+    private Map<String, TypeMirror> getBoundTypeMirrors() {
+        List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();
+        Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();
+
+        Map<String, TypeMirror> map = new LinkedHashMap<>();
+        while (tpi.hasNext()) {
+            TypeParameterElement tpe = tpi.next();
+            JavaClassElement classElement = (JavaClassElement) mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo, false);
+
+            map.put(tpe.toString(), ((TypeElement) classElement.getNativeType()).asType());
+        }
+
+        return Collections.unmodifiableMap(map);
+    }
+
     @NonNull
     @Override
     public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
-        Map<String, Map<String, TypeMirror>> info = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement);
+        Map<String, TypeMirror> typeArguments = getBoundTypeMirrors();
+        Map<String, Map<String, TypeMirror>> info = visitorContext.getGenericUtils()
+                .buildGenericTypeArgumentElementInfo(
+                        classElement,
+                        null,
+                        typeArguments
+                );
         Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>(info.size());
         info.forEach((name, generics) -> {
             Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
@@ -783,9 +809,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             });
             result.put(name, resolved);
         });
-        Map<String, ClassElement> typeArguments = getTypeArguments();
+
         if (!typeArguments.isEmpty()) {
-            result.put(getName(), typeArguments);
+            result.put(JavaModelUtils.getClassName(this.classElement), getTypeArguments());
         }
         return result;
     }
@@ -795,7 +821,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
      */
     Map<String, Map<String, TypeMirror>> getGenericTypeInfo() {
         if (genericTypeInfo == null) {
-            genericTypeInfo = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement);
+            genericTypeInfo = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, getBoundTypeMirrors());
         }
         return genericTypeInfo;
     }

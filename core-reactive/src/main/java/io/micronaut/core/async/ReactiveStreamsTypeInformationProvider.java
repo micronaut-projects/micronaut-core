@@ -35,7 +35,6 @@ public final class ReactiveStreamsTypeInformationProvider implements TypeInforma
         AnnotationMetadata annotationMetadata = annotationMetadataProvider.getAnnotationMetadata();
         return annotationMetadata.hasStereotype(SingleResult.class) &&
                 annotationMetadata.booleanValue(SingleResult.NAME).orElse(true);
-
     }
 
     @Override

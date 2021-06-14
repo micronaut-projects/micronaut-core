@@ -16,16 +16,12 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.ServiceInstanceList
 import io.micronaut.http.BasicAuth
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.Post
-import io.micronaut.http.annotation.Put
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -264,9 +260,11 @@ class ClientIntroductionAdviceSpec extends Specification {
         String post(@Body String data, BasicAuth basicAuth)
     }
 
-    class MyObject {
+    @Introspected
+    static class MyObject {
         String code
     }
+
     class TestServiceInstanceList implements ServiceInstanceList {
 
         private final URI uri

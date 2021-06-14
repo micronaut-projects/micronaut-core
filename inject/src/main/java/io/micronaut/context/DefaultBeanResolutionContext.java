@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 public final class DefaultBeanResolutionContext extends AbstractBeanResolutionContext {
-    private final Map<BeanIdentifier, Object> singlesInCreation = new ConcurrentHashMap<>(5);
+    private final Map<BeanIdentifier, Object> beansInCreation = new ConcurrentHashMap<>(5);
 
     /**
      * @param context        The bean context
@@ -43,23 +43,23 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
 
     @Override
     public void close() {
-        singlesInCreation.clear();
+        beansInCreation.clear();
     }
 
     @Override
     public <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance) {
-        singlesInCreation.put(beanIdentifier, instance);
+        beansInCreation.put(beanIdentifier, instance);
     }
 
     @Override
     public void removeInFlightBean(BeanIdentifier beanIdentifier) {
-        singlesInCreation.remove(beanIdentifier);
+        beansInCreation.remove(beanIdentifier);
     }
 
     @Nullable
     @Override
     public <T> T getInFlightBean(BeanIdentifier beanIdentifier) {
         //noinspection unchecked
-        return (T) singlesInCreation.get(beanIdentifier);
+        return (T) beansInCreation.get(beanIdentifier);
     }
 }

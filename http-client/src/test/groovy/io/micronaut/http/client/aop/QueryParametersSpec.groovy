@@ -17,13 +17,14 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.beans.exceptions.IntrospectionException
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
-import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -32,7 +33,6 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import javax.annotation.Nullable
-
 
 class QueryParametersSpec extends Specification {
 
@@ -95,11 +95,11 @@ class QueryParametersSpec extends Specification {
 
     @Unroll
     void "test client mappping URL parameters appended through a POJO with a list (served through #flavour)"() {
-        expect:
-        client.searchExplodedPojo(flavour, new SearchParamsAsList(term: ["Tool", "Agnes Obel"])).albums.size() == 4
+        when:
+        client.searchExplodedPojo("list", new SearchParamsAsList(term: ["Tool", "Agnes Obel"]))
 
-        where:
-        flavour << [ "pojo", "list", "map" ]
+        then:
+        thrown(IntrospectionException)
     }
 
     @Unroll
@@ -170,10 +170,12 @@ class QueryParametersSpec extends Specification {
         List<String> term // POJO parameters can bind request params to list fields
     }
 
+    @Introspected
     static class SearchParams {
         String term // Now, POJO parameters can bind request params to simple fields, too.
     }
 
+    @Introspected
     static class SearchParams2 {
         String song // Now, POJO parameters can bind request params to multiple POJOs, too.
     }

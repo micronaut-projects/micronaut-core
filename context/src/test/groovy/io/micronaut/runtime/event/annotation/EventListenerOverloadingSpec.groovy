@@ -22,7 +22,7 @@ import io.micronaut.context.event.StartupEvent
 import spock.lang.Issue
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 class EventListenerOverloadingSpec extends AbstractTypeElementSpec {
 
@@ -71,7 +71,7 @@ package test;
 import io.micronaut.context.event.ShutdownEvent;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.runtime.event.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class TestListener {

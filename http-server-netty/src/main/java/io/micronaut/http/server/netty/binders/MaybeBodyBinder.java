@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -62,13 +62,6 @@ public class MaybeBodyBinder extends DefaultBodyAnnotationBinder<Maybe> implemen
     @Override
     public List<Class<?>> superTypes() {
         return Collections.singletonList(MaybeSource.class);
-    }
-
-    @SuppressWarnings("checkstyle:designforextension")
-    @Deprecated
-    @Override
-    public boolean supportsSuperTypes() {
-        return false;
     }
 
     @Override

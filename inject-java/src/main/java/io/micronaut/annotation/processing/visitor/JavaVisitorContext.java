@@ -198,7 +198,7 @@ public class JavaVisitorContext implements VisitorContext {
 
     private void printMessage(String message, Diagnostic.Kind kind, @Nullable io.micronaut.inject.ast.Element element) {
         if (StringUtils.isNotEmpty(message)) {
-            if (element != null) {
+            if (element instanceof AbstractJavaElement) {
                 Element el = (Element) element.getNativeType();
                 messager.printMessage(kind, message, el);
             } else {

@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.visitor.VisitorContext;
 import org.objectweb.asm.Type;
 
 import io.micronaut.core.annotation.NonNull;
@@ -50,23 +51,29 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
     @Nullable
     Element getOriginatingElement();
 
+
     /**
      * Visits the constructor used to create the bean definition.
      *
-     * @param constructor  The method element that represents the constructor
-     * @param requiresReflection         Whether invoking the constructor requires reflection
+     * @param constructor        The method element that represents the constructor
+     * @param requiresReflection Whether invoking the constructor requires reflection
+     * @param visitorContext     The visitor context
      */
     void visitBeanDefinitionConstructor(MethodElement constructor,
-                                        boolean requiresReflection);
+                                        boolean requiresReflection,
+                                        VisitorContext visitorContext);
 
     /**
      * Visits the constructor used to create the bean definition in the case where no constructor is present.
      * This method should only be called in the class defines no constructor.
      *
      * @param annotationMetadata The annotation metadata for the constructor
-     *
+     * @param visitorContext     The visitor context
      */
-    void visitDefaultConstructor(AnnotationMetadata annotationMetadata);
+    void visitDefaultConstructor(
+            AnnotationMetadata annotationMetadata,
+            VisitorContext visitorContext
+    );
 
     /**
      * @return The name of the bean definition reference class.
@@ -173,10 +180,10 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
     /**
      * Visits an injection point for a setter.
      *
-     * @param declaringType          The declaring type
-     * @param methodElement          The method element
-     * @param requiresReflection     Whether the setter requires reflection
-     * @param isOptional             Whether the setter is optional
+     * @param declaringType      The declaring type
+     * @param methodElement      The method element
+     * @param requiresReflection Whether the setter requires reflection
+     * @param isOptional         Whether the setter is optional
      */
     void visitSetterValue(TypedElement declaringType,
                           MethodElement methodElement,
@@ -185,15 +192,16 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
 
     /**
      * Visits a method injection point.
-     *
-     * @param declaringType              The declaring type of the method. Either a Class or a string representing
-     *                                   the name of the type
-     * @param methodElement              The method element
-     * @param requiresReflection         Whether the method requires reflection
+     *  @param declaringType      The declaring type of the method. Either a Class or a string representing
+     *                           the name of the type
+     * @param methodElement      The method element
+     * @param requiresReflection Whether the method requires reflection
+     * @param visitorContext     The visitor context
      */
     void visitPostConstructMethod(TypedElement declaringType,
                                   MethodElement methodElement,
-                                  boolean requiresReflection);
+                                  boolean requiresReflection,
+                                  VisitorContext visitorContext);
 
     /**
      * Visits a method injection point.
@@ -201,10 +209,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param beanType           The bean type of the method
      * @param methodElement      The method element
      * @param requiresReflection Whether the method requires reflection
+     * @param visitorContext     The visitor context
      */
     void visitPreDestroyMethod(TypedElement beanType,
                                MethodElement methodElement,
-                               boolean requiresReflection);
+                               boolean requiresReflection,
+                               VisitorContext visitorContext);
 
     /**
      * Visits a method injection point.
@@ -212,20 +222,24 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param beanType           The bean type of the method
      * @param methodElement      The method element
      * @param requiresReflection Whether the method requires reflection
+     * @param visitorContext     The visitor context
      */
     void visitMethodInjectionPoint(TypedElement beanType,
                                    MethodElement methodElement,
-                                   boolean requiresReflection);
+                                   boolean requiresReflection,
+                                   VisitorContext visitorContext);
 
     /**
      * Visit a method that is to be made executable allow invocation of said method without reflection.
      *
-     * @param declaringBean The declaring bean of the method. Note this may differ from {@link MethodElement#getDeclaringType()} in the case of the method coming from a super class or interface.
-     * @param methodElement The method element
+     * @param declaringBean  The declaring bean of the method. Note this may differ from {@link MethodElement#getDeclaringType()} in the case of the method coming from a super class or interface.
+     * @param methodElement  The method element
+     * @param visitorContext The visitor context
      * @return The {@link ExecutableMethodWriter}.
      */
     ExecutableMethodWriter visitExecutableMethod(TypedElement declaringBean,
-                                                 MethodElement methodElement);
+                                                 MethodElement methodElement,
+                                                 VisitorContext visitorContext);
 
     /**
      * Visits a field injection point.
@@ -366,4 +380,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param typeArguments The type arguments
      */
     void visitTypeArguments(Map<String, Map<String, ClassElement>> typeArguments);
+
+    /**
+     * @return The generic type arguments for the bean type.
+     * @since 3.0.0
+     */
+    default @NonNull ClassElement[] getTypeArguments() {
+        return new ClassElement[0];
+    }
 }

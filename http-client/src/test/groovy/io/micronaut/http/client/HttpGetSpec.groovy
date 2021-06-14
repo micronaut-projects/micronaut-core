@@ -32,12 +32,12 @@ import io.reactivex.Completable
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.functions.Consumer
+import jakarta.inject.Inject
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import javax.annotation.Nullable
-import javax.inject.Inject
 import java.time.LocalDate
 
 /**
@@ -838,6 +838,7 @@ class HttpGetSpec extends Specification {
 
     @Client("/get")
     static interface MyGetClient {
+
         @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
         String simple()
 
@@ -914,8 +915,9 @@ class HttpGetSpec extends Specification {
 
     }
 
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     static class MyGetHelper {
+
         private final RxStreamingHttpClient rxClientSlash
         private final RxStreamingHttpClient rxClient
 

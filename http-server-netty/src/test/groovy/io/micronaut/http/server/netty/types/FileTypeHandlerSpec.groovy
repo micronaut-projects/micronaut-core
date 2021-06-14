@@ -27,10 +27,10 @@ import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableR
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType
 import io.micronaut.http.server.types.files.StreamedFile
 import io.micronaut.http.server.types.files.SystemFile
+import jakarta.inject.Inject
+import jakarta.inject.Named
 import spock.lang.IgnoreIf
 
-import javax.inject.Inject
-import javax.inject.Named
 import java.nio.file.Files
 import java.time.Instant
 import java.time.ZoneId

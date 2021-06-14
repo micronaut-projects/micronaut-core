@@ -28,9 +28,13 @@ import java.lang.annotation.RetentionPolicy;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Type {
+    /**
+     * The name of the annotation.
+     */
+    String NAME = Type.class.getName();
 
     /**
      * @return The types
      */
-    Class[] value();
+    Class<?>[] value();
 }

@@ -78,31 +78,41 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     @Override
-    protected void addRepeatable(String annotationName, AnnotationValue annotationValue) {
+    public void addRepeatable(String annotationName, AnnotationValue annotationValue) {
         Objects.requireNonNull(annotationValue, "Annotation Value cannot be null");
         this.hasPropertyExpressions = computeHasPropertyExpressions(annotationValue.getValues(), RetentionPolicy.RUNTIME);
         super.addRepeatable(annotationName, annotationValue);
     }
 
     @Override
-    protected void addRepeatable(String annotationName, AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
+    public void addRepeatable(String annotationName, AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
         Objects.requireNonNull(annotationValue, "Annotation Value cannot be null");
         this.hasPropertyExpressions = computeHasPropertyExpressions(annotationValue.getValues(), retentionPolicy);
         super.addRepeatable(annotationName, annotationValue, retentionPolicy);
     }
 
     @Override
-    protected void addDeclaredRepeatable(String annotationName, AnnotationValue annotationValue) {
+    public void addDeclaredRepeatable(String annotationName, AnnotationValue annotationValue) {
         Objects.requireNonNull(annotationValue, "Annotation Value cannot be null");
         this.hasPropertyExpressions = computeHasPropertyExpressions(annotationValue.getValues(), RetentionPolicy.RUNTIME);
         super.addDeclaredRepeatable(annotationName, annotationValue);
     }
 
     @Override
-    protected void addDeclaredRepeatable(String annotationName, AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
+    public void addDeclaredRepeatable(String annotationName, AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
         Objects.requireNonNull(annotationValue, "Annotation Value cannot be null");
         this.hasPropertyExpressions = computeHasPropertyExpressions(annotationValue.getValues(), retentionPolicy);
         super.addDeclaredRepeatable(annotationName, annotationValue, retentionPolicy);
+    }
+
+    @Override
+    public void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
+        super.addDeclaredStereotype(parentAnnotations, stereotype, values);
+    }
+
+    @Override
+    public void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
+        super.addDeclaredStereotype(parentAnnotations, stereotype, values, retentionPolicy);
     }
 
     private boolean computeHasPropertyExpressions(Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {

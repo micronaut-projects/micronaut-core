@@ -20,8 +20,8 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Replaces
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 /**
  * Created by graemerocher on 26/05/2017.
  */

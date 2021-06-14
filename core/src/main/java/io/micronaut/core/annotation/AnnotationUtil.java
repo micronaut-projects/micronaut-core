@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.annotation;
 
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.*;
@@ -115,6 +116,11 @@ public class AnnotationUtil {
     /**
      * The around annotation type.
      */
+    public static final String ANN_AROUND_CONSTRUCT = "io.micronaut.aop.AroundConstruct";
+
+    /**
+     * The around annotation type.
+     */
     public static final String ANN_INTRODUCTION = "io.micronaut.aop.Introduction";
 
     /**
@@ -128,9 +134,24 @@ public class AnnotationUtil {
     public static final String ANN_INTERCEPTOR_BINDING_QUALIFIER = "io.micronaut.inject.qualifiers.InterceptorBindingQualifier";
 
     /**
+     * The advice stereotypes.
+     */
+    public static final Set<String> ADVICE_STEREOTYPES = CollectionUtils.setOf(
+            ANN_AROUND,
+            ANN_AROUND_CONSTRUCT,
+            ANN_INTRODUCTION
+    );
+
+    /**
      * Name of the repeatable interceptor bindings type.
      */
     public static final String ANN_INTERCEPTOR_BINDINGS = "io.micronaut.aop.InterceptorBindingDefinitions";
+
+    public static final String INJECT = "javax.inject.Inject";
+    public static final String SCOPE = "javax.inject.Scope";
+    public static final String SINGLETON = "javax.inject.Singleton";
+    public static final String QUALIFIER = "javax.inject.Qualifier";
+    public static final String NAMED = "javax.inject.Named";
 
     private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();

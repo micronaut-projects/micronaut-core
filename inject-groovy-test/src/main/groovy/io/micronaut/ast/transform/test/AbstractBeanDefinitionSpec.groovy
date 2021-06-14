@@ -16,6 +16,7 @@
 package io.micronaut.ast.transform.test
 
 import groovy.transform.CompileStatic
+import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
@@ -47,6 +48,7 @@ import org.codehaus.groovy.control.SourceUnit
 import spock.lang.Specification
 
 import java.util.function.Predicate
+import java.util.stream.Collectors
 
 /**
  * @author graemerocher
@@ -173,7 +175,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     AnnotationMetadata buildMethodAnnotationMetadata(String cls, String source, String methodName) {
         ClassNode element = buildClassNode(source, cls)
         MethodNode method = element.getMethods(methodName)[0]
-        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
+        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(Stub(SourceUnit) {
+            getErrorCollector() >> null
+        }, null)
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
         return metadata
     }
@@ -246,11 +250,13 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
                 ClassPathResourceLoader.defaultLoader(classLoader),"test") {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
-                return classLoader.generatedClasses.keySet().findAll {
-                    it.endsWith("DefinitionClass")
-                }.collect {
-                    classLoader.loadClass(it).newInstance()
-                }.findAll { predicate == null || predicate.test(it) }
+                def references =  classLoader.generatedClasses.keySet()
+                    .stream()
+                    .filter({ name -> name.endsWith("DefinitionClass") })
+                    .map({ name -> (BeanDefinitionReference) classLoader.loadClass(name).newInstance() })
+                    .filter({ bdr -> predicate == null || predicate.test(bdr) })
+                    .collect(Collectors.toList())
+                return references + new InterceptorRegistryBean()
             }
         }.start()
     }

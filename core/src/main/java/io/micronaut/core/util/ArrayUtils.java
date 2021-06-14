@@ -164,7 +164,7 @@ public class ArrayUtils {
      *
      * @param collection The collection
      * @param createArrayFn The function to create the array
-     * @param <T> The create array function
+     * @param <T> The type of the array
      * @return The array
      */
     public static <T> T[] toArray(Collection<T> collection, IntFunction<T[]> createArrayFn) {

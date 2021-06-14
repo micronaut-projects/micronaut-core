@@ -15,6 +15,8 @@
  */
 package io.micronaut.aop;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import java.lang.annotation.Annotation;
 
 /**
@@ -31,11 +33,32 @@ public enum InterceptorKind {
      */
     AROUND(Around.class),
     /**
+     * Around advice interception.
+     *
+     * @see AroundConstruct
+     * @since 3.0.0
+     */
+    AROUND_CONSTRUCT(AroundConstruct.class),
+    /**
      * Introduction advice interception.
      *
      * @see Introduction
      */
-    INTRODUCTION(Introduction.class);
+    INTRODUCTION(Introduction.class),
+    /**
+     * Post construct interception.
+     *
+     * @see PostConstruct
+     * @since 3.0.0
+     */
+    POST_CONSTRUCT(PostConstruct.class),
+    /**
+     * PreDestroy interception.
+     *
+     * @see PreDestroy
+     * @since 3.0.0
+     */
+    PRE_DESTROY(PreDestroy.class);
 
     private final Class<? extends Annotation> annotationType;
 

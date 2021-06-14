@@ -20,7 +20,7 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.inject.ExecutableMethod;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 

@@ -6,6 +6,53 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 
 class LifeCycleWithProxySpec extends AbstractTypeElementSpec {
+    void "test that a proxy target AOP definition lifecycle hooks are invoked - annotation at class level"() {
+        when:
+        ApplicationContext context = buildContext('''
+package test;
+
+import io.micronaut.aop.proxytarget.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.convert.*;
+
+@Mutating("someVal")
+@jakarta.inject.Singleton
+class MyBean {
+
+    @jakarta.inject.Inject public ConversionService conversionService;
+    public int count = 0;
+    
+    public String someMethod() {
+        return "good";
+    }
+    
+    @javax.annotation.PostConstruct
+    void created() {
+        count++;
+    }
+    
+    @javax.annotation.PreDestroy
+    void destroyed() {
+        count--;
+    }
+
+}
+''')
+
+        def instance = getBean(context, "test.MyBean")
+
+
+        then:"proxy post construct methods are not invoked"
+        instance.conversionService // injection works
+        instance.someMethod() == 'good'
+        instance.count == 0
+
+        and:"proxy target post construct methods are invoked"
+        instance.interceptedTarget().count == 1
+
+        cleanup:
+        context.close()
+    }
 
     void "test that a simple AOP definition lifecycle hooks are invoked - annotation at class level"() {
         when:
@@ -17,10 +64,10 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.convert.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
-    @javax.inject.Inject public ConversionService conversionService;
+    @jakarta.inject.Inject public ConversionService conversionService;
     public int count = 0;
     
     public String someMethod() {
@@ -47,6 +94,7 @@ class MyBean {
 
         when:
         def context = ApplicationContext.run()
+
         def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
 
 
@@ -67,10 +115,10 @@ package test;
 import io.micronaut.aop.simple.*;
 import io.micronaut.core.convert.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
-    @javax.inject.Inject public ConversionService conversionService;
+    @jakarta.inject.Inject public ConversionService conversionService;
 
     public int count = 0;
     
@@ -119,10 +167,10 @@ import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.convert.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
-    @javax.inject.Inject public ConversionService conversionService;
+    @jakarta.inject.Inject public ConversionService conversionService;
     public int count = 0;
     
     @javax.annotation.PostConstruct

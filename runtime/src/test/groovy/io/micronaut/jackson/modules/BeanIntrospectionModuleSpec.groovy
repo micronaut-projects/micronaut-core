@@ -1,11 +1,6 @@
 package io.micronaut.jackson.modules
 
-import com.fasterxml.jackson.annotation.JsonCreator
-import com.fasterxml.jackson.annotation.JsonIgnore
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.annotation.JsonUnwrapped
-import com.fasterxml.jackson.annotation.JsonView
+import com.fasterxml.jackson.annotation.*
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.PropertyNamingStrategy
 import com.fasterxml.jackson.databind.annotation.JsonNaming
@@ -17,12 +12,7 @@ import io.micronaut.http.hateoas.JsonError
 import io.micronaut.jackson.JacksonConfiguration
 import io.micronaut.jackson.modules.testcase.EmailTemplate
 import io.micronaut.jackson.modules.testcase.Notification
-import io.micronaut.jackson.modules.wrappers.BooleanWrapper
-import io.micronaut.jackson.modules.wrappers.DoubleWrapper
-import io.micronaut.jackson.modules.wrappers.IntWrapper
-import io.micronaut.jackson.modules.wrappers.IntegerWrapper
-import io.micronaut.jackson.modules.wrappers.LongWrapper
-import io.micronaut.jackson.modules.wrappers.StringWrapper
+import io.micronaut.jackson.modules.wrappers.*
 import spock.lang.Issue
 import spock.lang.Specification
 

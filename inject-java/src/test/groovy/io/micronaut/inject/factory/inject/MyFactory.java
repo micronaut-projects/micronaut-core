@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Requires(property = "spec.name", value = "InjectExistingFactorySpec")
 @Factory

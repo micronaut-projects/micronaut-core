@@ -33,7 +33,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class AbstractBean {
     @Value("server.host")
     String host;
@@ -106,7 +106,7 @@ abstract class AbstractBean {
         BeanDefinition beanDefinition = buildBeanDefinition('test.Bean', '''
 package test;
 
-@javax.inject.Named("a")
+@jakarta.inject.Named("a")
 class Bean {
 
 }
@@ -121,7 +121,7 @@ class Bean {
         BeanDefinition beanDefinition = buildBeanDefinition('test.Bean', '''
 package test;
 
-@javax.inject.Named("a")
+@jakarta.inject.Named("a")
 abstract class Bean {
 
 }

@@ -28,18 +28,25 @@ import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.BeanPropertyBinder;
-import io.micronaut.core.convert.*;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.TypeConverter;
+import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.inject.Inject;
-import javax.inject.Provider;
-import javax.inject.Singleton;
-import java.util.*;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Converter registrar for Jackson.
@@ -53,22 +60,6 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
     private final BeanProvider<ObjectMapper> objectMapper;
     private final ConversionService<?> conversionService;
     private final BeanProvider<BeanPropertyBinder> beanPropertyBinder;
-
-    /**
-     * Default constructor.
-     * @param objectMapper The object mapper provider
-     * @param beanPropertyBinder The bean property binder provider
-     * @param conversionService The conversion service
-     */
-    @Deprecated
-    protected JacksonConverterRegistrar(
-            Provider<ObjectMapper> objectMapper,
-            Provider<BeanPropertyBinder> beanPropertyBinder,
-            ConversionService<?> conversionService) {
-        this.objectMapper = objectMapper::get;
-        this.conversionService = conversionService;
-        this.beanPropertyBinder = beanPropertyBinder::get;
-    }
 
     /**
      * Default constructor.

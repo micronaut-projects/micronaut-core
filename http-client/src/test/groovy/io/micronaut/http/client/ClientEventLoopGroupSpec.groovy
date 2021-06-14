@@ -2,11 +2,9 @@ package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
-import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.netty.channel.EventLoopGroup
 import spock.lang.Specification
-
 
 class ClientEventLoopGroupSpec extends Specification {
 

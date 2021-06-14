@@ -21,7 +21,7 @@ import io.micronaut.context.event.StartupEvent
 import io.micronaut.context.event.ShutdownEvent
 import io.micronaut.runtime.event.annotation.EventListener
 // end::imports[]
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Singleton

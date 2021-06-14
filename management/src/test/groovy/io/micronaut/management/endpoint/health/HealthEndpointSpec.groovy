@@ -37,10 +37,10 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import io.reactivex.annotations.NonNull
 import io.reactivex.functions.Function
+import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import spock.lang.Specification
 
-import javax.inject.Singleton
 import javax.sql.DataSource
 import java.security.Principal
 
@@ -476,12 +476,6 @@ class HealthEndpointSpec extends Specification {
                     })
                 }
             }
-        }
-
-        @Override
-        @Deprecated
-        boolean supportsSuperTypes() {
-            return false
         }
     }
 

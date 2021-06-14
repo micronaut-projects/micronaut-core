@@ -38,8 +38,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.DefaultRouteBuilder;
 import io.micronaut.web.router.UriRoute;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;

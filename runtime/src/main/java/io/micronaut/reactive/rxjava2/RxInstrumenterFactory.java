@@ -18,13 +18,13 @@ package io.micronaut.reactive.rxjava2;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 
-import io.micronaut.core.annotation.Nullable;
-import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
 

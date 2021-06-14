@@ -11,7 +11,7 @@ package test;
 
 import io.micronaut.core.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
 @Singleton
@@ -32,7 +32,7 @@ package test;
 
 import io.micronaut.core.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 class OuterBean {
 
@@ -58,7 +58,7 @@ class OuterBean {
         def definition = buildBeanDefinition('test.A', 'TestBean', '''
 package test.A;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class TestBean {
 
 }

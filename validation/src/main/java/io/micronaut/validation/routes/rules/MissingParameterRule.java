@@ -15,6 +15,13 @@
  */
 package io.micronaut.validation.routes.rules;
 
+import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.validation.InternalUriMatchTemplate;
+import io.micronaut.validation.routes.RouteValidationResult;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -22,13 +29,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.PropertyElement;
-import io.micronaut.validation.InternalUriMatchTemplate;
-import io.micronaut.validation.routes.RouteValidationResult;
 
 /**
  * Validates all route uri variables are present in the route arguments.

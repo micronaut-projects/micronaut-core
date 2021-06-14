@@ -41,7 +41,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 

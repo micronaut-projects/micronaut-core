@@ -28,7 +28,7 @@ class FieldInjectionSpec extends AbstractTypeElementSpec {
         def definition = buildBeanDefinition('fieldinjection.Test', '''
 package fieldinjection;
 
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 class Test {

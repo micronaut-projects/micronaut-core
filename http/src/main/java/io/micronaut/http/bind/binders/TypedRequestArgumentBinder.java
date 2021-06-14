@@ -32,18 +32,6 @@ import java.util.List;
 public interface TypedRequestArgumentBinder<T> extends RequestArgumentBinder<T>, TypeArgumentBinder<T, HttpRequest<?>> {
 
     /**
-     * Determines whether arguments that are an interface that {@link T}
-     * implements are candidates for binding.
-     *
-     * @return True if super interfaces are binding candidates
-     * @deprecated Use {@link #superTypes()} instead
-     */
-    @Deprecated
-    default boolean supportsSuperTypes() {
-        return true;
-    }
-
-    /**
      * Returns additional super types.
      *
      * @return Additional supers types

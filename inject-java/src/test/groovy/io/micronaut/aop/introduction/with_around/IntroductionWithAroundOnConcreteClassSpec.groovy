@@ -1,19 +1,37 @@
 package io.micronaut.aop.introduction.with_around
 
-
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-class IntroductionWithAroundOnConcreteClassSpec extends Specification {
+class IntroductionWithAroundOnConcreteClassSpec extends AbstractTypeElementSpec {
 
     @Shared
     @AutoCleanup
     ApplicationContext applicationContext = ApplicationContext.run()
+
+    void "test introduction with around compile"() {
+        given:
+        def context = buildContext('aroundwithintro.Test', '''
+package aroundwithintro;
+
+import io.micronaut.aop.introduction.with_around.ProxyIntroductionAndAroundOneAnnotation;
+
+@ProxyIntroductionAndAroundOneAnnotation
+class Test{}
+''', true)
+        expect:
+        getBean(context, 'aroundwithintro.Test')
+
+        cleanup:
+        context.close()
+    }
 
     @Unroll
     void "test introduction with around for #clazz"(Class clazz) {

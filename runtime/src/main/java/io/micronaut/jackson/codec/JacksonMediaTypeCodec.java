@@ -15,14 +15,6 @@
  */
 package io.micronaut.jackson.codec;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -40,7 +32,13 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import javax.inject.Provider;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * A {@link MediaTypeCodec} Jackson based implementations.
@@ -57,20 +55,6 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
     protected final MediaType mediaType;
     private final BeanProvider<ObjectMapper> objectMapperProvider;
     private ObjectMapper objectMapper;
-
-    /**
-     * @param objectMapperProvider     To read/write JSON
-     * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
-     * @param mediaType                Client request/response media type
-     */
-    @Deprecated
-    public JacksonMediaTypeCodec(Provider<ObjectMapper> objectMapperProvider,
-                                 ApplicationConfiguration applicationConfiguration,
-                                 CodecConfiguration codecConfiguration,
-                                 MediaType mediaType) {
-        this((BeanProvider<ObjectMapper>) objectMapperProvider::get, applicationConfiguration, codecConfiguration, mediaType);
-    }
 
     /**
      * @param objectMapperProvider     To read/write JSON

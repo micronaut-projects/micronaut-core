@@ -5,7 +5,7 @@ import io.micronaut.context.annotation.Requires
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @IgnoreIf({ os.windows })
 class RequiresSpec extends Specification {

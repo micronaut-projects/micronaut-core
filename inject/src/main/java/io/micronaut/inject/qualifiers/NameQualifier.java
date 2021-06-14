@@ -18,14 +18,16 @@ package io.micronaut.inject.qualifiers;
 import static io.micronaut.core.util.ArgumentUtils.check;
 
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.inject.BeanType;
 
-import javax.inject.Named;
+import java.lang.annotation.Annotation;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -40,13 +42,17 @@ import java.util.stream.Stream;
 @Internal
 class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
 
+    protected final Class<? extends Annotation> annotationType;
     private final String name;
 
-    /**
-     * @param name The qualifier name
-     */
-    NameQualifier(String name) {
-        this.name = Objects.requireNonNull(name, "Argument [name] cannot be null");
+    NameQualifier(AnnotationMetadata annotationMetadata, String name) {
+        this.annotationType = annotationMetadata != null ? annotationMetadata.getAnnotationType(name).orElse(null) : null;
+        this.name = Objects.requireNonNull(annotationType == null ? name : annotationType.getSimpleName(), "Argument [name] cannot be null");
+    }
+
+    NameQualifier(Class<? extends Annotation> annotationType) {
+        this.name = Objects.requireNonNull(annotationType.getSimpleName(), "Argument [name] cannot be null");
+        this.annotationType = annotationType;
     }
 
     @Override
@@ -57,23 +63,24 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
             if (!beanType.isAssignableFrom(candidate.getBeanType())) {
                 return false;
             }
-
-            String typeName;
-                AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
-                // here we resolved the declared Qualifier of the bean
-                Optional<String> beanQualifier = annotationMetadata
-                        .findDeclaredAnnotation(Named.class)
-                        .flatMap(AnnotationValue::stringValue);
-                typeName = beanQualifier.orElseGet(() -> {
-                    if (candidate instanceof NameResolver) {
-                        Optional<String> resolvedName = ((NameResolver) candidate).resolveName();
-                        return resolvedName.orElse(candidate.getBeanType().getSimpleName());
-                    }
-                    return candidate.getBeanType().getSimpleName();
-                });
-                return typeName.equalsIgnoreCase(name) || typeName.equalsIgnoreCase(name + beanType.getSimpleName());
+            if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(Any.class)) {
+                return true;
             }
-        );
+            String typeName;
+            AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
+            // here we resolved the declared Qualifier of the bean
+            Optional<String> beanQualifier = annotationMetadata
+                    .findDeclaredAnnotation(AnnotationUtil.NAMED)
+                    .flatMap(AnnotationValue::stringValue);
+            typeName = beanQualifier.orElseGet(() -> {
+                if (candidate instanceof NameResolver) {
+                    Optional<String> resolvedName = ((NameResolver) candidate).resolveName();
+                    return resolvedName.orElse(candidate.getBeanType().getSimpleName());
+                }
+                return candidate.getBeanType().getSimpleName();
+            });
+            return typeName.equalsIgnoreCase(name) || typeName.equalsIgnoreCase(name + beanType.getSimpleName());
+        });
     }
 
     @Override
@@ -117,12 +124,14 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
         return candidates.filter(candidate -> {
                 if (candidate.isPrimary() && Primary.class.getSimpleName().equals(annotationName)) {
                     return true;
+                } else if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(Any.class)) {
+                    return true;
                 }
                 String candidateName;
                 if (candidate instanceof NameResolver) {
                     candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
                 } else {
-                    Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(Named.class);
+                    Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(AnnotationUtil.NAMED);
                     candidateName = annotation.orElse(candidate.getBeanType().getSimpleName());
                 }
 
@@ -156,7 +165,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
                     if (candidate instanceof NameResolver) {
                         candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
                     } else {
-                        Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(Named.class);
+                        Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(AnnotationUtil.NAMED);
                         candidateName = annotation.orElse(candidate.getBeanType().getSimpleName());
                     }
 

@@ -16,8 +16,10 @@
 package io.micronaut.http.client.docs.streaming;
 
 // tag::imports[]
+
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
 import io.reactivex.Flowable;
 
 import java.time.ZonedDateTime;

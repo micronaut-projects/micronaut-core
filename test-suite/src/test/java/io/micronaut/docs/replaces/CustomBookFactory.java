@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.docs.requires.Book;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 // tag::class[]
 @Factory

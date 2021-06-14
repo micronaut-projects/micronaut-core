@@ -17,16 +17,7 @@ package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.reactivex.Completable;
-import io.reactivex.CompletableObserver;
-import io.reactivex.Flowable;
-import io.reactivex.FlowableSubscriber;
-import io.reactivex.Maybe;
-import io.reactivex.MaybeObserver;
-import io.reactivex.Observable;
-import io.reactivex.Observer;
-import io.reactivex.Single;
-import io.reactivex.SingleObserver;
+import io.reactivex.*;
 import io.reactivex.flowables.ConnectableFlowable;
 import io.reactivex.internal.fuseable.HasUpstreamCompletableSource;
 import io.reactivex.internal.fuseable.HasUpstreamMaybeSource;

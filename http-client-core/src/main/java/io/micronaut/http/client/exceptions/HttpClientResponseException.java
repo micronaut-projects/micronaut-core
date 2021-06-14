@@ -17,9 +17,9 @@ package io.micronaut.http.client.exceptions;
 
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseProvider;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.HttpResponseProvider;
 
 import java.util.Optional;
 

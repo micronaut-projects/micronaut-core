@@ -17,6 +17,7 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 
 import java.lang.reflect.ParameterizedType;
@@ -39,6 +40,26 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      * @return The type
      */
     @NonNull Class<T> getType();
+
+    /**
+     * @return Is the type primitive.
+     * @since 3.0.0
+     */
+    default boolean isPrimitive() {
+        return getType().isPrimitive();
+    }
+
+    /**
+     * If the type is primitive returns the wrapper type, otherwise returns the actual type.
+     * @return The wrapper type if primitive
+     */
+    default Class<?> getWrapperType() {
+        if (isPrimitive()) {
+            return ReflectionUtils.getWrapperType(getType());
+        } else {
+            return getType();
+        }
+    }
 
     @Override
     @NonNull
@@ -99,7 +120,8 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      * @return Whether this is a container type.
      */
     default boolean isContainerType() {
-        return DefaultArgument.CONTAINER_TYPES.contains(getType());
+        final Class<T> type = getType();
+        return Map.class == type ||  DefaultArgument.CONTAINER_TYPES.contains(type);
     }
 
     /**
@@ -211,5 +233,14 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      */
     default boolean isArray() {
         return getType().isArray();
+    }
+
+    /**
+     * Obtains the type's simple name.
+     * @return The simple name
+     * @since 3.0.0
+     */
+    default @NonNull String getSimpleName() {
+        return getType().getSimpleName();
     }
 }

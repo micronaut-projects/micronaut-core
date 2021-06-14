@@ -13,7 +13,7 @@ class BeanRegistrationSpec extends AbstractTypeElementSpec {
         def context = buildContext(className, '''
 package beanreg;
 
-import javax.inject.*;
+import jakarta.inject.*;
 import io.micronaut.context.BeanRegistration;
 import java.util.*;
 

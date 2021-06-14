@@ -21,9 +21,8 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponse;
-
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 /**
  * Default implementation of {@link HttpCompressionStrategy}.

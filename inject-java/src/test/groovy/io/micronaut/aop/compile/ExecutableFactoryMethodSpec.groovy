@@ -13,7 +13,7 @@ class ExecutableFactoryMethodSpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 interface SomeInterface {
 
@@ -59,7 +59,7 @@ package test;
 
 import io.reactivex.Flowable;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import org.reactivestreams.Publisher;
 
 @Factory

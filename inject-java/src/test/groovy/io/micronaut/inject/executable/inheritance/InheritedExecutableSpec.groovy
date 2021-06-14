@@ -34,7 +34,7 @@ package test;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Executable
 @Singleton
@@ -95,7 +95,7 @@ package test;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.io.Serializable;
 
 abstract class GenericController<T, ID extends Serializable> {
@@ -149,7 +149,7 @@ package test;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 interface X {
 

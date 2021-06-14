@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
 
@@ -100,6 +101,12 @@ class DefaultConditionContext<B extends AnnotationMetadataProvider> implements C
 
     @NonNull
     @Override
+    public <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return beanContext.getBean(resolutionContext, beanType, qualifier);
+    }
+
+    @NonNull
+    @Override
     public <T> Optional<T> findBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return beanContext.findBean(resolutionContext, beanType, qualifier);
     }
@@ -107,18 +114,30 @@ class DefaultConditionContext<B extends AnnotationMetadataProvider> implements C
     @NonNull
     @Override
     public <T> Collection<T> getBeansOfType(@NonNull Class<T> beanType) {
-        return beanContext.getBeansOfType(resolutionContext, beanType);
+        return getBeansOfType(beanType, null);
     }
 
     @NonNull
     @Override
     public <T> Collection<T> getBeansOfType(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return beanContext.getBeansOfType(resolutionContext, Argument.of(beanType), qualifier);
+    }
+
+    @NonNull
+    @Override
+    public <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return beanContext.getBeansOfType(resolutionContext, beanType, qualifier);
     }
 
     @NonNull
     @Override
     public <T> Stream<T> streamOfType(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return beanContext.streamOfType(resolutionContext, beanType, qualifier);
+    }
+
+    @NonNull
+    @Override
+    public <T> Stream<T> streamOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return beanContext.streamOfType(resolutionContext, beanType, qualifier);
     }
 
@@ -151,5 +170,10 @@ class DefaultConditionContext<B extends AnnotationMetadataProvider> implements C
             return ((PropertyResolver) beanContext).getProperty(name, conversionContext);
         }
         return Optional.empty();
+    }
+
+    @Override
+    public <T> Optional<T> findBean(Argument<T> beanType, Qualifier<T> qualifier) {
+        return beanContext.findBean(beanType, qualifier);
     }
 }

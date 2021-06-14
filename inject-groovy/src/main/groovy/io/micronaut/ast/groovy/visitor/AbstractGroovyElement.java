@@ -31,9 +31,7 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MemberElement;
-import io.micronaut.inject.ast.PrimitiveElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
-import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.control.CompilationUnit;
@@ -43,6 +41,7 @@ import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Abstract Groovy element.
@@ -97,15 +96,50 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
                     this.annotationMetadata,
                     av
             );
-            String declaringTypeName = this instanceof MemberElement ? ((MemberElement) this).getOwningType().getName() : getName();
-            AbstractAnnotationMetadataBuilder.addMutatedMetadata(
-                    declaringTypeName,
-                    annotatedNode,
-                    this.annotationMetadata
-            );
-            AstAnnotationUtils.invalidateCache(annotatedNode);
+            updateAnnotationCaches();
         }
         return this;
+    }
+
+    @Override
+    public Element removeAnnotation(@NonNull String annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeAnnotation(
+                this.annotationMetadata, annotationType
+        );
+        updateAnnotationCaches();
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+        ArgumentUtils.requireNonNull("predicate", predicate);
+        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeAnnotationIf(
+                this.annotationMetadata, predicate
+        );
+        updateAnnotationCaches();
+        return this;
+
+    }
+
+    @Override
+    public Element removeStereotype(@NonNull String annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeStereotype(
+                this.annotationMetadata, annotationType
+        );
+        updateAnnotationCaches();
+        return this;
+    }
+
+    private void updateAnnotationCaches() {
+        String declaringTypeName = this instanceof MemberElement ? ((MemberElement) this).getOwningType().getName() : getName();
+        AbstractAnnotationMetadataBuilder.addMutatedMetadata(
+                declaringTypeName,
+                annotatedNode,
+                this.annotationMetadata
+        );
+        AstAnnotationUtils.invalidateCache(annotatedNode);
     }
 
     /**
@@ -249,30 +283,6 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
             }
         }
         return rawElement;
-    }
-
-    /**
-     *
-     * @param sourceUnit The source unit
-     * @param compilationUnit The compilation unit
-     * @param classNode The class node
-     * @param annotationMetadata The metadata
-     * @return The class element
-     * @deprecated Use {@link io.micronaut.inject.ast.ElementFactory} instead
-     */
-    @Deprecated
-    public static ClassElement toClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
-        if (classNode.isArray()) {
-            ClassNode componentType = classNode.getComponentType();
-            ClassElement componentElement = toClassElement(sourceUnit, compilationUnit, componentType, annotationMetadata);
-            return componentElement.toArray();
-        } else if (ClassHelper.isPrimitiveType(classNode)) {
-            return PrimitiveElement.valueOf(classNode.getName());
-        } else if (classNode.isEnum()) {
-            return new GroovyEnumElement(new GroovyVisitorContext(sourceUnit, compilationUnit), classNode, annotationMetadata);
-        } else {
-            return new GroovyClassElement(new GroovyVisitorContext(sourceUnit, compilationUnit), classNode, annotationMetadata);
-        }
     }
 
     private ClassElement resolveGenericType(Map<String, ClassNode> typeGenericInfo, ClassNode returnType) {

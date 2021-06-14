@@ -21,22 +21,21 @@ import com.fasterxml.jackson.databind.DeserializationContext
 import com.fasterxml.jackson.databind.JsonDeserializer
 import com.fasterxml.jackson.databind.JsonSerializer
 import com.fasterxml.jackson.databind.SerializerProvider
-import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Issue
-import spock.lang.Shared
 import spock.lang.Specification
-import io.micronaut.http.annotation.*
 
-import javax.inject.Inject
-import javax.inject.Singleton
 import java.math.RoundingMode
-
 
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1089")
 @MicronautTest

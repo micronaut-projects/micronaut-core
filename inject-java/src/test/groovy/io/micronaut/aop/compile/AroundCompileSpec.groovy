@@ -25,7 +25,7 @@ package mapperbinding;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton
@@ -72,7 +72,7 @@ package annbinding2;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.simple.*;
 
@@ -151,7 +151,7 @@ package annbinding1;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton
@@ -163,11 +163,12 @@ class MyBean {
 
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
-@Around
+@InterceptorBinding
 @interface TestAnn {
 }
 
-@InterceptorBean(TestAnn.class)
+@Singleton
+@InterceptorBinding(TestAnn.class)
 class TestInterceptor implements Interceptor {
     boolean invoked = false;
     @Override
@@ -208,7 +209,7 @@ package justaround;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton
@@ -265,7 +266,7 @@ package test;
 
 import io.micronaut.aop.proxytarget.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 class MyBean {
     byte[] test(byte[] someVal) {
@@ -288,7 +289,7 @@ package test;
 
 import io.micronaut.aop.simple.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 @TestBinding
 class MyBean {
@@ -301,7 +302,7 @@ package test;
 
 import io.micronaut.aop.simple.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 @TestBinding
 class MyBean {
@@ -334,7 +335,7 @@ package annbinding2;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.simple.*;
 
@@ -403,7 +404,7 @@ package annbinding2;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.simple.*;
 
@@ -461,7 +462,7 @@ package annbinding2;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.simple.*;
 

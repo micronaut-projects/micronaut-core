@@ -15,8 +15,9 @@
  */
 package io.micronaut.retry;
 
-import io.micronaut.retry.annotation.RetryPredicate;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.retry.annotation.RetryPredicate;
+
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalDouble;

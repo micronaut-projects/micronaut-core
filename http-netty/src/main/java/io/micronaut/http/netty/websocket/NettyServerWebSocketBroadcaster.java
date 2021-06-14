@@ -24,8 +24,8 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.Attribute;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.function.Predicate;
 
 /**

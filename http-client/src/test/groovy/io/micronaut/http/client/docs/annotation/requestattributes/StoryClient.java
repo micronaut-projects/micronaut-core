@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.client.docs.annotation.requestattributes;
 
-import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.RequestAttributes;
 import io.micronaut.http.client.annotation.Client;
 import io.reactivex.Single;

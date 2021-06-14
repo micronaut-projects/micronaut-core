@@ -18,6 +18,7 @@ package io.micronaut.inject;
 import io.micronaut.core.type.Argument;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.type.ArgumentCoercible;
 
 /**
  * An injection point for a method or constructor argument.
@@ -27,7 +28,7 @@ import io.micronaut.core.annotation.NonNull;
  * @author graemerocher
  * @since 1.0
  */
-public interface ArgumentInjectionPoint<B, T> extends InjectionPoint<B> {
+public interface ArgumentInjectionPoint<B, T> extends InjectionPoint<B>, ArgumentCoercible<T> {
 
     /**
      * @return The outer injection point (method or constructor)
@@ -38,4 +39,9 @@ public interface ArgumentInjectionPoint<B, T> extends InjectionPoint<B> {
      * @return The argument that is being injected
      */
     @NonNull Argument<T> getArgument();
+
+    @Override
+    default Argument<T> asArgument() {
+        return getArgument();
+    }
 }

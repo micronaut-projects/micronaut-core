@@ -18,6 +18,7 @@ package io.micronaut.function.client.aop;
 import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.function.client.FunctionDefinition;
@@ -27,9 +28,9 @@ import io.micronaut.function.client.FunctionInvokerChooser;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -71,7 +72,7 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
             body = parameterValueMap;
         }
 
-        String functionName = context.stringValue(Named.class)
+        String functionName = context.stringValue(AnnotationUtil.NAMED)
                 .orElse(NameUtils.hyphenate(context.getMethodName(), true));
 
         Flowable<FunctionDefinition> functionDefinition = Flowable.fromPublisher(discoveryClient.getFunction(functionName));

@@ -15,7 +15,8 @@
  */
 package io.micronaut.context;
 
-import javax.inject.Provider;
+import jakarta.inject.Provider;
+
 import javax.validation.constraints.NotNull;
 
 /**

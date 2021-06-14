@@ -33,10 +33,10 @@ import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.context.scope.Refreshable;
 import io.micronaut.scheduling.TaskExecutors;
+import jakarta.inject.Named;
+import jakarta.inject.Provider;
+import jakarta.inject.Singleton;
 
-import javax.inject.Named;
-import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -60,13 +60,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 @Requires(notEnv = {Environment.FUNCTION, Environment.ANDROID})
 public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<RefreshScope>, ApplicationEventListener<RefreshEvent> {
 
-    private final Map<String, BeanRegistration> refreshableBeans = new ConcurrentHashMap<>(10);
+    private final Map<BeanIdentifier, BeanRegistration> refreshableBeans = new ConcurrentHashMap<>(10);
     private final ConcurrentMap<Object, ReadWriteLock> locks = new ConcurrentHashMap<>();
     private final BeanContext beanContext;
     private final Executor executorService;
 
     /**
-     * @param beanContext     The bean context to allow DI of beans annotated with {@link javax.inject.Inject}
+     * @param beanContext     The bean context to allow DI of beans annotated with @Inject
      * @param executorService The executor service
      */
     public RefreshScope(BeanContext beanContext, @Named(TaskExecutors.IO) Executor executorService) {
@@ -87,7 +87,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     @SuppressWarnings("unchecked")
     @Override
     public <T> T get(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, BeanIdentifier identifier, Provider<T> provider) {
-        BeanRegistration beanRegistration = refreshableBeans.computeIfAbsent(identifier.toString(), key -> {
+        BeanRegistration beanRegistration = refreshableBeans.computeIfAbsent(identifier, key -> {
             T bean = provider.get();
             BeanRegistration registration = new BeanRegistration(identifier, beanDefinition, bean);
             locks.putIfAbsent(registration.getBean(), new ReentrantReadWriteLock());
@@ -106,9 +106,9 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> remove(BeanIdentifier identifier) {
-        BeanRegistration registration = refreshableBeans.get(identifier.toString());
+        BeanRegistration registration = refreshableBeans.get(identifier);
         if (registration != null) {
-            disposeOfBean(identifier.toString());
+            disposeOfBean(identifier);
             return Optional.ofNullable((T) registration.getBean());
         }
         return Optional.empty();
@@ -184,7 +184,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     }
 
     private void disposeOfBeanSubset(Collection<String> keys) {
-        for (String beanKey : refreshableBeans.keySet()) {
+        for (BeanIdentifier beanKey : refreshableBeans.keySet()) {
             BeanRegistration beanRegistration = refreshableBeans.get(beanKey);
             BeanDefinition definition = beanRegistration.getBeanDefinition();
             String[] strings = definition.stringValues(Refreshable.class);
@@ -203,12 +203,12 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     }
 
     private void disposeOfAllBeans() {
-        for (String key : refreshableBeans.keySet()) {
+        for (BeanIdentifier key : refreshableBeans.keySet()) {
             disposeOfBean(key);
         }
     }
 
-    private void disposeOfBean(String key) {
+    private void disposeOfBean(BeanIdentifier key) {
         BeanRegistration registration = refreshableBeans.remove(key);
         if (registration != null) {
 

@@ -17,6 +17,7 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
@@ -33,23 +34,23 @@ import java.util.*;
  * @since 1.0
  */
 @Internal
-public class DefaultArgument<T> implements Argument<T> {
+public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
 
-    static final Set<Class<?>> CONTAINER_TYPES = CollectionUtils.setOf(
+    public static final Set<Class<?>> CONTAINER_TYPES = CollectionUtils.setOf(
         List.class,
         Set.class,
-        Map.class,
         Collection.class,
         Queue.class,
         SortedSet.class,
         Deque.class,
         Vector.class,
-        ArrayList.class);
+        ArrayList.class
+    );
 
     private final Class<T> type;
     private final String name;
     private final Map<String, Argument<?>> typeParameters;
-    private final Argument[] typeParameterArray;
+    private final Argument<?>[] typeParameterArray;
     private final AnnotationMetadata annotationMetadata;
 
     /**
@@ -88,8 +89,8 @@ public class DefaultArgument<T> implements Argument<T> {
      * @param typeParameters     The map of parameters
      * @param typeParameterArray The array of arguments
      */
-    public DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Map<String, Argument<?>> typeParameters, Argument[] typeParameterArray) {
-        this.type = type;
+    public DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Map<String, Argument<?>> typeParameters, Argument<?>[] typeParameterArray) {
+        this.type = Objects.requireNonNull(type, "Type cannot be null");
         this.name = name;
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         this.typeParameters = typeParameters;
@@ -152,6 +153,9 @@ public class DefaultArgument<T> implements Argument<T> {
 
     @Override
     public Argument[] getTypeParameters() {
+        if (typeParameterArray == null) {
+            return Argument.ZERO_ARGUMENTS;
+        }
         return typeParameterArray;
     }
 
@@ -161,11 +165,13 @@ public class DefaultArgument<T> implements Argument<T> {
     }
 
     @Override
+    @NonNull
     public Class<T> getType() {
         return type;
     }
 
     @Override
+    @NonNull
     public String getName() {
         if (name == null) {
             return getType().getSimpleName();
@@ -175,7 +181,11 @@ public class DefaultArgument<T> implements Argument<T> {
 
     @Override
     public String toString() {
-        return type.getSimpleName() + " " + getName();
+        if (this.name == null) {
+            return getType().getSimpleName();
+        } else {
+            return getType().getSimpleName() + " " + getName();
+        }
     }
 
     @Override
@@ -214,11 +224,11 @@ public class DefaultArgument<T> implements Argument<T> {
         return Objects.hash(type, getName(), typeParameters);
     }
 
-    private static Map<String, Argument<?>> initializeTypeParameters(Argument[] genericTypes) {
+    private static Map<String, Argument<?>> initializeTypeParameters(Argument<?>[] genericTypes) {
         Map<String, Argument<?>> typeParameters;
         if (genericTypes != null && genericTypes.length > 0) {
             typeParameters = new LinkedHashMap<>(genericTypes.length);
-            for (Argument genericType : genericTypes) {
+            for (Argument<?> genericType : genericTypes) {
                 typeParameters.put(genericType.getName(), genericType);
             }
         } else {
@@ -227,4 +237,8 @@ public class DefaultArgument<T> implements Argument<T> {
         return typeParameters;
     }
 
+    @Override
+    public @NonNull Argument<T> asArgument() {
+        return this;
+    }
 }

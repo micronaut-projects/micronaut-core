@@ -15,13 +15,13 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.Set;
-
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
+
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * Represents a http request or response element.

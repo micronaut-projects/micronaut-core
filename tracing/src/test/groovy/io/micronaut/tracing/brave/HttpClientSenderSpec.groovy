@@ -28,12 +28,13 @@ import io.micronaut.runtime.server.event.ServerStartupEvent
 import io.micronaut.tracing.brave.sender.HttpClientSender
 import io.reactivex.Flowable
 import io.reactivex.Single
+import jakarta.inject.Singleton
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import zipkin2.Span
+import zipkin2.reporter.Sender
 
-import javax.inject.Singleton
 /**
  * @author graemerocher
  * @since 1.0
@@ -51,10 +52,11 @@ class HttpClientSenderSpec extends Specification {
         )
 
         when:
-        HttpClientSender httpClientSender = context.getBean(HttpClientSender)
+        Sender httpClientSender = context.getBean(Sender)
 
         then:
         httpClientSender != null
+        httpClientSender instanceof HttpClientSender
 
         cleanup:
         httpClientSender.close()
@@ -63,22 +65,22 @@ class HttpClientSenderSpec extends Specification {
 
     void "test http client sender receives spans"() {
         given:
+        EmbeddedServer zipkinServer = ApplicationContext.run(
+                EmbeddedServer,
+                ['micronaut.server.port':-1]
+        )
+        SpanController spanController = zipkinServer.applicationContext.getBean(SpanController)
+
         ApplicationContext context = ApplicationContext.run(
                 'tracing.zipkin.enabled':true,
                 'tracing.zipkin.sampler.probability':1,
-                'tracing.zipkin.http.url':HttpClientSender.Builder.DEFAULT_SERVER_URL
+                'tracing.zipkin.http.url':zipkinServer.getURL().toString()
         )
-        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
         PollingConditions conditions = new PollingConditions(timeout: 10)
-        // mock Zipkin server
-        EmbeddedServer zipkinServer = ApplicationContext.run(
-                EmbeddedServer,
-                ['micronaut.server.port':9411]
-        )
-        SpanController spanController = zipkinServer.applicationContext.getBean(SpanController)
         StartedListener listener = zipkinServer.applicationContext.getBean(StartedListener)
 
         then:
@@ -121,22 +123,22 @@ class HttpClientSenderSpec extends Specification {
 
     void "test http client sender receives spans with custom path"() {
         given:
+        EmbeddedServer zipkinServer = ApplicationContext.run(
+                EmbeddedServer,
+                ['micronaut.server.port':-1]
+        )
         ApplicationContext context = ApplicationContext.run(
                 'tracing.zipkin.enabled':true,
                 'tracing.zipkin.sampler.probability':1,
-                'tracing.zipkin.http.url':HttpClientSender.Builder.DEFAULT_SERVER_URL,
+                'tracing.zipkin.http.url':zipkinServer.getURL().toString(),
                 'tracing.zipkin.http.path':'/custom/path/spans'
         )
+
+        when:
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
-        when:
         PollingConditions conditions = new PollingConditions(timeout: 10)
-        // mock Zipkin server
-        EmbeddedServer zipkinServer = ApplicationContext.run(
-                EmbeddedServer,
-                ['micronaut.server.port':9411]
-        )
         CustomPathSpanController customPathSpanController = zipkinServer.applicationContext.getBean(CustomPathSpanController)
         StartedListener listener = zipkinServer.applicationContext.getBean(StartedListener)
 

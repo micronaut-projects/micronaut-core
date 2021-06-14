@@ -86,7 +86,7 @@ dependency:micronaut-graal[scope="annotationProcessor"]
 This processor generates:
 
 - A `reflect-config.json` file in the `META-INF/native-image` directory in your build classes directory (`target/classes` with Maven and typically `build/classes/java/main` with Gradle).
-- A `native-image.properties` file to read this configuration for all classes annotated with either ann:core.annotation.Introspected[] or ann:core.annotation.TypeHint[].
+- A `native-image.properties` file to read this configuration for all classes annotated with either ann:core.annotation.ReflectiveAccess[] or ann:core.annotation.TypeHint[].
 - A `resource-config.json` file also in the `META-INF/native-image` directory in your build classes directory containing information about the files in the `src/main/resources` directory.
 
 For example the following class:
@@ -95,17 +95,17 @@ For example the following class:
 ----
 package example;
 
-import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 
-@Introspected
+@ReflectiveAccess
 class Test {
     ...
 }
 ----
 
-The above example results in the public methods and declared constructors of `example.Test` being included in `reflect-config.json`.
+The above example results in the public methods, declared fields and declared constructors of `example.Test` being included in `reflect-config.json`.
 
-If you have more advanced requirements and only wish to include certain fields or methods, use ann:core.annotation.ReflectiveAccess[] instead which can be present on any constructor, field or method to include only the specific field, constructor or method.
+If you have more advanced requirements and only wish to include certain fields or methods, use the annotation on any constructor, field or method to include only the specific field, constructor or method.
 
 TIP: To provide your own `reflect.json`, add one to `src/main/graal/reflect.json` and it will be automatically picked up.
 
@@ -113,9 +113,9 @@ Stating with Micronaut 2.0, as the framework automatically generates the `resour
 
 === Adding Additional Classes for Reflective Access
 
-To inform Micronaut of additional classes to be included in the generated `reflect.json` file at compile time, either annotate a class with ann:core.annotation.Introspected[] or ann:core.annotation.TypeHint[].
+To inform Micronaut of additional classes to be included in the generated `reflect.json` file at compile time, either annotate a class with ann:core.annotation.ReflectiveAccess[] or ann:core.annotation.TypeHint[].
 
-The former generates a compile-time introspection as well as allowing reflective access, and the latter only allows reflective access, and is typically used on a module or `Application` class to include classes that are needed reflectively. For example, the following is from Micronaut's Jackson module:
+Both allows for reflective access, and the latter is typically used on a module or `Application` class to include classes that are needed reflectively. For example, the following is from Micronaut's Jackson module:
 
 [source,java]
 ----

@@ -1,327 +1,159 @@
-This section documents breaking changes between Micronaut 1.x and Micronaut 2.x
+This section will document breaking changes between Micronaut 2.x and Micronaut 3.x
 
-=== Micronaut 2.5
+=== Core Changes
 
-In previous versions of Micronaut it was possible to read the body of a request in a server filter under some conditions. Reading the request body in a filter has historically been inconsistent because the body is not read in many cases. In Micronaut 2.4, the body was read until the route arguments were satisfied, and then the server filters were executed. This lead to issues with memory leaks in some cases and is inefficient because a filter may skip route execution altogether by not proceeding the chain, thus the body did not need to be read. In Micronaut 2.5 the body will not be read until after filters are executed. This may lead to cases where the body was available in a filter and is no longer available.
+==== Nullable Annotations
 
-=== Micronaut 2.4
+TODO: spotbugs gone, javax also gone. use Micronaut or pull in dep
 
-Methods annotated with `@CircuitBreaker` that used the `includes` or `excludes` members were not functioning correctly. The circuit breaker was opening for exceptions that did not match the supplied exception types. This has been changed to correctly respect the includes and excludes.
+==== Decapitalization Strategy
 
-=== Micronaut 2.3
+For many cases, one common one being introspections, getter names like `getXForwarded()` would result in the bean property being `XForwarded`. The name will now be `xForwarded`. This can affect many areas of the framework where names like `XForwarded` are used.
 
-The `micronaut.server.multipart.enabled` setting previously was not respected for the Netty server implementation. The setting is now honored and if explicitly set to false, all multipart requests will be rejected.
+==== @Order default
 
-=== Micronaut 2.2
+Previously the default order value for the `@Order` annotation was the lowest precedence. It is now 0.
 
-Kotlin suspend functions in controllers that return null now correctly respond with a 404. This behavior was inconsistent with other return types in previous versions and returned a 200 OK response.
+==== Deprecation Removal
 
-=== Thread Pool Selection Now Manual
+Classes, constructors, etc that have been deprecated in previous versions of Micronaut have been removed.
 
-In Micronaut 1.x, Micronaut would attempt to automatically deduce the thread pool to use based on the return type of the controller method.
+==== Reflective Bean Map
 
-This approach caused some confusion and created a false association between reactive types and blocking operations.
+In several places in Micronaut, it is required to get a map representation of your object. In previous versions, a reflection based strategy was used to retrieve that information if the class was not annotated with `@Introspected`. That functionality has been removed and it is now required to annotate classes with `@Introspected` that are being used in this way. Any class may be affected if it is passed as an argument or returned from any controller or client, among other use cases.
 
-Micronaut 2.x now leaves it up to the user to specify the thread pool to schedule operations on, including blocking operations.
+==== Cookie Secure Configuration
 
-If you are upgrading from Micronaut 1.x and have a controller that executes blocking I/O operations (such as JDBC or JPA) it is recommended that you add the ann:scheduling.annotation.ExecuteOn[] annotation to execute the blocking operations on a different thread.
+Previously the `secure` configuration for cookies was only respected if the request was determined to be sent over https. Due to a number of factors including proxies, HTTPS requests can be presented to the server as if they are HTTP. In those cases the setting was not having any effect. The setting is now respected regardless of the status of the request. If the setting is not set, cookies will be secure if the request is determined to be HTTPS.
 
-snippet::io.micronaut.docs.http.server.executeon.PersonController[tags="imports,class", indent=0,title="Using @ExecuteOn"]
+==== No Longer Possible to Inject a `List` of `Provider`
 
-<1> The ann:scheduling.annotation.ExecuteOn[] annotation is used to execute the operation on the I/O thread pool
+In Micronaut 2.x it was possible to inject a `List<javax.inject.Provider>`, although this was undocumented behaviour. In Micronaut 3.x injecting a list of `Provider` instances is no longer possible and you should instead use the api:context.BeanProvider[] API which provides `stream()` and `iterator()` methods to provide the same functionality.
 
-NOTE: To return to the previous Micronaut 1.x behaviour, set `micronaut.server.thread-selection` to `AUTO` in configuration.
+==== Injecting ExecutorService
 
-=== Micronaut Cache Removed from Core
+In previous versions of Micronaut it was possible to inject an link:{jdkapi}/java/util/concurrent/ExecutorService.html[ExecutorService] without any qualifiers and the default Netty event loop group would be injected. Because the event loop should not be used for general purpose use cases, the injection will now fail by default with a non unique bean exception. The injection point should be qualified for which executor service is desired.
 
-The `micronaut-runtime` module in Micronaut 1.x included support for caching AOP with the `@Cache` annotation. The core caching library and a default implementation based on Caffeine were included.
+==== Only the Exported Type from Factories is Injectable
 
-If you use the Caffeine-backed cache support, you must add a dependency to continue doing so. Add `io.micronaut.cache:micronaut-cache-caffeine` to your build to maintain the existing functionality. The new Caffeine cache module no longer uses the internal shadowed Caffeine version and declares its own normal dependency on Caffeine. You may need to exclude the transitive dependency to prevent conflicts with other versions that may be being pulled in.
-
-The management endpoint for caches is no longer included by default in the `micronaut-management` module. To use the `caches` endpoint, add a dependency on `io.micronaut.cache:micronaut-cache-management`.
-
-=== Support for RxJava 1.x Removed from Core
-
-RxJava 1.x support is no longer included in core by default. You can re-enable support by adding the following dependency:
-
-dependency:io.micronaut.rxjava1:micronaut-rxjava1[]
-
-=== Support for Reactor Removed from Core
-
-Reactor support is no longer included in core by default. You can re-enable support by adding the following dependency:
-
-dependency:io.micronaut.reactor:micronaut-reactor[]
-
-=== Loggers Endpoint Modifications Now Sensitive
-
-The method on the `loggers` endpoint to modify logging is now sensitive by default. To revert to the previous behavior, apply the following configuration:
-
-[source,yaml]
-----
-endpoints:
-  loggers:
-    write-sensitive: false
-----
-
-=== Server Side Content Negotiation May Require Test Changes
-
-The new support for server-side content negotiation may require changes to tests. For example a test that that makes a call such as:
+It is no longer possible to inject the internal implementation type from beans produced via factories. For example in the following example:
 
 [source,java]
 ----
-String result = client.toBlocking().retrieve(
-    HttpRequest.GET('/test')
-        .accept("text/plain"), String
-)
-----
-
-If the server implementation does not declare the route as `@Produces("text/plain")` the request will be rejected with a `NOT_ACCEPTABLE` HTTP status code.
-
-=== Server Filter Ordering
-
-In Micronaut 1.x almost all built-in filters operated on order 0, meaning the order was nondeterministic. That caused some compatibility issues with the metrics and security modules. A new class has been added (api:http.filter.ServerFilterPhase[]) that defines the phases of server filtering and sets an order. Many filters have been updated to now have their order reflect the phase they participate in.
-
-=== Heartbeat Events No Longer Published if no Discovery Clients present
-
-A api:health.HeartbeatEvent[] is no longer published automatically if there are no api:discovery.DiscoveryClient[] instances present.
-
-This behaviour can be changed by setting `micronaut.heartbeat.enabled` to `true` explicitly in configuration.
-
-=== Several TypeConverters Are No Longer Beans
-
-Many `TypeConverter` instances that were previously beans are no longer beans and are deprecated including:
-
-* api:http.MediaTypeConverter[]
-* api:convext.converters.StringToClassConverter[]
-* api:convext.converters.StringArrayToClassArrayConverter[]
-* api:http.client.converters.SocketAddressConverter[]
-* api:reactive.reactor.converters.PublisherToMonoConverter[]
-* api:reactive.reactor.converters.PublisherToFluxConverter[]
-* api:reactive.reactor.converters.ObjectToFluxConverter[]
-* api:reactive.reactor.converters.ObjectToMonoConverter[]
-* api:jackson.convert.JsonNodeToObjectConverter[]
-* api:jackson.convert.MapToObjectConverter[]
-* api:jackson.convert.ObjectToJsonNodeConverter[]
-* api:jackson.convert.ArrayNodeToArrayConverter[]
-* api:jackson.convert.ArrayNodeToIterableConverter[]
-* api:jackson.convert.ObjectNodeToConvertibleValuesConverter[]
-* api:runtime.http.converters.HttpStatusConverter[]
-
-These should not be injected directly but instead used through the api:core.convert.ConversionService[] API.
-
-=== @Executable No Longer Stereotype of @Around
-
-In Micronaut 1.x the ann:context.annotation.Executable[] annotation was a meta-annotation specified on the ann:aop.Around[] and ann:aop.Introduction[] annotations. This meant that an api:inject.ExecutableMethod[] reference was generated for every usage of AOP advice which consumed additional memory unnecessarily.
-
-In Micronaut 2.x and above this is no longer the case. If you need an api:inject.ExecutableMethod[] generated, add the ann:context.annotation.Executable[] annotation to any custom AOP advice, otherwise the method will not be available via the api:inject.BeanDefinition[] interface (using for example the api:BeanDefinition.getExecutableMethods[] method).
-
-=== Spot Bugs Instead of JSR-305 Nullable/NonNull Annotations
-
-The JSR-305 annotations library (`com.google.code.findbugs:jsr305`) is no longer a dependency (replaced by `spotbugs-annotations`). If you need this library you must add a dependency manually.
-
-=== Events Renamed
-
-The following events were renamed to avoid confusion with other events of similar names:
-
-|===
-| Old Name|New Name
-
-| `io.micronaut.discovery.event.ServiceStartedEvent`
-| api:discovery.event.ServiceReadyEvent[]
-
-| `io.micronaut.discovery.event.ServiceShutdownEvent`
-| api:discovery.event.ServiceStoppedEvent[]
-|===
-
-=== New Package for Netty Specific Classes of HTTP Client
-
-The HTTP client implementation classes including api:http.client.netty.DefaultHttpClient[] (considered internal in Micronaut 1.x) have been moved to a sub-package called `io.micronaut.http.client.netty`.
-
-=== HTTP Clients No Longer Named Beans
-
-HTTP clients declared with `micronaut.http.services` (see <<serviceDiscoveryManual,Manual Service Discovery Configuration>>) are no longer named beans in the context and cannot be injected with `javax.inject.Named`, for example given the configuration:
-
-.Manually configuring services
-[source,yaml]
-----
-micronaut:
-  http:
-    services:
-      foo:
-        urls:
-          - http://foo1
-          - http://foo2
-----
-
-You can no longer inject an HTTP client with `@Named("foo")`:
-
-[source,java]
-----
-@Inject
-@Named("foo")
-RxHttpClient httpClient;
-----
-
-Instead, use ann:http.client.annotation.Client[]:
-
-[source,java]
-----
-@Inject
-@Client("foo")
-RxHttpClient httpClient;
-----
-
-=== Source Retention Annotations No Longer Retained in Runtime Metadata
-
-In Micronaut 1.x annotations specified as source retention were still retained in the api:core.annotation.AnnotationMetadata[] interface. As of Micronaut 2.x, this is no longer the case with source retention annotations only available within the compiler APIs.
-
-To retain a particular source-level annotation when upgrading, write an api:inject.annotation.AnnotationTransformer[] that alters the `RetentionPolicy` of the annotation.
-
-=== Collection Beans No Longer Have An Implicit Primary
-
-In Micronaut 1.x injecting a single instance of an collection bean without qualifiers would inject the first bean. An collection bean is typically anything annotated with `@EachProperty` or `@EachBean`. Those beans typically are referenced from configuration. The first bean in this context is the first item in configuration that matches what the annotation expects.
-
-For example if you created a bean with `@EachProperty("cars")` and specified the following in your config:
-
-[source,yaml]
-----
-cars:
-  ford:
-    cylinders: 8
-  subaru:
-    cylinders: 4
-----
-
-Requesting a single instance of that bean would result in the "ford" instance being injected. Because that behavior is surprising and inconsistent with other types of beans, that is no longer the case, and a `NonUniqueBeanException` will be thrown.
-
-NOTE: This change does not apply to an explicit primary defined in the annotation (`@EachProperty(value = "cars", primary = "ford")`), nor requesting the instance by a qualifier (`@Named("ford") CarConfig carConfig`).
-
-=== No Longer Possible to Return Null to Disable a Bean
-
-It is no longer possible to return `null` from a ann:context.annotation.Factory[] bean method to disable the bean. Instead, throw a api:context.exceptions.DisabledBeanException[].
-
-=== Invalid Configuration File Locations
-
-Specifying a file with `micronaut.config.files`, either through a system property or environment variable, which does not exist or cannot be read will now result in the application failing to start. In previous versions of Micronaut a warning would be logged, and the file would be ignored.
-
-=== PropertySourceLoader Changes
-
-Some default interface methods are no longer default and require implementation.
-
-=== Deprecation Removal
-
-Most if not all deprecated classes and methods have been removed.
-
-=== Map Property Binding
-
-In Micronaut 1.x `java.util.Map` properties being bound from config were inconsistently bound as either nested or flat. Now maps are bound as nested by default, and the ann:core.convert.format.MapFormat[] annotation's default value for `transformation` has been changed to reflect that.
-
-For example given the config:
-
-[source,yaml]
-----
-persons:
-  joe:
-    age: 30
-  sally:
-    age: 25
-----
-
-A map property injected via `@Property(name ="persons")` may have been injected flat or nested depending on a couple factors.
-
-[source,json]
-.Flat
-----
-{"joe.age": 30, "sally.age": 25}
-----
-
-[source,json]
-.Nested
-----
-{"joe": {"age": 30}, "sally": {"age": 25}}
-----
-
-To bind to a map with flat keys, add the ann:core.convert.format.MapFormat[] annotation and set the `transformation` member.
-
-=== GraalVM BOM Entry
-
-The no longer used group for GraalVM is no longer part of the BOM. While upgrading if you depend on GraalVM you may see `Could not find com.oracle.substratevm:svm:.`. To resolve the issue, change the dependency group to `org.graalvm.nativeimage`.
-
-=== `@Retryable` and `@CircuitBreaker` Exception Handling
-
-`@Retryable` and `@CircuitBreaker` in previous versions of Micronaut resolved `includes` and `excludes` explicitly. Any exception thrown had to exactly match one of the exceptions specified. This has been changed to now also include subclasses of the exception types specified.
-
-=== MessageSource API Changes
-
-The semantics of the `getMessage` method have been changed to also interpolate the message with any provided variables. In previous versions of Micronaut, the raw message was returned from the bundle. To support reading the raw message, a new method `getRawMessage` has been added.
-
-In addition, escaping of messages with single quotes is now implemented in accordance with the standard Java link:{javase}java/text/MessageFormat.html[MessageFormat] class. Messages that contain a single quote will now need escaping for the quote to output as it did previously. For example:
-
-[source,properties]
-----
-my.message=We love Micronaut's documentation
-----
-
-Would now be output as `We love Micronauts documentation`. To achieve the desired result, escape the single quote with another single quote.
-
-[source,properties]
-----
-my.message=We love Micronaut''s documentation
-----
-
-NOTE: This change also applies to messages in custom constraint annotations, which interpolate the message via the message source api.
-
-=== Environment Order Bugfix
-
-Environments specified through the application context builder have priority over environments deduced or supplied through the MICRONAUT_ENVIRONMENTS environment variable, or the equivalent system property. A bug in the logic however did not change the order of a specified environment if it previously was found or deduced. This issue manifested itself with `@MicronautTest(environments = "test")`. The `test` environment is already deduced for tests, so it retained the order of other deduced environments, and was able to be overridden by `MICRONAUT_ENVIRONMENTS=dev`. In Micronaut 1.x configuration for `dev` would have overridden `test`. In Micronaut 2.x `test` overrides `dev`.
-
-=== Introspections and Inner Classes
-
-A bug in Micronaut 1.x caused bean introspections to be generated for inner classes of classes annotated with `@Introspected`. That also applies to classes where `@Introspection` is a meta annotation, like `@Entity`. This may have an impact for GraalVM users that rely on accesses to those classes without using reflection. For example:
-
-```
-@Entity
-public class Pet {
-    ...
-    private PetType type = PetType.DOG;
-    // getters and setters
-
-    public enum PetType {
-        DOG,
-        CAT
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ExecutorService;
+import javax.inject.Singleton;
+
+public class ExecutorFactory {
+    @Singleton
+    public ExecutorService executorService() {
+        return ForkJoinPool.commonPool();
     }
 }
-```
-
-Previously a bean introspection was generated for `PetType`. That is no longer the case. If the type should be introspected, simply add the annotation.
-
-=== Executable Methods
-
-A bug in Micronaut 1.x caused bean definitions to be created for classes that only declared executable annotations on one or more methods. Classes with executable methods must now be explicitly declared as a bean with a scope annotation for a bean definition to be created.
-
-=== Super interfaces No Longer Searched for Fallbacks
-
-If the ann:retry.annotation.Fallback[] annotation specifies a fallback for a ann:http.client.annotation.Client[] interface, the super interfaces of the client are no longer traversed to look up the fallback to invoke.
-
-In this case it may be necessary to specify the `api` member of the ann:retry.annotation.Recoverable[] annotation to ensure the fallback can be looked up. For example:
-
-.Specifying the `api` to recover from
-[source, java]
 ----
-@Client("/Books")
-@Recoverable(api = BookApi)
-interface BookClient extends BookApi {
-    @Override
-    Book get(Long id);
+
+In the above case, if the `ExecutorService` had been created previously a call to `context.getBean(ForkJoinPool.class)` would locate the already created bean. This behaviour was inconsistent because if the bean had not yet been created then this lookup would not work. In Micronaut 3 for consistency this is no longer possible.
+
+You can however restore the behaviour by using the new `typed` member of the ann:context.annotation.Bean[] annotation:
+
+[source,java]
+----
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ExecutorService;
+import javax.inject.Singleton;
+import io.micronaut.context.annotation.Bean;
+public class ExecutorFactory {
+    @Singleton
+    @Bean(typed = { ExecutorService.class, ForkJoinPool.class })
+    public ExecutorService executorService() {
+        return ForkJoinPool.commonPool();
+    }
 }
 ----
 
-=== AWS FunctionClient Moved to AWS Module
+==== No Longer Possible to Define AOP Advice on a Bean Produced from a Factory with Constructor arguments
 
-The AWS-based function client has been made part of the https://github.com/micronaut-projects/micronaut-aws/[Micronaut AWS] project. If you need this functionality add the following dependency:
+In previous versions of Micronaut it was possible to define AOP advice to a factory method that returned a class that featured constructor arguments. This could lead to undefined behaviour since the argument of the generated proxy which would be dependency injected by the framework may be different from manually constructed proxy target.
 
-dependency:io.micronaut.aws:micronaut-function-client-aws[]
+The following definition is now invalid in Micronaut 3 and above and will lead to a compilation error:
 
-=== LogLevel Enum Moved to io.micronaut.logging
+[source,java]
+----
+import io.micronaut.context.annotation.*;
+import io.micronaut.runtime.context.scope.*;
 
-`io.micronaut.management.endpoint.loggers.LogLevel` enum has moved to package `io.micronaut.logging`
+@Factory
+class ExampleFactory {
+
+    @ThreadLocal
+    Test test() {
+        return new Test("foo");
+    }
+}
+
+class Test {
+    // illegally defines constructor arguments
+    Test(String name) {}
+}
+----
+
+==== Implementations of `javax.inject.Provider` No Longer Generate Factories
+
+In Micronaut 2.x if you defined a bean that implemented the `javax.inject.Provider` interface then the return type of the `get` method also automatically became a bean.
+
+For example:
+
+[source,java]
+----
+import javax.inject.Provider;
+import javax.inject.Singleton;
+
+@Singleton
+public class AProvider implements Provider<A> {
+    @Override
+    public A get() {
+        return new AImpl();
+    }
+}
+----
+
+In the above example a bean of type `A` would automatically be exposed by Micronaut. This behaviour is no longer supported and instead the ann:context.annotation.Factory[] annotation should be used to express the same behaviour. For example:
+
+[source,java]
+----
+import io.micronaut.context.annotation.Factory;
+import javax.inject.Provider;
+import javax.inject.Singleton;
+
+@Factory
+public class AProvider implements Provider<A> {
+    @Override
+    @Singleton
+    public A get() {
+        return new AImpl();
+    }
+}
+----
+
+==== Fewer Executable Methods Generated for Controllers and Message Listeners
+
+Previous versions of Micronaut specified the ann:context.annotation.Executable[] annotation as a meta-annotation on the ann:http.annotation.Controller[], ann:http.annotation.Filter[] and ann:messaging.annotation.MessageListener[] annotations. This resulted in generating executable method all non-private methods of classes annotated with these annotations.
+
+In Micronaut 3.x and above the ann:context.annotation.Executable[] has been moved to a meta-annotation of ann:http.annotation.HttpMethodMapping[] and ann:messaging.annotation.MessageMapping[] instead to reduce memory consumption and improve efficiency.
+
+If you were relying on the present of these executable methods you will need to annotate explicitly methods in your classes with ann:context.annotation.Executable[] to restore this behaviour.
+
+
+==== GraalVM changes
+
+In previous versions of Micronaut annotating a class with `@Introspected` automatically added it to the GraalVM `reflect-config.json` file. The original intended usage of the annotation is to generate <<introspection, Bean Introspection Metadata>> so Micronaut can instantiate the class and call getters and setters without using reflection.
+
+Starting in Micronaut 3.x the `@Introspected` annotation doesn't add the class to the GraalVM `reflect-config.json` file anymore, because in most of the cases is not really necessary. If you need to declare a class to be accessed by reflection, use the `@ReflectiveAccess` annotation instead.
+
+
+=== Module Changes
+
+==== New package for Micronaut Cassandra
+
+The classes in Micronaut Cassandra have been moved from `io.micronaut.configuration.cassandra` to `io.micronaut.cassandra` package.
+

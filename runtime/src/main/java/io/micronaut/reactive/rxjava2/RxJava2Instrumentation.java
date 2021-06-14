@@ -34,11 +34,11 @@ import io.reactivex.functions.Function;
 import io.reactivex.observables.ConnectableObservable;
 import io.reactivex.parallel.ParallelFlowable;
 import io.reactivex.plugins.RxJavaPlugins;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Subscriber;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import javax.inject.Singleton;
 
 /**
  * Provides a single point of entry for all instrumentations for RxJava 2.x.

@@ -2,7 +2,7 @@ package io.micronaut.docs.server.suspend
 
 import io.micronaut.retry.annotation.Retryable
 import kotlinx.coroutines.delay
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 open class SuspendService(

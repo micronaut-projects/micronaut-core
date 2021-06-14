@@ -19,8 +19,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.beans.BeanDefinitionData;
 import io.micronaut.management.endpoint.beans.BeansEndpoint;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +68,7 @@ public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String,
      * @return The scope for the bean
      */
     protected String getScope(BeanDefinition<?> beanDefinition) {
-        return beanDefinition.getScope().map(Class::getSimpleName).map(String::toLowerCase).orElse(null);
+        return beanDefinition.getScopeName().orElse(null);
     }
 
     /**

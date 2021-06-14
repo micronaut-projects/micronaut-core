@@ -28,11 +28,12 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ReturnType<T> extends TypeInformation<T>, AnnotationMetadataProvider {
+public interface ReturnType<T> extends TypeInformation<T>, AnnotationMetadataProvider, ArgumentCoercible<T> {
 
     /**
      * @return The return type as an argument
      */
+    @Override
     default @NonNull Argument<T> asArgument() {
         Collection<Argument<?>> values = getTypeVariables().values();
         return Argument.of(getType(), values.toArray(Argument.ZERO_ARGUMENTS));

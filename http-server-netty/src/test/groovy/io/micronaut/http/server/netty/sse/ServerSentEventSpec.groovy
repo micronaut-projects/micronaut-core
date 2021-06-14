@@ -30,10 +30,10 @@ import io.micronaut.http.sse.Event
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Emitter
 import io.reactivex.Flowable
+import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import spock.lang.Specification
 
-import javax.inject.Inject
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 

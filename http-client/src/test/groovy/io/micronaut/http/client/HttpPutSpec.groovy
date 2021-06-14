@@ -15,13 +15,10 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.core.annotation.Nullable
 import groovy.transform.EqualsAndHashCode
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.MutableHttpRequest
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.Nullable
+import io.micronaut.http.*
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Header
@@ -30,10 +27,9 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Flowable
+import jakarta.inject.Inject
 import spock.lang.Issue
 import spock.lang.Specification
-
-import javax.inject.Inject
 
 /**
  * @author Graeme Rocher
@@ -255,6 +251,7 @@ class HttpPutSpec extends Specification {
     }
 
     @EqualsAndHashCode
+    @Introspected
     static class Book {
         String title
         Integer pages

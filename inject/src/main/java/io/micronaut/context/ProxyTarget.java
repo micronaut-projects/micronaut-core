@@ -15,9 +15,10 @@
  */
 package io.micronaut.context;
 
+import jakarta.inject.Qualifier;
+
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import javax.inject.Qualifier;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 

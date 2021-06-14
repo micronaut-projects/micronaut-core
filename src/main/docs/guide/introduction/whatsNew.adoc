@@ -2,21 +2,69 @@ Micronaut {version} includes the following changes:
 
 === Core Features
 
-==== IO Stream Support
+==== Support Narrowing Injection by Generic Type Arguments
 
-It is now possible to define a body argument of a controller method with an InputStream. For example `@Body InputStream inputStream`. Note that you must offload the execution to another thread pool to avoid blocking the event loop when reading the stream. `InputStream` can also be returned from controller methods. The stream will be read by Micronaut on the IO thread pool if the controller method is executed on the event loop.
+Micronaut can now resolve the correct bean to inject based on the generic type arguments specified on the injection point:
 
-==== HTTP to HTTPS redirect with Dual Protocol
+snippet::io.micronaut.docs.inject.generics.Vehicle[tags="constructor",indent=0]
 
-If Dual Protocol is enabled, now it is possible to redirect all HTTP requests automatically to the HTTPS port. See more information <<dualProtocol, about how to enable and configure it>>.
+For more information see the section on <<qualifiers, Qualifying by Generic Type Arguments>>.
 
-==== GraalVM 21.1.0 Support
+==== Support for using Annotation Members in Qualifiers
 
-Micronaut has been updated to support the latest GraalVM 21.1.0 release with the Gradle and Maven plugins now defaulting to 21.1.0.
+You can now use annotation members in qualifiers and specify which members should be excluded with the new ann:context.annotation.NonBinding[] annotation.
 
-==== Support for JDK 16 and Gradle 7.0 in Micronaut Launch
+For more information see the section on <<qualifiers, Qualifying By Annotation Members>>.
 
-https://micronaut.io/launch/[Micronaut Launch] has been updated with support for JDK 16 and Gradle 7.0.
+==== Support for Limiting the Injectable Types
+
+You can now limit the exposed types of a bean using the `typed` member of the ann:context.annotation.Bean[] annotation:
+
+snippet::io.micronaut.docs.inject.typed.V8Engine[tags="class",indent=0]
+
+For more information see the section on <<typed, Limiting Injectable Types>>.
+
+==== Factories can produce bean from fields
+
+Beans defined with the ann:context.annotation.Factory[] annotation can now produce beans from public or package protected fields, for example:
+
+snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="class",indent=0]
+
+For more information see the <<factories, Bean Factories>> section of the documentation.
+
+==== Enhanced `BeanProvider` Interface
+
+The api:context.BeanProvider[] interface has been enhanced with new methods such as `iterator()` and `stream()` as well as methods to check for bean existence and uniqueness.
+
+==== New `@Any` Qualifier for use in Bean Factories
+
+A new ann:context.annotation.Any[] qualifier has been introduced to allow injecting any available instance into an injection point and can be used in combination with the new `BeanProvider` interface mentioned above to allow more dynamic behaviour.
+
+snippet::io.micronaut.docs.qualifiers.any.Vehicle[tags="imports,clazz", indent=0, title="Using BeanProvider with Any"]
+
+The annotation can also be used on ann:context.annotation.Factory[] methods to allow customization of how objects are injected via the api:inject.InjectionPoint[] API.
+
+==== Support for Fields in Bean Introspections
+
+Bean introspections on public or package protected fields are now supported:
+
+snippet::io.micronaut.docs.ioc.beans.User[tags="class", indent=0]
+
+For more information see the "Bean Fields" section of the <<introspection, Bean Introspections>> documentation.
+
+=== AOP Features
+
+==== Support for Constructor Interception
+
+It is now possible to intercept bean construction invocations through the api:aop.ConstructorInterceptor[] interface and ann:aop.AroundConstruct[] annotation.
+
+See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
+
+==== Support for `@PostConstruct` & `@PreDestroy` Interception
+
+It is now possible to intercept `@PostConstruct` and `@PreDestroy` method invocations through the api:aop.MethodInterceptor[] interface and ann:aop.InterceptorBinding[] annotation.
+
+See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
 
 ==== Random Configuration Values
 
@@ -44,6 +92,11 @@ The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micr
 
 Micronaut's https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/[Oracle Cloud Integration] has been updated with support for Cloud Monitoring and Tracing.
 
+
+==== Micronaut Cassandra 4.0.0
+
+The https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micronaut Cassandra] integration now includes support for GraalVM out of the box.
+
 ==== Other Modules
 
 - Micronaut Security 2.4.2
@@ -59,6 +112,7 @@ Micronaut's https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/g
 
 === Dependency Upgrades
 
+- Cassandra 4.11.1
 - Kafka 2.8.0
 - GraalVM 21.1.0
 - Liquibase 4.3.4

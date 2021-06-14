@@ -15,13 +15,17 @@
  */
 package io.micronaut.management.endpoint.loggers;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.type.Argument;
-import io.micronaut.management.endpoint.annotation.*;
 import io.micronaut.management.endpoint.EndpointConfiguration;
+import io.micronaut.management.endpoint.annotation.Endpoint;
+import io.micronaut.management.endpoint.annotation.Read;
+import io.micronaut.management.endpoint.annotation.Selector;
+import io.micronaut.management.endpoint.annotation.Sensitive;
+import io.micronaut.management.endpoint.annotation.Write;
 import io.reactivex.Single;
 
-import io.micronaut.core.annotation.Nullable;
 import javax.validation.constraints.NotBlank;
 import java.util.Map;
 

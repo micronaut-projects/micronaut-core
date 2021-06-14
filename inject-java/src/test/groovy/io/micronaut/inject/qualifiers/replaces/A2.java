@@ -17,7 +17,7 @@ package io.micronaut.inject.qualifiers.replaces;
 
 import io.micronaut.context.annotation.Replaces;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Replaces(A1.class)
 @Singleton

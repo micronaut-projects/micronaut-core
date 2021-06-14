@@ -16,7 +16,7 @@
 package io.micronaut.inject.qualifiers.secondary;
 
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.util.List;
 
 /**

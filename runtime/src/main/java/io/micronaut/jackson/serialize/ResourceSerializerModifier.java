@@ -24,8 +24,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.hateoas.Resource;
 import io.micronaut.jackson.modules.BeanIntrospectionModule;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Iterator;
 import java.util.List;
 

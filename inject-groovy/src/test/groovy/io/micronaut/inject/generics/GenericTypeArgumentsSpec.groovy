@@ -92,7 +92,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Executable
@@ -122,7 +122,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class GenericsTest1 implements java.util.function.Function<String, Integer>{
 
     public Integer apply(String str) {
@@ -149,7 +149,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class GenericsTest2 implements Foo {
 
     public Integer apply(String str) {
@@ -238,6 +238,34 @@ import io.micronaut.context.annotation.*;
 class TestFactory {
 
     @Bean
+    java.util.function.Function<String, Integer> myFunc() {
+        return { String str -> 10 };
+    }
+}
+
+''')
+        expect:
+        definition != null
+        definition.getTypeArguments(Function).size() == 2
+        definition.getTypeArguments(Function)[0].name == 'T'
+        definition.getTypeArguments(Function)[1].name == 'R'
+        definition.getTypeArguments(Function)[0].type == String
+        definition.getTypeArguments(Function)[1].type == Integer
+    }
+
+    void "test type arguments for factory with AOP advice applied"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.$TestFactory$MyFunc0Definition$Intercepted', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@Factory
+class TestFactory {
+
+    @Bean
+    @io.micronaut.aop.interceptors.Mutating
     java.util.function.Function<String, Integer> myFunc() {
         return { String str -> 10 };
     }

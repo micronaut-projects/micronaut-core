@@ -17,7 +17,7 @@ package io.micronaut.docs.qualifiers.replaces.defaultimpl;
 
 //tag::clazz[]
 import io.micronaut.context.annotation.Replaces;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 @Replaces(ResponseStrategy.class)

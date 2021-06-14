@@ -22,10 +22,13 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Sensitive;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Finds any sensitive endpoints.
@@ -40,19 +43,6 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
     private final EndpointDefaultConfiguration defaultConfiguration;
     private final PropertyResolver propertyResolver;
     private Map<ExecutableMethod, Boolean> endpointMethods = new HashMap<>();
-
-    /**
-     * Constructs with the existing and default endpoint configurations used to determine if a given endpoint is
-     * sensitive.
-     *
-     * @param endpointConfigurations The endpoint configurations
-     * @param defaultConfiguration   The default endpoint configuration
-     */
-    @Deprecated
-    public EndpointSensitivityProcessor(List<EndpointConfiguration> endpointConfigurations,
-                                        EndpointDefaultConfiguration defaultConfiguration) {
-        this(endpointConfigurations, defaultConfiguration, null);
-    }
 
     /**
      * Constructs with the existing and default endpoint configurations used to determine if a given endpoint is

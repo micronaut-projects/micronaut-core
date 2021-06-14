@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
@@ -528,13 +529,33 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      */
     @Override
     public boolean hasAnnotation(Element element, Class<? extends Annotation> ann) {
+        return hasAnnotation(element, ann.getName());
+    }
+
+    /**
+     * Checks if a method has an annotation.
+     *
+     * @param element The method
+     * @param ann    The annotation to look for
+     * @return Whether if the method has the annotation
+     */
+    @Override
+    public boolean hasAnnotation(Element element, String ann) {
         List<? extends AnnotationMirror> annotationMirrors = element.getAnnotationMirrors();
-        for (AnnotationMirror annotationMirror : annotationMirrors) {
-            if (annotationMirror.getAnnotationType().toString().equals(ann.getName())) {
-                return true;
+        if (CollectionUtils.isNotEmpty(annotationMirrors)) {
+            for (AnnotationMirror annotationMirror : annotationMirrors) {
+                final DeclaredType annotationType = annotationMirror.getAnnotationType();
+                if (annotationType.toString().equals(ann)) {
+                    return true;
+                }
             }
         }
         return false;
+    }
+
+    @Override
+    protected boolean hasAnnotations(Element element) {
+        return CollectionUtils.isNotEmpty(element.getAnnotationMirrors());
     }
 
     /**

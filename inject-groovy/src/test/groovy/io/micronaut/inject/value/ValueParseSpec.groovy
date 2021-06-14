@@ -11,7 +11,7 @@ class ValueParseSpec extends AbstractBeanDefinitionSpec{
 package test;
 import io.micronaut.context.annotation.Value;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class A {
     @Value('${foo.bar}')
     int port

@@ -64,7 +64,7 @@ public @interface Around {
     boolean proxyTarget() default false;
 
     /**
-     * <p>If {@link #proxyTarget()} is set to <code>true</code> then one can optionally set the of <code>hotswap</code> to true
+     * <p>If {@link #proxyTarget()} is set to <code>true</code> then one can optionally set the value of <code>hotswap</code> to true
      * in which case the proxy will implement the {@link HotSwappableInterceptedProxy} interface.</p>
      *
      * @return True if the proxy should allow hotswap

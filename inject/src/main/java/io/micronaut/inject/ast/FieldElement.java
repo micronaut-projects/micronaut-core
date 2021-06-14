@@ -15,6 +15,8 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.NonNull;
+
 /**
  * Stores data about an element that references a field.
  *
@@ -28,5 +30,15 @@ public interface FieldElement extends TypedElement, MemberElement {
      */
     default ClassElement getGenericField() {
         return getGenericType();
+    }
+
+    @NonNull
+    @Override
+    default String getDescription(boolean simple) {
+        if (simple) {
+            return getType().getSimpleName() + " " + getName();
+        } else {
+            return getType().getName() + " " + getName();
+        }
     }
 }

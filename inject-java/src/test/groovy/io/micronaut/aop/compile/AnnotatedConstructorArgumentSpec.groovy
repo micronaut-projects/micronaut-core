@@ -41,7 +41,7 @@ import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
     private String myValue;
@@ -94,7 +94,7 @@ import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
 
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
     private String myValue;

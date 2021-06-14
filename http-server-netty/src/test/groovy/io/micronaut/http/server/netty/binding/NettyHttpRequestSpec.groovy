@@ -15,17 +15,18 @@
  */
 package io.micronaut.http.server.netty.binding
 
-import io.micronaut.http.MutableHttpRequest
-import io.netty.channel.ChannelHandlerContext
-import io.netty.handler.codec.http.DefaultFullHttpRequest
-import io.netty.handler.codec.http.HttpVersion
 import io.micronaut.core.convert.DefaultConversionService
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpMethod
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.netty.NettyHttpRequest
+import io.netty.channel.ChannelHandlerContext
+import io.netty.handler.codec.http.DefaultFullHttpRequest
+import io.netty.handler.codec.http.HttpVersion
 import spock.lang.Specification
-import static io.netty.handler.codec.http.HttpMethod.*
+
+import static io.netty.handler.codec.http.HttpMethod.GET
 
 /**
  * @author Graeme Rocher

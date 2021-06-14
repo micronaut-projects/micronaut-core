@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -61,12 +61,6 @@ public class SingleBodyBinder extends DefaultBodyAnnotationBinder<Single> implem
     @Override
     public List<Class<?>> superTypes() {
         return Collections.singletonList(SingleSource.class);
-    }
-
-    @Override
-    @Deprecated
-    public boolean supportsSuperTypes() {
-        return false;
     }
 
     @Override

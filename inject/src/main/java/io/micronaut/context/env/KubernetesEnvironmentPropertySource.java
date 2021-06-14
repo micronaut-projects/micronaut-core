@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.env;
 
-import org.jetbrains.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
 import java.util.Arrays;
 import java.util.HashMap;
