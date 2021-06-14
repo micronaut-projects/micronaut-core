@@ -209,15 +209,9 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test keep alive connection header is not set by default for > 499 response"() {
         when:
-        DefaultHttpClientConfiguration config = new DefaultHttpClientConfiguration()
-        // The client will explicitly request "Connection: close" unless using a connection pool, so set it up
-        config.connectionPoolConfiguration.enabled = true
-        config.connectionPoolConfiguration.maxConnections = 2;
-        config.connectionPoolConfiguration.acquireTimeout = Duration.of(3, ChronoUnit.SECONDS);
-
-        ApplicationContext applicationContext = Micronaut.run()
-        EmbeddedServer embeddedServer = applicationContext.run(EmbeddedServer, [(SPEC_NAME_PROPERTY):getClass().simpleName])
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), config)
+        EmbeddedServer server = applicationContext.run(EmbeddedServer, [(SPEC_NAME_PROPERTY):getClass().simpleName])
+        def ctx = server.getApplicationContext()
+        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         client.exchange(
           HttpRequest.GET('/test-header/fail')
@@ -229,8 +223,9 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         e.response.header(HttpHeaders.CONNECTION) == 'close'
 
         cleanup:
-        client.stop()
-        applicationContext.stop()
+        ctx.stop()
+        server.stop()
+        server.close()
     }
 
     void "test connection header is defaulted to keep-alive when configured to true for > 499 response"() {
@@ -238,14 +233,11 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         DefaultHttpClientConfiguration config = new DefaultHttpClientConfiguration()
         // The client will explicitly request "Connection: close" unless using a connection pool, so set it up
         config.connectionPoolConfiguration.enabled = true
-        config.connectionPoolConfiguration.maxConnections = 2;
-        config.connectionPoolConfiguration.acquireTimeout = Duration.of(3, ChronoUnit.SECONDS);
-
-        ApplicationContext applicationContext = Micronaut.run()
-        EmbeddedServer embeddedServer = applicationContext.run(EmbeddedServer, [
+        EmbeddedServer server = applicationContext.run(EmbeddedServer, [
           (SPEC_NAME_PROPERTY):getClass().simpleName,
           'micronaut.server.netty.keepAliveOnServerError':true
         ])
+        def ctx = server.getApplicationContext()
         RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), config)
 
         client.exchange(
@@ -258,37 +250,9 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         e.response.header(HttpHeaders.CONNECTION) == 'keep-alive'
 
         cleanup:
-        client.stop()
-        applicationContext.stop()
-    }
-
-    void "test connection header is not defaulted to keep-alive  when configured to false for > 499 response"() {
-        when:
-        DefaultHttpClientConfiguration config = new DefaultHttpClientConfiguration()
-        // The client will explicitly request "Connection: close" unless using a connection pool, so set it up
-        config.connectionPoolConfiguration.enabled = true
-        config.connectionPoolConfiguration.maxConnections = 2;
-        config.connectionPoolConfiguration.acquireTimeout = Duration.of(3, ChronoUnit.SECONDS);
-
-        ApplicationContext applicationContext = Micronaut.run()
-        EmbeddedServer embeddedServer = applicationContext.run(EmbeddedServer, [
-          (SPEC_NAME_PROPERTY):getClass().simpleName,
-          'micronaut.server.netty.keepAliveOnServerError':false
-        ])
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), config)
-
-        client.exchange(
-          HttpRequest.GET('/test-header/fail')
-        ).blockingFirst()
-
-        then:
-        def e = thrown(HttpClientResponseException)
-        e.response.status == HttpStatus.INTERNAL_SERVER_ERROR
-        e.response.header(HttpHeaders.CONNECTION) == "close"
-
-        cleanup:
-        embeddedServer.stop()
-        client.stop()
+        ctx.stop()
+        server.stop()
+        server.close()
     }
 
     @Controller('/test-header')
@@ -301,7 +265,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
         @Get("/fail")
         HttpResponse fail() {
-            HttpResponse.notFound().status(HttpStatus.INTERNAL_SERVER_ERROR)
+            HttpResponse.serverError("server error")
         }
     }
 
