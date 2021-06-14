@@ -17,7 +17,7 @@ package io.micronaut.inject.qualifiers.replaces;
 
 import io.micronaut.aop.introduction.Stub;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Stub
 @Singleton

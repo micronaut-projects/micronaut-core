@@ -12,7 +12,7 @@ package introductiontest;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 

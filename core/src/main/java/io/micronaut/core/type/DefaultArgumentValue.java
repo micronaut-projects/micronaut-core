@@ -17,6 +17,8 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Map;
@@ -76,6 +78,18 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     @Override
     public <T extends Annotation> T synthesize(Class<T> annotationClass) {
         return argument.synthesize(annotationClass);
+    }
+
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        return argument.synthesize(annotationClass, sourceAnnotation);
+    }
+
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        return argument.synthesizeDeclared(annotationClass, sourceAnnotation);
     }
 
     @Override

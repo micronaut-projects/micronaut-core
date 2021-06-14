@@ -21,13 +21,11 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.convert.value.ConvertibleValues
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
 
 class RepeatableAnnotationSpec extends AbstractTypeElementSpec {
-
-
 
     void "test repeatable annotation properties with alias"() {
         given:
@@ -39,7 +37,7 @@ import io.micronaut.context.annotation.*;
 
 @OneRequires(properties = @Property(name="prop1", value="value1"))
 @SomeOther(properties = @Property(name="prop2", value="value2"))
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @OneRequires(properties = @Property(name="prop2", value="value2"))    
@@ -71,7 +69,7 @@ import io.micronaut.context.annotation.*;
 @Property(name="prop1", value="value1")
 @Property(name="prop2", value="value2")
 @Property(name="prop3", value="value3")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Property(name="prop2", value="value2")    
@@ -106,7 +104,7 @@ import io.micronaut.context.annotation.*;
 
 @OneRequires
 @Requires(property="bar")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -134,7 +132,7 @@ import io.micronaut.context.annotation.*;
 
 @Requires(property="bar")
 @OneRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -162,7 +160,7 @@ import io.micronaut.context.annotation.*;
 
 @OneRequires
 @TwoRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -192,7 +190,7 @@ import io.micronaut.context.annotation.*;
 
 @TwoRequires
 @OneRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -224,7 +222,7 @@ import io.micronaut.context.annotation.*;
 @OneRequires
 @Requires(property="bar")
 @Requires(property="another")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -252,7 +250,7 @@ import io.micronaut.context.annotation.*;
 @Requires(property="bar")
 @Requires(property="another")
 @OneRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -280,7 +278,7 @@ import io.micronaut.context.annotation.*;
 @TwoRequires
 @Requires(property="bar")
 @Requires(property="another")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -307,7 +305,7 @@ import io.micronaut.context.annotation.*;
 
 @TwoRequires
 @Requires(property="bar")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -332,7 +330,7 @@ import io.micronaut.context.annotation.*;
 
 @Requires(property="bar")
 @TwoRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -345,5 +343,27 @@ class Test {
         requirements != null
         requirements.size() == 3
         requires.size() == 3
+    }
+
+    void "test members in repeatable parent are retained"() {
+        when:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@Topics(connectionName = "test", value = {@Topic("hello"), @Topic("world")})
+@jakarta.inject.Singleton
+class Test {
+
+}
+''')
+
+        then:
+        definition.getValue(Topics, "connectionName", String).get() == "test"
+        definition.getAnnotationValuesByType(Topic).size() == 2
+        definition.getAnnotationValuesByType(Topic)[0].getValue(String).get() == "hello"
+        definition.getAnnotationValuesByType(Topic)[1].getValue(String).get() == "world"
     }
 }

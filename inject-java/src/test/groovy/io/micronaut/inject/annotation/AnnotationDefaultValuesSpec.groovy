@@ -2,7 +2,7 @@ package io.micronaut.inject.annotation
 
 import io.micronaut.context.annotation.Parameter
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.annotation.repeatable.Topic
 
@@ -15,7 +15,7 @@ package issue5048;
 
 import io.micronaut.inject.annotation.repeatable.Topic;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Topic("test")
 class Test {
     
@@ -33,12 +33,12 @@ class Test {
         BeanDefinition definition = buildBeanDefinition('test.Test','''\
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
     Test(@io.micronaut.inject.annotation.ParamAnn Foo[] foo) {}
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Foo {}
 ''')
         expect:

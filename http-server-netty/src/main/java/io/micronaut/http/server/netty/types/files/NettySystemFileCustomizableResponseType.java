@@ -27,11 +27,11 @@ import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.netty.channel.*;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
-import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
@@ -115,11 +115,10 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
 
         if (response instanceof NettyMutableHttpResponse) {
 
-            FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
+            NettyMutableHttpResponse nettyResponse = ((NettyMutableHttpResponse) response);
 
             // Write the request data
-            HttpHeaders headers = nettyResponse.headers();
-            final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), headers);
+            final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
             final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
             final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
             if (isHttp2 && request instanceof NettyHttpRequest) {
@@ -140,7 +139,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
             };
 
             // Write the content.
-            if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(nettyResponse)) {
+            if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(finalResponse)) {
                 // SSL not enabled - can use zero-copy file transfer.
                 context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise())
                         .addListener(closeListener);

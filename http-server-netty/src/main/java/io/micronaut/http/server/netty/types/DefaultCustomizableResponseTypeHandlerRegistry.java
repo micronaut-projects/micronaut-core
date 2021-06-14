@@ -16,9 +16,9 @@
 package io.micronaut.http.server.netty.types;
 
 import io.micronaut.core.util.CollectionUtils;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -35,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCustomizableResponseTypeHandlerRegistry {
 
     private List<NettyCustomizableResponseTypeHandler> handlers;
-    private ConcurrentHashMap<Class<?>, NettyCustomizableResponseTypeHandler> handlerCache = new ConcurrentHashMap<>(5);
+    private ConcurrentHashMap<Class<?>, Optional<NettyCustomizableResponseTypeHandler>> handlerCache = new ConcurrentHashMap<>(5);
 
     /**
      * @param typeHandlers The Netty customizable response type handlers
@@ -54,12 +54,18 @@ public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCust
 
     @Override
     public Optional<NettyCustomizableResponseTypeHandler> findTypeHandler(Class<?> type) {
-        return Optional
-            .ofNullable(handlerCache.computeIfAbsent(type, clazz ->
-                handlers.stream()
-                    .filter(handler -> handler.supports(clazz))
-                    .findFirst()
-                    .orElse(null))
-            );
+        Optional<NettyCustomizableResponseTypeHandler> foundHandler = handlerCache.get(type);
+        if (foundHandler != null) {
+            return foundHandler;
+        }
+        Optional<NettyCustomizableResponseTypeHandler> optionalHandler = Optional.empty();
+        for (NettyCustomizableResponseTypeHandler handler : handlers) {
+            if (handler.supports(type)) {
+                optionalHandler = Optional.of(handler);
+                break;
+            }
+        }
+        handlerCache.put(type, optionalHandler);
+        return optionalHandler;
     }
 }

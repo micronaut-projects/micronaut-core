@@ -16,14 +16,21 @@
 package io.micronaut.management.endpoint.loggers.impl;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.management.endpoint.loggers.*;
+import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
+import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
+import io.micronaut.management.endpoint.loggers.LoggersManager;
+import io.micronaut.management.endpoint.loggers.ManagedLoggingSystem;
 import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Singleton;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**

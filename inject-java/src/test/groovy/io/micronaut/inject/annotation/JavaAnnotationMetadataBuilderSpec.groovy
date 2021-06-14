@@ -22,16 +22,17 @@ import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.http.annotation.Header
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.ScopedProxy
 import spock.lang.Unroll
 
-import javax.inject.Qualifier
-import javax.inject.Scope
-import javax.inject.Singleton
+import jakarta.inject.Qualifier
+import jakarta.inject.Scope
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher
@@ -82,7 +83,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;
 import io.micronaut.inject.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.context.annotation.Executable
@@ -129,7 +130,7 @@ import java.lang.annotation.Target;
 import io.micronaut.inject.annotation.*;
 
 @TestAnnotation
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 }
 
@@ -156,7 +157,7 @@ class Test {
 
         expect:
         metadata != null
-        metadata.getAnnotationNameByStereotype(Scope).get() == ScopeTwo.name
+        metadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).get() == ScopeTwo.name
     }
 
 
@@ -307,10 +308,10 @@ class Test {
         expect:
         metadata != null
         metadata.hasDeclaredAnnotation(Primary)
-        !metadata.hasDeclaredAnnotation(Singleton)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
         metadata.hasAnnotation(Primary)
-        metadata.hasStereotype(Qualifier)
-        !metadata.hasStereotype(Singleton)
+        metadata.hasStereotype(AnnotationUtil.QUALIFIER)
+        !metadata.hasStereotype(AnnotationUtil.SINGLETON)
     }
 
     void "test parse first level stereotype data singleton"() {
@@ -319,7 +320,7 @@ class Test {
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class AImpl implements A {
 
 }
@@ -333,13 +334,13 @@ interface A {
 
         expect:
         metadata != null
-        !metadata.hasDeclaredAnnotation(Scope)
-        metadata.hasDeclaredAnnotation(Singleton)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SCOPE)
+        metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
         metadata.hasSimpleDeclaredAnnotation("Singleton")
         metadata.hasSimpleAnnotation("Singleton")
-        metadata.hasStereotype(Singleton)
-        metadata.hasStereotype(Scope)
-        metadata.getAnnotationNameByStereotype(Singleton).get() == 'javax.inject.Singleton'
+        metadata.hasStereotype(AnnotationUtil.SINGLETON)
+        metadata.hasStereotype(AnnotationUtil.SCOPE)
+        metadata.getAnnotationNameByStereotype(AnnotationUtil.SINGLETON).get() == 'javax.inject.Singleton'
     }
 
     void "test parse inherited stereotype data attributes"() {
@@ -363,8 +364,8 @@ class Test {
         metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
-        metadata.hasStereotype(Scope)
-        !metadata.hasDeclaredAnnotation(Scope)
+        metadata.hasStereotype(AnnotationUtil.SCOPE)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SCOPE)
         !metadata.hasDeclaredAnnotation(Around)
         metadata.getValue(Around, 'hotswap').isPresent()
         metadata.isTrue(Around, 'hotswap')
@@ -400,8 +401,8 @@ interface ITest {
         !metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
-        metadata.hasStereotype(Scope)
-        !metadata.hasDeclaredAnnotation(Scope)
+        metadata.hasStereotype(AnnotationUtil.SCOPE)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SCOPE)
         !metadata.hasDeclaredAnnotation(Around)
         metadata.getValue(Around, 'hotswap').isPresent()
         metadata.isTrue(Around, 'hotswap')
@@ -439,8 +440,8 @@ class SuperTest {
         !metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
-        metadata.hasStereotype(Scope)
-        !metadata.hasDeclaredAnnotation(Scope)
+        metadata.hasStereotype(AnnotationUtil.SCOPE)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SCOPE)
         !metadata.hasDeclaredAnnotation(Around)
         metadata.getValue(Around, 'hotswap').isPresent()
         metadata.isTrue(Around, 'hotswap')
@@ -479,8 +480,8 @@ class SuperTest {
         metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
-        metadata.hasStereotype(Scope)
-        !metadata.hasDeclaredAnnotation(Scope)
+        metadata.hasStereotype(AnnotationUtil.SCOPE)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SCOPE)
         !metadata.hasDeclaredAnnotation(Around)
         metadata.getValue(Around, 'hotswap').isPresent()
         metadata.isFalse(Around, 'hotswap')
@@ -518,8 +519,8 @@ interface ITest {
         !metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
-        metadata.hasStereotype(Scope)
-        !metadata.hasDeclaredAnnotation(Scope)
+        metadata.hasStereotype(AnnotationUtil.SCOPE)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SCOPE)
         !metadata.hasDeclaredAnnotation(Around)
         metadata.getValue(Around, 'hotswap').isPresent()
         metadata.isTrue(Around, 'hotswap')
@@ -547,10 +548,10 @@ class Test {
         expect:
         metadata != null
         metadata.hasDeclaredAnnotation(Primary)
-        !metadata.hasDeclaredAnnotation(Singleton)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
         metadata.hasAnnotation(Primary)
-        metadata.hasStereotype(Qualifier)
-        !metadata.hasStereotype(Singleton)
+        metadata.hasStereotype(AnnotationUtil.QUALIFIER)
+        !metadata.hasStereotype(AnnotationUtil.SINGLETON)
     }
 
     void "test parse inherited from class method stereotype data"() {
@@ -569,10 +570,10 @@ class Test {
         expect:
         metadata != null
         !metadata.hasDeclaredAnnotation(Primary)
-        !metadata.hasDeclaredAnnotation(Singleton)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
         metadata.hasAnnotation(Primary)
-        metadata.hasStereotype(Qualifier)
-        !metadata.hasStereotype(Singleton)
+        metadata.hasStereotype(AnnotationUtil.QUALIFIER)
+        !metadata.hasStereotype(AnnotationUtil.SINGLETON)
     }
 
     void "test parse inherited from interface method stereotype data"() {
@@ -597,10 +598,10 @@ interface ITest {
         expect:
         metadata != null
         !metadata.hasDeclaredAnnotation(Primary)
-        !metadata.hasDeclaredAnnotation(Singleton)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
         metadata.hasAnnotation(Primary)
-        metadata.hasStereotype(Qualifier)
-        !metadata.hasStereotype(Singleton)
+        metadata.hasStereotype(AnnotationUtil.QUALIFIER)
+        !metadata.hasStereotype(AnnotationUtil.SINGLETON)
     }
 
     void "test a circular annotation is read correctly"() {

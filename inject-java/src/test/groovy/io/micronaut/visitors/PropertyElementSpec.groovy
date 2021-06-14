@@ -16,7 +16,7 @@
 package io.micronaut.visitors
 
 import io.micronaut.http.annotation.Get
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.PropertyElement
 import spock.lang.IgnoreIf
@@ -126,7 +126,7 @@ public class TestController {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends CharSequence> {
@@ -164,7 +164,7 @@ public class TestController<T extends CharSequence> {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {

@@ -190,6 +190,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         List<AnnotationMirror> expanded = new ArrayList<>(annotationMirrors.size());
         for (AnnotationMirror annotation: annotationMirrors) {
             boolean repeatable = false;
+            boolean hasOtherMembers = false;
             for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry: annotation.getElementValues().entrySet()) {
                 if (entry.getKey().getSimpleName().toString().equals("value")) {
                     Object value = entry.getValue().getValue();
@@ -205,9 +206,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                             }
                         }
                     }
+                } else {
+                    hasOtherMembers = true;
                 }
             }
-            if (!repeatable) {
+            if (!repeatable || hasOtherMembers) {
                 expanded.add(annotation);
             }
         }
@@ -526,11 +529,23 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      */
     @Override
     public boolean hasAnnotation(Element element, Class<? extends Annotation> ann) {
+        return hasAnnotation(element, ann.getName());
+    }
+
+    /**
+     * Checks if a method has an annotation.
+     *
+     * @param element The method
+     * @param ann    The annotation to look for
+     * @return Whether if the method has the annotation
+     */
+    @Override
+    public boolean hasAnnotation(Element element, String ann) {
         List<? extends AnnotationMirror> annotationMirrors = element.getAnnotationMirrors();
         if (CollectionUtils.isNotEmpty(annotationMirrors)) {
             for (AnnotationMirror annotationMirror : annotationMirrors) {
                 final DeclaredType annotationType = annotationMirror.getAnnotationType();
-                if (annotationType.toString().equals(ann.getName())) {
+                if (annotationType.toString().equals(ann)) {
                     return true;
                 }
             }

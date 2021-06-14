@@ -17,7 +17,9 @@ package io.micronaut.http.netty.stream;
 
 import io.micronaut.core.annotation.Internal;
 import io.netty.handler.codec.DecoderResult;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpMessage;
+import io.netty.handler.codec.http.HttpVersion;
 
 /**
  * Delegate for HTTP Message.

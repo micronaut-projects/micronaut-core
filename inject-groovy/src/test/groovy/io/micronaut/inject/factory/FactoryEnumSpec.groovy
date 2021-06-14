@@ -17,7 +17,7 @@ import io.micronaut.inject.factory.TestEnum;
 @Factory
 class TestFactory$TestEnum {
 
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     TestEnum testEnum() {
         return TestEnum.ONE;
     }

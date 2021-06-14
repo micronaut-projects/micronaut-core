@@ -22,10 +22,10 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import io.reactivex.Flowable
 import io.reactivex.Single
+import jakarta.inject.Inject
 import spock.lang.Specification
-
-import javax.inject.Inject
 
 @MicronautTest
 class ServerErrorSpec extends Specification {
@@ -87,6 +87,15 @@ class ServerErrorSpec extends Specification {
         e.message == "Internal Server Error: Bad things happening"
     }
 
+    void "test flowable error - flowable"() {
+        when:
+        myClient.flowableErrorFlowable().blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == "Internal Server Error"
+    }
+
     @Client('/server-errors')
     static interface MyClient {
         @Get('/five-hundred')
@@ -106,6 +115,9 @@ class ServerErrorSpec extends Specification {
 
         @Get('/single-error')
         Single singleErrorSingle()
+
+        @Get('/flowable-error')
+        Flowable flowableErrorFlowable()
     }
 
     @Controller('/server-errors')
@@ -126,5 +138,11 @@ class ServerErrorSpec extends Specification {
         Single singleError() {
             Single.error(new RuntimeException("Bad things happening"))
         }
+
+        @Get('/flowable-error')
+        Flowable flowableError() {
+            Flowable.error(new RuntimeException("Bad things happening"))
+        }
+
     }
 }

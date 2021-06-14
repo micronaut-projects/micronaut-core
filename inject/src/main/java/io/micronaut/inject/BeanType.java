@@ -21,6 +21,8 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
@@ -51,6 +53,15 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
     Class<T> getBeanType();
 
     /**
+     * Checks whether the bean type is a container type.
+     * @return Whether the type is a container type like {@link Iterable}.
+     * @since 3.0.0
+     */
+    default boolean isContainerType() {
+        return DefaultArgument.CONTAINER_TYPES.contains(getBeanType());
+    }
+
+    /**
      * Returns a potentially limited subset of bean types exposed by this bean.
      * The types to be exposed can be defined by the {@link io.micronaut.context.annotation.Type} annotation.
      *
@@ -75,16 +86,16 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
      * @return True if it is
      * @since 3.0.0
      */
-    default boolean isCandidateBean(@Nullable Class<?> beanType) {
+    default boolean isCandidateBean(@Nullable Argument<?> beanType) {
         if (beanType == null) {
             return false;
         }
         final Set<Class<?>> exposedTypes = getExposedTypes();
         if (CollectionUtils.isNotEmpty(exposedTypes)) {
-            return exposedTypes.contains(beanType);
+            return exposedTypes.contains(beanType.getType());
         } else {
             final Class<T> exposedType = getBeanType();
-            return beanType.isAssignableFrom(exposedType) || beanType == exposedType;
+            return beanType.isAssignableFrom(exposedType) || beanType.getType() == exposedType || isContainerType();
         }
     }
 

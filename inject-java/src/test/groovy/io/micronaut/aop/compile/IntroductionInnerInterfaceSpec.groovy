@@ -1,8 +1,8 @@
 package io.micronaut.aop.compile
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 class IntroductionInnerInterfaceSpec extends AbstractTypeElementSpec {
@@ -14,7 +14,7 @@ class IntroductionInnerInterfaceSpec extends AbstractTypeElementSpec {
         def context = buildContext(clsName, '''
 package inneritfce;
 
-import javax.inject.*;
+import jakarta.inject.*;
 import io.micronaut.aop.introduction.*;
 
 @Singleton

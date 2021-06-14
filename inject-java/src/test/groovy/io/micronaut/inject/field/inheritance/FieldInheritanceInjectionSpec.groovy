@@ -1,7 +1,7 @@
 package io.micronaut.inject.field.inheritance
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class FieldInheritanceInjectionSpec extends AbstractTypeElementSpec {
 
@@ -10,8 +10,8 @@ class FieldInheritanceInjectionSpec extends AbstractTypeElementSpec {
         ApplicationContext context = buildContext('test.Listener', '''
 package test;
 
-import javax.inject.Singleton;
-import javax.inject.Inject;
+import jakarta.inject.Singleton;
+import jakarta.inject.Inject;
 
 abstract class AbstractListener  {
 @Inject protected SomeBean someBean;

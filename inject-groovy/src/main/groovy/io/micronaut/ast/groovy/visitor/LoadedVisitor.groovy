@@ -55,6 +55,8 @@ class LoadedVisitor implements Ordered {
     private ClassElement currentClassElement
     private final CompilationUnit compilationUnit
 
+    private static final String OBJECT_CLASS = Object.class.getName()
+
     LoadedVisitor(SourceUnit source, CompilationUnit compilationUnit, TypeElementVisitor visitor) {
         this.compilationUnit = compilationUnit
         this.sourceUnit = source
@@ -65,8 +67,18 @@ class LoadedVisitor implements Ordered {
         }
         GenericsType[] generics = definition.getGenericsTypes()
         if (generics) {
-            classAnnotation = generics[0].type.name
-            elementAnnotation = generics[1].type.name
+            String typeName = generics[0].type.name
+            if (typeName == OBJECT_CLASS) {
+                classAnnotation = visitor.getClassType()
+            } else {
+                classAnnotation = typeName
+            }
+            String elementName = generics[1].type.name
+            if (elementName == OBJECT_CLASS) {
+                elementAnnotation = visitor.getElementType()
+            } else {
+                elementAnnotation = elementName
+            }
         } else {
             classAnnotation = ClassHelper.OBJECT
             elementAnnotation = ClassHelper.OBJECT
@@ -149,14 +161,14 @@ class LoadedVisitor implements Ordered {
                 return e
             case MethodNode:
                 if (currentClassElement != null) {
-                    def e = visitorContext.getElementFactory().newMethodElement(currentClassElement, (MethodNode) annotatedNode, annotationMetadata)
+                    def e = visitorContext.getElementFactory().newSourceMethodElement(currentClassElement, (MethodNode) annotatedNode, annotationMetadata)
                     visitor.visitMethod(e, visitorContext)
                     return e
                 }
                 break
             case ClassNode:
                 ClassNode cn = (ClassNode) annotatedNode
-                currentClassElement = visitorContext.getElementFactory().newClassElement(cn, annotationMetadata)
+                currentClassElement = visitorContext.getElementFactory().newSourceClassElement(cn, annotationMetadata)
                 visitor.visitClass(currentClassElement, visitorContext)
                 return currentClassElement
         }

@@ -11,8 +11,8 @@ import io.micronaut.context.exceptions.BeanContextException
 import spock.lang.Specification
 
 import javax.annotation.Nullable
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 class FieldInjectionSpec extends Specification {
 

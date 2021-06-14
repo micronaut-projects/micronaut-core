@@ -36,16 +36,16 @@ import java.util.*;
 @Internal
 public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
 
-    static final Set<Class<?>> CONTAINER_TYPES = CollectionUtils.setOf(
+    public static final Set<Class<?>> CONTAINER_TYPES = CollectionUtils.setOf(
         List.class,
         Set.class,
-        Map.class,
         Collection.class,
         Queue.class,
         SortedSet.class,
         Deque.class,
         Vector.class,
-        ArrayList.class);
+        ArrayList.class
+    );
 
     private final Class<T> type;
     private final String name;
@@ -146,13 +146,16 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     @Override
     public Optional<Argument<?>> getFirstTypeVariable() {
         if (!typeParameters.isEmpty()) {
-            return typeParameters.values().stream().findFirst();
+            return Optional.of(typeParameters.values().iterator().next());
         }
         return Optional.empty();
     }
 
     @Override
     public Argument[] getTypeParameters() {
+        if (typeParameterArray == null) {
+            return Argument.ZERO_ARGUMENTS;
+        }
         return typeParameterArray;
     }
 
@@ -221,11 +224,11 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
         return Objects.hash(type, getName(), typeParameters);
     }
 
-    private static Map<String, Argument<?>> initializeTypeParameters(Argument[] genericTypes) {
+    private static Map<String, Argument<?>> initializeTypeParameters(Argument<?>[] genericTypes) {
         Map<String, Argument<?>> typeParameters;
         if (genericTypes != null && genericTypes.length > 0) {
             typeParameters = new LinkedHashMap<>(genericTypes.length);
-            for (Argument genericType : genericTypes) {
+            for (Argument<?> genericType : genericTypes) {
                 typeParameters.put(genericType.getName(), genericType);
             }
         } else {

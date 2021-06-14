@@ -16,7 +16,7 @@ package annbinding1;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton
@@ -161,7 +161,7 @@ package annbinding1;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton
@@ -277,6 +277,76 @@ class AnotherInterceptor implements Interceptor {
 
     }
 
+    void 'test around construct without around interception - interceptors from factory'() {
+        given:
+        ApplicationContext context = buildContext("""
+package annbinding1;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Singleton
+@TestAnn
+class MyBean {
+    MyBean(io.micronaut.context.env.Environment env) {}
+    void test() {
+    }
+}
+
+@io.micronaut.context.annotation.Factory
+class MyFactory {
+    @TestAnn
+    @Singleton
+    MyOtherBean test(io.micronaut.context.env.Environment env) {
+        return new MyOtherBean();
+    }
+}
+
+class MyOtherBean {}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@AroundConstruct
+@interface TestAnn {
+}
+
+
+@Factory
+class InterceptorFactory {
+    boolean aroundConstructInvoked = false;
+    
+    @InterceptorBean(TestAnn.class)
+    ConstructorInterceptor<Object> aroundIntercept() {
+        return (context) -> {
+            this.aroundConstructInvoked = true;
+            return context.proceed();
+        };
+    }
+    
+}
+
+""")
+        when:
+        def factory = getBean(context, 'annbinding1.InterceptorFactory')
+
+        then:
+        !factory.aroundConstructInvoked
+
+        when:"A bean that features constructor injection is instantiated"
+        def instance = getBean(context, 'annbinding1.MyBean')
+
+        then:"The constructor interceptor is invoked"
+        !(instance instanceof Intercepted)
+        factory.aroundConstructInvoked
+
+
+        cleanup:
+        context.close()
+
+    }
 
     void 'test around construct with introduction advice'() {
         given:
@@ -285,7 +355,7 @@ package annbinding1;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton

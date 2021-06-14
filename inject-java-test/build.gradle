@@ -23,6 +23,6 @@ dependencies {
 
 afterEvaluate {
     sourcesJar {
-        from sourceSets.main.allSource
+        from "$projectDir/src/main/groovy"
     }
 }

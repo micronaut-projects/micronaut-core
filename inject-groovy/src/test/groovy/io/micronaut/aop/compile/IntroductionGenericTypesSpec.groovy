@@ -48,7 +48,7 @@ interface MyInterface<T extends URL> {
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean extends MyInterface<URL> {
 }
 
@@ -106,7 +106,7 @@ interface MyInterface<T extends Person> {
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean extends MyInterface<SubPerson> {
 
 }

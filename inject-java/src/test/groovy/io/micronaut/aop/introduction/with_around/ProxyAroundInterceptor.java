@@ -18,7 +18,7 @@ package io.micronaut.aop.introduction.with_around;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class ProxyAroundInterceptor implements MethodInterceptor<Object, Object> {

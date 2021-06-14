@@ -1,20 +1,18 @@
-import org.apache.tools.ant.taskdefs.condition.Os
-
 dependencies {
     annotationProcessor project(":inject-java")
-    api dependencyVersion("rxjava2")    
+    api dependencyVersion("rxjava2")
     api project(":runtime")
     api project(":http-client-core")
     api project(":websocket")
 
     api project(":http-netty")
     api dependencyModuleVersion("netty", "netty-handler-proxy")
-    
+
     testAnnotationProcessor project(":validation")
     testAnnotationProcessor project(":inject-java")
 
     testCompileOnly project(":inject-groovy")
-    testImplementation project(":validation")    
+    testImplementation project(":validation")
     testImplementation project(":inject")
     testImplementation dependencyVersion("rxjava2")
     testImplementation project(":http-server-netty")
@@ -26,6 +24,10 @@ dependencies {
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
+    }
+
+    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
+        testImplementation('org.bouncycastle:bcpkix-jdk15on:1.65')
     }
 }
 

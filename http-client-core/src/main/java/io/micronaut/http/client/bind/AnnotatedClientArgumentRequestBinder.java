@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.client.bind;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 
 import java.lang.annotation.Annotation;
 

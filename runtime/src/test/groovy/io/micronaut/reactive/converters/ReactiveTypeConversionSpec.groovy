@@ -15,10 +15,10 @@
  */
 package io.micronaut.reactive.converters
 
-import io.reactivex.Completable
-import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService
+import io.reactivex.Completable
+import io.reactivex.Flowable
 import io.reactivex.Maybe
 import spock.lang.Specification
 import spock.lang.Unroll

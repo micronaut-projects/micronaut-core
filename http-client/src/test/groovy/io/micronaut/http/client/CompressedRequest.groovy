@@ -28,10 +28,11 @@ import io.reactivex.Single
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
 import java.util.zip.GZIPOutputStream
 
 class CompressedRequest extends Specification {
-    
+
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer)
 

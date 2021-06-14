@@ -21,11 +21,10 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.netty.DefaultHttpClient
 import io.micronaut.runtime.ApplicationConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import spock.lang.Retry
 import spock.lang.Specification
-
-import javax.inject.Inject
-import javax.inject.Singleton
 
 // sometimes fails due to a port bind issue on Travis
 // this is because there is a timing issue between when an available port

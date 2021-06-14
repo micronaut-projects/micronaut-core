@@ -24,12 +24,12 @@ class ScheduledCustomExecutorSpec extends Specification {
         then:
         conditions.eventually {
             bean.ran
-            bean.cronEvents.get() == 2
+            bean.cronEvents.get() >= 2
         }
     }
 
     @Requires(property = "spec.name", value = "ScheduledCustomExecutorSpec")
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     static class ScheduledBean {
 
         public boolean ran = false

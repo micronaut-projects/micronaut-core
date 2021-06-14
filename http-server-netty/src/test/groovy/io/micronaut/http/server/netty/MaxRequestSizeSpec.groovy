@@ -7,8 +7,8 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
@@ -176,6 +176,30 @@ class MaxRequestSizeSpec extends Specification {
         then:
         def ex = thrown(HttpClientResponseException)
         ex.message == "The part named [e] exceeds the maximum allowed content length [1024]"
+
+        cleanup:
+        client.close()
+        embeddedServer.close()
+    }
+
+    void "test content length exceeded with different disk storage"() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.server.maxRequestSize': '10KB',
+                'micronaut.server.multipart.disk': true
+        ])
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        MultipartBody body = MultipartBody.builder()
+                .addPart("a", "a.pdf", new byte[20240])
+                .build()
+
+        String result = client.retrieve(HttpRequest.POST("/test-max-size/multipart-body", body)
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)).blockingFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.message.contains("exceeds the maximum allowed content length [10240]")
 
         cleanup:
         client.close()

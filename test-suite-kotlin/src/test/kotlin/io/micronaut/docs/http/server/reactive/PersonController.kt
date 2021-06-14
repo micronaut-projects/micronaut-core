@@ -9,7 +9,7 @@ import io.reactivex.Scheduler
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 import java.util.concurrent.ExecutorService
-import javax.inject.Named
+import jakarta.inject.Named
 // end::imports[]
 
 // tag::class[]

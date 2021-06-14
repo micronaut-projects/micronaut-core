@@ -15,24 +15,24 @@
  */
 package io.micronaut.http.client.rxjava2
 
-import io.micronaut.core.annotation.Introspected
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Error
-import io.micronaut.http.annotation.Post
-import io.micronaut.http.client.RxStreamingHttpClient
-import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpPostSpec
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.RxStreamingHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.core.type.Argument
+import io.reactivex.Flowable
 import io.reactivex.Maybe
 import io.reactivex.Single
 import io.reactivex.functions.Function

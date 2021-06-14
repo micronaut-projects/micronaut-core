@@ -24,6 +24,34 @@ snippet::io.micronaut.docs.inject.typed.V8Engine[tags="class",indent=0]
 
 For more information see the section on <<typed, Limiting Injectable Types>>.
 
+==== Factories can produce bean from fields
+
+Beans defined with the ann:context.annotation.Factory[] annotation can now produce beans from public or package protected fields, for example:
+
+snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="class",indent=0]
+
+For more information see the <<factories, Bean Factories>> section of the documentation.
+
+==== Enhanced `BeanProvider` Interface
+
+The api:context.BeanProvider[] interface has been enhanced with new methods such as `iterator()` and `stream()` as well as methods to check for bean existence and uniqueness.
+
+==== New `@Any` Qualifier for use in Bean Factories
+
+A new ann:context.annotation.Any[] qualifier has been introduced to allow injecting any available instance into an injection point and can be used in combination with the new `BeanProvider` interface mentioned above to allow more dynamic behaviour.
+
+snippet::io.micronaut.docs.qualifiers.any.Vehicle[tags="imports,clazz", indent=0, title="Using BeanProvider with Any"]
+
+The annotation can also be used on ann:context.annotation.Factory[] methods to allow customization of how objects are injected via the api:inject.InjectionPoint[] API.
+
+==== Support for Fields in Bean Introspections
+
+Bean introspections on public or package protected fields are now supported:
+
+snippet::io.micronaut.docs.ioc.beans.User[tags="class", indent=0]
+
+For more information see the "Bean Fields" section of the <<introspection, Bean Introspections>> documentation.
+
 === AOP Features
 
 ==== Support for Constructor Interception
@@ -38,10 +66,55 @@ It is now possible to intercept `@PostConstruct` and `@PreDestroy` method invoca
 
 See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
 
+==== Random Configuration Values
+
+It is now possible to set a max and a range for random numbers in configuration. For example to set an integer between 0 and 9, `${random.int(10)}` can be used as the configuration value. See the <<propertySource, documentation>> under "Using Random Properties" for more information.
+
 === Module Upgrades
 
-TODO
+==== Micronaut Data 2.4.0
+
+Huge https://micronaut-projects.github.io/micronaut-data/latest/guide/[Micronaut Data] update including many new features including:
+
+- Full support for immutable entities. You can use Java 16 records or Kotlin immutable data classes
+- Integrated support for R2DBC, now the `data-r2dbc` module is a part of the data project and shares the same code with JDBC
+- Optimistic locking for JDBC/R2DBC
+- Repositories now support batch insert/update/delete even with a custom query
+- Rewritten entity mapper allows more complex mapping for JDBC/R2DBC entities
+- Support for `@JoinTable` and `@JoinColumn` annotations
+- A lot of bugfixes!
+
+==== Micronaut Micrometer 3.4.0
+
+The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micrometer module] has been upgraded and now supports repeated definitions of the https://micrometer.io/docs/concepts#_the_timed_annotation[@Timed] annotation as well as also supporting the `@Counted` annotation for counters when you add the `micronaut-micrometer-annotation` dependency to your annotation processor classpath.
+
+==== Micronaut Oracle Cloud 1.3.0
+
+Micronaut's https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/[Oracle Cloud Integration] has been updated with support for Cloud Monitoring and Tracing.
+
+
+==== Micronaut Cassandra 4.0.0
+
+The https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micronaut Cassandra] integration now includes support for GraalVM out of the box.
+
+==== Other Modules
+
+- Micronaut Security 2.4.2
+- Micronaut Azure 2.2.0
+- Micronaut Aws 2.6.0
+- Micronaut Grpc 2.4.0
+- Micronaut OpenApi 2.4.0
+- Micronaut Kafka 3.3.0
+- Micronaut Flyway 3.6.0
+- Micronaut Liquibase 3.3.1
+- Micronaut Discovery Client 2.4.0
+- Micronaut ElasticSearch 2.3.0
 
 === Dependency Upgrades
 
-TODO
+- Cassandra 4.11.1
+- Kafka 2.8.0
+- GraalVM 21.1.0
+- Liquibase 4.3.4
+- Flyway 7.7.3
+- Elasticsearch 7.12.0

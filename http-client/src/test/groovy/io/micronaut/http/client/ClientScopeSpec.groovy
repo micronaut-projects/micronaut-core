@@ -30,13 +30,11 @@ import io.micronaut.http.client.netty.DefaultHttpClient
 import io.micronaut.jackson.annotation.JacksonFeatures
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
-import spock.lang.AutoCleanup
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
 import spock.lang.Retry
 import spock.lang.Specification
-
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * @author Graeme Rocher

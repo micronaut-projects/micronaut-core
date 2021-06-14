@@ -6,25 +6,18 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Error
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Post
-import io.micronaut.http.annotation.Produces
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.server.netty.binding.FormDataBindingSpec.FormController.Person
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.inject.Inject
-
-import static io.micronaut.http.server.netty.ContentNegotiationSpec.NegotiatingController.JSON
-import static io.micronaut.http.server.netty.ContentNegotiationSpec.NegotiatingController.TEXT
-import static io.micronaut.http.server.netty.ContentNegotiationSpec.NegotiatingController.XML
+import static io.micronaut.http.server.netty.ContentNegotiationSpec.NegotiatingController.*
 
 @MicronautTest
 class ContentNegotiationSpec extends Specification {

@@ -1,3 +1,5 @@
+import java.time.Duration
+
 dependencies {
 	annotationProcessor project(":inject-java")
     api project(":http")
@@ -6,4 +8,8 @@ dependencies {
     api dependencyVersion("rxjava2")
 
     testImplementation project(":inject-groovy")
+}
+
+test {
+    timeout = Duration.ofMinutes(5)
 }

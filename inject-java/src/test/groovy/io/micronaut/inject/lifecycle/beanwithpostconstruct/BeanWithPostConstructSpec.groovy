@@ -17,7 +17,7 @@ package io.micronaut.inject.lifecycle.beanwithpostconstruct
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
 class BeanWithPostConstructSpec extends AbstractTypeElementSpec {
@@ -28,8 +28,8 @@ class BeanWithPostConstructSpec extends AbstractTypeElementSpec {
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
 package test;
 import javax.annotation.*;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import io.micronaut.context.annotation.*;
 
@@ -54,7 +54,7 @@ class MyBean {
 }
 
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Foo {}
 
 ''')

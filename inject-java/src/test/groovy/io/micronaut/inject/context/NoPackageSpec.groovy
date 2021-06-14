@@ -1,6 +1,6 @@
 package io.micronaut.inject.context
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class NoPackageSpec extends AbstractTypeElementSpec {
 
@@ -10,7 +10,7 @@ class NoPackageSpec extends AbstractTypeElementSpec {
 
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Bean {
 
 }

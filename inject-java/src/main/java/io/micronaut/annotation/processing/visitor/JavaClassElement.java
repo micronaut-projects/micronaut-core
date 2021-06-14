@@ -55,6 +55,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private List<PropertyElement> beanProperties;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
     private List<? extends Element> enclosedElements;
+    private String simpleName;
+    private String name;
+    private String packageName;
 
     /**
      * @param classElement       The {@link TypeElement}
@@ -98,6 +101,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         this.visitorContext = visitorContext;
         this.genericTypeInfo = genericsInfo;
         this.arrayDimensions = arrayDimensions;
+    }
+
+    @Override
+    public String toString() {
+        return getName();
     }
 
     @Override
@@ -509,14 +517,16 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         List<Predicate<Set<ElementModifier>>> modifierPredicates = result.getModifierPredicates();
         List<Predicate<String>> namePredicates = result.getNamePredicates();
         List<Predicate<AnnotationMetadata>> annotationPredicates = result.getAnnotationPredicates();
+        final List<Predicate<ClassElement>> typePredicates = result.getTypePredicates();
         boolean hasNamePredicates = !namePredicates.isEmpty();
         boolean hasModifierPredicates = !modifierPredicates.isEmpty();
         boolean hasAnnotationPredicates = !annotationPredicates.isEmpty();
-        
+        boolean hasTypePredicates = !typePredicates.isEmpty();
+
         elementLoop:
         for (Element enclosedElement : enclosedElements) {
             ElementKind enclosedElementKind = enclosedElement.getKind();
-            if (enclosedElementKind == kind) {
+            if (enclosedElementKind == kind || (enclosedElementKind == ElementKind.ENUM && kind == ElementKind.CLASS)) {
                 String elementName = enclosedElement.getSimpleName().toString();
                 if (onlyAccessible) {
                     // exclude private members
@@ -527,13 +537,15 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         continue;
                     } else {
                         Element enclosingElement = enclosedElement.getEnclosingElement();
+                        final ClassElement onlyAccessibleFrom = result.getOnlyAccessibleFromType().orElse(this);
+                        Object accessibleFrom = onlyAccessibleFrom.getNativeType();
                         // if the outer element of the enclosed element is not the current class
                         // we need to check if it package private and within a different package so it can be excluded
-                        if (enclosingElement != this.classElement && visitorContext.getModelUtils().isPackagePrivate(enclosedElement)) {
+                        if (enclosingElement != accessibleFrom && visitorContext.getModelUtils().isPackagePrivate(enclosedElement)) {
                             if (enclosingElement instanceof TypeElement) {
                                 Name qualifiedName = ((TypeElement) enclosingElement).getQualifiedName();
                                 String packageName = NameUtils.getPackageName(qualifiedName.toString());
-                                if (!packageName.equals(getPackageName())) {
+                                if (!packageName.equals(onlyAccessibleFrom.getPackageName())) {
                                     continue;
                                 }
                             }
@@ -567,6 +579,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         }
                     }
                 }
+
                 T element;
                 switch (enclosedElementKind) {
                     case METHOD:
@@ -593,12 +606,36 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                 (ExecutableElement) enclosedElement,
                                 metadata
                         );
+                    case CLASS:
+                    case ENUM:
+                        //noinspection unchecked
+                        element = (T) visitorContext.getElementFactory().newClassElement(
+                                (TypeElement) enclosedElement,
+                                metadata
+                        );
                     break;
                     default:
                         element = null;
                 }
 
                 if (element != null) {
+                    if (hasTypePredicates) {
+                        for (Predicate<ClassElement> typePredicate : typePredicates) {
+                            ClassElement classElement;
+                            if (element instanceof ConstructorElement) {
+                                classElement = this;
+                            } else if (element instanceof MethodElement) {
+                                classElement = ((MethodElement) element).getGenericReturnType();
+                            } else if (element instanceof ClassElement) {
+                                classElement = (ClassElement) element;
+                            } else {
+                                classElement = ((FieldElement) element).getGenericField();
+                            }
+                            if (!typePredicate.test(classElement)) {
+                                continue elementLoop;
+                            }
+                        }
+                    }
                     List<Predicate<T>> elementPredicates = result.getElementPredicates();
                     if (!elementPredicates.isEmpty()) {
                         for (Predicate<T> elementPredicate : elementPredicates) {
@@ -628,6 +665,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             return ElementKind.FIELD;
         } else if (elementType == ConstructorElement.class) {
             return ElementKind.CONSTRUCTOR;
+        } else if (elementType == ClassElement.class) {
+            return ElementKind.CLASS;
         }
         throw new IllegalArgumentException("Unsupported element type for query: " + elementType);
     }
@@ -648,8 +687,27 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
+    public String getSimpleName() {
+        if (simpleName == null) {
+            simpleName = JavaModelUtils.getClassNameWithoutPackage(classElement);
+        }
+        return simpleName;
+    }
+
+    @Override
     public String getName() {
-        return JavaModelUtils.getClassName(classElement);
+        if (name == null) {
+            name = JavaModelUtils.getClassName(classElement);
+        }
+        return name;
+    }
+
+    @Override
+    public String getPackageName() {
+        if (packageName == null) {
+            packageName = JavaModelUtils.getPackageName(classElement);
+        }
+        return packageName;
     }
 
     @Override

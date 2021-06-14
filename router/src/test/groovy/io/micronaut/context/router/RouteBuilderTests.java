@@ -24,8 +24,8 @@ import io.micronaut.http.MediaType;
 import org.junit.Test;
 import io.micronaut.web.router.*;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import java.util.List;
 

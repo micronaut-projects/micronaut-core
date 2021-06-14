@@ -15,13 +15,11 @@
  */
 package io.micronaut.inject.provider;
 
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanProvider;
-import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.Qualifier;
+import io.micronaut.context.*;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 
@@ -35,7 +33,7 @@ import java.util.stream.Stream;
  * @since 3.0.0
  */
 @Internal
-final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvider<Object>> {
+public final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvider<Object>> {
     @Override
     public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
         return true;
@@ -48,10 +46,16 @@ final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvid
     }
 
     @Override
+    public boolean isPresent() {
+        return true;
+    }
+
+    @Override
     protected BeanProvider<Object> buildProvider(
-            BeanContext context,
-            Argument<Object> argument,
-            Qualifier<Object> qualifier,
+            @NonNull BeanResolutionContext resolutionContext,
+            @NonNull BeanContext context,
+            @NonNull Argument<Object> argument,
+            @Nullable Qualifier<Object> qualifier,
             boolean singleton) {
         return new BeanProvider<Object>() {
             private final Qualifier<Object> finalQualifier =
@@ -59,19 +63,18 @@ final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvid
 
             @Override
             public Object get() {
-                return context.getBean(argument, finalQualifier);
+                return ((DefaultBeanContext) context).getBean(resolutionContext, argument, finalQualifier);
             }
 
             @Override
             public Object get(Qualifier<Object> qualifier) {
-                return context.getBean(argument, qualifier);
+                return ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
             }
 
             @Override
             public boolean isUnique() {
                 try {
-                    context.getBeanDefinition(argument, finalQualifier);
-                    return true;
+                    return context.getBeanDefinitions(argument, finalQualifier).size() == 1;
                 } catch (NoSuchBeanException e) {
                     return false;
                 }
@@ -85,12 +88,12 @@ final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvid
             @NonNull
             @Override
             public Iterator<Object> iterator() {
-                return context.getBeansOfType(argument, finalQualifier).iterator();
+                return ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argument, finalQualifier).iterator();
             }
 
             @Override
             public Stream<Object> stream() {
-                return context.streamOfType(argument, finalQualifier);
+                return ((DefaultBeanContext) context).streamOfType(resolutionContext, argument, finalQualifier);
             }
         };
     }

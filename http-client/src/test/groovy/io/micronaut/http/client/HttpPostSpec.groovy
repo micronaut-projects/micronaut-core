@@ -22,20 +22,16 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.Post
-import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Flowable
+import jakarta.inject.Inject
 import spock.lang.Specification
 
-import javax.inject.Inject
 import java.nio.charset.StandardCharsets
 
 /**
@@ -371,6 +367,14 @@ class HttpPostSpec extends Specification {
         val == "multiple mappings"
     }
 
+    void "test http post with empty body"() {
+        when:
+        def res = Flowable.fromPublisher(client.exchange(HttpRequest.POST('/post/emptyBody', null))).blockingFirst();
+
+        then:
+        res.status == HttpStatus.NO_CONTENT
+    }
+
     @Controller('/post')
     static class PostController {
 
@@ -468,6 +472,11 @@ class HttpPostSpec extends Specification {
         @Post(uris = ["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
+        }
+
+        @Post(uri = "/emptyBody")
+        HttpResponse emptyBody() {
+            HttpResponse.noContent()
         }
     }
 

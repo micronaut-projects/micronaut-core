@@ -18,13 +18,12 @@ package io.micronaut.inject.executable
 import io.micronaut.context.AbstractExecutableMethod
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.ExecutionHandle
 import io.micronaut.inject.MethodExecutionHandle
-
-import javax.inject.Named
 
 class ExecutableSpec extends AbstractTypeElementSpec {
 
@@ -38,7 +37,7 @@ import io.micronaut.context.annotation.*;
 
 @Executable
 class MyBean {
-    public String methodOne(@javax.inject.Named("foo") String one) {
+    public String methodOne(@jakarta.inject.Named("foo") String one) {
         return "good";
     }
     
@@ -56,7 +55,7 @@ class MyBean {
         then:"the default scope is singleton"
         beanDefinition.executableMethods.size() == 3
         beanDefinition.executableMethods[0].methodName == 'methodOne'
-        beanDefinition.executableMethods[0].getArguments()[0].synthesize(Named).value() == 'foo'
+        beanDefinition.executableMethods[0].getArguments()[0].getAnnotationMetadata().stringValue(AnnotationUtil.NAMED).get() == 'foo'
     }
 
     void "test executable metadata"() {

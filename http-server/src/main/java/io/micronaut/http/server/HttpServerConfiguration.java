@@ -17,6 +17,8 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
@@ -26,10 +28,8 @@ import io.micronaut.http.server.cors.CorsOriginConfiguration;
 import io.micronaut.http.server.util.locale.HttpLocaleResolutionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import jakarta.inject.Inject;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
 import java.io.File;
 import java.nio.charset.Charset;
 import java.time.Duration;
@@ -110,6 +110,12 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_DUAL_PROTOCOL = false;
 
+    /**
+     * The default value for redirect HTTP to HTTPS when using dual protocal.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_HTTP_TO_HTTPS_REDIRECT = false;
+
     private Integer port;
     private String host;
     private Integer readTimeout;
@@ -127,6 +133,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private String clientAddressHeader;
     private String contextPath;
     private boolean dualProtocol = DEFAULT_DUAL_PROTOCOL;
+    private boolean httpToHttpsRedirect = DEFAULT_HTTP_TO_HTTPS_REDIRECT;
     private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
@@ -324,6 +331,13 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
+     * @return if redirection from HTTP to HTTPS is enabled or not
+     */
+    public boolean isHttpToHttpsRedirect() {
+        return httpToHttpsRedirect;
+    }
+
+    /**
      * @param defaultCharset The default charset to use
      */
     public void setDefaultCharset(Charset defaultCharset) {
@@ -472,10 +486,20 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * @param dualProtocol the dual protocol (http/https) configuration
+     * @param dualProtocol the dual protocol (http/https) configuration. Default value ({@value #DEFAULT_DUAL_PROTOCOL}).
      */
     public void setDualProtocol(boolean dualProtocol) {
         this.dualProtocol = dualProtocol;
+    }
+
+    /**
+     * @param httpToHttpsRedirect Set to true to enable redirecting all http requests to the same URL but with
+                                  https instead. This should only be used when {@code dualProtocol} is enabled.
+                                  Default value ({@value #DEFAULT_HTTP_TO_HTTPS_REDIRECT}). This feature uses
+                                  the host resolution capabilities to determine the host to redirect to.
+     */
+    public void setHttpToHttpsRedirect(boolean httpToHttpsRedirect) {
+        this.httpToHttpsRedirect = httpToHttpsRedirect;
     }
 
     /**

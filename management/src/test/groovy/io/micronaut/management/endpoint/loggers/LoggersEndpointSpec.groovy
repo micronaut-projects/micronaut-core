@@ -24,7 +24,8 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static io.micronaut.http.HttpRequest.*
+import static io.micronaut.http.HttpRequest.GET
+import static io.micronaut.http.HttpRequest.POST
 
 class LoggersEndpointSpec extends Specification {
 

@@ -1,6 +1,6 @@
 package io.micronaut.inject.executable.inheritance
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
 class InheritedExecutableSpec extends AbstractTypeElementSpec {
@@ -34,7 +34,7 @@ package test;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Executable
 @Singleton
@@ -95,7 +95,7 @@ package test;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.io.Serializable;
 
 abstract class GenericController<T, ID extends Serializable> {
@@ -149,7 +149,7 @@ package test;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 interface X {
 

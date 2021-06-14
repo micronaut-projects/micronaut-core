@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.method.nullableinjection
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 
 class B {

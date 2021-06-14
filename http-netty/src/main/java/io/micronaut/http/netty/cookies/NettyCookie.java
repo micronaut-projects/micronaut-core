@@ -15,13 +15,13 @@
  */
 package io.micronaut.http.netty.cookies;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.SameSite;
 import io.netty.handler.codec.http.cookie.DefaultCookie;
 
-import io.micronaut.core.annotation.NonNull;
 import java.util.Objects;
 import java.util.Optional;
 

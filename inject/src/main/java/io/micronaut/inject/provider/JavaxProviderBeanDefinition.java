@@ -17,6 +17,7 @@ package io.micronaut.inject.provider;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
@@ -30,10 +31,11 @@ import javax.inject.Provider;
  * @since 3.0.0
  */
 @Internal
-final class JavaxProviderBeanDefinition extends AbstractProviderDefinition<Provider<Object>> {
+public final class JavaxProviderBeanDefinition extends AbstractProviderDefinition<Provider<Object>> {
+
     @Override
     public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
-        return JavaxProviderBeanDefinitionReference.isTypePresent();
+        return isTypePresent();
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -43,7 +45,13 @@ final class JavaxProviderBeanDefinition extends AbstractProviderDefinition<Provi
     }
 
     @Override
+    public boolean isPresent() {
+        return isTypePresent();
+    }
+
+    @Override
     protected Provider<Object> buildProvider(
+            BeanResolutionContext resolutionContext,
             BeanContext context,
             Argument<Object> argument,
             Qualifier<Object> qualifier,
@@ -55,13 +63,22 @@ final class JavaxProviderBeanDefinition extends AbstractProviderDefinition<Provi
                 @Override
                 public Object get() {
                     if (bean == null) {
-                        bean = context.getBean(argument, qualifier);
+                        bean = ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
                     }
                     return bean;
                 }
             };
         } else {
-            return () -> context.getBean(argument, qualifier);
+            return () -> ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
+        }
+    }
+
+    private static boolean isTypePresent() {
+        try {
+            return Provider.class.isInterface();
+        } catch (Throwable e) {
+            // class not present
+            return false;
         }
     }
 }

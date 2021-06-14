@@ -18,7 +18,7 @@ package io.micronaut.aop.introduction;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class NotImplementedAdvice implements MethodInterceptor<Object, Object> {

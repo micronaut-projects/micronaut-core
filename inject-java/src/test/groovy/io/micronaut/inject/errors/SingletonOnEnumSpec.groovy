@@ -1,11 +1,11 @@
 package io.micronaut.inject.errors
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.aliasfor.TestAnnotation
 
-import javax.inject.Named
-import javax.inject.Qualifier
+import jakarta.inject.Named
+import jakarta.inject.Qualifier
 
 class SingletonOnEnumSpec extends AbstractTypeElementSpec {
 
@@ -14,7 +14,7 @@ class SingletonOnEnumSpec extends AbstractTypeElementSpec {
         buildBeanDefinition('test.Test','''\
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 enum Test {
 }
 

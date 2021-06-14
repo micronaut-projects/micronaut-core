@@ -3,7 +3,7 @@ package io.micronaut.inject.records
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.DependencyInjectionException
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.validation.BeanDefinitionValidator
 import io.micronaut.validation.validator.DefaultValidator
@@ -20,7 +20,7 @@ package test;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.convert.ConversionService;
 import javax.validation.constraints.Min;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import io.micronaut.context.BeanContext;
 
 @ConfigurationProperties("foo")
@@ -63,12 +63,12 @@ record Test(
         BeanDefinition<?> definition = buildBeanDefinition('test.Test', '''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 record Test(OtherBean otherBean) {
 
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class OtherBean {
 
 }
@@ -94,7 +94,7 @@ record Test(OtherBean otherBean) {
 
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class OtherBean {
 
 }

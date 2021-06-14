@@ -11,7 +11,7 @@ package test;
 
 import io.micronaut.core.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
 @Singleton
@@ -32,7 +32,7 @@ package test;
 
 import io.micronaut.core.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 class OuterBean {
 
@@ -51,5 +51,20 @@ class OuterBean {
         expect:
 
         definition.intValue(Order).getAsInt() == 10
+    }
+
+    void "test a bean definition in a package with uppercase letters"() {
+        when:
+        def definition = buildBeanDefinition('test.A', 'TestBean', '''
+package test.A;
+
+@jakarta.inject.Singleton
+class TestBean {
+
+}
+''')
+        then:
+        noExceptionThrown()
+        definition != null
     }
 }

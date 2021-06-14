@@ -1,7 +1,7 @@
 package io.micronaut.inject.annotation
 
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
 import java.lang.annotation.Native
@@ -13,11 +13,11 @@ class SourceRetentionSpec extends AbstractTypeElementSpec {
         BeanDefinition definition = buildBeanDefinition('test.Test','''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
     
     
-    @javax.inject.Inject
+    @jakarta.inject.Inject
     @java.lang.annotation.Native
     String someField;
     

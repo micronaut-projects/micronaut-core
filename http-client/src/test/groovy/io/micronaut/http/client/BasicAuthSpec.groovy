@@ -18,7 +18,6 @@ package io.micronaut.http.client
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
 import spock.lang.Specification
 
 class BasicAuthSpec extends Specification {

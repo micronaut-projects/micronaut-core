@@ -1,8 +1,7 @@
 package io.micronaut.aop.compile
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -18,7 +17,7 @@ import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
 import java.net.*;
 import javax.validation.constraints.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Stub
 @Singleton

@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.ioc.validation.custom
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.validation.constraints.NotBlank
 import java.time.Duration
 

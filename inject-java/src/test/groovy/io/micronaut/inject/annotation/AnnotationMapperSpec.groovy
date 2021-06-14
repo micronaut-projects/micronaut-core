@@ -10,7 +10,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.annotation.QueryValue
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.visitor.VisitorContext
@@ -27,7 +27,7 @@ class AnnotationMapperSpec extends AbstractTypeElementSpec {
         def metadata = buildMethodAnnotationMetadata('''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.inject.annotation.CustomCreator
@@ -58,7 +58,7 @@ class Test {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 
@@ -85,7 +85,7 @@ class Test {
         def metadata = buildMethodAnnotationMetadata('''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.inject.annotation.CustomGet

@@ -29,8 +29,8 @@ import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.io.File;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -159,7 +159,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         MutableHttpResponse response = HttpResponse.notModified();
         copyNonEntityHeaders(originalResponse, response);
         setDateHeader(response);
-        return ((NettyMutableHttpResponse) response).getNativeResponse();
+        return ((NettyMutableHttpResponse) response).toFullHttpResponse();
     }
 
 }

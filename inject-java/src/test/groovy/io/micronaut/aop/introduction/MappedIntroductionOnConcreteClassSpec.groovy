@@ -15,11 +15,10 @@
  */
 package io.micronaut.aop.introduction
 
-
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.StartupEvent
-import io.micronaut.inject.AbstractTypeElementSpec
 
 class MappedIntroductionOnConcreteClassSpec extends AbstractTypeElementSpec {
 
@@ -29,7 +28,7 @@ class MappedIntroductionOnConcreteClassSpec extends AbstractTypeElementSpec {
 package test;
 
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @io.micronaut.aop.introduction.ListenerAdviceMarker
 @Singleton

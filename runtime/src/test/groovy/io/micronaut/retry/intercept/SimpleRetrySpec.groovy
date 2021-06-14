@@ -21,9 +21,9 @@ import io.micronaut.retry.annotation.Retryable
 import io.micronaut.retry.event.RetryEvent
 import io.micronaut.retry.event.RetryEventListener
 import io.reactivex.Single
+import jakarta.inject.Singleton
 import spock.lang.Specification
 
-import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ExecutionException

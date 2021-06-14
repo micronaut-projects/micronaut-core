@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.websocket;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -34,7 +35,6 @@ import io.netty.util.AttributeKey;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 
-import io.micronaut.core.annotation.Nullable;
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;

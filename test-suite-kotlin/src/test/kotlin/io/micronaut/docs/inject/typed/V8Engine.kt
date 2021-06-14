@@ -1,7 +1,7 @@
 package io.micronaut.docs.inject.typed
 
 import io.micronaut.context.annotation.Bean
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Singleton
@@ -13,4 +13,4 @@ class V8Engine : Engine { // <2>
 
     override val cylinders: Int = 8
 }
-// ebd::class[]
+// end::class[]

@@ -15,14 +15,6 @@
  */
 package io.micronaut.jackson.codec;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,6 +31,14 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * A {@link MediaTypeCodec} Jackson based implementations.
@@ -233,8 +233,13 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
 
     @Override
     public <T, B> ByteBuffer<B> encode(T object, ByteBufferFactory<?, B> allocator) throws CodecException {
-        byte[] bytes = encode(object);
-        return allocator.copiedBuffer(bytes);
+        if (object instanceof byte[]) {
+            return allocator.copiedBuffer((byte[]) object);
+        }
+        ByteBuffer<B> buffer = allocator.buffer();
+        OutputStream outputStream = buffer.toOutputStream();
+        encode(object, outputStream);
+        return buffer;
     }
 
     private <T> JavaType constructJavaType(Argument<T> type) {

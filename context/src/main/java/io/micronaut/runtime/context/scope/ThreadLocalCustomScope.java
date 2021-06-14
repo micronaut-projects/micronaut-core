@@ -20,9 +20,9 @@ import io.micronaut.context.LifeCycle;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
+import jakarta.inject.Provider;
+import jakarta.inject.Singleton;
 
-import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;

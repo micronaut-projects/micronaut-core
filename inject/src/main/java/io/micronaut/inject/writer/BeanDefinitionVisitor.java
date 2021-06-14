@@ -51,6 +51,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
     @Nullable
     Element getOriginatingElement();
 
+
     /**
      * Visits the constructor used to create the bean definition.
      *
@@ -379,4 +380,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param typeArguments The type arguments
      */
     void visitTypeArguments(Map<String, Map<String, ClassElement>> typeArguments);
+
+    /**
+     * @return The generic type arguments for the bean type.
+     * @since 3.0.0
+     */
+    default @NonNull ClassElement[] getTypeArguments() {
+        return new ClassElement[0];
+    }
 }

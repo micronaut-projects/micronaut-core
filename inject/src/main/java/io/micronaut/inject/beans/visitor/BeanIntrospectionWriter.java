@@ -57,8 +57,10 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private static final Method METHOD_ADD_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "addProperty", BeanProperty.class));
     private static final Method METHOD_ADD_METHOD = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "addMethod", BeanMethod.class));
     private static final Method METHOD_INDEX_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "indexProperty", Class.class, String.class, String.class));
+    private static final Method METHOD_ARRAYS_COPY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(Arrays.class, "copyOf", Object[].class, int.class));
     private static final String REFERENCE_SUFFIX = "$IntrospectionRef";
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
+    private static final String FIELD_CONSTRUCTOR_ARGUMENTS = "$CONSTRUCTOR_ARGUMENTS";
 
     private final ClassWriter referenceWriter;
     private final String introspectionName;
@@ -285,6 +287,23 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                     int.class
             );
 
+            if (constructor != null && ArrayUtils.isNotEmpty(constructor.getParameters())) {
+                introspectionWriter.visitField(ACC_PRIVATE | ACC_FINAL, FIELD_CONSTRUCTOR_ARGUMENTS, Type.getDescriptor(Argument[].class), null, null);
+
+                constructorWriter.loadThis();
+
+                pushBuildArgumentsForMethod(
+                        introspectionType.getClassName(),
+                        introspectionType,
+                        introspectionWriter,
+                        constructorWriter,
+                        Arrays.asList(constructor.getParameters()),
+                        localLoadTypeMethods
+                );
+
+                constructorWriter.putField(introspectionType, FIELD_CONSTRUCTOR_ARGUMENTS, Type.getType(Argument[].class));
+            }
+
             // process the properties, creating them etc.
             for (BeanPropertyWriter propertyWriter : propertyDefinitions.values()) {
                 propertyWriter.accept(classWriterOutputVisitor);
@@ -376,17 +395,12 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     private void writeConstructorArguments() {
-        final GeneratorAdapter getConstructorArguments = startPublicMethodZeroArgs(introspectionWriter, Argument[].class, "getConstructorArguments");
         List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
-        pushBuildArgumentsForMethod(
-                introspectionType.getClassName(),
-                introspectionType,
-                introspectionWriter,
-                getConstructorArguments,
-                constructorArguments,
-                localLoadTypeMethods
-        );
-
+        final GeneratorAdapter getConstructorArguments = startPublicMethodZeroArgs(introspectionWriter, Argument[].class, "getConstructorArguments");
+        getConstructorArguments.loadThis();
+        getConstructorArguments.getField(introspectionType, FIELD_CONSTRUCTOR_ARGUMENTS, Type.getType(Argument[].class));
+        getConstructorArguments.push(constructor.getParameters().length);
+        getConstructorArguments.invokeStatic(Type.getType(Arrays.class), METHOD_ARRAYS_COPY);
         getConstructorArguments.returnValue();
         getConstructorArguments.visitMaxs(1, 1);
         getConstructorArguments.endMethod();
@@ -588,6 +602,30 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         if (element != null && !element.isPrivate()) {
             methodDefinitions.add(new BeanMethodWriter(this, introspectionType, methodDefinitions.size(), element));
         }
+    }
+
+    /**
+     * Visits a bean field.
+     * @param beanField The field
+     */
+    public void visitBeanField(FieldElement beanField) {
+        final Type propertyType = JavaModelUtils.getTypeReference(beanField.getType());
+        final Type propertyGenericType = JavaModelUtils.getTypeReference(beanField.getGenericType());
+
+        DefaultAnnotationMetadata.contributeDefaults(
+                this.annotationMetadata,
+                beanField.getAnnotationMetadata()
+        );
+
+        propertyDefinitions.put(
+                beanField.getName(),
+                new BeanFieldWriter(
+                        this,
+                        propertyType,
+                        propertyGenericType,
+                        beanField,
+                        propertyIndex++
+                ));
     }
 
     /**

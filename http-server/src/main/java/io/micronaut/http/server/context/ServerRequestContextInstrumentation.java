@@ -20,8 +20,7 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * Instruments Micronaut such that {@link io.micronaut.http.context.ServerRequestContext} state is propagated.

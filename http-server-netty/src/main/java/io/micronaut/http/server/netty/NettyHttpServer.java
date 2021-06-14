@@ -15,27 +15,35 @@
  */
 package io.micronaut.http.server.netty;
 
-import io.micronaut.context.BeanProvider;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.TypeHint;
-import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.discovery.event.ServiceStoppedEvent;
+import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.discovery.EmbeddedServerInstance;
 import io.micronaut.discovery.event.ServiceReadyEvent;
+import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.http.HttpRequestFactory;
 import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
-import io.micronaut.http.netty.channel.*;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.micronaut.http.netty.channel.ChannelPipelineListener;
+import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
+import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
+import io.micronaut.http.netty.channel.EventLoopGroupFactory;
+import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
+import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
@@ -52,11 +60,11 @@ import io.micronaut.http.server.netty.ssl.HttpRequestCertificateHandler;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
+import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.discovery.EmbeddedServerInstance;
 import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskExecutors;
@@ -65,13 +73,35 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelOutboundHandler;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpContentDecompressor;
+import io.netty.handler.codec.http.HttpMessage;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
+import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import io.netty.handler.codec.http2.*;
+import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
+import io.netty.handler.codec.http2.DefaultHttp2Connection;
+import io.netty.handler.codec.http2.Http2CodecUtil;
+import io.netty.handler.codec.http2.Http2Connection;
+import io.netty.handler.codec.http2.Http2FrameListener;
+import io.netty.handler.codec.http2.Http2FrameLogger;
+import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
+import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
+import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.flow.FlowControlHandler;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -84,17 +114,26 @@ import io.netty.util.AsciiString;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.micronaut.core.annotation.Nullable;
-
-import javax.inject.Singleton;
 import java.io.File;
-import java.net.*;
+import java.net.BindException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -145,6 +184,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final ChannelOptionFactory channelOptionFactory;
+    private final HttpHostResolver hostResolver;
     private boolean shutdownWorker = false;
     private boolean shutdownParent = false;
     private EventLoopGroup workerGroup;
@@ -165,12 +205,13 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param executorSelector                        The executor selector
      * @param serverSslBuilder                        The Netty Server SSL builder
      * @param outboundHandlers                        The outbound handlers
-     * @param eventLoopGroupRegistry                  The event loop registry
      * @param eventLoopGroupFactory                   The EventLoopGroupFactory
+     * @param eventLoopGroupRegistry                  The event loop registry
      * @param httpCompressionStrategy                 The http compression strategy
      * @param httpContentProcessorResolver            The http content processor resolver
      * @param channelOptionFactory                    The channel option factory
      * @param errorResponseProcessor                  The factory to create error responses
+     * @param hostResolver                            The HTTP host resolver
      */
     @SuppressWarnings("ParameterNumber")
     public NettyHttpServer(
@@ -181,8 +222,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
             StaticResourceResolver resourceResolver,
-            @javax.inject.Named(TaskExecutors.IO) BeanProvider<ExecutorService> ioExecutor,
-            @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
+            @jakarta.inject.Named(TaskExecutors.IO) BeanProvider<ExecutorService> ioExecutor,
+            @jakarta.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
             ExecutorSelector executorSelector,
             @Nullable ServerSslBuilder serverSslBuilder,
             List<ChannelOutboundHandler> outboundHandlers,
@@ -191,7 +232,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             HttpCompressionStrategy httpCompressionStrategy,
             HttpContentProcessorResolver httpContentProcessorResolver,
             ChannelOptionFactory channelOptionFactory,
-            ErrorResponseProcessor<?> errorResponseProcessor
+            ErrorResponseProcessor<?> errorResponseProcessor,
+            HttpHostResolver hostResolver
     ) {
         this.httpCompressionStrategy = httpCompressionStrategy;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
@@ -241,6 +283,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 errorResponseProcessor
         );
         this.channelOptionFactory = channelOptionFactory;
+        this.hostResolver = hostResolver;
     }
 
     /**
@@ -305,11 +348,11 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             workerGroup = createWorkerEventLoopGroup(workerConfig);
             parentGroup = createParentEventLoopGroup();
             ServerBootstrap serverBootstrap = createServerBootstrap();
+            serverBootstrap.channelFactory(() -> eventLoopGroupFactory.serverSocketChannelInstance(workerConfig));
 
             processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
             processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
-                    .channel(eventLoopGroupFactory.serverSocketChannelClass(workerConfig))
                     .childHandler(new NettyHttpServerInitializer());
 
             Optional<String> host = serverConfiguration.getHost();
@@ -742,6 +785,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             handlers.put(HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
             handlers.put(HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
             handlers.put(HttpRequestDecoder.ID, requestDecoder);
+            if (serverConfiguration.isDualProtocol() && serverConfiguration.isHttpToHttpsRedirect() && useSsl) {
+                handlers.put(HANDLER_HTTP_TO_HTTPS_REDIRECT, new HttpToHttpsRedirectHandler(sslConfiguration, hostResolver));
+            }
             if (useSsl) {
                 handlers.put("request-certificate-handler", requestCertificateHandler);
             }

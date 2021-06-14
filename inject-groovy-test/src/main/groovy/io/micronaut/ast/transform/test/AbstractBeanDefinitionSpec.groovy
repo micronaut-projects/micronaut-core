@@ -20,13 +20,16 @@ import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
+import io.micronaut.ast.groovy.visitor.GroovyElementFactory
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.Qualifier
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.writer.BeanDefinitionVisitor
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
@@ -43,6 +46,9 @@ import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.ErrorCollector
 import org.codehaus.groovy.control.SourceUnit
 import spock.lang.Specification
+
+import java.util.function.Predicate
+import java.util.stream.Collectors
 
 /**
  * @author graemerocher
@@ -65,12 +71,29 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
             def compilationUnit = new CompilationUnit()
             def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)
-            return new GroovyClassElement(
-                    new GroovyVisitorContext(sourceUnit, compilationUnit ), cn, metadata
-            )
+            def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
+            return elementFactory.newClassElement(cn, metadata)
         } else {
             throw new IllegalArgumentException("No class found in passed source code")
         }
+    }
+
+    ClassElement buildClassElement(String className, String source) {
+        def builder = new AstBuilder()
+        ASTNode[] nodes = builder.buildFromString(source)
+        for (ASTNode node: nodes) {
+            if (node instanceof ClassNode) {
+                if (node.getName() == className) {
+                    def cc = new CompilerConfiguration()
+                    def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
+                    def compilationUnit = new CompilationUnit()
+                    def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, node)
+                    def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
+                    return elementFactory.newClassElement(node, metadata)
+                }
+            }
+        }
+        throw new IllegalArgumentException("No class found in passed source code")
     }
 
     @CompileStatic
@@ -88,8 +111,52 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         }
     }
 
-    InMemoryByteCodeGroovyClassLoader buildClassLoader(String classStr) {
+    @CompileStatic
+    BeanDefinition buildBeanDefinition(String packageName, String className, String classStr) {
+        def beanDefName= '$' + className + 'Definition'
+        String beanFullName = "${packageName}.${beanDefName}"
+
         def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        classLoader.parseClass(classStr)
+        try {
+            return (BeanDefinition) classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
+    }
+
+    /**
+     * Builds the bean definition for an AOP proxy bean.
+     * @param className The class name
+     * @param cls The class source
+     * @return The bean definition
+     */
+    protected BeanDefinition buildInterceptedBeanDefinition(String className, String cls) {
+        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'Definition'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(cls)
+        return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    /**
+     * Builds the bean definition reference for an AOP proxy bean.
+     * @param className The class name
+     * @param cls The class source
+     * @return The bean definition
+     */
+    protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, String cls) {
+        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'DefinitionClass'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(cls)
+        return (BeanDefinitionReference)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    InMemoryByteCodeGroovyClassLoader buildClassLoader(String classStr) {
+        def classLoader = new InMemoryByteCodeGroovyClassLoader(getClass().getClassLoader())
         classLoader.parseClass(classStr)
         return classLoader
     }
@@ -108,7 +175,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     AnnotationMetadata buildMethodAnnotationMetadata(String cls, String source, String methodName) {
         ClassNode element = buildClassNode(source, cls)
         MethodNode method = element.getMethods(methodName)[0]
-        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
+        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(Stub(SourceUnit) {
+            getErrorCollector() >> null
+        }, null)
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
         return metadata
     }
@@ -164,20 +233,35 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
     }
 
+    /**
+     * Gets a bean from the context for the given class name
+     * @param context The context
+     * @param className The class name
+     * @return The bean instance
+     */
+    Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {
+        context.getBean(context.classLoader.loadClass(className), qualifier)
+    }
+
     protected ApplicationContext buildContext(String className, String cls) {
         InMemoryByteCodeGroovyClassLoader classLoader = buildClassLoader(cls)
 
         return new DefaultApplicationContext(
                 ClassPathResourceLoader.defaultLoader(classLoader),"test") {
             @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                def references = classLoader.generatedClasses.keySet().findAll {
-                    it.endsWith("DefinitionClass")
-                }.collect {
-                    classLoader.loadClass(it).newInstance()
-                }
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+                def references =  classLoader.generatedClasses.keySet()
+                    .stream()
+                    .filter({ name -> name.endsWith("DefinitionClass") })
+                    .map({ name -> (BeanDefinitionReference) classLoader.loadClass(name).newInstance() })
+                    .filter({ bdr -> predicate == null || predicate.test(bdr) })
+                    .collect(Collectors.toList())
                 return references + new InterceptorRegistryBean()
             }
         }.start()
+    }
+
+    protected ApplicationContext buildContext(String cls) {
+        buildContext(null, cls)
     }
 }

@@ -21,6 +21,7 @@ import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.convert.*;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.Named;
@@ -37,6 +38,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -60,10 +62,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames The environment names
      */
     public DefaultApplicationContext(@NonNull String... environmentNames) {
-        this(() -> {
-            ArgumentUtils.requireNonNull("environmentNames", environmentNames);
-            return Arrays.asList(environmentNames);
-        });
+        this(ClassPathResourceLoader.defaultLoader(DefaultApplicationContext.class.getClassLoader()), environmentNames);
     }
 
     /**
@@ -123,11 +122,28 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected @NonNull List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-        if (resolvedBeanReferences != null) {
+    protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+        if (resolvedBeanReferences == null) {
+            return super.resolveBeanDefinitionReferences();
+        }
+        return resolvedBeanReferences;
+    }
+
+    @Override
+    protected @NonNull List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+        if (resolvedBeanReferences == null) {
+            return super.resolveBeanDefinitionReferences(predicate);
+        }
+        if (predicate == null) {
             return resolvedBeanReferences;
         }
-        return super.resolveBeanDefinitionReferences();
+        List<BeanDefinitionReference> beanDefinitionReferences = new ArrayList<>(resolvedBeanReferences.size());
+        for (BeanDefinitionReference reference : resolvedBeanReferences) {
+            if (predicate.test(reference)) {
+                beanDefinitionReferences.add(reference);
+            }
+        }
+        return beanDefinitionReferences;
     }
 
     /**
@@ -226,6 +242,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
+    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Argument<T> beanType, boolean filterProxied, Predicate<BeanDefinition<T>> predicate) {
+        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(resolutionContext, beanType, filterProxied, predicate);
+        return transformIterables(resolutionContext, candidates, filterProxied);
+    }
+
+    @Override
     protected <T> Collection<BeanDefinition<T>> transformIterables(BeanResolutionContext resolutionContext, Collection<BeanDefinition<T>> candidates, boolean filterProxied) {
         if (!candidates.isEmpty()) {
 
@@ -286,7 +308,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         continue;
                     }
 
-                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), null, filterProxied);
+                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), filterProxied, null);
+
                     if (!dependentCandidates.isEmpty()) {
                         for (BeanDefinition dependentCandidate : dependentCandidates) {
 
@@ -296,7 +319,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
                                 optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
                             } else {
-                                Optional<String> qualifierName = dependentCandidate.getAnnotationNameByStereotype(javax.inject.Qualifier.class);
+                                Optional<String> qualifierName = dependentCandidate.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER);
                                 optional = qualifierName.map(name -> Qualifiers.byAnnotation(dependentCandidate, name));
                             }
 
@@ -305,7 +328,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                             }
 
                             optional.ifPresent(qualifier -> {
-                                    String qualifierKey = javax.inject.Qualifier.class.getName();
+                                    String qualifierKey = AnnotationUtil.QUALIFIER;
                                     Argument<?>[] arguments = candidate.getConstructor().getArguments();
                                     for (Argument<?> argument : arguments) {
                                         Class<?> argumentType = argument.getType();
@@ -415,7 +438,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 return delegate;
                             }
                         } else {
-                            Optional<Qualifier> resolvedQualifier = delegate.get(javax.inject.Qualifier.class.getName(), Qualifier.class);
+                            Optional<Qualifier> resolvedQualifier = delegate.get(AnnotationUtil.QUALIFIER, Qualifier.class);
                             if (resolvedQualifier.isPresent() && resolvedQualifier.get().equals(qualifier)) {
                                 return delegate;
                             }
@@ -607,14 +630,18 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         @Override
-        protected @NonNull List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-            List<BeanDefinitionReference> refs = super.resolveBeanDefinitionReferences();
+        protected @NonNull List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+            List<BeanDefinitionReference> refs = super.resolveBeanDefinitionReferences(null);
             // we cache the resolved beans in a local field to avoid the I/O cost of resolving them twice
             // once for the bootstrap context and again for the main context
             resolvedBeanReferences = refs;
-            return refs.stream()
-                        .filter(ref -> ref.isAnnotationPresent(BootstrapContextCompatible.class))
-                        .collect(Collectors.toList());
+            List<BeanDefinitionReference> beanDefinitionReferences = new ArrayList<>();
+            for (BeanDefinitionReference reference : refs) {
+                if ((predicate == null || predicate.test(reference)) && reference.isAnnotationPresent(BootstrapContextCompatible.class)) {
+                    beanDefinitionReferences.add(reference);
+                }
+            }
+            return beanDefinitionReferences;
         }
 
         @Override

@@ -182,6 +182,16 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
+    protected boolean hasAnnotation(AnnotatedNode element, String annotation) {
+        for (AnnotationNode ann: element.getAnnotations()) {
+            if (ann.getClassNode().getName() == annotation) {
+                return true
+            }
+        }
+        return false
+    }
+
+    @Override
     protected boolean hasAnnotations(AnnotatedNode element) {
         return CollectionUtils.isNotEmpty(element.getAnnotations())
     }
@@ -262,7 +272,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                     }
                 }
             }
-            if (!repeatable) {
+            if (!repeatable || node.members.size() > 1) {
                 expanded.add(node)
             }
         }

@@ -32,7 +32,7 @@ import io.reactivex.Flowable
 import org.slf4j.LoggerFactory
 import spock.lang.Specification
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit

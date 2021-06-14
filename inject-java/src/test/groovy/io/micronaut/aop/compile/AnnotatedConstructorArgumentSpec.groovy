@@ -15,13 +15,13 @@
  */
 package io.micronaut.aop.compile
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.simple.Mutating
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Type
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 
@@ -41,7 +41,7 @@ import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
     private String myValue;
@@ -94,7 +94,7 @@ import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
 
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
     private String myValue;

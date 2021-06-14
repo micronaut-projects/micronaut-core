@@ -3,7 +3,6 @@ package io.micronaut.tracing.brave
 import brave.propagation.CurrentTraceContext
 import brave.propagation.ThreadLocalCurrentTraceContext
 import io.micronaut.context.ApplicationContext
-import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification

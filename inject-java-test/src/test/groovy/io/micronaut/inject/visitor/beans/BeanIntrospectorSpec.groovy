@@ -6,7 +6,7 @@ import io.micronaut.core.beans.BeanIntrospector
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version

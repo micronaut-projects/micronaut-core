@@ -36,7 +36,7 @@ class CustomVisitorSpec extends AbstractBeanDefinitionSpec {
 package test
 
 import io.micronaut.http.annotation.*
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 @Controller("/test")
 class TestController {
@@ -75,7 +75,7 @@ class TestController {
 package test;
 
 import io.micronaut.http.annotation.*
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 public class TestController {
 
@@ -114,7 +114,7 @@ public class TestController {
 package test;
 
 import io.micronaut.core.annotation.Generated
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 @Generated
 public class TestGenerated {

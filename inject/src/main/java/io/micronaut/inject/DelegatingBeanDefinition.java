@@ -54,6 +54,11 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
+    default Optional<String> getScopeName() {
+        return getTarget().getScopeName();
+    }
+
+    @Override
     default AnnotationMetadata getAnnotationMetadata() {
         return getTarget().getAnnotationMetadata();
     }

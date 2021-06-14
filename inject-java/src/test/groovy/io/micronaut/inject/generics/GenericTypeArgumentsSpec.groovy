@@ -15,15 +15,12 @@
  */
 package io.micronaut.inject.generics
 
-import io.micronaut.context.ApplicationContext
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.core.annotation.AnnotationMetadataProvider
-import io.micronaut.core.type.Argument
 import io.micronaut.http.filter.HttpClientFilterResolver
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
-import io.micronaut.inject.MethodInjectionPoint
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Unroll
 import zipkin2.Span
@@ -37,44 +34,6 @@ import java.util.stream.Stream
 
 class GenericTypeArgumentsSpec extends AbstractTypeElementSpec {
 
-    void 'test inject with generic inheritance'() {
-        given:
-        def context = buildContext('genericinheritance.Test', '''
-package genericinheritance;
-
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.http.filter.HttpClientFilterResolver;
-import io.micronaut.http.filter.HttpFilterResolver.FilterEntry;
-import io.micronaut.http.filter.HttpClientFilter;
-import io.micronaut.http.HttpRequest;
-import java.util.List;
-
-@javax.inject.Singleton
-public class Test implements HttpClientFilterResolver<TestMetadata> {
-    public List<FilterEntry<HttpClientFilter>> resolveFilterEntries(TestMetadata context) {
-        return java.util.Collections.emptyList();
-    }
-    
-    public List<HttpClientFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry<HttpClientFilter>> filterEntries) {
-    return java.util.Collections.emptyList();
-    }
-}
-
-interface TestMetadata extends AnnotationMetadataProvider {} 
-''')
-
-        expect:
-        context != null
-
-        Qualifiers.byGenerics(AnnotationMetadataProvider)
-            .reduce(HttpClientFilterResolver,
-                Stream.of(context.getBeanDefinition(context.classLoader.loadClass('genericinheritance.Test')))
-            ).findFirst().isPresent()
-
-        cleanup:
-        context.close()
-    }
-
     void "test generic type arguments with inner classes resolve"() {
         given:
         def definition = buildBeanDefinition('innergenerics.Outer$FooImpl', '''
@@ -84,7 +43,7 @@ class Outer {
 
     interface Foo<T extends CharSequence> {}
     
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     class FooImpl implements Foo<String> {}
 }
 ''')
@@ -99,7 +58,7 @@ class Outer {
         BeanDefinition definition = buildBeanDefinition('inheritedfields.UserDaoClient', '''
 package inheritedfields;
 
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 class UserDaoClient extends DaoClient<User>{
@@ -192,7 +151,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import java.util.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Executable
@@ -224,7 +183,7 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import io.micronaut.core.convert.value.ConvertibleValues;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.util.Map;
 import io.micronaut.context.annotation.Executable;
@@ -266,7 +225,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 final class TrackedSortedSet<T extends java.lang.Comparable<? super T>> {
  public TrackedSortedSet(java.util.Collection<? extends T> initial) {
         super();
@@ -286,7 +245,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements java.util.function.Function<String, Integer>{
 
     public Integer apply(String str) {
@@ -313,7 +272,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements Foo {
 
     public Integer apply(String str) {
@@ -340,7 +299,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements Bar {
 
     public Integer apply(String str) {
@@ -368,7 +327,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements Bar {
 
     public Integer apply(String str) {
@@ -397,7 +356,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test extends Foo {
 
     public Integer apply(String str) {
@@ -424,7 +383,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test extends Foo<String, Integer> {
 
     public Integer apply(String str) {
@@ -515,7 +474,7 @@ import zipkin2.*;
 @Factory
 class Test {
 
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     AsyncReporter<Span> asyncReporter() {
         return null;
     }

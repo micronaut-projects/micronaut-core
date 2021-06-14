@@ -31,9 +31,9 @@ import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
+import jakarta.inject.Named;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Named;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 

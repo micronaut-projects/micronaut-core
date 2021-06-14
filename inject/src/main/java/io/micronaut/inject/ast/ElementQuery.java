@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -78,6 +79,20 @@ public interface ElementQuery<T extends Element> {
     @NonNull ElementQuery<T> onlyAccessible();
 
     /**
+     * Indicates that only accessible members from the given type should be returned. Inaccessible members include:
+     *
+     * <ul>
+     *     <li>package/private members that are in a different package</li>
+     *     <li>private members</li>
+     *     <li>synthetic members or those whose names start with the dollar symbol</li>
+     * </ul>
+     *
+     * @param fromType The origin type
+     * @return This query
+     */
+    @NonNull ElementQuery<T> onlyAccessible(ClassElement fromType);
+
+    /**
      * Indicates to return only instance (non-static methods).
      * @return The query
      */
@@ -89,6 +104,13 @@ public interface ElementQuery<T extends Element> {
      * @return This query
      */
     @NonNull ElementQuery<T> named(@NonNull Predicate<String> predicate);
+
+    /**
+     * Allows filtering elements by type. For {@link MethodElement} instances this is based on the return type.
+     * @param predicate The predicate to use. Should return true to include the element.
+     * @return This query
+     */
+    @NonNull ElementQuery<T> typed(@NonNull Predicate<ClassElement> predicate);
 
     /**
      * Allows filtering elements by annotation.
@@ -158,6 +180,11 @@ public interface ElementQuery<T extends Element> {
         boolean isOnlyAccessible();
 
         /**
+         * @return Get the type this element is only accessible from.
+         */
+        Optional<ClassElement> getOnlyAccessibleFromType();
+
+        /**
          * @return Whether to declare only declared members
          */
         boolean isOnlyDeclared();
@@ -171,6 +198,13 @@ public interface ElementQuery<T extends Element> {
          * @return The name predicates
          */
         @NonNull List<Predicate<String>> getNamePredicates();
+
+
+        /**
+         * @return The name predicates
+         * @since 3.0.0
+         */
+        @NonNull List<Predicate<ClassElement>> getTypePredicates();
 
         /**
          * @return The annotation predicates

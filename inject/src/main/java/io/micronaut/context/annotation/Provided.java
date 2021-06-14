@@ -15,9 +15,10 @@
  */
 package io.micronaut.context.annotation;
 
+import jakarta.inject.Scope;
+
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import javax.inject.Scope;
 import java.lang.annotation.Retention;
 
 /**

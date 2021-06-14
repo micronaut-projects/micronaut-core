@@ -26,12 +26,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
-import com.fasterxml.jackson.databind.node.LongNode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
-
-import java.math.BigDecimal
-
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
@@ -775,7 +771,7 @@ class JacksonProcessorSpec extends Specification {
 
         when:
         long longValue = Integer.MAX_VALUE + 1L
-        BigInteger bigIntegerValue = new BigInteger(Long.MAX_VALUE) + 1L
+        BigInteger bigIntegerValue = BigInteger.valueOf(Long.MAX_VALUE) + 1L
         BigDecimal bigDecimalValue = new BigDecimal(Double.MAX_VALUE) * new BigDecimal("10")
         byte[] bytes = "[1, $longValue, [3, 4, [5, 6], 7], $bigDecimalValue, [8, 9, 10], 11, $bigIntegerValue]".bytes
         boolean complete = false

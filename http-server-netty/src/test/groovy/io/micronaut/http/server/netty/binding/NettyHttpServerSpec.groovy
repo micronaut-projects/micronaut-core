@@ -31,11 +31,11 @@ import io.micronaut.http.server.exceptions.ServerStartupException
 import io.micronaut.runtime.Micronaut
 import io.micronaut.runtime.event.annotation.EventListener
 import io.micronaut.runtime.server.EmbeddedServer
+import jakarta.inject.Singleton
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.lang.Stepwise
 
-import javax.inject.Singleton
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.atomic.AtomicInteger

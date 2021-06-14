@@ -22,7 +22,6 @@ import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.Attribute;
@@ -64,8 +63,7 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
             nettyStatus = new HttpResponseStatus(status.getCode(), reason);
         }
 
-        DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, nettyStatus);
-        return new NettyMutableHttpResponse(fullHttpResponse, ConversionService.SHARED);
+        return new NettyMutableHttpResponse(HttpVersion.HTTP_1_1, nettyStatus, ConversionService.SHARED);
     }
 
     /**

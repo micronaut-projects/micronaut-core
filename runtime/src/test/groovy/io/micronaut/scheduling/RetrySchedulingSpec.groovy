@@ -4,10 +4,10 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.scheduling.annotation.Scheduled
+import jakarta.inject.Singleton
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.inject.Singleton
 import java.util.concurrent.atomic.AtomicInteger
 
 class RetrySchedulingSpec extends Specification {

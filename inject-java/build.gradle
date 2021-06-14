@@ -5,7 +5,6 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    compileOnly "jakarta.inject:jakarta.inject-api:2.0.0"
     compileOnly dependencyVersion("validation")
 
     testImplementation project(':aop')
@@ -27,7 +26,6 @@ dependencies {
     testImplementation dependencyModuleVersion("micrometer", "micrometer-core")
     testImplementation project(":validation")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
-    testImplementation "jakarta.inject:jakarta.inject-api:2.0.0"
     testImplementation dependencyVersion("zipkin.reporter")
 
     testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'

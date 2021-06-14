@@ -15,18 +15,18 @@
  */
 package io.micronaut.http.netty.channel;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
@@ -76,10 +76,20 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
         return NioServerSocketChannel.class;
     }
 
+    @Override
+    public NioServerSocketChannel serverSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return new NioServerSocketChannel();
+    }
+
     @NonNull
     @Override
     public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return NioSocketChannel.class;
+    }
+
+    @Override
+    public SocketChannel clientSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return new NioSocketChannel();
     }
 
     private static NioEventLoopGroup withIoRatio(NioEventLoopGroup group, @Nullable Integer ioRatio) {

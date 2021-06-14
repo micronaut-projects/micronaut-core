@@ -20,16 +20,14 @@ import io.micronaut.context.ApplicationContext;
 //tag::import[]
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.function.client.FunctionClient;
+import jakarta.inject.Named;
 import org.junit.Test;
 
-import javax.inject.Named;
 import static org.junit.Assert.assertEquals;
 //end::import[]
 
 //tag::rxImport[]
 import io.reactivex.Single;
-
-import java.util.Collections;
 //end::rxImport[]
 
 public class LocalFunctionInvokeSpec {

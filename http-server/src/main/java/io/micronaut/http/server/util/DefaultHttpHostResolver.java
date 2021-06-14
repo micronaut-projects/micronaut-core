@@ -16,17 +16,16 @@
 package io.micronaut.http.server.util;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.HttpServerConfiguration.HostResolutionConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.net.URI;
 import java.util.List;
 import java.util.regex.Matcher;

@@ -32,7 +32,9 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -73,7 +75,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     @Override
     public Optional<MediaType> getContentType() {
         try {
-            return Optional.of(new MediaType(fileUpload.getContentType()));
+            return Optional.of(MediaType.of(fileUpload.getContentType()));
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }

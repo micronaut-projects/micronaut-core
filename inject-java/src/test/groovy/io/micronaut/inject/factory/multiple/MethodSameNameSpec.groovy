@@ -1,7 +1,7 @@
 package io.micronaut.inject.factory.multiple
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class MethodSameNameSpec extends AbstractTypeElementSpec {
 
@@ -24,12 +24,12 @@ package test;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Factory
 class AFactory {
 
-    @Bean
+    @Singleton
     @Requires(beans=X.class, missingBeans=Y.class)
     A a(X x) {
         return new A();

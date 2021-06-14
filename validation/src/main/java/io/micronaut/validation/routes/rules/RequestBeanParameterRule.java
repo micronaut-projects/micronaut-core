@@ -15,17 +15,17 @@
  */
 package io.micronaut.validation.routes.rules;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.validation.InternalUriMatchTemplate;
 import io.micronaut.validation.routes.RouteValidationResult;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Validates RequestBean parameters.

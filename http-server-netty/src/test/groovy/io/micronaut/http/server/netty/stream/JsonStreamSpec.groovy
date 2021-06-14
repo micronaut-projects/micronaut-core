@@ -15,9 +15,6 @@
  */
 package io.micronaut.http.server.netty.stream
 
-import io.micronaut.core.io.buffer.ByteBuffer
-import io.micronaut.http.annotation.Produces
-import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -26,9 +23,9 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.RxStreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
 import io.reactivex.Single
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 

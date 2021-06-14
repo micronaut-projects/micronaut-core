@@ -16,6 +16,7 @@
 package io.micronaut.tracing.instrument.http;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Filter;
@@ -30,8 +31,6 @@ import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
 import org.reactivestreams.Publisher;
-
-import io.micronaut.core.annotation.NonNull;
 
 /**
  * An HTTP client instrumentation filter that uses Open Tracing.

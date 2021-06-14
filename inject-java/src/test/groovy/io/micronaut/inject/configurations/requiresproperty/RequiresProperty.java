@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.configurations.requiresproperty;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * Created by graemerocher on 15/06/2017.

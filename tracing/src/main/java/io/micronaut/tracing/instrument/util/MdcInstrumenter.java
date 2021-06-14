@@ -21,9 +21,9 @@ import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
+import jakarta.inject.Singleton;
 import org.slf4j.MDC;
 
-import javax.inject.Singleton;
 import java.util.Map;
 
 /**

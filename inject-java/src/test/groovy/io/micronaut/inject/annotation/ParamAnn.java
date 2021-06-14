@@ -1,6 +1,6 @@
 package io.micronaut.inject.annotation;
 
-import javax.inject.Qualifier;
+import jakarta.inject.Qualifier;
 import java.lang.annotation.*;
 
 @Retention(RetentionPolicy.RUNTIME)

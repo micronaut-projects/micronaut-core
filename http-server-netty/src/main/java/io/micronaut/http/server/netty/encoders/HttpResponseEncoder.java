@@ -19,8 +19,10 @@ import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.http.*;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
@@ -29,10 +31,15 @@ import io.micronaut.runtime.http.codec.TextPlainCodec;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelHandler.Sharable;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,7 +111,7 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
         }
 
         if (response instanceof NettyMutableHttpResponse) {
-            out.add(((NettyMutableHttpResponse) response).getNativeResponse());
+            out.add(((NettyMutableHttpResponse) response).toHttpResponse());
         } else {
             io.netty.handler.codec.http.HttpHeaders nettyHeaders = new DefaultHttpHeaders();
             for (Map.Entry<String, List<String>> header : response.getHeaders()) {

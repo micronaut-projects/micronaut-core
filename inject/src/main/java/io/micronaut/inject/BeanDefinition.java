@@ -15,9 +15,11 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Provided;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanContext;
@@ -28,9 +30,10 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
@@ -62,12 +65,91 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     }
 
     /**
+     * @return The name of the scope
+     */
+    default Optional<String> getScopeName() {
+        return Optional.empty();
+    }
+
+    /**
      * @return Whether the scope is singleton
      */
     default boolean isSingleton() {
         AnnotationMetadata am = getAnnotationMetadata();
-        return am.hasDeclaredStereotype(Singleton.class) ||
-                am.classValue(DefaultScope.class).map(t -> t == Singleton.class).orElse(false);
+        if (am.hasDeclaredStereotype(AnnotationUtil.SINGLETON)) {
+            return true;
+        } else {
+            if (!am.hasDeclaredStereotype(AnnotationUtil.SCOPE) &&
+                    am.hasDeclaredStereotype(DefaultScope.class)) {
+                return am.stringValue(DefaultScope.class)
+                        .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
+                        .orElse(false);
+            } else {
+                return false;
+            }
+        }
+    }
+
+    /**
+     * If {@link #isContainerType()} returns true this will return the container element.
+     * @return The container element.
+     */
+    default Optional<Argument<?>> getContainerElement() {
+        return Optional.empty();
+    }
+
+    @Override
+    default boolean isCandidateBean(@Nullable Argument<?> beanType) {
+        if (BeanType.super.isCandidateBean(beanType)) {
+            if (hasStereotype(Any.class)) {
+                return true;
+            } else {
+                final Argument<?>[] typeArguments = beanType.getTypeParameters();
+                final int len = typeArguments.length;
+                if (len == 0) {
+                    if (isContainerType()) {
+                        final Optional<Argument<?>> containerElement = getContainerElement();
+                        if (containerElement.isPresent()) {
+                            final Class<?> t = containerElement.get().getType();
+                            return beanType.isAssignableFrom(t) || beanType.getType() == t;
+                        } else {
+                            return false;
+                        }
+                    } else {
+                        return true;
+                    }
+                } else {
+                    final Class<?>[] beanTypeParameters;
+                    if (!Iterable.class.isAssignableFrom(beanType.getType())) {
+                        final Optional<Argument<?>> containerElement = getContainerElement();
+                        //noinspection OptionalIsPresent
+                        if (containerElement.isPresent()) {
+                            beanTypeParameters = Argument.toClassArray(containerElement.get().getTypeParameters());
+                        } else {
+                            beanTypeParameters = getTypeParameters(beanType.getType());
+                        }
+                    } else {
+                        beanTypeParameters = getTypeParameters(beanType.getType());
+                    }
+                    if (len != beanTypeParameters.length) {
+                        return false;
+                    }
+
+                    for (int i = 0; i < beanTypeParameters.length; i++) {
+                        Class<?> candidateParameter = beanTypeParameters[i];
+                        final Argument<?> requestedParameter = typeArguments[i];
+
+                        if (!requestedParameter.isAssignableFrom(candidateParameter)) {
+                            return false;
+                        }
+
+                    }
+                    return true;
+                }
+            }
+
+        }
+        return false;
     }
 
     /**
@@ -286,7 +368,15 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         } else {
             final List<Argument<?>> typeArguments = getTypeArguments(type);
-            return typeArguments.stream().map(Argument::getType).toArray(Class[]::new);
+            if (typeArguments.size() == 0) {
+                return ReflectionUtils.EMPTY_CLASS_ARRAY;
+            }
+            Class[] params = new Class[typeArguments.size()];
+            int i = 0;
+            for (Argument<?> argument : typeArguments) {
+                params[i++] = argument.getType();
+            }
+            return params;
         }
     }
 
@@ -337,17 +427,28 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The qualifier or null if this isn't one
      */
     default @Nullable Qualifier<T> getDeclaredQualifier() {
-        final String annotation = getAnnotationNameByStereotype(javax.inject.Qualifier.class).orElse(null);
-        if (annotation != null) {
-            if (annotation.equals(Qualifier.PRIMARY)) {
-                // primary is the same as null
-                return null;
+        final List<String> annotations = getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
+        if (CollectionUtils.isNotEmpty(annotations)) {
+            if (annotations.size() == 1) {
+                final String annotation = annotations.iterator().next();
+                if (annotation.equals(Qualifier.PRIMARY)) {
+                    // primary is the same as null
+                    return null;
+                }
+                return Qualifiers.byAnnotation(this, annotation);
+            } else {
+                @SuppressWarnings("rawtypes") final Qualifier[] qualifiers = annotations.stream()
+                        .map((name) -> Qualifiers.byAnnotation(this, name))
+                        .toArray(Qualifier[]::new);
+                //noinspection unchecked
+                return Qualifiers.byQualifiers(
+                        qualifiers
+                );
             }
-            return Qualifiers.byAnnotation(this, annotation);
         } else {
             Qualifier<T> qualifier = resolveDynamicQualifier();
             if (qualifier == null) {
-                String name = stringValue(javax.inject.Named.class).orElse(null);
+                String name = stringValue(AnnotationUtil.NAMED).orElse(null);
                 qualifier = name != null ? Qualifiers.byAnnotation(this, name) : null;
             }
             return qualifier;

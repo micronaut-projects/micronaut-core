@@ -15,12 +15,13 @@
  */
 package io.micronaut.inject.aliasfor
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 
-import javax.inject.Named
-import javax.inject.Qualifier
+import jakarta.inject.Named
+import jakarta.inject.Qualifier
 import java.util.function.Function
 
 class AliasForQualifierSpec extends AbstractTypeElementSpec {
@@ -47,8 +48,8 @@ class Test {
 ''')
         expect:
         definition != null
-        definition.getAnnotationTypeByStereotype(Qualifier).isPresent()
-        definition.getAnnotationTypeByStereotype(Qualifier).get() == Named
-        definition.getValue(Named, String).get() == 'foo'
+        definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).isPresent()
+        definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == AnnotationUtil.NAMED
+        definition.getValue(AnnotationUtil.NAMED, String).get() == 'foo'
     }
 }

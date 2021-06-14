@@ -12,10 +12,9 @@ import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Flowable
+import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import spock.lang.Specification
-
-import javax.inject.Inject
 
 @MicronautTest
 class ResponseAndStreamSpec extends Specification {

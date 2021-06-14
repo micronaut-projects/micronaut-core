@@ -15,13 +15,13 @@
  */
 package io.micronaut.http.server.util;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
+import jakarta.inject.Singleton;
 
-import io.micronaut.core.annotation.NonNull;
-import javax.inject.Singleton;
 import java.net.InetSocketAddress;
 import java.util.List;
 

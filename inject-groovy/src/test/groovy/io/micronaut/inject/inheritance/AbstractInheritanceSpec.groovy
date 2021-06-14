@@ -16,8 +16,10 @@
 package io.micronaut.inject.inheritance
 
 import groovy.transform.PackageScope
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -26,7 +28,7 @@ import javax.inject.Singleton
 /**
  * Created by graemerocher on 15/05/2017.
  */
-class AbstractInheritanceSpec extends Specification {
+class AbstractInheritanceSpec extends AbstractBeanDefinitionSpec {
 
     void "test values are injected for abstract parent class"() {
         given:
@@ -42,6 +44,38 @@ class AbstractInheritanceSpec extends Specification {
         b.a.is(b.another)
         b.packagePrivate != null
         b.packagePrivate.is(b.another)
+    }
+
+    void "test qualifiers are not inherited"() {
+        when:
+        def definition = buildBeanDefinition('test.Child', '''
+package test
+
+abstract class Parent {
+    @jakarta.inject.Inject
+    void injectQualifiers(@jakarta.inject.Named("hello") Bean bean) {}
+}
+
+@jakarta.inject.Singleton
+class Child extends Parent {
+    @Override
+    void injectQualifiers(Bean bean) { }
+}
+
+interface Bean { }
+
+@jakarta.inject.Singleton
+@jakarta.inject.Named("hello")
+class NamedBean implements Bean { }
+
+@jakarta.inject.Singleton
+class NotNamedBean implements Bean { }
+
+''')
+
+        then:
+        noExceptionThrown()
+        definition != null
     }
 
     @Singleton

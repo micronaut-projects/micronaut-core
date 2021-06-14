@@ -146,6 +146,18 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
 
     @NonNull
     @Override
+    default String[] stringValues(@NonNull String annotation, @NonNull String member) {
+        return getAnnotationMetadata().stringValues(annotation, member);
+    }
+
+    @NonNull
+    @Override
+    default String[] stringValues(@NonNull String annotation) {
+        return getAnnotationMetadata().stringValues(annotation, AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    @NonNull
+    @Override
     default OptionalInt intValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         return getAnnotationMetadata().intValue(annotation, member);
     }
@@ -338,6 +350,11 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
 
     @Override
     default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
+        return getAnnotationMetadata().getAnnotationTypesByStereotype(stereotype);
+    }
+
+    @Override
+    default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull String stereotype) {
         return getAnnotationMetadata().getAnnotationTypesByStereotype(stereotype);
     }
 
@@ -564,6 +581,18 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     @Override
     default @Nullable <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass) {
         return getAnnotationMetadata().synthesize(annotationClass);
+    }
+
+    @Nullable
+    @Override
+    default <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        return getAnnotationMetadata().synthesize(annotationClass, sourceAnnotation);
+    }
+
+    @Nullable
+    @Override
+    default <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        return getAnnotationMetadata().synthesizeDeclared(annotationClass, sourceAnnotation);
     }
 
     @Override

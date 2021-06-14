@@ -18,13 +18,17 @@ package io.micronaut.http.client.netty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpVersion;
@@ -32,7 +36,13 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.client.*;
+import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.LoadBalancerResolver;
+import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.RxHttpClientRegistry;
+import io.micronaut.http.client.RxStreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
@@ -56,13 +66,17 @@ import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
+import io.netty.channel.ChannelFactory;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.PreDestroy;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadFactory;
 
@@ -320,7 +334,6 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
             AnnotationMetadata annotationMetadata) {
 
         EventLoopGroup eventLoopGroup = resolveEventLoopGroup(configuration, beanContext);
-        Class<? extends SocketChannel> socketChannelClass = resolveSocketChannel(configuration, beanContext);
         return new DefaultHttpClient(
                 loadBalancer,
                 httpVersion,
@@ -339,7 +352,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
                         new DefaultRequestBinderRegistry(ConversionService.SHARED)
                 ),
                 eventLoopGroup,
-                socketChannelClass,
+                resolveSocketChannelFactory(configuration, beanContext),
                 invocationInstrumenterFactories
         );
     }
@@ -369,7 +382,6 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
                 configuration = defaultHttpClientConfiguration;
             }
             EventLoopGroup eventLoopGroup = resolveEventLoopGroup(configuration, beanContext);
-            Class<? extends SocketChannel> socketChannelClass = resolveSocketChannel(configuration, beanContext);
             return new DefaultHttpClient(
                     loadBalancer,
                     null,
@@ -385,7 +397,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
                             new DefaultRequestBinderRegistry(ConversionService.SHARED)
                     ),
                     eventLoopGroup,
-                    socketChannelClass,
+                    resolveSocketChannelFactory(configuration, beanContext),
                     invocationInstrumenterFactories
             );
         } else {
@@ -393,7 +405,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
         }
     }
 
-    private Class<? extends SocketChannel> resolveSocketChannel(HttpClientConfiguration configuration, BeanContext beanContext) {
+    private ChannelFactory resolveSocketChannelFactory(HttpClientConfiguration configuration, BeanContext beanContext) {
         final String eventLoopGroup = configuration.getEventLoopGroup();
 
         final EventLoopGroupConfiguration eventLoopGroupConfiguration = beanContext.findBean(EventLoopGroupConfiguration.class, Qualifiers.byName(eventLoopGroup))
@@ -405,7 +417,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
                     }
                 });
 
-        return eventLoopGroupFactory.clientSocketChannelClass(eventLoopGroupConfiguration);
+        return () -> eventLoopGroupFactory.clientSocketChannelInstance(eventLoopGroupConfiguration);
     }
 
     private ClientKey getClientKey(AnnotationMetadata metadata) {

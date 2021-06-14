@@ -30,6 +30,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
+import io.micronaut.core.value.ValueException;
 import org.slf4j.Logger;
 
 import io.micronaut.core.annotation.NonNull;
@@ -52,7 +53,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
     private static final Logger LOG = ClassUtils.getLogger(PropertySourcePropertyResolver.class);
     private static final Pattern DOT_PATTERN = Pattern.compile("\\.");
-    private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{\\s?random\\.(\\S+?)\\}");
+    private static final String RANDOM_PREFIX = "\\s?random\\.(\\S+?)";
+    private static final String RANDOM_UPPER_LIMIT = "(\\(-?\\d+(\\.\\d+)?\\))";
+    private static final String RANDOM_RANGE = "(\\[-?\\d+(\\.\\d+)?,\\s?-?\\d+(\\.\\d+)?])";
+    private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{" + RANDOM_PREFIX + "(" + RANDOM_UPPER_LIMIT + "|" + RANDOM_RANGE + ")?\\}");
     private static final char[] DOT_DASH = new char[] {'.', '-'};
     private static final Object NO_VALUE = new Object();
     private static final PropertyCatalog[] CONVENTIONS = {PropertyCatalog.GENERATED, PropertyCatalog.RAW};
@@ -138,8 +142,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 for (PropertyCatalog convention : CONVENTIONS) {
                     Map<String, Object> entries = resolveEntriesForKey(name, false, convention);
                     if (entries != null) {
-                        String finalName = trimIndex(name);
-                        if (entries.containsKey(finalName)) {
+                        if (entries.containsKey(name)) {
                             result = true;
                             break;
                         }
@@ -160,11 +163,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             for (PropertyCatalog propertyCatalog : CONVENTIONS) {
                 Map<String, Object> entries = resolveEntriesForKey(name, false, propertyCatalog);
                 if (entries != null) {
-                    String trimmedName = trimIndex(name);
-                    if (entries.containsKey(trimmedName)) {
+                    if (entries.containsKey(name)) {
                         return true;
                     } else {
-                        String finalName = trimmedName + ".";
+                        String finalName = name + ".";
                         for (String key : entries.keySet()) {
                             if (key.startsWith(finalName)) {
                                 return true;
@@ -637,6 +639,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     collapseProperty(prefix + "[" + i + "]", entries, item);
                 }
             }
+            entries.put(prefix, value);
         } else if (value instanceof Map) {
             for (Map.Entry<?, ?> entry: ((Map<?, ?>) value).entrySet()) {
                 Object key = entry.getKey();
@@ -657,6 +660,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             while (matcher.find()) {
                 hasRandoms = true;
                 String type = matcher.group(1).trim().toLowerCase();
+                String range = matcher.group(2);
+                if (range != null) {
+                    range = range.substring(1, range.length() - 1);
+                }
                 String randomValue;
                 switch (type) {
                     case "port":
@@ -664,13 +671,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         break;
                     case "int":
                     case "integer":
-                        randomValue = String.valueOf(random.nextInt());
+                        randomValue = String.valueOf(range == null ? random.nextInt() : getNextIntegerInRange(range, property));
                         break;
                     case "long":
-                        randomValue = String.valueOf(random.nextLong());
+                        randomValue = String.valueOf(range == null ? random.nextLong() : getNextLongInRange(range, property));
                         break;
                     case "float":
-                        randomValue = String.valueOf(random.nextFloat());
+                        randomValue = String.valueOf(range == null ? random.nextFloat() : getNextFloatInRange(range, property));
                         break;
                     case "shortuuid":
                         randomValue = UUID.randomUUID().toString().substring(25, 35);
@@ -881,6 +888,48 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             for (int i = list.size(); i <= toIndex; i++) {
                 list.add(i, value);
             }
+        }
+    }
+
+    private int getNextIntegerInRange(String range, String property) {
+        try {
+            String[] tokens = range.split(",");
+            int lowerBound = Integer.parseInt(tokens[0]);
+            if (tokens.length == 1) {
+                return lowerBound >= 0 ? 1 : -1  * (random.nextInt(Math.abs(lowerBound)));
+            }
+            int upperBound = Integer.parseInt(tokens[1]);
+            return lowerBound + (int) (Math.random() * (upperBound - lowerBound));
+        } catch (NumberFormatException ex) {
+            throw new ValueException("Invalid range: `" + range + "` found for type Integer while parsing property: " + property, ex);
+        }
+    }
+
+    private long getNextLongInRange(String range, String property) {
+        try {
+            String[] tokens = range.split(",");
+            long lowerBound = Long.parseLong(tokens[0]);
+            if (tokens.length == 1) {
+                return (long) (Math.random() * (lowerBound));
+            }
+            long upperBound = Long.parseLong(tokens[1]);
+            return lowerBound + (long) (Math.random() * (upperBound - lowerBound));
+        } catch (NumberFormatException ex) {
+            throw new ValueException("Invalid range: `" + range + "` found for type Long while parsing property: " + property, ex);
+        }
+    }
+
+    private float getNextFloatInRange(String range, String property) {
+        try {
+            String[] tokens = range.split(",");
+            float lowerBound = Float.parseFloat(tokens[0]);
+            if (tokens.length == 1) {
+                return (float) (Math.random() * (lowerBound));
+            }
+            float upperBound = Float.parseFloat(tokens[1]);
+            return lowerBound + (float) (Math.random() * (upperBound - lowerBound));
+        } catch (NumberFormatException ex) {
+            throw new ValueException("Invalid range: `" + range + "` found for type Float while parsing property: " + property, ex);
         }
     }
 

@@ -19,7 +19,7 @@ package io.micronaut.docs.aop.introduction
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.aop.InterceptorBean
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]

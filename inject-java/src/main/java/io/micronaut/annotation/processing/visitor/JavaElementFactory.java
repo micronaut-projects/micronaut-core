@@ -15,10 +15,12 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.annotation.processing.JavaConfigurationMetadataBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
 import javax.lang.model.element.*;
 import javax.lang.model.element.Element;
@@ -59,6 +61,121 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
                     visitorContext
             );
         }
+    }
+
+    @NonNull
+    @Override
+    public ClassElement newClassElement(@NonNull TypeElement type, @NonNull AnnotationMetadata annotationMetadata, @NonNull Map<String, ClassElement> resolvedGenerics) {
+        ElementKind kind = type.getKind();
+        if (kind == ElementKind.ENUM) {
+            return new JavaEnumElement(
+                    type,
+                    annotationMetadata,
+                    visitorContext
+            ) {
+                @NonNull
+                @Override
+                public Map<String, ClassElement> getTypeArguments() {
+                    if (resolvedGenerics != null) {
+                        return resolvedGenerics;
+                    }
+                    return super.getTypeArguments();
+                }
+            };
+        } else {
+            return new JavaClassElement(
+                    type,
+                    annotationMetadata,
+                    visitorContext
+            ) {
+                @NonNull
+                @Override
+                public Map<String, ClassElement> getTypeArguments() {
+                    if (resolvedGenerics != null) {
+                        return resolvedGenerics;
+                    }
+                    return super.getTypeArguments();
+                }
+            };
+        }
+    }
+
+    @NonNull
+    @Override
+    public JavaClassElement newSourceClassElement(@NonNull TypeElement type, @NonNull AnnotationMetadata annotationMetadata) {
+        ElementKind kind = type.getKind();
+        if (kind == ElementKind.ENUM) {
+            return new JavaEnumElement(
+                    type,
+                    annotationMetadata,
+                    visitorContext
+            ) {
+                @NonNull
+                @Override
+                public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+                    return new JavaBeanDefinitionBuilder(
+                            this,
+                            type,
+                            new JavaConfigurationMetadataBuilder(
+                                    visitorContext.getElements(),
+                                    visitorContext.getTypes(),
+                                    visitorContext.getAnnotationUtils()
+                            ),
+                            visitorContext
+                    );
+                }
+            };
+        } else {
+            return new JavaClassElement(
+                    type,
+                    annotationMetadata,
+                    visitorContext
+            ) {
+                @NonNull
+                @Override
+                public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+                    return new JavaBeanDefinitionBuilder(
+                            this,
+                            type,
+                            new JavaConfigurationMetadataBuilder(
+                                    visitorContext.getElements(),
+                                    visitorContext.getTypes(),
+                                    visitorContext.getAnnotationUtils()
+                            ),
+                            visitorContext
+                    );
+                }
+            };
+        }
+    }
+
+    @NonNull
+    @Override
+    public JavaMethodElement newSourceMethodElement(ClassElement declaringClass, @NonNull ExecutableElement method, @NonNull AnnotationMetadata annotationMetadata) {
+        if (!(declaringClass instanceof JavaClassElement)) {
+            throw new IllegalArgumentException("Declaring class must be a JavaClassElement");
+        }
+        return new JavaMethodElement(
+                (JavaClassElement) declaringClass,
+                method,
+                annotationMetadata,
+                visitorContext
+        ) {
+            @NonNull
+            @Override
+            public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+                return new JavaBeanDefinitionBuilder(
+                        this,
+                        type,
+                        new JavaConfigurationMetadataBuilder(
+                                visitorContext.getElements(),
+                                visitorContext.getTypes(),
+                                visitorContext.getAnnotationUtils()
+                        ),
+                        visitorContext
+                );
+            }
+        };
     }
 
     @NonNull

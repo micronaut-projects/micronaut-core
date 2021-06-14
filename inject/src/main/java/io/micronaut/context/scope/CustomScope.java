@@ -20,8 +20,8 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
+import jakarta.inject.Provider;
 
-import javax.inject.Provider;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 

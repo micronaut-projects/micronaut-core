@@ -19,7 +19,7 @@ import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.io.ResourceLoader;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class A {
     @Inject

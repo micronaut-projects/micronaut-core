@@ -191,7 +191,6 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @Override
     public ClassElement getDeclaringType() {
         if (this.declaringElement == null) {
-
             this.declaringElement = visitorContext.getElementFactory().newClassElement(
                     methodNode.getDeclaringClass(),
                     AstAnnotationUtils.getAnnotationMetadata(

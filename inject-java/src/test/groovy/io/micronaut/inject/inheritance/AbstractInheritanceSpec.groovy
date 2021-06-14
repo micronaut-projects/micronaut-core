@@ -15,11 +15,13 @@
  */
 package io.micronaut.inject.inheritance
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import spock.lang.Specification
+import io.micronaut.inject.BeanDefinition
+import spock.lang.PendingFeature
 
-class AbstractInheritanceSpec extends Specification {
+class AbstractInheritanceSpec extends AbstractTypeElementSpec {
 
     void "test values are injected for abstract parent class"() {
         given:
@@ -35,5 +37,67 @@ class AbstractInheritanceSpec extends Specification {
         b.a.is(b.another)
         b.packagePrivate != null
         b.packagePrivate.is(b.another)
+    }
+
+    @PendingFeature
+    void "test subclass method is injectable"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition("test.SubClass", """
+package test;
+
+abstract class Parent {
+
+    @jakarta.inject.Inject
+    void inject(Bean bean) {
+    
+    }
+    
+    @jakarta.inject.Inject
+    public void injectPublic(Bean bean) {
+    
+    }
+    
+    @jakarta.inject.Inject
+    public void injectNoOverride(Bean bean) {
+    
+    }
+}
+
+class Middle extends Parent {
+
+    @jakarta.inject.Inject
+    public void injectNoOverride(Bean bean) {
+    
+    }
+}
+
+@jakarta.inject.Singleton
+class SubClass extends Middle {
+
+    @Override
+    void inject(Bean bean) {
+    
+    }
+    
+    @Override
+    public void injectPublic(Bean bean) {
+    
+    }
+    
+    public void injectNoOverride(Bean bean) {
+    
+    }
+}
+
+@jakarta.inject.Singleton
+class Bean {
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanDefinition != null
+        beanDefinition.getInjectedMethods().size() == 1
+        beanDefinition.getInjectedMethods()[0].name == "injectPublic"
     }
 }

@@ -16,12 +16,9 @@
 package io.micronaut.inject.constructor.factoryinjection;
 
 
-import javax.inject.Inject;
-
 public class AImpl implements A {
     final C c;
     final C c2;
-    @Inject
     protected D d;
 
     public AImpl(C c, C c2) {

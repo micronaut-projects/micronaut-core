@@ -19,26 +19,22 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Consumes
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Produces
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.annotation.Error
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
+import jakarta.inject.Inject
+import jakarta.inject.Named
+import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
 

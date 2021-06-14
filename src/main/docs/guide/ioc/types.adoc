@@ -8,9 +8,9 @@ In addition to being able to inject beans, Micronaut natively supports injecting
 |An `Optional` of a bean. `empty()` is injected if the bean doesn't exist
 |`Optional<Engine>`
 
-|link:{jdkapi}/java/lang/Iterable.html[java.lang.Iterable]
-|An `Iterable` or subtype of `Iterable` (e.g. `List`, `Collection`, etc.)
-|`Iterable<Engine>`
+|link:{jdkapi}/java/lang/Collection.html[java.lang.Collection]
+|An `Collection` or subtype of `Collection` (e.g. `List`, `Set`, etc.)
+|`Collection<Engine>`
 
 |link:{jdkapi}/java/util/stream/Stream.html[java.util.stream.Stream]
 |A lazy `Stream` of beans
@@ -38,7 +38,7 @@ NOTE: There are 3 different provider types supported, however the `BeanProvider`
 
 [NOTE]
 ====
-When injecting a `java.lang.Iterable`, or `java.util.stream.Stream`, `Array` of beans into a bean matching the injection type, then the owning bean will not be be a member of the injected collection.  A common pattern demonstrating this is aggregation. For example:
+When injecting a `java.lang.Collection`, or `java.util.stream.Stream`, `Array` of beans into a bean matching the injection type, then the owning bean will not be be a member of the injected collection.  A common pattern demonstrating this is aggregation. For example:
 ```java
 @Singleton
 class AggregateEngine implements Engine {
@@ -67,3 +67,9 @@ The ann:core.annotation.Order[] annotation is especially useful for ordering bea
 snippet::io.micronaut.docs.config.env.RateLimitsFactory[tags="clazz", indent=0, title="Factory with @Order"]
 
 When a collection of `RateLimit` beans are requested from the context, they are returned in ascending order based on the value in the annotation.
+
+=== Injecting a Bean by Order
+
+When injecting a single instance of a bean the ann:core.annotation.Order[] annotation can also be used to define which bean has the highest precedence and hence should be injected.
+
+NOTE: The api:core.order.Ordered[] interface is not taken into account when selecting a single instance as this would require instantiating the bean to resolve the order.

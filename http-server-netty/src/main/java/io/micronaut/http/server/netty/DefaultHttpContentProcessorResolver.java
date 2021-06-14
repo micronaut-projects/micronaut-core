@@ -19,6 +19,7 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
@@ -29,9 +30,8 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.inject.ExecutionHandle;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
-import io.micronaut.core.annotation.NonNull;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.io.InputStream;
 import java.util.Optional;
 import java.util.Set;

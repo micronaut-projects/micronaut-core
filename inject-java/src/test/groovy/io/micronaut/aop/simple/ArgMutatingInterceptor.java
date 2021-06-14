@@ -20,7 +20,7 @@ import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InvocationContext;
 import io.micronaut.core.type.MutableArgumentValue;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * @author Graeme Rocher

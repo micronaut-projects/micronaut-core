@@ -23,13 +23,12 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanFactory;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -47,24 +46,52 @@ import java.util.Optional;
  * @since 3.0.0
  * @author graemerocher
  */
-public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>, BeanFactory<T> {
+public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>, BeanFactory<T>, BeanDefinitionReference<T> {
 
-    public static final AnnotationMetadata ANNOTATION_METADATA;
+    private final AnnotationMetadata annotationMetadata;
 
-    static {
+    public AbstractProviderDefinition() {
         MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
         metadata.addDeclaredAnnotation(Any.class.getName(), Collections.emptyMap());
         metadata.addDeclaredStereotype(
                 Collections.singletonList(Any.class.getName()),
-                javax.inject.Qualifier.class.getName(),
+                AnnotationUtil.QUALIFIER,
                 Collections.emptyMap()
         );
         metadata.addDeclaredAnnotation(BootstrapContextCompatible.class.getName(), Collections.emptyMap());
-        ANNOTATION_METADATA = metadata;
+        metadata.addDeclaredAnnotation(Indexes.class.getName(), Collections.singletonMap(AnnotationMetadata.VALUE_MEMBER, getBeanType()));
+        annotationMetadata = metadata;
+    }
+
+    @Override
+    public boolean isContainerType() {
+        return false;
+    }
+
+    @Override
+    public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+        return isPresent();
+    }
+
+    @Override
+    public String getBeanDefinitionName() {
+        return getClass().getName();
+    }
+
+    @Override
+    public BeanDefinition<T> load() {
+        return this;
+    }
+
+    @Override
+    public boolean isPresent() {
+        return false;
     }
 
     /**
      * Builds a provider implementation.
+     *
+     * @param resolutionContext The resolution context
      * @param context The context
      * @param argument The argument
      * @param qualifier The qualifier
@@ -72,6 +99,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
      * @return The provider
      */
     protected abstract @NonNull T buildProvider(
+            @NonNull BeanResolutionContext resolutionContext,
             @NonNull BeanContext context,
             @NonNull Argument<Object> argument,
             @Nullable Qualifier<Object> qualifier,
@@ -109,6 +137,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
                     boolean hasBean = context.containsBean(argument, qualifier);
                     if (hasBean) {
                         return buildProvider(
+                                resolutionContext,
                                 context,
                                 argument,
                                 qualifier,
@@ -122,6 +151,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
                         } else {
                             if (qualifier instanceof AnyQualifier) {
                                 return buildProvider(
+                                        resolutionContext,
                                         context,
                                         argument,
                                         qualifier,
@@ -168,7 +198,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return ANNOTATION_METADATA;
+        return annotationMetadata;
     }
 
     @Override

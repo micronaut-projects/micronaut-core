@@ -33,10 +33,10 @@ import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.context.scope.Refreshable;
 import io.micronaut.scheduling.TaskExecutors;
+import jakarta.inject.Named;
+import jakarta.inject.Provider;
+import jakarta.inject.Singleton;
 
-import javax.inject.Named;
-import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -66,7 +66,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     private final Executor executorService;
 
     /**
-     * @param beanContext     The bean context to allow DI of beans annotated with {@link javax.inject.Inject}
+     * @param beanContext     The bean context to allow DI of beans annotated with @Inject
      * @param executorService The executor service
      */
     public RefreshScope(BeanContext beanContext, @Named(TaskExecutors.IO) Executor executorService) {

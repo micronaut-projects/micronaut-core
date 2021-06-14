@@ -23,8 +23,7 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * A {@link ByteBufferFactory} implementation for Netty.
@@ -90,6 +89,9 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
 
     @Override
     public ByteBuffer<ByteBuf> copiedBuffer(byte[] bytes) {
+        if (bytes.length == 0) {
+            return new NettyByteBuffer(Unpooled.EMPTY_BUFFER);
+        }
         return new NettyByteBuffer(Unpooled.copiedBuffer(bytes));
     }
 

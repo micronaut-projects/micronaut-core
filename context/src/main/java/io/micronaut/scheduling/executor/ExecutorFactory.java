@@ -21,8 +21,8 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import jakarta.inject.Inject;
 
-import javax.inject.Inject;
 import java.util.concurrent.*;
 
 /**

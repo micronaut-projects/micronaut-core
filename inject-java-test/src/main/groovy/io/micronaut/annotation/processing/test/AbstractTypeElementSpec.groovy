@@ -15,22 +15,25 @@
  */
 package io.micronaut.annotation.processing.test
 
-import com.sun.tools.javac.model.JavacElements
-import com.sun.tools.javac.processing.JavacProcessingEnvironment
-import com.sun.tools.javac.util.Context
-import io.micronaut.aop.internal.InterceptorRegistryBean
-import io.micronaut.context.Qualifier
-import io.micronaut.core.annotation.NonNull
-import io.micronaut.core.annotation.Nullable
+import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
+import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
 import io.micronaut.annotation.processing.AnnotationUtils
+import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor
 import io.micronaut.annotation.processing.GenericUtils
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.annotation.processing.ModelUtils
+import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.visitor.JavaClassElement
+import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
+import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.Qualifier
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.io.scan.ClassPathResourceLoader
@@ -40,18 +43,24 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
-import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.provider.BeanProviderDefinition
+import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
+import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.Element
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
+import java.util.function.Predicate
+import java.util.stream.Collectors
+import java.util.stream.StreamSupport
 
 /**
  * Base class to extend from to allow compilation of Java sources
@@ -68,32 +77,33 @@ abstract class AbstractTypeElementSpec extends Specification {
      * @return The class element
      */
     ClassElement buildClassElement(String cls) {
-        TypeElement typeElement = buildTypeElement(cls)
-        def env = JavacProcessingEnvironment.instance(new Context())
-        def elements = JavacElements.instance(new Context())
-        ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
-        GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, genericUtils, env.filer) {
+        TypeElementInfo typeElementInfo = buildTypeElementInfo(cls)
+        TypeElement typeElement = typeElementInfo.typeElement
+        def lastTask = typeElementInfo.javaParser.lastTask.get()
+        def elements = lastTask.elements
+        def types = lastTask.types
+        def processingEnv = typeElementInfo.javaParser.processingEnv
+        def messager = processingEnv.messager
+        ModelUtils modelUtils = new ModelUtils(elements, types) {}
+        GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
+        AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, genericUtils, processingEnv.filer) {
         }
         AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement)
 
-        return new JavaClassElement(
-                typeElement,
-                annotationMetadata,
-                new JavaVisitorContext(
-                      env,
-                      env.messager,
-                      elements,
-                      annotationUtils,
-                        env.typeUtils,
-                        modelUtils,
-                        genericUtils,
-                        env.filer,
-                        new MutableConvertibleValuesMap<Object>()
-                )
-        ) {
+        JavaVisitorContext visitorContext = new JavaVisitorContext(
+                processingEnv,
+                messager,
+                elements,
+                annotationUtils,
+                types,
+                modelUtils,
+                genericUtils,
+                processingEnv.filer,
+                new MutableConvertibleValuesMap<Object>(),
+                TypeElementVisitor.VisitorKind.ISOLATING
+        )
 
-        }
+        return new JavaElementFactory(visitorContext).newClassElement(typeElement, annotationMetadata)
     }
 
     /**
@@ -105,6 +115,23 @@ abstract class AbstractTypeElementSpec extends Specification {
         Element element = buildTypeElement(cls)
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        return metadata
+    }
+
+    AnnotationMetadata buildDeclaredMethodAnnotationMetadata(String cls, String methodName) {
+        TypeElement element = buildTypeElement(cls)
+        Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
+        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
+        AnnotationMetadata metadata = method != null ? builder.buildDeclared(method) : null
+        return metadata
+    }
+
+    AnnotationMetadata buildMethodArgumentAnnotationMetadata(String cls, String methodName, String argumentName) {
+        TypeElement element = buildTypeElement(cls)
+        ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
+        VariableElement argument = method.parameters.find() { it.simpleName.toString() == argumentName }
+        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
+        AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
         return metadata
     }
 
@@ -200,16 +227,23 @@ class Test {
 
         return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader), "test") {
             @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                def references = files.findAll { JavaFileObject jfo ->
-                    jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith("DefinitionClass.class")
-                }.collect { JavaFileObject jfo ->
-                    def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
-                    name = name.replace('/', '.') - '.class'
-                    return classLoader.loadClass(name).newInstance()
-                } as List<BeanDefinitionReference>
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+                def references = StreamSupport.stream(files.spliterator(), false)
+                        .filter({ JavaFileObject jfo ->
+                            jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith("DefinitionClass.class")
+                        })
+                        .map({ JavaFileObject jfo ->
+                            def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
+                            name = name.replace('/', '.') - '.class'
+                            return (BeanDefinitionReference) classLoader.loadClass(name).newInstance()
+                        })
+                        .filter({ bdr -> predicate == null || predicate.test(bdr) })
+                        .collect(Collectors.toList())
 
-                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : new InterceptorRegistryBean())
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : [
+                        new InterceptorRegistryBean(),
+                        new BeanProviderDefinition()
+                ])
             }
         }.start()
     }
@@ -218,9 +252,34 @@ class Test {
      * Create and return a new Java parser.
      * @return The java parser to use
      */
-    @CompileStatic
     protected JavaParser newJavaParser() {
-        return new JavaParser()
+        def visitors = getLocalTypeElementVisitors()
+        if (visitors) {
+            return new JavaParser() {
+                @Override
+                protected TypeElementVisitorProcessor getTypeElementVisitorProcessor() {
+                    return new TypeElementVisitorProcessor() {
+                        @Override
+                        protected Collection<TypeElementVisitor> findTypeElementVisitors() {
+                            return visitors
+                        }
+                    }
+                }
+
+                @Override
+                protected AggregatingTypeElementVisitorProcessor getAggregatingTypeElementVisitorProcessor() {
+                    return new AggregatingTypeElementVisitorProcessor() {
+                        @Override
+                        protected Collection<TypeElementVisitor> findTypeElementVisitors() {
+                            return visitors
+                        }
+                    }
+                }
+
+            }
+        } else {
+            return new JavaParser()
+        }
     }
 
     /**
@@ -254,12 +313,30 @@ class Test {
     }
 
     protected TypeElement buildTypeElement(String cls) {
-        List<Element> elements = newJavaParser().parseLines("",
+        List<Element> elements = []
+
+        newJavaParser().parseLines("",
                 cls
-        ).toList()
+        ).each { elements.add(it) }
 
         def element = elements ? elements[0] : null
         return (TypeElement) element
+    }
+
+    protected TypeElementInfo buildTypeElementInfo(String cls) {
+        List<Element> elements = []
+
+
+        def parser = newJavaParser()
+        parser.parseLines("",
+                cls
+        ).each { elements.add(it) }
+
+        def element = elements ? elements[0] : null
+        return new TypeElementInfo(
+                typeElement: element,
+                javaParser: parser
+        )
     }
 
     protected BeanDefinition buildBeanDefinition(String className, String cls) {
@@ -268,7 +345,23 @@ class Test {
         String beanFullName = "${packageName}.${beanDefName}"
 
         ClassLoader classLoader = buildClassLoader(className, cls)
-        return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+        try {
+            return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
+    }
+
+    protected BeanDefinition buildBeanDefinition(String packageName, String className, String cls) {
+        def beanDefName= '$' + className + 'Definition'
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        try {
+            return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
     }
 
     /**
@@ -292,6 +385,23 @@ class Test {
      * @return The mappers for the annotation
      */
     protected List<AnnotationMapper<? extends Annotation>> getLocalAnnotationMappers(@NonNull String annotationName) {
+        return Collections.emptyList()
+    }
+
+    /**
+     * Retrieve additional annotation transformers  to apply
+     * @param annotationName The annotation name
+     * @return The transformers for the annotation
+     */
+    protected List<AnnotationTransformer<? extends Annotation>> getLocalAnnotationTransformers(@NonNull String annotationName) {
+        return Collections.emptyList()
+    }
+
+    /**
+     * Retrieve additional type element visitors for this test.
+     * @return the visitors
+     */
+    protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
         return Collections.emptyList()
     }
 
@@ -343,7 +453,7 @@ class Test {
 
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
         def stream = new ByteArrayOutputStream()
-        new AnnotationMetadataWriter(className, toWrite)
+        new AnnotationMetadataWriter(className, null, toWrite, true)
                 .writeTo(stream)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
         ClassLoader classLoader = new ClassLoader() {
@@ -361,19 +471,22 @@ class Test {
         return metadata
     }
 
-    @CompileStatic
     private JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
-        def env = JavacProcessingEnvironment.instance(new Context())
-        def elements = JavacElements.instance(new Context())
-        ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
-        GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, genericUtils, env.filer) {
+        JavaParser parser = newJavaParser()
+        JavacTask javacTask = parser.getJavacTask()
+        def elements = javacTask.elements
+        def types = javacTask.types
+        def processingEnv = parser.processingEnv
+        def messager = processingEnv.messager
+        ModelUtils modelUtils = new ModelUtils(elements, types) {}
+        GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
+        AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, genericUtils, parser.filer) {
             @Override
             JavaAnnotationMetadataBuilder newAnnotationBuilder() {
                 return super.newAnnotationBuilder()
             }
         }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, modelUtils) {
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, messager, annotationUtils, modelUtils) {
             @Override
             protected List<AnnotationMapper<? extends Annotation>> getAnnotationMappers(@NonNull String annotationName) {
                 def loadedMappers = super.getAnnotationMappers(annotationName)
@@ -393,7 +506,28 @@ class Test {
                     }
                 }
             }
+
+            @Override
+            protected List<AnnotationTransformer<Annotation>> getAnnotationTransformers(@NonNull String annotationName) {
+                def loadedTransformers = super.getAnnotationTransformers(annotationName)
+                def localTransfomers = getLocalAnnotationTransformers(annotationName)
+                if (localTransfomers) {
+                    def newList = []
+                    if (loadedTransformers) {
+                        newList.addAll(loadedTransformers)
+                    }
+                    newList.addAll(localTransfomers)
+                    return newList
+                } else {
+                    return loadedTransformers
+                }
+            }
         }
         return builder
+    }
+
+    static class TypeElementInfo {
+        TypeElement typeElement
+        JavaParser javaParser
     }
 }

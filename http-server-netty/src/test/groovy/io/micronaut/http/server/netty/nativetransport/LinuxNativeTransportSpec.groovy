@@ -1,8 +1,8 @@
 package io.micronaut.http.server.netty.nativetransport
 
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.netty.channel.EventLoopGroupFactory
+import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.netty.channel.epoll.EpollServerSocketChannel
 import spock.lang.Requires
 import spock.util.environment.OperatingSystem

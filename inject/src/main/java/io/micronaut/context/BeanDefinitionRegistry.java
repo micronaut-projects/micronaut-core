@@ -152,10 +152,7 @@ public interface BeanDefinitionRegistry {
      * @since 3.0.0
      */
     default @NonNull <T> Optional<BeanDefinition<T>> findBeanDefinition(@NonNull Argument<T> beanType) {
-        return findBeanDefinition(
-                Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
-                null
-        );
+        return findBeanDefinition(beanType, null);
     }
 
     /**

@@ -28,14 +28,14 @@ import io.micronaut.inject.ast.*;
 import org.apache.groovy.ast.tools.ClassNodeUtils;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
+import org.codehaus.groovy.util.ArrayIterator;
 
-import javax.inject.Inject;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
+import static groovyjarjarasm.asm.Opcodes.*;
 import static org.codehaus.groovy.ast.ClassHelper.makeCached;
 
 /**
@@ -48,24 +48,26 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached;
 public class GroovyClassElement extends AbstractGroovyElement implements ArrayableClassElement {
 
     private static final Predicate<MethodNode> JUNK_METHOD_FILTER = m -> {
-                String methodName = m.getName();
+        String methodName = m.getName();
 
-                return !m.isStaticConstructor() &&
-                        !methodName.startsWith("$") &&
-                        !methodName.contains("trait$") &&
-                        !methodName.startsWith("super$") &&
-                        !methodName.equals("setMetaClass") &&
-                        !m.getReturnType().getNameWithoutPackage().equals("MetaClass") &&
-                        !m.getDeclaringClass().equals(ClassHelper.GROOVY_OBJECT_TYPE) && !m.getDeclaringClass().equals(ClassHelper.OBJECT_TYPE);
-            };
+        return m.isStaticConstructor() ||
+                methodName.startsWith("$") ||
+                methodName.contains("trait$") ||
+                methodName.startsWith("super$") ||
+                methodName.equals("setMetaClass") ||
+                m.getReturnType().getNameWithoutPackage().equals("MetaClass") ||
+                m.getDeclaringClass().equals(ClassHelper.GROOVY_OBJECT_TYPE) ||
+                m.getDeclaringClass().equals(ClassHelper.OBJECT_TYPE);
+    };
     private static final Predicate<FieldNode> JUNK_FIELD_FILTER = m -> {
         String fieldName = m.getName();
 
-        return  !fieldName.startsWith("$") &&
-                !fieldName.startsWith("__$") &&
-                !fieldName.contains("trait$") &&
-                !fieldName.equals("metaClass") &&
-                !m.getDeclaringClass().equals(ClassHelper.GROOVY_OBJECT_TYPE) && !m.getDeclaringClass().equals(ClassHelper.OBJECT_TYPE);
+        return  fieldName.startsWith("$") ||
+                fieldName.startsWith("__$") ||
+                fieldName.contains("trait$") ||
+                fieldName.equals("metaClass") ||
+                m.getDeclaringClass().equals(ClassHelper.GROOVY_OBJECT_TYPE) ||
+                m.getDeclaringClass().equals(ClassHelper.OBJECT_TYPE);
     };
     protected final ClassNode classNode;
     private final int arrayDimensions;
@@ -111,6 +113,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         boolean onlyAbstract = result.isOnlyAbstract();
         boolean onlyConcrete = result.isOnlyConcrete();
         List<Predicate<String>> namePredicates = result.getNamePredicates();
+        List<Predicate<ClassElement>> typePredicates = result.getTypePredicates();
         List<Predicate<AnnotationMetadata>> annotationPredicates = result.getAnnotationPredicates();
         List<Predicate<T>> elementPredicates = result.getElementPredicates();
         List<Predicate<Set<ElementModifier>>> modifierPredicates = result.getModifierPredicates();
@@ -122,18 +125,18 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             Map<String, MethodNode> declaredMethodsMap = classNode.getDeclaredMethodsMap();
             ClassNodeUtils.addDeclaredMethodsFromInterfaces(classNode, declaredMethodsMap);
             if (onlyDeclared) {
-                methods = classNode.getMethods()
-                        .stream().filter(JUNK_METHOD_FILTER)
-                        .collect(Collectors.toList());
+                methods = new ArrayList<>(classNode.getMethods());
             } else {
-                methods = classNode.getAllDeclaredMethods()
-                        .stream().filter(JUNK_METHOD_FILTER)
-                        .collect(Collectors.toList());
+                methods = new ArrayList<>(classNode.getAllDeclaredMethods());
             }
 
             Iterator<MethodNode> i = methods.iterator();
             while (i.hasNext()) {
                 MethodNode methodNode = i.next();
+                if (JUNK_METHOD_FILTER.test(methodNode)) {
+                    i.remove();
+                    continue;
+                }
                 if (onlyAbstract && !methodNode.isAbstract()) {
                     i.remove();
                     continue;
@@ -143,12 +146,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     continue;
                 }
                 if (onlyAccessible) {
+                    final ClassElement accessibleFromType = result.getOnlyAccessibleFromType().orElse(this);
                     if (methodNode.isPrivate()) {
                         i.remove();
                         continue;
-                    } else if (!methodNode.getDeclaringClass().equals(classNode)) {
+                    } else if (!methodNode.getDeclaringClass().getName().equals(accessibleFromType.getName())) {
                         // inaccessible through package scope
-                        if (methodNode.isPackageScope() && !methodNode.getDeclaringClass().getPackageName().equals(getPackageName())) {
+                        if (methodNode.isPackageScope() && !methodNode.getDeclaringClass().getPackageName().equals(accessibleFromType.getPackageName())) {
                             i.remove();
                             continue;
                         }
@@ -176,11 +180,15 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     methodNode,
                     AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode)
             )).collect(Collectors.toList());
+
+            if (!typePredicates.isEmpty()) {
+                elements.removeIf(e -> !typePredicates.stream().allMatch(p -> p.test(((MethodElement) e).getGenericReturnType())));
+            }
         } else if (elementType == FieldElement.class) {
             List<FieldNode> fields;
             if (onlyDeclared) {
                 List<FieldNode> initialFields = classNode.getFields();
-                fields = findRelevantFields(onlyAccessible, initialFields, namePredicates, modifierPredicates);
+                fields = findRelevantFields(onlyAccessible, result.getOnlyAccessibleFromType().orElse(this), initialFields, namePredicates, modifierPredicates);
             } else {
                 fields = new ArrayList<>(classNode.getFields());
                 ClassNode superClass = classNode.getSuperClass();
@@ -188,7 +196,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     fields.addAll(superClass.getFields());
                     superClass = superClass.getSuperClass();
                 }
-                fields = findRelevantFields(onlyAccessible, fields, namePredicates, modifierPredicates);
+                fields = findRelevantFields(onlyAccessible, result.getOnlyAccessibleFromType().orElse(this), fields, namePredicates, modifierPredicates);
             }
             //noinspection unchecked
             elements = fields.stream().map(fieldNode -> (T) new GroovyFieldElement(
@@ -197,6 +205,50 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     fieldNode,
                     AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, fieldNode)
             )).collect(Collectors.toList());
+
+            if (!typePredicates.isEmpty()) {
+                elements.removeIf(e -> !typePredicates.stream().allMatch(p -> p.test(((FieldElement) e).getGenericField())));
+            }
+        } else if (elementType == ClassElement.class) {
+            Iterator<InnerClassNode> i = classNode.getInnerClasses();
+            List<T> innerClasses = new ArrayList<>();
+            while (i.hasNext()) {
+                InnerClassNode innerClassNode = i.next();
+                if (onlyAbstract && !innerClassNode.isAbstract()) {
+                    continue;
+                }
+                if (onlyConcrete && innerClassNode.isAbstract()) {
+                    continue;
+                }
+                if (onlyAccessible) {
+                    if (Modifier.isPrivate(innerClassNode.getModifiers())) {
+                        continue;
+                    }
+                }
+                if (!modifierPredicates.isEmpty()) {
+                    Set<ElementModifier> elementModifiers = resolveModifiers(innerClassNode);
+                    if (!modifierPredicates.stream().allMatch(p -> p.test(elementModifiers))) {
+                        continue;
+                    }
+                }
+
+                if (!namePredicates.isEmpty()) {
+                    if (!namePredicates.stream().allMatch(p -> p.test(innerClassNode.getName()))) {
+                        continue;
+                    }
+                }
+                ClassElement classElement = visitorContext.getElementFactory()
+                        .newClassElement(innerClassNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, innerClassNode));
+
+                if (!typePredicates.isEmpty()) {
+                    if (!typePredicates.stream().allMatch(p -> p.test(classElement))) {
+                        continue;
+                    }
+                }
+
+                innerClasses.add((T) classElement);
+            }
+            elements = innerClasses;
         } else {
             elements = Collections.emptyList();
         }
@@ -212,53 +264,80 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         return elements;
     }
 
-    private List<FieldNode> findRelevantFields(boolean onlyAccessible, List<FieldNode> initialFields, List<Predicate<String>> namePredicates, List<Predicate<Set<ElementModifier>>> modifierPredicates) {
-        Stream<FieldNode> fieldStream = initialFields.stream().filter(JUNK_FIELD_FILTER);
-        if (onlyAccessible) {
-            fieldStream = fieldStream.filter(fn -> !fn.isPrivate());
+    private List<FieldNode> findRelevantFields(
+            boolean onlyAccessible,
+            ClassElement onlyAccessibleType,
+            List<FieldNode> initialFields,
+            List<Predicate<String>> namePredicates,
+            List<Predicate<Set<ElementModifier>>> modifierPredicates) {
+        List<FieldNode> filteredFields = new ArrayList<>(initialFields.size());
+
+        elementLoop:
+        for (FieldNode fn: initialFields) {
+            if (JUNK_FIELD_FILTER.test(fn)) {
+                continue;
+            }
+            if (onlyAccessible && fn.isPrivate()) {
+                continue;
+            } else if (onlyAccessible && isPackageScope(fn)) {
+                if (!fn.getDeclaringClass().getPackageName().equals(onlyAccessibleType.getPackageName())) {
+                    continue;
+                }
+            }
+            if (!modifierPredicates.isEmpty()) {
+                final Set<ElementModifier> elementModifiers = resolveModifiers(fn);
+                for (Predicate<Set<ElementModifier>> modifierPredicate : modifierPredicates) {
+                    if (!modifierPredicate.test(elementModifiers)) {
+                        continue elementLoop;
+                    }
+                }
+            }
+
+            if (!namePredicates.isEmpty()) {
+                String name = fn.getName();
+                for (Predicate<String> namePredicate : namePredicates) {
+                    if (!namePredicate.test(name)) {
+                        continue elementLoop;
+                    }
+                }
+            }
+
+            filteredFields.add(fn);
         }
-        if (!namePredicates.isEmpty()) {
-            fieldStream = fieldStream.filter(fn -> !namePredicates.stream().allMatch(p -> p.test(fn.getName())));
-        }
-        if (!modifierPredicates.isEmpty()) {
-            fieldStream = fieldStream.filter(fn -> !modifierPredicates.stream().allMatch(p -> p.test(resolveModifiers(fn))));
-        }
-        return fieldStream.collect(Collectors.toList());
+        return filteredFields;
+    }
+
+    private boolean isPackageScope(FieldNode fn) {
+        return (fn.getModifiers() & (ACC_PUBLIC | ACC_PRIVATE | ACC_PROTECTED)) == 0;
     }
 
     private Set<ElementModifier> resolveModifiers(MethodNode methodNode) {
-        Set<ElementModifier> modifiers = new HashSet<>(5);
-        if (methodNode.isPrivate()) {
-            modifiers.add(ElementModifier.PRIVATE);
-        } else if (methodNode.isProtected()) {
-            modifiers.add(ElementModifier.PROTECTED);
-        } else if (methodNode.isPublic()) {
-            modifiers.add(ElementModifier.PUBLIC);
-        }
-        if (methodNode.isAbstract()) {
-            modifiers.add(ElementModifier.ABSTRACT);
-        } else if (methodNode.isStatic()) {
-            modifiers.add(ElementModifier.STATIC);
-        }
-        if (methodNode.isFinal()) {
-            modifiers.add(ElementModifier.FINAL);
-        }
-        return modifiers;
+        return resolveModifiers(methodNode.getModifiers());
     }
 
     private Set<ElementModifier> resolveModifiers(FieldNode fieldNode) {
+        return resolveModifiers(fieldNode.getModifiers());
+    }
+
+    private Set<ElementModifier> resolveModifiers(ClassNode classNode) {
+        return resolveModifiers(classNode.getModifiers());
+    }
+
+    private Set<ElementModifier> resolveModifiers(int mod) {
         Set<ElementModifier> modifiers = new HashSet<>(5);
-        if (fieldNode.isPrivate()) {
+        if (Modifier.isPrivate(mod)) {
             modifiers.add(ElementModifier.PRIVATE);
-        } else if (fieldNode.isProtected()) {
+        } else if (Modifier.isProtected(mod)) {
             modifiers.add(ElementModifier.PROTECTED);
-        } else if (fieldNode.isPublic()) {
+        } else if (Modifier.isPublic(mod)) {
             modifiers.add(ElementModifier.PUBLIC);
         }
-        if (fieldNode.isStatic()) {
+        if (Modifier.isAbstract(mod)) {
+            modifiers.add(ElementModifier.ABSTRACT);
+        } else if (Modifier.isStatic(mod)) {
             modifiers.add(ElementModifier.STATIC);
         }
-        if (fieldNode.isFinal()) {
+        if (Modifier.isFinal(mod)) {
             modifiers.add(ElementModifier.FINAL);
         }
         return modifiers;
@@ -732,6 +811,16 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
+    public String getSimpleName() {
+        return classNode.getNameWithoutPackage();
+    }
+
+    @Override
+    public String getPackageName() {
+        return classNode.getPackageName();
+    }
+
+    @Override
     public boolean isAbstract() {
         return classNode.isAbstract();
     }
@@ -788,9 +877,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         if (nonPrivateConstructors.size() == 1) {
             methodNode = nonPrivateConstructors.get(0);
         } else {
-            methodNode = nonPrivateConstructors.stream().filter(cn ->
-                    !cn.getAnnotations(makeCached(Inject.class)).isEmpty() ||
-                            !cn.getAnnotations(makeCached(Creator.class)).isEmpty()).findFirst().orElse(null);
+            methodNode = nonPrivateConstructors.stream()
+                    .filter(cn -> {
+                        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn);
+                        return annotationMetadata.hasAnnotation(AnnotationUtil.INJECT) ||
+                                annotationMetadata.hasAnnotation(Creator.class);
+                    })
+                    .findFirst().orElse(null);
             if (methodNode == null) {
                 methodNode = nonPrivateConstructors.stream().filter(cn -> Modifier.isPublic(cn.getModifiers())).findFirst().orElse(null);
             }

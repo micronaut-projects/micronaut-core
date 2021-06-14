@@ -28,8 +28,6 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.Array;
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * <p>An interface implemented at compile time by Micronaut that allows the inspection of annotation metadata and
@@ -127,6 +125,21 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * Get all of the values for the given annotation and type of the underlying values.
+     *
+     * @param annotation The annotation name
+     * @return An immutable map of values
+     */
+    default @NonNull Map<CharSequence, Object> getValues(@NonNull String annotation) {
+        final AnnotationValue<Annotation> ann = getAnnotation(annotation);
+        if (ann != null) {
+            return ann.getValues();
+        } else {
+            return Collections.emptyMap();
+        }
+    }
+
+    /**
      * Return the default value for the given annotation member.
      *
      * @param annotation   The annotation
@@ -191,9 +204,12 @@ public interface AnnotationMetadata extends AnnotationSource {
         if (annotation == null) {
             return false;
         }
-        return getAnnotationNames().stream().anyMatch(a ->
-                NameUtils.getSimpleName(a).equalsIgnoreCase(annotation)
-        );
+        for (String a : getAnnotationNames()) {
+            if (NameUtils.getSimpleName(a).equalsIgnoreCase(annotation)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -206,9 +222,12 @@ public interface AnnotationMetadata extends AnnotationSource {
         if (annotation == null) {
             return false;
         }
-        return getDeclaredAnnotationNames().stream().anyMatch(a ->
-                NameUtils.getSimpleName(a).equalsIgnoreCase(annotation)
-        );
+        for (String a : getDeclaredAnnotationNames()) {
+            if (NameUtils.getSimpleName(a).equalsIgnoreCase(annotation)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -322,6 +341,31 @@ public interface AnnotationMetadata extends AnnotationSource {
         return hasDeclaredAnnotation(annotationClass);
     }
 
+
+    /**
+     * @see AnnotationSource#isAnnotationPresent(String)
+     */
+    @Override
+    default boolean isAnnotationPresent(@NonNull String annotationName) {
+        //noinspection ConstantConditions
+        if (annotationName == null) {
+            return false;
+        }
+        return hasAnnotation(annotationName);
+    }
+
+    /**
+     * @see AnnotationSource#isAnnotationPresent(String)
+     */
+    @Override
+    default boolean isDeclaredAnnotationPresent(@NonNull String annotationName) {
+        //noinspection ConstantConditions
+        if (annotationName == null) {
+            return false;
+        }
+        return hasDeclaredAnnotation(annotationName);
+    }
+
     /**
      * Return the default value for the given annotation member.
      *
@@ -390,7 +434,11 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return The annotation name
      */
     default Optional<String> getAnnotationNameByStereotype(@Nullable String stereotype) {
-        return getAnnotationNamesByStereotype(stereotype).stream().findFirst();
+        List<String> annotationNamesByStereotype = getAnnotationNamesByStereotype(stereotype);
+        if (annotationNamesByStereotype.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(annotationNamesByStereotype.get(0));
     }
 
     /**
@@ -400,7 +448,11 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return The annotation name
      */
     default Optional<String> getDeclaredAnnotationNameByStereotype(@Nullable String stereotype) {
-        return getDeclaredAnnotationNamesByStereotype(stereotype).stream().findFirst();
+        List<String> declaredAnnotationNamesByStereotype = getDeclaredAnnotationNamesByStereotype(stereotype);
+        if (declaredAnnotationNamesByStereotype.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(declaredAnnotationNamesByStereotype.get(0));
     }
 
     /**
@@ -445,13 +497,12 @@ public interface AnnotationMetadata extends AnnotationSource {
     default Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
         ArgumentUtils.requireNonNull("name", name);
         final Optional<Class> aClass = ClassUtils.forName(name, classLoader);
-        return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
-            if (Annotation.class.isAssignableFrom(aClass1)) {
-                //noinspection unchecked
-                return Optional.of(aClass1);
-            }
-            return Optional.empty();
-        });
+        Class clazz = aClass.orElse(null);
+        if (clazz != null && Annotation.class.isAssignableFrom(clazz)) {
+            //noinspection unchecked
+            return (Optional) aClass;
+        }
+        return Optional.empty();
     }
 
     /**
@@ -517,13 +568,28 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return A set of annotation names
      */
     default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
+        return getAnnotationTypesByStereotype(stereotype.getName());
+    }
+
+    /**
+     * Resolve all of the annotation names that feature the given stereotype.
+     *
+     * @param stereotype The annotation names
+     * @return A set of annotation names
+     */
+    default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull String stereotype) {
         ArgumentUtils.requireNonNull("stereotype", stereotype);
 
-        List<String> names = getAnnotationNamesByStereotype(stereotype.getName());
-        return names.stream().map(this::getAnnotationType)
-            .filter(Optional::isPresent)
-            .map(opt -> (Class<? extends Annotation>) opt.get())
-            .collect(Collectors.toList());
+        List<String> names = getAnnotationNamesByStereotype(stereotype);
+        List<Class<? extends Annotation>> list = new ArrayList<>(names.size());
+        for (String name : names) {
+            Optional<Class<? extends Annotation>> opt = getAnnotationType(name);
+            if (opt.isPresent()) {
+                Class<? extends Annotation> aClass = opt.get();
+                list.add(aClass);
+            }
+        }
+        return list;
     }
 
     /**
@@ -537,10 +603,15 @@ public interface AnnotationMetadata extends AnnotationSource {
         ArgumentUtils.requireNonNull("stereotype", stereotype);
 
         List<String> names = getAnnotationNamesByStereotype(stereotype.getName());
-        return names.stream().map(name -> getAnnotationType(name, classLoader))
-                .filter(Optional::isPresent)
-                .map(opt -> (Class<? extends Annotation>) opt.get())
-                .collect(Collectors.toList());
+        List<Class<? extends Annotation>> list = new ArrayList<>(names.size());
+        for (String name : names) {
+            Optional<Class<? extends Annotation>> opt = getAnnotationType(name, classLoader);
+            if (opt.isPresent()) {
+                Class<? extends Annotation> aClass = opt.get();
+                list.add(aClass);
+            }
+        }
+        return list;
     }
 
     /**
@@ -556,10 +627,10 @@ public interface AnnotationMetadata extends AnnotationSource {
         Repeatable repeatable = annotationClass.getAnnotation(Repeatable.class);
         if (repeatable != null) {
             List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
-            if (!values.isEmpty()) {
-                return Optional.of(values.iterator().next());
-            } else {
+            if (values.isEmpty()) {
                 return Optional.empty();
+            } else {
+                return Optional.of(values.get(0));
             }
         } else {
             return this.findAnnotation(annotationClass.getName());
@@ -575,10 +646,10 @@ public interface AnnotationMetadata extends AnnotationSource {
         Repeatable repeatable = annotationClass.getAnnotation(Repeatable.class);
         if (repeatable != null) {
             List<AnnotationValue<T>> values = getDeclaredAnnotationValuesByType(annotationClass);
-            if (!values.isEmpty()) {
-                return Optional.of(values.iterator().next());
-            } else {
+            if (values.isEmpty()) {
                 return Optional.empty();
+            } else {
+                return Optional.of(values.get(0));
             }
         } else {
             return this.findDeclaredAnnotation(annotationClass.getName());
@@ -1024,6 +1095,27 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return The string values if it is present
      */
     default @NonNull String[] stringValues(@NonNull Class<? extends Annotation> annotation) {
+        return stringValues(annotation, VALUE_MEMBER);
+    }
+
+    /**
+     * The values as string array for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @param member     The member
+     * @return The string values if it is present
+     */
+    default @NonNull String[] stringValues(@NonNull String annotation, @NonNull String member) {
+        return StringUtils.EMPTY_STRING_ARRAY;
+    }
+
+    /**
+     * The values as string array for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @return The string values if it is present
+     */
+    default @NonNull String[] stringValues(@NonNull String annotation) {
         return stringValues(annotation, VALUE_MEMBER);
     }
 

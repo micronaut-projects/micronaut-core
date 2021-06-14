@@ -16,20 +16,21 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.netty.DefaultHttpClient;
+import io.micronaut.runtime.server.EmbeddedServer;
 import io.reactivex.Flowable;
-import static org.junit.Assert.*;
-
 import org.junit.Assert;
 import org.junit.Test;
-import io.micronaut.core.type.Argument;
-import io.micronaut.runtime.server.EmbeddedServer;
 
 import java.util.List;
 import java.util.Optional;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author Graeme Rocher

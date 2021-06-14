@@ -25,8 +25,7 @@ import brave.http.HttpServerResponse;
 import brave.http.HttpTracing;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * Adds HTTP tracing for Micronaut using Brave.

@@ -15,13 +15,17 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.ast.groovy.config.GroovyConfigurationMetadataBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
+
+import java.util.Map;
 
 /**
  * Implementation of {@link ElementFactory} for Groovy.
@@ -58,6 +62,40 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
 
     @NonNull
     @Override
+    public ClassElement newClassElement(@NonNull ClassNode classNode, @NonNull AnnotationMetadata annotationMetadata, @NonNull Map<String, ClassElement> resolvedGenerics) {
+        if (classNode.isArray()) {
+            ClassNode componentType = classNode.getComponentType();
+            ClassElement componentElement = newClassElement(componentType, annotationMetadata);
+            return componentElement.toArray();
+        } else if (ClassHelper.isPrimitiveType(classNode)) {
+            return PrimitiveElement.valueOf(classNode.getName());
+        } else if (classNode.isEnum()) {
+            return new GroovyEnumElement(visitorContext, classNode, annotationMetadata) {
+                @NonNull
+                @Override
+                public Map<String, ClassElement> getTypeArguments() {
+                    if (resolvedGenerics != null) {
+                        return resolvedGenerics;
+                    }
+                    return super.getTypeArguments();
+                }
+            };
+        } else {
+            return new GroovyClassElement(visitorContext, classNode, annotationMetadata) {
+                @NonNull
+                @Override
+                public Map<String, ClassElement> getTypeArguments() {
+                    if (resolvedGenerics != null) {
+                        return resolvedGenerics;
+                    }
+                    return super.getTypeArguments();
+                }
+            };
+        }
+    }
+
+    @NonNull
+    @Override
     public MethodElement newMethodElement(ClassElement declaringClass, @NonNull MethodNode method, @NonNull AnnotationMetadata annotationMetadata) {
         if (!(declaringClass instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
@@ -68,6 +106,69 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
                 method,
                 annotationMetadata
         );
+    }
+
+    @NonNull
+    @Override
+    public ClassElement newSourceClassElement(@NonNull ClassNode classNode, @NonNull AnnotationMetadata annotationMetadata) {
+        if (classNode.isArray()) {
+            ClassNode componentType = classNode.getComponentType();
+            ClassElement componentElement = newSourceClassElement(componentType, annotationMetadata);
+            return componentElement.toArray();
+        } else if (ClassHelper.isPrimitiveType(classNode)) {
+            return PrimitiveElement.valueOf(classNode.getName());
+        } else if (classNode.isEnum()) {
+            return new GroovyEnumElement(visitorContext, classNode, annotationMetadata) {
+                @NonNull
+                @Override
+                public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+                    return new GroovyBeanDefinitionBuilder(
+                            this,
+                            type,
+                            new GroovyConfigurationMetadataBuilder(sourceUnit, compilationUnit),
+                            visitorContext
+                    );
+                }
+            };
+        } else {
+            return new GroovyClassElement(visitorContext, classNode, annotationMetadata) {
+                @NonNull
+                @Override
+                public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+                    return new GroovyBeanDefinitionBuilder(
+                            this,
+                            type,
+                            new GroovyConfigurationMetadataBuilder(sourceUnit, compilationUnit),
+                            visitorContext
+                    );
+                }
+            };
+        }
+    }
+
+    @NonNull
+    @Override
+    public MethodElement newSourceMethodElement(ClassElement declaringClass, @NonNull MethodNode method, @NonNull AnnotationMetadata annotationMetadata) {
+        if (!(declaringClass instanceof GroovyClassElement)) {
+            throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
+        }
+        return new GroovyMethodElement(
+                (GroovyClassElement) declaringClass,
+                visitorContext,
+                method,
+                annotationMetadata
+        ) {
+            @NonNull
+            @Override
+            public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+                return new GroovyBeanDefinitionBuilder(
+                        this,
+                        type,
+                        new GroovyConfigurationMetadataBuilder(sourceUnit, compilationUnit),
+                        visitorContext
+                );
+            }
+        };
     }
 
     @NonNull

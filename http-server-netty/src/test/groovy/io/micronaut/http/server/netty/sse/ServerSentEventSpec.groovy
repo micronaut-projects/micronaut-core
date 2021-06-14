@@ -19,19 +19,21 @@ import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.sse.Event
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Emitter
 import io.reactivex.Flowable
+import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import spock.lang.Specification
 
-import javax.inject.Inject
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 
@@ -76,10 +78,12 @@ class ServerSentEventSpec extends Specification {
 
     void "test receive error from supplier"() {
         when:
-        List<Event<String>> events = client.exception().toList().blockingGet()
+        client.exception().toList().blockingGet()
 
         then:
-        events.size() == 0
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.INTERNAL_SERVER_ERROR
+        ex.message == "Internal Server Error"
     }
 
     @Client('/sse')

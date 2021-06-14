@@ -38,8 +38,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.DefaultRouteBuilder;
 import io.micronaut.web.router.UriRoute;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -94,8 +94,8 @@ public class AnnotatedFunctionRouteBuilder
             String functionMethod = beanDefinition.stringValue(FunctionBean.class, "method").orElse(null);
 
             List<UriRoute> routes = new ArrayList<>(2);
-            MediaType[] consumes = Arrays.stream(method.stringValues(Consumes.class)).map(MediaType::new).toArray(MediaType[]::new);
-            MediaType[] produces = Arrays.stream(method.stringValues(Produces.class)).map(MediaType::new).toArray(MediaType[]::new);
+            MediaType[] consumes = Arrays.stream(method.stringValues(Consumes.class)).map(MediaType::of).toArray(MediaType[]::new);
+            MediaType[] produces = Arrays.stream(method.stringValues(Produces.class)).map(MediaType::of).toArray(MediaType[]::new);
 
             if (Stream.of(java.util.function.Function.class, Consumer.class, BiFunction.class, BiConsumer.class).anyMatch(type -> type.isAssignableFrom(declaringType))) {
                 if (methodName.equals("accept") || methodName.equals("apply") || methodName.equals(functionMethod)) {
