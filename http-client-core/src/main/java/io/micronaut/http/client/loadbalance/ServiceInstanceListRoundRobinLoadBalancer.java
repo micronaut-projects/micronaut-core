@@ -19,11 +19,8 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
-
+import reactor.core.publisher.Mono;
 import java.util.Optional;
-import java.util.function.Supplier;
-import java.util.stream.Stream;
 
 /**
  * @author Graeme Rocher
@@ -41,7 +38,7 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
 
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
-        return Flux.just(getNextAvailable(serviceInstanceList.getInstances()));
+        return Mono.fromCallable(() -> getNextAvailable(serviceInstanceList.getInstances()));
     }
 
     @Override
