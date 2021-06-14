@@ -27,7 +27,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import spock.lang.Issue
@@ -41,7 +41,7 @@ class BigDecimalSerializationSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxHttpClient client
+    ReactorHttpClient client
 
     void "test that big decimal precision is retained during JSON ser-de"() {
         given:

@@ -19,7 +19,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.RequestAttributes;
 import io.micronaut.http.client.annotation.Client;
-import io.reactivex.Single;
+import reactor.core.publisher.Mono;
 
 // tag::class[]
 @Client("/story")
@@ -30,6 +30,6 @@ import io.reactivex.Single;
 public interface StoryClient {
 
     @Get("/{storyId}")
-    Single<Story> getById(@RequestAttribute String storyId);
+    Mono<Story> getById(@RequestAttribute String storyId);
 }
 // end::class[]

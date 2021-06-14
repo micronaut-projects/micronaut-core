@@ -16,9 +16,11 @@
 package io.micronaut.scheduling.exceptions
 
 import io.micronaut.context.ApplicationContext
+import spock.lang.Ignore
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+@Ignore
 class ScheduledExceptionHandlingSpec extends Specification {
 
     void "test that a task that throws a specific exception is handled by the correct handler"() {

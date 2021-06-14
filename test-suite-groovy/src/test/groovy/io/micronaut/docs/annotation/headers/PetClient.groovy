@@ -20,7 +20,7 @@ import io.micronaut.docs.annotation.PetOperations
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.client.annotation.Client
-import io.reactivex.Single
+import reactor.core.publisher.Mono
 
 // tag::class[]
 @Client("/pets")
@@ -28,9 +28,9 @@ import io.reactivex.Single
 interface PetClient extends PetOperations {
 
     @Override
-    Single<Pet> save(String name, int age)
+    Mono<Pet> save(String name, int age)
 
     @Get("/{name}")
-    Single<Pet> get(String name)
+    Mono<Pet> get(String name)
 }
 // end::class[]

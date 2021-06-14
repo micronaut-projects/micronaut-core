@@ -33,16 +33,16 @@ import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.tracing.annotation.ContinueSpan
 import io.opentracing.Tracer
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.reactivex.schedulers.Schedulers
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import jakarta.inject.Inject
 import java.time.Duration
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
 
 /**
@@ -760,18 +760,18 @@ class HttpTracingSpec extends Specification {
 
         @Get("/response-rx/{name}")
         HttpResponse<Publisher<String>> responseRx(String name) {
-            return HttpResponse.ok(Publishers.map(Flowable.fromCallable({ ->
+            return HttpResponse.ok(Publishers.map(Mono.fromCallable({ ->
                 spanCustomizer.activeSpan().setTag("foo", "bar")
                 return name
             }), { String n -> n }))
         }
 
         @Get("/rxjava/{name}")
-        Single<String> rxjava(String name) {
-            Single.fromCallable({ ->
+        Mono<String> rxjava(String name) {
+            Mono.fromCallable({ ->
                 spanCustomizer.activeSpan().setTag("foo", "bar")
                 return name
-            }).subscribeOn(Schedulers.io())
+            }).subscribeOn(Schedulers.boundedElastic())
         }
 
         @Get("/error/{name}")
@@ -786,8 +786,8 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/rxError/{name}")
-        Single<String> rxError(String name) {
-            Single.defer { Single.just(error(name)) }
+        Mono<String> rxError(String name) {
+            Mono.defer { Mono.just(error(name)) }
         }
 
         @Get("/nested/{name}")
@@ -816,7 +816,7 @@ class HttpTracingSpec extends Specification {
 
         @ContinueSpan
         @Get("/continueRx/{name}")
-        Single<String> continuedRx(String name) {
+        Mono<String> continuedRx(String name) {
             tracedClient.continuedRx(name)
         }
 
@@ -845,29 +845,30 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/nestedRx/{name}")
-        Single<String> nestedRx(String name) {
+        Mono<String> nestedRx(String name) {
             spanCustomizer.activeSpan().setBaggageItem("foo", "bar")
             tracedClient.continuedRx(name)
-                    .flatMap({ String res ->
+                    .map({ String res ->
                         assert spanCustomizer.activeSpan().getBaggageItem("foo") == "bar"
                         return tracedClient.nestedRx2(res)
                     })
         }
 
         @Get("/nestedRx2/{name}")
-        Single<Integer> nestedRx2(String name) {
+        Mono<Integer> nestedRx2(String name) {
             assert spanCustomizer.activeSpan().getBaggageItem("foo") == "bar"
-            return Single.just(10)
+            return Mono.just(10)
         }
 
         @Get("/quota-error")
-        Single<String> quotaError() {
-            Single.error(new QuotaException("retry later"))
+        Mono<String> quotaError() {
+            Mono.error(new QuotaException("retry later"))
         }
 
         @Get("/delayed-error/{duration}")
-        Single<Object> delayedError(Duration duration) {
-            Single.error(new RuntimeException("delayed error")).delay(duration.toMillis(), TimeUnit.MILLISECONDS, true)
+        Mono<Object> delayedError(Duration duration) {
+            Mono.error(new RuntimeException("delayed error"))
+                    .delayElement(Duration.of(duration.toMillis(), ChronoUnit.MILLIS))
         }
 
         @Error(QuotaException)
@@ -904,9 +905,9 @@ class HttpTracingSpec extends Specification {
         String blockingContinued(String name)
 
         @Get("/hello/{name}")
-        Single<String> continuedRx(String name)
+        Mono<String> continuedRx(String name)
 
         @Get("/nestedRx2/{name}")
-        Single<String> nestedRx2(String name)
+        Mono<String> nestedRx2(String name)
     }
 }

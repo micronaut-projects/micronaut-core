@@ -11,9 +11,9 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Flowable
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 @MicronautTest
@@ -51,8 +51,8 @@ class ResponseAndStreamSpec extends Specification {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(
                 HttpRequest<?> request, ServerFilterChain chain) {
-            return Flowable.fromPublisher(chain.proceed()).map { MutableHttpResponse<?> response ->
-                return response.body(Flowable.fromIterable([
+            return Flux.from(chain.proceed()).map { MutableHttpResponse<?> response ->
+                return response.body(Flux.fromIterable([
                         "chunk1",
                         "chunk2",
                         "chunk3",

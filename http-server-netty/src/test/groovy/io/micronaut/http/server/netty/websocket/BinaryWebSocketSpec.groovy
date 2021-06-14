@@ -17,7 +17,7 @@ package io.micronaut.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.websocket.RxWebSocketClient
+import io.micronaut.websocket.ReactorWebSocketClient
 import io.netty.buffer.Unpooled
 import spock.lang.Retry
 import spock.lang.Specification
@@ -36,9 +36,9 @@ class BinaryWebSocketSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
-        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
-        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockingFirst()
-        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
+        ReactorWebSocketClient wsClient = embeddedServer.applicationContext.createBean(ReactorWebSocketClient, embeddedServer.getURI())
+        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockFirst()
+        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"]).blockFirst()
 
         then:"The connection is valid"
         fred.session != null
@@ -84,7 +84,7 @@ class BinaryWebSocketSpec extends Specification {
         def buffer = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
         buffer.retain()
         fred.sendAsync(buffer).get().toString(StandardCharsets.UTF_8) == 'foo'
-        new String(fred.sendRx(ByteBuffer.wrap("bar".bytes)).blockingGet().array()) == 'bar'
+        new String(fred.sendRx(ByteBuffer.wrap("bar".bytes)).block().array()) == 'bar'
 
         when:
         bob.close()
@@ -116,9 +116,9 @@ class BinaryWebSocketSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
-        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
-        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockingFirst()
-        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
+        ReactorWebSocketClient wsClient = embeddedServer.applicationContext.createBean(ReactorWebSocketClient, embeddedServer.getURI())
+        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockFirst()
+        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"]).blockFirst()
 
 
         then:"The connection is valid"
@@ -150,9 +150,9 @@ class BinaryWebSocketSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
-        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
-        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockingFirst()
-        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
+        ReactorWebSocketClient wsClient = embeddedServer.applicationContext.createBean(ReactorWebSocketClient, embeddedServer.getURI())
+        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockFirst()
+        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"]).blockFirst()
 
 
         then:"The connection is valid"

@@ -11,14 +11,14 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
-import io.reactivex.Flowable
-import io.reactivex.Single
 import jakarta.inject.Inject
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
@@ -30,13 +30,13 @@ class ByteBufferSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxHttpClient rxClient
+    ReactorHttpClient rxClient
 
     void "test reading the body with a publisher of bytebuffers"() {
         when:
         String response = rxClient.retrieve(
                 HttpRequest.POST("/buffer-test", "hello")
-                        .contentType(MediaType.TEXT_PLAIN), String).blockingFirst()
+                        .contentType(MediaType.TEXT_PLAIN), String).blockFirst()
 
         then:
         response == "hello"
@@ -47,7 +47,7 @@ class ByteBufferSpec extends Specification {
         String body = "hello" * 1000
         String response = rxClient.retrieve(
                 HttpRequest.POST("/buffer-completable", body)
-                        .contentType(MediaType.TEXT_PLAIN), String).blockingFirst()
+                        .contentType(MediaType.TEXT_PLAIN), String).blockFirst()
 
         then:
         response == body
@@ -55,7 +55,7 @@ class ByteBufferSpec extends Specification {
 
     void "test read bytes"() {
         when:
-        def bytes = rxClient.retrieve(HttpRequest.GET('/bytes'), byte[].class).blockingFirst()
+        def bytes = rxClient.retrieve(HttpRequest.GET('/bytes'), byte[].class).blockFirst()
 
         then:
         new String(bytes) == 'blah'
@@ -64,7 +64,7 @@ class ByteBufferSpec extends Specification {
 
     void "test read byteBuffer"() {
         when:
-        def bytes = rxClient.retrieve(HttpRequest.GET('/byteBuffer'), byte[].class).blockingFirst()
+        def bytes = rxClient.retrieve(HttpRequest.GET('/byteBuffer'), byte[].class).blockFirst()
 
         then:
         new String(bytes) == 'blah'
@@ -72,7 +72,7 @@ class ByteBufferSpec extends Specification {
 
     void "test read byteBuf"() {
         when:
-        def bytes = rxClient.retrieve(HttpRequest.GET('/byteBuf'), byte[].class).blockingFirst()
+        def bytes = rxClient.retrieve(HttpRequest.GET('/byteBuf'), byte[].class).blockFirst()
 
         then:
         new String(bytes) == 'blah'
@@ -80,7 +80,7 @@ class ByteBufferSpec extends Specification {
 
     void "test read single bytes flowable"() {
         when:
-        def bytes = rxClient.retrieve(HttpRequest.GET('/singleBytesFlowable'), byte[].class).blockingFirst()
+        def bytes = rxClient.retrieve(HttpRequest.GET('/singleBytesFlowable'), byte[].class).blockFirst()
 
         then:
         new String(bytes) == 'blah'
@@ -93,7 +93,7 @@ class ByteBufferSpec extends Specification {
         @Inject ByteBufferFactory<?, ?> byteBufferFactory
 
         @Post(uri = "/buffer-test", processes = MediaType.TEXT_PLAIN)
-        Flowable<String> buffer(@Body Flowable<ByteBuffer> body) {
+        Flux<String> buffer(@Body Flux<ByteBuffer> body) {
             return body.map({ buffer -> buffer.toString(StandardCharsets.UTF_8) })
         }
 
@@ -125,10 +125,10 @@ class ByteBufferSpec extends Specification {
         }
 
         @Get(uri = "/singleBytesFlowable", produces = MediaType.IMAGE_JPEG)
-        Single<HttpResponse<Flowable<byte[]>>> singleBytesFlowable() throws IOException {
-            return Single.just(
+        Mono<HttpResponse<Flux<byte[]>>> singleBytesFlowable() throws IOException {
+            return Mono.just(
                     HttpResponse
-                            .ok(Flowable.just("blah".getBytes()))
+                            .ok(Flux.just("blah".getBytes()))
                             .contentType(MediaType.IMAGE_JPEG)
             )
         }

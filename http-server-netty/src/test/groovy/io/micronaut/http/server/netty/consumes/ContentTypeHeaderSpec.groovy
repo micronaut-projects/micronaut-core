@@ -19,7 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -29,8 +29,8 @@ class ContentTypeHeaderSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
-    @Shared RxHttpClient client = embeddedServer.applicationContext.createBean(
-            RxHttpClient,
+    @Shared ReactorHttpClient client = embeddedServer.applicationContext.createBean(
+            ReactorHttpClient,
             embeddedServer.getURL()
     )
 

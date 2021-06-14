@@ -16,10 +16,10 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.hateoas.Link
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.reactivex.schedulers.Schedulers
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import spock.lang.Issue
 
 import java.util.concurrent.CompletableFuture
@@ -31,7 +31,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"title":"The Stand"'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/string', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -43,7 +43,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"title":"The Stand"'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/request-string', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -55,7 +55,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"name":"Fred", "age":10}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/params', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -68,7 +68,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"title":The Stand}'
         rxClient.exchange(
                 HttpRequest.POST('/json/map', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -93,7 +93,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"title":"The Stand"}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/map', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "Body: [title:The Stand]"
@@ -104,7 +104,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"title":"The Stand"}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/string', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "Body: $json"
@@ -115,7 +115,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"title":"The Stand"}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/body-title', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "Body Title: The Stand"
@@ -126,7 +126,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"title":"The Stand"}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/request-string', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "Body: $json"
@@ -137,7 +137,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"title":"The Stand"}'
         rxClient.exchange(
                 HttpRequest.POST('/json/map', json).contentType(io.micronaut.http.MediaType.APPLICATION_ATOM_XML_TYPE), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -149,7 +149,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"name":"Fred", "age":10}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/object', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "Body: Foo(Fred, 10)"
@@ -160,7 +160,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/object-to-object', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == json
@@ -171,7 +171,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '[{"name":"Fred", "age":10},{"name":"Barney", "age":11}]'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/array', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
@@ -182,7 +182,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/array-to-array', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == json
@@ -193,7 +193,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '[{"name":"Fred", "age":10},{"name":"Barney", "age":11}]'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/list', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
@@ -204,7 +204,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/future', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "Body: $json".toString()
@@ -215,7 +215,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/future-map', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "Body: [name:Fred, age:10]".toString()
@@ -226,7 +226,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/future-object', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "Body: Foo(Fred, 10)".toString()
@@ -237,7 +237,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/publisher-object', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "[Foo(Fred, 10)]".toString()
@@ -248,7 +248,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"message":"foo"}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/single', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "$json".toString()
@@ -259,7 +259,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/request-generic', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "Foo(Fred, 10)".toString()
@@ -270,7 +270,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = ''
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/request-generic', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -283,7 +283,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '[1,2,3]'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/request-generic', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == "not found"
@@ -295,7 +295,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '[{"name":"Joe"},{"name":"Sally"}]'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/deserialize-listwrapper', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         response.body() == '["Joe","Sally"]'
@@ -357,9 +357,8 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post("/single")
-        Single<String> single(@Body Single<String> message) {
+        Mono<String> single(@Body Mono<String> message) {
             message
-
         }
 
         @Post("/future")
@@ -385,7 +384,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post("/publisher-object")
-        Publisher<String> publisherObject(@Body Flowable<Foo> publisher) {
+        Publisher<String> publisherObject(@Body Flux<Foo> publisher) {
             return publisher
                     .subscribeOn(Schedulers.io())
                     .map({ Foo foo ->

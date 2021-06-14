@@ -31,7 +31,7 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
 
     void "test that a bad request is handled is handled by a globally marked controller method"() {
         when:
-        rxClient.exchange('/test1/bad').blockingFirst()
+        rxClient.exchange('/test1/bad').blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -39,7 +39,7 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
         e.response.reason() == "You sent me bad stuff - from Test2Controller.badHandler()"
 
         when:
-        rxClient.exchange('/test2/bad').blockingFirst()
+        rxClient.exchange('/test2/bad').blockFirst()
 
         then:
         e = thrown(HttpClientResponseException)
@@ -52,7 +52,7 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
         rxClient.exchange(
                 HttpRequest.POST('/test1/simple', [name:"Fred"])
                         .contentType(MediaType.FORM)
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -63,7 +63,7 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
         rxClient.exchange(
                 HttpRequest.POST('/test2/simple', [name:"Fred"])
                         .contentType(MediaType.FORM)
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         e = thrown(HttpClientResponseException)
@@ -73,7 +73,7 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
 
     void "test that a not found response request data can be handled by a local method"() {
         when:
-        rxClient.exchange('/test1/notFound').blockingFirst()
+        rxClient.exchange('/test1/notFound').blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)

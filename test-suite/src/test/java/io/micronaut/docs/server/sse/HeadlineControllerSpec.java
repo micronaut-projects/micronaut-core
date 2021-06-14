@@ -17,7 +17,7 @@ package io.micronaut.docs.server.sse;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.client.sse.RxSseClient;
+import io.micronaut.http.client.sse.ReactorSseClient;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
@@ -49,7 +49,7 @@ public class HeadlineControllerSpec {
 
     @Test
     public void testConsumeEventStreamObject() {
-        RxSseClient client = embeddedServer.getApplicationContext().createBean(RxSseClient.class, embeddedServer.getURL());
+        ReactorSseClient client = embeddedServer.getApplicationContext().createBean(ReactorSseClient.class, embeddedServer.getURL());
 
         List<Event<Headline>> events = new ArrayList<>();
 

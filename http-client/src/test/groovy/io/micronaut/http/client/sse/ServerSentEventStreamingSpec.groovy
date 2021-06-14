@@ -26,7 +26,7 @@ import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -36,13 +36,13 @@ import java.util.concurrent.TimeUnit
 class ServerSentEventStreamingSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-    @Shared @AutoCleanup RxSseClient sseClient = embeddedServer.applicationContext.createBean(RxSseClient, embeddedServer.getURL())
+    @Shared @AutoCleanup ReactorSseClient sseClient = embeddedServer.applicationContext.createBean(ReactorSseClient, embeddedServer.getURL())
     @Shared ProductClient productClient = embeddedServer.applicationContext.getBean(ProductClient)
 
 
-    void "test consume SSE stream with RxSseClient"() {
+    void "test consume SSE stream with ReactorSseClient"() {
         when:
-        List<Event<Product>> results = sseClient.eventStream("/stream/sse/pojo/events", Product).toList().blockingGet()
+        List<Event<Product>> results = sseClient.eventStream("/stream/sse/pojo/events", Product).collectList().block()
 
         then:
         results[0].data.name == "Apple"
@@ -56,7 +56,7 @@ class ServerSentEventStreamingSpec extends Specification {
 
     void "test consume SSE stream with @Client"() {
         when:
-        List<Event<Product>> results = productClient.pojoEventStream().toList().blockingGet()
+        List<Event<Product>> results = productClient.pojoEventStream().collectList().block()
 
         then:
         results[0].data.name == "Apple"
@@ -69,7 +69,7 @@ class ServerSentEventStreamingSpec extends Specification {
 
     void "test consume pojo SSE stream with @Client"() {
         when:
-        List<Product> results = productClient.pojoStream().toList().blockingGet()
+        List<Product> results = productClient.pojoStream().collectList().block()
 
         then:
         results[0].name == "Apple"
@@ -82,7 +82,7 @@ class ServerSentEventStreamingSpec extends Specification {
     // this tests that read timeout is not applied, but instead idle timeout is applied
     void "test consume pojo delayed SSE stream with @Client"() {
         when:
-        List<Product> results = productClient.delayedStream().toList().blockingGet()
+        List<Product> results = productClient.delayedStream().collectList().block()
 
         then:
         results[0].name == "Apple"
@@ -106,18 +106,17 @@ class ServerSentEventStreamingSpec extends Specification {
         ]
     }
 
-
     @Client("/stream/sse")
     static interface ProductClient {
 
         @Get(value = '/pojo/events', processes = MediaType.TEXT_EVENT_STREAM)
-        Flowable<Event<Product>> pojoEventStream()
+        Flux<Event<Product>> pojoEventStream()
 
         @Get(value = '/pojo/objects', processes = MediaType.TEXT_EVENT_STREAM)
-        Flowable<Product> pojoStream()
+        Flux<Product> pojoStream()
 
         @Get(value = '/pojo/delayed', processes = MediaType.TEXT_EVENT_STREAM)
-        Flowable<Product> delayedStream()
+        Flux<Product> delayedStream()
     }
 
     @Controller("/stream/sse")
@@ -126,18 +125,18 @@ class ServerSentEventStreamingSpec extends Specification {
 
 
         @Get(value = '/pojo/events', produces = MediaType.TEXT_EVENT_STREAM)
-        Flowable<Event<Product>> pojoEventStream() {
-            return Flowable.fromIterable(dataSet())
+        Flux<Event<Product>> pojoEventStream() {
+            return Flux.fromIterable(dataSet())
         }
 
         @Get(value = '/pojo/objects', produces = MediaType.TEXT_EVENT_STREAM)
-        Flowable<Product> pojoStream() {
-            return Flowable.fromIterable(dataSet().collect { it.data })
+        Flux<Product> pojoStream() {
+            return Flux.fromIterable(dataSet().collect { it.data })
         }
 
         @Get(value = '/pojo/delayed', produces = MediaType.TEXT_EVENT_STREAM)
-        Flowable<Product> delayedStream() {
-            return Flowable.fromIterable(dataSet().collect { it.data }).delay(
+        Flux<Product> delayedStream() {
+            return Flux.fromIterable(dataSet().collect { it.data }).delay(
                     5,
                     TimeUnit.SECONDS
             )

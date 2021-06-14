@@ -55,8 +55,8 @@ import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
-import io.micronaut.http.client.RxHttpClient;
-import io.micronaut.http.client.RxHttpClientRegistry;
+import io.micronaut.http.client.ReactiveHttpClientRegistry;
+import io.micronaut.http.client.ReactorHttpClient;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
@@ -105,7 +105,7 @@ import java.util.function.Supplier;
 @BootstrapContextCompatible
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(RxHttpClient.class);
+    private static final Logger LOG = LoggerFactory.getLogger(HttpClientIntroductionAdvice.class);
 
     /**
      * The default Accept-Types.
@@ -119,7 +119,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final List<ReactiveClientResultTransformer> transformers;
     private final HttpClientBinderRegistry binderRegistry;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
-    private final RxHttpClientRegistry clientFactory;
+    private final ReactiveHttpClientRegistry<ReactorHttpClient> clientFactory;
 
     /**
      * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
@@ -132,7 +132,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     public HttpClientIntroductionAdvice(
             BeanContext beanContext,
-            RxHttpClientRegistry clientFactory,
+            ReactiveHttpClientRegistry<ReactorHttpClient> clientFactory,
             JsonMediaTypeCodec jsonMediaTypeCodec,
             List<ReactiveClientResultTransformer> transformers,
             HttpClientBinderRegistry binderRegistry) {

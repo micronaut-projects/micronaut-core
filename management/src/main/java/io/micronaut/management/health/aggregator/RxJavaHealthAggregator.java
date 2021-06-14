@@ -23,10 +23,10 @@ import io.micronaut.management.endpoint.health.HealthLevelOfDetail;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.runtime.ApplicationConfiguration;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -64,22 +64,22 @@ public class RxJavaHealthAggregator implements HealthAggregator<HealthResult> {
 
     @Override
     public Publisher<HealthResult> aggregate(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail) {
-        Flowable<HealthResult> results = aggregateResults(indicators);
-        Single<HealthResult> result = results.toList().map(list -> {
+        Flux<HealthResult> results = aggregateResults(indicators);
+        Mono<HealthResult> result = results.collectList().map(list -> {
             HealthStatus overallStatus = calculateOverallStatus(list);
             return buildResult(overallStatus, aggregateDetails(list), healthLevelOfDetail);
         });
-        return result.toFlowable();
+        return result.flux();
     }
 
     @Override
     public Publisher<HealthResult> aggregate(String name, Publisher<HealthResult> results) {
-        Single<HealthResult> result = Flowable.fromPublisher(results).toList().map(list -> {
+        Mono<HealthResult> result = Flux.from(results).collectList().map(list -> {
             HealthStatus overallStatus = calculateOverallStatus(list);
             Object details = aggregateDetails(list);
             return HealthResult.builder(name, overallStatus).details(details).build();
         });
-        return result.toFlowable();
+        return result.flux();
     }
 
     /**
@@ -99,8 +99,8 @@ public class RxJavaHealthAggregator implements HealthAggregator<HealthResult> {
      * @param indicators An array of {@link HealthIndicator}
      * @return The aggregated results from all health indicators
      */
-    protected Flowable<HealthResult> aggregateResults(HealthIndicator[] indicators) {
-        return Flowable.merge(
+    protected Flux<HealthResult> aggregateResults(HealthIndicator[] indicators) {
+        return Flux.merge(
             Arrays.stream(indicators)
                 .map(HealthIndicator::getResult)
                 .collect(Collectors.toList())

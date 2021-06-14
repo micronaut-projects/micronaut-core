@@ -5,10 +5,10 @@ import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -21,8 +21,8 @@ class HelloControllerSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(
             EmbeddedServer,
             ["spec.name": HelloControllerSpec.simpleName])
-    @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext
-                                                             .createBean(RxHttpClient, embeddedServer.URL)
+    @Shared @AutoCleanup ReactorHttpClient client = embeddedServer.applicationContext
+                                                             .createBean(ReactorHttpClient, embeddedServer.URL)
 
     void "test simple retrieve"() {
         // tag::simple[]
@@ -43,26 +43,26 @@ class HelloControllerSpec extends Specification {
     void "test retrieve with headers"() {
         when:
         // tag::headers[]
-        Flowable<String> response = client.retrieve(
+        Flux<String> response = client.retrieve(
                 GET("/hello/John")
                 .header("X-My-Header", "SomeValue")
         )
         // end::headers[]
 
         then:
-        "Hello John" == response.blockingFirst()
+        "Hello John" == response.blockFirst()
     }
 
     void "test retrieve with JSON"() {
         when:
         // tag::jsonmap[]
-        Flowable<Map> response = client.retrieve(
+        Flux<Map> response = client.retrieve(
                 GET("/greet/John"), Map
         )
         // end::jsonmap[]
 
         then:
-        "Hello John" == response.blockingFirst().get("text")
+        "Hello John" == response.blockFirst().get("text")
 
         when:
         // tag::jsonmaptypes[]
@@ -73,29 +73,29 @@ class HelloControllerSpec extends Specification {
         // end::jsonmaptypes[]
 
         then:
-        "Hello John" == response.blockingFirst().get("text")
+        "Hello John" == response.blockFirst().get("text")
     }
 
     void "test retrieve with POJO"() {
         // tag::jsonpojo[]
         when:
-        Flowable<Message> response = client.retrieve(
+        Flux<Message> response = client.retrieve(
                 GET("/greet/John"), Message
         )
 
         then:
-        "Hello John" == response.blockingFirst().getText()
+        "Hello John" == response.blockFirst().getText()
         // end::jsonpojo[]
     }
 
     void "test retrieve with POJO response"() {
         // tag::pojoresponse[]
         when:
-        Flowable<HttpResponse<Message>> call = client.exchange(
+        Flux<HttpResponse<Message>> call = client.exchange(
                 GET("/greet/John"), Message // <1>
         )
 
-        HttpResponse<Message> response = call.blockingFirst();
+        HttpResponse<Message> response = call.blockFirst();
         Optional<Message> message = response.getBody(Message) // <2>
         // check the status
         then:
@@ -109,7 +109,7 @@ class HelloControllerSpec extends Specification {
     void "test post request with string"() {
         when:
         // tag::poststring[]
-        Flowable<HttpResponse<String>> call = client.exchange(
+        Flux<HttpResponse<String>> call = client.exchange(
                 POST("/hello", "Hello John") // <1>
                     .contentType(MediaType.TEXT_PLAIN_TYPE)
                     .accept(MediaType.TEXT_PLAIN_TYPE), // <2>
@@ -117,7 +117,7 @@ class HelloControllerSpec extends Specification {
         )
         // end::poststring[]
 
-        HttpResponse<String> response = call.blockingFirst()
+        HttpResponse<String> response = call.blockFirst()
         Optional<String> message = response.getBody(String) // <2>
         // check the status
         then:
@@ -130,13 +130,13 @@ class HelloControllerSpec extends Specification {
     void "test post request with POJO"() {
         when:
         // tag::postpojo[]
-        Flowable<HttpResponse<Message>> call = client.exchange(
+        Flux<HttpResponse<Message>> call = client.exchange(
                 POST("/greet", new Message("Hello John")), // <1>
                 Message // <2>
         )
         // end::postpojo[]
 
-        HttpResponse<Message> response = call.blockingFirst()
+        HttpResponse<Message> response = call.blockFirst()
         Optional<Message> message = response.getBody(Message) // <2>
         // check the status
         then:

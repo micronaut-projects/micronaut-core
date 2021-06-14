@@ -9,6 +9,9 @@ dependencies {
         exclude module:'micronaut-bom'
     }
 
+    implementation platform('io.projectreactor:reactor-bom:2020.0.7')
+    implementation 'io.projectreactor:reactor-core'
+
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")
@@ -22,5 +25,6 @@ dependencies {
 
     compileOnly "ch.qos.logback:logback-classic:1.2.3"
     compileOnly "org.apache.logging.log4j:log4j-core:2.14.1"
+
 }
 

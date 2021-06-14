@@ -17,37 +17,37 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.RxHttpClient;
-import io.micronaut.http.client.RxHttpClientFactory;
-import io.micronaut.http.client.RxStreamingHttpClient;
+import io.micronaut.http.client.ReactorHttpClient;
+import io.micronaut.http.client.ReactorHttpClientFactory;
+import io.micronaut.http.client.ReactorStreamingHttpClient;
 
 import java.net.URL;
 
 /**
- * Implementation of {@link RxHttpClientFactory} for Netty.
+ * Implementation of {@link ReactorHttpClientFactory} for Netty.
  *
  * @author graemerocher
  * @since 2.0
  */
 @Internal
-public class NettyRxHttpClientFactory implements RxHttpClientFactory {
+public class NettyReactorHttpClientFactory implements ReactorHttpClientFactory {
     @Override
-    public RxHttpClient createClient(URL url) {
+    public ReactorHttpClient createClient(URL url) {
         return new DefaultHttpClient(url);
     }
 
     @Override
-    public RxHttpClient createClient(URL url, HttpClientConfiguration configuration) {
+    public ReactorHttpClient createClient(URL url, HttpClientConfiguration configuration) {
         return new DefaultHttpClient(url, configuration);
     }
 
     @Override
-    public RxStreamingHttpClient createStreamingClient(URL url) {
+    public ReactorStreamingHttpClient createStreamingClient(URL url) {
         return new DefaultHttpClient(url);
     }
 
     @Override
-    public RxStreamingHttpClient createStreamingClient(URL url, HttpClientConfiguration configuration) {
+    public ReactorStreamingHttpClient createStreamingClient(URL url, HttpClientConfiguration configuration) {
         return new DefaultHttpClient(url, configuration);
     }
 }

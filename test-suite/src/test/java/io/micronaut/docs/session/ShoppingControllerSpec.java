@@ -19,7 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.ReactorHttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -32,14 +32,14 @@ import static org.junit.Assert.assertTrue;
 public class ShoppingControllerSpec {
 
     private static EmbeddedServer server;
-    private static RxHttpClient client;
+    private static ReactorHttpClient client;
 
     @BeforeClass
     public static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class);
         client = server
                 .getApplicationContext()
-                .createBean(RxHttpClient.class, server.getURL());
+                .createBean(ReactorHttpClient.class, server.getURL());
     }
 
     @AfterClass
@@ -56,7 +56,7 @@ public class ShoppingControllerSpec {
     public void testSessionValueUsedOnReturnValue() {
         // tag::view[]
         HttpResponse<Cart> response = client.exchange(HttpRequest.GET("/shopping/cart"), Cart.class) // <1>
-                                            .blockingFirst();
+                                            .blockFirst();
         Cart cart = response.body();
 
         assertNotNull(response.header(HttpHeaders.AUTHORIZATION_INFO)); // <2>
@@ -69,7 +69,7 @@ public class ShoppingControllerSpec {
 
         response = client.exchange(HttpRequest.POST("/shopping/cart/Apple", "")
                          .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart.class) // <2>
-                         .blockingFirst();
+                         .blockFirst();
         cart = response.body();
         // end::add[]
 
@@ -78,7 +78,7 @@ public class ShoppingControllerSpec {
 
         response = client.exchange(HttpRequest.GET("/shopping/cart")
                          .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart.class)
-                         .blockingFirst();
+                         .blockFirst();
         cart = response.body();
 
         response.header(HttpHeaders.AUTHORIZATION_INFO);

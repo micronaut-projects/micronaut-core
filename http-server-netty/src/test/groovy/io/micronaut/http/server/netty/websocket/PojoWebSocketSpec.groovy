@@ -17,7 +17,7 @@ package io.micronaut.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.websocket.RxWebSocketClient
+import io.micronaut.websocket.ReactorWebSocketClient
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -30,9 +30,9 @@ class PojoWebSocketSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
-        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
-        PojoChatClientWebSocket fred = wsClient.connect(PojoChatClientWebSocket, "/pojo/chat/stuff/fred").blockingFirst()
-        PojoChatClientWebSocket bob = wsClient.connect(PojoChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
+        ReactorWebSocketClient wsClient = embeddedServer.applicationContext.createBean(ReactorWebSocketClient, embeddedServer.getURI())
+        PojoChatClientWebSocket fred = wsClient.connect(PojoChatClientWebSocket, "/pojo/chat/stuff/fred").blockFirst()
+        PojoChatClientWebSocket bob = wsClient.connect(PojoChatClientWebSocket, [topic:"stuff",username:"bob"]).blockFirst()
 
         then:"A session is established"
         fred.topic == 'stuff'
@@ -65,7 +65,7 @@ class PojoWebSocketSpec extends Specification {
             bob.replies.contains(new Message(text:"[fred] Hello bob!"))
         }
         fred.sendAsync(new Message(text:  "foo")).get().text == 'foo'
-        fred.sendRx(new Message(text:  "bar")).blockingGet().text == 'bar'
+        fred.sendRx(new Message(text:  "bar")).block().text == 'bar'
 
         cleanup:
         bob?.close()

@@ -19,6 +19,8 @@ dependencies {
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation "com.blazebit:blaze-persistence-core-impl:1.6.0-Alpha1"
 
+    testImplementation platform('io.projectreactor:reactor-bom:2020.0.7')
+    testImplementation 'io.projectreactor:reactor-core'
 }
 
 test {

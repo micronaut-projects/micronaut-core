@@ -19,7 +19,8 @@ package io.micronaut.docs.streaming
 import io.micronaut.http.MediaType.APPLICATION_JSON_STREAM
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
+
 // end::imports[]
 
 // tag::class[]
@@ -27,9 +28,9 @@ import io.reactivex.Flowable
 interface HeadlineClient {
 
     @Get(value = "/headlines", processes = [APPLICATION_JSON_STREAM]) // <1>
-    fun streamHeadlines(): Flowable<Headline>  // <2>
+    fun streamHeadlines(): Flux<Headline>  // <2>
     // end::class[]
 
     @Get(value = "/headlines", processes = [APPLICATION_JSON_STREAM]) // <1>
-    fun streamFlux(): Flowable<Headline>
+    fun streamFlux(): Flux<Headline>
 }

@@ -12,7 +12,7 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.ReactorHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -46,7 +46,7 @@ public class Http2PostTest implements TestPropertyProvider {
 
     @Inject
     @Client(value = "/", httpVersion = HttpVersion.HTTP_2_0)
-    RxHttpClient client;
+    ReactorHttpClient client;
 
     @Inject
     ServerSslBuilder serverSslBuilder;
@@ -55,7 +55,7 @@ public class Http2PostTest implements TestPropertyProvider {
     void testPost() {
         HttpResponse<String> result = client.exchange(HttpRequest.POST("/vertx/demo/testPost", "Request-1")
                 .contentType(MediaType.TEXT_PLAIN), String.class)
-                .blockingFirst();
+                .blockFirst();
 
         Assertions.assertEquals(
                 "Test succeeded on POST. Received : Request-1",
@@ -64,7 +64,7 @@ public class Http2PostTest implements TestPropertyProvider {
 
         result = client.exchange(HttpRequest.POST("/vertx/demo/testPost", "Request-2")
                 .contentType(MediaType.TEXT_PLAIN), String.class)
-                .blockingFirst();
+                .blockFirst();
 
         Assertions.assertEquals(
                 "Test succeeded on POST. Received : Request-2",

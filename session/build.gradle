@@ -9,6 +9,9 @@ dependencies {
     compileOnly project(":http-server")
     compileOnly project(":http-server-netty")
 
+    implementation platform('io.projectreactor:reactor-bom:2020.0.7')
+    implementation 'io.projectreactor:reactor-core'
+
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
     testImplementation project(":inject")

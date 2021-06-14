@@ -14,7 +14,7 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
         when:
         def response = rxClient
                 .exchange('/ssl', String)
-                .blockingFirst()
+                .blockFirst()
         then:
         response.code() == HttpStatus.OK.code
         response.body() == "O=Test CA,ST=Some-State,C=US"

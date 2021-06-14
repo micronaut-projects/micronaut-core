@@ -54,7 +54,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
     void "test bind HTTP parameters for URI #uri"() {
         given:
         def response = rxClient.exchange(uri, String)
-                .onErrorReturn({t -> t.response}).blockingFirst()
+                .onErrorReturn({t -> t.response}).blockFirst()
         def status = response.status
         def body = null
         if (status == HttpStatus.OK) {

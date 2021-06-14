@@ -237,7 +237,8 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @return The client
      */
     static HttpClient create(@Nullable URL url) {
-        return HttpClientConfiguration.createClient(url);
+        return null;
+        //TODO return HttpClientConfiguration.createClient(url);
     }
 
     /**
@@ -250,6 +251,8 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @since 2.2.0
      */
     static HttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
-        return HttpClientConfiguration.createClient(url, configuration);
+        return null;
+        //TODO
+        //return HttpClientConfiguration.createClient(url, configuration);
     }
 }

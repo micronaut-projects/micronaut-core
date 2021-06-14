@@ -38,11 +38,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.ServiceLoader;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -103,8 +101,6 @@ public abstract class HttpClientConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
-
-    private static RxHttpClientFactory clientFactory = null;
 
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
@@ -643,88 +639,6 @@ public abstract class HttpClientConfiguration {
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    /**
-     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link javax.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @return The client
-     */
-    @Internal
-    static RxHttpClient createClient(@Nullable URL url) {
-        RxHttpClientFactory clientFactory = getRxHttpClientFactory();
-
-        return clientFactory.createClient(url);
-    }
-
-    /**
-     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @param configuration the client configuration
-     * @return The client
-     * @since 2.2.0
-     */
-    @Internal
-    static RxHttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration) {
-        RxHttpClientFactory clientFactory = getRxHttpClientFactory();
-
-        return clientFactory.createClient(url, configuration);
-    }
-
-    /**
-     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link javax.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @return The client
-     */
-    @Internal
-    static RxStreamingHttpClient createStreamingClient(@NonNull URL url) {
-        ArgumentUtils.requireNonNull("url", url);
-        RxHttpClientFactory clientFactory = getRxHttpClientFactory();
-        return clientFactory.createStreamingClient(url);
-    }
-
-    /**
-     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @param configuration The client configuration
-     * @return The client
-     * @since 2.2.0
-     */
-    @Internal
-    static RxStreamingHttpClient createStreamingClient(@NonNull URL url, HttpClientConfiguration configuration) {
-        ArgumentUtils.requireNonNull("url", url);
-        RxHttpClientFactory clientFactory = getRxHttpClientFactory();
-        return clientFactory.createStreamingClient(url, configuration);
-    }
-
-    private static RxHttpClientFactory getRxHttpClientFactory() {
-        RxHttpClientFactory clientFactory = HttpClientConfiguration.clientFactory;
-        if (clientFactory == null) {
-            synchronized (HttpClientConfiguration.class) { // double check
-                clientFactory = HttpClientConfiguration.clientFactory;
-                if (clientFactory == null) {
-                    clientFactory = resolveClientFactory();
-                    HttpClientConfiguration.clientFactory = clientFactory;
-                }
-            }
-        }
-        return clientFactory;
-    }
-
-    private static RxHttpClientFactory resolveClientFactory() {
-        final Iterator<RxHttpClientFactory> i = ServiceLoader.load(RxHttpClientFactory.class).iterator();
-        if (i.hasNext()) {
-            return i.next();
-        }
-        throw new IllegalStateException("No RxHttpClientFactory present on classpath, cannot create HTTP client");
     }
 
     /**

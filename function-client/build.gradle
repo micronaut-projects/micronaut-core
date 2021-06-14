@@ -2,4 +2,6 @@ dependencies {
     annotationProcessor project(":inject-java")
     api project(":function")
     api project(":http-client")
+    implementation platform('io.projectreactor:reactor-bom:2020.0.7')
+    implementation 'io.projectreactor:reactor-core'
 }

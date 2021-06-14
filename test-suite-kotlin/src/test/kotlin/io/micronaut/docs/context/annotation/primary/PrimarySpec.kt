@@ -6,7 +6,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 
 class PrimarySpec : StringSpec() {
@@ -15,7 +15,7 @@ class PrimarySpec : StringSpec() {
             "spec.name" to "primaryspec"
     ), Environment.TEST))
 
-    val rxClient = autoClose(embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL()))
+    val rxClient = autoClose(embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.getURL()))
 
     init {
         "test @Primary annotated beans gets injected in case of a collection" {

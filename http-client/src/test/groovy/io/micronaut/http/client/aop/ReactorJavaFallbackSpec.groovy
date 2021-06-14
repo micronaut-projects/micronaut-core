@@ -20,10 +20,9 @@ import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Fallback
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
-import io.reactivex.Maybe
-import io.reactivex.Single
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -32,7 +31,7 @@ import spock.lang.Specification
  * @author graemerocher
  * @since 1.0
  */
-class RxJavaFallbackSpec extends Specification{
+class ReactorJavaFallbackSpec extends Specification{
     @Shared
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run()
@@ -45,11 +44,10 @@ class RxJavaFallbackSpec extends Specification{
         BookClient client = context.getBean(BookClient)
 
         when:
-        Book book = client.get(99)
-                .blockingGet()
-        List<Book> books = client.list().blockingGet()
+        Book book = client.get(99).block()
+        List<Book> books = client.list().block()
 
-        List<Book> stream = Flowable.fromPublisher(client.stream()).toList().blockingGet()
+        List<Book> stream = Flux.from(client.stream()).collectList().block()
 
         then:
         book.title == "Fallback Book"
@@ -58,7 +56,7 @@ class RxJavaFallbackSpec extends Specification{
         stream.first().title == "Fallback Book"
 
         when:
-        book = client.save("The Stand").blockingGet()
+        book = client.save("The Stand").block()
 
         then:
         book != null
@@ -66,7 +64,7 @@ class RxJavaFallbackSpec extends Specification{
         book.id == null
 
         when:
-        book = client.get(1).blockingGet()
+        book = client.get(1).block()
 
         then:
         book != null
@@ -74,7 +72,7 @@ class RxJavaFallbackSpec extends Specification{
         book.id == null
 
         when:
-        book = client.update(1, "The Shining").blockingGet()
+        book = client.update(1, "The Shining").block()
 
         then:
         book != null
@@ -82,14 +80,14 @@ class RxJavaFallbackSpec extends Specification{
         book.id == null
 
         when:
-        book = client.delete(1).blockingGet()
+        book = client.delete(1).block()
 
         then:
         book == null
 
         when:
-        book = client.get(1)
-                .blockingGet()
+        book = client.get(1).block()
+
         then:
         book.title == "Fallback Book"
     }
@@ -103,33 +101,33 @@ class RxJavaFallbackSpec extends Specification{
     static class BookFallback implements BookApi {
 
         @Override
-        Maybe<Book> get(Long id) {
-            return Maybe.just(new Book(title: "Fallback Book"))
+        Mono<Book> get(Long id) {
+            return Mono.just(new Book(title: "Fallback Book"))
         }
 
         @Override
-        Single<List<Book>> list() {
-            return Single.just([])
+        Mono<List<Book>> list() {
+            return Mono.just([])
         }
 
         @Override
         Publisher<Book> stream() {
-            return Flowable.fromArray(new Book(title: "Fallback Book"))
+            return Flux.fromArray(new Book(title: "Fallback Book"))
         }
 
         @Override
-        Maybe<Book> delete(Long id) {
-            return Maybe.empty()
+        Mono<Book> delete(Long id) {
+            return Mono.empty()
         }
 
         @Override
-        Single<Book> save(String title) {
-            return Single.just(new Book(title: "Fallback Book"))
+        Mono<Book> save(String title) {
+            return Mono.just(new Book(title: "Fallback Book"))
         }
 
         @Override
-        Maybe<Book> update(Long id, String title) {
-            return Maybe.just(new Book(title: "Fallback Book"))
+        Mono<Book> update(Long id, String title) {
+            return Mono.just(new Book(title: "Fallback Book"))
         }
     }
 
@@ -139,57 +137,56 @@ class RxJavaFallbackSpec extends Specification{
         Map<Long, Book> books = new LinkedHashMap<>()
 
         @Override
-        Maybe<Book> get(Long id) {
-            Maybe.error(new RuntimeException("bad"))
+        Mono<Book> get(Long id) {
+            Mono.error(new RuntimeException("bad"))
         }
 
         @Override
-        Single<List<Book>> list() {
-            Single.error(new RuntimeException("bad"))
+        Mono<List<Book>> list() {
+            Mono.error(new RuntimeException("bad"))
         }
 
         @Override
         Publisher<Book> stream() {
-            Flowable.error(new RuntimeException("bad"))
+            Flux.error(new RuntimeException("bad"))
         }
 
         @Override
-        Maybe<Book> delete(Long id) {
-            Maybe.error(new RuntimeException("bad"))
+        Mono<Book> delete(Long id) {
+            Mono.error(new RuntimeException("bad"))
         }
 
         @Override
-        Single<Book> save(String title) {
-            Single.error(new RuntimeException("bad"))
+        Mono<Book> save(String title) {
+            Mono.error(new RuntimeException("bad"))
         }
 
         @Override
-        Maybe<Book> update(Long id, String title) {
-            Maybe.error(new RuntimeException("bad"))
+        Mono<Book> update(Long id, String title) {
+            Mono.error(new RuntimeException("bad"))
         }
     }
 
     static interface BookApi {
 
         @Get("/{id}")
-        Maybe<Book> get(Long id)
+        Mono<Book> get(Long id)
 
         @Get
-        Single<List<Book>> list()
+        Mono<List<Book>> list()
 
         @Get('/stream')
         Publisher<Book> stream()
 
         @Delete("/{id}")
-        Maybe<Book> delete(Long id)
+        Mono<Book> delete(Long id)
 
         @Post
-        Single<Book> save(String title)
+        Mono<Book> save(String title)
 
         @Patch("/{id}")
-        Maybe<Book> update(Long id, String title)
+        Mono<Book> update(Long id, String title)
     }
-
 
     static class Book {
         Long id

@@ -25,15 +25,15 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.websocket.CloseReason;
-import io.micronaut.websocket.RxWebSocketSession;
+import io.micronaut.websocket.ReactorWebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.AttributeKey;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 
 import java.net.URI;
 import java.util.Collection;
@@ -44,17 +44,17 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 /**
- * Implementation of the {@link RxWebSocketSession} interface for Netty and RxJava.
+ * Implementation of the {@link ReactorWebSocketSession} interface for Netty and RxJava.
  *
  * @author graemerocher
  * @since 1.0
  */
 @Internal
-public class NettyRxWebSocketSession implements RxWebSocketSession {
+public class NettyReactorWebSocketSession implements ReactorWebSocketSession {
     /**
      * The WebSocket session is stored within a Channel attribute using the given key.
      */
-    public static final AttributeKey<NettyRxWebSocketSession> WEB_SOCKET_SESSION_KEY = AttributeKey.newInstance("micronaut.websocket.session");
+    public static final AttributeKey<NettyReactorWebSocketSession> WEB_SOCKET_SESSION_KEY = AttributeKey.newInstance("micronaut.websocket.session");
 
     private final String id;
     private final Channel channel;
@@ -74,7 +74,7 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
      * @param protocolVersion The protocol version
      * @param isSecure Whether the session is secure
      */
-    protected NettyRxWebSocketSession(
+    protected NettyReactorWebSocketSession(
             String id,
             Channel channel,
             HttpRequest<?> request,
@@ -118,7 +118,7 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
     }
 
     @Override
-    public Set<? extends RxWebSocketSession> getOpenSessions() {
+    public Set<? extends ReactorWebSocketSession> getOpenSessions() {
         return Collections.emptySet();
     }
 
@@ -188,14 +188,14 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
     }
 
     @Override
-    public <T> Flowable<T> send(T message, MediaType mediaType) {
+    public <T> Flux<T> send(T message, MediaType mediaType) {
         if (message == null) {
-            return Flowable.empty();
+            return Flux.empty();
         }
 
-        return Flowable.create(emitter -> {
+        return Flux.create(emitter -> {
             if (!isOpen()) {
-                emitter.onError(new WebSocketSessionException("Session closed"));
+                emitter.error(new WebSocketSessionException("Session closed"));
             } else {
                 WebSocketFrame frame;
                 if (message instanceof WebSocketFrame) {
@@ -207,14 +207,14 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
                 ChannelFuture channelFuture = channel.writeAndFlush(frame);
                 channelFuture.addListener(future -> {
                     if (future.isSuccess()) {
-                        emitter.onNext(message);
-                        emitter.onComplete();
+                        emitter.next(message);
+                        emitter.complete();
                     } else {
-                        emitter.onError(new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause()));
+                        emitter.error(new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause()));
                     }
                 });
             }
-        }, BackpressureStrategy.ERROR);
+        }, FluxSink.OverflowStrategy.ERROR);
     }
 
     @Override

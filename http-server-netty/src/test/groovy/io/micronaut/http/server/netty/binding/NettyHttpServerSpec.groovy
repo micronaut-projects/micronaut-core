@@ -25,7 +25,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Put
 import io.micronaut.http.client.DefaultHttpClientConfiguration
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.exceptions.ServerStartupException
 import io.micronaut.runtime.Micronaut
@@ -52,9 +52,9 @@ class NettyHttpServerSpec extends Specification {
         when:
         ApplicationContext applicationContext = Micronaut.run()
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
-        HttpResponse response = client.exchange('/person/Fred', String).blockingFirst()
+        HttpResponse response = client.exchange('/person/Fred', String).blockFirst()
         then:
         response.body() == "Person Named Fred"
 
@@ -68,8 +68,8 @@ class NettyHttpServerSpec extends Specification {
         PropertySource propertySource = PropertySource.of('micronaut.server.port':-1)
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
 
-        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
-        HttpResponse response = client.exchange('/person/Fred', String).blockingFirst()
+        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpResponse response = client.exchange('/person/Fred', String).blockFirst()
 
         then:
         response.body() == "Person Named Fred"
@@ -91,9 +91,9 @@ class NettyHttpServerSpec extends Specification {
         when:
         ApplicationContext applicationContext = Micronaut.run()
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
-        HttpResponse response = client.exchange('/person/Fred', String).blockingFirst()
+        HttpResponse response = client.exchange('/person/Fred', String).blockFirst()
         then:
         response.body() == "Person Named Fred"
 
@@ -107,9 +107,9 @@ class NettyHttpServerSpec extends Specification {
         int newPort = SocketUtils.findAvailableTcpPort()
         ApplicationContext applicationContext = Micronaut.run('-port',newPort.toString())
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
-        HttpResponse response = client.exchange('/person/Fred', String).blockingFirst()
+        HttpResponse response = client.exchange('/person/Fred', String).blockFirst()
 
         then:
         response.body() == "Person Named Fred"
@@ -124,9 +124,9 @@ class NettyHttpServerSpec extends Specification {
         int newPort = SocketUtils.findAvailableTcpPort()
         ApplicationContext applicationContext = Micronaut.run('-port',newPort.toString())
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
-        HttpResponse response = client.exchange('/person/another/job?id=10', String).blockingFirst()
+        HttpResponse response = client.exchange('/person/another/job?id=10', String).blockFirst()
 
         then:
         response.body() == "JOB ID 10"
@@ -141,9 +141,9 @@ class NettyHttpServerSpec extends Specification {
         int newPort = SocketUtils.findAvailableTcpPort()
         ApplicationContext applicationContext = Micronaut.run('-port',newPort.toString())
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
-        client.exchange('/person/another/job', String).blockingFirst()
+        client.exchange('/person/another/job', String).blockFirst()
 
         then:"A 400 is returned"
         def e = thrown(HttpClientResponseException)
@@ -159,9 +159,9 @@ class NettyHttpServerSpec extends Specification {
         int newPort = SocketUtils.findAvailableTcpPort()
         ApplicationContext applicationContext = Micronaut.run('-port',newPort.toString())
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
-        client.exchange(HttpRequest.POST('/person/job/test', '{}'), String).blockingFirst()
+        client.exchange(HttpRequest.POST('/person/job/test', '{}'), String).blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -183,10 +183,10 @@ class NettyHttpServerSpec extends Specification {
 
         ApplicationContext applicationContext = Micronaut.run()
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), config)
+        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL(), config)
 
         HttpRequest request = HttpRequest.create(HttpMethod.GET, '/person/Fred')
-        HttpResponse response = client.exchange(request, String).blockingFirst()
+        HttpResponse response = client.exchange(request, String).blockFirst()
         then:
         response.body() == "Person Named Fred"
         response.header(HttpHeaders.CONNECTION) == 'keep-alive'
@@ -208,10 +208,10 @@ class NettyHttpServerSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
 
         def secureUrl = embeddedServer.getURL()
-        RxHttpClient httpsClient = embeddedServer.applicationContext.createBean(RxHttpClient, secureUrl)
-        RxHttpClient httpClient = embeddedServer.applicationContext.createBean(RxHttpClient, new URL("http://localhost:$httpPort"))
-        HttpResponse httpsResponse = httpsClient.exchange('/person/Fred', String).blockingFirst()
-        HttpResponse httpResponse = httpClient.exchange('/person/Fred', String).blockingFirst()
+        ReactorHttpClient httpsClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, secureUrl)
+        ReactorHttpClient httpClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, new URL("http://localhost:$httpPort"))
+        HttpResponse httpsResponse = httpsClient.exchange('/person/Fred', String).blockFirst()
+        HttpResponse httpResponse = httpClient.exchange('/person/Fred', String).blockFirst()
 
         then:
         httpsResponse.body() == "Person Named Fred"

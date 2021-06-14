@@ -15,7 +15,7 @@ class RequestAttributeSpec extends Specification {
         StoryClient client = embeddedServer.getApplicationContext().getBean(StoryClient)
         StoryClientFilter filter = embeddedServer.getApplicationContext().getBean(StoryClientFilter)
 
-        Story story = client.getById("jan2019").blockingGet()
+        Story story = client.getById("jan2019").block()
 
         then:
         null != story

@@ -35,7 +35,7 @@ public class HelloClientSpec  {
 
     @Test
     public void testHelloWorldResponse(){
-        assertEquals("Hello World", client.hello().blockingGet());// <3>
+        assertEquals("Hello World", client.hello().block());// <3>
     }
 }
 // end::class[]

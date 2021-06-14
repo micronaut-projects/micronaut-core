@@ -20,7 +20,7 @@ import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Retry
@@ -46,7 +46,7 @@ class HttpToHttpsRedirectSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    RxHttpClient httpClient = embeddedServer.applicationContext.createBean(RxHttpClient, new URL("http://localhost:$port"))
+    ReactorHttpClient httpClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, new URL("http://localhost:$port"))
 
     void 'test http to https redirect when enabled'() {
         when:

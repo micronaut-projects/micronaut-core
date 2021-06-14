@@ -15,7 +15,7 @@ class HeaderSpec extends Specification {
     void "test sender headers"() throws Exception {
         when:
         PetClient client = embeddedServer.getApplicationContext().getBean(PetClient)
-        Pet pet = client.get("Fred").blockingGet()
+        Pet pet = client.get("Fred").block()
 
         then:
         null != pet

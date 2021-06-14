@@ -5,8 +5,8 @@ import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
-import io.reactivex.Flowable
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 
 @Filter("/suspend/illegalWithContext")
 class SuspendFilter : OncePerRequestHttpServerFilter() {
@@ -15,7 +15,7 @@ class SuspendFilter : OncePerRequestHttpServerFilter() {
     var error: Throwable? = null
 
     override fun doFilterOnce(request: HttpRequest<*>, chain: ServerFilterChain): Publisher<MutableHttpResponse<*>> {
-        return Flowable.fromPublisher(chain.proceed(request)).doOnNext { rsp ->
+        return Flux.from(chain.proceed(request)).doOnNext { rsp ->
                     response = rsp
                 }.doOnError {
                     error = it

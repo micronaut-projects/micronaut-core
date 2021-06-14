@@ -11,19 +11,22 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
-import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.client.RxStreamingHttpClient
+import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.ReactorStreamingHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.SynchronousSink
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.Flow
+import java.util.function.Consumer
 
 // Netty + HTTP/2 on JDKs less than 9 require tcnative setup
 // which is not included in this test suite
@@ -38,26 +41,26 @@ class Http2RequestSpec extends Specification {
             "micronaut.http.client.log-level" : "TRACE",
             "micronaut.server.netty.log-level" : "TRACE"
     ])
-    RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
+    ReactorHttpClient client = server.getApplicationContext().getBean(ReactorHttpClient)
 
     void "test make HTTP/2 stream request"() {
         when:"A non stream request is executed"
-        def people = ((RxStreamingHttpClient)client).jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person)
-                .toList().blockingGet()
+        def people = ((ReactorStreamingHttpClient)client).jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person)
+                .collectList().block()
 
         then:
         people == Http2Controller.people
 
         when:"posting a data"
         def response = client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person))
-                .blockingFirst()
+                .blockFirst()
 
         then:"The response is correct"
         response.body() == Http2Controller.people
 
         when:"posting a data again"
         response = client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person))
-                .blockingFirst()
+                .blockFirst()
 
         then:"The response is correct"
         response.body() == Http2Controller.people
@@ -67,7 +70,7 @@ class Http2RequestSpec extends Specification {
         when:"An sse stream is obtain"
         def client = server.applicationContext.getBean(TestHttp2Client)
 
-        def results = client.rich().toList().blockingGet()
+        def results = client.rich().collectList().block()
 
         then:
         results.size() == 4
@@ -78,20 +81,20 @@ class Http2RequestSpec extends Specification {
 
     void "test make HTTP/2 request - HTTPS"() {
         when:
-        def result = client.retrieve("${server.URL}/http2").blockingFirst()
+        def result = client.retrieve("${server.URL}/http2").blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
 
         when:"operation repeated to use same connection"
-        result = client.retrieve("${server.URL}/http2").blockingFirst()
+        result = client.retrieve("${server.URL}/http2").blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
 
         when:"A non stream request is executed"
         List<Person> people = client.retrieve(HttpRequest.GET("${server.URL}/http2/personStream"), Argument.listOf(Person))
-                .blockingFirst()
+                .blockFirst()
 
         then:
         people == Http2Controller.people
@@ -106,23 +109,23 @@ class Http2RequestSpec extends Specification {
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
-        RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
+        ReactorHttpClient client = server.getApplicationContext().getBean(ReactorHttpClient)
 
         when:
-        def result = client.retrieve("${server.URL}/http2").blockingFirst()
+        def result = client.retrieve("${server.URL}/http2").blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
 
         when:"operation repeated to use same connection"
-        result = client.retrieve("${server.URL}/http2").blockingFirst()
+        result = client.retrieve("${server.URL}/http2").blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
 
         when:"A post request is performed"
         def response = client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
-                .blockingFirst()
+                .blockFirst()
 
         then:
         response.status() == HttpStatus.OK
@@ -130,7 +133,7 @@ class Http2RequestSpec extends Specification {
 
         when:"A post request is performed again"
         response = client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
-                .blockingFirst()
+                .blockFirst()
 
         then:
         response.status() == HttpStatus.OK
@@ -151,8 +154,8 @@ class Http2RequestSpec extends Specification {
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
-        RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
-        def result = client.retrieve("${server.URL}/http2").blockingFirst()
+        ReactorHttpClient client = server.getApplicationContext().getBean(ReactorHttpClient)
+        def result = client.retrieve("${server.URL}/http2").blockFirst()
 
         expect:
         result == 'Version: HTTP_1_1'
@@ -179,23 +182,23 @@ class Http2RequestSpec extends Specification {
         }
 
         @Get(value = '/stream', produces = MediaType.TEXT_PLAIN)
-        Flowable<String> flowable(HttpRequest<?> request) {
-            return Flowable.fromIterable(
+        Flux<String> flowable(HttpRequest<?> request) {
+            return Flux.fromIterable(
                     ["Version: ",
                     request.httpVersion.toString()]
             )
         }
 
         @Get(value = '/personStream', produces = MediaType.APPLICATION_JSON)
-        Flowable<Person> personStream(HttpRequest<?> request) {
-            return Flowable.fromIterable(
+        Flux<Person> personStream(HttpRequest<?> request) {
+            return Flux.fromIterable(
                     people
             )
         }
 
         @Post(value = '/personStream', processes = MediaType.APPLICATION_JSON)
-        Flowable<Person> postStream(@Body Flowable<Person> body) {
-            return Flowable.fromIterable(
+        Flux<Person> postStream(@Body Flux<Person> body) {
+            return Flux.fromIterable(
                     people
             )
         }
@@ -204,18 +207,21 @@ class Http2RequestSpec extends Specification {
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> rich() {
             Integer i = 0
-            Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
-                if (i < 4) {
-                    i++
-                    emitter.onNext(
-                            Event.of(new Person( "First $i","Last $i"))
-                                    .name('foo')
-                                    .id(i.toString())
-                                    .comment("Foo Comment $i")
-                                    .retry(Duration.of(2, ChronoUnit.MINUTES)))
-                }
-                else {
-                    emitter.onComplete()
+            Flux.generate(new Consumer<SynchronousSink<Event>>() {
+                @Override
+                void accept(SynchronousSink<Event> emitter) {
+                    if (i < 4) {
+                        i++
+                        emitter.next(
+                                Event.of(new Person( "First $i","Last $i"))
+                                        .name('foo')
+                                        .id(i.toString())
+                                        .comment("Foo Comment $i")
+                                        .retry(Duration.of(2, ChronoUnit.MINUTES)))
+                    }
+                    else {
+                        emitter.complete()
+                    }
                 }
             })
         }
@@ -225,6 +231,6 @@ class Http2RequestSpec extends Specification {
     static interface TestHttp2Client {
 
         @Get(value = '/rich', processes = MediaType.TEXT_EVENT_STREAM)
-        Flowable<Event<Person>> rich()
+        Flux<Event<Person>> rich()
     }
 }

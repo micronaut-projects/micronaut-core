@@ -5,7 +5,7 @@ import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import kotlin.test.assertNotNull
 
@@ -16,14 +16,14 @@ class ShoppingControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.url)
     )
 
     init {
         "testSessionValueUsedOnReturnValue" {
             // tag::view[]
             var response = client.exchange(HttpRequest.GET<Cart>("/shopping/cart"), Cart::class.java) // <1>
-                                 .blockingFirst()
+                                 .blockFirst()
             var cart = response.body()
 
             assertNotNull(response.header(HttpHeaders.AUTHORIZATION_INFO)) // <2>
@@ -36,7 +36,7 @@ class ShoppingControllerSpec: StringSpec() {
 
             response = client.exchange(HttpRequest.POST("/shopping/cart/Apple", "")
                              .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart::class.java) // <2>
-                             .blockingFirst()
+                             .blockFirst()
             cart = response.body()
             // end::add[]
 
@@ -45,7 +45,7 @@ class ShoppingControllerSpec: StringSpec() {
 
             response = client.exchange(HttpRequest.GET<Any>("/shopping/cart")
                              .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart::class.java)
-                             .blockingFirst()
+                             .blockFirst()
             cart = response.body()
 
             response.header(HttpHeaders.AUTHORIZATION_INFO)

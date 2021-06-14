@@ -36,7 +36,7 @@ class HelloClientSpec extends Specification {
 
     void "test hello world response"() {
         expect:
-        client.hello().blockingGet() == "Hello World" // <3>
+        client.hello().block() == "Hello World" // <3>
     }
 
 }

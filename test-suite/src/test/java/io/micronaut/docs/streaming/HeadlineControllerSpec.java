@@ -16,13 +16,13 @@
 package io.micronaut.docs.streaming;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.http.client.RxStreamingHttpClient;
+import io.micronaut.http.client.ReactorStreamingHttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.reactivex.Flowable;
-import io.reactivex.Maybe;
 import org.junit.Test;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -42,9 +42,9 @@ public class HeadlineControllerSpec {
                                                 .getApplicationContext()
                                                 .getBean(HeadlineClient.class); // <1>
 
-            Maybe<Headline> firstHeadline = headlineClient.streamHeadlines().firstElement(); // <2>
+            Mono<Headline> firstHeadline = headlineClient.streamHeadlines().next(); // <2>
 
-            Headline headline = firstHeadline.blockingGet(); // <3>
+            Headline headline = firstHeadline.block(); // <3>
 
             assertNotNull(headline);
             assertTrue(headline.getText().startsWith("Latest Headline"));
@@ -55,11 +55,11 @@ public class HeadlineControllerSpec {
     @Test
     public void testStreamingClient() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxStreamingHttpClient client = embeddedServer.getApplicationContext().createBean(
-                RxStreamingHttpClient.class, embeddedServer.getURL());
+        ReactorStreamingHttpClient client = embeddedServer.getApplicationContext().createBean(
+                ReactorStreamingHttpClient.class, embeddedServer.getURL());
 
         // tag::streaming[]
-        Flowable<Headline> headlineStream = client.jsonStream(
+        Flux<Headline> headlineStream = client.jsonStream(
                 GET("/streaming/headlines"), Headline.class); // <1>
         CompletableFuture<Headline> future = new CompletableFuture<>(); // <2>
         headlineStream.subscribe(new Subscriber<Headline>() {

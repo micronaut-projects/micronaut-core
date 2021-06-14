@@ -6,7 +6,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest.POST
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 
 class BookControllerSpec: StringSpec() {
@@ -16,7 +16,7 @@ class BookControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -28,7 +28,7 @@ class BookControllerSpec: StringSpec() {
             )
             // end::posturitemplate[]
 
-            val response = call.blockingFirst()
+            val response = call.blockFirst()
             val message = response.getBody(Book::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.CREATED // <3>
@@ -46,7 +46,7 @@ class BookControllerSpec: StringSpec() {
             )
             // end::postform[]
 
-            val response = call.blockingFirst()
+            val response = call.blockFirst()
             val message = response.getBody(Book::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.CREATED // <3>

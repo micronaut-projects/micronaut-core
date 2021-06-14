@@ -22,7 +22,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.retry.annotation.CircuitBreaker
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Single
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -79,7 +79,7 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         controller.countValue = 0
 
         when:"A method is annotated retry"
-        int result = countClient.getCountSingle().blockingGet()
+        int result = countClient.getCountSingle().block()
 
         then:"It executes until successful"
         result == 3
@@ -88,7 +88,7 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         controller.countThreshold = Integer.MAX_VALUE
         controller.countRx = 0
         def single = countClient.getCountSingle()
-        single.blockingGet()
+        single.block()
 
         then:"The original exception is thrown"
         def e = thrown(HttpClientResponseException)
@@ -97,7 +97,7 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
 
         when:"The method is called again"
         single = countClient.getCountSingle()
-        single.blockingGet()
+        single.block()
 
         then:"The value is not incremented because the circuit is open"
          e = thrown(HttpClientResponseException)
@@ -127,8 +127,8 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         }
 
         @Override
-        Single<Integer> getCountSingle() {
-            Single.fromCallable({->
+        Mono<Integer> getCountSingle() {
+            Mono.fromCallable({->
                 countRx++
                 if(countRx < countThreshold) {
                     throw new IllegalStateException("Bad count")
@@ -145,6 +145,6 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         int getCount()
 
         @Get('/rx-count')
-        Single<Integer> getCountSingle()
+        Mono<Integer> getCountSingle()
     }
 }

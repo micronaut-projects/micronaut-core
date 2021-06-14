@@ -27,7 +27,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.*
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -49,7 +49,7 @@ class PojoBodyParameterSpec extends Specification {
                                                            Environment.TEST)
     @Shared
     @AutoCleanup
-    RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
+    ReactorHttpClient client = embeddedServer.getApplicationContext().createBean(ReactorHttpClient, embeddedServer.getURL())
 
     void 'test custom constraints in a Pojo are taken into account when it is used as a controller parameter'() {
         given:

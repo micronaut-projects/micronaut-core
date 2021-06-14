@@ -50,11 +50,10 @@ import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
-import io.reactivex.Flowable;
-import io.reactivex.functions.BiConsumer;
-import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -64,6 +63,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
  * Abstract implementation that handles WebSocket frames.
@@ -86,7 +87,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final WebSocketBean<?> webSocketBean;
     protected final HttpRequest<?> originatingRequest;
     protected final MethodExecutionHandle<?, ?> messageHandler;
-    protected final NettyRxWebSocketSession session;
+    protected final NettyReactorWebSocketSession session;
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final WebSocketVersion webSocketVersion;
     protected final WebSocketSessionRepository webSocketSessionRepository;
@@ -170,7 +171,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         BoundExecutable finalBoundExecutable = boundExecutable;
                         Object result = invokeExecutable(finalBoundExecutable, openMethod);
                         if (Publishers.isConvertibleToPublisher(result)) {
-                            Flowable<?> flowable = instrumentPublisher(ctx, result);
+                            Flux<?> flowable = instrumentPublisher(ctx, result);
                             flowable.subscribe(
                                     o -> {
                                     },
@@ -211,7 +212,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     /**
      * @return The session
      */
-    public NettyRxWebSocketSession getSession() {
+    public NettyReactorWebSocketSession getSession() {
         return session;
     }
 
@@ -243,8 +244,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     return;
                 }
                 if (Publishers.isConvertibleToPublisher(result)) {
-                    Flowable<?> flowable = instrumentPublisher(ctx, result);
-                    flowable.toList().subscribe((BiConsumer<List<?>, Throwable>) (objects, throwable) -> {
+                    Flux<?> flowable = instrumentPublisher(ctx, result);
+                    flowable.collectList().subscribe(objects -> handleUnexpected(ctx, cause), throwable -> {
                         if (throwable != null && LOG.isErrorEnabled()) {
                             LOG.error("Error subscribing to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + throwable.getMessage(), throwable);
                         }
@@ -267,12 +268,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     /**
-     * Subclasses should implement to create the actual {@link NettyRxWebSocketSession}.
+     * Subclasses should implement to create the actual {@link NettyReactorWebSocketSession}.
      *
      * @param ctx The context
      * @return The session
      */
-    protected abstract NettyRxWebSocketSession createWebSocketSession(ChannelHandlerContext ctx);
+    protected abstract NettyReactorWebSocketSession createWebSocketSession(ChannelHandlerContext ctx);
 
     /**
      * Subclasses can override to customize publishers returned from message handlers.
@@ -281,9 +282,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param result The result
      * @return The flowable
      */
-    protected Flowable<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
-        Flowable<?> actual = Publishers.convertPublisher(result, Flowable.class);
-        return actual.subscribeOn(Schedulers.from(ctx.channel().eventLoop()));
+    protected Flux<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
+        Flux<?> actual = Publishers.convertPublisher(result, Flux.class);
+        return actual.subscribeOn(Schedulers.fromExecutor(ctx.channel().eventLoop()));
     }
 
     /**
@@ -371,7 +372,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 if (converted.isPresent()) {
                     Object v = converted.get();
 
-                    NettyRxWebSocketSession currentSession = getSession();
+                    NettyReactorWebSocketSession currentSession = getSession();
                     ExecutableBinder<WebSocketState> executableBinder = new DefaultExecutableBinder<>(
                             Collections.singletonMap(bodyArgument, v)
                     );
@@ -385,7 +386,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
                         Object result = invokeExecutable(boundExecutable, messageHandler);
                         if (Publishers.isConvertibleToPublisher(result)) {
-                            Flowable<?> flowable = instrumentPublisher(ctx, result);
+                            Flux<?> flowable = instrumentPublisher(ctx, result);
                             flowable.subscribe(
                                     o -> {
                                     },
@@ -440,7 +441,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param session The session
      * @param message The message that was handled
      */
-    protected void messageHandled(ChannelHandlerContext ctx, NettyRxWebSocketSession session, Object message) {
+    protected void messageHandled(ChannelHandlerContext ctx, NettyReactorWebSocketSession session, Object message) {
         // no-op
     }
 
@@ -509,8 +510,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
 
         if (Publishers.isConvertibleToPublisher(result)) {
-            Flowable<?> flowable = instrumentPublisher(ctx, result);
-            flowable.toList().subscribe((BiConsumer<List<?>, Throwable>) (objects, throwable) -> {
+            Flux<?> reactiveSequence = instrumentPublisher(ctx, result);
+            reactiveSequence.collectList().subscribe((Consumer<List<?>>) objects -> {
+
+            }, throwable -> {
                 if (throwable != null && LOG.isErrorEnabled()) {
                     LOG.error("Error subscribing to @" + (isClose ? "OnClose" : "OnError") + " handler for WebSocket bean [" + target + "]: " + throwable.getMessage(), throwable);
                 }

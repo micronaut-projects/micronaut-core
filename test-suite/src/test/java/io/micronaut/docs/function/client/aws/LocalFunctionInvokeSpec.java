@@ -27,7 +27,7 @@ import static org.junit.Assert.assertEquals;
 //end::import[]
 
 //tag::rxImport[]
-import io.reactivex.Single;
+import reactor.core.publisher.Mono;
 //end::rxImport[]
 
 public class LocalFunctionInvokeSpec {
@@ -60,9 +60,9 @@ public class LocalFunctionInvokeSpec {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
         RxMathClient mathClient = server.getApplicationContext().getBean(RxMathClient.class);
 
-        assertEquals(Long.valueOf(Integer.MAX_VALUE), mathClient.max().blockingGet());
-        assertEquals(2, mathClient.rnd(1.6f).blockingGet().longValue());
-        assertEquals(15, mathClient.sum(sum).blockingGet().longValue());
+        assertEquals(Long.valueOf(Integer.MAX_VALUE), mathClient.max().block());
+        assertEquals(2, mathClient.rnd(1.6f).block().longValue());
+        assertEquals(15, mathClient.sum(sum).block().longValue());
 
         server.close();
     }
@@ -91,12 +91,12 @@ public class LocalFunctionInvokeSpec {
     //tag::rxFunctionClient[]
     @FunctionClient
     interface RxMathClient {
-        Single<Long> max();
+        Mono<Long> max();
 
         @Named("round")
-        Single<Integer> rnd(float value);
+        Mono<Integer> rnd(float value);
 
-        Single<Long> sum(Sum sum);
+        Mono<Long> sum(Sum sum);
     }
     //end::rxFunctionClient[]
 }

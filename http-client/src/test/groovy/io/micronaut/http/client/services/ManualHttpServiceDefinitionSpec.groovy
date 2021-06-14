@@ -23,7 +23,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Put
 import io.micronaut.http.client.HttpClientConfiguration
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.client.ServiceHttpClientConfiguration
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.netty.DefaultHttpClient
@@ -95,8 +95,8 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
 
         when:
-        RxHttpClient client = clientApp.getBean(TestBean).fooClient
-        String result = client.retrieve('/').blockingFirst()
+        ReactorHttpClient client = clientApp.getBean(TestBean).fooClient
+        String result = client.retrieve('/').blockFirst()
 
         then:
         client.configuration == config
@@ -116,7 +116,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
         when:
         client = clientApp.getBean(TestBean).barClient
-        result = client.retrieve(HttpRequest.POST('/', '')).blockingFirst()
+        result = client.retrieve(HttpRequest.POST('/', '')).blockFirst()
 
         then:
         client.configuration == config
@@ -177,7 +177,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         !config.getConnectionPoolConfiguration().isEnabled()
 
         when:
-        def opt = clientApp.findBean(RxHttpClient, Qualifiers.byName("foo"))
+        def opt = clientApp.findBean(ReactorHttpClient, Qualifiers.byName("foo"))
 
         then:
         !opt.isPresent()
@@ -235,18 +235,18 @@ class ManualHttpServiceDefinitionSpec extends Specification {
     static class TestBean {
         @Client(id = "foo")
         @Inject
-        RxHttpClient fooClient
+        ReactorHttpClient fooClient
 
         @Client(id = "bar")
         @Inject
-        RxHttpClient barClient
+        ReactorHttpClient barClient
     }
 
     @Singleton
     static class TestSslBean {
         @Client(id = "client1")
         @Inject
-        RxHttpClient client
+        ReactorHttpClient client
     }
 
     @Client(id = "foo")

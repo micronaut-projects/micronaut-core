@@ -5,7 +5,7 @@ import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -29,20 +29,20 @@ class CorsSingleHeaderSpec extends Specification {
     void 'test CORS single header config works where single-header=#singleHeader'() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, getProperties(singleHeader))
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = embeddedServer.getApplicationContext().createBean(ReactorHttpClient, embeddedServer.getURL())
 
         def optionsResponse = client.exchange(
                 HttpRequest.OPTIONS('/test/arbitrary')
                         .header(ORIGIN, 'foo.com')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.GET)
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, "${HttpHeaders.CONTENT_TYPE},${HttpHeaders.ACCEPT}")
-        ).blockingFirst()
+        ).blockFirst()
         Set<String> optionsHeaderNames = optionsResponse.headers.names()
 
         def response = client.exchange(
                 HttpRequest.GET('/test/arbitrary')
                         .header(ORIGIN, 'foo.com')
-        ).blockingFirst()
+        ).blockFirst()
 
 
 

@@ -1,7 +1,7 @@
 package io.micronaut.http.server.netty.types
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
@@ -17,10 +17,10 @@ class CacheControlSpec extends Specification {
         int serverPort = embeddedServer.getPort()
         URL server = embeddedServer.getURL()
         ApplicationContext applicationContext = embeddedServer.applicationContext
-        RxHttpClient rxClient = applicationContext.createBean(RxHttpClient, server)
+        ReactorHttpClient rxClient = applicationContext.createBean(ReactorHttpClient, server)
 
         when:
-        def response = rxClient.exchange('/test/html', String).blockingFirst()
+        def response = rxClient.exchange('/test/html', String).blockFirst()
 
         then:
         response.header(CACHE_CONTROL) == "private, max-age=60"
@@ -37,10 +37,10 @@ class CacheControlSpec extends Specification {
         int serverPort = embeddedServer.getPort()
         URL server = embeddedServer.getURL()
         ApplicationContext applicationContext = embeddedServer.applicationContext
-        RxHttpClient rxClient = applicationContext.createBean(RxHttpClient, server)
+        ReactorHttpClient rxClient = applicationContext.createBean(ReactorHttpClient, server)
 
         when:
-        def response = rxClient.exchange('/test/html', String).blockingFirst()
+        def response = rxClient.exchange('/test/html', String).blockFirst()
 
         then:
         response.header(CACHE_CONTROL) == "public, max-age=60"
@@ -57,10 +57,10 @@ class CacheControlSpec extends Specification {
         int serverPort = embeddedServer.getPort()
         URL server = embeddedServer.getURL()
         ApplicationContext applicationContext = embeddedServer.applicationContext
-        RxHttpClient rxClient = applicationContext.createBean(RxHttpClient, server)
+        ReactorHttpClient rxClient = applicationContext.createBean(ReactorHttpClient, server)
 
         when:
-        def response = rxClient.exchange('/test/html', String).blockingFirst()
+        def response = rxClient.exchange('/test/html', String).blockFirst()
 
         then:
         response.header(CACHE_CONTROL) == "private, max-age=120"

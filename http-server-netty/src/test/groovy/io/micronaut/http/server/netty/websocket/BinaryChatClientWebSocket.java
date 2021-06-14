@@ -22,7 +22,7 @@ import io.micronaut.websocket.annotation.OnOpen;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-import io.reactivex.Single;
+import reactor.core.publisher.Mono;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -72,7 +72,7 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
 
     public abstract Future<ByteBuf> sendAsync(ByteBuf message);
 
-    public abstract Single<ByteBuffer> sendRx(ByteBuffer message);
+    public abstract Mono<ByteBuffer> sendRx(ByteBuffer message);
 
     public void sendMultiple() {
         session.sendSync(new TextWebSocketFrame(false, 0, "hello"));

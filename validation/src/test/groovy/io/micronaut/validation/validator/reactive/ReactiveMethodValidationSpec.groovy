@@ -3,8 +3,8 @@ package io.micronaut.validation.validator.reactive
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
-import io.reactivex.Single
 import jakarta.inject.Singleton
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -27,7 +27,7 @@ class ReactiveMethodValidationSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         when:
-        bookService.rxReturnInvalid(Single.just(new Book(title: "It"))).blockingGet()
+        bookService.rxReturnInvalid(Mono.just(new Book(title: "It"))).block()
 
         then:
         def e = thrown(ConstraintViolationException)
@@ -40,7 +40,7 @@ class ReactiveMethodValidationSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         when:
-        bookService.rxValid(Single.just(new Book(title: ""))).blockingGet()
+        bookService.rxValid(Mono.just(new Book(title: ""))).block()
 
         then:
         def e = thrown(ConstraintViolationException)
@@ -53,7 +53,7 @@ class ReactiveMethodValidationSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         when:
-        bookService.rxSimple(Single.just("")).blockingGet()
+        bookService.rxSimple(Mono.just("")).block()
 
         then:
         def e = thrown(ConstraintViolationException)
@@ -94,7 +94,7 @@ class ReactiveMethodValidationSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         when:
-        def book = bookService.rxValid(Single.just(new Book(title: "It"))).blockingGet()
+        def book = bookService.rxValid(Mono.just(new Book(title: "It"))).block()
 
         then:
         book.title == 'It'
@@ -118,19 +118,19 @@ class BookService {
 
     @Executable
     @Valid
-    Single<Book> rxSimple(@NotBlank Single<String> title) {
+    Mono<Book> rxSimple(@NotBlank Mono<String> title) {
         return title.map({ String t -> new Book(title: t)})
     }
 
     @Executable
     @Valid
-    Single<Book> rxValid(@Valid Single<Book> book) {
+    Mono<Book> rxValid(@Valid Mono<Book> book) {
         return book
     }
 
     @Executable
     @Valid
-    Single<Book> rxReturnInvalid(@Valid Single<Book> book) {
+    Mono<Book> rxReturnInvalid(@Valid Mono<Book> book) {
         return book.map({ b -> b.title =''; return b})
     }
 

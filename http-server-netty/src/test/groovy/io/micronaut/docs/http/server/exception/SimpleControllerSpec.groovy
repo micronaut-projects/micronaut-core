@@ -10,7 +10,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.runtime.server.EmbeddedServer
@@ -25,7 +25,7 @@ class SimpleControllerSpec extends Specification {
             'spec.name': SimpleControllerSpec.simpleName
     ], Environment.TEST)
 
-    @AutoCleanup @Shared RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+    @AutoCleanup @Shared ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
 
     def "should not go into infinite loop when exception occurs in bean initialization"() {

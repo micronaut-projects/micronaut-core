@@ -20,13 +20,13 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.ReactorHttpClient;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.reactivex.Flowable;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import reactor.core.publisher.Flux;
 
 import java.util.Collections;
 import java.util.Map;
@@ -40,7 +40,7 @@ import static org.junit.Assert.assertTrue;
 public class HelloControllerSpec {
 
     private EmbeddedServer embeddedServer;
-    private RxHttpClient client;
+    private ReactorHttpClient client;
 
     @Before
     public void setup() {
@@ -48,7 +48,7 @@ public class HelloControllerSpec {
                 EmbeddedServer.class,
                 Collections.singletonMap("spec.name", getClass().getSimpleName()));
         client = embeddedServer.getApplicationContext().createBean(
-                RxHttpClient.class,
+                ReactorHttpClient.class,
                 embeddedServer.getURL());
     }
 
@@ -75,24 +75,24 @@ public class HelloControllerSpec {
     @Test
     public void testRetrieveWithHeaders() {
         // tag::headers[]
-        Flowable<String> response = client.retrieve(
+        Flux<String> response = client.retrieve(
                 GET("/hello/John")
                 .header("X-My-Header", "SomeValue")
         );
         // end::headers[]
 
-        assertEquals("Hello John", response.blockingFirst());
+        assertEquals("Hello John", response.blockFirst());
     }
 
     @Test
     public void testRetrieveWithJSON() {
         // tag::jsonmap[]
-        Flowable<Map> response = client.retrieve(
+        Flux<Map> response = client.retrieve(
                 GET("/greet/John"), Map.class
         );
         // end::jsonmap[]
 
-        assertEquals("Hello John", response.blockingFirst().get("text"));
+        assertEquals("Hello John", response.blockFirst().get("text"));
 
         // tag::jsonmaptypes[]
         response = client.retrieve(
@@ -101,28 +101,28 @@ public class HelloControllerSpec {
         );
         // end::jsonmaptypes[]
 
-        assertEquals("Hello John", response.blockingFirst().get("text"));
+        assertEquals("Hello John", response.blockFirst().get("text"));
     }
 
     @Test
     public void testRetrieveWithPOJO() {
         // tag::jsonpojo[]
-        Flowable<Message> response = client.retrieve(
+        Flux<Message> response = client.retrieve(
                 GET("/greet/John"), Message.class
         );
 
-        assertEquals("Hello John", response.blockingFirst().getText());
+        assertEquals("Hello John", response.blockFirst().getText());
         // end::jsonpojo[]
     }
 
     @Test
     public void testRetrieveWithPOJOResponse() {
         // tag::pojoresponse[]
-        Flowable<HttpResponse<Message>> call = client.exchange(
+        Flux<HttpResponse<Message>> call = client.exchange(
                 GET("/greet/John"), Message.class // <1>
         );
 
-        HttpResponse<Message> response = call.blockingFirst();
+        HttpResponse<Message> response = call.blockFirst();
         Optional<Message> message = response.getBody(Message.class); // <2>
         // check the status
         assertEquals(HttpStatus.OK, response.getStatus()); // <3>
@@ -135,7 +135,7 @@ public class HelloControllerSpec {
     @Test
     public void testPostRequestWithString() {
         // tag::poststring[]
-        Flowable<HttpResponse<String>> call = client.exchange(
+        Flux<HttpResponse<String>> call = client.exchange(
                 POST("/hello", "Hello John") // <1>
                     .contentType(MediaType.TEXT_PLAIN_TYPE)
                     .accept(MediaType.TEXT_PLAIN_TYPE), // <2>
@@ -143,7 +143,7 @@ public class HelloControllerSpec {
         );
         // end::poststring[]
 
-        HttpResponse<String> response = call.blockingFirst();
+        HttpResponse<String> response = call.blockFirst();
         Optional<String> message = response.getBody(String.class); // <2>
         // check the status
         assertEquals(HttpStatus.CREATED, response.getStatus()); // <3>
@@ -155,13 +155,13 @@ public class HelloControllerSpec {
     @Test
     public void testPostRequestWithPOJO() {
         // tag::postpojo[]
-        Flowable<HttpResponse<Message>> call = client.exchange(
+        Flux<HttpResponse<Message>> call = client.exchange(
                 POST("/greet", new Message("Hello John")), // <1>
                 Message.class // <2>
         );
         // end::postpojo[]
 
-        HttpResponse<Message> response = call.blockingFirst();
+        HttpResponse<Message> response = call.blockFirst();
         Optional<Message> message = response.getBody(Message.class); // <2>
         // check the status
         assertEquals(HttpStatus.CREATED, response.getStatus()); // <3>

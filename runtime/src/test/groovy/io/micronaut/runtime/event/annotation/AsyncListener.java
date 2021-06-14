@@ -17,8 +17,8 @@ package io.micronaut.runtime.event.annotation;
 
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.scheduling.annotation.Async;
-import io.reactivex.Completable;
 import jakarta.inject.Singleton;
+import reactor.core.publisher.Mono;
 
 @Singleton
 public class AsyncListener {
@@ -27,13 +27,13 @@ public class AsyncListener {
 
     @EventListener
     @Async
-    Completable onCompletableStartup(StartupEvent event) {
+    Mono<Void> onCompletableStartup(StartupEvent event) {
         try {
             Thread.currentThread().sleep(500);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
         completableInvoked = true;
-        return Completable.complete();
+        return Mono.just(null);
     }
 }

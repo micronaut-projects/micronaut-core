@@ -27,8 +27,8 @@ import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Shared
@@ -66,7 +66,7 @@ class MutateRequestClientFilterSpec extends Specification {
         String withQuery(@Nullable String q)
 
         @Get("/stream")
-        Flowable<String> stream()
+        Flux<String> stream()
     }
 
     @Controller('/filters/uri/test')
@@ -80,8 +80,8 @@ class MutateRequestClientFilterSpec extends Specification {
             q + signature
         }
         @Get('/stream')
-        Flowable<String> stream(@QueryValue String signature) {
-            Flowable.fromArray('"' + signature + '"')
+        Flux<String> stream(@QueryValue String signature) {
+            Flux.fromArray('"' + signature + '"')
         }
     }
 

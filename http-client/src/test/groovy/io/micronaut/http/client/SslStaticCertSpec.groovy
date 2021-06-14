@@ -23,7 +23,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
@@ -73,10 +73,10 @@ class SslStaticCertSpec extends Specification {
 
     void "test send https request"() {
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> reactiveSequence = Flux.from(client.exchange(
                 HttpRequest.GET("/ssl/static"), String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = reactiveSequence.blockFirst()
 
         then:
         response.body() == "Hello"

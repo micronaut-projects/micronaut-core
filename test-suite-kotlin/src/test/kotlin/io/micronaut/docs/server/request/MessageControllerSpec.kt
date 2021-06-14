@@ -1,10 +1,10 @@
 package io.micronaut.docs.server.request
 
-import io.kotlintest.shouldBe
 import io.kotlintest.shouldNotBe
+import io.kotlintest.shouldBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 
 class MessageControllerSpec: StringSpec() {
@@ -14,7 +14,7 @@ class MessageControllerSpec: StringSpec() {
     )
 
     val client = autoClose( // <2>
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL()) // <1>
+            embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.getURL()) // <1>
     )
 
     init {

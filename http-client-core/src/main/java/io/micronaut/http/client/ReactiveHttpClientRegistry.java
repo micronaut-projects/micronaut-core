@@ -15,20 +15,21 @@
  */
 package io.micronaut.http.client;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpVersion;
 
 /**
- * Internal interface for managing the construction and lifecycle of instances of {@link RxHttpClient}.
+ * Internal interface for managing the construction and lifecycle of instances of reactive clients.
+ * Classes which extends from {@link HttpClient}.
  *
  * @author graemerocher
  * @since 2.0
  */
 @Internal
-public interface RxHttpClientRegistry {
+public interface ReactiveHttpClientRegistry<ReactiveClient extends HttpClient> {
 
     /**
      * Return the client for the client ID and path.
@@ -39,7 +40,7 @@ public interface RxHttpClientRegistry {
      * @return The client
      */
     @NonNull
-    RxHttpClient getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path);
+    ReactiveClient getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path);
 
     /**
      * Return the client for the given annotation metadata.
@@ -48,7 +49,7 @@ public interface RxHttpClientRegistry {
      * @return The client
      */
     @NonNull
-    RxHttpClient getClient(@NonNull AnnotationMetadata annotationMetadata);
+    ReactiveClient getClient(@NonNull AnnotationMetadata annotationMetadata);
 
     /**
      * Dispose of the client defined by the given metadata.
@@ -60,7 +61,7 @@ public interface RxHttpClientRegistry {
     /**
      * @return Return the default HTTP client.
      */
-    default RxHttpClient getDefaultClient() {
+    default ReactiveClient getDefaultClient() {
         return getClient(AnnotationMetadata.EMPTY_METADATA);
     }
 

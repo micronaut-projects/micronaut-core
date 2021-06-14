@@ -26,10 +26,9 @@ import io.micronaut.function.client.FunctionDiscoveryClient;
 import io.micronaut.function.client.FunctionInvoker;
 import io.micronaut.function.client.FunctionInvokerChooser;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
-import io.reactivex.Flowable;
-import io.reactivex.Maybe;
-import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -75,7 +74,7 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
         String functionName = context.stringValue(AnnotationUtil.NAMED)
                 .orElse(NameUtils.hyphenate(context.getMethodName(), true));
 
-        Flowable<FunctionDefinition> functionDefinition = Flowable.fromPublisher(discoveryClient.getFunction(functionName));
+        Flux<FunctionDefinition> functionDefinition = Flux.from(discoveryClient.getFunction(functionName));
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
         try {
             switch (interceptedMethod.resultType()) {
@@ -86,7 +85,7 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
                             invokeFn(body, functionName, functionDefinition, interceptedMethod.returnTypeValue())
                     ));
                 case SYNCHRONOUS:
-                    FunctionDefinition def = functionDefinition.blockingFirst();
+                    FunctionDefinition def = functionDefinition.blockFirst();
                     FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
                     return functionInvoker.invoke(def, body, context.getReturnType().asArgument());
                 default:
@@ -97,20 +96,18 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
         }
     }
 
-    private Flowable<Object> invokeFn(Object body, String functionName, Flowable<FunctionDefinition> functionDefinition, Argument<?> valueType) {
-        return functionDefinition.firstElement().flatMap(def -> {
-            FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
-            return (Maybe<Object>) functionInvoker.invoke(
-                    def,
-                    body,
-                    Argument.of(Maybe.class, valueType)
-            );
-        }).switchIfEmpty(Maybe.error(() -> new FunctionNotFoundException(functionName))).toFlowable();
+    private Flux<Object> invokeFn(Object body, String functionName, Flux<FunctionDefinition> functionDefinition, Argument<?> valueType) {
+        return functionDefinition.next()
+                .flatMap(def -> {
+                    FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
+                    return (Mono<Object>) functionInvoker.invoke(def, body, Argument.of(Mono.class, valueType));
+                }).switchIfEmpty(Mono.error(() -> new FunctionNotFoundException(functionName)))
+                .flux();
     }
 
-    private CompletableFuture<Object> toCompletableFuture(Flowable<Object> flowable) {
+    private CompletableFuture<Object> toCompletableFuture(Flux<Object> flowable) {
         CompletableFuture<Object> completableFuture = new CompletableFuture<>();
-        flowable.firstElement().subscribe(completableFuture::complete, completableFuture::completeExceptionally, () -> completableFuture.complete(null));
+        flowable.next().subscribe(completableFuture::complete, completableFuture::completeExceptionally, () -> completableFuture.complete(null));
         return completableFuture;
     }
 

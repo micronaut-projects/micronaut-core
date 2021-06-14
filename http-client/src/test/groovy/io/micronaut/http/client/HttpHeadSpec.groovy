@@ -25,14 +25,13 @@ import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.reactivex.functions.Consumer
 import jakarta.inject.Inject
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
 import java.time.LocalDate
+import java.util.function.Consumer
 
 /**
  * @author Graeme Rocher
@@ -43,7 +42,7 @@ class HttpHeadSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxHttpClient client
+    ReactorHttpClient client
 
     @Inject
     MyGetClient myGetClient
@@ -53,25 +52,24 @@ class HttpHeadSpec extends Specification {
 
     void "test simple head request"() {
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux<?> flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/head/simple").header("Accept-Encoding", "gzip")
         ))
         Optional<String> body = flowable.map({res ->
             res.getBody(String)}
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         !body.isPresent()
     }
 
-
     void "test simple 404 request"() {
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux<?> flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/head/doesntexist")
         ))
 
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -81,11 +79,11 @@ class HttpHeadSpec extends Specification {
 
     void "test 500 request with body"() {
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux<?> flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/head/error"), Argument.of(String), Argument.of(String)
         ))
 
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -96,11 +94,11 @@ class HttpHeadSpec extends Specification {
 
     void "test 500 request with json body"() {
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux<?> flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/get/jsonError"), Argument.of(String), Argument.of(Map)
         ))
 
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -110,7 +108,7 @@ class HttpHeadSpec extends Specification {
 
     void "test simple 404 request as VndError"() {
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux<?> flowable = Flux.fromPublisher(client.exchange(
                 HttpRequest.GET("/head/doesntexist")
         ))
 
@@ -119,7 +117,7 @@ class HttpHeadSpec extends Specification {
                 return HttpResponse.status(error.status).body(error.response.getBody(Map).orElse(null))
             }
             throw error
-        }).blockingFirst()
+        }).blockFirst()
 
         def body = response.body
 
@@ -148,10 +146,10 @@ class HttpHeadSpec extends Specification {
 
     void "test simple get request with type"() {
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/head/simple"), String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
         def body = response.getBody()
 
         then:
@@ -163,11 +161,11 @@ class HttpHeadSpec extends Specification {
     void "test simple exchange request with POJO"() {
 
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/head/pojo"), Book
         ))
 
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:
@@ -179,9 +177,9 @@ class HttpHeadSpec extends Specification {
 
     void "test simple retrieve request with POJO"() {
         when:
-        Flowable<Book> flowable = Flowable.fromPublisher(client.retrieve(
+        Flux<Book> flowable = Flux.from(client.retrieve(
                 HttpRequest.HEAD("/head/pojo"), Book
-        )).blockingFirst()
+        )).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -190,11 +188,11 @@ class HttpHeadSpec extends Specification {
 
     void "test simple get request with POJO list"() {
         when:
-        Flowable<HttpResponse<List<Book>>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<List<Book>>> flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/head/pojoList"), Argument.of(List, Book)
         ))
 
-        HttpResponse<List<Book>> response = flowable.blockingFirst()
+        HttpResponse<List<Book>> response = flowable.blockFirst()
         Optional<List<Book>> body = response.getBody()
 
         then:
@@ -244,7 +242,7 @@ class HttpHeadSpec extends Specification {
 
     void "test body availability"() {
         when:
-        Flowable<HttpResponse> flowable = client.exchange(
+        Flux<HttpResponse> flowable = client.exchange(
                 HttpRequest.HEAD("/head/simple")
         )
         String body
@@ -262,11 +260,11 @@ class HttpHeadSpec extends Specification {
 
     void "test that Optional.empty() should return 404"() {
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/head/empty")
         ))
 
-        HttpResponse<Optional<String>> response = flowable.blockingFirst()
+        HttpResponse<Optional<String>> response = flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -380,12 +378,12 @@ class HttpHeadSpec extends Specification {
 
     void "test head route on reactive return"() {
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        def flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/head/reactive")
         ))
         Optional<String> body = flowable.map({res ->
             res.getBody(String)}
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         !body.isPresent()
@@ -400,8 +398,8 @@ class HttpHeadSpec extends Specification {
         }
 
         @Get(value = "/reactive", produces = MediaType.TEXT_PLAIN)
-        Single<String> reactive() {
-            return Single.just("success")
+        Mono<String> reactive() {
+            return Mono.just("success")
         }
 
         @Get("/pojo")
@@ -542,11 +540,11 @@ class HttpHeadSpec extends Specification {
 
     @jakarta.inject.Singleton
     static class MyGetHelper {
-        private final RxStreamingHttpClient rxClientSlash
-        private final RxStreamingHttpClient rxClient
+        private final ReactorStreamingHttpClient rxClientSlash
+        private final ReactorStreamingHttpClient rxClient
 
-        MyGetHelper(@Client("/head/") RxStreamingHttpClient rxClientSlash,
-                    @Client("/head") RxStreamingHttpClient rxClient) {
+        MyGetHelper(@Client("/head/") ReactorStreamingHttpClient rxClientSlash,
+                    @Client("/head") ReactorStreamingHttpClient rxClient) {
             this.rxClient = rxClient
             this.rxClientSlash = rxClientSlash
         }

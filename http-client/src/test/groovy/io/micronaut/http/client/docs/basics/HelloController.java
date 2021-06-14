@@ -24,9 +24,9 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
-import io.reactivex.Maybe;
+import reactor.core.publisher.Mono;
 
 import static io.micronaut.http.HttpRequest.GET;
 // end::imports[]
@@ -34,17 +34,16 @@ import static io.micronaut.http.HttpRequest.GET;
 @Controller("/")
 public class HelloController {
 
-    private final RxHttpClient httpClient;
+    private final HttpClient httpClient;
 
-    public HelloController(@Client("/endpoint") RxHttpClient httpClient) {
+    public HelloController(@Client("/endpoint") HttpClient httpClient) {
         this.httpClient = httpClient;
     }
 
     // tag::nonblocking[]
     @Get("/hello/{name}")
-    Maybe<String> hello(String name) { // <1>
-        return httpClient.retrieve( GET("/hello/" + name) )
-                         .firstElement(); // <2>
+    Mono<String> hello(String name) { // <1>
+        return Mono.from(httpClient.retrieve(GET("/hello/" + name))); // <2>
     }
     // end::nonblocking[]
 

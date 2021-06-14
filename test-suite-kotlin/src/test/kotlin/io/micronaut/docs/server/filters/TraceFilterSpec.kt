@@ -5,9 +5,8 @@ import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.docs.server.intro.HelloControllerSpec
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-
 
 class TraceFilterSpec: StringSpec() {
 
@@ -17,7 +16,7 @@ class TraceFilterSpec: StringSpec() {
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+            embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.url)
     )
 
     init {

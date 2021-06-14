@@ -22,13 +22,10 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
-import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.scheduling.annotation.ExecuteOn;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import javax.validation.constraints.Size;
-import java.io.InputStream;
 // end::imports[]
 
 // tag::class[]
@@ -45,7 +42,7 @@ public class MessageController {
 
     // tag::echoReactive[]
     @Post(value = "/echo-flow", consumes = MediaType.TEXT_PLAIN) // <1>
-    Single<MutableHttpResponse<String>> echoFlow(@Body Flowable<String> text) { //<2>
+    Mono<MutableHttpResponse<String>> echoFlow(@Body Flux<String> text) { //<2>
         return text
                 .collect(StringBuffer::new, StringBuffer::append) // <3>
                 .map(buffer -> HttpResponse.ok(buffer.toString()));

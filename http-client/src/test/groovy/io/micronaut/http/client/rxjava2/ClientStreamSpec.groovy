@@ -21,7 +21,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -33,7 +33,7 @@ class ClientStreamSpec extends Specification {
 
     void "test stream array of json objects"() {
         when:
-        List<Book> books = bookClient.arrayStream().toList().blockingGet()
+        List<Book> books = bookClient.arrayStream().collectList().block()
 
         then:
         books.size() == 2
@@ -44,7 +44,7 @@ class ClientStreamSpec extends Specification {
 
     void "test stream json stream of objects"() {
         when:
-        List<Book> books = bookClient.jsonStream().toList().blockingGet()
+        List<Book> books = bookClient.jsonStream().collectList().block()
 
         then:
         books.size() == 2
@@ -63,16 +63,16 @@ class ClientStreamSpec extends Specification {
     static class StreamController implements BookApi {
 
         @Override
-        Flowable<Book> arrayStream() {
-            return Flowable.just(
+        Flux<Book> arrayStream() {
+            return Flux.just(
                     new Book(title: "The Stand"),
                     new Book(title: "The Shining"),
             )
         }
 
         @Override
-        Flowable<Book> jsonStream() {
-            return Flowable.just(
+        Flux<Book> jsonStream() {
+            return Flux.just(
                     new Book(title: "The Stand"),
                     new Book(title: "The Shining"),
             )
@@ -81,10 +81,10 @@ class ClientStreamSpec extends Specification {
 
     static interface BookApi {
         @Get("/array")
-        Flowable<Book> arrayStream()
+        Flux<Book> arrayStream()
 
         @Get(value = "/json", processes = MediaType.APPLICATION_JSON_STREAM)
-        Flowable<Book> jsonStream()
+        Flux<Book> jsonStream()
     }
 
     static class Book {

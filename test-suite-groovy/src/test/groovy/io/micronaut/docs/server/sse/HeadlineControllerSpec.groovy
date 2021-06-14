@@ -2,7 +2,7 @@ package io.micronaut.docs.server.sse
 
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.client.sse.RxSseClient
+import io.micronaut.http.client.sse.ReactorSseClient
 import io.micronaut.http.sse.Event
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.Specification
@@ -15,7 +15,7 @@ class HeadlineControllerSpec extends Specification {
 
     @Inject
     @Client('/')
-    RxSseClient client
+    ReactorSseClient client
 
     void "test consume event stream object"() {
         given:

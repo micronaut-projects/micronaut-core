@@ -34,7 +34,7 @@ class CustomErrorTypeSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxHttpClient client
+    ReactorHttpClient client
 
     void "test custom error type"() {
 

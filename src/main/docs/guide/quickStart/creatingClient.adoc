@@ -19,7 +19,7 @@ snippet::io.micronaut.docs.server.intro.HelloClient[tags="imports,class",indent=
 
 <1> The `@Client` annotation is used with a value that is a relative path to the current server
 <2> The same ann:http.annotation.Get[] annotation used on the server is used to define the client mapping
-<3> An RxJava rx:Single[] is returned with the value read from the server
+<3> An RxJava reactor:Mono[] is returned with the value read from the server
 
 To test the `HelloClient`, retrieve it from the api:context.ApplicationContext[] associated with the server:
 

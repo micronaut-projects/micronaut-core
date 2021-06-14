@@ -7,6 +7,9 @@ dependencies {
     api project(":http-netty")
     api dependencyModuleVersion("netty", "netty-codec-http")
 
+    implementation platform('io.projectreactor:reactor-bom:2020.0.7')
+    implementation 'io.projectreactor:reactor-core'
+
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
 
     testCompileOnly project(":inject-groovy")
@@ -41,7 +44,7 @@ dependencies {
 
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation dependencyModuleVersion("groovy", "groovy-templates")
-    testImplementation dependencyVersion("rxjava2")
+    //testImplementation dependencyVersion("rxjava2")
     testImplementation(dependencyModuleVersion("netty", "netty-transport-native-epoll") + ":linux-x86_64")
     testImplementation(dependencyModuleVersion("netty", "netty-transport-native-kqueue") + ":osx-x86_64")
     testImplementation "ch.qos.logback:logback-classic:1.2.3"

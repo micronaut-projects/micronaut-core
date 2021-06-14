@@ -21,7 +21,7 @@ import io.micronaut.core.util.Toggleable
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.management.endpoint.annotation.Endpoint
 import io.micronaut.management.endpoint.annotation.Read
@@ -40,10 +40,10 @@ class SimpleEndpointSpec extends Specification {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.myValue':'foo'], Environment.TEST)
-        RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
+        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
 
         when:
-        def response = rxClient.exchange("/simple", String).blockingFirst()
+        def response = rxClient.exchange("/simple", String).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -58,10 +58,10 @@ class SimpleEndpointSpec extends Specification {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.myValue':'foo'], Environment.TEST)
-        RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
+        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
 
         when:
-        def response = rxClient.exchange(HttpRequest.HEAD("/simple"), String).blockingFirst()
+        def response = rxClient.exchange(HttpRequest.HEAD("/simple"), String).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -77,11 +77,11 @@ class SimpleEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.myValue':'foo']
         )
-        RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
+        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
 
 
         when:
-        def response = rxClient.exchange("/simple/baz", String).blockingFirst()
+        def response = rxClient.exchange("/simple/baz", String).blockFirst()
 
 
         then:
@@ -98,16 +98,16 @@ class SimpleEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.myValue':'foo']
         )
-        RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
+        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
 
         when:
-        def response = rxClient.exchange(HttpRequest.POST("/simple", "bar").contentType("text/plain"), String).blockingFirst()
+        def response = rxClient.exchange(HttpRequest.POST("/simple", "bar").contentType("text/plain"), String).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
 
         when:
-        response = rxClient.exchange("/simple", String).blockingFirst()
+        response = rxClient.exchange("/simple", String).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -123,10 +123,10 @@ class SimpleEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.enabled':false]
         )
-        RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
+        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
 
         when:
-        rxClient.exchange("/simple", String).blockingFirst()
+        rxClient.exchange("/simple", String).blockFirst()
 
         then:
         HttpClientResponseException ex = thrown()

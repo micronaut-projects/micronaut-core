@@ -20,7 +20,7 @@ class PetControllerSpec extends Specification {
         // tag::post[]
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
         PetClient client = embeddedServer.getApplicationContext().getBean(PetClient)
-        Pet pet = client.save("Dino", 10).blockingGet()
+        Pet pet = client.save("Dino", 10).block()
 
         then:
         "Dino" == pet.getName()
@@ -37,7 +37,7 @@ class PetControllerSpec extends Specification {
         // tag::error[]
         thrown.expect(ConstraintViolationException.class)
         thrown.expectMessage("save.age: must be greater than or equal to 1")
-        client.save("Fred", -1).blockingGet()
+        client.save("Fred", -1).block()
         // end::error[]
 
         embeddedServer.stop()

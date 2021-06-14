@@ -31,7 +31,7 @@ public class RequestAttributeTest {
             StoryClient client = embeddedServer.getApplicationContext().getBean(StoryClient.class);
             StoryClientFilter filter = embeddedServer.getApplicationContext().getBean(StoryClientFilter.class);
 
-            Story story = client.getById("jan2019").blockingGet();
+            Story story = client.getById("jan2019").block();
 
             Assert.assertNotNull(story);
 

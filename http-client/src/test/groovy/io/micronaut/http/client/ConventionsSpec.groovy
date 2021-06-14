@@ -39,7 +39,7 @@ class ConventionsSpec extends Specification {
 
     void 'test convention mappings'() {
         given:
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = embeddedServer.getApplicationContext().createBean(ReactorHttpClient, embeddedServer.getURL())
 
         expect:
         client.toBlocking().retrieve('/hello-convention') == 'good'
@@ -51,7 +51,7 @@ class ConventionsSpec extends Specification {
 
     void 'test convention mappings with validation'() {
         given:
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = embeddedServer.getApplicationContext().createBean(ReactorHttpClient, embeddedServer.getURL())
 
         expect:
         client.toBlocking().retrieve('/hello-validated') == 'good'

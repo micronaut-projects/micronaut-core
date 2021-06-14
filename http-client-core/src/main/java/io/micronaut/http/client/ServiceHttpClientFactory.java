@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
@@ -31,9 +32,9 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskScheduler;
-import io.reactivex.Flowable;
-
+import reactor.core.publisher.Flux;
 import java.net.URI;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -51,7 +52,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class ServiceHttpClientFactory {
 
     private final TaskScheduler taskScheduler;
-    private final BeanProvider<RxHttpClientRegistry> clientFactory;
+    private final BeanProvider<ReactiveHttpClientRegistry<ReactorHttpClient>> clientFactory;
 
     /**
      * Default constructor.
@@ -61,7 +62,7 @@ public class ServiceHttpClientFactory {
      */
     public ServiceHttpClientFactory(
             TaskScheduler taskScheduler,
-            BeanProvider<RxHttpClientRegistry> clientFactory) {
+            BeanProvider<ReactiveHttpClientRegistry<ReactorHttpClient>> clientFactory) {
         this.taskScheduler = taskScheduler;
         this.clientFactory = clientFactory;
     }
@@ -96,36 +97,36 @@ public class ServiceHttpClientFactory {
             return event -> {
                     final List<URI> originalURLs = configuration.getUrls();
                     Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
-                    final RxHttpClient httpClient = clientFactory.get()
+                    final ReactorHttpClient httpClient = clientFactory.get()
                             .getClient(
                                     configuration.getHttpVersion(),
                                     configuration.getServiceId(),
                                     configuration.getPath().orElse(null));
-                    taskScheduler.scheduleWithFixedDelay(configuration.getHealthCheckInterval(), configuration.getHealthCheckInterval(), () -> Flowable.fromIterable(originalURLs).flatMap(originalURI -> {
-                        URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());
-                        return httpClient.exchange(HttpRequest.GET(healthCheckURI)).onErrorResumeNext(throwable -> {
-                            if (throwable instanceof HttpClientResponseException) {
-                                HttpClientResponseException responseException = (HttpClientResponseException) throwable;
-                                HttpResponse<ByteBuffer> response = (HttpResponse<ByteBuffer>) responseException.getResponse();
-                                return Flowable.just(response);
-                            }
-                            return Flowable.just(HttpResponse.serverError());
-                        }).map(response -> Collections.singletonMap(originalURI, response.getStatus()));
-                    }).subscribe(uriToStatusMap -> {
-                        Map.Entry<URI, HttpStatus> entry = uriToStatusMap.entrySet().iterator().next();
-
-                        URI uri = entry.getKey();
-                        HttpStatus status = entry.getValue();
-
-                        if (status.getCode() >= 300) {
-                            loadBalancedURIs.remove(uri);
-                        } else if (!loadBalancedURIs.contains(uri)) {
-                            loadBalancedURIs.add(uri);
-                        }
+                    final Duration initialDelay = configuration.getHealthCheckInterval();
+                    Duration delay = configuration.getHealthCheckInterval();
+                    taskScheduler.scheduleWithFixedDelay(initialDelay, delay, () -> Flux.fromIterable(originalURLs)
+                            .flatMap(originalURI -> {
+                                URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());
+                                return httpClient.exchange(HttpRequest.GET(healthCheckURI))
+                                        .onErrorResume(throwable -> {
+                                            if (throwable instanceof HttpClientResponseException) {
+                                                HttpClientResponseException responseException = (HttpClientResponseException) throwable;
+                                                return Flux.just((HttpResponse<ByteBuffer>) responseException.getResponse());
+                                            }
+                                            return Flux.just(HttpResponse.serverError());
+                                        }).map(response -> Collections.singletonMap(originalURI, response.getStatus()));
+                            }).subscribe(uriToStatusMap -> {
+                                Map.Entry<URI, HttpStatus> entry = uriToStatusMap.entrySet().iterator().next();
+                                URI uri = entry.getKey();
+                                HttpStatus status = entry.getValue();
+                                if (status.getCode() >= 300) {
+                                    loadBalancedURIs.remove(uri);
+                                } else if (!loadBalancedURIs.contains(uri)) {
+                                    loadBalancedURIs.add(uri);
+                                }
                     }));
             };
         }
         throw new DisabledBeanException("HTTP Client Health Check not enabled");
     }
-
 }

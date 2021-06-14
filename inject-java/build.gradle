@@ -12,7 +12,10 @@ dependencies {
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
-    testImplementation dependencyVersion("rxjava2")
+    //testImplementation dependencyVersion("rxjava2")
+    testImplementation platform('io.projectreactor:reactor-bom:2020.0.7')
+    testImplementation 'io.projectreactor:reactor-core'
+
     testImplementation dependencyVersion("spotbugs")
     testImplementation "org.hibernate:hibernate-core:5.4.29.Final"
     testImplementation "junit:junit:4.13.2"

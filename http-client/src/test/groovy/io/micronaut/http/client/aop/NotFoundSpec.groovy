@@ -22,8 +22,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
-import io.reactivex.Maybe
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -37,18 +37,18 @@ class NotFoundSpec extends Specification {
         InventoryClient client = embeddedServer.getApplicationContext().getBean(InventoryClient)
 
         expect:
-        client.flowable('1234').blockingFirst()
-        client.flowable('notthere').toList().blockingGet() == []
+        client.flowable('1234').blockFirst()
+        client.flowable('notthere').collectList().block() == []
 
     }
 
-    void "test 404 handling with Maybe"() {
+    void "test 404 handling with Mono"() {
         given:
         InventoryClient client = embeddedServer.getApplicationContext().getBean(InventoryClient)
 
         expect:
-        client.maybe('1234').blockingGet()
-        client.maybe('notthere').blockingGet() == null
+        client.maybe('1234').block()
+        client.maybe('notthere').block() == null
 
     }
 
@@ -56,10 +56,10 @@ class NotFoundSpec extends Specification {
     static interface InventoryClient {
         @Get('/maybe/{isbn}')
         @Consumes(MediaType.TEXT_PLAIN)
-        Maybe<Boolean> maybe(String isbn)
+        Mono<Boolean> maybe(String isbn)
 
         @Get(value = '/flowable/{isbn}', processes = MediaType.TEXT_EVENT_STREAM)
-        Flowable<Boolean> flowable(String isbn)
+        Flux<Boolean> flowable(String isbn)
     }
 
     @Controller(value = "/not-found", produces = MediaType.TEXT_PLAIN)
@@ -70,21 +70,21 @@ class NotFoundSpec extends Specification {
 
 
         @Get('/maybe/{isbn}')
-        Maybe<Boolean> maybe(String isbn) {
+        Mono<Boolean> maybe(String isbn) {
             Boolean value = stock[isbn]
             if (value != null) {
-                return Maybe.just(value)
+                return Mono.just(value)
             }
-            return Maybe.empty()
+            return Mono.empty()
         }
 
         @Get(value = '/flowable/{isbn}', processes = MediaType.TEXT_EVENT_STREAM)
-        Flowable<Boolean> flowable(String isbn) {
+        Flux<Boolean> flowable(String isbn) {
             Boolean value = stock[isbn]
             if (value != null) {
-                return Flowable.just(value)
+                return Flux.just(value)
             }
-            return Flowable.empty()
+            return Flux.empty()
         }
     }
 }

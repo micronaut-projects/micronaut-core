@@ -21,17 +21,17 @@ class InvalidStatusSpec extends Specification {
         wireMockServer.start()
         wireMockServer.stubFor(WireMock.get("/status-only")
                 .willReturn(WireMock.status(519)))
-        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient, new URL("http://localhost:${wireMockServer.port()}"))
+        ReactorStreamingHttpClient client = context.createBean(ReactorStreamingHttpClient, new URL("http://localhost:${wireMockServer.port()}"))
 
         when:
-        client.exchange("/status-only", String).blockingFirst()
+        client.exchange("/status-only", String).blockFirst()
 
         then:
         def ex = thrown(IllegalArgumentException)
         ex.message == "Invalid HTTP status code: 519"
 
         when:
-        client.dataStream(HttpRequest.GET("/status-only")).blockingFirst()
+        client.dataStream(HttpRequest.GET("/status-only")).blockFirst()
 
         then:
         ex = thrown(IllegalArgumentException)

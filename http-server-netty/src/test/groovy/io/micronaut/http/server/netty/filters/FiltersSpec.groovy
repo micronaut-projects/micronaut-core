@@ -15,12 +15,12 @@ import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.reactivex.schedulers.Schedulers
 import jakarta.inject.Inject
 import jakarta.inject.Named
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -177,8 +177,8 @@ class FiltersSpec extends Specification {
         }
 
         @Get("/filters-reactive-get")
-        Single<String> getReactive(HttpRequest<?> request) {
-            return Single.fromCallable(new Callable<String>() {
+        Mono<String> getReactive(HttpRequest<?> request) {
+            return Mono.fromCallable(new Callable<String>() {
                 @Override
                 String call() throws Exception {
                     if (!ServerRequestContext.currentRequest().isPresent()) {
@@ -227,7 +227,7 @@ class FiltersSpec extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            return Flowable.fromPublisher(super.doFilter(request, chain)).subscribeOn(Schedulers.from(executor))
+            return Flux.from(super.doFilter(request, chain)).subscribeOn(Schedulers.fromExecutor(executor))
         }
 
         @Override

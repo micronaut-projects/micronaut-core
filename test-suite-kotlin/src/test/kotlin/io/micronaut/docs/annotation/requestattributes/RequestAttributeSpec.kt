@@ -4,10 +4,7 @@ import io.kotlintest.shouldBe
 import io.kotlintest.shouldNotBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.Assert
-import org.junit.Test
 
 class RequestAttributeSpec: StringSpec() {
 
@@ -20,7 +17,7 @@ class RequestAttributeSpec: StringSpec() {
             val client = embeddedServer.applicationContext.getBean(StoryClient::class.java)
             val filter = embeddedServer.applicationContext.getBean(StoryClientFilter::class.java)
 
-            val story = client.getById("jan2019").blockingGet()
+            val story = client.getById("jan2019").block()
             val attributes = filter.latestRequestAttributes
 
             story shouldNotBe null

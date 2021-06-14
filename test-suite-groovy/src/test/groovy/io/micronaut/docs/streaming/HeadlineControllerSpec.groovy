@@ -1,12 +1,12 @@
 package io.micronaut.docs.streaming
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.RxStreamingHttpClient
+import io.micronaut.http.client.ReactorStreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
-import io.reactivex.Maybe
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -27,9 +27,9 @@ class HeadlineControllerSpec extends Specification {
         def headlineClient = embeddedServer.applicationContext
                                            .getBean(HeadlineClient) // <1>
 
-        Maybe<Headline> firstHeadline = headlineClient.streamHeadlines().firstElement() // <2>
+        Mono<Headline> firstHeadline = headlineClient.streamHeadlines().firstElement() // <2>
 
-        Headline headline = firstHeadline.blockingGet() // <3>
+        Headline headline = firstHeadline.block() // <3>
 
         then:
         headline
@@ -39,11 +39,11 @@ class HeadlineControllerSpec extends Specification {
 
     void "test streaming client" () {
         when:
-        RxStreamingHttpClient client = embeddedServer.applicationContext
-                                                     .createBean(RxStreamingHttpClient, embeddedServer.URL)
+        ReactorStreamingHttpClient client = embeddedServer.applicationContext
+                                                     .createBean(ReactorStreamingHttpClient, embeddedServer.URL)
 
         // tag::streaming[]
-        Flowable<Headline> headlineStream = client.jsonStream(
+        Flux<Headline> headlineStream = client.jsonStream(
                 GET("/streaming/headlines"), Headline) // <1>
         CompletableFuture<Headline> future = new CompletableFuture<>() // <2>
         headlineStream.subscribe(new Subscriber<Headline>() {

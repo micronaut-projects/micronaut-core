@@ -6,13 +6,12 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Single
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
 import java.util.concurrent.CompletableFuture
 
 class NonMutableResponseSpec extends Specification {
@@ -39,7 +38,7 @@ class NonMutableResponseSpec extends Specification {
         CompletableFuture<HttpResponse<String>> goCompletable()
 
         @Get('/test/non-mutable/proxy')
-        Single<HttpResponse<String>> goSingle()
+        Mono<HttpResponse<String>> goMono()
 
         @Get('/test/non-mutable/proxy')
         Publisher<HttpResponse<String>> goPublisher()
@@ -61,8 +60,8 @@ class NonMutableResponseSpec extends Specification {
         }
 
         @Get('/test/non-mutable/single')
-        Single<HttpResponse<String>> goSingle() {
-            responseClient.goSingle()
+        Mono<HttpResponse<String>> goMono() {
+            responseClient.goMono()
         }
 
         @Get('/test/non-mutable/publisher')

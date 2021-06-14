@@ -22,7 +22,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Single
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -65,7 +65,7 @@ class HttpClientJsonRetrySpec extends Specification {
         controller.count = 0
 
         when:"A method is annotated retry"
-        Count result = countClient.getCountSingle().blockingGet()
+        Count result = countClient.getCountSingle().block()
 
         then:"It executes until successful"
         result.number
@@ -74,7 +74,7 @@ class HttpClientJsonRetrySpec extends Specification {
         controller.countThreshold = 10
         controller.count = 0
         def single = countClient.getCountSingle()
-        single.blockingGet()
+        single.block()
 
         then:"The original exception is thrown"
         def e = thrown(HttpClientResponseException)
@@ -105,8 +105,8 @@ class HttpClientJsonRetrySpec extends Specification {
         }
 
         @Override
-        Single<Count> getCountSingle() {
-            Single.fromCallable({->
+        Mono<Count> getCountSingle() {
+            Mono.fromCallable({->
                 countRx++
                 if(countRx < countThreshold) {
                     throw new IllegalStateException("Bad count")
@@ -127,6 +127,6 @@ class HttpClientJsonRetrySpec extends Specification {
         Count getCount()
 
         @Get('/rx-count')
-        Single<Count> getCountSingle()
+        Mono<Count> getCountSingle()
     }
 }

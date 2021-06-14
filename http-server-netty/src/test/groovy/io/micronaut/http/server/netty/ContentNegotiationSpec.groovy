@@ -7,7 +7,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.*
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
@@ -24,13 +24,13 @@ class ContentNegotiationSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxHttpClient client
+    ReactorHttpClient client
 
     @Unroll
     void "test ACCEPT header content negotiation #header"() {
         expect:
         client.retrieve(HttpRequest.GET("/negotiate").accept(header as MediaType[]), String)
-                .blockingFirst() == response
+                .blockFirst() == response
 
         where:
         header                                                                            | response
@@ -55,7 +55,7 @@ class ContentNegotiationSpec extends Specification {
                     .accept(contentType)
         }
         def response = client.exchange(request, String)
-                .blockingFirst()
+                .blockFirst()
 
         expect: "the correct content type was used"
         response.getContentType().get() == expectedContentType
@@ -72,7 +72,7 @@ class ContentNegotiationSpec extends Specification {
         when: "An unacceptable type is sent"
         client.retrieve(HttpRequest.GET("/negotiate/other")
                 .accept(MediaType.APPLICATION_GRAPHQL), Argument.STRING, JsonError.TYPE)
-                .blockingFirst()
+                .blockFirst()
 
         then: "An exception is thrown that states the acceptable types"
         def e = thrown(HttpClientResponseException)
@@ -91,7 +91,7 @@ class ContentNegotiationSpec extends Specification {
         HttpResponse<String> response = null
         try {
             client.exchange(request, String)
-                    .blockingFirst()
+                    .blockFirst()
         } catch (HttpClientResponseException e) {
             response = e.response
         }
@@ -118,7 +118,7 @@ class ContentNegotiationSpec extends Specification {
         HttpResponse<String> response = null
         try {
             response = client.exchange(request, String)
-                    .blockingFirst()
+                    .blockFirst()
         } catch (HttpClientResponseException e) {
             response = e.response
         }

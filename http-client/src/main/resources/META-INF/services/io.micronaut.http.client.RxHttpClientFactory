@@ -1,1 +1,1 @@
-io.micronaut.http.client.netty.NettyRxHttpClientFactory
+io.micronaut.http.client.netty.NettyReactorHttpClientFactory

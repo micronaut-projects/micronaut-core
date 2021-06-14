@@ -14,13 +14,13 @@ import spock.lang.Specification
 class ServerSentEventMultilineSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['jackson.serialization.indentOutput': true])
-    @Shared @AutoCleanup RxSseClient sseClient = embeddedServer.applicationContext.createBean(RxSseClient, embeddedServer.getURL())
+    @Shared @AutoCleanup ReactorSseClient sseClient = embeddedServer.applicationContext.createBean(ReactorSseClient, embeddedServer.getURL())
     @Shared ProductClient productClient = embeddedServer.applicationContext.getBean(ProductClient)
 
 
-    void "test consume multiline SSE stream with RxSseClient"() {
+    void "test consume multiline SSE stream with ReactorSseClient"() {
         when:
-        List<Event<Product>> results = sseClient.eventStream("/stream/sse/pojo/events", Product).toList().blockingGet()
+        List<Event<Product>> results = sseClient.eventStream("/stream/sse/pojo/events", Product).collectList().block()
 
         then:
         results[0].data.name == "Apple"
@@ -33,7 +33,7 @@ class ServerSentEventMultilineSpec extends Specification {
 
     void "test consume multiline pojo SSE stream with @Client"() {
         when:
-        List<Product> results = productClient.pojoStream().toList().blockingGet()
+        List<Product> results = productClient.pojoStream().collectList().block()
 
         then:
         results[0].name == "Apple"

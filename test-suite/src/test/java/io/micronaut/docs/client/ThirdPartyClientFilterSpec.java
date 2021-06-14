@@ -25,18 +25,17 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Header;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.ReactorHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.reactivex.Flowable;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 import spock.lang.Retry;
-
 import jakarta.inject.Singleton;
 import java.util.Base64;
 import java.util.HashMap;
@@ -53,7 +52,7 @@ public class ThirdPartyClientFilterSpec {
 
     private static ApplicationContext context;
     private static EmbeddedServer server;
-    private static RxHttpClient client;
+    private static ReactorHttpClient client;
 
     private String result;
 
@@ -66,7 +65,7 @@ public class ThirdPartyClientFilterSpec {
         map.put("bintray.organization", "grails");
         server = ApplicationContext.run(EmbeddedServer.class, map);
         context = server.getApplicationContext();
-        client = context.createBean(RxHttpClient.class, server.getURL());
+        client = context.createBean(ReactorHttpClient.class, server.getURL());
     }
 
     @AfterClass
@@ -110,22 +109,22 @@ public class ThirdPartyClientFilterSpec {
 //tag::bintrayService[]
 @Singleton
 class BintrayService {
-    final RxHttpClient client;
+    final ReactorHttpClient client;
     final String org;
 
     BintrayService(
-            @Client(BintrayApi.URL) RxHttpClient client,           // <1>
+            @Client(BintrayApi.URL) ReactorHttpClient client,           // <1>
             @Value("${bintray.organization}") String org ) {
         this.client = client;
         this.org = org;
     }
 
-    Flowable<HttpResponse<String>> fetchRepositories() {
+    Flux<HttpResponse<String>> fetchRepositories() {
         return client.exchange(HttpRequest.GET(
                 "/repos/" + org), String.class); // <2>
     }
 
-    Flowable<HttpResponse<String>> fetchPackages(String repo) {
+    Flux<HttpResponse<String>> fetchPackages(String repo) {
         return client.exchange(HttpRequest.GET(
                 "/repos/" + org + "/" + repo + "/packages"), String.class); // <2>
     }

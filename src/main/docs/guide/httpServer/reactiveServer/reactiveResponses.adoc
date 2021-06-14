@@ -1,6 +1,6 @@
 The previous section introduced the notion of Reactive programming using RxJava 2.x and Micronaut.
 
-Micronaut supports returning common reactive types such as rx:Single[] or rx:Observable[] (or the `Mono` type from Reactor 3.x), an instance of rs:Publisher[] or jdk:java.util.concurrent.CompletableFuture[] from any controller method.
+Micronaut supports returning common reactive types such as reactor:Mono[] or rx:Observable[] (or the `Mono` type from Reactor 3.x), an instance of rs:Publisher[] or jdk:java.util.concurrent.CompletableFuture[] from any controller method.
 
 The argument designated as the body of the request using the api:http.annotation.Body[] annotation can also be a reactive type or a jdk:java.util.concurrent.CompletableFuture[].
 
@@ -16,7 +16,7 @@ To summarize, the following table illustrates some common response types and the
 
 |rs:Publisher[]
 |Any type that implements the rs:Publisher[] interface
-|`Flowable<String> hello()`
+|`Flux<String> hello()`
 
 |jdk:java.util.concurrent.CompletableFuture[]
 |A Java `CompletableFuture` instance
@@ -24,7 +24,7 @@ To summarize, the following table illustrates some common response types and the
 
 |api:http.HttpResponse[]
 |An api:http.HttpResponse[] and optional response body
-|`HttpResponse<Flowable<String>> hello()`
+|`HttpResponse<Flux<String>> hello()`
 
 |jdk:java.lang.CharSequence[]
 |Any implementation of `CharSequence`
@@ -35,4 +35,4 @@ To summarize, the following table illustrates some common response types and the
 |`Book show()`
 |===
 
-NOTE: When returning a Reactive type, its type affects the returned response. For example, when returning a rx:Flowable[], Micronaut cannot know the size of the response, so `Transfer-Encoding` type of `Chunked` is used. Whilst for types that emit a single result such as `rx:Single[]` the `Content-Length` header is populated.
+NOTE: When returning a Reactive type, its type affects the returned response. For example, when returning a reactor:Flux[], Micronaut cannot know the size of the response, so `Transfer-Encoding` type of `Chunked` is used. Whilst for types that emit a single result such as `reactor:Mono[]` the `Content-Length` header is populated.

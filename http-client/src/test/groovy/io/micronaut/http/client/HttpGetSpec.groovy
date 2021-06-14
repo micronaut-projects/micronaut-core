@@ -28,17 +28,16 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Completable
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.reactivex.functions.Consumer
 import jakarta.inject.Inject
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import javax.annotation.Nullable
 import java.time.LocalDate
+import java.util.function.Consumer
 
 /**
  * @author Graeme Rocher
@@ -51,7 +50,7 @@ class HttpGetSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxHttpClient client
+    ReactorHttpClient client
 
     @Inject
     MyGetClient myGetClient
@@ -67,28 +66,25 @@ class HttpGetSpec extends Specification {
 
     void "test simple get request"() {
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/simple").header("Accept-Encoding", "gzip")
         ))
-        Optional<String> body = flowable.map({res ->
+        Optional<String> body = flowable.map({ res ->
             res.getBody(String)}
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         body.isPresent()
         body.get() == 'success'
-
     }
 
-
     void "test simple 404 request"() {
-
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux<?> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/doesntexist")
         ))
 
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -98,13 +94,12 @@ class HttpGetSpec extends Specification {
     }
 
     void "test 500 request with body"() {
-
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        def flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/error"), Argument.of(String), Argument.of(String)
         ))
 
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -115,14 +110,12 @@ class HttpGetSpec extends Specification {
     }
 
     void "test 500 request with json body"() {
-
-
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        def flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/jsonError"), Argument.of(String), Argument.of(Map)
         ))
 
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -133,7 +126,7 @@ class HttpGetSpec extends Specification {
 
     void "test simple 404 request as VndError"() {
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        def flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/doesntexist")
         ))
 
@@ -142,7 +135,7 @@ class HttpGetSpec extends Specification {
                 return HttpResponse.status(error.status).body(error.response.getBody(Map).orElse(null))
             }
             throw error
-        }).blockingFirst()
+        }).blockFirst()
 
         def body = response.body
 
@@ -170,11 +163,11 @@ class HttpGetSpec extends Specification {
 
     void "test simple get request with type"() {
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/simple"), String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
-        def body = response.getBody()
+        HttpResponse<String> response = flowable.blockFirst()
+        Optional<String> body = response.getBody()
 
         then:
         response.status == HttpStatus.OK
@@ -184,11 +177,11 @@ class HttpGetSpec extends Specification {
 
     void "test simple exchange request with POJO"() {
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/pojo"), Book
         ))
 
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
         then:
         response.contentType.isPresent()
@@ -202,12 +195,13 @@ class HttpGetSpec extends Specification {
 
     void "test simple exchange request with POJO with String response"() {
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/pojo"), String
         ))
 
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
         Optional<String> body = response.getBody()
+
         then:
         response.contentType.isPresent()
         response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
@@ -220,11 +214,11 @@ class HttpGetSpec extends Specification {
 
     void "test simple retrieve request with POJO"() {
         when:
-        Flowable<Book> flowable = Flowable.fromPublisher(client.retrieve(
+        Flux<Book> flowable = Flux.from(client.retrieve(
                 HttpRequest.GET("/get/pojo"), Book
         ))
 
-        Book book = flowable.blockingFirst()
+        Book book = flowable.blockFirst()
 
         then:
         book != null
@@ -233,11 +227,11 @@ class HttpGetSpec extends Specification {
 
     void "test simple get request with POJO list"() {
         when:
-        Flowable<HttpResponse<List<Book>>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<List<Book>>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/pojoList"), Argument.of(List, Book)
         ))
 
-        HttpResponse<List<Book>> response = flowable.blockingFirst()
+        HttpResponse<List<Book>> response = flowable.blockFirst()
         Optional<List<Book>> body = response.getBody()
 
         then:
@@ -274,7 +268,7 @@ class HttpGetSpec extends Specification {
 
     void "test body availability"() {
         when:
-        Flowable<HttpResponse> flowable = client.exchange(
+        Flux<HttpResponse> flowable = client.exchange(
                 HttpRequest.GET("/get/simple")
         )
         String body
@@ -306,11 +300,11 @@ class HttpGetSpec extends Specification {
 
     void "test that Optional.empty() should return 404"() {
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux<?> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/empty")
         ))
 
-        HttpResponse<Optional<String>> response = flowable.blockingFirst()
+        HttpResponse<Optional<String>> response = flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -402,7 +396,7 @@ class HttpGetSpec extends Specification {
 
     void "test empty list returns ok"() {
         when:
-        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList"), Argument.listOf(Book)).blockingFirst()
+        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList"), Argument.listOf(Book)).blockFirst()
 
         then:
         noExceptionThrown()
@@ -415,7 +409,7 @@ class HttpGetSpec extends Specification {
 
     void "test single empty list returns ok"() {
         when:
-        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList/single"), Argument.listOf(Book)).blockingFirst()
+        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList/single"), Argument.listOf(Book)).blockFirst()
 
         then:
         noExceptionThrown()
@@ -429,8 +423,8 @@ class HttpGetSpec extends Specification {
     void "test completable returns 200"() {
         when:
         MyGetClient client = this.myGetClient
-        def returnsNull = client.completable().blockingGet()
-        def ex = client.completableError().blockingGet()
+        def returnsNull = client.completable().block()
+        def ex = client.completableError().block()
 
         then:
         returnsNull == null
@@ -550,7 +544,7 @@ class HttpGetSpec extends Specification {
 
     void "test creating an rx client with a null URL"() {
         given:
-        BlockingHttpClient client = RxHttpClient.create(null).toBlocking()
+        BlockingHttpClient client = ReactorHttpClient.create(null).toBlocking()
 
         when:
         String uri = UriBuilder.of(embeddedServer.getURI()).path("/get/simple").toString()
@@ -577,7 +571,7 @@ class HttpGetSpec extends Specification {
         books[0][0].title == "The Stand"
 
         when:
-        BlockingHttpClient client = RxHttpClient.create(embeddedServer.getURL()).toBlocking()
+        BlockingHttpClient client = ReactorHttpClient.create(embeddedServer.getURL()).toBlocking()
         books = client.retrieve(HttpRequest.GET("/get/nestedPojoList"), Argument.listOf(Argument.listOf(Book.class)))
 
         then:
@@ -599,7 +593,7 @@ class HttpGetSpec extends Specification {
 
     void "test an invalid content type reactive response"() {
         when:
-        myGetClient.invalidContentTypeReactive().blockingGet()
+        myGetClient.invalidContentTypeReactive().block()
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -640,8 +634,8 @@ class HttpGetSpec extends Specification {
         }
 
         @Get("/emptyList/single")
-        Single<List<Book>> emptyListSingle() {
-            return Single.just([])
+        Mono<List<Book>> emptyListSingle() {
+            return Mono.just([])
         }
 
         @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
@@ -710,13 +704,13 @@ class HttpGetSpec extends Specification {
         }
 
         @Get("/completable")
-        Completable completable(){
-            return Completable.complete()
+        Mono<Void> completable(){
+            return Mono.just(null)
         }
 
         @Get("/completable/error")
-        Completable completableError() {
-            return Completable.error(new RuntimeException("completable error"))
+        Mono<Void> completableError() {
+            return Mono.error(new RuntimeException("completable error"))
         }
 
         @Get(uris = ["/multiple", "/multiple/mappings"])
@@ -888,10 +882,10 @@ class HttpGetSpec extends Specification {
         String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate)
 
         @Get("/completable")
-        Completable completable()
+        Mono<Void> completable()
 
         @Get("/completable/error")
-        Completable completableError()
+        Mono<Void> completableError()
 
         @Get("/multiple")
         String multiple()
@@ -903,7 +897,7 @@ class HttpGetSpec extends Specification {
         Book invalidContentType()
 
         @Get(value = "/invalidContentType", consumes = "does/notexist")
-        Single<Book> invalidContentTypeReactive()
+        Mono<Book> invalidContentTypeReactive()
 
     }
 
@@ -918,11 +912,11 @@ class HttpGetSpec extends Specification {
     @jakarta.inject.Singleton
     static class MyGetHelper {
 
-        private final RxStreamingHttpClient rxClientSlash
-        private final RxStreamingHttpClient rxClient
+        private final ReactorStreamingHttpClient rxClientSlash
+        private final ReactorStreamingHttpClient rxClient
 
-        MyGetHelper(@Client("/get/") RxStreamingHttpClient rxClientSlash,
-                    @Client("/get") RxStreamingHttpClient rxClient) {
+        MyGetHelper(@Client("/get/") ReactorStreamingHttpClient rxClientSlash,
+                    @Client("/get") ReactorStreamingHttpClient rxClient) {
             this.rxClient = rxClient
             this.rxClientSlash = rxClientSlash
         }

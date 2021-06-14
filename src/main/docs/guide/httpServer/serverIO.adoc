@@ -7,8 +7,8 @@ The following table summarizes example return type signatures and the behaviour 
 |===
 |Return Type | Description
 
-|`Flowable<byte[]>`
-|A rx:Flowable[] that emits each chunk of content as a `byte[]` without blocking
+|`Flux<byte[]>`
+|A reactor:Flux[] that emits each chunk of content as a `byte[]` without blocking
 
 |`Flux<ByteBuf>`
 |A Reactor `Flux` that emits each chunk as a Netty `ByteBuf`
@@ -16,7 +16,7 @@ The following table summarizes example return type signatures and the behaviour 
 |`Publisher<String>`
 |A rs:Publisher[] that emits each chunk of content as a String
 
-|`Flowable<Book>`
+|`Flux<Book>`
 |When emitting a POJO, each emitted object is encoded as JSON by default without blocking
 
 |===
@@ -66,6 +66,6 @@ See the following example:
 snippet::io.micronaut.docs.respondingnotfound.BooksController[tags="clazz", indent=0]
 
 <1> Returning `null` triggers a 404 (Not Found) response.
-<2> Returning an empty `Maybe` triggers a 404 (Not Found) response.
+<2> Returning an empty `Mono` triggers a 404 (Not Found) response.
 
-NOTE: Responding with an empty `Publisher` or `Flowable` results in an empty array being returned if the content type is JSON.
+NOTE: Responding with an empty `Publisher` or `Flux` results in an empty array being returned if the content type is JSON.

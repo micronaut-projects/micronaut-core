@@ -17,7 +17,7 @@ package io.micronaut.docs.annotation;
 
 // tag::imports[]
 import io.micronaut.http.annotation.Controller;
-import io.reactivex.Single;
+import reactor.core.publisher.Mono;
 // end::imports[]
 
 // tag::class[]
@@ -25,12 +25,12 @@ import io.reactivex.Single;
 public class PetController implements PetOperations {
 
     @Override
-    public Single<Pet> save(String name, int age) {
+    public Mono<Pet> save(String name, int age) {
         Pet pet = new Pet();
         pet.setName(name);
         pet.setAge(age);
         // save to database or something
-        return Single.just(pet);
+        return Mono.just(pet);
     }
 }
 // end::class[]

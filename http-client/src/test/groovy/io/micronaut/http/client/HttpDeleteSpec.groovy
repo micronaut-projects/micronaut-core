@@ -24,8 +24,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Delete
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Flowable
 import jakarta.inject.Inject
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 /**
@@ -44,7 +44,7 @@ class HttpDeleteSpec extends Specification {
 
     void "test http delete"() {
         when:
-        def res = Flowable.fromPublisher(client.exchange(HttpRequest.DELETE('/delete/simple'))).blockingFirst()
+        def res = Flux.from(client.exchange(HttpRequest.DELETE('/delete/simple'))).blockFirst()
 
         then:
         res.status == HttpStatus.NO_CONTENT
@@ -52,7 +52,7 @@ class HttpDeleteSpec extends Specification {
 
     void "test http delete with blocking client"() {
         when:
-        def res = Flowable.fromPublisher(client.exchange(HttpRequest.DELETE('/delete/simple'))).blockingFirst()
+        def res = Flux.from(client.exchange(HttpRequest.DELETE('/delete/simple'))).blockFirst()
 
         then:
         res.status == HttpStatus.NO_CONTENT
@@ -60,9 +60,9 @@ class HttpDeleteSpec extends Specification {
 
     void "test http delete with body"() {
         when:
-        def res = Flowable.fromPublisher(client.exchange(
+        def res = Flux.from(client.exchange(
                 HttpRequest.DELETE('/delete/body', 'test')
-                           .contentType(MediaType.TEXT_PLAIN) , String)).blockingFirst()
+                           .contentType(MediaType.TEXT_PLAIN) , String)).blockFirst()
         def body = res.body
         then:
         res.status == HttpStatus.ACCEPTED

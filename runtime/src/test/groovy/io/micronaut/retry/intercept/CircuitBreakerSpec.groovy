@@ -22,8 +22,8 @@ import io.micronaut.retry.event.CircuitClosedEvent
 import io.micronaut.retry.event.CircuitOpenEvent
 import io.micronaut.retry.event.RetryEvent
 import io.micronaut.retry.event.RetryEventListener
-import io.reactivex.Single
 import jakarta.inject.Singleton
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -114,7 +114,7 @@ class CircuitBreakerSpec extends Specification{
         MyCircuitClosedEventListener circuitClosedEventListener = context.getBean(MyCircuitClosedEventListener)
 
         when:"A method is annotated retry"
-        int result = counterService.getCountSingle().blockingGet()
+        int result = counterService.getCountSingle().block()
 
         then:"It executes until successful"
         result == 3
@@ -124,7 +124,7 @@ class CircuitBreakerSpec extends Specification{
         listener.reset()
         counterService.countThreshold = 10
         counterService.countRx = 0
-        counterService.getCountSingle().blockingGet()
+        counterService.getCountSingle().block()
 
         then:"The original exception is thrown"
         def e = thrown(IllegalStateException)
@@ -137,7 +137,7 @@ class CircuitBreakerSpec extends Specification{
         when:"We attempt to execute the method again"
         circuitOpenEventListener.lastEvent = null
         PollingConditions pollingConditions = new PollingConditions()
-        counterService.getCountSingle().blockingGet()
+        counterService.getCountSingle().block()
 
         then:"The exception is rethrown but the original logic is never invoked"
         e = thrown(IllegalStateException)
@@ -151,7 +151,7 @@ class CircuitBreakerSpec extends Specification{
         listener.reset()
         counterService.countThreshold = 3
         counterService.countRx=0
-        counterService.getCountSingle().blockingGet()
+        counterService.getCountSingle().block()
 
         then:"The exception continues to thrown until the timeout is reached"
         e = thrown(IllegalStateException)
@@ -163,7 +163,7 @@ class CircuitBreakerSpec extends Specification{
         listener.events.size() == 0
 
         pollingConditions.eventually {
-            counterService.getCountSingle().blockingGet() == 3
+            counterService.getCountSingle().block() == 3
             circuitClosedEventListener.lastEvent != null
         }
 
@@ -235,8 +235,8 @@ class CircuitBreakerSpec extends Specification{
             return countValue
         }
 
-        Single<Integer> getCountSingle() {
-            Single.fromCallable({->
+        Mono<Integer> getCountSingle() {
+            Mono.fromCallable({->
                 countRx++
                 println "countValue = $countRx"
                 println "countThreshold = $countThreshold"

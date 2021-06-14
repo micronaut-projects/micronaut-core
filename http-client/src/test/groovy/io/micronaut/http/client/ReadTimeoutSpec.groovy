@@ -25,12 +25,11 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.ReadTimeoutException
-import io.micronaut.http.client.netty.RxNettyHttpClientRegistry
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.pool.AbstractChannelPoolMap
 import io.netty.channel.pool.FixedChannelPool
-import io.reactivex.Flowable
 import jakarta.inject.Inject
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Shared
@@ -77,11 +76,11 @@ class ReadTimeoutSpec extends Specification {
                 'micronaut.http.client.pool.enabled':true,
                 'micronaut.http.client.pool.max-connections':10
         )
-        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
         when:"Another request is made"
-        def result = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
-        def result2 = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
+        def result = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockFirst()
 
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
@@ -90,7 +89,7 @@ class ReadTimeoutSpec extends Specification {
         AtomicInteger integer = new AtomicInteger(0)
         def results = (1..50).collect() { // larger than available connections
             CompletableFuture.supplyAsync({->
-                client.retrieve(HttpRequest.GET('/timeout/success/' + integer.incrementAndGet()), String).blockingFirst()
+                client.retrieve(HttpRequest.GET('/timeout/success/' + integer.incrementAndGet()), String).blockFirst()
             })
 
         }.collect({ it.get()})
@@ -112,21 +111,21 @@ class ReadTimeoutSpec extends Specification {
                 'micronaut.http.client.pool.enabled':true,
                 'micronaut.http.client.pool.max-connections':10
         )
-        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
         when:"Another request is made"
-        def result = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
-        def result2 = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
+        def result = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockFirst()
 
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
 
         when:"issue a whole bunch of requests"
         def integer = new AtomicInteger()
-        def results = Flowable.concat((1..500).collect() {
+        def results = Flux.concat((1..500).collect() {
 
             client.retrieve(HttpRequest.GET('/timeout/success/' + integer.incrementAndGet()), String)
-        }).toList().blockingGet()
+        }).collectList().block()
 
         then:"Every result is correct"
         results.size() == 500
@@ -145,19 +144,19 @@ class ReadTimeoutSpec extends Specification {
                 'micronaut.http.client.pool.enabled':true,
                 'micronaut.http.client.pool.max-connections':10
         )
-        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
         when:"Another request is made"
-        def result = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
-        def result2 = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
+        def result = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockFirst()
 
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
 
         when:"issue a whole bunch of requests"
-        def results = Flowable.concat((1..500).collect() {
+        def results = Flux.concat((1..500).collect() {
             client.retrieve(HttpRequest.GET('/timeout/success'), String)
-        }).toList().blockingGet()
+        }).collectList().block()
 
         then:"Every result is correct"
         results.size() == 500
@@ -176,20 +175,20 @@ class ReadTimeoutSpec extends Specification {
                 'micronaut.http.client.pool.enabled':true,
                 'micronaut.http.client.pool.max-connections':10
         )
-        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
         when:"Another request is made"
         def integer = new AtomicInteger()
-        def result = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
-        def result2 = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+        def result = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockFirst()
 
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
 
         when:"issue a whole bunch of requests"
-        def results = Flowable.concat((1..50).collect() {
+        def results = Flux.concat((1..50).collect() {
             client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)
-        }).toList().blockingGet()
+        }).collectList().block()
 
         then:"Every result is correct"
         results.size() == 50
@@ -208,12 +207,12 @@ class ReadTimeoutSpec extends Specification {
                 'micronaut.http.client.pool.enabled':true,
                 'micronaut.http.client.pool.max-connections':10
         )
-        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
         when:"Another request is made"
         def integer = new AtomicInteger()
-        def result = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
-        def result2 = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+        def result = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockFirst()
 
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
@@ -221,7 +220,7 @@ class ReadTimeoutSpec extends Specification {
         when:"issue a whole bunch of requests"
         def results = (1..25).collect() { // larger than available connections
             CompletableFuture.supplyAsync({->
-                client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+                client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockFirst()
             })
 
         }.collect({ it.get()})
@@ -243,17 +242,17 @@ class ReadTimeoutSpec extends Specification {
                 'micronaut.http.client.pool.enabled':true,
                 'micronaut.http.client.pool.max-connections':1
         )
-        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
         when:
-        client.retrieve(HttpRequest.GET('/timeout/client'), String).blockingFirst()
+        client.retrieve(HttpRequest.GET('/timeout/client'), String).blockFirst()
 
         then:
         def e = thrown(ReadTimeoutException)
         e.message == 'Read Timeout'
 
         when:"Another request is made"
-        def result = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
-        def result2 = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
+        def result = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockFirst()
 
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
@@ -300,7 +299,7 @@ class ReadTimeoutSpec extends Specification {
         clientContext.close()
     }
 
-    FixedChannelPool getPool(RxHttpClient client) {
+    FixedChannelPool getPool(ReactorHttpClient client) {
         AbstractChannelPoolMap poolMap = client.poolMap
         Field mapField = AbstractChannelPoolMap.getDeclaredField("map")
         mapField.setAccessible(true)
@@ -314,9 +313,9 @@ class ReadTimeoutSpec extends Specification {
         ApplicationContext clientContext = ApplicationContext.run(
                 'micronaut.http.client.read-timeout':'-1s')
         def server = clientContext.getBean(EmbeddedServer).start()
-        RxHttpClient client = clientContext.createBean(RxHttpClient, server.getURL())
+        ReactorHttpClient client = clientContext.createBean(ReactorHttpClient, server.getURL())
         when:
-        def result = client.retrieve(HttpRequest.GET('/timeout/client'), String).blockingFirst()
+        def result = client.retrieve(HttpRequest.GET('/timeout/client'), String).blockFirst()
 
         then:
         result == 'success'

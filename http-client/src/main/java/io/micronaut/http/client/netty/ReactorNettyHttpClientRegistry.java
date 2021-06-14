@@ -40,9 +40,9 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
-import io.micronaut.http.client.RxHttpClient;
-import io.micronaut.http.client.RxHttpClientRegistry;
-import io.micronaut.http.client.RxStreamingHttpClient;
+import io.micronaut.http.client.ReactiveHttpClientRegistry;
+import io.micronaut.http.client.ReactorHttpClient;
+import io.micronaut.http.client.ReactorStreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
@@ -89,8 +89,8 @@ import java.util.concurrent.ThreadFactory;
 @Factory
 @BootstrapContextCompatible
 @Internal
-public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientRegistry {
-    private static final Logger LOG = LoggerFactory.getLogger(RxNettyHttpClientRegistry.class);
+public class ReactorNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClientRegistry<ReactorHttpClient> {
+    private static final Logger LOG = LoggerFactory.getLogger(ReactorNettyHttpClientRegistry.class);
     private final Map<ClientKey, DefaultHttpClient> clients = new ConcurrentHashMap<>(10);
     private final LoadBalancerResolver loadBalancerResolver;
     private final NettyClientSslBuilder nettyClientSslBuilder;
@@ -117,7 +117,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
      * @param beanContext                     The bean context
      * @param invocationInstrumenterFactories The invocation instrumenter factories
      */
-    public RxNettyHttpClientRegistry(
+    public ReactorNettyHttpClientRegistry(
             HttpClientConfiguration defaultHttpClientConfiguration,
             HttpClientFilterResolver httpClientFilterResolver,
             LoadBalancerResolver loadBalancerResolver,
@@ -143,7 +143,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
 
     @NonNull
     @Override
-    public RxHttpClient getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path) {
+    public ReactorHttpClient getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path) {
         final ClientKey key = new ClientKey(
                 httpVersion,
                 clientId,
@@ -180,7 +180,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
     @Override
     public void disposeClient(AnnotationMetadata annotationMetadata) {
         final ClientKey key = getClientKey(annotationMetadata);
-        final RxStreamingHttpClient rxStreamingHttpClient = clients.get(key);
+        final ReactorStreamingHttpClient rxStreamingHttpClient = clients.get(key);
         if (rxStreamingHttpClient != null && rxStreamingHttpClient.isRunning()) {
             rxStreamingHttpClient.close();
             clients.remove(key);
@@ -215,7 +215,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
 
             if (clientId != null) {
                 clientBean = (DefaultHttpClient) this.beanContext
-                        .findBean(RxHttpClient.class, Qualifiers.byName(clientId)).orElse(null);
+                        .findBean(ReactorHttpClient.class, Qualifiers.byName(clientId)).orElse(null);
             }
 
             if (configurationClass != null && !HttpClientConfiguration.class.isAssignableFrom(configurationClass)) {

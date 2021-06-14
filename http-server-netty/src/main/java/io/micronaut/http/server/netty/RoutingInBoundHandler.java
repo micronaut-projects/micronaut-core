@@ -104,20 +104,18 @@ import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-import io.reactivex.Completable;
-import io.reactivex.Flowable;
-import io.reactivex.FlowableOperator;
-import io.reactivex.Scheduler;
-import io.reactivex.Single;
-import io.reactivex.SingleEmitter;
-import io.reactivex.functions.LongConsumer;
-import io.reactivex.processors.UnicastProcessor;
-import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxOperator;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.UnicastProcessor;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import javax.net.ssl.SSLException;
 import java.io.File;
@@ -148,6 +146,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -391,7 +390,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (exceptionHandler.isPresent()) {
                 ExceptionHandler handler = exceptionHandler.get();
                 try {
-                    Flowable<MutableHttpResponse<?>> routePublisher = Flowable.fromCallable(() -> {
+                    Mono<MutableHttpResponse<?>> routePublisher = Mono.fromCallable(() -> {
                         Object result = handler.handle(nettyHttpRequest, cause);
                         return errorResultToResponse(result);
                     });
@@ -765,7 +764,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         request.setMatchedRoute(route);
 
         Optional<Argument<?>> bodyArgument = route.getBodyArgument()
-            .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
+                .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
 
         // The request body is required, so at this point we must have a StreamedHttpRequest
         io.netty.handler.codec.http.HttpRequest nativeRequest = request.getNativeRequest();
@@ -811,7 +810,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private Subscriber<Object> buildSubscriber(NettyHttpRequest<?> request,
                                                RouteMatch<?> finalRoute,
-                                               SingleEmitter<RouteMatch<?>> emitter) {
+                                               FluxSink<RouteMatch<?>> emitter) {
         boolean isFormData = request.isFormOrMultipartData();
         if (isFormData) {
             return new CompletionAwareSubscriber<Object>() {
@@ -833,7 +832,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     }
                 });
 
-                Flowable processFlowable(Flowable flowable, Integer dataKey, boolean controlsFlow) {
+                Flux processReactiveSequence(Flux flowable, Integer dataKey, boolean controlsFlow) {
                     if (controlsFlow) {
                         flowable = flowable.doOnRequest(onRequest);
                     }
@@ -900,15 +899,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         dataReference.subject.getAndUpdate(subject -> {
                                             if (subject == null) {
                                                 UnicastProcessor childSubject = UnicastProcessor.create();
-                                                Flowable flowable = processFlowable(childSubject, dataKey, true);
+                                                Flux reactiveSequence = processReactiveSequence(childSubject, dataKey, true);
                                                 if (streamingFileUpload && data instanceof FileUpload) {
                                                     namedSubject.onNext(new NettyStreamingFileUpload(
                                                             (FileUpload) data,
                                                             serverConfiguration.getMultipart(),
                                                             getIoExecutor(),
-                                                            (Flowable<PartData>) flowable));
+                                                            (Flux<PartData>) reactiveSequence));
                                                 } else {
-                                                    namedSubject.onNext(flowable);
+                                                    namedSubject.onNext(reactiveSequence);
                                                 }
 
                                                 return childSubject;
@@ -952,7 +951,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                         (FileUpload) data,
                                                         serverConfiguration.getMultipart(),
                                                         getIoExecutor(),
-                                                        (Flowable<PartData>) processFlowable(subject, dataKey, true));
+                                                        (Flux<PartData>) processReactiveSequence(subject, dataKey, true));
                                             }
                                             return upload;
                                         });
@@ -971,7 +970,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         if (upload != null) {
                                             return upload;
                                         } else {
-                                            return processFlowable(namedSubject, dataKey, dataReference.subject.get() == null);
+                                            return processReactiveSequence(namedSubject, dataKey, dataReference.subject.get() == null);
                                         }
                                     };
 
@@ -1031,13 +1030,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 @Override
                 protected void doOnError(Throwable t) {
                     s.cancel();
-                    emitter.onError(t);
+                    emitter.error(t);
                 }
 
                 @Override
                 protected void doOnComplete() {
                     for (UnicastProcessor subject : subjects.values()) {
-                        if (!subject.hasComplete()) {
+                        if (!subject.hasCompleted()) {
                             subject.onComplete();
                         }
                     }
@@ -1046,7 +1045,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                 private void executeRoute() {
                     if (executed.compareAndSet(false, true)) {
-                        emitter.onSuccess(routeMatch);
+                        //TODO emitter.onSuccess(routeMatch);
                     }
                 }
             };
@@ -1076,13 +1075,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 @Override
                 protected void doOnError(Throwable t) {
                     s.cancel();
-                    emitter.onError(t);
+                    emitter.error(t);
                 }
 
                 @Override
                 protected void doOnComplete() {
                     if (executed.compareAndSet(false, true)) {
-                        emitter.onSuccess(routeMatch);
+                        //TODO emitter.onSuccess(routeMatch);
                     }
                 }
             };
@@ -1375,16 +1374,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (isJson) {
                                     // if the Publisher is returning JSON then in order for it to be valid JSON for each emitted element
                                     // we must wrap the JSON in array and delimit the emitted items
-                                    httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
-                                            .lift((FlowableOperator<HttpContent, HttpContent>) ArrayBracketSubscriber::new);
+                                    //TODO httpContentPublisher = Flux.from(httpContentPublisher)
+                                    //        .lift((FluxOperator<HttpContent, HttpContent>) ArrayBracketSubscriber::new);
                                 }
 
                                 httpContentPublisher = Publishers.then(httpContentPublisher, httpContent ->
-                                    // once an http content is written, read the next item if it is available
-                                    context.read()
+                                        // once an http content is written, read the next item if it is available
+                                        context.read()
                                 );
 
-                                httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
+                                httpContentPublisher = Flux.from(httpContentPublisher)
                                         .doAfterTerminate(() -> cleanupRequest(context, request));
 
                                 DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(
@@ -1443,13 +1442,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             HttpContentProcessor<?> contentProcessor) {
         // build the result emitter. This result emitter emits the response from a controller action
         Publisher<MutableHttpResponse<?>> executeRoutePublisher;
-        if (contentProcessor != null) {
-            executeRoutePublisher = Single.<RouteMatch<?>>create(emitter ->
-                    contentProcessor.subscribe(buildSubscriber(request, finalRoute, emitter)))
-                    .flatMapPublisher((route) -> createExecuteRoutePublisher(request, requestReference, route, isErrorRoute, executor));
-        } else {
+//        if (contentProcessor != null) {
+//TODO            executeRoutePublisher = Mono.<RouteMatch<?>>create(emitter ->
+//                    contentProcessor.subscribe(buildSubscriber(request, finalRoute, emitter)))
+//                    .flatMapPublisher((route) -> createExecuteRoutePublisher(request, requestReference, route, isErrorRoute, executor));
+//        } else {
             executeRoutePublisher = createExecuteRoutePublisher(request, requestReference, finalRoute, isErrorRoute, executor);
-        }
+//        }
 
         // process the publisher through the available filters
         return filterPublisher(
@@ -1460,10 +1459,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private Publisher<MutableHttpResponse<?>> createExecuteRoutePublisher(NettyHttpRequest<?> request,
-                                                                                    AtomicReference<HttpRequest<?>> requestReference,
-                                                                                    RouteMatch<?> routeMatch,
-                                                                                    boolean isErrorRoute,
-                                                                                    Executor executor) {
+                                                                          AtomicReference<HttpRequest<?>> requestReference,
+                                                                          RouteMatch<?> routeMatch,
+                                                                          boolean isErrorRoute,
+                                                                          Executor executor) {
         return new Publisher<MutableHttpResponse<?>>() {
             @Override
             public void subscribe(Subscriber<? super MutableHttpResponse<?>> subscriber) {
@@ -1647,11 +1646,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             return;
                         } else {
                             Object suspendedBody;
-                            if (isKotlinFunctionReturnTypeUnit) {
-                                suspendedBody = Completable.complete();
-                            } else {
+                            //if (isKotlinFunctionReturnTypeUnit) {
+                                //TODO suspendedBody = Completable.complete();
+                            //} else {
                                 suspendedBody = body;
-                            }
+                            //}
                             if (suspendedBody instanceof HttpResponse) {
                                 outgoingResponse = toMutableResponse((HttpResponse<?>) suspendedBody);
                             } else {
@@ -2140,21 +2139,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Publisher<T> publisher,
             @Nullable ExecutorService executor) {
         if (executor != null) {
-            final Scheduler scheduler = Schedulers.from(executor);
-            return publisherToFlowable(publisher)
-                        .subscribeOn(scheduler)
-                        .observeOn(scheduler);
+            final Scheduler scheduler = Schedulers.fromExecutorService(executor);
+            return publisherToReactiveSequence(publisher)
+                    .subscribeOn(scheduler);
+                    //TODO .observeOn(scheduler);
         } else {
             return publisher;
         }
     }
 
-    private <T> Flowable<T> publisherToFlowable(
+    private <T> Flux<T> publisherToReactiveSequence(
             Publisher<T> publisher) {
-        if (publisher instanceof Flowable) {
-            return (Flowable<T>) publisher;
+        if (publisher instanceof Flux) {
+            return (Flux<T>) publisher;
         } else {
-            return Flowable.fromPublisher(publisher);
+            return Flux.from(publisher);
         }
     }
 

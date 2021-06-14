@@ -18,6 +18,7 @@ package io.micronaut.http.client
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
@@ -27,13 +28,15 @@ import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.*
-import io.reactivex.annotations.NonNull
 import jakarta.inject.Inject
+import reactor.core.publisher.Flux
+import reactor.core.publisher.FluxSink
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
 import java.time.Duration
+import java.util.function.Consumer
 
 /**
  * @author graemerocher
@@ -43,7 +46,7 @@ import java.time.Duration
 class StreamRequestSpec extends Specification {
     @Inject
     @Client("/")
-    RxStreamingHttpClient client
+    ReactorStreamingHttpClient client
 
     @Inject
     ApplicationContext applicationContext
@@ -55,19 +58,17 @@ class StreamRequestSpec extends Specification {
 
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/numbers', Flowable.create( new FlowableOnSubscribe<Object>() {
+        Flux bodyFlux = Flux.create(new Consumer<FluxSink<Object>>() {
             @Override
-            void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
+            void accept(FluxSink<Object> emitter) {
                 while(i < 5) {
-                    emitter.onNext(i++)
+                    emitter.next(i++)
                 }
-                emitter.onComplete()
-
-
+                emitter.complete()
             }
-        }, BackpressureStrategy.BUFFER
-
-        )).contentType(MediaType.APPLICATION_JSON_TYPE), List).blockingFirst()
+        }, FluxSink.OverflowStrategy.BUFFER)
+        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/numbers', bodyFlux)
+                .contentType(MediaType.APPLICATION_JSON_TYPE), List)
 
         then:
         result.body().size() == 5
@@ -77,19 +78,16 @@ class StreamRequestSpec extends Specification {
     void "test stream post request with strings"() {
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/strings', Flowable.create( new FlowableOnSubscribe<Object>() {
+        Flux fluxbody = Flux.create(new Consumer<FluxSink<Object>>() {
             @Override
-            void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
+            void accept(FluxSink<Object> emitter) {
                 while(i < 5) {
-                    emitter.onNext("Number ${i++}")
+                    emitter.next("Number ${i++}")
                 }
-                emitter.onComplete()
-
-
+                emitter.complete()
             }
-        }, BackpressureStrategy.BUFFER
-
-        )).contentType(MediaType.TEXT_PLAIN_TYPE), List).blockingFirst()
+        }, FluxSink.OverflowStrategy.BUFFER)
+        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/strings', fluxbody).contentType(MediaType.TEXT_PLAIN_TYPE), List)
 
         then:
         result.body().size() == 5
@@ -99,10 +97,10 @@ class StreamRequestSpec extends Specification {
 
     void "test stream get request with JSON strings"() {
         given:
-        RxStreamingHttpClient client = RxStreamingHttpClient.create(embeddedServer.getURL())
+        ReactorStreamingHttpClient client = ReactorStreamingHttpClient.create(embeddedServer.getURL())
 
         when:
-        HttpResponse<?> result = client.exchangeStream(HttpRequest.GET('/stream/request/jsonstrings')).blockingFirst()
+        HttpResponse<?> result = client.exchangeStream(HttpRequest.GET('/stream/request/jsonstrings')).blockFirst()
 
         then:
         result.headers.getAll(HttpHeaders.TRANSFER_ENCODING).size() == 1
@@ -115,19 +113,16 @@ class StreamRequestSpec extends Specification {
     void "test stream post request with byte chunks"() {
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/bytes', Flowable.create( new FlowableOnSubscribe<Object>() {
+        Flux fluxbody = Flux.create(new Consumer<FluxSink<Object>>() {
             @Override
-            void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
+            void accept(FluxSink<Object> emitter) {
                 while(i < 5) {
                     emitter.onNext("Number ${i++}".getBytes(StandardCharsets.UTF_8))
                 }
                 emitter.onComplete()
-
-
             }
-        }, BackpressureStrategy.BUFFER
-
-        )).contentType(MediaType.TEXT_PLAIN_TYPE), List).blockingFirst()
+        }, FluxSink.OverflowStrategy.BUFFER)
+        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/bytes', fluxbody).contentType(MediaType.TEXT_PLAIN_TYPE), List).blockFirst()
 
         then:
         result.body().size() == 5
@@ -137,19 +132,17 @@ class StreamRequestSpec extends Specification {
     void "test stream post request with POJOs"() {
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojos', Flowable.create( new FlowableOnSubscribe<Object>() {
+        Flux fluxbody = Flux.create(new Consumer<FluxSink<Object>>() {
             @Override
-            void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
+            void accept(FluxSink<Object> emitter) {
                 while(i < 5) {
-                    emitter.onNext(new Book(title:"Number ${i++}"))
+                    emitter.next(new Book(title:"Number ${i++}"))
                 }
-                emitter.onComplete()
-
-
+                emitter.complete()
             }
-        }, BackpressureStrategy.BUFFER
-
-        )), Argument.of(List, Book)).blockingFirst()
+        }, FluxSink.OverflowStrategy.BUFFER)
+        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojos', fluxbody), Argument.of(List, Book))
+                .block()
 
         then:
         result.body().size() == 5
@@ -161,22 +154,21 @@ class StreamRequestSpec extends Specification {
         given:
         def configuration = new DefaultHttpClientConfiguration()
         configuration.setReadTimeout(Duration.ofMinutes(1))
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), configuration)
+        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL(), configuration)
 
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojo-flowable', Flowable.create( new FlowableOnSubscribe<Object>() {
+        Flux bodyflux = Flux.create(new Consumer<FluxSink<Object>>() {
             @Override
-            void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
+            void accept(FluxSink<Object> emitter) {
                 while(i < 5) {
-                    emitter.onNext(new Book(title:"Number ${i++}"))
+                    emitter.next(new Book(title:"Number ${i++}"))
                 }
-                emitter.onComplete()
+                emitter.complete()
 
             }
-        }, BackpressureStrategy.BUFFER
-
-        )), Argument.of(List, Book)).blockingFirst()
+        }, FluxSink.OverflowStrategy.BUFFER)
+        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojo-flowable', bodyflux), Argument.of(List, Book)).blockFirst()
 
         then:
         result.body().size() == 5
@@ -190,18 +182,16 @@ class StreamRequestSpec extends Specification {
     void "test json stream post request with POJOs flowable"() {
         when:
         int i = 0
-        List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojo-flowable', Flowable.create( new FlowableOnSubscribe<Object>() {
+        Flux fluxbody = Flux.create(new Consumer<FluxSink<Object>>() {
             @Override
-            void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
+            void accept(FluxSink<Object> emitter) {
                 while(i < 5) {
-                    emitter.onNext(new Book(title:"Number ${i++}"))
+                    emitter.next(new Book(title:"Number ${i++}"))
                 }
-                emitter.onComplete()
-
+                emitter.complete()
             }
-        }, BackpressureStrategy.BUFFER
-
-        )), Book).toList().blockingGet()
+        }, FluxSink.OverflowStrategy.BUFFER)
+        List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojo-flowable', fluxbody), Book).collectList().block()
 
         then:
         result.size() == 5
@@ -211,18 +201,16 @@ class StreamRequestSpec extends Specification {
     void "test json stream post request with POJOs flowable error"() {
         when:
         int i = 0
-        List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojo-flowable-error', Flowable.create( new FlowableOnSubscribe<Object>() {
+        Flux fluxbody = Flux.create(new Consumer<FluxSink<Object>>() {
             @Override
-            void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
+            void accept(FluxSink<Object> emitter) {
                 while(i < 5) {
-                    emitter.onNext(new Book(title:"Number ${i++}"))
+                    emitter.next(new Book(title:"Number ${i++}"))
                 }
-                emitter.onComplete()
-
+                emitter.complete()
             }
-        }, BackpressureStrategy.BUFFER
-
-        )), Book).toList().blockingGet()
+        }, FluxSink.OverflowStrategy.BUFFER)
+        List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojo-flowable-error', fluxbody), Book).collectList().block()
 
         then:
         def e= thrown(RuntimeException) // TODO: this should be HttpClientException
@@ -233,18 +221,20 @@ class StreamRequestSpec extends Specification {
     void "test manually setting the content length does not chunked encoding"() {
         when:
         int i = 0
-        HttpResponse<String> result = client.exchange(HttpRequest.POST('/stream/request/strings/contentLength', Flowable.create( new FlowableOnSubscribe<Object>() {
+        Flux fluxbody = Flux.create(new Consumer<FluxSink<Object>>() {
             @Override
-            void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
+            void accept(FluxSink<Object> emitter) {
                 while(i < 5) {
-                    emitter.onNext("aa")
+                    emitter.next("aa")
                     i++
                 }
-                emitter.onComplete()
+                emitter.complete()
             }
-        }, BackpressureStrategy.BUFFER
+        }, FluxSink.OverflowStrategy.BUFFER)
 
-        )).contentType(MediaType.TEXT_PLAIN_TYPE).contentLength(10), String).blockingFirst()
+        HttpResponse<String> result = client.exchange(HttpRequest.POST('/stream/request/strings/contentLength', fluxbody)
+                .contentType(MediaType.TEXT_PLAIN_TYPE).contentLength(10), String)
+                .block()
 
         then:
         noExceptionThrown()
@@ -257,23 +247,23 @@ class StreamRequestSpec extends Specification {
     static class StreamController {
 
         @Post("/numbers")
-        Single<List<Long>> numbers(@Header MediaType contentType, @Body Single<List<Long>> numbers) {
+        Mono<List<Long>> numbers(@Header MediaType contentType, @Body Mono<List<Long>> numbers) {
             assert contentType == MediaType.APPLICATION_JSON_TYPE
             numbers
         }
 
         @Get("/jsonstrings")
-        Flowable<String> jsonStrings() {
-            return Flowable.just("Hello World")
+        Flux<String> jsonStrings() {
+            return Flux.just("Hello World")
         }
 
         @Post(uri = "/strings", consumes = MediaType.TEXT_PLAIN)
-        Single<List<String>> strings(@Body Flowable<String> strings) {
-            strings.toList()
+        Mono<List<String>> strings(@Body Flux<String> strings) {
+            strings.collectList()
         }
 
         @Post(uri = "/strings/contentLength", processes = MediaType.TEXT_PLAIN)
-        Flowable<String> strings(@Body Flowable<String> strings, HttpHeaders headers) {
+        Flux<String> strings(@Body Flux<String> strings, HttpHeaders headers) {
             assert headers.contentLength().isPresent()
             assert headers.contentLength().getAsLong() == 10
             assert !headers.getFirst(HttpHeaders.TRANSFER_ENCODING).isPresent()
@@ -281,30 +271,30 @@ class StreamRequestSpec extends Specification {
         }
 
         @Post(uri = "/bytes", consumes = MediaType.TEXT_PLAIN)
-        Single<List<String>> bytes(@Body Flowable<byte[]> strings) {
+        Mono<List<String>> bytes(@Body Flux<byte[]> strings) {
             strings.map({ byte[] bytes -> new String(bytes, StandardCharsets.UTF_8)}).toList()
         }
 
         @Post("/pojos")
-        Single<List<Book>> pojos(@Header MediaType contentType, @Body Single<List<Book>> books) {
+        Mono<List<Book>> pojos(@Header MediaType contentType, @Body Mono<List<Book>> books) {
             assert contentType == MediaType.APPLICATION_JSON_TYPE
             books
         }
 
         @Post("/pojo-flowable")
-        Flowable<Book> pojoFlowable(@Header MediaType contentType, @Body Flowable<Book> books) {
+        Flux<Book> pojoFlowable(@Header MediaType contentType, @Body Flux<Book> books) {
             assert contentType == MediaType.APPLICATION_JSON_TYPE
             books
         }
 
         @Post("/pojo-flowable-error")
-        Flowable<Book> pojoFlowableError(@Header MediaType contentType, @Body Flowable<Book> books) {
+        Flux<Book> pojoFlowableError(@Header MediaType contentType, @Body Flux<Book> books) {
             return books.flatMap({ Book book ->
                 if(book.title.endsWith("3")) {
-                    return Flowable.error(new RuntimeException("Can't have books with 3"))
+                    return Flux.error(new RuntimeException("Can't have books with 3"))
                 }
                 else {
-                    return Flowable.just(book)
+                    return Flux.just(book)
                 }
             })
         }

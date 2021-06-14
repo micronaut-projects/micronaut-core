@@ -4,6 +4,9 @@ dependencies {
     api project(":router")
     api project(":http-server")
 
+    testImplementation platform('io.projectreactor:reactor-bom:2020.0.7')
+    testImplementation 'io.projectreactor:reactor-core'
+
     testImplementation project(":http-client")
     testImplementation project(":inject")
     testImplementation project(":http-server-netty")

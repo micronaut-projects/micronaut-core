@@ -6,7 +6,7 @@ import io.kotlintest.shouldBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.sse.RxSseClient
+import io.micronaut.http.client.sse.ReactorSseClient
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
 import org.opentest4j.AssertionFailedError
@@ -21,7 +21,7 @@ class HeadlineControllerSpec: StringSpec() {
 
     init {
         "test consume eventstream object" {
-            val client = embeddedServer.applicationContext.createBean(RxSseClient::class.java, embeddedServer.url)
+            val client = embeddedServer.applicationContext.createBean(ReactorSseClient::class.java, embeddedServer.url)
 
             val events = ArrayList<Event<Headline>>()
 

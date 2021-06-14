@@ -3,6 +3,7 @@ package io.micronaut.http.server.netty.threading
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.core.annotation.NonBlocking
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpResponse
@@ -20,14 +21,16 @@ import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.scheduling.executor.ThreadSelection
 import io.netty.channel.EventLoopGroup
-import io.reactivex.*
-import io.reactivex.annotations.NonNull
 import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.FluxSink
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.util.concurrent.ExecutorService
+import java.util.function.Consumer
 
 class ThreadSelectionSpec extends Specification {
 
@@ -132,14 +135,14 @@ class ThreadSelectionSpec extends Specification {
         }
 
         @Get("/reactive")
-        Single<String> reactive() {
-            Single.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
+        Mono<String> reactive() {
+            Mono.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
         }
 
         @Get("/reactiveblocking")
         @Blocking
-        Single<String> reactiveBlocking() {
-            Single.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
+        Mono<String> reactiveBlocking() {
+            Mono.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
         }
 
         @Get("/scheduleblocking")
@@ -162,18 +165,18 @@ class ThreadSelectionSpec extends Specification {
 
         @Get("/schedulereactive")
         @ExecuteOn(TaskExecutors.IO)
-        Single<String> scheduleReactive() {
-            Single.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
+        Mono<String> scheduleReactive() {
+            Mono.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
         }
 
         @ExecuteOn(TaskExecutors.IO)
         @Get(uri = "/scheduleSse", produces = MediaType.TEXT_EVENT_STREAM)
-        Flowable<Event<String>> scheduleSse() {
-            return Flowable
+        Flux<Event<String>> scheduleSse() {
+            return Flux
                     .<Event<String>>create(emitter -> {
-                        emitter.onNext( Event.of("thread: ${Thread.currentThread().name}".toString()))
-                        emitter.onComplete()
-                    }, BackpressureStrategy.BUFFER)
+                        emitter.next( Event.of("thread: ${Thread.currentThread().name}".toString()))
+                        emitter.complete()
+                    }, FluxSink.OverflowStrategy.BUFFER)
         }
     }
 
@@ -182,13 +185,14 @@ class ThreadSelectionSpec extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            return Flowable.create(new FlowableOnSubscribe<String>() {
+            return Flux.create(new Consumer<FluxSink<String>>() {
                 @Override
-                void subscribe(@NotNull @NonNull FlowableEmitter<String> emitter) throws Exception {
-                    emitter.onNext("Good")
-                    emitter.onComplete()
+                void accept(FluxSink<String> emitter) {
+                    emitter.next("Good")
+                    emitter.complete()
                 }
-            }, BackpressureStrategy.LATEST).switchMap({ String it ->
+            }, FluxSink.OverflowStrategy.LATEST)
+                    .switchMap({ String it ->
                 return chain.proceed(request)
             })
         }

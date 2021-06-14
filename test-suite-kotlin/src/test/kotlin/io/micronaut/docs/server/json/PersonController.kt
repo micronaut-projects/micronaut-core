@@ -27,8 +27,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.hateoas.Link
-import io.reactivex.Maybe
-import io.reactivex.Single
+import reactor.core.publisher.Mono
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -47,15 +46,15 @@ class PersonController {
     }
 
     @Get("/{name}")
-    operator fun get(name: String): Maybe<Person> {
+    operator fun get(name: String): Mono<Person> {
         return if (inMemoryDatastore.containsKey(name)) {
-            Maybe.just(inMemoryDatastore[name])
-        } else Maybe.empty()
+            Mono.just(inMemoryDatastore[name])
+        } else Mono.empty()
     }
 
     // tag::single[]
     @Post("/saveReactive")
-    fun save(@Body person: Single<Person>): Single<HttpResponse<Person>> { // <1>
+    fun save(@Body person: Mono<Person>): Mono<HttpResponse<Person>> { // <1>
         return person.map { p ->
             inMemoryDatastore[p.firstName] = p // <2>
             HttpResponse.created(p) // <3>

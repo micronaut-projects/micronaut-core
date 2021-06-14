@@ -16,7 +16,7 @@
 package io.micronaut.annotation.processing
 
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import org.junit.jupiter.api.Test
@@ -29,7 +29,7 @@ class SuspendMethodSpec {
 
     @Inject
     @field:Client("/demo")
-    lateinit var client: RxHttpClient
+    lateinit var client: ReactorHttpClient
 
     @Test
     fun testSyncMethodReturnTypeAny() {
@@ -37,7 +37,7 @@ class SuspendMethodSpec {
             .retrieve(
                 HttpRequest.GET<Any>("/sync/any"),
                 Any::class.java
-            ).blockingFirst()
+            ).blockFirst()
 
         assertEquals("sync any", res)
     }
@@ -48,7 +48,7 @@ class SuspendMethodSpec {
             .retrieve(
                 HttpRequest.GET<String>("/sync/string"),
                 Any::class.java
-            ).blockingFirst()
+            ).blockFirst()
 
         assertEquals("sync string", res)
     }
@@ -60,7 +60,7 @@ class SuspendMethodSpec {
             .retrieve(
                 HttpRequest.GET<Any>("/async/any"),
                 Any::class.java
-            ).blockingFirst()
+            ).blockFirst()
 
         assertEquals("async any", res)
     }
@@ -71,7 +71,7 @@ class SuspendMethodSpec {
             .retrieve(
                 HttpRequest.GET<String>("/async/string"),
                 Any::class.java
-            ).blockingFirst()
+            ).blockFirst()
 
         assertEquals("async string", res)
     }

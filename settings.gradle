@@ -34,6 +34,9 @@ include "tracing"
 include "validation"
 include "websocket"
 
+include 'rxjava2'
+include 'rxjava2-http-client'
+
 // test suites
 include "test-suite"
 include "test-suite-helper"

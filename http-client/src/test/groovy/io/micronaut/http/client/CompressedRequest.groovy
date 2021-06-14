@@ -24,7 +24,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Single
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -38,12 +38,12 @@ class CompressedRequest extends Specification {
 
     void "test gzipped body in post request"() {
         given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+        ReactorHttpClient client = ReactorHttpClient.create(embeddedServer.getURL())
         byte[] body = gzip("[0, 1, 2, 3, 4]")
 
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/gzip/request/numbers', body).contentEncoding(io.netty.handler.codec.http.HttpHeaderValues.GZIP).contentType(MediaType.APPLICATION_JSON_TYPE), List).blockingFirst()
+        HttpResponse<List> result = client.exchange(HttpRequest.POST('/gzip/request/numbers', body).contentEncoding(io.netty.handler.codec.http.HttpHeaderValues.GZIP).contentType(MediaType.APPLICATION_JSON_TYPE), List).blockFirst()
 
         then:
         result.body().size() == 5
@@ -58,7 +58,7 @@ class CompressedRequest extends Specification {
     static class StreamController {
 
         @Post("/numbers")
-        Single<List<Long>> numbers(@Header MediaType contentType, @Body Single<List<Long>> numbers) {
+        Mono<List<Long>> numbers(@Header MediaType contentType, @Body Mono<List<Long>> numbers) {
             assert contentType == MediaType.APPLICATION_JSON_TYPE
             numbers
         }
@@ -73,5 +73,4 @@ class CompressedRequest extends Specification {
         targetStream.close()
         zippedBytes
     }
-
 }

@@ -33,10 +33,10 @@ class IdleTimeoutSpec extends Specification {
       'micronaut.http.client.connection-pool-idle-timeout':'800ms',
       'micronaut.http.client.pool.enabled':true
     )
-    RxHttpClient httpClient = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+    ReactorHttpClient httpClient = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    httpClient.retrieve(HttpRequest.GET('/idleTimeout/'),String).blockingFirst()
+    httpClient.retrieve(HttpRequest.GET('/idleTimeout/'),String).blockFirst()
     Deque<Channel> deque = getQueuedChannels(httpClient)
     Channel ch1 = deque.first
 
@@ -48,7 +48,7 @@ class IdleTimeoutSpec extends Specification {
     }
 
     when:"make another request"
-    httpClient.retrieve(HttpRequest.GET('/idleTimeout'),String).blockingFirst()
+    httpClient.retrieve(HttpRequest.GET('/idleTimeout'),String).blockFirst()
     Channel ch2 = deque.first
 
     then:"ensure channel 2 is open and channel 2 != channel 1"
@@ -70,10 +70,10 @@ class IdleTimeoutSpec extends Specification {
       'my.port':embeddedServer.getPort(),
       'micronaut.http.client.pool.enabled':true
     )
-    RxHttpClient httpClient = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+    ReactorHttpClient httpClient = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    httpClient.retrieve(HttpRequest.GET('/idleTimeout/'),String).blockingFirst()
+    httpClient.retrieve(HttpRequest.GET('/idleTimeout/'),String).blockFirst()
     Deque<Channel> deque = getQueuedChannels(httpClient)
     Channel ch1 = deque.first
 
@@ -84,7 +84,7 @@ class IdleTimeoutSpec extends Specification {
     }
 
     when:"make another request"
-    httpClient.retrieve(HttpRequest.GET('/idleTimeout'),String).blockingFirst()
+    httpClient.retrieve(HttpRequest.GET('/idleTimeout'),String).blockFirst()
     Channel ch2 = deque.first
 
     then:"ensure channel is still open"
@@ -99,7 +99,7 @@ class IdleTimeoutSpec extends Specification {
     clientContext.close()
   }
 
-  Deque getQueuedChannels(RxHttpClient client) {
+  Deque getQueuedChannels(ReactorHttpClient client) {
     AbstractChannelPoolMap poolMap = client.poolMap
     Field mapField = AbstractChannelPoolMap.getDeclaredField("map")
     mapField.setAccessible(true)

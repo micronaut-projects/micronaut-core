@@ -21,8 +21,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Maybe
-import io.reactivex.Single
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Shared
@@ -34,7 +33,7 @@ import java.util.concurrent.atomic.AtomicLong
  * @author graemerocher
  * @since 1.0
  */
-class RxJavaCrudSpec extends Specification {
+class ReactorJavaCrudSpec extends Specification {
 
     @Shared
     @AutoCleanup
@@ -43,21 +42,20 @@ class RxJavaCrudSpec extends Specification {
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
-    void "test it is possible to implement CRUD operations with RxJava"() {
+    void "test it is possible to implement CRUD operations with Reactor"() {
         given:
         BookClient client = context.getBean(BookClient)
 
         when:
-        Book book = client.get(99)
-                          .blockingGet()
-        List<Book> books = client.list().blockingGet()
+        Book book = client.get(99).block()
+        List<Book> books = client.list().block()
 
         then:
         book == null
         books.size() == 0
 
         when:
-        book = client.save("The Stand").blockingGet()
+        book = client.save("The Stand").block()
 
         then:
         book != null
@@ -65,7 +63,7 @@ class RxJavaCrudSpec extends Specification {
         book.id == 1
 
         when:
-        book = client.get(book.id).blockingGet()
+        book = client.get(book.id).block()
 
         then:
         book != null
@@ -74,14 +72,14 @@ class RxJavaCrudSpec extends Specification {
 
 
         when:'the full response is resolved'
-        HttpResponse<Book> bookAndResponse = client.getResponse(book.id).blockingGet()
+        HttpResponse<Book> bookAndResponse = client.getResponse(book.id).block()
 
         then:"The response is valid"
         bookAndResponse.status() == HttpStatus.OK
         bookAndResponse.body().title == "The Stand"
 
         when:
-        book = client.update(book.id, "The Shining").blockingGet()
+        book = client.update(book.id, "The Shining").block()
 
         then:
         book != null
@@ -89,14 +87,13 @@ class RxJavaCrudSpec extends Specification {
         book.id == 1
 
         when:
-        book = client.delete(book.id).blockingGet()
+        book = client.delete(book.id).block()
 
         then:
         book != null
 
         when:
-        book = client.get(book.id)
-                .blockingGet()
+        book = client.get(book.id).block()
         then:
         book == null
     }
@@ -107,8 +104,8 @@ class RxJavaCrudSpec extends Specification {
         BookClient client = context.getBean(BookClient)
 
         expect:
-        client.getPrice("good").blockingGet() == 10
-        client.getPrice("empty").blockingGet() == null
+        client.getPrice("good").block() == 10
+        client.getPrice("empty").block() == null
     }
 
 
@@ -123,89 +120,89 @@ class RxJavaCrudSpec extends Specification {
         AtomicLong currentId = new AtomicLong(0)
 
         @Override
-        Maybe<Book> get(Long id) {
+        Mono<Book> get(Long id) {
             Book book = books.get(id)
             if(book)
-                return Maybe.just(book)
-            Maybe.empty()
+                return Mono.just(book)
+            Mono.empty()
         }
 
         @Override
-        Single<HttpResponse<Book>> getResponse(Long id) {
+        Mono<HttpResponse<Book>> getResponse(Long id) {
             Book book = books.get(id)
             if(book) {
-                return Single.just(HttpResponse.ok(book))
+                return Mono.just(HttpResponse.ok(book))
             }
-            return Single.just(HttpResponse.notFound())
+            return Mono.just(HttpResponse.notFound())
         }
 
         @Override
-        Single<List<Book>> list() {
-            return Single.just(books.values().toList())
+        Mono<List<Book>> list() {
+            return Mono.just(books.values().toList())
         }
 
         @Override
-        Maybe<Book> delete(Long id) {
+        Mono<Book> delete(Long id) {
             Book book = books.remove(id)
             if(book) {
-                return Maybe.just(book)
+                return Mono.just(book)
             }
-            return Maybe.empty()
+            return Mono.empty()
         }
 
         @Override
-        Single<Book> save(String title) {
+        Mono<Book> save(String title) {
             Book book = new Book(title: title, id:currentId.incrementAndGet())
             books[book.id] = book
-            return Single.just(book)
+            return Mono.just(book)
         }
 
         @Override
-        Maybe<Book> update(Long id, String title) {
+        Mono<Book> update(Long id, String title) {
             Book book = books[id]
             if(book != null) {
                 book.title = title
-                return Maybe.just(book)
+                return Mono.just(book)
             }
             else {
-                return Maybe.empty()
+                return Mono.empty()
             }
         }
 
         @Override
-        Maybe<Integer> getPrice(String title) {
+        Mono<Integer> getPrice(String title) {
             if (title == 'empty') {
-                return Maybe.empty()
+                return Mono.empty()
             }
-            return Maybe.just(10)
+            return Mono.just(10)
         }
     }
 
     static interface BookApi {
 
         @Get("/{id}")
-        Maybe<Book> get(Long id)
+        Mono<Book> get(Long id)
 
         @Get("/res/{id}")
-        Single<HttpResponse<Book>> getResponse(Long id)
+        Mono<HttpResponse<Book>> getResponse(Long id)
 
         @Get
-        Single<List<Book>> list()
+        Mono<List<Book>> list()
 
         @Delete("/{id}")
-        Maybe<Book> delete(Long id)
+        Mono<Book> delete(Long id)
 
         @Post
-        Single<Book> save(String title)
+        Mono<Book> save(String title)
 
         @Patch("/{id}")
-        Maybe<Book> update(Long id, String title)
+        Mono<Book> update(Long id, String title)
 
     }
 
     static interface PriceApi {
         @Get(uri = "/price/{title}")
-        Maybe<Integer> getPrice(@PathVariable String title)
+        Mono<Integer> getPrice(@PathVariable String title)
     }
 
 

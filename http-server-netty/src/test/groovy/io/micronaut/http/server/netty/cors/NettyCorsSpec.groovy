@@ -31,7 +31,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test non cors request"() {
         when:
-        def response = rxClient.exchange('/test').blockingFirst()
+        def response = rxClient.exchange('/test').blockFirst()
         Set<String> headerNames = response.getHeaders().names()
 
         then:
@@ -46,7 +46,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/test')
                            .header(ORIGIN, 'fooBar.com')
-        ).blockingFirst()
+        ).blockFirst()
 
         when:
         Set<String> headerNames = response.headers.names()
@@ -62,7 +62,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/test/arbitrary')
                         .header(ORIGIN, 'foo.com')
-        ).blockingFirst()
+        ).blockFirst()
 
         when:
         Set<String> headerNames = response.headers.names()
@@ -83,7 +83,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/test')
                         .header(ORIGIN, 'foo.com')
-        ).blockingFirst()
+        ).blockFirst()
 
         when:
         Set<String> headerNames = response.headers.names()
@@ -106,7 +106,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                         .header(ORIGIN, 'bar.com')
                         .header(ACCEPT, 'application/json')
 
-        ).blockingFirst()
+        ).blockFirst()
 
         when:
         Set<String> headerNames = response.headers.names()
@@ -128,7 +128,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                 HttpRequest.POST('/test', [:])
                         .header(ORIGIN, 'foo.com')
 
-        ).onErrorReturn({ t -> t.response} ).blockingFirst()
+        ).onErrorReturn({ t -> t.response} ).blockFirst()
 
         when:
         Set<String> headerNames = response.headers.names()
@@ -145,7 +145,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                         .header(ORIGIN, 'bar.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Accept')
 
-        ).blockingFirst()
+        ).blockFirst()
 
         expect: "it passes through because only preflight requests check allowed headers"
         response.code() == HttpStatus.NO_CONTENT.code
@@ -159,7 +159,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                         .header(ORIGIN, 'bar.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Accept')
 
-        ).onErrorReturn({ t -> t.response} ).blockingFirst()
+        ).onErrorReturn({ t -> t.response} ).blockFirst()
 
         expect: "it fails because preflight requests check allowed headers"
         response.code() == HttpStatus.FORBIDDEN.code
@@ -172,7 +172,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
                         .header(ORIGIN, 'foo.com')
 
-        ).onErrorReturn({ t -> t.response} ).blockingFirst()
+        ).onErrorReturn({ t -> t.response} ).blockFirst()
 
         expect:
         response.code() == HttpStatus.FORBIDDEN.code
@@ -186,7 +186,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                         .header(ORIGIN, 'foo.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Bar')
 
-        ).blockingFirst()
+        ).blockFirst()
 
         def headerNames = response.headers.names()
 
@@ -209,7 +209,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
                         .header(ORIGIN, 'bar.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Accept')
-        ).blockingFirst()
+        ).blockFirst()
 
         def headerNames = response.headers.names()
 
@@ -229,7 +229,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         rxClient.exchange(
                 HttpRequest.GET('/test/error')
                         .header(ORIGIN, 'foo.com')
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -243,7 +243,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         rxClient.exchange(
                 HttpRequest.GET('/test/error-checked')
                         .header(ORIGIN, 'foo.com')
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -257,7 +257,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         rxClient.exchange(
                 HttpRequest.GET('/test/error-response')
                         .header(ORIGIN, 'foo.com')
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)

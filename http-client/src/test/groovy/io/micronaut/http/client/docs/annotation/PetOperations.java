@@ -19,7 +19,7 @@ package io.micronaut.http.client.docs.annotation;
 
 import io.micronaut.http.annotation.Post;
 import io.micronaut.validation.Validated;
-import io.reactivex.Single;
+import reactor.core.publisher.Mono;
 
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
@@ -34,7 +34,7 @@ import javax.validation.constraints.NotBlank;
 public interface PetOperations {
     // tag::save[]
     @Post
-    Single<Pet> save(@NotBlank String name, @Min(1L) int age);
+    Mono<Pet> save(@NotBlank String name, @Min(1L) int age);
     // end::save[]
 }
 // end::class[]

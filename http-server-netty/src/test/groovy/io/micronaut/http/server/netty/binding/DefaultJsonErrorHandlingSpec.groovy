@@ -17,7 +17,7 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
         def json = '{"title":"The Stand"'
         rxClient.exchange(
                 HttpRequest.POST('/errors/map', json), String
-        ).blockingFirst()
+        ).blockFirst()
 
 
         then:

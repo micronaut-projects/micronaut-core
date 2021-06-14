@@ -8,7 +8,7 @@ import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
@@ -30,7 +30,7 @@ class MDCSpec2 extends Specification {
     ])
 
     @Shared @AutoCleanup
-    RxHttpClient client = RxHttpClient.create(embeddedServer.URL)
+    ReactorHttpClient client = ReactorHttpClient.create(embeddedServer.URL)
 
     void "test MDC doesn't leak"() {
         given:
@@ -40,7 +40,7 @@ class MDCSpec2 extends Specification {
         100.times {
             String traceId = UUID.randomUUID().toString()
             HttpRequest<Object> request = HttpRequest.GET("/mdc-test").header("traceId", traceId)
-            String response = client.retrieve(request).blockingFirst()
+            String response = client.retrieve(request).blockFirst()
             assert response == traceId
         }
     }

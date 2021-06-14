@@ -19,8 +19,11 @@ package io.micronaut.docs.streaming
 import io.micronaut.http.MediaType.APPLICATION_JSON_STREAM
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import java.time.Duration
 import java.time.ZonedDateTime
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit.SECONDS
 // end::imports[]
 
@@ -29,13 +32,13 @@ class HeadlineController {
 
     // tag::streaming[]
     @Get(value = "/headlines", processes = [APPLICATION_JSON_STREAM]) // <1>
-    internal fun streamHeadlines(): Flowable<Headline> {
-        return Flowable.fromCallable { // <2>
+    internal fun streamHeadlines(): Flux<Headline> {
+        return Mono.fromCallable { // <2>
             val headline = Headline()
             headline.text = "Latest Headline at ${ZonedDateTime.now()}"
             headline
         }.repeat(100) // <3>
-         .delay(1, SECONDS) // <4>
+         .delayElements(Duration.of(1, ChronoUnit.SECONDS)) // <4>
     }
     // end::streaming[]
 }

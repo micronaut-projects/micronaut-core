@@ -16,39 +16,39 @@
 package io.micronaut.websocket;
 
 import io.micronaut.http.MutableHttpRequest;
-import io.reactivex.Flowable;
+import reactor.core.publisher.Flux;
 
 import java.net.URI;
 import java.util.Map;
 
 /**
- * Specialization of the {@link WebSocketClient} interface for RxJava.
+ * Specialization of the {@link WebSocketClient} interface for Project Reactor.
  *
  * @author graemerocher
  * @since 1.0
  * @see WebSocketClient
  */
-public interface RxWebSocketClient extends WebSocketClient {
+public interface ReactorWebSocketClient extends WebSocketClient {
 
     @Override
-    <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, MutableHttpRequest<?> request);
+    <T extends AutoCloseable> Flux<T> connect(Class<T> clientEndpointType, MutableHttpRequest<?> request);
 
     /**
      * {@inheritDoc}
      */
     @Override
-    default <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, URI uri) {
-        return (Flowable<T>) WebSocketClient.super.connect(clientEndpointType, uri);
+    default <T extends AutoCloseable> Flux<T> connect(Class<T> clientEndpointType, URI uri) {
+        return (Flux<T>) WebSocketClient.super.connect(clientEndpointType, uri);
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters);
+    <T extends AutoCloseable> Flux<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters);
 
     @Override
-    default <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, String uri) {
-        return (Flowable<T>) WebSocketClient.super.connect(clientEndpointType, uri);
+    default <T extends AutoCloseable> Flux<T> connect(Class<T> clientEndpointType, String uri) {
+        return (Flux<T>) WebSocketClient.super.connect(clientEndpointType, uri);
     }
 }

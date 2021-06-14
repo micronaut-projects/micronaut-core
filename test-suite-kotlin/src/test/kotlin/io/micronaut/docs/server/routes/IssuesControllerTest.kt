@@ -6,7 +6,7 @@ import io.kotlintest.shouldNotBe
 import io.kotlintest.shouldThrow
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 // end::imports[]
@@ -20,7 +20,7 @@ class IssuesControllerTest: StringSpec() {
 
     val client = autoClose( // <2>
         embeddedServer.applicationContext.createBean(
-            RxHttpClient::class.java,
+            ReactorHttpClient::class.java,
             embeddedServer.url) // <1>
     )
 

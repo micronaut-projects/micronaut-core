@@ -23,8 +23,8 @@ import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
-import io.reactivex.Single
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.*
 
 /**
@@ -45,7 +45,7 @@ class ServerRedirectSpec extends Specification {
         given:"An HTTPS URL issues an HTTPS"
         YoutubeClient youtubeClient=  embeddedServer.getApplicationContext().getBean(YoutubeClient)
         def client = HttpClient.create(new URL("https://www.youtube.com"))
-        def declarativeResult = youtubeClient.test().blockingGet()
+        def declarativeResult = youtubeClient.test().block()
         def response= client
                 .toBlocking().retrieve("/")
 //
@@ -81,10 +81,10 @@ class ServerRedirectSpec extends Specification {
     @Unroll
     void "test http client follows #type redirects for regular stream requests"() {
         given:
-        RxStreamingHttpClient client = RxStreamingHttpClient.create(embeddedServer.getURL())
+        ReactorStreamingHttpClient client = ReactorStreamingHttpClient.create(embeddedServer.getURL())
 
         expect:
-        client.jsonStream(HttpRequest.GET("/redirect/stream/$type"), Book).blockingFirst().title == "The Stand"
+        client.jsonStream(HttpRequest.GET("/redirect/stream/$type"), Book).blockFirst().title == "The Stand"
 
         cleanup:
         client.stop()
@@ -101,15 +101,15 @@ class ServerRedirectSpec extends Specification {
 
     void "test stream redirect headers"() {
         given:
-        RxStreamingHttpClient client = RxStreamingHttpClient.create(embeddedServer.getURL())
+        ReactorStreamingHttpClient client = ReactorStreamingHttpClient.create(embeddedServer.getURL())
 
         when:
-        String response = ((RxStreamingHttpClient) client).exchangeStream(
+        String response = ((ReactorStreamingHttpClient) client).exchangeStream(
                 HttpRequest.GET("/redirect/stream/title").accept(MediaType.TEXT_EVENT_STREAM_TYPE))
                 .map({res ->
                     new String(res.body().toByteArray())
                 })
-                .blockingFirst()
+                .blockFirst()
 
         then:
         response == "data: The Stand"
@@ -216,17 +216,17 @@ class ServerRedirectSpec extends Specification {
 
         @Get
         @Produces(MediaType.APPLICATION_JSON_STREAM)
-        Flowable<Book> home() {
-            Flowable.just(new Book(title: "The Stand"))
+        Flux<Book> home() {
+            Flux.just(new Book(title: "The Stand"))
         }
 
         @Get("/text")
         @Produces([MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON_STREAM])
-        HttpResponse<Flowable<?>> title(final HttpHeaders headers) {
+        HttpResponse<Flux<?>> title(final HttpHeaders headers) {
             if (headers.accept().contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
-                return HttpResponse.ok(Flowable.just("The Stand")).contentType(MediaType.TEXT_EVENT_STREAM)
+                return HttpResponse.ok(Flux.just("The Stand")).contentType(MediaType.TEXT_EVENT_STREAM)
             }
-            return HttpResponse.ok(Flowable.just(new Book(title: "The Stand"))).contentType(MediaType.APPLICATION_JSON_STREAM)
+            return HttpResponse.ok(Flux.just(new Book(title: "The Stand"))).contentType(MediaType.APPLICATION_JSON_STREAM)
         }
 
     }
@@ -234,9 +234,8 @@ class ServerRedirectSpec extends Specification {
     @Client("https://www.youtube.com")
     static interface YoutubeClient {
         @Get
-        Single<String> test()
+        Mono<String> test()
     }
-
 
     static class Book {
         String title

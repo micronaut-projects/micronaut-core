@@ -36,7 +36,7 @@ class CookieBindingSpec extends AbstractMicronautSpec {
         for (header in headers) {
             request = request.header(header.key, header.value)
         }
-        rxClient.retrieve(request).blockingFirst() == result
+        rxClient.retrieve(request).blockFirst() == result
 
         where:
         uri                | result              | headers

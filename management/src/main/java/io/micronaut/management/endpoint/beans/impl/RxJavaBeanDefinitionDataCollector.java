@@ -20,14 +20,17 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.beans.BeanDefinitionData;
 import io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector;
 import io.micronaut.management.endpoint.beans.BeansEndpoint;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * The default {@link BeanDefinitionDataCollector} implementation. Returns a {@link Map} with
@@ -55,20 +58,16 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
             Map<String, Object> beanData = new LinkedHashMap<>(1);
             beanData.put("beans", beans);
             return beanData;
-        }).toFlowable();
+        }).flux();
     }
 
     /**
      * @param definitions The bean definitions
-     * @return A {@link Single} that wraps a Map
+     * @return A {@link Mono} that wraps a Map
      */
-    protected Single<Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
-        Map<String, Object> beans = new LinkedHashMap<>(definitions.size());
-
-        return Flowable
-            .fromIterable(definitions)
-            .collectInto(beans, (map, definition) ->
-                map.put(definition.getClass().getName(), beanDefinitionData.getData(definition))
-            );
+    protected Mono<Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
+        return Flux.fromIterable(definitions)
+                .collectMap(definition -> definition.getClass().getName(),
+                        definition -> { return beanDefinitionData.getData(definition); });
     }
 }

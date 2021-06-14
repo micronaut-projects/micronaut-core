@@ -28,7 +28,7 @@ With the above in place, if `book.retry.attempts` is specified in configuration 
 
 == Reactive Retry
 
-`@Retryable` advice can also be applied to methods that return reactive types, such as an RxJava `Flowable`. For example:
+`@Retryable` advice can also be applied to methods that return reactive types, such as a Reactor `Flux`. For example:
 
 snippet::io.micronaut.docs.aop.retry.BookService[tags="reactive", indent=0, title="Applying Retry Policy to Reactive Types"]
 

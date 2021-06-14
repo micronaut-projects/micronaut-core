@@ -19,34 +19,34 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.sse.Event;
-import io.reactivex.Flowable;
+import reactor.core.publisher.Flux;
 
 /**
- * Extended version of {@link SseClient} for RxJava 2.x.
+ * Extended version of {@link SseClient} for Project Reactor.
  *
- * @author Graeme Rocher
- * @since 1.0
+ * @author Sergio del Amo
+ * @since 3.3.0
  */
-public interface RxSseClient extends SseClient {
+public interface ReactorSseClient extends SseClient {
 
     @Override
-    <I> Flowable<Event<ByteBuffer<?>>> eventStream(HttpRequest<I> request);
+    <I> Flux<Event<ByteBuffer<?>>> eventStream(HttpRequest<I> request);
 
     @Override
-    <I, B> Flowable<Event<B>> eventStream(HttpRequest<I> request, Argument<B> eventType);
+    <I, B> Flux<Event<B>> eventStream(HttpRequest<I> request, Argument<B> eventType);
 
     @Override
-    default <I, B> Flowable<Event<B>> eventStream(HttpRequest<I> request, Class<B> eventType) {
-        return (Flowable<Event<B>>) SseClient.super.eventStream(request, eventType);
+    default <I, B> Flux<Event<B>> eventStream(HttpRequest<I> request, Class<B> eventType) {
+        return (Flux<Event<B>>) SseClient.super.eventStream(request, eventType);
     }
 
     @Override
-    default <B> Flowable<Event<B>> eventStream(String uri, Class<B> eventType) {
-        return (Flowable<Event<B>>) SseClient.super.eventStream(uri, eventType);
+    default <B> Flux<Event<B>> eventStream(String uri, Class<B> eventType) {
+        return (Flux<Event<B>>) SseClient.super.eventStream(uri, eventType);
     }
 
     @Override
-    default <B> Flowable<Event<B>> eventStream(String uri, Argument<B> eventType) {
-        return (Flowable<Event<B>>) SseClient.super.eventStream(uri, eventType);
+    default <B> Flux<Event<B>> eventStream(String uri, Argument<B> eventType) {
+        return (Flux<Event<B>>) SseClient.super.eventStream(uri, eventType);
     }
 }

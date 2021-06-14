@@ -27,9 +27,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
-import io.reactivex.Maybe;
-import io.reactivex.Single;
-
+import reactor.core.publisher.Mono;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -50,16 +48,16 @@ public class PersonController {
     }
 
     @Get("/{name}")
-    public Maybe<Person> get(String name) {
+    public Mono<Person> get(String name) {
         if (inMemoryDatastore.containsKey(name)) {
-            return Maybe.just(inMemoryDatastore.get(name));
+            return Mono.just(inMemoryDatastore.get(name));
         }
-        return Maybe.empty();
+        return Mono.empty();
     }
 
     // tag::single[]
     @Post("/saveReactive")
-    public Single<HttpResponse<Person>> save(@Body Single<Person> person) { // <1>
+    public Mono<HttpResponse<Person>> save(@Body Mono<Person> person) { // <1>
         return person.map(p -> {
                     inMemoryDatastore.put(p.getFirstName(), p); // <2>
                     return HttpResponse.created(p); // <3>

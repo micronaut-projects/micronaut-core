@@ -25,9 +25,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
-import io.reactivex.Observable;
-import io.reactivex.ObservableSource;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -35,15 +34,15 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Bindings {@link io.micronaut.http.annotation.Body} arguments of type {@link Observable}.
+ * Bindings {@link io.micronaut.http.annotation.Body} arguments of type {@link Mono}.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
-public class ObservableBodyBinder extends DefaultBodyAnnotationBinder<Observable> implements NonBlockingBodyArgumentBinder<Observable> {
+public class MonoBodyBinder extends DefaultBodyAnnotationBinder<Mono> implements NonBlockingBodyArgumentBinder<Mono> {
 
-    public static final Argument<Observable> TYPE = Argument.of(Observable.class);
+    public static final Argument<Mono> TYPE = Argument.of(Mono.class);
 
     private PublisherBodyBinder publisherBodyBinder;
 
@@ -51,36 +50,29 @@ public class ObservableBodyBinder extends DefaultBodyAnnotationBinder<Observable
      * @param conversionService            The conversion service
      * @param httpContentProcessorResolver The http content processor resolver
      */
-    public ObservableBodyBinder(ConversionService conversionService,
-                                HttpContentProcessorResolver httpContentProcessorResolver) {
+    public MonoBodyBinder(ConversionService conversionService,
+                          HttpContentProcessorResolver httpContentProcessorResolver) {
         super(conversionService);
         this.publisherBodyBinder = new PublisherBodyBinder(conversionService, httpContentProcessorResolver);
     }
 
-    @NonNull
     @Override
-    public List<Class<?>> superTypes() {
-        return Collections.singletonList(ObservableSource.class);
-    }
-
-    @Override
-    public Argument<Observable> argumentType() {
+    public Argument<Mono> argumentType() {
         return TYPE;
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public BindingResult<Observable> bind(ArgumentConversionContext<Observable> context, HttpRequest<?> source) {
+    public BindingResult<Mono> bind(ArgumentConversionContext<Mono> context, HttpRequest<?> source) {
         Collection<Argument<?>> typeVariables = context.getArgument().getTypeVariables().values();
 
         BindingResult<Publisher> result = publisherBodyBinder.bind(
-            ConversionContext.of(Argument.of(Publisher.class, typeVariables.toArray(new Argument[0]))),
-            source
+                ConversionContext.of(Argument.of(Publisher.class, typeVariables.toArray(Argument.ZERO_ARGUMENTS))),
+                source
         );
         if (result.isPresentAndSatisfied()) {
-            return () -> Optional.of(Observable.fromPublisher(result.get()));
+            return () -> Optional.of(Mono.from(result.get()));
         }
-        return BindingResult.EMPTY;
+        return () -> Optional.of(Mono.empty());
     }
 }
-

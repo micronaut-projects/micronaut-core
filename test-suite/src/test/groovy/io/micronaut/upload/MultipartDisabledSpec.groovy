@@ -7,7 +7,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 
 class MultipartDisabledSpec extends AbstractMicronautSpec {
 
@@ -24,13 +24,14 @@ class MultipartDisabledSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-json", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.onErrorReturn(t -> ((HttpClientResponseException) t).response).blockingFirst()
+        HttpResponse<String> response = flowable.onErrorReturn(t -> ((HttpClientResponseException) t).response)
+                .blockFirst()
 
         then:
         response.code() == HttpStatus.UNSUPPORTED_MEDIA_TYPE.code

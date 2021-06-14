@@ -16,17 +16,17 @@
 package io.micronaut.websocket;
 
 import io.micronaut.http.MediaType;
-import io.reactivex.Flowable;
+import reactor.core.publisher.Flux;
 
 import java.util.Set;
 
 /**
- * Generalization of the {@link WebSocketSession} interface for RxJava.
+ * Generalization of the {@link WebSocketSession} interface for Project Reactor.
  *
  * @author graemerocher
  * @since 1.0
  */
-public interface RxWebSocketSession extends WebSocketSession {
+public interface ReactorWebSocketSession extends WebSocketSession {
 
     /**
      * The current open sessions.
@@ -34,16 +34,16 @@ public interface RxWebSocketSession extends WebSocketSession {
      * @return The open sessions
      */
     @Override
-    Set<? extends RxWebSocketSession> getOpenSessions();
+    Set<? extends ReactorWebSocketSession> getOpenSessions();
 
     /**
-     * Broadcast a message and return a {@link Flowable}.
+     * Broadcast a message and return a {@link Flux}.
      *
      * @param message The message
      * @param mediaType The media type
      * @param <T> The message generic type
-     * @return The {@link Flowable}
+     * @return The {@link Flux}
      */
     @Override
-    <T> Flowable<T> send(T message, MediaType mediaType);
+    <T> Flux<T> send(T message, MediaType mediaType);
 }

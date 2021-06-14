@@ -7,11 +7,11 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 
 class UploadControllerSpec: StringSpec() {
 
@@ -20,7 +20,7 @@ class UploadControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL())
+            embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.getURL())
     )
 
     init {
@@ -29,13 +29,13 @@ class UploadControllerSpec: StringSpec() {
                     .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".toByteArray())
                     .build()
 
-            val flowable = Flowable.fromPublisher(client.exchange(
+            val flowable = Flux.from(client.exchange(
                     HttpRequest.POST("/upload", body)
                             .contentType(MediaType.MULTIPART_FORM_DATA)
                             .accept(MediaType.TEXT_PLAIN_TYPE),
                     String::class.java
             ))
-            val response = flowable.blockingFirst()
+            val response = flowable.blockFirst()
 
             response.status() shouldBe HttpStatus.OK
             response.body.get() shouldBe "Uploaded"
@@ -46,13 +46,13 @@ class UploadControllerSpec: StringSpec() {
                     .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".toByteArray())
                     .build()
 
-            val flowable = Flowable.fromPublisher(client!!.exchange(
+            val flowable = Flux.from(client!!.exchange(
                     HttpRequest.POST("/upload/completed", body)
                             .contentType(MediaType.MULTIPART_FORM_DATA)
                             .accept(MediaType.TEXT_PLAIN_TYPE),
                     String::class.java
             ))
-            val response = flowable.blockingFirst()
+            val response = flowable.blockFirst()
 
             response.status() shouldBe HttpStatus.OK
             response.body.get() shouldBe "Uploaded"
@@ -63,13 +63,13 @@ class UploadControllerSpec: StringSpec() {
                     .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, ByteArray(0))
                     .build()
 
-            val flowable = Flowable.fromPublisher(client!!.exchange(
+            val flowable = Flux.from(client!!.exchange(
                     HttpRequest.POST("/upload/completed", body)
                             .contentType(MediaType.MULTIPART_FORM_DATA)
                             .accept(MediaType.TEXT_PLAIN_TYPE),
                     String::class.java
             ))
-            val response = flowable.blockingFirst()
+            val response = flowable.blockFirst()
 
             response.status() shouldBe HttpStatus.OK
             response.body.get() shouldBe "Uploaded"
@@ -80,14 +80,14 @@ class UploadControllerSpec: StringSpec() {
                     .addPart("file", "", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".toByteArray())
                     .build()
 
-            val flowable = Flowable.fromPublisher(client.exchange(
+            val flowable = Flux.from(client.exchange(
                     HttpRequest.POST("/upload/completed", body)
                             .contentType(MediaType.MULTIPART_FORM_DATA)
                             .accept(MediaType.TEXT_PLAIN_TYPE),
                     String::class.java
             ))
 
-            val ex = shouldThrow<HttpClientResponseException> { flowable.blockingFirst() }
+            val ex = shouldThrow<HttpClientResponseException> { flowable.blockFirst() }
 
             ex.message shouldBe "Required argument [CompletedFileUpload file] not specified"
         }
@@ -97,14 +97,14 @@ class UploadControllerSpec: StringSpec() {
                     .addPart("file", "", MediaType.APPLICATION_JSON_TYPE, ByteArray(0))
                     .build()
 
-            val flowable = Flowable.fromPublisher(client!!.exchange(
+            val flowable = Flux.from(client!!.exchange(
                     HttpRequest.POST("/upload/completed", body)
                             .contentType(MediaType.MULTIPART_FORM_DATA)
                             .accept(MediaType.TEXT_PLAIN_TYPE),
                     String::class.java
             ))
 
-            val ex = shouldThrow<HttpClientResponseException> { flowable.blockingFirst() }
+            val ex = shouldThrow<HttpClientResponseException> { flowable.blockFirst() }
 
             ex.message shouldBe "Required argument [CompletedFileUpload file] not specified"
         }
@@ -114,13 +114,13 @@ class UploadControllerSpec: StringSpec() {
                     .addPart("filex", "", MediaType.APPLICATION_JSON_TYPE, ByteArray(0))
                     .build()
 
-            val flowable = Flowable.fromPublisher(client!!.exchange(
+            val flowable = Flux.from(client!!.exchange(
                     HttpRequest.POST("/upload/completed", body)
                             .contentType(MediaType.MULTIPART_FORM_DATA)
                             .accept(MediaType.TEXT_PLAIN_TYPE),
                     String::class.java
             ))
-            val ex = shouldThrow<HttpClientResponseException> { flowable.blockingFirst() }
+            val ex = shouldThrow<HttpClientResponseException> { flowable.blockFirst() }
 
             ex.message shouldBe "Required argument [CompletedFileUpload file] not specified"
         }
@@ -131,13 +131,13 @@ class UploadControllerSpec: StringSpec() {
                     .addPart("fileName", "bar")
                     .build()
 
-            val flowable = Flowable.fromPublisher(client!!.exchange(
+            val flowable = Flux.from(client!!.exchange(
                     HttpRequest.POST("/upload/bytes", body)
                             .contentType(MediaType.MULTIPART_FORM_DATA)
                             .accept(MediaType.TEXT_PLAIN_TYPE),
                     String::class.java
             ))
-            val response = flowable.blockingFirst()
+            val response = flowable.blockFirst()
 
             response.status() shouldBe HttpStatus.OK
             response.body.get() shouldBe "Uploaded"

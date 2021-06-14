@@ -24,16 +24,16 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.FilterMatcher
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Flowable
-import io.reactivex.Single
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 /**
@@ -46,11 +46,11 @@ class HttpFilterSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxHttpClient rxClient
+    ReactorHttpClient rxClient
 
     void "test interceptor execution and order - write replacement"() {
         when:
-        rxClient.retrieve("/secure").blockingFirst()
+        rxClient.retrieve("/secure").blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -59,7 +59,7 @@ class HttpFilterSpec extends Specification {
 
     void "test interceptor execution and order - proceed"() {
         when:
-        HttpResponse<String> response = rxClient.exchange("/secure?username=fred", String).blockingFirst()
+        HttpResponse<String> response = rxClient.exchange("/secure?username=fred", String).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -70,7 +70,7 @@ class HttpFilterSpec extends Specification {
 
     void "test a filter on the root url"() {
         when:
-        HttpResponse response = rxClient.exchange("/").blockingFirst()
+        HttpResponse response = rxClient.exchange("/").blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -80,7 +80,7 @@ class HttpFilterSpec extends Specification {
 
     void "test a filter on a reactive url"() {
         when:
-        HttpResponse response = rxClient.exchange("/reactive").blockingFirst()
+        HttpResponse response = rxClient.exchange("/reactive").blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -90,7 +90,7 @@ class HttpFilterSpec extends Specification {
 
     void "test a filter on matched with filter matcher URI"() {
         when:
-        HttpResponse response = rxClient.exchange("/matched").blockingFirst()
+        HttpResponse response = rxClient.exchange("/matched").blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -100,7 +100,7 @@ class HttpFilterSpec extends Specification {
 
     void "test two filters on matched with filter matcher URI"() {
         when:
-        HttpResponse response = rxClient.exchange("/matchedtwice").blockingFirst()
+        HttpResponse response = rxClient.exchange("/matchedtwice").blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -111,7 +111,7 @@ class HttpFilterSpec extends Specification {
 
     void "test a filter on indirect matched with filter matcher URI"() {
         when:
-        HttpResponse response = rxClient.exchange("/indirectlymatched").blockingFirst()
+        HttpResponse response = rxClient.exchange("/indirectlymatched").blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -126,7 +126,7 @@ class HttpFilterSpec extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            return Flowable.fromPublisher(chain.proceed(request)).doOnNext({ response ->
+            return Flux.from(chain.proceed(request)).doOnNext({ response ->
                 if (response.status.code < 300) {
                     assert response.getAttribute(HttpAttributes.ROUTE_MATCH,
                             AnnotationMetadata.class).isPresent()
@@ -143,7 +143,7 @@ class HttpFilterSpec extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            return Flowable.fromPublisher(chain.proceed(request)).doOnNext({ response ->
+            return Flux.from(chain.proceed(request)).doOnNext({ response ->
                 response.header("X-Matched-Filter", "processed")
             })
         }
@@ -156,7 +156,7 @@ class HttpFilterSpec extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            return Flowable.fromPublisher(chain.proceed(request)).doOnNext({ response ->
+            return Flux.from(chain.proceed(request)).doOnNext({ response ->
                 response.header("X-Another-Matched-Filter", "processed")
             })
         }
@@ -173,8 +173,8 @@ class HttpFilterSpec extends Specification {
         }
 
         @Get("/reactive")
-        Single<HttpResponse> reactive() {
-            Single.just(HttpResponse.ok())
+        Mono<HttpResponse> reactive() {
+            Mono.just(HttpResponse.ok())
         }
 
         @Get("/matched")
@@ -195,11 +195,9 @@ class HttpFilterSpec extends Specification {
         HttpResponse indirectlyMatched() {
             HttpResponse.ok()
         }
-
     }
-
-
 }
+
 @FilterMatcher
 @interface MarkerStereotypeAnnotation {
 

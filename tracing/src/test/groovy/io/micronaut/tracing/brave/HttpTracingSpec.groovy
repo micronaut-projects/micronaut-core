@@ -27,9 +27,9 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Single
-import io.reactivex.schedulers.Schedulers
 import jakarta.inject.Inject
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import spock.lang.Specification
 import zipkin2.Span
 import zipkin2.Span.Kind
@@ -280,8 +280,8 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get(value = "/rxjava/observe", produces = MediaType.TEXT_PLAIN)
-        Single<String> index() {
-            return Single.just("hello").observeOn(Schedulers.computation()).map( { r ->
+        Mono<String> index() {
+            return Mono.just("hello").observeOn(Schedulers.computation()).map( { r ->
                 if (ServerRequestContext.currentRequest().isPresent()) {
                     return r;
                 } else {
@@ -291,11 +291,11 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/rxjava/{name}")
-        Single<String> rxjava(String name) {
-            Single.fromCallable({->
+        Mono<String> rxjava(String name) {
+            Mono.fromCallable({->
                 spanCustomizer.tag("foo", "bar")
                 return name
-            }).subscribeOn(Schedulers.io())
+            }).subscribeOn(Schedulers.boundedElastic())
         }
 
         @Get("/error/{name}")

@@ -30,9 +30,9 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -158,7 +158,7 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Flowable.fromPublisher(chain.proceed(request))
+            return Flux.from(chain.proceed(request))
                     .map({ HttpResponse response ->
                         HttpResponse.ok(response.body().toString() + " Intercepted")
                     })
@@ -176,7 +176,7 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Flowable.fromPublisher(chain.proceed(request))
+            return Flux.from(chain.proceed(request))
                     .map({ HttpResponse response ->
                         HttpResponse.ok(response.body().toString() + " Twice")
                     })
@@ -194,7 +194,7 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Flowable.fromPublisher(chain.proceed(request))
+            return Flux.from(chain.proceed(request))
                     .map({ HttpResponse response ->
                         HttpResponse.ok(response.body().toString() + " Post")
                     })
@@ -212,7 +212,7 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Flowable.fromPublisher(chain.proceed(request))
+            return Flux.from(chain.proceed(request))
                     .map({ HttpResponse response ->
                         HttpResponse.ok(response.body().toString() + " URL")
                     })

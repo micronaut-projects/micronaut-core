@@ -20,9 +20,9 @@ import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
-import io.reactivex.Maybe
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -47,18 +47,18 @@ class PublisherCrudSpec extends Specification {
         BookClient client = context.getBean(BookClient)
 
         when:
-        Book book = Flowable.fromPublisher(client.get(99))
-                            .firstElement()
-                            .onErrorResumeNext(Maybe.empty())
-                            .blockingGet()
-        List<Book> books = Flowable.fromPublisher(client.list()).blockingFirst()
+        Book book = Flux.from(client.get(99))
+                            .next()
+                            .onErrorResume(Mono.empty())
+                            .block()
+        List<Book> books = Flux.from(client.list()).blockFirst()
 
         then:
         book == null
         books.size() == 0
 
         when:
-        book = Flowable.fromPublisher(client.save("The Stand")).blockingFirst()
+        book = Flux.from(client.save("The Stand")).blockFirst()
 
         then:
         book != null
@@ -66,7 +66,7 @@ class PublisherCrudSpec extends Specification {
         book.id == 1
 
         when:
-        book = Flowable.fromPublisher(client.get(book.id)).blockingFirst()
+        book = Flux.from(client.get(book.id)).blockFirst()
 
         then:
         book != null
@@ -74,7 +74,7 @@ class PublisherCrudSpec extends Specification {
         book.id == 1
 
         when:
-        book = Flowable.fromPublisher(client.update(book.id, "The Shining")).blockingFirst()
+        book = Flux.from(client.update(book.id, "The Shining")).blockFirst()
 
         then:
         book != null
@@ -82,11 +82,11 @@ class PublisherCrudSpec extends Specification {
         book.id == 1
 
         when:
-        Flowable.fromPublisher(client.delete(book.id)).blockingFirst()
-        book = Flowable.fromPublisher(client.get(book.id))
-                .firstElement()
-                .onErrorResumeNext(Maybe.empty())
-                .blockingGet()
+        Flux.from(client.delete(book.id)).blockFirst()
+        book = Flux.from(client.get(book.id))
+                .next()
+                .onErrorResume(Mono.empty())
+                .block()
         then:
         book == null
     }
@@ -152,7 +152,6 @@ class PublisherCrudSpec extends Specification {
         @Patch(uri = "/{id}", single = true)
         Publisher<Book> update(Long id, String title)
     }
-
 
     static class Book {
         Long id

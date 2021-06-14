@@ -35,10 +35,10 @@ class ConnectionTTLSpec extends Specification {
       'micronaut.http.client.connect-ttl':'1000ms',
       'micronaut.http.client.pool.enabled':true
     )
-    RxHttpClient httpClient = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+    ReactorHttpClient httpClient = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockingFirst()
+    httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockFirst()
     Channel ch = getQueuedChannels(httpClient).first
 
     then:"ensure that connection is open as connect-ttl is not reached"
@@ -46,7 +46,7 @@ class ConnectionTTLSpec extends Specification {
     ch.isOpen()
 
     when:"make another request in which connect-ttl will exceed"
-    httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockingFirst()
+    httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockFirst()
 
     then:"ensure channel is closed"
     new PollingConditions().eventually {
@@ -64,10 +64,10 @@ class ConnectionTTLSpec extends Specification {
       'my.port':embeddedServer.getPort(),
       'micronaut.http.client.pool.enabled':true
     )
-    RxHttpClient httpClient = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+    ReactorHttpClient httpClient = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockingFirst()
+    httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockFirst()
     Deque<Channel> deque = getQueuedChannels(httpClient)
 
     then:"ensure that connection is open as connect-ttl is not reached"
@@ -76,7 +76,7 @@ class ConnectionTTLSpec extends Specification {
     }
 
     when:"make another request"
-    httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockingFirst()
+    httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockFirst()
 
     then:"ensure channel is still open"
     new PollingConditions().eventually {
@@ -89,7 +89,7 @@ class ConnectionTTLSpec extends Specification {
   }
 
 
-  Deque getQueuedChannels(RxHttpClient client) {
+  Deque getQueuedChannels(ReactorHttpClient client) {
     AbstractChannelPoolMap poolMap = client.poolMap
     Field mapField = AbstractChannelPoolMap.getDeclaredField("map")
     mapField.setAccessible(true)

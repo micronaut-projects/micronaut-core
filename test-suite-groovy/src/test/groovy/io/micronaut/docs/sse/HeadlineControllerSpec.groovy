@@ -17,7 +17,7 @@ class HeadlineControllerSpec extends Specification {
     @Test
     void testClientAnnotationStreaming() throws Exception {
         when:
-            Event<Headline> headline = headlineClient.streamHeadlines().blockingFirst()
+            Event<Headline> headline = headlineClient.streamHeadlines().blockFirst()
         then:
             headline != null
             headline.getData().getText().startsWith("Latest Headline")

@@ -26,8 +26,8 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.reactivex.Flowable
-import io.reactivex.Maybe
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Issue
 
 /**
@@ -41,7 +41,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(HttpRequest.POST('/form/simple', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -55,7 +55,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
                 name:"Fred",
                 age:"10",
                 something: "else"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -67,7 +67,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         when:
         rxClient.exchange(HttpRequest.POST('/form/simple', [
                 name:"Fred"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -88,7 +88,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         given:
         MultipartBody body = MultipartBody.builder().addPart("SAMLResponse", SAML_DATA).build()
         String data = rxClient.retrieve(HttpRequest.POST("/form/saml/test/form-data", body)
-                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String).blockingFirst()
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String).blockFirst()
 
         expect:
         data == SAML_DATA
@@ -132,7 +132,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(HttpRequest.POST('/form/string', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -145,7 +145,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(HttpRequest.POST('/form/maybe-string', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -162,7 +162,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post('/maybe-string')
-        Maybe<String> string(@Body Flowable<String> string) {
+        Mono<String> string(@Body Flux<String> string) {
             string.reduce({ a, b -> a + b })
         }
 

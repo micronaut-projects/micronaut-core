@@ -70,6 +70,10 @@ dependencies {
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation('org.bouncycastle:bcpkix-jdk15on:1.65')
     }
+
+    testImplementation platform('io.projectreactor:reactor-bom:2020.0.7')
+    testImplementation 'io.projectreactor:reactor-core'
+
 }
 
 //tasks.withType(Test) {

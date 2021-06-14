@@ -38,10 +38,10 @@ class BasicAuthSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
         ApplicationContext ctx = server.getApplicationContext()
 
-        def httpClient = ctx.createBean(RxHttpClient, new URL("http://sherlock:password@localhost:${server.port}"))
+        def httpClient = ctx.createBean(ReactorHttpClient, new URL("http://sherlock:password@localhost:${server.port}"))
         def client = httpClient.retrieve("/basic-auth")
         when:
-        String resp = client.blockingFirst()
+        String resp = client.blockFirst()
 
         then:
         resp == "sherlock:password"

@@ -28,10 +28,9 @@ import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Flowable
 import jakarta.inject.Inject
+import reactor.core.publisher.Flux
 import spock.lang.Specification
-
 import java.nio.charset.StandardCharsets
 
 /**
@@ -53,14 +52,14 @@ class HttpPostSpec extends Specification {
         def book = new Book(title: "The Stand", pages: 1000)
 
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.PATCH("/post/simple", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 Book
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientException)
@@ -72,14 +71,14 @@ class HttpPostSpec extends Specification {
         def book = new Book(title: "The Stand", pages: 1000)
 
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/post/simple", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 Book
         ))
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:
@@ -91,20 +90,19 @@ class HttpPostSpec extends Specification {
         body.get() == book
     }
 
-
-
     void "test simple post request with URI template and JSON"() {
         given:
         def book = new Book(title: "The Stand",pages: 1000)
+
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/post/title/{title}", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 Book
         ))
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:
@@ -119,15 +117,16 @@ class HttpPostSpec extends Specification {
     void "test simple post request with URI template and JSON Map"() {
         given:
         def book = [title: "The Stand",pages: 1000]
+
         when:
-        Flowable<HttpResponse<Map>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Map>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/post/title/{title}", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 Map
         ))
-        HttpResponse<Map> response = flowable.blockingFirst()
+        HttpResponse<Map> response = flowable.blockFirst()
         Optional<Map> body = response.getBody()
 
         then:
@@ -143,7 +142,7 @@ class HttpPostSpec extends Specification {
         given:
         def book = new Book(title: "The Stand", pages: 1000)
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/post/form", book)
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
@@ -151,7 +150,7 @@ class HttpPostSpec extends Specification {
 
                 Book
         ))
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:

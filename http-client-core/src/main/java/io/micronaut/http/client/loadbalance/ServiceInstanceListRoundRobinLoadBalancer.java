@@ -18,10 +18,12 @@ package io.micronaut.http.client.loadbalance;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * @author Graeme Rocher
@@ -39,7 +41,7 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
 
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
-        return Flowable.fromCallable(() -> getNextAvailable(serviceInstanceList.getInstances()));
+        return Flux.just(getNextAvailable(serviceInstanceList.getInstances()));
     }
 
     @Override

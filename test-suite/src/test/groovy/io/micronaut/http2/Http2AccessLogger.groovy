@@ -3,6 +3,8 @@ package io.micronaut.http2
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
 import ch.qos.logback.classic.Logger
+import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.ReactorStreamingHttpClient
 import org.slf4j.LoggerFactory
 
 import io.micronaut.context.ApplicationContext
@@ -10,24 +12,15 @@ import io.micronaut.core.type.Argument
 import io.micronaut.docs.server.json.Person
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Post
-import io.micronaut.http.annotation.Produces
-import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.client.RxStreamingHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
-import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import java.time.Duration
-import java.time.temporal.ChronoUnit
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -46,7 +39,7 @@ class Http2AccessLoggerSpec extends Specification {
             "micronaut.server.netty.log-level" : "TRACE",
             'micronaut.server.netty.access-logger.enabled': true
     ])
-    RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
+    ReactorHttpClient client = server.getApplicationContext().getBean(ReactorHttpClient)
     static MemoryAppender appender = new MemoryAppender()
 
     static {
@@ -58,8 +51,8 @@ class Http2AccessLoggerSpec extends Specification {
     void "test make HTTP/2 stream request with access logger enabled"() {
         when:"A non stream request is executed"
         appender.events.clear()
-        def people = ((RxStreamingHttpClient)client).jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person)
-                .toList().blockingGet()
+        def people = ((ReactorStreamingHttpClient)client).jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person)
+                .collectList().block()
 
         then:
         people
@@ -67,7 +60,7 @@ class Http2AccessLoggerSpec extends Specification {
 
         when:"posting a data"
         def response = client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Object), Argument.listOf(Person))
-                .blockingFirst()
+                .blockFirst()
 
         then:
         response
@@ -79,7 +72,7 @@ class Http2AccessLoggerSpec extends Specification {
         when:"An sse stream is obtain"
         def client = server.applicationContext.getBean(TestHttp2Client)
         appender.events.clear()
-        def results = client.rich().toList().blockingGet()
+        def results = client.rich().collectList().block()
 
         then:
         results.size() == 4
@@ -89,14 +82,14 @@ class Http2AccessLoggerSpec extends Specification {
     void "test make HTTP/2 request with access logger enabled - HTTPS"() {
         when:
         appender.events.clear()
-        def result = client.retrieve("${server.URL}/http2").blockingFirst()
+        def result = client.retrieve("${server.URL}/http2").blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
         appender.headLog(10)
 
         when:"operation repeated to use same connection"
-        result = client.retrieve("${server.URL}/http2").blockingFirst()
+        result = client.retrieve("${server.URL}/http2").blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
@@ -104,7 +97,7 @@ class Http2AccessLoggerSpec extends Specification {
 
         when:"A non stream request is executed"
         client.retrieve(HttpRequest.GET("${server.URL}/http2/personStream"), Argument.listOf(Person))
-                .blockingFirst()
+                .blockFirst()
 
         then:
         appender.headLog(10)
@@ -120,18 +113,18 @@ class Http2AccessLoggerSpec extends Specification {
                 "micronaut.server.netty.log-level" : "TRACE",
                 'micronaut.server.netty.access-logger.enabled': true
         ])
-        RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
+        ReactorHttpClient client = server.getApplicationContext().getBean(ReactorHttpClient)
         appender.events.clear()
 
         when:
-        def result = client.retrieve("${server.URL}/http2").blockingFirst()
+        def result = client.retrieve("${server.URL}/http2").blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
         appender.headLog(10)
 
         when:"operation repeated to use same connection"
-        result = client.retrieve("${server.URL}/http2").blockingFirst()
+        result = client.retrieve("${server.URL}/http2").blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
@@ -152,9 +145,9 @@ class Http2AccessLoggerSpec extends Specification {
                 "micronaut.server.netty.log-level" : "TRACE",
                 'micronaut.server.netty.access-logger.enabled': true
         ])
-        RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
+        ReactorHttpClient client = server.getApplicationContext().getBean(ReactorHttpClient)
         appender.events.clear()
-        def result = client.retrieve("${server.URL}/http2").blockingFirst()
+        def result = client.retrieve("${server.URL}/http2").blockFirst()
 
         expect:
         result == 'Version: HTTP_1_1'
@@ -186,6 +179,6 @@ class Http2AccessLoggerSpec extends Specification {
     static interface TestHttp2Client {
 
         @Get(value = '/rich', processes = MediaType.TEXT_EVENT_STREAM)
-        Flowable<Event<Person>> rich()
+        Flux<Event<Person>> rich()
     }
 }

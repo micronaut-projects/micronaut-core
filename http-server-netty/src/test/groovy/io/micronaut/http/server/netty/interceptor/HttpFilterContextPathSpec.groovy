@@ -16,7 +16,7 @@ class HttpFilterContextPathSpec extends AbstractMicronautSpec {
 
     void "test interceptor execution and order - proceed"() {
         when:
-        HttpResponse<String> response = rxClient.exchange("/context/path/secure?username=fred", String).blockingFirst()
+        HttpResponse<String> response = rxClient.exchange("/context/path/secure?username=fred", String).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -27,7 +27,7 @@ class HttpFilterContextPathSpec extends AbstractMicronautSpec {
 
     void "test a filter on the root url"() {
         when:
-        HttpResponse response = rxClient.exchange("/context/path").blockingFirst()
+        HttpResponse response = rxClient.exchange("/context/path").blockFirst()
 
         then:
         response.status == HttpStatus.OK

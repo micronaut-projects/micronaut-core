@@ -22,7 +22,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Fallback
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Single
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -68,7 +68,7 @@ class HttpClientRetryWithFallbackSpec extends Specification{
         controller.count = 0
 
         when:"A method is annotated retry"
-        int result = countClient.getCountSingle().blockingGet()
+        int result = countClient.getCountSingle().block()
 
         then:"It executes until successful"
         result == 3
@@ -80,7 +80,7 @@ class HttpClientRetryWithFallbackSpec extends Specification{
 
 
         then:"The original exception is thrown"
-        single.blockingGet() == 9999
+        single.block() == 9999
 
     }
 
@@ -99,8 +99,8 @@ class HttpClientRetryWithFallbackSpec extends Specification{
         }
 
         @Override
-        Single<Integer> getCountSingle() {
-            return Single.just(9999)
+        Mono<Integer> getCountSingle() {
+            return Mono.just(9999)
         }
     }
 
@@ -120,8 +120,8 @@ class HttpClientRetryWithFallbackSpec extends Specification{
         }
 
         @Override
-        Single<Integer> getCountSingle() {
-            Single.fromCallable({->
+        Mono<Integer> getCountSingle() {
+            Mono.fromCallable({->
                 countRx++
                 if(countRx < countThreshold) {
                     throw new IllegalStateException("Bad count")
@@ -138,6 +138,6 @@ class HttpClientRetryWithFallbackSpec extends Specification{
         int getCount()
 
         @Get('/rx-count')
-        Single<Integer> getCountSingle()
+        Mono<Integer> getCountSingle()
     }
 }

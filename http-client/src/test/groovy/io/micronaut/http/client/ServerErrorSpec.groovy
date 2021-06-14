@@ -22,9 +22,9 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Flowable
-import io.reactivex.Single
 import jakarta.inject.Inject
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 @MicronautTest
@@ -44,7 +44,7 @@ class ServerErrorSpec extends Specification {
 
     void "test 500 error - single"() {
         when:
-        myClient.fiveHundredSingle().blockingGet()
+        myClient.fiveHundredSingle().block()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -60,9 +60,9 @@ class ServerErrorSpec extends Specification {
         e.message == "Internal Server Error: Bad things happening"
     }
 
-    void "test exception error - single"() {
+    void "test exception error - mono"() {
         when:
-        myClient.exceptionSingle().blockingGet()
+        myClient.exceptionMono().block()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -71,7 +71,7 @@ class ServerErrorSpec extends Specification {
 
     void "test single error"() {
         when:
-        myClient.singleError()
+        myClient.monoError()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -80,7 +80,7 @@ class ServerErrorSpec extends Specification {
 
     void "test single error - single"() {
         when:
-        myClient.singleErrorSingle().blockingGet()
+        myClient.monoErrorMono().block()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -89,7 +89,7 @@ class ServerErrorSpec extends Specification {
 
     void "test flowable error - flowable"() {
         when:
-        myClient.flowableErrorFlowable().blockingFirst()
+        myClient.flowableErrorFlowable().blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -102,22 +102,22 @@ class ServerErrorSpec extends Specification {
         HttpResponse fiveHundred()
 
         @Get('/five-hundred')
-        Single fiveHundredSingle()
+        Mono fiveHundredMono()
 
         @Get('/exception')
         HttpResponse exception()
 
         @Get('/exception')
-        Single exceptionSingle()
+        Mono exceptionMono()
 
         @Get('/single-error')
-        HttpResponse singleError()
+        HttpResponse monoError()
 
         @Get('/single-error')
-        Single singleErrorSingle()
+        Mono monoErrorMono()
 
         @Get('/flowable-error')
-        Flowable flowableErrorFlowable()
+        Flux fluxErrorFlux()
     }
 
     @Controller('/server-errors')
@@ -135,13 +135,13 @@ class ServerErrorSpec extends Specification {
         }
 
         @Get('/single-error')
-        Single singleError() {
-            Single.error(new RuntimeException("Bad things happening"))
+        Mono singleError() {
+            Mono.error(new RuntimeException("Bad things happening"))
         }
 
         @Get('/flowable-error')
-        Flowable flowableError() {
-            Flowable.error(new RuntimeException("Bad things happening"))
+        Flux flowableError() {
+            Flux.error(new RuntimeException("Bad things happening"))
         }
 
     }

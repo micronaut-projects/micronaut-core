@@ -28,7 +28,7 @@ As an example, consider this `TraceService` that uses RxJava to compose an I/O o
 
 snippet::io.micronaut.docs.server.filters.TraceService[tags="imports,class", indent=0, title="A TraceService Example using RxJava"]
 
-<1> The rx:Flowable[] type creates logic that executes potentially blocking operations to write the trace data from the request
+<1> The reactor:Flux[] type creates logic that executes potentially blocking operations to write the trace data from the request
 <2> Since this is just an example, the logic does nothing yet
 <3> The RxJava I/O scheduler executes the logic
 

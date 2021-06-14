@@ -13,16 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava2;
+package io.micronaut.http.client;
 
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MutableHttpResponse;
+import reactor.core.publisher.Flux;
 
 /**
- * Marker interface.
+ * Extended version of {@link ProxyHttpClient} for RxJava 2.
  *
  * @author graemerocher
- * @since 1.1
+ * @since 2.0.0
  */
-@Internal
-interface RxInstrumentedComponent {
+public interface ReactorProxyHttpClient extends ProxyHttpClient {
+    @Override
+    Flux<MutableHttpResponse<?>> proxy(HttpRequest<?> request);
 }

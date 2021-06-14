@@ -21,10 +21,10 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.session.Session
-import io.micronaut.websocket.RxWebSocketClient
+import io.micronaut.websocket.ReactorWebSocketClient
 import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.annotation.ClientWebSocket
 import io.micronaut.websocket.annotation.OnMessage
@@ -39,8 +39,8 @@ class WebSocketSessionSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
-        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURL())
-        RxHttpClient httpClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorWebSocketClient wsClient = embeddedServer.applicationContext.createBean(ReactorWebSocketClient, embeddedServer.getURL())
+        ReactorHttpClient httpClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse response = httpClient.toBlocking().exchange(HttpRequest.GET('/ws/session/simple'), String)
@@ -56,7 +56,7 @@ class WebSocketSessionSpec extends Specification {
         result == 'value in session'
 
         when:
-        SomeValueClient someValueClient= wsClient.connect(SomeValueClient, HttpRequest.GET('/ws/somesocket').header(HttpHeaders.AUTHORIZATION_INFO, sessionId)).blockingFirst()
+        SomeValueClient someValueClient= wsClient.connect(SomeValueClient, HttpRequest.GET('/ws/somesocket').header(HttpHeaders.AUTHORIZATION_INFO, sessionId)).blockFirst()
         someValueClient.send("hello")
         PollingConditions conditions = new PollingConditions(timeout: 3, delay: 0.5)
 

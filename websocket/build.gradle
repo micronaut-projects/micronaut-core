@@ -5,7 +5,9 @@ dependencies {
     api project(":http")
     api project(":inject")
     api project(':aop')
-    api dependencyVersion("rxjava2")
+    //api dependencyVersion("rxjava2")
+    implementation platform('io.projectreactor:reactor-bom:2020.0.7')
+    implementation 'io.projectreactor:reactor-core'
 
     testImplementation project(":inject-groovy")
 }

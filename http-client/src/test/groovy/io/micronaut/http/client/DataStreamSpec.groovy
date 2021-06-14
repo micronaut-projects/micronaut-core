@@ -31,12 +31,12 @@ import io.micronaut.http.codec.CodecException
 import io.micronaut.http.multipart.PartData
 import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Flowable
-import io.reactivex.Single
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Issue
 import spock.lang.Retry
 import spock.lang.Specification
@@ -54,7 +54,7 @@ class DataStreamSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxStreamingHttpClient client
+    ReactorStreamingHttpClient client
 
     @Inject
     ByteBufferFactory bufferFactory
@@ -66,7 +66,7 @@ class DataStreamSpec extends Specification {
                 '/datastream/books'
         )).map({buf ->
             buf.toByteArray()}
-        ).toList().blockingGet()
+        ).toList().block()
 
         then:
         arrays.size() == 2
@@ -135,7 +135,9 @@ class DataStreamSpec extends Specification {
         when:
         List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(
                 '/datastream/books'
-        )).map { res -> res.body.get().toByteArray() }.blockingIterable().toList()
+        )).map(res -> res.body.get().toByteArray())
+                .collectList()
+                .block()
 
         then:
         arrays.size() == 2
@@ -146,9 +148,9 @@ class DataStreamSpec extends Specification {
     void "test streaming body codec exception"() {
         when:
         Publisher<String> bodyPublisher = client.retrieve(HttpRequest.POST(
-                '/datastream/books', Flowable.just(new Book(title: 'The Shining'))
+                '/datastream/books', Flux.just(new Book(title: 'The Shining'))
         ).contentType("custom/content"))
-        String body = Flowable.fromPublisher(bodyPublisher).toList().map({list -> list.join('')}).blockingGet()
+        String body = Flux.from(bodyPublisher).collectList().map({list -> list.join('')}).block()
 
         then:
         def ex = thrown(CodecException)
@@ -162,13 +164,12 @@ class DataStreamSpec extends Specification {
 
         when:
         Publisher<String> bodyPublisher = client.retrieve(HttpRequest.POST(
-                '/datastream/books', Flowable.just(buffer)
+                '/datastream/books', Flux.just(buffer)
         ).contentType("custom/content"))
-        String body = Flowable.fromPublisher(bodyPublisher).toList().map({list -> list.join('')}).blockingGet()
+        String body = Flux.from(bodyPublisher).collectList().map({list -> list.join('')}).block()
 
         then:
         body == 'The Shining'
-
     }
 
     void "test reading a byte array"() {
@@ -231,11 +232,11 @@ class DataStreamSpec extends Specification {
 
         @Inject
         @Client("/")
-        RxStreamingHttpClient client
+        ReactorStreamingHttpClient client
 
         @Get(uri = "/books", produces = MediaType.APPLICATION_JSON_STREAM)
         Publisher<byte[]> list() {
-            return Flowable.just("The Stand".getBytes(StandardCharsets.UTF_8), "The Shining".getBytes(StandardCharsets.UTF_8))
+            return Flux.just("The Stand".getBytes(StandardCharsets.UTF_8), "The Shining".getBytes(StandardCharsets.UTF_8))
         }
 
         @Post(uri = "/books", consumes = "custom/content", produces = MediaType.TEXT_PLAIN)
@@ -255,17 +256,17 @@ class DataStreamSpec extends Specification {
         }
 
         @Get("/direct")
-        Flowable<byte[]> direct() {
+        Flux<byte[]> direct() {
             client.dataStream(HttpRequest.GET(
                     '/datastream/bigdata'
             )).map(buffer -> buffer.toByteArray())
         }
 
         @Post(uri = "/upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-        Single<HttpResponse<String>> test(StreamingFileUpload data) {
+        Mono<HttpResponse<String>> test(StreamingFileUpload data) {
             AtomicInteger bytes = new AtomicInteger()
 
-            Single.<HttpResponse<String>>create { emitter ->
+            Mono.<HttpResponse<String>>create { emitter ->
                 data.subscribe(new Subscriber<PartData>() {
                     private Subscription s
 
@@ -283,12 +284,12 @@ class DataStreamSpec extends Specification {
 
                     @Override
                     void onError(Throwable t) {
-                        emitter.onError(t)
+                        emitter.error(t)
                     }
 
                     @Override
                     void onComplete() {
-                        emitter.onSuccess(HttpResponse.ok("Read ${bytes.get()} bytes".toString()))
+                        emitter.success(HttpResponse.ok("Read ${bytes.get()} bytes".toString()))
                     }
                 })
             }

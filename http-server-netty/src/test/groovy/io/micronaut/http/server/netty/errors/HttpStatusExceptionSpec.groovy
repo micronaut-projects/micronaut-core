@@ -35,7 +35,7 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
         when:
         def response = rxClient
             .exchange(HttpRequest.GET('/errors'))
-            .onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockingFirst()
+            .onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockFirst()
 
         then:
         response.code() == HttpStatus.UNPROCESSABLE_ENTITY.code
@@ -52,7 +52,7 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
     void 'test returning an arbitrary POGO'() {
         when:
         def response = rxClient
-            .exchange((HttpRequest.GET('/errors/book')), String).blockingFirst()
+            .exchange((HttpRequest.GET('/errors/book')), String).blockFirst()
 
         then:
         response.code() == HttpStatus.ACCEPTED.code

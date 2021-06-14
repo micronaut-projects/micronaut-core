@@ -14,7 +14,7 @@ From a developer perspective however, you can generally just work with Plain Old
 
 snippet::io.micronaut.docs.server.json.PersonController[tags="class,single,endclass", indent=0, title="Using RxJava 2 to Read the JSON"]
 
-<1> The method receives an RxJava rx:Single[] which emits the POJO once the JSON has been read
+<1> The method receives an RxJava reactor:Mono[] which emits the POJO once the JSON has been read
 <2> The `map` method stores the instance in a `Map`
 <3> An api:http.HttpResponse[] is returned
 
