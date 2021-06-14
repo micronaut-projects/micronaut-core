@@ -27,6 +27,7 @@ import io.micronaut.http.HttpVersion;
  *
  * @author graemerocher
  * @since 2.0
+ * @param <ReactiveClient> Reactive HTTP Client
  */
 @Internal
 public interface ReactiveHttpClientRegistry<ReactiveClient extends HttpClient> {
