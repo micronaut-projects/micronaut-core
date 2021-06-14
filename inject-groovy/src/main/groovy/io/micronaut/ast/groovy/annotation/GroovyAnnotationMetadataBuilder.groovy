@@ -192,7 +192,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     @Override
     protected String getRepeatableName(AnnotationNode annotationMirror) {
-       return getRepeatableNameForType(annotationMirror.classNode)
+        return getRepeatableNameForType(annotationMirror.classNode)
     }
 
     @Override
