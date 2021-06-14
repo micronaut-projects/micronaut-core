@@ -66,6 +66,16 @@ public class MediaType implements CharSequence {
     public static final String EXTENSION_PDF = "pdf";
 
     /**
+     * File extension used for Microsoft Excel Open XML Spreadsheet (XLSX).
+     */
+    public static final String EXTENSION_XLSX = "xlsx";
+
+    /**
+     * File extension for Microsoft Excel's workbook files in use between 97-2003.
+     */
+    public static final String EXTENSION_XLS = "xls";
+
+    /**
      * Default empty media type array.
      */
     public static final MediaType[] EMPTY_ARRAY = new MediaType[0];
@@ -154,6 +164,27 @@ public class MediaType implements CharSequence {
      * YAML: application/x-yaml.
      */
     public static final MediaType APPLICATION_YAML_TYPE = new MediaType(MediaType.APPLICATION_YAML);
+
+    /**
+     * XML: Microsoft Excel Open XML Spreadsheet (XLSX).
+     */
+    public static final String MICROSOFT_EXCEL_OPEN_XML = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    /**
+     * XML: Microsoft Excel Open XML Spreadsheet (XLSX).
+     */
+    public static final MediaType MICROSOFT_EXCEL_OPEN_XML_TYPE = new MediaType(MICROSOFT_EXCEL_OPEN_XML, EXTENSION_XLSX);
+
+    /**
+     * Microsoft Excel's workbook files in use between 97-2003.
+     */
+    public static final String MICROSOFT_EXCEL = "application/vnd.ms-excel";
+
+    /**
+     * Microsoft Excel's workbook files in use between 97-2003.
+     */
+    public static final MediaType MICROSOFT_EXCEL_TYPE = new MediaType(MICROSOFT_EXCEL, EXTENSION_XLS);
+
 
     /**
      * XML: text/xml.

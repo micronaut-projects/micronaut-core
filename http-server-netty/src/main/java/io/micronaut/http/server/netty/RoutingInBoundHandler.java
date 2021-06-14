@@ -55,6 +55,7 @@ import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.content.HttpContentUtil;
+import io.micronaut.http.netty.stream.ArrayBracketSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
@@ -105,6 +106,7 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
+import io.reactivex.FlowableOperator;
 import io.reactivex.Scheduler;
 import io.reactivex.Single;
 import io.reactivex.SingleEmitter;
@@ -1373,32 +1375,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (isJson) {
                                     // if the Publisher is returning JSON then in order for it to be valid JSON for each emitted element
                                     // we must wrap the JSON in array and delimit the emitted items
-                                    httpContentPublisher = Flowable.concat(
-                                            Flowable.fromCallable(HttpContentUtil::openBracket),
-                                            httpContentPublisher,
-                                            Flowable.fromCallable(HttpContentUtil::closeBracket)
-                                    );
-                                }
-
-                                if (mediaType.equals(MediaType.TEXT_EVENT_STREAM_TYPE)) {
-                                    httpContentPublisher = Publishers.onComplete(httpContentPublisher, () -> {
-                                        CompletableFuture<Void> future = new CompletableFuture<>();
-                                        if (!request.getHeaders().isKeepAlive()) {
-                                            if (context.channel().isOpen()) {
-                                                context.pipeline()
-                                                        .writeAndFlush(new DefaultLastHttpContent())
-                                                        .addListener(f -> {
-                                                                    if (f.isSuccess()) {
-                                                                        future.complete(null);
-                                                                    } else {
-                                                                        future.completeExceptionally(f.cause());
-                                                                    }
-                                                                }
-                                                        );
-                                            }
-                                        }
-                                        return future;
-                                    });
+                                    httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
+                                            .lift((FlowableOperator<HttpContent, HttpContent>) ArrayBracketSubscriber::new);
                                 }
 
                                 httpContentPublisher = Publishers.then(httpContentPublisher, httpContent ->
@@ -1881,10 +1859,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             // default Connection header if not set explicitly
             if (!isHttp2) {
                 if (!message.getHeaders().contains(HttpHeaders.CONNECTION)) {
-                    if (httpStatus.getCode() > 499) {
-                        message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.CLOSE);
-                    } else {
+                    if (httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError()) {
                         message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                    } else {
+                        message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.CLOSE);
                     }
                 }
             }
@@ -1899,10 +1877,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (!isHttp2) {
                 if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
                     boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || request.getHeaders().isKeepAlive();
-                    if (!expectKeepAlive || httpStatus.getCode() > 499) {
-                        nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                    } else {
+                    if (expectKeepAlive || httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError()) {
                         nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                    } else {
+                        nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
                     }
                 }
             }

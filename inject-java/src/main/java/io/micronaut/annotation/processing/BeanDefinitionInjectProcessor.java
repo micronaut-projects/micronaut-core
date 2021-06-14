@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1294,6 +1294,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                             int paramLen = targetParameters.size();
                             if (paramLen == sourceParams.length) {
+
+                                if (sourceMethodElement.isSuspend()) {
+                                    error(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Kotlin suspend method not supported here.");
+                                    return;
+                                }
 
                                 Map<String, ClassElement> genericTypes = new LinkedHashMap<>(paramLen);
                                 for (int i = 0; i < paramLen; i++) {

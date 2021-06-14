@@ -526,7 +526,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         elementLoop:
         for (Element enclosedElement : enclosedElements) {
             ElementKind enclosedElementKind = enclosedElement.getKind();
-            if (enclosedElementKind == kind) {
+            if (enclosedElementKind == kind || (enclosedElementKind == ElementKind.ENUM && kind == ElementKind.CLASS)) {
                 String elementName = enclosedElement.getSimpleName().toString();
                 if (onlyAccessible) {
                     // exclude private members
@@ -606,6 +606,13 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                 (ExecutableElement) enclosedElement,
                                 metadata
                         );
+                    case CLASS:
+                    case ENUM:
+                        //noinspection unchecked
+                        element = (T) visitorContext.getElementFactory().newClassElement(
+                                (TypeElement) enclosedElement,
+                                metadata
+                        );
                     break;
                     default:
                         element = null;
@@ -619,6 +626,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                 classElement = this;
                             } else if (element instanceof MethodElement) {
                                 classElement = ((MethodElement) element).getGenericReturnType();
+                            } else if (element instanceof ClassElement) {
+                                classElement = (ClassElement) element;
                             } else {
                                 classElement = ((FieldElement) element).getGenericField();
                             }
@@ -656,6 +665,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             return ElementKind.FIELD;
         } else if (elementType == ConstructorElement.class) {
             return ElementKind.CONSTRUCTOR;
+        } else if (elementType == ClassElement.class) {
+            return ElementKind.CLASS;
         }
         throw new IllegalArgumentException("Unsupported element type for query: " + elementType);
     }
