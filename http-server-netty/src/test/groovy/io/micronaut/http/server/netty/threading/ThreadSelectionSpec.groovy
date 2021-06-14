@@ -19,12 +19,15 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.scheduling.executor.ThreadSelection
+import io.netty.channel.EventLoopGroup
 import io.reactivex.*
 import io.reactivex.annotations.NonNull
 import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
 import spock.lang.Specification
 import spock.lang.Unroll
+
+import java.util.concurrent.ExecutorService
 
 class ThreadSelectionSpec extends Specification {
 
@@ -71,10 +74,19 @@ class ThreadSelectionSpec extends Specification {
         ThreadSelection.AUTO   |  'default-nioEventLoopGroup' | 'io-executor-thread-'       | "io-executor-thread-" | "io-executor-thread-"
         ThreadSelection.IO     |  'io-executor-thread-'       | 'io-executor-thread-'       | "io-executor-thread-" | "io-executor-thread-"
         ThreadSelection.MANUAL |  'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | "io-executor-thread-" | "io-executor-thread-"
-
-
     }
 
+    void "test injecting an executor service does not inject the Netty event loop"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        ApplicationContext ctx = embeddedServer.applicationContext
+
+        when:
+        EventLoopGroup eventLoopGroup = ctx.getBean(EventLoopGroup)
+
+        then:
+        !ctx.getBeansOfType(ExecutorService).contains(eventLoopGroup)
+    }
 
     @Client("/thread-selection")
     static interface ThreadSelectionClient {

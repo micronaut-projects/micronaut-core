@@ -24,6 +24,7 @@ import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.visitor.JavaClassElement
+import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
@@ -87,23 +88,19 @@ abstract class AbstractTypeElementSpec extends Specification {
         }
         AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement)
 
-        return new JavaClassElement(
-                typeElement,
-                annotationMetadata,
-                new JavaVisitorContext(
-                      processingEnv,
-                      messager,
-                      elements,
-                      annotationUtils,
-                        types,
-                        modelUtils,
-                        genericUtils,
-                        processingEnv.filer,
-                        new MutableConvertibleValuesMap<Object>()
-                )
-        ) {
+        JavaVisitorContext visitorContext = new JavaVisitorContext(
+                processingEnv,
+                messager,
+                elements,
+                annotationUtils,
+                types,
+                modelUtils,
+                genericUtils,
+                processingEnv.filer,
+                new MutableConvertibleValuesMap<Object>()
+        )
 
-        }
+        return new JavaElementFactory(visitorContext).newClassElement(typeElement, annotationMetadata)
     }
 
     /**
