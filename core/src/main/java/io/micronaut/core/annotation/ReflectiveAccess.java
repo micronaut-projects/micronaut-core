@@ -26,7 +26,7 @@ import java.lang.annotation.Target;
  * @author graemerocher
  * @since 1.1
  */
-@Target({ElementType.FIELD, ElementType.METHOD, ElementType.CONSTRUCTOR, ElementType.TYPE})
+@Target({ElementType.FIELD, ElementType.METHOD, ElementType.CONSTRUCTOR, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Experimental
 public @interface ReflectiveAccess {
