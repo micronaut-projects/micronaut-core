@@ -47,7 +47,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     private final ExecutableElement executableElement;
     private final JavaVisitorContext visitorContext;
     private final JavaClassElement declaringClass;
-    private JavaClassElement resolvedDeclaringClass;
+    private ClassElement resolvedDeclaringClass;
     private ParameterElement[] parameters;
     private ParameterElement continuationParameter;
     private ClassElement genericReturnType;
@@ -168,12 +168,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                 if (declaringClass.getName().equals(te.getQualifiedName().toString())) {
                     resolvedDeclaringClass = declaringClass;
                 } else {
-                    resolvedDeclaringClass = new JavaClassElement(
-                            te,
-                            visitorContext.getAnnotationUtils().getAnnotationMetadata(te),
-                            visitorContext,
-                            declaringClass.getGenericTypeInfo()
-                    );
+                    resolvedDeclaringClass = mirrorToClassElement(te.asType(), visitorContext, declaringClass.getGenericTypeInfo());
                 }
             } else {
                 return declaringClass;

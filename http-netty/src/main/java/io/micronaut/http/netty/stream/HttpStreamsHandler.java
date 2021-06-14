@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Base class for Http Streams handlers.
@@ -364,10 +365,20 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
             StreamedHttpMessage streamed = (StreamedHttpMessage) message;
             HandlerSubscriber<HttpContent> subscriber = new HandlerSubscriber<HttpContent>(ctx.executor()) {
+                AtomicBoolean messageWritten = new AtomicBoolean();
+
+                @Override
+                public void onNext(HttpContent httpContent) {
+                    if (messageWritten.compareAndSet(false, true)) {
+                        ctx.writeAndFlush(message).addListener(future -> super.onNext(httpContent));
+                    } else {
+                        super.onNext(httpContent);
+                    }
+                }
+
                 @Override
                 protected void error(Throwable error) {
                     try {
-
                         if (LOG.isErrorEnabled()) {
                             LOG.error("Error occurred writing stream response: " + error.getMessage(), error);
                         }
@@ -380,6 +391,14 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
                 @Override
                 protected void complete() {
+                    if (messageWritten.compareAndSet(false, true)) {
+                        ctx.writeAndFlush(message).addListener(future -> doOnComplete());
+                    } else {
+                        doOnComplete();
+                    }
+                }
+
+                private void doOnComplete() {
                     if (ctx.executor().inEventLoop()) {
                         completeBody(ctx, promise);
                     } else {
@@ -389,9 +408,6 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             };
 
             sendLastHttpContent = true;
-
-            // DON'T pass the promise through, create a new promise instead.
-            ctx.writeAndFlush(message);
 
             ctx.pipeline().addAfter(ctx.name(), ctx.name() + "-body-subscriber", subscriber);
             subscribeSubscriberToStream(streamed, subscriber);
