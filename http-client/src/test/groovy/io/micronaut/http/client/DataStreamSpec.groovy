@@ -66,7 +66,7 @@ class DataStreamSpec extends Specification {
                 '/datastream/books'
         )).map({buf ->
             buf.toByteArray()}
-        ).toList().block()
+        ).collectList().block()
 
         then:
         arrays.size() == 2
