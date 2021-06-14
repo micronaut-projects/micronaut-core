@@ -29,6 +29,11 @@ class AnotherClass<A> {
         return "Name is " + name
     }
 
+    // protected methods not proxied
+    private String testPrivate(String name) {
+        return "Name is " + name
+    }
+
     String test(String name) {
         return "Name is " + name
     }
