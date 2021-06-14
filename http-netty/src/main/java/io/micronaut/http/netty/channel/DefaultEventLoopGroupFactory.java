@@ -93,6 +93,7 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
         return nativeFactory.createEventLoopGroup(threads, threadFactory, ioRatio);
     }
 
+    @NonNull
     @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return nativeFactory.serverSocketChannelClass();

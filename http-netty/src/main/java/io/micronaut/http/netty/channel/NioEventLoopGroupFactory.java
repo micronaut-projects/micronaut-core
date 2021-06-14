@@ -71,6 +71,7 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
      *
      * @return NioServerSocketChannel.
      */
+    @NonNull
     @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return NioServerSocketChannel.class;

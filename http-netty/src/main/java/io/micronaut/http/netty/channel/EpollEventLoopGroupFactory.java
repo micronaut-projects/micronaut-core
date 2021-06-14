@@ -76,6 +76,7 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
      *
      * @return EpollServerSocketChannel.
      */
+    @NonNull
     @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return EpollServerSocketChannel.class;

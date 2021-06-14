@@ -42,15 +42,6 @@ public class ContentLengthExceededHandler implements ExceptionHandler<ContentLen
 
     /**
      * Constructor.
-     * @deprecated Use {@link ContentLengthExceededHandler(ErrorResponseProcessor)} instead.
-     */
-    @Deprecated
-    public ContentLengthExceededHandler() {
-        this.responseProcessor = null;
-    }
-
-    /**
-     * Constructor.
      * @param responseProcessor Error Response Processor
      */
     @Inject

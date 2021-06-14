@@ -81,6 +81,7 @@ public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
      *
      * @return KQueueServerSocketChannel.
      */
+    @NonNull
     @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return KQueueServerSocketChannel.class;

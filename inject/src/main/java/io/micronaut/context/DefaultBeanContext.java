@@ -2187,29 +2187,6 @@ public class DefaultBeanContext implements BeanContext {
      * @param resolutionContext The {@link BeanResolutionContext}
      * @param beanDefinition    The {@link BeanDefinition}
      * @param qualifier         The {@link Qualifier}
-     * @param isSingleton       Whether the bean is a singleton
-     * @param argumentValues    Any argument values passed to create the bean
-     * @param <T>               The bean generic type
-     * @return The created bean
-     * @deprecated Use {@link #doCreateBean(BeanResolutionContext, BeanDefinition, Qualifier, Argument, boolean, Map)} instead.
-     */
-    @Nullable
-    @Deprecated
-    protected <T> T doCreateBean(@NonNull BeanResolutionContext resolutionContext,
-                                 @NonNull BeanDefinition<T> beanDefinition,
-                                 @Nullable Qualifier<T> qualifier,
-                                 boolean isSingleton,
-                                 @Nullable Map<String, Object> argumentValues) {
-        return doCreateBean(resolutionContext, beanDefinition, qualifier, Argument.of(beanDefinition.getBeanType()), isSingleton, argumentValues);
-    }
-
-    /**
-     * Execution the creation of a bean. The returned value can be null if a
-     * factory method returned null.
-     *
-     * @param resolutionContext The {@link BeanResolutionContext}
-     * @param beanDefinition    The {@link BeanDefinition}
-     * @param qualifier         The {@link Qualifier}
      * @param qualifierBeanType The bean type used in the qualifier
      * @param isSingleton       Whether the bean is a singleton
      * @param argumentValues    Any argument values passed to create the bean
