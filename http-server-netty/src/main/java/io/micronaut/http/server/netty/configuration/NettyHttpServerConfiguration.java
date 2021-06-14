@@ -335,10 +335,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Default value ({@value DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR})
-     * @return Configuration to add `keep-alive` connection header to responses with HttpStatus > 499
-     * @param keepAliveOnServerError boolean flag indicating whether to add connection header `keep-alive` to responses with HttpStatus > 499
-     * @see io.micronaut.http.server.netty.RoutingInBoundHandler#writeFinalNettyResponse()
+     * @return True if the connection should be kept alive on internal server errors
      */
     public boolean isKeepAliveOnServerError() {
         return keepAliveOnServerError;
@@ -459,9 +456,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Sets the Configuration to add keep-alive connection header to responses with HttpStatus > 499.
-     * @param keepAliveOnServerError boolean flag indicating whether to add connection header `keep-alive` to responses with HttpStatus > 499
-     * @see io.micronaut.http.server.netty.RoutingInBoundHandler#writeFinalNettyResponse()
+     * Whether to send connection keep alive on internal server errors. Default value ({@value DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR}).
+     * @param keepAliveOnServerError The keep alive on server error flag
      */
     public void setKeepAliveOnServerError(boolean keepAliveOnServerError) {
         this.keepAliveOnServerError = keepAliveOnServerError;
