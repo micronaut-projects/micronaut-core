@@ -334,5 +334,22 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
         }
         return annotationMetadata;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        AbstractGroovyElement that = (AbstractGroovyElement) o;
+        return annotatedNode.equals(that.annotatedNode);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(annotatedNode);
+    }
 }
 

@@ -56,6 +56,16 @@ class AstAnnotationUtils {
     }
 
     /**
+     * Get the {@link AnnotationMetadata} for the given method node node
+     *
+     * @param annotatedNode The node
+     * @return The metadata
+     */
+    static AnnotationMetadata getMethodAnnotationMetadata(SourceUnit sourceUnit, CompilationUnit compilationUnit, MethodNode annotatedNode) {
+        return new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildOverridden(annotatedNode)
+    }
+
+    /**
      * Get the {@link AnnotationMetadata} for the given annotated node
      *
      * @param sourceUnit the source unit
