@@ -1859,10 +1859,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             // default Connection header if not set explicitly
             if (!isHttp2) {
                 if (!message.getHeaders().contains(HttpHeaders.CONNECTION)) {
-                    if (httpStatus.getCode() > 499) {
-                        message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.CLOSE);
-                    } else {
+                    if (httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError()) {
                         message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                    } else {
+                        message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.CLOSE);
                     }
                 }
             }
@@ -1877,10 +1877,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (!isHttp2) {
                 if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
                     boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || request.getHeaders().isKeepAlive();
-                    if (!expectKeepAlive || httpStatus.getCode() > 499) {
-                        nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                    } else {
+                    if (expectKeepAlive || httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError()) {
                         nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                    } else {
+                        nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
                     }
                 }
             }
