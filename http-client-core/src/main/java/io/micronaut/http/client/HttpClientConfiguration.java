@@ -38,15 +38,17 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.ServiceLoader;
 import java.util.concurrent.ThreadFactory;
 
 /**
  * Configuration for the {@link HttpClient}. This configuration only takes affect for {@link HttpClient}
  * instances created outside the application context using {@link HttpClient#create(URL, HttpClientConfiguration)}.
- * For clients created within the context using, e.g. {@link javax.inject.Inject} or
+ * For clients created within the context using, e.g. {@link jakarta.inject.Inject} or
  * {@link io.micronaut.context.ApplicationContext#createBean(Class)}, use event loop group configuration.
  *
  * @author Graeme Rocher
@@ -101,6 +103,8 @@ public abstract class HttpClientConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
+
+    private static ReactorHttpClientFactory clientFactory = null;
 
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
@@ -639,6 +643,88 @@ public abstract class HttpClientConfiguration {
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    @Internal
+    static ReactorHttpClient createClient(@Nullable URL url) {
+        ReactorHttpClientFactory clientFactory = getReactiveHttpClientFactory();
+
+        return clientFactory.createClient(url);
+    }
+
+    /**
+     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    @Internal
+    static ReactorHttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration) {
+        ReactorHttpClientFactory clientFactory = getReactiveHttpClientFactory();
+
+        return clientFactory.createClient(url, configuration);
+    }
+
+    /**
+     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    @Internal
+    static ReactorStreamingHttpClient createStreamingClient(@NonNull URL url) {
+        ArgumentUtils.requireNonNull("url", url);
+        ReactorHttpClientFactory clientFactory = getReactiveHttpClientFactory();
+        return clientFactory.createStreamingClient(url);
+    }
+
+    /**
+     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration The client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    @Internal
+    static ReactorStreamingHttpClient createStreamingClient(@NonNull URL url, HttpClientConfiguration configuration) {
+        ArgumentUtils.requireNonNull("url", url);
+        ReactorHttpClientFactory clientFactory = getReactiveHttpClientFactory();
+        return clientFactory.createStreamingClient(url, configuration);
+    }
+
+    private static ReactorHttpClientFactory getReactiveHttpClientFactory() {
+        ReactorHttpClientFactory clientFactory = HttpClientConfiguration.clientFactory;
+        if (clientFactory == null) {
+            synchronized (HttpClientConfiguration.class) { // double check
+                clientFactory = HttpClientConfiguration.clientFactory;
+                if (clientFactory == null) {
+                    clientFactory = resolveClientFactory();
+                    HttpClientConfiguration.clientFactory = clientFactory;
+                }
+            }
+        }
+        return clientFactory;
+    }
+
+    private static ReactorHttpClientFactory resolveClientFactory() {
+        final Iterator<ReactorHttpClientFactory> i = ServiceLoader.load(ReactorHttpClientFactory.class).iterator();
+        if (i.hasNext()) {
+            return i.next();
+        }
+        throw new IllegalStateException("No RxHttpClientFactory present on classpath, cannot create HTTP client");
     }
 
     /**
