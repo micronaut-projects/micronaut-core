@@ -371,7 +371,7 @@ class HttpPostSpec extends Specification {
 
     void "test http post with empty body"() {
         when:
-        def res = Flowable.fromPublisher(client.exchange(HttpRequest.POST('/post/emptyBody'))).blockingFirst();
+        def res = Flowable.fromPublisher(client.exchange(HttpRequest.POST('/post/emptyBody', null))).blockingFirst();
 
         then:
         res.status == HttpStatus.NO_CONTENT

@@ -200,7 +200,7 @@ class HttpPutSpec extends Specification {
 
     void "test http put with empty body"() {
         when:
-        def res = Flowable.fromPublisher(client.exchange(HttpRequest.PUT('/put/emptyBody'))).blockingFirst();
+        def res = Flowable.fromPublisher(client.exchange(HttpRequest.PUT('/put/emptyBody', null))).blockingFirst();
 
         then:
         res.status == HttpStatus.NO_CONTENT

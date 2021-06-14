@@ -296,19 +296,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#POST} request for the given URI.
-     *
-     * @param uri  The URI
-     * @param <T> The Http request type
-     * @return The {@link MutableHttpRequest} instance
-     * @see HttpRequestFactory
-     */
-    static <T> MutableHttpRequest<T> POST(String uri) {
-        Objects.requireNonNull(uri, "Argument [uri] is required");
-        return POST(uri, null);
-    }
-
-    /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PUT} request for the given URI.
      *
      * @param uri  The URI
@@ -336,19 +323,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PUT} request for the given URI.
-     *
-     * @param uri  The URI
-     * @param <T>  The body type
-     * @return The {@link MutableHttpRequest} instance
-     * @see HttpRequestFactory
-     */
-    static <T> MutableHttpRequest<T> PUT(String uri) {
-        Objects.requireNonNull(uri, "Argument [uri] is required");
-        return PUT(uri, null);
-    }
-
-    /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PATCH} request for the given URI.
      *
      * @param uri  The URI
@@ -373,19 +347,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     static <T> MutableHttpRequest<T> PATCH(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         return HttpRequestFactory.INSTANCE.patch(uri, body);
-    }
-
-    /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PATCH} request for the given URI.
-     *
-     * @param uri  The URI
-     * @param <T> The Http request type
-     * @return The {@link MutableHttpRequest} instance
-     * @see HttpRequestFactory
-     */
-    static <T> MutableHttpRequest<T> PATCH(String uri) {
-        Objects.requireNonNull(uri, "Argument [uri] is required");
-        return HttpRequestFactory.INSTANCE.patch(uri, null);
     }
 
     /**

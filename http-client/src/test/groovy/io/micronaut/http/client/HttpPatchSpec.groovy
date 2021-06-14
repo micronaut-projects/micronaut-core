@@ -153,7 +153,7 @@ class HttpPatchSpec extends Specification {
 
     void "test http patch with empty body"() {
         when:
-        def res = Flowable.fromPublisher(client.exchange(HttpRequest.PATCH('/patch/emptyBody'))).blockingFirst();
+        def res = Flowable.fromPublisher(client.exchange(HttpRequest.PATCH('/patch/emptyBody', null))).blockingFirst();
 
         then:
         res.status == HttpStatus.NO_CONTENT
