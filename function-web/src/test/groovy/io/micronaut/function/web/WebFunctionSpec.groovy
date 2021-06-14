@@ -26,7 +26,6 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.ReactorHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.Ignore
 import spock.lang.Specification
 
 import java.util.function.Consumer
@@ -36,7 +35,6 @@ import java.util.function.Supplier
  * @author Graeme Rocher
  * @since 1.0
  */
-@Ignore
 class WebFunctionSpec extends Specification {
 
     void "test the function registry"() {

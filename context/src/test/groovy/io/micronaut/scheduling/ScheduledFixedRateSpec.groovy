@@ -23,13 +23,11 @@ import spock.util.concurrent.PollingConditions
 
 import jakarta.inject.Singleton
 import java.util.concurrent.atomic.AtomicInteger
-import spock.lang.Ignore
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Ignore
 class ScheduledFixedRateSpec extends Specification {
 
     void 'test schedule task at fixed delay or rate '() {
