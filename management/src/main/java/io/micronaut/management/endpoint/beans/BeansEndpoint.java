@@ -57,6 +57,7 @@ public class BeansEndpoint {
                 .stream()
                 .sorted(Comparator.comparing((BeanDefinition<?> bd) -> bd.getClass().getName()))
                 .collect(Collectors.toList());
-        return Mono.from(beanDefinitionDataCollector.getData(beanDefinitions));
+        return Mono.from(beanDefinitionDataCollector.getData(beanDefinitions))
+                    .defaultIfEmpty(Collections.emptyMap());
     }
 }
