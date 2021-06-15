@@ -132,6 +132,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Observable;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -1648,11 +1649,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             return;
                         } else {
                             Object suspendedBody;
-                            //if (isKotlinFunctionReturnTypeUnit) {
-                                //TODO suspendedBody = Completable.complete();
-                            //} else {
+                            if (isKotlinFunctionReturnTypeUnit) {
+                                suspendedBody = Mono.<Void>just(null);
+                            } else {
                                 suspendedBody = body;
-                            //}
+                            }
                             if (suspendedBody instanceof HttpResponse) {
                                 outgoingResponse = toMutableResponse((HttpResponse<?>) suspendedBody);
                             } else {
