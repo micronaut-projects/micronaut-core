@@ -114,6 +114,7 @@ import reactor.core.publisher.FluxOperator;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
+import reactor.core.publisher.Sinks;
 import reactor.core.publisher.UnicastProcessor;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -1378,8 +1379,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (isJson) {
                                     // if the Publisher is returning JSON then in order for it to be valid JSON for each emitted element
                                     // we must wrap the JSON in array and delimit the emitted items
-                                    //TODO httpContentPublisher = Flux.from(httpContentPublisher)
-                                    //        .lift((FluxOperator<HttpContent, HttpContent>) ArrayBracketSubscriber::new);
+                                    httpContentPublisher = Flux.from(httpContentPublisher);
+                                    //TODO         .lift((FluxOperator<HttpContent, HttpContent>) ArrayBracketSubscriber::new);
                                 }
 
                                 httpContentPublisher = Publishers.then(httpContentPublisher, httpContent ->
