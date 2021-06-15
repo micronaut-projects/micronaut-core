@@ -59,6 +59,11 @@ class StringUtilsSpec extends Specification {
         "/a"  | "/b/" | "/a/b/"
         "/a/" | "/b/" | "/a/b/"
         "/"   | "/b"  | "/b"
+        "/"   | "?x=true"  | "/?x=true"
+        "a"   | "?x=true"  | "a?x=true"
+        "a/"  | "?x=true"  | "a/?x=true"
+        "/a"  | "?x=true"  | "/a?x=true"
+        "/a/" | "?x=true"  | "/a/?x=true"
     }
 
     @Unroll

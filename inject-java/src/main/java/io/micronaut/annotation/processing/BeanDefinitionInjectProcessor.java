@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -130,7 +130,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 modelUtils,
                 genericUtils,
                 filer,
-                visitorAttributes
+                visitorAttributes,
+                getVisitorKind()
         ) {
             @NonNull
             @Override
@@ -156,8 +157,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     String packageName = NameUtils.getPackageName(name);
                     return !name.equals(AnnotationUtil.KOTLIN_METADATA) && !AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName);
                 })
-                .filter(ann ->
-                        annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES) || AbstractAnnotationMetadataBuilder.isAnnotationMapped(ann.getQualifiedName().toString()))
+                .filter(ann -> annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES) || isProcessedAnnotation(ann.getQualifiedName().toString()))
                 .collect(Collectors.toSet());
 
         if (!annotations.isEmpty()) {
@@ -170,13 +170,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     .filter(element -> element.getKind() != ANNOTATION_TYPE)
                     .forEach(element -> {
                         TypeElement typeElement = modelUtils.classElementFor(element);
-
+                        if (typeElement == null) {
+                            return;
+                        }
                         if (element.getKind() == ENUM) {
                             error(element, "Enum types cannot be defined as beans");
                             return;
                         }
                         // skip Groovy code, handled by InjectTransform. Required for GroovyEclipse compiler
-                        if (typeElement == null || (groovyObjectType != null && typeUtils.isAssignable(typeElement.asType(), groovyObjectType))) {
+                        if ((groovyObjectType != null && typeUtils.isAssignable(typeElement.asType(), groovyObjectType))) {
                             return;
                         }
 
@@ -1292,6 +1294,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                             int paramLen = targetParameters.size();
                             if (paramLen == sourceParams.length) {
+
+                                if (sourceMethodElement.isSuspend()) {
+                                    error(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Kotlin suspend method not supported here.");
+                                    return;
+                                }
 
                                 Map<String, ClassElement> genericTypes = new LinkedHashMap<>(paramLen);
                                 for (int i = 0; i < paramLen; i++) {

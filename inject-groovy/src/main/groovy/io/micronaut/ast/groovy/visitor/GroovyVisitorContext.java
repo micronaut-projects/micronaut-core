@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import groovy.lang.GroovyClassLoader;
@@ -32,6 +33,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
@@ -68,6 +70,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final MutableConvertibleValues<Object> attributes;
     private final List<String> generatedResources = new ArrayList<>();
     private final GroovyElementFactory groovyElementFactory;
+    private final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = new ArrayList<>();
 
     /**
      * @param sourceUnit      The source unit
@@ -338,5 +341,24 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public void addGeneratedResource(@NonNull String resource) {
         generatedResources.add(resource);
+    }
+
+    /**
+     * @return Gets the produced bean definition builders.
+     */
+    @Internal
+    public List<AbstractBeanDefinitionBuilder> getBeanElementBuilders() {
+        final ArrayList<AbstractBeanDefinitionBuilder> current = new ArrayList<>(beanDefinitionBuilders);
+        beanDefinitionBuilders.clear();
+        return current;
+    }
+
+    /**
+     * Adds a java bean definition builder.
+     * @param groovyBeanDefinitionBuilder The groovy bean definition builder
+     */
+    @Internal
+    void addBeanDefinitionBuilder(GroovyBeanDefinitionBuilder groovyBeanDefinitionBuilder) {
+        this.beanDefinitionBuilders.add(groovyBeanDefinitionBuilder);
     }
 }

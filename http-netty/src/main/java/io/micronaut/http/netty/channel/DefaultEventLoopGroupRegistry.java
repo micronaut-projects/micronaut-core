@@ -127,8 +127,8 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     @Singleton
     @Requires(missingProperty = EventLoopGroupConfiguration.DEFAULT_LOOP)
     @Primary
-    @Bean
     @BootstrapContextCompatible
+    @Bean(typed = { EventLoopGroup.class })
     protected EventLoopGroup defaultEventLoopGroup(@Named(NettyThreadFactory.NAME) ThreadFactory threadFactory) {
         EventLoopGroupConfiguration configuration = new DefaultEventLoopGroupConfiguration();
         EventLoopGroup eventLoopGroup = eventLoopGroupFactory.createEventLoopGroup(configuration, threadFactory);

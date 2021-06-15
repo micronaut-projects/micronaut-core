@@ -28,6 +28,8 @@ import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.visitor.TypeElementVisitor;
+
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -271,7 +273,8 @@ public class AnnotationUtils {
                 modelUtils,
                 genericUtils,
                 filer,
-                visitorAttributes
+                visitorAttributes,
+                TypeElementVisitor.VisitorKind.ISOLATING
         );
     }
 

@@ -512,6 +512,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
                                     clazz.isEnum() ||
                                     clazz == Class.class ||
                                     clazz == String.class ||
+                                    clazz == Enum.class ||
                                     clazz == AnnotationClassValue.class ||
                                     clazz == AnnotationValue.class
                             );

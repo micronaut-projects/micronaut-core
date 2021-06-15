@@ -161,14 +161,14 @@ class LoadedVisitor implements Ordered {
                 return e
             case MethodNode:
                 if (currentClassElement != null) {
-                    def e = visitorContext.getElementFactory().newMethodElement(currentClassElement, (MethodNode) annotatedNode, annotationMetadata)
+                    def e = visitorContext.getElementFactory().newSourceMethodElement(currentClassElement, (MethodNode) annotatedNode, annotationMetadata)
                     visitor.visitMethod(e, visitorContext)
                     return e
                 }
                 break
             case ClassNode:
                 ClassNode cn = (ClassNode) annotatedNode
-                currentClassElement = visitorContext.getElementFactory().newClassElement(cn, annotationMetadata)
+                currentClassElement = visitorContext.getElementFactory().newSourceClassElement(cn, annotationMetadata)
                 visitor.visitClass(currentClassElement, visitorContext)
                 return currentClassElement
         }

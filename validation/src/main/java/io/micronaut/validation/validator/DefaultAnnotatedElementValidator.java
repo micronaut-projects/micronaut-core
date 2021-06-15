@@ -53,7 +53,7 @@ public class DefaultAnnotatedElementValidator extends DefaultValidator implement
     /**
      * Local constraint validator lookup using service loader.
      */
-    private static class LocalConstraintValidators extends DefaultConstraintValidators {
+    private static final class LocalConstraintValidators extends DefaultConstraintValidators {
 
         private Map<ValidatorKey, ConstraintValidator> validatorMap;
 

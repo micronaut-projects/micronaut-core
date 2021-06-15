@@ -17,11 +17,15 @@ package io.micronaut.annotation.processing.test
 
 import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
+import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
 import io.micronaut.annotation.processing.AnnotationUtils
+import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor
 import io.micronaut.annotation.processing.GenericUtils
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.annotation.processing.ModelUtils
+import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.visitor.JavaClassElement
+import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
@@ -42,10 +46,12 @@ import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.provider.BeanProviderDefinition
+import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
+import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.Element
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
@@ -84,23 +90,20 @@ abstract class AbstractTypeElementSpec extends Specification {
         }
         AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement)
 
-        return new JavaClassElement(
-                typeElement,
-                annotationMetadata,
-                new JavaVisitorContext(
-                      processingEnv,
-                      messager,
-                      elements,
-                      annotationUtils,
-                        types,
-                        modelUtils,
-                        genericUtils,
-                        processingEnv.filer,
-                        new MutableConvertibleValuesMap<Object>()
-                )
-        ) {
+        JavaVisitorContext visitorContext = new JavaVisitorContext(
+                processingEnv,
+                messager,
+                elements,
+                annotationUtils,
+                types,
+                modelUtils,
+                genericUtils,
+                processingEnv.filer,
+                new MutableConvertibleValuesMap<Object>(),
+                TypeElementVisitor.VisitorKind.ISOLATING
+        )
 
-        }
+        return new JavaElementFactory(visitorContext).newClassElement(typeElement, annotationMetadata)
     }
 
     /**
@@ -249,9 +252,34 @@ class Test {
      * Create and return a new Java parser.
      * @return The java parser to use
      */
-    @CompileStatic
     protected JavaParser newJavaParser() {
-        return new JavaParser()
+        def visitors = getLocalTypeElementVisitors()
+        if (visitors) {
+            return new JavaParser() {
+                @Override
+                protected TypeElementVisitorProcessor getTypeElementVisitorProcessor() {
+                    return new TypeElementVisitorProcessor() {
+                        @Override
+                        protected Collection<TypeElementVisitor> findTypeElementVisitors() {
+                            return visitors
+                        }
+                    }
+                }
+
+                @Override
+                protected AggregatingTypeElementVisitorProcessor getAggregatingTypeElementVisitorProcessor() {
+                    return new AggregatingTypeElementVisitorProcessor() {
+                        @Override
+                        protected Collection<TypeElementVisitor> findTypeElementVisitors() {
+                            return visitors
+                        }
+                    }
+                }
+
+            }
+        } else {
+            return new JavaParser()
+        }
     }
 
     /**
@@ -366,6 +394,14 @@ class Test {
      * @return The transformers for the annotation
      */
     protected List<AnnotationTransformer<? extends Annotation>> getLocalAnnotationTransformers(@NonNull String annotationName) {
+        return Collections.emptyList()
+    }
+
+    /**
+     * Retrieve additional type element visitors for this test.
+     * @return the visitors
+     */
+    protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
         return Collections.emptyList()
     }
 

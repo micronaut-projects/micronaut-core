@@ -166,7 +166,13 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
 
     private AnnotationMetadata initAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
         if (annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
-            return new MethodAnnotationMetadata(annotationMetadata);
+            if (annotationMetadata != null) {
+                if (annotationMetadata.hasPropertyExpressions()) {
+                    return new MethodAnnotationMetadata(annotationMetadata);
+                } else {
+                    return annotationMetadata;
+                }
+            }
         }
         return AnnotationMetadata.EMPTY_METADATA;
     }

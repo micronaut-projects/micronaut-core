@@ -20,7 +20,6 @@ import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import io.micronaut.core.annotation.Creator;
-import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.naming.NameUtils;
@@ -102,15 +101,11 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         if (!isSubclass && !element.hasStereotype(Deprecated.class)) {
-            if (element.hasAnnotation(Introspected.class)) {
+            if (element.hasAnnotation(ReflectiveAccess.class)) {
                 packages.add(element.getPackageName());
                 final String beanName = element.getName();
                 addBean(beanName);
                 resolveClassData(beanName + "[]");
-                final String[] introspectedClasses = element.getValue(Introspected.class, "classes", String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
-                for (String introspectedClass : introspectedClasses) {
-                    addBean(introspectedClass);
-                }
             } else if (element.hasAnnotation(TypeHint.class)) {
                 packages.add(element.getPackageName());
                 final String[] introspectedClasses = element.stringValues(TypeHint.class);
@@ -176,7 +171,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 final ClassElement declaringType = element.getDeclaringType();
                 packages.add(declaringType.getPackageName());
                 addBean(declaringType.getName());
-            } else if (element.hasAnnotation(ReflectiveAccess.class)) {
+            } else if (element.hasAnnotation(ReflectiveAccess.class) && !element.getDeclaringType().isEnum()) {
                 processMethodElement(element);
             }
         }

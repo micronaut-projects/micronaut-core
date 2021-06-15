@@ -165,7 +165,7 @@ public class LoadedVisitor implements Ordered {
                     );
                     return e;
                 } else {
-                    final JavaMethodElement e = elementFactory.newMethodElement(rootClassElement, executableElement, annotationMetadata);
+                    final JavaMethodElement e = elementFactory.newSourceMethodElement(rootClassElement, executableElement, annotationMetadata);
                     visitor.visitMethod(
                             e,
                             visitorContext
@@ -175,7 +175,7 @@ public class LoadedVisitor implements Ordered {
             }
         } else if (element instanceof TypeElement) {
             TypeElement typeElement = (TypeElement) element;
-            this.rootClassElement = elementFactory.newClassElement(typeElement, annotationMetadata);
+            this.rootClassElement = elementFactory.newSourceClassElement(typeElement, annotationMetadata);
             visitor.visitClass(
                     rootClassElement,
                     visitorContext

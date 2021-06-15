@@ -460,7 +460,9 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
         String methodName = methodNode.name
         ClassNode declaringClass = methodNode.declaringClass
-        AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode)
+        AnnotationMetadata methodAnnotationMetadata = getAnnotationMetadataHierarchy(
+                AstAnnotationUtils.getMethodAnnotationMetadata(sourceUnit, compilationUnit, methodNode)
+        )
         def declaringElement = elementFactory.newClassElement(
                 declaringClass,
                 AnnotationMetadata.EMPTY_METADATA
@@ -552,8 +554,16 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             boolean isPublic = methodNode.isPublic() && !hasInvalidModifiers
             boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable) || hasAroundStereotype(methodAnnotationMetadata)) && !hasInvalidModifiers
             if (isDeclaredBean && isExecutable) {
-                visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
+
+                visitExecutableMethod(
+                        declaringClass,
+                        methodNode,
+                        methodAnnotationMetadata,
+                        methodName,
+                        isPublic
+                )
             } else if (isConfigurationProperties && isPublic) {
+                methodAnnotationMetadata = AstAnnotationUtils.newBuilder(sourceUnit, compilationUnit).buildDeclared(methodNode)
                 if (NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
                     String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
                     MethodElement groovyMethodElement = elementFactory.newMethodElement(
@@ -622,6 +632,10 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 }
             }
         }
+    }
+
+    private AnnotationMetadata getAnnotationMetadataHierarchy(AnnotationMetadata methodAnnotationMetadata) {
+        return methodAnnotationMetadata instanceof AnnotationMetadataHierarchy ? methodAnnotationMetadata : new AnnotationMetadataHierarchy(concreteClassAnnotationMetadata, methodAnnotationMetadata)
     }
 
     @CompileStatic
@@ -1354,6 +1368,9 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
     @CompileDynamic
     private void visitAdaptedMethod(MethodNode method, AnnotationMetadata methodAnnotationMetadata) {
+        if (methodAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
+            methodAnnotationMetadata = ((AnnotationMetadataHierarchy) methodAnnotationMetadata).getDeclaredMetadata();
+        }
         Optional<ClassNode> adaptedType = methodAnnotationMetadata.getValue(Adapter.class, String.class).flatMap({ String s ->
             ClassNode cn = sourceUnit.AST.classes.find { ClassNode cn -> cn.name == s }
             if (cn != null) {
