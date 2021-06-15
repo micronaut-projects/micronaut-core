@@ -21,11 +21,7 @@ import ch.qos.logback.core.AppenderBase
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
-import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpMethod
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.netty.channel.EventLoopGroupFactory
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory
 import io.micronaut.http.netty.channel.converters.DefaultChannelOptionFactory
@@ -34,7 +30,6 @@ import io.micronaut.http.netty.channel.converters.KQueueChannelOptionFactory
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.cors.CorsOriginConfiguration
 import io.micronaut.http.server.netty.NettyHttpServer
-import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.ChannelOption
 import io.netty.channel.epoll.Epoll

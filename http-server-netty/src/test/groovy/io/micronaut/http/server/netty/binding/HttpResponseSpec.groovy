@@ -211,7 +211,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         when:
         EmbeddedServer server = applicationContext.run(EmbeddedServer, [(SPEC_NAME_PROPERTY):getClass().simpleName])
         def ctx = server.getApplicationContext()
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
         client.exchange(
           HttpRequest.GET('/test-header/fail')
@@ -238,7 +238,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
           'micronaut.server.netty.keepAliveOnServerError':true
         ])
         def ctx = server.getApplicationContext()
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), config)
+        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL(), config)
 
         client.exchange(
           HttpRequest.GET('/test-header/fail')
