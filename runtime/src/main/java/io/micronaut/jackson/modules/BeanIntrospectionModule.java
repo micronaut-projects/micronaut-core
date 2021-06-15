@@ -159,6 +159,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                         }
                     }
                 };
+                
+                newBuilder.setAnyGetter(builder.getAnyGetter());
                 final List<BeanPropertyWriter> properties = builder.getProperties();
                 final Collection<BeanProperty<Object, Object>> beanProperties = introspection.getBeanProperties();
                 if (CollectionUtils.isEmpty(properties) && CollectionUtils.isNotEmpty(beanProperties)) {
