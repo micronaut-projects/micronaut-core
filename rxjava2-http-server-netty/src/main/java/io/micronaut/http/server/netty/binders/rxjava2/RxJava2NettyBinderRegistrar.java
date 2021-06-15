@@ -38,6 +38,10 @@ class RxJava2NettyBinderRegistrar implements BeanCreatedEventListener<RequestBin
                 conversionService,
                 httpContentProcessorResolver
         ));
+        registry.addRequestArgumentBinder(new ObservableBodyBinder(
+                conversionService,
+                httpContentProcessorResolver
+        ));
         registry.addRequestArgumentBinder(new SingleBodyBinder(
                 conversionService,
                 httpContentProcessorResolver
