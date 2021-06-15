@@ -16,7 +16,6 @@
 package io.micronaut.jackson.parser;
 
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
@@ -95,7 +94,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
      * Construct with given JSON factory.
      *
      * @param jsonFactory To configure and construct reader (aka parser, {@link JsonParser})
-     *                    and writer (aka generator, {@link JsonGenerator}) instances.
+     *                    and writer (aka generator, {@link com.fasterxml.jackson.core.JsonGenerator}) instances.
      * @param deserializationConfig The jackson deserialization configuration
      */
     public JacksonProcessor(JsonFactory jsonFactory, DeserializationConfig deserializationConfig) {
@@ -106,7 +105,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
      * Construct with given JSON factory.
      *
      * @param jsonFactory To configure and construct reader (aka parser, {@link JsonParser})
-     *                    and writer (aka generator, {@link JsonGenerator}) instances.
+     *                    and writer (aka generator, {@link com.fasterxml.jackson.core.JsonGenerator}) instances.
      */
     public JacksonProcessor(JsonFactory jsonFactory) {
         this(jsonFactory, false, null);
