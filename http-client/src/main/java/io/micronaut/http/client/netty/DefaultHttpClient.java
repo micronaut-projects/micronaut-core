@@ -2162,7 +2162,7 @@ public class DefaultHttpClient implements
                                     .subscribe(oHttpResponse -> {
                                         emitter.next(oHttpResponse);
                                         emitter.complete();
-                                    }, throwable -> emitter.error(throwable));
+                                    }, emitter::error);
                             return;
                         }
                         if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
