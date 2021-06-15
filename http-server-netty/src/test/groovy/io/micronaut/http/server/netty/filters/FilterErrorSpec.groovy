@@ -24,6 +24,8 @@ import spock.lang.Ignore
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
+import java.util.concurrent.atomic.AtomicInteger
+
 class FilterErrorSpec extends Specification {
 
     void "test errors emitted from filters interacting with exception handlers"() {
@@ -58,6 +60,7 @@ class FilterErrorSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '2'])
         def ctx = server.applicationContext
         RxHttpClient client = ctx.createBean(RxHttpClient, server.getURL())
+        FirstEvery filter = ctx.getBean(FirstEvery)
 
         when:
         def response = client.exchange("/filter-error-spec", String)
@@ -67,6 +70,7 @@ class FilterErrorSpec extends Specification {
         then:
         response.status() == HttpStatus.BAD_REQUEST
         response.body() == "from filter exception handler"
+        filter.executedCount.get() == 1
 
         cleanup:
         client.close()
@@ -110,8 +114,11 @@ class FilterErrorSpec extends Specification {
     @Filter("/**")
     static class FirstEvery implements HttpServerFilter {
 
+        AtomicInteger executedCount = new AtomicInteger(0)
+
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            executedCount.incrementAndGet()
             return Publishers.just(new FilterException())
         }
 
