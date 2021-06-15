@@ -20,16 +20,12 @@ package io.micronaut.http.client.docs.streaming;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
-import jdk.javadoc.internal.doclets.formats.html.markup.Head;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 // end::imports[]
 
 /**
