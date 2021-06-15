@@ -54,6 +54,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     private final Map<String, Object> defaultValues;
     private final Function<Object, Object> valueMapper;
     private final RetentionPolicy retentionPolicy;
+    private final List<AnnotationValue<?>> stereotypes;
 
     /**
      * @param annotationName The annotation name
@@ -70,8 +71,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param retentionPolicy The retention policy
      */
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
-        this(annotationName, values, Collections.emptyMap(), retentionPolicy);
+        this(annotationName, values, Collections.emptyMap(), retentionPolicy, null);
     }
+
+    /**
+     * @param annotationName  The annotation name
+     * @param values          The values
+     * @param retentionPolicy The retention policy
+     * @param stereotypes     The stereotypes of the annotation
+     */
+    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
+        this(annotationName, values, Collections.emptyMap(), retentionPolicy, stereotypes);
+    }
+
 
     /**
      * @param annotationName The annotation name
@@ -80,7 +92,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues) {
-        this(annotationName, values, defaultValues, RetentionPolicy.RUNTIME);
+        this(annotationName, values, defaultValues, RetentionPolicy.RUNTIME, null);
     }
 
     /**
@@ -91,12 +103,24 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues, RetentionPolicy retentionPolicy) {
+        this(annotationName, values, defaultValues, retentionPolicy, null);
+    }
+
+    /**
+     * @param annotationName  The annotation name
+     * @param values          The values
+     * @param defaultValues   The default values
+     * @param retentionPolicy The retention policy
+     * @param stereotypes     The stereotypes of the annotation
+     */
+    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
         this.annotationName = annotationName;
         this.convertibleValues = newConvertibleValues(values);
         this.values = values;
         this.defaultValues = defaultValues != null ? defaultValues : Collections.emptyMap();
         this.valueMapper = null;
         this.retentionPolicy = retentionPolicy != null ? retentionPolicy : RetentionPolicy.RUNTIME;
+        this.stereotypes = stereotypes;
     }
 
     /**
@@ -120,6 +144,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         this.defaultValues = Collections.emptyMap();
         this.valueMapper = null;
         this.retentionPolicy = RetentionPolicy.RUNTIME;
+        this.stereotypes = null;
     }
 
     /**
@@ -143,6 +168,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         this.convertibleValues = convertibleValues;
         this.valueMapper = valueMapper;
         this.retentionPolicy = RetentionPolicy.RUNTIME;
+        this.stereotypes = null;
     }
 
     /**
@@ -151,6 +177,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @NonNull
     public final RetentionPolicy getRetentionPolicy() {
         return retentionPolicy;
+    }
+
+    /**
+     * @return The stereotypes of the annotation
+     */
+    @Nullable
+    public List<AnnotationValue<?>> getStereotypes() {
+        return stereotypes;
     }
 
     /**
@@ -1051,7 +1085,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         // conditional branches ordered from most likely to least likely
         // generally at runtime values are always AnnotationClassValue
         // A class can be present at compilation time
-        if (value instanceof AnnotationClassValue) {
+        if (value == null) {
+            return null;
+        } else if (value instanceof AnnotationClassValue) {
             Class<?> type = ((AnnotationClassValue<?>) value).getType().orElse(null);
             if (type != null) {
                 return new Class[]{type};
