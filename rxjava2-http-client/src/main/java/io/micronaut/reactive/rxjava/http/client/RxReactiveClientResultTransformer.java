@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.rxjava2.http.client;
+package io.micronaut.reactive.rxjava.http.client;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Indexed;

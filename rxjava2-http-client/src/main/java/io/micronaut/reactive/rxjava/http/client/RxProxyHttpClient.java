@@ -13,17 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.rxjava2.http.client;
+package io.micronaut.reactive.rxjava.http.client;
 
-import io.micronaut.http.client.ReactiveHttpClientFactory;
-import io.micronaut.http.client.StreamingHttpClient;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.client.ProxyHttpClient;
+import io.reactivex.Flowable;
 
 /**
- * Factory interface for creating clients.
+ * Extended version of {@link ProxyHttpClient} for RxJava 2.
  *
  * @author graemerocher
- * @author Sergio del Amo
- * @since 2.0
+ * @since 2.0.0
  */
-public interface RxHttpClientFactory extends ReactiveHttpClientFactory<RxHttpClient, StreamingHttpClient> {
+public interface RxProxyHttpClient extends ProxyHttpClient {
+    @Override
+    Flowable<MutableHttpResponse<?>> proxy(HttpRequest<?> request);
 }

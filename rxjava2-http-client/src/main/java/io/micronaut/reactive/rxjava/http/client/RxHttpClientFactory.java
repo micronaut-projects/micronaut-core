@@ -13,18 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.rxjava2.http.client;
+package io.micronaut.reactive.rxjava.http.client;
 
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.client.ReactiveHttpClientRegistry;
+import io.micronaut.http.client.ReactiveHttpClientFactory;
+import io.micronaut.http.client.StreamingHttpClient;
 
 /**
- * Internal interface for managing the construction and lifecycle of instances of {@link RxHttpClient}.
+ * Factory interface for creating clients.
  *
  * @author graemerocher
  * @author Sergio del Amo
  * @since 2.0
  */
-@Internal
-public interface RxHttpClientRegistry extends ReactiveHttpClientRegistry<RxHttpClient> {
+public interface RxHttpClientFactory extends ReactiveHttpClientFactory<RxHttpClient, StreamingHttpClient> {
 }
