@@ -215,7 +215,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             }
         }));
 
-        return Flux.from(traced).subscribeOn(Schedulers.fromExecutor(ctx.channel().eventLoop()));
+        return Flux.from(traced).subscribeOn(Schedulers.fromExecutorService(ctx.channel().eventLoop()));
     }
 
     @Override

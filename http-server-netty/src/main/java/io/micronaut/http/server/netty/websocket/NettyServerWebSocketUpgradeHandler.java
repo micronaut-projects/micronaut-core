@@ -184,7 +184,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
 
             Channel channel = ctx.channel();
             Mono.from(finalPublisher)
-                    .subscribeOn(Schedulers.fromExecutor(channel.eventLoop()))
+                    .subscribeOn(Schedulers.fromExecutorService(channel.eventLoop()))
                     .subscribe((Consumer<MutableHttpResponse<?>>) actualResponse -> {
                         if (actualResponse == proceed) {
                             //Adding new handler to the existing pipeline to handle WebSocket Messages
