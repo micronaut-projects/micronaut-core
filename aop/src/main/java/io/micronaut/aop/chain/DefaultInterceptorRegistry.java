@@ -107,7 +107,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                         return isApplicableByType || isApplicationByBinding;
                     })).sorted(OrderUtil.COMPARATOR)
                     .map(BeanRegistration::getBean)
-                    .filter(bean -> (bean instanceof MethodInterceptor))
+                    .filter(bean -> (bean instanceof MethodInterceptor) || !(bean instanceof ConstructorInterceptor))
                     .toArray(Interceptor[]::new);
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Resolved {} {} interceptors out of a possible {} for method: {} - {}", resolvedInterceptors.length, interceptorKind, interceptors.size(), method.getDeclaringType(), method instanceof Described ? ((Described) method).getDescription(true) : method.toString());
@@ -161,7 +161,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                     return isApplicableByType || isApplicationByBinding;
                 })).sorted(OrderUtil.COMPARATOR)
                 .map(BeanRegistration::getBean)
-                .filter(bean -> (bean instanceof ConstructorInterceptor))
+                .filter(bean -> (bean instanceof ConstructorInterceptor) || !(bean instanceof MethodInterceptor))
                 .toArray(Interceptor[]::new);
         if (LOG.isTraceEnabled()) {
             LOG.trace("Resolved {} {} interceptors out of a possible {} for constructor: {} - {}", resolvedInterceptors.length, InterceptorKind.AROUND_CONSTRUCT, interceptors.size(), constructor.getDeclaringBeanType(), constructor.getDescription(true));
