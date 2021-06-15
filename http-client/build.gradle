@@ -1,6 +1,5 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    //api dependencyVersion("rxjava2")
     api project(":runtime")
     api project(":http-client-core")
     api project(":websocket")
@@ -14,7 +13,7 @@ dependencies {
     testImplementation project(":validation")
     testImplementation project(":inject")
 
-    implementation platform('io.projectreactor:reactor-bom:2020.0.7')
+    implementation platform("io.projectreactor:reactor-bom:$reactorVersion")
     implementation 'io.projectreactor:reactor-core'
 
     //testImplementation dependencyVersion("rxjava2")

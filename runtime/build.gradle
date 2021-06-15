@@ -11,8 +11,7 @@ dependencies {
     api project(":core-reactive")
     api dependencyVersion("validation")
     api "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
-    //api dependencyVersion("rxjava2")
-    implementation platform('io.projectreactor:reactor-bom:2020.0.7')
+    implementation platform("io.projectreactor:reactor-bom:$reactorVersion")
     implementation 'io.projectreactor:reactor-core'
 
     api "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
