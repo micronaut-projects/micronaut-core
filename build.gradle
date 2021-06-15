@@ -199,12 +199,6 @@ ext {
                     group:'io.micronaut.cassandra',
                     name:'micronaut-cassandra'
             ],
-            // TODO Deprecated: Remove in the next major version
-            'micronaut.discovery.old': [
-                    version:micronautOldDiscoveryClientVersion,
-                    group:'io.micronaut',
-                    name:'micronaut-discovery-client'
-            ],
             'micronaut.discovery': [
                     version:micronautDiscoveryClientVersion,
                     group:'io.micronaut.discovery',
@@ -278,12 +272,6 @@ ext {
                     group:'io.micronaut.liquibase',
                     name:'micronaut-liquibase'
             ],
-            // TODO Deprecated: Remove in the next major version
-            'micronaut.multitenancy.old': [
-                    version:micronautOldMultitenancyVersion,
-                    group:'io.micronaut',
-                    name:'micronaut-multitenancy'
-            ],
             'micronaut.multitenancy': [
                     version:micronautMultitenancyVersion,
                     group:'io.micronaut.multitenancy',
@@ -299,12 +287,6 @@ ext {
                     version:micronautOpenApiVersion,
                     group:'io.micronaut.openapi',
                     name:'micronaut-openapi'
-            ],
-            // TODO Deprecated: Remove in the next major version
-            'micronaut.openapi.old': [
-                    version: micronautOldOpenApiVersion,
-                    group: 'io.micronaut.configuration',
-                    name: 'micronaut-openapi'
             ],
             kafka                      : [
                     version: kafkaVersion,
@@ -401,12 +383,6 @@ ext {
                     group  : 'com.oracle.database.jdbc',
                     name   : 'ojdbc8',
                     modules: ['ucp']
-            ],
-            // TODO Deprecated: Remove in the next major version
-            oldOracle                  : [
-                    version: oldOracleDriverVersion,
-                    group  : 'com.oracle.ojdbc',
-                    name   : 'ojdbc8'
             ],
             'jcache'                   : [
                     version: jcacheVersion,
