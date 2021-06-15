@@ -638,8 +638,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
 
-        Flowable.fromPublisher(filterPublisher(requestReference, responsePublisher))
-                .onErrorResumeNext((Throwable t) -> exceptionCaughtInternal(ctx, t, request))
+        Flowable.fromPublisher(filterPublisher(requestReference, responsePublisher, ctx))
                 .subscribe(response -> {
                     encodeHttpResponse(
                             ctx,
@@ -1320,14 +1319,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 });
 
         if (executeFilters) {
-            executeRoutePublisher = filterPublisher(requestReference, executeRoutePublisher);
+            executeRoutePublisher = filterPublisher(requestReference, executeRoutePublisher, context);
         }
 
-        return Flowable.fromPublisher(executeRoutePublisher)
-                .onErrorResumeNext((t) -> {
-                    final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
-                    return exceptionCaughtInternal(context, t, nettyHttpRequest);
-                });
+        return Flowable.fromPublisher(executeRoutePublisher);
     }
 
     private Publisher<MutableHttpResponse<?>> createExecuteRoutePublisher(NettyHttpRequest<?> request,
@@ -1976,7 +1971,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private Publisher<MutableHttpResponse<?>> filterPublisher(
             AtomicReference<HttpRequest<?>> requestReference,
-            Publisher<MutableHttpResponse<?>> upstreamResponsePublisher) {
+            Publisher<MutableHttpResponse<?>> upstreamResponsePublisher,
+            ChannelHandlerContext context) {
         List<HttpFilter> httpFilters = router.findFilters(requestReference.get());
         if (httpFilters.isEmpty()) {
             return upstreamResponsePublisher;
@@ -1999,14 +1995,22 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     return upstreamResponsePublisher;
                 }
                 HttpFilter httpFilter = filters.get(pos);
-                return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this);
+                return Flowable.fromPublisher((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this))
+                        .onErrorResumeNext((t) -> {
+                            final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
+                            return exceptionCaughtInternal(context, t, nettyHttpRequest);
+                        });
             }
         };
         Optional<HttpRequest<Object>> prevRequest = ServerRequestContext.currentRequest();
         try {
             ServerRequestContext.set(requestReference.get());
             HttpFilter httpFilter = filters.get(0);
-            return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain);
+            return Flowable.fromPublisher((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain))
+                    .onErrorResumeNext((t) -> {
+                        final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
+                        return exceptionCaughtInternal(context, t, nettyHttpRequest);
+                    });
         } finally {
             if (prevRequest.isPresent()) {
                 ServerRequestContext.set(prevRequest.get());
