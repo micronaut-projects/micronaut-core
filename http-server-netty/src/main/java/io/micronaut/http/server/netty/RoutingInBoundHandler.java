@@ -1444,13 +1444,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             HttpContentProcessor<?> contentProcessor) {
         // build the result emitter. This result emitter emits the response from a controller action
         Publisher<MutableHttpResponse<?>> executeRoutePublisher;
-//        if (contentProcessor != null) {
-//TODO            executeRoutePublisher = Mono.<RouteMatch<?>>create(emitter ->
-//                    contentProcessor.subscribe(buildSubscriber(request, finalRoute, emitter)))
-//                    .flatMapPublisher((route) -> createExecuteRoutePublisher(request, requestReference, route, isErrorRoute, executor));
-//        } else {
+        if (contentProcessor != null) {
+            executeRoutePublisher = Flux.<RouteMatch<?>>create(emitter ->
+                    contentProcessor.subscribe(buildSubscriber(request, finalRoute, emitter)))
+                    .flatMap((route) -> createExecuteRoutePublisher(request, requestReference, route, isErrorRoute, executor));
+        } else {
             executeRoutePublisher = createExecuteRoutePublisher(request, requestReference, finalRoute, isErrorRoute, executor);
-//        }
+        }
 
         // process the publisher through the available filters
         return filterPublisher(
