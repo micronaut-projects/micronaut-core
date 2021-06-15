@@ -724,7 +724,7 @@ public abstract class HttpClientConfiguration {
         if (i.hasNext()) {
             return i.next();
         }
-        throw new IllegalStateException("No RxHttpClientFactory present on classpath, cannot create HTTP client");
+        throw new IllegalStateException("No ReactorHttpClientFactory present on classpath, cannot create HTTP client");
     }
 
     /**

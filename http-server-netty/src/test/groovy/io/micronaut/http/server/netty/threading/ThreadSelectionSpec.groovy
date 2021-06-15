@@ -3,7 +3,6 @@ package io.micronaut.http.server.netty.threading
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.core.annotation.NonBlocking
-import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpResponse
@@ -21,7 +20,6 @@ import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.scheduling.executor.ThreadSelection
 import io.netty.channel.EventLoopGroup
-import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.FluxSink
@@ -30,7 +28,6 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.util.concurrent.ExecutorService
-import java.util.function.Consumer
 
 class ThreadSelectionSpec extends Specification {
 
@@ -172,8 +169,7 @@ class ThreadSelectionSpec extends Specification {
         @ExecuteOn(TaskExecutors.IO)
         @Get(uri = "/scheduleSse", produces = MediaType.TEXT_EVENT_STREAM)
         Flux<Event<String>> scheduleSse() {
-            return Flux
-                    .<Event<String>>create(emitter -> {
+            return Flux.<Event<String>>create(emitter -> {
                         emitter.next( Event.of("thread: ${Thread.currentThread().name}".toString()))
                         emitter.complete()
                     }, FluxSink.OverflowStrategy.BUFFER)
@@ -185,14 +181,10 @@ class ThreadSelectionSpec extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            return Flux.create(new Consumer<FluxSink<String>>() {
-                @Override
-                void accept(FluxSink<String> emitter) {
+            return Flux.create(emitter -> {
                     emitter.next("Good")
                     emitter.complete()
-                }
-            }, FluxSink.OverflowStrategy.LATEST)
-                    .switchMap({ String it ->
+            }, FluxSink.OverflowStrategy.LATEST).switchMap({ String it ->
                 return chain.proceed(request)
             })
         }

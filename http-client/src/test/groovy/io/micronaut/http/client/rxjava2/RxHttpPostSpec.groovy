@@ -137,7 +137,7 @@ class RxHttpPostSpec extends Specification {
 
                 HttpPostSpec.Book
         )
-        HttpPostSpec.Book book = flowable.block()
+        HttpPostSpec.Book book = flowable.blockFirst()
 
         then:
         book.title == "The Stand"
@@ -166,7 +166,7 @@ class RxHttpPostSpec extends Specification {
                 Argument.of(User),
                 Argument.of(User)
         )
-        User user = flowable.onErrorResumeNext((Function){ t ->
+        User user = flowable.onErrorResume((Function){ t ->
             Flux.just(((HttpClientResponseException) t).response.getBody(User).get())
         }).blockFirst()
 

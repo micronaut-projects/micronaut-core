@@ -44,7 +44,7 @@ class ServerErrorSpec extends Specification {
 
     void "test 500 error - single"() {
         when:
-        myClient.fiveHundredSingle().block()
+        myClient.fiveHundredMono().block()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -89,7 +89,7 @@ class ServerErrorSpec extends Specification {
 
     void "test flowable error - flowable"() {
         when:
-        myClient.flowableErrorFlowable().blockFirst()
+        myClient.fluxErrorFlux().blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)

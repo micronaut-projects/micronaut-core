@@ -17,12 +17,10 @@ package io.micronaut.management.endpoint.health
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
 import io.micronaut.health.HealthStatus
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
 import io.micronaut.http.client.ReactorHttpClient
@@ -42,7 +40,6 @@ import spock.lang.Specification
 
 import javax.sql.DataSource
 import java.security.Principal
-import java.util.function.Function
 
 class HealthEndpointSpec extends Specification {
 
@@ -183,14 +180,10 @@ class HealthEndpointSpec extends Specification {
 
         when:
         def response = rxClient.exchange("/health", HealthResult)
-                                .onErrorResumeNext(new Function<Throwable, Publisher<? extends HttpResponse<HealthResult>>>() {
-            @Override
-            Publisher<? extends HttpResponse<HealthResult>> apply(@NonNull Throwable throwable) throws Exception {
-
-                def rsp = ((HttpClientResponseException) throwable).response
-                rsp.getBody(HealthResult)
-                return Flux.just(rsp)
-            }
+                                .onErrorResume(throwable -> {
+                                    def rsp = ((HttpClientResponseException) throwable).response
+                                    rsp.getBody(HealthResult)
+                                    return Flux.just(rsp)
         }).blockFirst()
         HealthResult result = response.getBody(HealthResult).get()
 
@@ -243,14 +236,10 @@ class HealthEndpointSpec extends Specification {
         ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, server)
 
         when:
-        def response = rxClient.exchange("/health", Map).onErrorResumeNext(new Function<Throwable, Publisher<? extends HttpResponse<HealthResult>>>() {
-            @Override
-            Publisher<? extends HttpResponse<HealthResult>> apply(@NonNull Throwable throwable) throws Exception {
-
+        def response = rxClient.exchange("/health", Map).onErrorResume(throwable -> {
                 def rsp = ((HttpClientResponseException) throwable).response
                 rsp.getBody(Map)
                 return Flux.just(rsp)
-            }
         }).blockFirst()
         Map result = response.getBody(Map).get()
 
@@ -355,14 +344,10 @@ class HealthEndpointSpec extends Specification {
 
         when:
         def response = rxClient.exchange("/health/liveness", HealthResult)
-                .onErrorResumeNext(new Function<Throwable, Publisher<? extends HttpResponse<HealthResult>>>() {
-                    @Override
-                    Publisher<? extends HttpResponse<HealthResult>> apply(@NonNull Throwable throwable) throws Exception {
-
+                .onErrorResume(throwable -> {
                         def rsp = ((HttpClientResponseException) throwable).response
                         rsp.getBody(HealthResult)
                         return Flux.just(rsp)
-                    }
                 }).blockFirst()
         HealthResult result = response.getBody(HealthResult).get()
 
@@ -386,14 +371,10 @@ class HealthEndpointSpec extends Specification {
 
         when:
         def response = rxClient.exchange("/health/readiness", HealthResult)
-                .onErrorResumeNext(new Function<Throwable, Publisher<? extends HttpResponse<HealthResult>>>() {
-                    @Override
-                    Publisher<? extends HttpResponse<HealthResult>> apply(@NonNull Throwable throwable) throws Exception {
-
+                .onErrorResume(throwable -> {
                         def rsp = ((HttpClientResponseException) throwable).response
                         rsp.getBody(HealthResult)
                         return Flux.just(rsp)
-                    }
                 }).blockFirst()
         HealthResult result = response.getBody(HealthResult).get()
 
