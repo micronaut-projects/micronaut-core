@@ -2173,7 +2173,11 @@ public class DefaultHttpClient implements
                                     .subscribe(oHttpResponse -> {
                                         emitter.next(oHttpResponse);
                                         emitter.complete();
-                                    }, emitter::error);
+                                    }, throwable -> {
+                                        if (!emitter.isCancelled()) {
+                                            emitter.error(throwable);
+                                        }
+                                    });
                             return;
                         }
                         if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
