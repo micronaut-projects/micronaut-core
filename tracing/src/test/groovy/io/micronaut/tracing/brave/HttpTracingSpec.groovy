@@ -85,7 +85,7 @@ class HttpTracingSpec extends Specification {
         reporter.spans[1].kind() == Span.Kind.CLIENT
 
 
-        when:"An observeOn call is used"
+        when:"An publishOn call is used"
         response = client.toBlocking().exchange('/traced/rxjava/observe', String)
 
         then:"The response is correct"
@@ -281,7 +281,7 @@ class HttpTracingSpec extends Specification {
 
         @Get(value = "/rxjava/observe", produces = MediaType.TEXT_PLAIN)
         Mono<String> index() {
-            return Mono.just("hello").observeOn(Schedulers.computation()).map( { r ->
+            return Mono.just("hello").publishOn(Schedulers.boundedElastic()).map( { r ->
                 if (ServerRequestContext.currentRequest().isPresent()) {
                     return r;
                 } else {

@@ -2146,8 +2146,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (executor != null) {
             final Scheduler scheduler = Schedulers.fromExecutorService(executor);
             return publisherToReactiveSequence(publisher)
-                    .subscribeOn(scheduler);
-                    //TODO .observeOn(scheduler);
+                    .subscribeOn(scheduler)
+                    .publishOn(scheduler);
         } else {
             return publisher;
         }
