@@ -1852,7 +1852,11 @@ public class DefaultHttpClient implements
                 requestURI,
                 requestContentType,
                 permitsBody,
-                emitter::error, //TODO emitter::tryOnError
+                throwable -> {
+                    if (!emitter.isCancelled()) {
+                        emitter.error(throwable);
+                    }
+                },
                 true
         );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
@@ -2125,7 +2129,9 @@ public class DefaultHttpClient implements
                         httpStatus = HttpStatus.valueOf(statusCode);
                     } catch (IllegalArgumentException e) {
                         if (complete.compareAndSet(false, true)) {
-                            emitter.error(e); //TODO emitter.tryOnError
+                            if (!emitter.isCancelled()) {
+                                emitter.error(e);
+                            }
                         } else if (LOG.isWarnEnabled()) {
                             LOG.warn("Unsupported http status after handler completed: " + e.getMessage(), e);
                         }
@@ -2196,14 +2202,18 @@ public class DefaultHttpClient implements
                                         );
                                     }
                                     try {
-                                        emitter.error(clientError); //TODO emitter.tryOnError(clientError);
+                                        if (!emitter.isCancelled()) {
+                                            emitter.error(clientError);
+                                        }
                                     } finally {
                                         response.onComplete();
                                     }
                                 } catch (Throwable t) {
                                     if (t instanceof HttpClientResponseException) {
                                         try {
-                                            emitter.error(t); //TODO emitter.tryOnError(t);
+                                            if (!emitter.isCancelled()) {
+                                                emitter.error(t);
+                                            }
                                         } finally {
                                             response.onComplete();
                                         }
@@ -2224,7 +2234,9 @@ public class DefaultHttpClient implements
                                                 errorResponse,
                                                 null
                                         );
-                                        emitter.error(clientResponseError); //TODO emitter.tryOnError(clientResponseError);
+                                        if (!emitter.isCancelled()) {
+                                            emitter.error(clientResponseError);
+                                        }
                                     }
                                 }
                             }
@@ -2232,7 +2244,9 @@ public class DefaultHttpClient implements
                     } catch (Throwable t) {
                         if (complete.compareAndSet(false, true)) {
                             if (t instanceof HttpClientResponseException) {
-                                emitter.error(t); // emitter.tryOnError(t);
+                                if (!emitter.isCancelled()) {
+                                    emitter.error(t);
+                                }
                             } else {
                                 FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, null, false);
                                 HttpClientResponseException clientResponseError = new HttpClientResponseException(
@@ -2247,7 +2261,10 @@ public class DefaultHttpClient implements
                                         }
                                 );
                                 try {
-                                    emitter.error(clientResponseError); // emitter.tryOnError(clientResponseError);
+                                    if (!emitter.isCancelled()) {
+                                        emitter.error(clientResponseError);
+                                    }
+
                                 } finally {
                                     response.onComplete();
                                 }
@@ -2343,15 +2360,19 @@ public class DefaultHttpClient implements
                                     message, request.getMethodName(), request.getUri());
                         }
 
-                        /*
-                        TODO
                         if (cause instanceof TooLongFrameException) {
-                            emitter.tryOnError(new ContentLengthExceededException(configuration.getMaxContentLength()));
+                            if (!emitter.isCancelled()) {
+                                emitter.error(new ContentLengthExceededException(configuration.getMaxContentLength()));
+                            }
                         } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
-                            emitter.tryOnError(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                            if (!emitter.isCancelled()) {
+                                emitter.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                            }
                         } else {
-                            emitter.tryOnError(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
-                        }*/
+                            if (!emitter.isCancelled()) {
+                                emitter.error(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
+                            }
+                        }
                     }
                 } finally {
                     keepAlive = false;
@@ -2565,7 +2586,11 @@ public class DefaultHttpClient implements
                 requestURI,
                 requestContentType,
                 permitsBody,
-                emitter::error, //TODO emitter::tryOnError,
+                throwable -> {
+                    if (!emitter.isCancelled()) {
+                        emitter.error(throwable);
+                    }
+                },
                 closeChannelAfterWrite
         );
         io.netty.handler.codec.http.HttpRequest nettyRequest = requestWriter.getNettyRequest();
