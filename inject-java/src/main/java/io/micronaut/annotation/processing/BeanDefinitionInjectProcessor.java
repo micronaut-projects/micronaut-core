@@ -763,17 +763,18 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
+            final boolean isAbstract = javaMethodElement.isAbstract();
+            final boolean isPrivate = javaMethodElement.isPrivate();
+            final boolean isStatic = javaMethodElement.isStatic();
+            final boolean isPublic = javaMethodElement.isPublic();
+            final boolean isInternal = methodAnnotationMetadata.hasAnnotation(Internal.class);
+
+            boolean hasInvalidModifiers = isAbstract || isStatic || isPrivate || isInternal;
 
             Set<Modifier> modifiers = method.getModifiers();
-            boolean hasInvalidModifiers = javaMethodElement.isAbstract() ||
-                    javaMethodElement.isStatic() ||
-                    methodAnnotationMetadata.hasAnnotation(Internal.class) ||
-                    javaMethodElement.isPrivate();
-            boolean isPublic = javaMethodElement.isPublic() && !hasInvalidModifiers;
             boolean isExecutable =
-                    !hasInvalidModifiers &&
-                            (isExecutableThroughType(method.getEnclosingElement(), methodAnnotationMetadata, annotationMetadata, modifiers, isPublic) ||
-                                    hasAroundStereotype(annotationMetadata));
+                            isExecutableThroughType(method.getEnclosingElement(), methodAnnotationMetadata, annotationMetadata, modifiers, isPublic) ||
+                            hasAroundStereotype(annotationMetadata);
 
             boolean hasConstraints = false;
             if (isDeclaredBean && !methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
@@ -784,7 +785,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             if (isDeclaredBean && isExecutable) {
-                visitExecutableMethod(javaMethodElement, method, methodAnnotationMetadata);
+                if (hasInvalidModifiers) {
+                    if (isPrivate) {
+                        error(method, "Method annotated as executable but is declared private. Change the method to be non-private in order for AOP advice to be applied.");
+                    }
+                } else {
+                    visitExecutableMethod(javaMethodElement, method, methodAnnotationMetadata);
+                }
             } else if (isConfigurationPropertiesType && !modelUtils.isPrivate(method) && !modelUtils.isStatic(method)) {
                 String methodName = javaMethodElement.getSimpleName();
                 if (NameUtils.isSetterName(methodName) && javaMethodElement.getParameters().length == 1) {
@@ -795,8 +802,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         writer.setValidated(IS_CONSTRAINT.test(methodAnnotationMetadata));
                     }
                 }
-            } else if (isPublic && hasConstraints) {
-                visitExecutableMethod(javaMethodElement, method, methodAnnotationMetadata);
+            } else if (hasConstraints) {
+                if (hasInvalidModifiers) {
+                    if (isPrivate) {
+                        error(method, "Method annotated with constraints but is declared private. Change the method to be non-private in order for AOP advice to be applied.");
+                    }
+                } else if (isPublic) {
+                    visitExecutableMethod(javaMethodElement, method, methodAnnotationMetadata);
+                }
             }
 
             return null;

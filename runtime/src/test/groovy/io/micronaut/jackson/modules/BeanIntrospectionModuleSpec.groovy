@@ -1,6 +1,13 @@
 package io.micronaut.jackson.modules
 
-import com.fasterxml.jackson.annotation.*
+import com.fasterxml.jackson.annotation.JsonAnyGetter
+import com.fasterxml.jackson.annotation.JsonAnySetter
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.JsonUnwrapped
+import com.fasterxml.jackson.annotation.JsonView
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.PropertyNamingStrategy
 import com.fasterxml.jackson.databind.annotation.JsonNaming
@@ -169,6 +176,30 @@ class BeanIntrospectionModuleSpec extends Specification {
         result.contains('"book_title":')
         result.contains('"book_pages":')
 
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test that introspected serialization works with @JsonAnyGetter"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        def plant = new PlantWithAnyGetter(name: "Rose", attributes: [color: "green", hasFlowers: true])
+        def str = objectMapper.writeValueAsString(plant)
+
+        then:
+        str == '{"name":"Rose","color":"green","hasFlowers":true}'
+
+        when:"deserializing"
+        def read = objectMapper.readValue(str, PlantWithAnyGetter)
+
+        then:
+        read == plant
+        read.attributes.color == 'green'
+        read.attributes.hasFlowers
 
         cleanup:
         ctx.close()
@@ -483,6 +514,25 @@ class BeanIntrospectionModuleSpec extends Specification {
     static class Attributes {
         String color
         boolean hasFlowers
+
+    }
+
+    @Introspected
+    @EqualsAndHashCode
+    static class PlantWithAnyGetter {
+        String name
+
+        private Map<String, Object> attributes = [:]
+
+        @JsonAnyGetter
+        Map<String, Object> getAttributes() {
+            return attributes
+        }
+
+        @JsonAnySetter
+        void addAttribute(String key, Object value) {
+            attributes[key] = value
+        }
 
     }
         //Used for @JsonView

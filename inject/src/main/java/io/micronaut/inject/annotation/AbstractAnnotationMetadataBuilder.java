@@ -1238,11 +1238,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     if (isDeclared) {
                         applyTransformations(listIterator, metadata, isDeclared, annotationMirror, data, parents, interceptorBindings,
                                 (string, av) -> metadata.addDeclaredRepeatableStereotype(parents, string, av),
-                                (string, values, rp) -> metadata.addDeclaredStereotype(parents, string, values, retentionPolicy));
+                                (string, values, rp) -> metadata.addDeclaredStereotype(parents, string, values, rp));
                     } else {
                         applyTransformations(listIterator, metadata, isDeclared, annotationMirror, data, parents, interceptorBindings,
                                 (string, av) -> metadata.addRepeatableStereotype(parents, string, av),
-                                (string, values, rp) -> metadata.addStereotype(parents, string, values, retentionPolicy));
+                                (string, values, rp) -> metadata.addStereotype(parents, string, values, rp));
                     }
                 }
             }
@@ -1508,6 +1508,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                 final List<AnnotationValue<?>> tav = transformer.transform(av, visitorContext);
                                 for (AnnotationValue<?> value : tav) {
                                     addRepeatableAnnotation.accept(annotationValue.getAnnotationName(), value);
+                                    if (CollectionUtils.isNotEmpty(value.getStereotypes())) {
+                                        addTransformedStereotypes(annotationMetadata, isDeclared, value, parents);
+                                    } else {
+                                        addTransformedStereotypes(annotationMetadata, isDeclared, value.getAnnotationName(), parents);
+                                    }
                                 }
                             }
 
@@ -1518,6 +1523,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         final List<AnnotationValue<?>> tav = transformer.transform(av, visitorContext);
                         for (AnnotationValue<?> value : tav) {
                             addRepeatableAnnotation.accept(repeatableName, value);
+                            if (CollectionUtils.isNotEmpty(value.getStereotypes())) {
+                                addTransformedStereotypes(annotationMetadata, isDeclared, value, parents);
+                            } else {
+                                addTransformedStereotypes(annotationMetadata, isDeclared, value.getAnnotationName(), parents);
+                            }
                         }
                     }
                 }
