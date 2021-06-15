@@ -150,6 +150,16 @@ class HttpPatchSpec extends Specification {
         val == "multiple mappings"
     }
 
+
+    void "test http patch with empty body"() {
+        when:
+        def res = Flowable.fromPublisher(client.exchange(HttpRequest.PATCH('/patch/emptyBody', null))).blockingFirst();
+
+        then:
+        res.status == HttpStatus.NO_CONTENT
+    }
+
+
     @Controller('/patch')
     static class PostController {
 
@@ -184,6 +194,11 @@ class HttpPatchSpec extends Specification {
         @Patch(uris = ["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
+        }
+
+        @Patch(uri = "/emptyBody")
+        HttpResponse emptyBody() {
+            HttpResponse.noContent()
         }
     }
 

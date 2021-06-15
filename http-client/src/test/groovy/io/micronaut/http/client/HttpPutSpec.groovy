@@ -194,6 +194,14 @@ class HttpPutSpec extends Specification {
         body == "put done"
     }
 
+    void "test http put with empty body"() {
+        when:
+        def res = Flowable.fromPublisher(client.exchange(HttpRequest.PUT('/put/emptyBody', null))).blockingFirst();
+
+        then:
+        res.status == HttpStatus.NO_CONTENT
+    }
+
     @Controller('/put')
     static class PostController {
 
@@ -247,6 +255,11 @@ class HttpPutSpec extends Specification {
                                  @Nullable @Header("foo") final String auth) {
 
             return "put done"
+        }
+
+        @Put(uri = "/emptyBody")
+        HttpResponse emptyBody() {
+            HttpResponse.noContent()
         }
     }
 

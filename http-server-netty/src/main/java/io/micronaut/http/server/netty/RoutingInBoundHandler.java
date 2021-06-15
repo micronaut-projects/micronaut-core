@@ -322,27 +322,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             cause = t;
         }
 
-        // when arguments do not match, then there is UnsatisfiedRouteException, we can handle this with a routed bad request
-        if (cause instanceof UnsatisfiedRouteException) {
-            if (declaringType != null) {
-                // handle error with a method that is non global with bad request
-                errorRoute = router.findStatusRoute(declaringType, HttpStatus.BAD_REQUEST, nettyHttpRequest).orElse(null);
-            }
-            if (errorRoute == null) {
-                // handle error with a method that is global with bad request
-                errorRoute = router.findStatusRoute(HttpStatus.BAD_REQUEST, nettyHttpRequest).orElse(null);
-            }
-        } else if (cause instanceof HttpStatusException) {
-            HttpStatusException statusException = (HttpStatusException) cause;
-            if (declaringType != null) {
-                // handle error with a method that is non global with bad request
-                errorRoute = router.findStatusRoute(declaringType, statusException.getStatus(), nettyHttpRequest).orElse(null);
-            }
-            if (errorRoute == null) {
-                // handle error with a method that is global with bad request
-                errorRoute = router.findStatusRoute(statusException.getStatus(), nettyHttpRequest).orElse(null);
-            }
-        } else if (cause instanceof BeanCreationException && declaringType != null) {
+        if (cause instanceof BeanCreationException && declaringType != null) {
             // If the controller could not be instantiated, don't look for a local error route
             Optional<Class> rootBeanType = ((BeanCreationException) cause).getRootBeanType().map(BeanType::getBeanType);
             if (rootBeanType.isPresent() && declaringType == rootBeanType.get()) {
@@ -353,13 +333,35 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
         }
 
-        // any another other exception may arise. handle these with non global exception marked method or a global exception marked method.
+        // First try to find an error route by the exception
+        if (declaringType != null) {
+            // handle error with a method that is non global with exception
+            errorRoute = router.findErrorRoute(declaringType, cause, nettyHttpRequest).orElse(null);
+        }
         if (errorRoute == null) {
-            if (declaringType != null) {
-                errorRoute = router.findErrorRoute(declaringType, cause, nettyHttpRequest).orElse(null);
+            // handle error with a method that is global with exception
+            errorRoute = router.findErrorRoute(cause, nettyHttpRequest).orElse(null);
+        }
+
+        if (errorRoute == null) {
+            // Second try is by status route if the status is known
+            HttpStatus errorStatus = null;
+            if (cause instanceof UnsatisfiedRouteException) {
+                // when arguments do not match, then there is UnsatisfiedRouteException, we can handle this with a routed bad request
+                errorStatus = HttpStatus.BAD_REQUEST;
+            } else if (cause instanceof HttpStatusException) {
+                errorStatus = ((HttpStatusException) cause).getStatus();
             }
-            if (errorRoute == null) {
-                errorRoute = router.findErrorRoute(cause, nettyHttpRequest).orElse(null);
+
+            if (errorStatus != null) {
+                if (declaringType != null) {
+                    // handle error with a method that is non global with bad request
+                    errorRoute = router.findStatusRoute(declaringType, errorStatus, nettyHttpRequest).orElse(null);
+                }
+                if (errorRoute == null) {
+                    // handle error with a method that is global with bad request
+                    errorRoute = router.findStatusRoute(errorStatus, nettyHttpRequest).orElse(null);
+                }
             }
         }
 
@@ -1858,10 +1860,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             // default Connection header if not set explicitly
             if (!isHttp2) {
                 if (!message.getHeaders().contains(HttpHeaders.CONNECTION)) {
-                    if (httpStatus.getCode() > 499) {
-                        message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.CLOSE);
-                    } else {
+                    if (httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError()) {
                         message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                    } else {
+                        message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.CLOSE);
                     }
                 }
             }
@@ -1876,10 +1878,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (!isHttp2) {
                 if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
                     boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || request.getHeaders().isKeepAlive();
-                    if (!expectKeepAlive || httpStatus.getCode() > 499) {
-                        nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                    } else {
+                    if (expectKeepAlive || httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError()) {
                         nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                    } else {
+                        nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
                     }
                 }
             }

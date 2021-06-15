@@ -366,6 +366,14 @@ class HttpPostSpec extends Specification {
         val == "multiple mappings"
     }
 
+    void "test http post with empty body"() {
+        when:
+        def res = Flowable.fromPublisher(client.exchange(HttpRequest.POST('/post/emptyBody', null))).blockingFirst();
+
+        then:
+        res.status == HttpStatus.NO_CONTENT
+    }
+
     @Controller('/post')
     static class PostController {
 
@@ -463,6 +471,11 @@ class HttpPostSpec extends Specification {
         @Post(uris = ["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
+        }
+
+        @Post(uri = "/emptyBody")
+        HttpResponse emptyBody() {
+            HttpResponse.noContent()
         }
     }
 
