@@ -2158,7 +2158,7 @@ public class DefaultHttpClient implements
                             Flux<io.micronaut.http.HttpResponse<O>> redirectExchange = Flux.from(resolveRedirectURI(request, redirectRequest))
                                     .switchMap(buildExchangePublisher(request, redirectRequest, bodyType, errorType));
                             redirectExchange
-                                    .defaultIfEmpty(io.micronaut.http.HttpResponse.notFound())//TODO .first(io.micronaut.http.HttpResponse.notFound())
+                                    .defaultIfEmpty(io.micronaut.http.HttpResponse.notFound())
                                     .subscribe(oHttpResponse -> {
                                         emitter.next(oHttpResponse);
                                         emitter.complete();
