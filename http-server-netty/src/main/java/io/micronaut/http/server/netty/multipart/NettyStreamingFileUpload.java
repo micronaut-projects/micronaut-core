@@ -160,12 +160,12 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
                     public void onComplete() {
                         try {
                             outputStream.close();
-                            //TODO emitter.onSuccess(true);
+                            emitter.success(true);
                         } catch (IOException e) {
                             if (LOG.isWarnEnabled()) {
                                 LOG.warn("Failed to close file stream : " + fileUpload.getName());
                             }
-                            //TODO emitter.onSuccess(false);
+                            emitter.success(false);
                         }
                     }
 
