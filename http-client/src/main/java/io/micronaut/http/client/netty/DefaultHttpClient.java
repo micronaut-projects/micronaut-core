@@ -739,10 +739,15 @@ public class DefaultHttpClient implements
     public <I> Flux<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
         return Flux.from(resolveRequestURI(request))
                 .flatMap(buildDataStreamPublisher(request))
-                .doOnNext(buffer -> {
-                    ByteBuf byteBuf = (ByteBuf) buffer.asNativeBuffer();
-                    if (byteBuf.refCnt() > 0) {
-                        ReferenceCountUtil.safeRelease(byteBuf);
+                .doOnEach(buffer -> {
+                    if (buffer.hasValue()) {
+                        ByteBuffer<?> byteBuffer = buffer.get();
+                        if (byteBuffer != null) {
+                            ByteBuf nativeByteBuf = (ByteBuf) byteBuffer.asNativeBuffer();
+                            if (nativeByteBuf.refCnt() > 0) {
+                                ReferenceCountUtil.safeRelease(nativeByteBuf);
+                            }
+                        }
                     }
                 });
     }
@@ -751,10 +756,16 @@ public class DefaultHttpClient implements
     public <I> Flux<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
         return Flux.from(resolveRequestURI(request))
                 .flatMap(buildExchangeStreamPublisher(request))
-                .doOnNext(res -> {
-                    ByteBuffer<?> buffer = res.body();
-                    if (buffer instanceof ReferenceCounted) {
-                        ((ReferenceCounted) buffer).release();
+                .doOnEach(res -> {
+                    if (res.hasValue()) {
+                        HttpResponse<ByteBuffer<?>> httpResponseByteBuffer = res.get();
+                        if (httpResponseByteBuffer != null) {
+                            ByteBuffer<?> buffer = httpResponseByteBuffer.body();
+                            if (buffer instanceof ReferenceCounted) {
+                                ((ReferenceCounted) buffer).release();
+                            }
+                        }
+
                     }
                 });
     }
