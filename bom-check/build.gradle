@@ -7,8 +7,6 @@ plugins {
 
 repositories {
     mavenCentral()
-    // TODO: remove when GORM is in central
-    maven { url "https://repo.grails.org/grails/libs-releases/" }
 }
 
 boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
