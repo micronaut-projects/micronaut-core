@@ -739,7 +739,7 @@ public class DefaultHttpClient implements
     public <I> Flux<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
         return Flux.from(resolveRequestURI(request))
                 .flatMap(buildDataStreamPublisher(request))
-                .doOnNext(buffer -> { //TODO .doAfterNext(
+                .doOnNext(buffer -> {
                     ByteBuf byteBuf = (ByteBuf) buffer.asNativeBuffer();
                     if (byteBuf.refCnt() > 0) {
                         ReferenceCountUtil.safeRelease(byteBuf);
@@ -751,7 +751,7 @@ public class DefaultHttpClient implements
     public <I> Flux<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
         return Flux.from(resolveRequestURI(request))
                 .flatMap(buildExchangeStreamPublisher(request))
-                .doOnNext(res -> { //TODO doAfterNext
+                .doOnNext(res -> {
                     ByteBuffer<?> buffer = res.body();
                     if (buffer instanceof ReferenceCounted) {
                         ((ReferenceCounted) buffer).release();
