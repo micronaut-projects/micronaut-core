@@ -100,13 +100,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param values          The values
      * @param defaultValues   The default values
      * @param retentionPolicy The retention policy
-     * @param stereotypes     The stereotypes of the annotation
      */
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues, RetentionPolicy retentionPolicy) {
         this(annotationName, values, defaultValues, retentionPolicy, null);
     }
-
 
     /**
      * @param annotationName  The annotation name
