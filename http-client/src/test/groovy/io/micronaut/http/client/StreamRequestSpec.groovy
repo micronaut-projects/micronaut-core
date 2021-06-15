@@ -18,6 +18,7 @@ package io.micronaut.http.client
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
@@ -28,7 +29,6 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.*
-import io.reactivex.annotations.NonNull
 import jakarta.inject.Inject
 import spock.lang.Specification
 

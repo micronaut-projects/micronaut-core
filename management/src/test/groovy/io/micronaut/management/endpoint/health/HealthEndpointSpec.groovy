@@ -35,7 +35,7 @@ import io.micronaut.management.health.indicator.diskspace.DiskSpaceIndicator
 import io.micronaut.management.health.indicator.jdbc.JdbcIndicator
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
-import io.reactivex.annotations.NonNull
+import io.micronaut.core.annotation.NonNull
 import io.reactivex.functions.Function
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher

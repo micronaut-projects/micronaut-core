@@ -21,7 +21,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.scheduling.executor.ThreadSelection
 import io.netty.channel.EventLoopGroup
 import io.reactivex.*
-import io.reactivex.annotations.NonNull
+import io.micronaut.core.annotation.NonNull
 import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
 import spock.lang.Specification
