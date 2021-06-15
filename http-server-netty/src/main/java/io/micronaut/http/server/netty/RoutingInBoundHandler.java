@@ -334,7 +334,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         nettyHttpRequest,
                         ctx,
                         ctx.executor(),
-                        true,
                         false,
                         null,
                         defaultResponseMediaType
@@ -754,7 +753,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 request,
                 context,
                 executor,
-                false,
                 true,
                 contentProcessor,
                 defaultResponseMediaType
@@ -1111,7 +1109,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             NettyHttpRequest<?> request,
             ChannelHandlerContext context,
             ExecutorService executor,
-            boolean isErrorRoute,
             boolean executeFilters,
             HttpContentProcessor<?> contentProcessor,
             Supplier<MediaType> defaultResponseMediaType) {
@@ -1121,7 +1118,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 requestReference,
                 routeMatch,
                 executor,
-                isErrorRoute,
                 executeFilters,
                 contentProcessor,
                 context
@@ -1133,7 +1129,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     applyConfiguredHeaders(message.getHeaders());
 
                     HttpStatus status = message.status();
-                    if (status.getCode() >= 400 && !isErrorRoute) {
+                    boolean errorRoute = message.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class)
+                            .filter(RouteMatch::isErrorRoute)
+                            .isPresent();
+                    if (status.getCode() >= 400 && !errorRoute) {
                         RouteMatch<Object> statusRoute = findStatusRoute(incomingRequest, status, routeMatch);
 
                         if (statusRoute != null) {
@@ -1144,7 +1143,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     request,
                                     context,
                                     executor,
-                                    true,
                                     false,
                                     null,
                                     () -> resolveDefaultResponseContentType(request, statusRoute)
@@ -1173,7 +1171,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                 message.body(null);
                                                 message.header(HttpHeaders.CONTENT_LENGTH, HttpHeaderValues.ZERO);
                                                 return Publishers.just(message);
-                                            } else if (!isErrorRoute) {
+                                            } else if (!errorRoute) {
                                                 RouteMatch<Object> statusRoute = findStatusRoute(incomingRequest, HttpStatus.NOT_FOUND, routeMatch);
                                                 if (statusRoute != null) {
                                                     return executeRoute(
@@ -1181,7 +1179,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                             request,
                                                             context,
                                                             executor,
-                                                            true,
                                                             false,
                                                             null,
                                                             () -> resolveDefaultResponseContentType(request, statusRoute));
@@ -1278,7 +1275,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             AtomicReference<HttpRequest<?>> requestReference,
             RouteMatch<?> finalRoute,
             ExecutorService executor,
-            boolean isErrorRoute,
             boolean executeFilters,
             HttpContentProcessor<?> contentProcessor,
             ChannelHandlerContext context) {
@@ -1287,9 +1283,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (contentProcessor != null) {
             executeRoutePublisher = Single.<RouteMatch<?>>create(emitter ->
                     contentProcessor.subscribe(buildSubscriber(request, finalRoute, emitter)))
-                    .flatMapPublisher((route) -> createExecuteRoutePublisher(request, requestReference, route, isErrorRoute, executor));
+                    .flatMapPublisher((route) -> createExecuteRoutePublisher(request, requestReference, route, executor));
         } else {
-            executeRoutePublisher = createExecuteRoutePublisher(request, requestReference, finalRoute, isErrorRoute, executor);
+            executeRoutePublisher = createExecuteRoutePublisher(request, requestReference, finalRoute, executor);
         }
 
         executeRoutePublisher = Flowable.fromPublisher(executeRoutePublisher)
@@ -1308,7 +1304,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private Publisher<MutableHttpResponse<?>> createExecuteRoutePublisher(NettyHttpRequest<?> request,
                                                                                     AtomicReference<HttpRequest<?>> requestReference,
                                                                                     RouteMatch<?> routeMatch,
-                                                                                    boolean isErrorRoute,
                                                                                     Executor executor) {
         return new Publisher<MutableHttpResponse<?>>() {
             @Override
@@ -1335,7 +1330,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         done = true;
                         try {
                             ServerRequestContext.set(requestReference.get());
-                            emitRouteResponse((Subscriber<MutableHttpResponse<?>>) subscriber, request, requestReference, routeMatch, isErrorRoute);
+                            emitRouteResponse((Subscriber<MutableHttpResponse<?>>) subscriber, request, requestReference, routeMatch);
                         } finally {
                             ServerRequestContext.set(null);
                         }
@@ -1353,8 +1348,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private void emitRouteResponse(Subscriber<MutableHttpResponse<?>> subscriber,
                                    NettyHttpRequest<?> request,
                                    AtomicReference<HttpRequest<?>> requestReference,
-                                   RouteMatch<?> routeMatch,
-                                   boolean isErrorRoute) {
+                                   RouteMatch<?> routeMatch) {
         try {
             final RouteMatch<?> finalRoute;
 
@@ -1386,7 +1380,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     outgoingResponse = newNotFoundError(request);
                 }
             } else {
-                HttpStatus defaultHttpStatus = isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK;
+                HttpStatus defaultHttpStatus = routeMatch.isErrorRoute() ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK;
                 boolean isReactive = finalRoute.isAsyncOrReactive() || Publishers.isConvertibleToPublisher(body);
                 if (isReactive) {
                     Class<?> bodyClass = body.getClass();
