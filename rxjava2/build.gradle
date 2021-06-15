@@ -1,0 +1,3 @@
+dependencies {
+    annotationProcessor project(":inject-java")
+}

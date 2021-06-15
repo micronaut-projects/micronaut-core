@@ -1,0 +1,5 @@
+dependencies {
+    annotationProcessor project(":inject-java")
+    api dependencyVersion("rxjava2")
+    api project(":http-client-core")
+}
