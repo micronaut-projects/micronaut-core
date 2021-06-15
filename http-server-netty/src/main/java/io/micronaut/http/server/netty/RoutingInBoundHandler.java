@@ -113,6 +113,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxOperator;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.MonoSink;
 import reactor.core.publisher.UnicastProcessor;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -813,7 +814,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private Subscriber<Object> buildSubscriber(NettyHttpRequest<?> request,
                                                RouteMatch<?> finalRoute,
-                                               FluxSink<RouteMatch<?>> emitter) {
+                                               MonoSink<RouteMatch<?>> emitter) {
         boolean isFormData = request.isFormOrMultipartData();
         if (isFormData) {
             return new CompletionAwareSubscriber<Object>() {
@@ -1048,7 +1049,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                 private void executeRoute() {
                     if (executed.compareAndSet(false, true)) {
-                        //TODO emitter.onSuccess(routeMatch);
+                        emitter.success(routeMatch);
                     }
                 }
             };
@@ -1084,7 +1085,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 @Override
                 protected void doOnComplete() {
                     if (executed.compareAndSet(false, true)) {
-                        //TODO emitter.onSuccess(routeMatch);
+                        emitter.success(routeMatch);
                     }
                 }
             };
@@ -1446,8 +1447,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         // build the result emitter. This result emitter emits the response from a controller action
         Publisher<MutableHttpResponse<?>> executeRoutePublisher;
         if (contentProcessor != null) {
-            executeRoutePublisher = Flux.<RouteMatch<?>>create(emitter ->
+            executeRoutePublisher = Mono.<RouteMatch<?>>create(emitter ->
                     contentProcessor.subscribe(buildSubscriber(request, finalRoute, emitter)))
+                    .flux()
                     .flatMap((route) -> createExecuteRoutePublisher(request, requestReference, route, isErrorRoute, executor));
         } else {
             executeRoutePublisher = createExecuteRoutePublisher(request, requestReference, finalRoute, isErrorRoute, executor);
