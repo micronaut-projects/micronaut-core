@@ -705,7 +705,7 @@ class HttpGetSpec extends Specification {
 
         @Get("/completable")
         Mono<Void> completable(){
-            return Mono.just(null)
+            return Mono.empty()
         }
 
         @Get("/completable/error")

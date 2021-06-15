@@ -34,6 +34,6 @@ public class AsyncListener {
             e.printStackTrace();
         }
         completableInvoked = true;
-        return Mono.just(null);
+        return Mono.empty();
     }
 }
