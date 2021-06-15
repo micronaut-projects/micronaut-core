@@ -1302,9 +1302,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private Publisher<MutableHttpResponse<?>> createExecuteRoutePublisher(NettyHttpRequest<?> request,
-                                                                                    AtomicReference<HttpRequest<?>> requestReference,
-                                                                                    RouteMatch<?> routeMatch,
-                                                                                    Executor executor) {
+                                                                          AtomicReference<HttpRequest<?>> requestReference,
+                                                                          RouteMatch<?> routeMatch,
+                                                                          Executor executor) {
         return new Publisher<MutableHttpResponse<?>>() {
             @Override
             public void subscribe(Subscriber<? super MutableHttpResponse<?>> subscriber) {

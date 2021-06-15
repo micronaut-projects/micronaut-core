@@ -46,6 +46,19 @@ Previously the `secure` configuration for cookies was only respected if the requ
 
 Previously if a route could not be satisfied, or an `HttpStatusException` was thrown, routes for the relevant HTTP status was searched before routes that handled the specific exception. In Micronaut 3 routes that handle the exception will be searched first, then routes that handle the HTTP status.
 
+==== Status Route Default Response Status
+
+Status error routes will now default to produce responses with the same HTTP status as specified in the `@Error` annotation. In previous versions a 200 OK response was created. For example:
+
+```
+@Error(status = HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+String unsupportedMediaTypeHandler() {
+    return "not supported";
+}
+```
+
+The above method will result in a response of HTTP status 415 with a body of "not supported". Previously it would have been a response of HTTP status 200 with a body of "not supported". To specify the desired response status, either annotate the method with `@Status` or return an `HttpResponse`.
+
 ==== No Longer Possible to Inject a `List` of `Provider`
 
 In Micronaut 2.x it was possible to inject a `List<javax.inject.Provider>`, although this was undocumented behaviour. In Micronaut 3.x injecting a list of `Provider` instances is no longer possible and you should instead use the api:context.BeanProvider[] API which provides `stream()` and `iterator()` methods to provide the same functionality.

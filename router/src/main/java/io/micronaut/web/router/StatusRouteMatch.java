@@ -63,7 +63,7 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
 
     @Override
     public HttpStatus findStatus(HttpStatus defaultStatus) {
-        return httpStatus;
+        return super.findStatus(httpStatus);
     }
 
     @Override
