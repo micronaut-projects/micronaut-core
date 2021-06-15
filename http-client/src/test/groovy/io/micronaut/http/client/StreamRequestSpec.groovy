@@ -68,7 +68,7 @@ class StreamRequestSpec extends Specification {
             }
         }, FluxSink.OverflowStrategy.BUFFER)
         HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/numbers', bodyFlux)
-                .contentType(MediaType.APPLICATION_JSON_TYPE), List)
+                .contentType(MediaType.APPLICATION_JSON_TYPE), List).blockFirst()
 
         then:
         result.body().size() == 5
@@ -87,7 +87,7 @@ class StreamRequestSpec extends Specification {
                 emitter.complete()
             }
         }, FluxSink.OverflowStrategy.BUFFER)
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/strings', fluxbody).contentType(MediaType.TEXT_PLAIN_TYPE), List)
+        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/strings', fluxbody).contentType(MediaType.TEXT_PLAIN_TYPE), List).blockFirst()
 
         then:
         result.body().size() == 5
@@ -141,8 +141,7 @@ class StreamRequestSpec extends Specification {
                 emitter.complete()
             }
         }, FluxSink.OverflowStrategy.BUFFER)
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojos', fluxbody), Argument.of(List, Book))
-                .block()
+        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojos', fluxbody), Argument.of(List, Book)).blockFirst()
 
         then:
         result.body().size() == 5
@@ -234,7 +233,7 @@ class StreamRequestSpec extends Specification {
 
         HttpResponse<String> result = client.exchange(HttpRequest.POST('/stream/request/strings/contentLength', fluxbody)
                 .contentType(MediaType.TEXT_PLAIN_TYPE).contentLength(10), String)
-                .block()
+                .blockFirst()
 
         then:
         noExceptionThrown()
