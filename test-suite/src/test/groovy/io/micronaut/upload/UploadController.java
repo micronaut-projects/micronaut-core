@@ -15,7 +15,6 @@
  */
 package io.micronaut.upload;
 
-import io.jaegertracing.internal.utils.Http;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
