@@ -54,7 +54,7 @@ class MutateRequestClientFilterSpec extends Specification {
 
     void "test mutate stream request URI"() {
         expect:
-        myClient.stream().blockingSingle() == "xxxxxxxxxxx"
+        myClient.stream().blockFirst() == "xxxxxxxxxxx"
     }
 
     @Client("/filters/uri/test")

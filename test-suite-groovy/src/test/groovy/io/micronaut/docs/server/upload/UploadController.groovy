@@ -36,7 +36,7 @@ class UploadController {
         File tempFile = File.createTempFile(file.filename, "temp")
         Publisher<Boolean> uploadPublisher = file.transferTo(tempFile) // <3>
 
-        Single.fromPublisher(uploadPublisher)  // <4>
+        Mono.from(uploadPublisher)  // <4>
             .map({ success ->
                 if (success) {
                     HttpResponse.ok("Uploaded")

@@ -31,6 +31,8 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.time.Duration
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
 
 class ServerSentEventStreamingSpec extends Specification {
@@ -136,10 +138,8 @@ class ServerSentEventStreamingSpec extends Specification {
 
         @Get(value = '/pojo/delayed', produces = MediaType.TEXT_EVENT_STREAM)
         Flux<Product> delayedStream() {
-            return Flux.fromIterable(dataSet().collect { it.data }).delay(
-                    5,
-                    TimeUnit.SECONDS
-            )
+            return Flux.fromIterable(dataSet().collect { it.data })
+                    .delayElements(Duration.of(5, ChronoUnit.SECONDS))
         }
     }
 

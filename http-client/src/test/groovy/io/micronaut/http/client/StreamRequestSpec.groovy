@@ -174,7 +174,7 @@ class StreamRequestSpec extends Specification {
                 emitter.complete()
         }, FluxSink.OverflowStrategy.BUFFER
 
-        )), Book).toList().blockingGet()
+        )), Book).collectList().block()
 
         then:
         result.size() == 5
@@ -191,7 +191,7 @@ class StreamRequestSpec extends Specification {
                 emitter.complete()
         }, FluxSink.OverflowStrategy.BUFFER
 
-        )), Book).toList().blockingGet()
+        )), Book).collectList().block()
 
         then:
         def e= thrown(RuntimeException) // TODO: this should be HttpClientException

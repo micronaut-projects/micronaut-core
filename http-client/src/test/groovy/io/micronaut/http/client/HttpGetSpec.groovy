@@ -126,13 +126,11 @@ class HttpGetSpec extends Specification {
 
     void "test simple 404 request as VndError"() {
         when:
-        def flowable = Flux.from(client.exchange(
+        HttpResponse<?> response = Flux.from(client.exchange(
                 HttpRequest.GET("/get/doesntexist")
-        ))
-
-        def response = flowable.onErrorReturn({ error ->
+        )).onErrorResume({ error ->
             if (error instanceof HttpClientResponseException) {
-                return HttpResponse.status(error.status).body(error.response.getBody(Map).orElse(null))
+                return Flux.just(HttpResponse.status(error.status).body(error.response.getBody(Map).orElse(null)))
             }
             throw error
         }).blockFirst()
@@ -272,7 +270,7 @@ class HttpGetSpec extends Specification {
                 HttpRequest.GET("/get/simple")
         )
         String body
-        flowable.firstOrError().subscribe((Consumer){ HttpResponse res ->
+        flowable.next().subscribe((Consumer){ HttpResponse res ->
             Thread.sleep(3000)
             body = res.getBody(String).orElse(null)
         })
@@ -418,18 +416,6 @@ class HttpGetSpec extends Specification {
 
         cleanup:
         client.close()
-    }
-
-    void "test completable returns 200"() {
-        when:
-        MyGetClient client = this.myGetClient
-        def returnsNull = client.completable().block()
-        def ex = client.completableError().block()
-
-        then:
-        returnsNull == null
-        ex instanceof HttpClientResponseException
-        ex.message.contains("completable error")
     }
 
     void "test setting query params on the request"() {
@@ -703,16 +689,6 @@ class HttpGetSpec extends Specification {
             return host
         }
 
-        @Get("/completable")
-        Mono<Void> completable(){
-            return Mono.empty()
-        }
-
-        @Get("/completable/error")
-        Mono<Void> completableError() {
-            return Mono.error(new RuntimeException("completable error"))
-        }
-
         @Get(uris = ["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
@@ -880,12 +856,6 @@ class HttpGetSpec extends Specification {
 
         @Get("/dateTimeQuery")
         String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate)
-
-        @Get("/completable")
-        Mono<Void> completable()
-
-        @Get("/completable/error")
-        Mono<Void> completableError()
 
         @Get("/multiple")
         String multiple()

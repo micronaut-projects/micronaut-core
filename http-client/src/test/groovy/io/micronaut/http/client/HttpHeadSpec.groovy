@@ -108,15 +108,13 @@ class HttpHeadSpec extends Specification {
 
     void "test simple 404 request as VndError"() {
         when:
-        Flux<?> flowable = Flux.fromPublisher(client.exchange(
+        def response = Flux.from(client.exchange(
                 HttpRequest.GET("/head/doesntexist")
-        ))
-
-        def response = flowable.onErrorReturn({ error ->
-            if (error instanceof HttpClientResponseException) {
-                return HttpResponse.status(error.status).body(error.response.getBody(Map).orElse(null))
-            }
-            throw error
+        )).onErrorResume(error -> {
+                if (error instanceof HttpClientResponseException) {
+                    return Flux.just(HttpResponse.status(error.status).body(error.response.getBody(Map).orElse(null)))
+                }
+                throw error
         }).blockFirst()
 
         def body = response.body
@@ -246,7 +244,7 @@ class HttpHeadSpec extends Specification {
                 HttpRequest.HEAD("/head/simple")
         )
         String body
-        flowable.firstOrError().subscribe((Consumer){ HttpResponse res ->
+        flowable.next().subscribe((Consumer){ HttpResponse res ->
             Thread.sleep(3000)
             body = res.getBody(String).orElse(null)
         })

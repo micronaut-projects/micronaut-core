@@ -48,9 +48,9 @@ class PublisherCrudSpec extends Specification {
 
         when:
         Book book = Flux.from(client.get(99))
-                            .next()
-                            .onErrorResume(Mono.empty())
-                            .block()
+                .onErrorResume(t -> { Flux.empty()})
+                .next()
+                .block()
         List<Book> books = Flux.from(client.list()).blockFirst()
 
         then:
@@ -84,8 +84,8 @@ class PublisherCrudSpec extends Specification {
         when:
         Flux.from(client.delete(book.id)).blockFirst()
         book = Flux.from(client.get(book.id))
+                .onErrorResume(t -> { Flux.empty()})
                 .next()
-                .onErrorResume(Mono.empty())
                 .block()
         then:
         book == null

@@ -164,7 +164,7 @@ class JsonStreamSpec  extends Specification {
         ReactorStreamingHttpClient client = context.createBean(ReactorStreamingHttpClient, embeddedServer.getURL())
         signal = new Semaphore(1)
         when:
-        // Funny request flow which required the server to relase the semaphore so we can keep sending stuff
+        // Funny request flow which required the server to release the semaphore so we can keep sending stuff
         def stream = client.jsonStream(HttpRequest.POST(
                 '/jsonstream/books/count',
                 Mono.fromCallable {
