@@ -738,36 +738,13 @@ public class DefaultHttpClient implements
     @Override
     public <I> Flux<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
         return Flux.from(resolveRequestURI(request))
-                .flatMap(buildDataStreamPublisher(request))
-                .doOnEach(buffer -> {
-                    if (buffer.hasValue()) {
-                        ByteBuffer<?> byteBuffer = buffer.get();
-                        if (byteBuffer != null) {
-                            ByteBuf nativeByteBuf = (ByteBuf) byteBuffer.asNativeBuffer();
-                            if (nativeByteBuf.refCnt() > 0) {
-                                ReferenceCountUtil.safeRelease(nativeByteBuf);
-                            }
-                        }
-                    }
-                });
+                .flatMap(buildDataStreamPublisher(request));
     }
 
     @Override
     public <I> Flux<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
         return Flux.from(resolveRequestURI(request))
-                .flatMap(buildExchangeStreamPublisher(request))
-                .doOnEach(res -> {
-                    if (res.hasValue()) {
-                        HttpResponse<ByteBuffer<?>> httpResponseByteBuffer = res.get();
-                        if (httpResponseByteBuffer != null) {
-                            ByteBuffer<?> buffer = httpResponseByteBuffer.body();
-                            if (buffer instanceof ReferenceCounted) {
-                                ((ReferenceCounted) buffer).release();
-                            }
-                        }
-
-                    }
-                });
+                .flatMap(buildExchangeStreamPublisher(request));
     }
 
     @Override
