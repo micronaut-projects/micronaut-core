@@ -212,12 +212,12 @@ class StreamSpec extends Specification {
 
         @Get(value = "/echo{?n,data}", produces = MediaType.TEXT_PLAIN)
         Flux<byte[]> postStream(@QueryValue @Nullable Integer n, @QueryValue @Nullable String data) {
-            return Flux.just(data.getBytes(StandardCharsets.UTF_8)).repeat(n)
+            return Flux.just(data.getBytes(StandardCharsets.UTF_8)).repeat(n - 1)
         }
 
         @Get(value = "/echoWithHeaders{?n,data}", produces = MediaType.TEXT_PLAIN)
         HttpResponse<Flux<byte[]>> echoWithHeaders(@QueryValue @Nullable Integer n, @QueryValue @Nullable String data) {
-            return HttpResponse.ok(Flux.just(data.getBytes(StandardCharsets.UTF_8)).repeat(n)).header("X-MyHeader", "42")
+            return HttpResponse.ok(Flux.just(data.getBytes(StandardCharsets.UTF_8)).repeat(n - 1)).header("X-MyHeader", "42")
         }
 
         @Get(value = "/echoWithHeadersSingle{?data}", produces = MediaType.TEXT_PLAIN)

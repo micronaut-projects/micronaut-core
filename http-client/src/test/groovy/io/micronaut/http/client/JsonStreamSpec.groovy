@@ -171,7 +171,7 @@ class JsonStreamSpec  extends Specification {
                     JsonStreamSpec.signal.acquire()
                     new Book(title: "Micronaut for dummies")
                 }
-                .repeat(10)
+                .repeat(9)
                 ).contentType(MediaType.APPLICATION_JSON_STREAM_TYPE).accept(MediaType.APPLICATION_JSON_STREAM_TYPE))
 
         then:
@@ -195,7 +195,7 @@ class JsonStreamSpec  extends Specification {
                     JsonStreamSpec.signal.acquire()
                     new Book(title: "Micronaut for dummies, volume 2")
                 }
-                .repeat(7))
+                .repeat(6))
         then:
         result.timeout(Duration.of(10, ChronoUnit.SECONDS)).block().bookCount == 7
     }
