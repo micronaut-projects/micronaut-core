@@ -24,11 +24,6 @@ import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import reactor.core.publisher.SynchronousSink
-
-import java.util.concurrent.Callable
-import java.util.function.BiFunction
-
 // end::imports[]
 
 /**
