@@ -2,6 +2,10 @@ Micronaut {version} includes the following changes:
 
 === Core Features
 
+==== Jakarta Inject
+
+The `jakarta.inject` annotations are now the default injection annotations for Micronaut 3
+
 ==== Support Narrowing Injection by Generic Type Arguments
 
 Micronaut can now resolve the correct bean to inject based on the generic type arguments specified on the injection point:

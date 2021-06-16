@@ -23,6 +23,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 
 /**
  * Test the non global attribute for @Error.
@@ -91,7 +92,8 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
                 HttpRequest.POST('/test1/simple', '<foo></foo>')
                         .contentType(MediaType.APPLICATION_XML),
                 String
-        ).blockFirst()
+        ).onErrorResume(t -> Flux.just(((HttpClientResponseException) t).response))
+        .blockFirst()
 
         then:
         response.getBody(String).get() == "You sent an unsupported media type - from Test1Controller.unsupportedMediaTypeHandler()"

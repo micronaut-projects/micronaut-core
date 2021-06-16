@@ -97,12 +97,14 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
     }
 
     private Flux<Object> invokeFn(Object body, String functionName, Flux<FunctionDefinition> functionDefinition, Argument<?> valueType) {
-        return functionDefinition.next()
-                .flatMap(def -> {
-                    FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
-                    return (Mono<Object>) functionInvoker.invoke(def, body, Argument.of(Mono.class, valueType));
-                }).switchIfEmpty(Mono.error(() -> new FunctionNotFoundException(functionName)))
-                .flux();
+        return functionDefinition.next().flatMap(def -> {
+            FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
+            return (Mono<Object>) functionInvoker.invoke(
+                    def,
+                    body,
+                    Argument.of(Mono.class, valueType)
+            );
+        }).switchIfEmpty(Mono.error(() -> new FunctionNotFoundException(functionName))).flux();
     }
 
     private CompletableFuture<Object> toCompletableFuture(Flux<Object> flowable) {
