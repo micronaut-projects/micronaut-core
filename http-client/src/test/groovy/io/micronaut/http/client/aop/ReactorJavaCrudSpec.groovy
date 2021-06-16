@@ -49,7 +49,9 @@ class ReactorJavaCrudSpec extends Specification {
         BookClient client = context.getBean(BookClient)
 
         when:
-        Book book = client.get(99).block()
+        Book book = client.get(99)
+                .onErrorResume(t -> { Mono.empty()})
+                .block()
         List<Book> books = client.list().block()
 
         then:
@@ -95,7 +97,9 @@ class ReactorJavaCrudSpec extends Specification {
         book != null
 
         when:
-        book = client.get(book.id).block()
+        book = client.get(book.id)
+                .onErrorResume(t -> { Mono.empty()})
+                .block()
         then:
         book == null
     }
