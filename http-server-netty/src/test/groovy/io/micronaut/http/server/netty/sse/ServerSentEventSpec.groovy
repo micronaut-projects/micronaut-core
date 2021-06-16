@@ -115,9 +115,7 @@ class ServerSentEventSpec extends Specification {
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> object() {
             int i = 0
-            Flux.generate(new Consumer<SynchronousSink<Event>>() {
-                @Override
-                void accept(SynchronousSink<Event> emitter) {
+            Flux.generate(emitter -> {
                     if (i < 4) {
                         i++
                         emitter.next(Event.of(new Foo(name: "Foo $i", age: i + 10)))
@@ -125,7 +123,6 @@ class ServerSentEventSpec extends Specification {
                     else {
                         emitter.complete()
                     }
-                }
             })
         }
 
@@ -133,9 +130,7 @@ class ServerSentEventSpec extends Specification {
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> rich() {
             Integer i = 0
-            Flux.generate(new Consumer<SynchronousSink<Event>>() {
-                @Override
-                void accept(SynchronousSink<Event> emitter) {
+            Flux.generate(emitter -> {
                     if (i < 4) {
                         i++
                         emitter.next(
@@ -148,7 +143,6 @@ class ServerSentEventSpec extends Specification {
                     else {
                         emitter.complete()
                     }
-                }
             })
         }
 
@@ -156,9 +150,7 @@ class ServerSentEventSpec extends Specification {
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> string() {
             int i = 0
-            Flux.generate(new Consumer<SynchronousSink<Event>>() {
-                @Override
-                void accept(SynchronousSink<Event> emitter) {
+            Flux.generate(emitter -> {
                     if (i < 4) {
                         i++
                         emitter.next(Event.of("Foo $i"))
@@ -166,29 +158,22 @@ class ServerSentEventSpec extends Specification {
                     else {
                         emitter.complete()
                     }
-                }
             })
         }
 
         @Get('/exception')
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> exception() {
-            Flux.generate(new Consumer<SynchronousSink<Event>>() {
-                @Override
-                void accept(SynchronousSink<Event> emitter) {
+            Flux.generate(emitter -> {
                     throw new RuntimeException("bad things happened")
-                }
             })
         }
 
         @Get('on-error')
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> onError() {
-            Flux.generate(new Consumer<SynchronousSink<Event>>() {
-                @Override
-                void accept(SynchronousSink<Event> emitter) {
+            Flux.generate(emitter -> {
                     emitter.error(new RuntimeException("bad things happened"))
-                }
             })
         }
     }
