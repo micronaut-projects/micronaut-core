@@ -48,7 +48,9 @@ class NotFoundSpec extends Specification {
 
         expect:
         client.maybe('1234').block()
-        client.maybe('notthere').block() == null
+        client.maybe('notthere')
+                .onErrorResume(t -> { Mono.empty()})
+                .block() == null
 
     }
 

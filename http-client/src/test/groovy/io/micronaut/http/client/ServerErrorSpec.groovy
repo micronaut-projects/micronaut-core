@@ -89,11 +89,17 @@ class ServerErrorSpec extends Specification {
 
     void "test flowable error - flowable"() {
         when:
-        myClient.fluxErrorFlux().blockFirst()
+        def response = myClient.fluxErrorFlux()
+                .onErrorResume(throwable -> {
+            if (throwable instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) throwable).response)
+            }
+            throw throwable
+        }).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error"
+        response.body.isPresent()
+        response.body.message == "Internal Server Error"
     }
 
     @Client('/server-errors')
