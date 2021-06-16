@@ -70,9 +70,8 @@ public class CorsFilter implements HttpServerFilter {
             if (response != null) {
                 return Publishers.just(response);
             } else {
-                return Publishers.map(chain.proceed(request), mutableHttpResponse -> {
+                return Publishers.then(chain.proceed(request), mutableHttpResponse -> {
                     handleResponse(request, mutableHttpResponse);
-                    return mutableHttpResponse;
                 });
             }
         } else {

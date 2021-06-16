@@ -202,7 +202,7 @@ class SuspendControllerSpec : StringSpec() {
 
             ex.status shouldBe HttpStatus.BAD_REQUEST
             body shouldBe "illegal.argument"
-            filter.response shouldBe null
+            filter.response.status shouldBe HttpStatus.BAD_REQUEST
             filter.error should { t -> t is IllegalArgumentException }
         }
 

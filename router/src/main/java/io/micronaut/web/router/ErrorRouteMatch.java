@@ -18,12 +18,13 @@ package io.micronaut.web.router;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpStatus;
 
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
-class ErrorRouteMatch<T, R> extends StatusRouteMatch<T, R> {
+class ErrorRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
 
     private final Throwable error;
     private final Map<String, Object> variables;
@@ -46,7 +47,7 @@ class ErrorRouteMatch<T, R> extends StatusRouteMatch<T, R> {
      * @param conversionService The conversion service
      */
     ErrorRouteMatch(Throwable error, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
-        super(HttpStatus.INTERNAL_SERVER_ERROR, abstractRoute, conversionService);
+        super(abstractRoute, conversionService);
         this.error = error;
         this.variables = new LinkedHashMap<>();
         for (Argument argument : getArguments()) {
@@ -67,6 +68,49 @@ class ErrorRouteMatch<T, R> extends StatusRouteMatch<T, R> {
     @Override
     public Map<String, Object> getVariableValues() {
         return variables;
+    }
+
+    @Override
+    public boolean isErrorRoute() {
+        return true;
+    }
+
+    @Override
+    protected RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
+        return new ErrorRouteMatch<T, R>(error, abstractRoute, conversionService) {
+            @Override
+            public Collection<Argument> getRequiredArguments() {
+                return requiredArguments;
+            }
+
+            @Override
+            public Map<String, Object> getVariableValues() {
+                return newVariables;
+            }
+        };
+    }
+
+    @Override
+    public RouteMatch<R> decorate(Function<RouteMatch<R>, R> executor) {
+        Map<String, Object> variables = getVariableValues();
+        Collection<Argument> arguments = getRequiredArguments();
+        RouteMatch thisRoute = this;
+        return new ErrorRouteMatch(error, abstractRoute, conversionService) {
+            @Override
+            public Collection<Argument> getRequiredArguments() {
+                return arguments;
+            }
+
+            @Override
+            public T execute(Map argumentValues) {
+                return (T) executor.apply(thisRoute);
+            }
+
+            @Override
+            public Map<String, Object> getVariableValues() {
+                return variables;
+            }
+        };
     }
 
     @Override

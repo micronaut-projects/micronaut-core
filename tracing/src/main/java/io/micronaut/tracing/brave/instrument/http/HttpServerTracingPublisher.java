@@ -108,21 +108,25 @@ public class HttpServerTracingPublisher implements Publishers.MicronautPublisher
                                 response.body(Publishers.convertPublisher(scopedPublisher, type));
                             }
                         }
-                        serverHandler.handleSend(mapResponse(request, response), span);
-                        actual.onNext(response);
+                        final Optional<Throwable> throwable = response.getAttribute(HttpAttributes.EXCEPTION, Throwable.class);
+                        if (throwable.isPresent()) {
+                            int statusCode = 500;
+                            Throwable error = throwable.get();
+                            if (error instanceof HttpStatusException) {
+                                statusCode = ((HttpStatusException) error).getStatus().getCode();
+                            }
+                            serverHandler.handleSend(mapResponse(request, statusCode, error), span);
+                            actual.onError(error);
+                        } else {
+                            serverHandler.handleSend(mapResponse(request, response), span);
+                            actual.onNext(response);
+                        }
                     }
                 }
 
                 @Override
                 public void onError(Throwable error) {
-                    try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
-                        int statusCode = 500;
-                        if (error instanceof HttpStatusException) {
-                            statusCode = ((HttpStatusException) error).getStatus().getCode();
-                        }
-                        serverHandler.handleSend(mapResponse(request, statusCode, error), span);
-                        actual.onError(error);
-                    }
+                    actual.onError(error);
                 }
 
                 @Override
