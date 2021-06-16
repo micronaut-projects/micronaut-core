@@ -1655,7 +1655,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         } else {
                             Object suspendedBody;
                             if (isKotlinFunctionReturnTypeUnit) {
-                                suspendedBody = Mono.<Void>just(null);
+                                suspendedBody = Mono.empty();
                             } else {
                                 suspendedBody = body;
                             }
