@@ -20,7 +20,9 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Issue
@@ -105,9 +107,13 @@ class ReactorJavaCrudSpec extends Specification {
 
         expect:
         client.getPrice("good").block() == 10
-        client.getPrice("empty").block() == null
+        client.getPrice("empty").onErrorResume(throwable -> {
+            if (throwable instanceof HttpClientResponseException) {
+                return Mono.empty()
+            }
+            throw throwable
+        }).block() == null
     }
-
 
     @Client('/rxjava/books')
     static interface BookClient extends BookApi, PriceApi {
