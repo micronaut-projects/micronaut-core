@@ -19,6 +19,7 @@ import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
 import io.micronaut.annotation.processing.AnnotationUtils
+import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor
 import io.micronaut.annotation.processing.GenericUtils
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.annotation.processing.ModelUtils
@@ -50,6 +51,7 @@ import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
+import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.Element
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
@@ -97,7 +99,8 @@ abstract class AbstractTypeElementSpec extends Specification {
                 modelUtils,
                 genericUtils,
                 processingEnv.filer,
-                new MutableConvertibleValuesMap<Object>()
+                new MutableConvertibleValuesMap<Object>(),
+                TypeElementVisitor.VisitorKind.ISOLATING
         )
 
         return new JavaElementFactory(visitorContext).newClassElement(typeElement, annotationMetadata)
@@ -272,6 +275,7 @@ class Test {
                         }
                     }
                 }
+
             }
         } else {
             return new JavaParser()

@@ -1141,6 +1141,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         annotationMirror,
                         annotationValues,
                         Collections.emptyList(),
+                        null,
                         annotationMetadata::addDeclaredRepeatable,
                         annotationMetadata::addDeclaredAnnotation);
             } else {
@@ -1151,6 +1152,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         annotationMirror,
                         annotationValues,
                         Collections.emptyList(),
+                        null,
                         annotationMetadata::addRepeatable,
                         annotationMetadata::addAnnotation);
             }
@@ -1195,25 +1197,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             continue;
                         }
                     }
-                    if (lastParent != null) {
-                        AnnotationValueBuilder<?> interceptorBinding = null;
-                        if (AnnotationUtil.ANN_AROUND.equals(annotationName) || AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
-                            interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
-                                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
-                                    .member("kind", "AROUND");
-                        } else if (AnnotationUtil.ANN_INTRODUCTION.equals(annotationName)) {
-                            interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
-                                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
-                                    .member("kind", "INTRODUCTION");
-                        } else if (AnnotationUtil.ANN_AROUND_CONSTRUCT.equals(annotationName)) {
-                            interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
-                                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
-                                    .member("kind", "AROUND_CONSTRUCT");
-                        }
-                        if (interceptorBinding != null) {
-                            interceptorBindings.add(interceptorBinding);
-                        }
-                    }
+                    addToInterceptorBindingsIfNecessary(interceptorBindings, lastParent, annotationName);
 
                     final T annotationTypeMirror = getTypeForAnnotation(annotationMirror);
                     final RetentionPolicy retentionPolicy = getRetentionPolicy(annotationTypeMirror);
@@ -1252,13 +1236,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     }
 
                     if (isDeclared) {
-                        applyTransformations(listIterator, metadata, isDeclared, annotationMirror, data, parents,
+                        applyTransformations(listIterator, metadata, isDeclared, annotationMirror, data, parents, interceptorBindings,
                                 (string, av) -> metadata.addDeclaredRepeatableStereotype(parents, string, av),
-                                (string, values, rp) -> metadata.addDeclaredStereotype(parents, string, values, retentionPolicy));
+                                (string, values, rp) -> metadata.addDeclaredStereotype(parents, string, values, rp));
                     } else {
-                        applyTransformations(listIterator, metadata, isDeclared, annotationMirror, data, parents,
+                        applyTransformations(listIterator, metadata, isDeclared, annotationMirror, data, parents, interceptorBindings,
                                 (string, av) -> metadata.addRepeatableStereotype(parents, string, av),
-                                (string, values, rp) -> metadata.addStereotype(parents, string, values, retentionPolicy));
+                                (string, values, rp) -> metadata.addStereotype(parents, string, values, rp));
                     }
                 }
             }
@@ -1284,6 +1268,28 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             interceptorBinding.build()
                     );
                 }
+            }
+        }
+    }
+
+    private void addToInterceptorBindingsIfNecessary(LinkedList<AnnotationValueBuilder<?>> interceptorBindings, String lastParent, String annotationName) {
+        if (lastParent != null) {
+            AnnotationValueBuilder<?> interceptorBinding = null;
+            if (AnnotationUtil.ANN_AROUND.equals(annotationName) || AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
+                interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
+                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
+                        .member("kind", "AROUND");
+            } else if (AnnotationUtil.ANN_INTRODUCTION.equals(annotationName)) {
+                interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
+                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
+                        .member("kind", "INTRODUCTION");
+            } else if (AnnotationUtil.ANN_AROUND_CONSTRUCT.equals(annotationName)) {
+                interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
+                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
+                        .member("kind", "AROUND_CONSTRUCT");
+            }
+            if (interceptorBinding != null) {
+                interceptorBindings.add(interceptorBinding);
             }
         }
     }
@@ -1318,25 +1324,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             continue;
                         }
                     }
-                    if (lastParent != null) {
-                        AnnotationValueBuilder<?> interceptorBinding = null;
-                        if (AnnotationUtil.ANN_AROUND.equals(annotationName) || AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
-                            interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
-                                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
-                                    .member("kind", "AROUND");
-                        } else if (AnnotationUtil.ANN_INTRODUCTION.equals(annotationName)) {
-                            interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
-                                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
-                                    .member("kind", "INTRODUCTION");
-                        } else if (AnnotationUtil.ANN_AROUND_CONSTRUCT.equals(annotationName)) {
-                            interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
-                                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
-                                    .member("kind", "AROUND_CONSTRUCT");
-                        }
-                        if (interceptorBinding != null) {
-                            interceptorBindings.add(interceptorBinding);
-                        }
-                    }
+                    addToInterceptorBindingsIfNecessary(interceptorBindings, lastParent, annotationName);
 
                     final RetentionPolicy retentionPolicy = annotationMirror.getRetentionPolicy();
 
@@ -1458,6 +1446,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                       A annotationMirror,
                                       Map<CharSequence, Object> data,
                                       List<String> parents,
+                                      @Nullable LinkedList<AnnotationValueBuilder<?>> interceptorBindings,
                                       BiConsumer<String, AnnotationValue> addRepeatableAnnotation,
                                       TriConsumer<String, Map<CharSequence, Object>, RetentionPolicy> addAnnotation) {
         String annotationName = getAnnotationTypeName(annotationMirror);
@@ -1519,6 +1508,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                 final List<AnnotationValue<?>> tav = transformer.transform(av, visitorContext);
                                 for (AnnotationValue<?> value : tav) {
                                     addRepeatableAnnotation.accept(annotationValue.getAnnotationName(), value);
+                                    if (CollectionUtils.isNotEmpty(value.getStereotypes())) {
+                                        addTransformedStereotypes(annotationMetadata, isDeclared, value, parents);
+                                    } else {
+                                        addTransformedStereotypes(annotationMetadata, isDeclared, value.getAnnotationName(), parents);
+                                    }
                                 }
                             }
 
@@ -1529,6 +1523,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         final List<AnnotationValue<?>> tav = transformer.transform(av, visitorContext);
                         for (AnnotationValue<?> value : tav) {
                             addRepeatableAnnotation.accept(repeatableName, value);
+                            if (CollectionUtils.isNotEmpty(value.getStereotypes())) {
+                                addTransformedStereotypes(annotationMetadata, isDeclared, value, parents);
+                            } else {
+                                addTransformedStereotypes(annotationMetadata, isDeclared, value.getAnnotationName(), parents);
+                            }
                         }
                     }
                 }
@@ -1574,6 +1573,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     final List<AnnotationValue<?>> transformedValues = annotationTransformer.transform(av, visitorContext);
                     for (AnnotationValue<?> transformedValue : transformedValues) {
                         final String transformedAnnotationName = transformedValue.getAnnotationName();
+                        if (interceptorBindings != null && !parents.isEmpty() && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(transformedAnnotationName)) {
+                            final AnnotationValueBuilder<Annotation> newBuilder = AnnotationValue
+                                    .builder(transformedAnnotationName, transformedValue.getRetentionPolicy())
+                                    .members(transformedValue.getValues());
+                            if (!transformedValue.contains(AnnotationMetadata.VALUE_MEMBER)) {
+                                newBuilder.value(parents.get(parents.size() - 1));
+                            }
+                            interceptorBindings.add(newBuilder);
+                        }
                         final String transformedRepeatableName;
 
                         if (isRepeatableCandidate(transformedAnnotationName)) {

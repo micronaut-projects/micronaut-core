@@ -15,7 +15,7 @@
  */
 package io.micronaut.function.web
 
-import groovy.transform.NotYetImplemented
+import groovy.test.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse

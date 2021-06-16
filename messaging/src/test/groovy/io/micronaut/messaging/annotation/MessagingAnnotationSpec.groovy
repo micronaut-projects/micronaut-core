@@ -36,6 +36,7 @@ class TestListener {
         method.arguments[0].annotationMetadata.hasAnnotation(Body)
         method.arguments[0].annotationMetadata.getAnnotationNameByStereotype(Bindable).get() == Body.name
         !method.arguments[1].annotationMetadata.hasAnnotation(MessageHeader)
+        method.arguments[1].annotationMetadata.getAnnotationTypeByStereotype(Bindable).get() == Header
         def headers = method.arguments[1].annotationMetadata.getAnnotationValuesByType(Header)
         headers.size() == 1
         headers[0].annotationName == Header.name

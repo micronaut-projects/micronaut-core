@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -32,6 +33,10 @@ import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
+import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
+import io.micronaut.inject.writer.BeanDefinitionWriter;
+
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
@@ -43,6 +48,7 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementScanner8;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -242,8 +248,31 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             }
         }
 
+        final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = javaVisitorContext.getBeanElementBuilders();
+        if (CollectionUtils.isNotEmpty(beanDefinitionBuilders)) {
+            for (AbstractBeanDefinitionBuilder beanDefinitionBuilder : beanDefinitionBuilders) {
+                final BeanDefinitionWriter beanDefinitionWriter = beanDefinitionBuilder.build();
+                if (beanDefinitionWriter != null) {
+                    try {
+                        beanDefinitionWriter.accept(classWriterOutputVisitor);
+                        String beanTypeName = beanDefinitionWriter.getBeanTypeName();
+                        BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
+                                new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter);
+                        beanDefinitionReferenceWriter
+                                .setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
+                        beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
+                    } catch (IOException e) {
+                        // raise a compile error
+                        String message = e.getMessage();
+                        error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
+                    }
+                }
+            }
+        }
+
         if (roundEnv.processingOver()) {
             javaVisitorContext.finish();
+            writeBeanDefinitionsToMetaInf();
         }
         return false;
     }
@@ -259,6 +288,18 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             warning(visitorWarning);
         }
         return findCoreTypeElementVisitors(SERVICE_LOADER, null);
+    }
+
+    /**
+     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io.micronaut.inject.BeanDefinitionReference.
+     */
+    private void writeBeanDefinitionsToMetaInf() {
+        try {
+            classWriterOutputVisitor.finish();
+        } catch (Exception e) {
+            String message = e.getMessage();
+            error("Error occurred writing META-INF files: %s", message != null ? message : e);
+        }
     }
 
     private static @NonNull
@@ -305,7 +346,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         }
         return typeElementVisitors.values();
     }
-
 
     /**
      * The class to visit the type elements.
