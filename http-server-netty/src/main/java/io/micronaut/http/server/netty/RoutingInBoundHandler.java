@@ -1379,7 +1379,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (isJson) {
                                     // if the Publisher is returning JSON then in order for it to be valid JSON for each emitted element
                                     // we must wrap the JSON in array and delimit the emitted items
-                                    httpContentPublisher = Flux.from(httpContentPublisher);
+                                    httpContentPublisher = Flux.concat(Flux.just(HttpContentUtil.openBracket()),
+                                            Flux.from(httpContentPublisher),
+                                            Flux.just(HttpContentUtil.closeBracket()));
                                     //TODO         .lift((FluxOperator<HttpContent, HttpContent>) ArrayBracketSubscriber::new);
                                 }
 
