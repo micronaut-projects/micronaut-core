@@ -13,12 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
-@Requires(classes = Flowable.class)
-package io.micronaut.reactive.rxjava2;
+package io.micronaut.reactive.rxjava2.instrumentation;
 
-import io.micronaut.context.annotation.Requires;
-import io.reactivex.Flowable;
+import io.micronaut.core.annotation.Internal;
+
+/**
+ * Marker interface.
+ *
+ * @author graemerocher
+ * @since 1.1
+ */
+@Internal
+interface RxInstrumentedComponent {
+}

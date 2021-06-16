@@ -13,27 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava2;
+package io.micronaut.reactive.rxjava2.instrumentation;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.reactivex.Maybe;
-import io.reactivex.MaybeObserver;
-import io.reactivex.MaybeSource;
-
+import io.reactivex.Completable;
+import io.reactivex.CompletableObserver;
+import io.reactivex.CompletableSource;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
  * See https://github.com/openzipkin/brave/tree/master/context/rxjava2/src/main/java/brave/context/rxjava2/internal.
  *
- * @param <T> The type
  * @author graemerocher
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedMaybe<T> extends Maybe<T> implements RxInstrumentedComponent {
-    private final MaybeSource<T> source;
+final class RxInstrumentedCompletable extends Completable implements RxInstrumentedComponent {
+    private final CompletableSource source;
     private final InvocationInstrumenter instrumenter;
 
     /**
@@ -42,13 +40,13 @@ final class RxInstrumentedMaybe<T> extends Maybe<T> implements RxInstrumentedCom
      * @param source       The source
      * @param instrumenter The instrumenter
      */
-    RxInstrumentedMaybe(MaybeSource<T> source, InvocationInstrumenter instrumenter) {
+    RxInstrumentedCompletable(CompletableSource source, InvocationInstrumenter instrumenter) {
         this.source = source;
         this.instrumenter = instrumenter;
     }
 
     @Override
-    protected void subscribeActual(MaybeObserver<? super T> o) {
+    protected void subscribeActual(CompletableObserver o) {
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.subscribe(o);
         }

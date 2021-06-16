@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava2;
+package io.micronaut.reactive.rxjava2.instrumentation;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.reactivex.Observable;
-import io.reactivex.ObservableSource;
-import io.reactivex.Observer;
-
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -32,25 +30,47 @@ import io.reactivex.Observer;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedObservable<T> extends Observable<T> implements RxInstrumentedComponent {
-    private final ObservableSource<T> source;
+@SuppressWarnings("ReactiveStreamsSubscriberImplementation")
+class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent {
+    private final Subscriber<T> source;
     private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
      *
-     * @param source       The source
-     * @param instrumenter The instrumenter
+     * @param source              The source subscriber
+     * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedObservable(ObservableSource<T> source, InvocationInstrumenter instrumenter) {
+    RxInstrumentedSubscriber(Subscriber<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = instrumenter;
+        this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
-    protected void subscribeActual(Observer<? super T> o) {
+    public void onSubscribe(Subscription s) {
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.subscribe(o);
+            source.onSubscribe(s);
+        }
+    }
+
+    @Override
+    public void onNext(T t) {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            source.onNext(t);
+        }
+    }
+
+    @Override
+    public void onError(Throwable t) {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            source.onError(t);
+        }
+    }
+
+    @Override
+    public void onComplete() {
+        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            source.onComplete();
         }
     }
 }

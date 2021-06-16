@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava2;
+package io.micronaut.reactive.rxjava2.instrumentation;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
+import io.reactivex.SingleObserver;
+import io.reactivex.disposables.Disposable;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -30,33 +30,25 @@ import org.reactivestreams.Subscription;
  * @since 1.1
  */
 @Internal
-@SuppressWarnings("ReactiveStreamsSubscriberImplementation")
-class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent {
-    private final Subscriber<T> source;
+final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, RxInstrumentedComponent {
+    private final SingleObserver<T> source;
     private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
      *
-     * @param source              The source subscriber
+     * @param source              The source observer
      * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedSubscriber(Subscriber<T> source, RxInstrumenterFactory instrumenterFactory) {
+    RxInstrumentedSingleObserver(SingleObserver<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
         this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
-    public void onSubscribe(Subscription s) {
+    public void onSubscribe(Disposable d) {
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.onSubscribe(s);
-        }
-    }
-
-    @Override
-    public void onNext(T t) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.onNext(t);
+            source.onSubscribe(d);
         }
     }
 
@@ -68,9 +60,9 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
     }
 
     @Override
-    public void onComplete() {
+    public void onSuccess(T value) {
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.onComplete();
+            source.onSuccess(value);
         }
     }
 }

@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava2;
+package io.micronaut.reactive.rxjava2.instrumentation;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
+import io.reactivex.Observable;
+import io.reactivex.ObservableSource;
 import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
-import io.reactivex.functions.Consumer;
-import io.reactivex.observables.ConnectableObservable;
+
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -32,8 +32,8 @@ import io.reactivex.observables.ConnectableObservable;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable<T> implements RxInstrumentedComponent {
-    private final ConnectableObservable<T> source;
+final class RxInstrumentedObservable<T> extends Observable<T> implements RxInstrumentedComponent {
+    private final ObservableSource<T> source;
     private final InvocationInstrumenter instrumenter;
 
     /**
@@ -42,7 +42,7 @@ final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable
      * @param source       The source
      * @param instrumenter The instrumenter
      */
-    RxInstrumentedConnectableObservable(ConnectableObservable<T> source, InvocationInstrumenter instrumenter) {
+    RxInstrumentedObservable(ObservableSource<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
         this.instrumenter = instrumenter;
     }
@@ -51,13 +51,6 @@ final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable
     protected void subscribeActual(Observer<? super T> o) {
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.subscribe(o);
-        }
-    }
-
-    @Override
-    public void connect(Consumer<? super Disposable> connection) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.connect(connection);
         }
     }
 }

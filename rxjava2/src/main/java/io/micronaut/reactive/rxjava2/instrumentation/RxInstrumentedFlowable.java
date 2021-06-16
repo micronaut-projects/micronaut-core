@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava2;
+package io.micronaut.reactive.rxjava2.instrumentation;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.reactivex.Single;
-import io.reactivex.SingleObserver;
-import io.reactivex.SingleSource;
+import io.reactivex.Flowable;
+import io.reactivex.FlowableSubscriber;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -31,8 +33,8 @@ import io.reactivex.SingleSource;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedSingle<T> extends Single<T> implements RxInstrumentedComponent {
-    private final SingleSource<T> source;
+final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumentedComponent {
+    private final Publisher<T> source;
     private final InvocationInstrumenter instrumenter;
 
     /**
@@ -41,15 +43,18 @@ final class RxInstrumentedSingle<T> extends Single<T> implements RxInstrumentedC
      * @param source       The source
      * @param instrumenter The instrumenter
      */
-    RxInstrumentedSingle(SingleSource<T> source, InvocationInstrumenter instrumenter) {
+    RxInstrumentedFlowable(Publisher<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
         this.instrumenter = instrumenter;
     }
 
     @Override
-    protected void subscribeActual(SingleObserver<? super T> o) {
+    protected void subscribeActual(Subscriber<? super T> s) {
+        if (!(s instanceof FlowableSubscriber)) {
+            throw new IllegalArgumentException("Subscriber must be an instance of FlowableSubscriber");
+        }
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.subscribe(o);
+            source.subscribe(s);
         }
     }
 }

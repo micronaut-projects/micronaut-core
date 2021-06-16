@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava2;
+package io.micronaut.reactive.rxjava2.instrumentation;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Consumer;
+import io.reactivex.observables.ConnectableObservable;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -30,46 +32,32 @@ import io.reactivex.disposables.Disposable;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComponent {
-    private final Observer<T> source;
+final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable<T> implements RxInstrumentedComponent {
+    private final ConnectableObservable<T> source;
     private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
      *
-     * @param source              The downstream observer
-     * @param instrumenterFactory The instrumenterFactory
+     * @param source       The source
+     * @param instrumenter The instrumenter
      */
-    RxInstrumentedObserver(Observer<T> source, RxInstrumenterFactory instrumenterFactory) {
+    RxInstrumentedConnectableObservable(ConnectableObservable<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
-        this.instrumenter = instrumenterFactory.create();
+        this.instrumenter = instrumenter;
     }
 
     @Override
-    public void onSubscribe(Disposable d) {
+    protected void subscribeActual(Observer<? super T> o) {
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.onSubscribe(d);
+            source.subscribe(o);
         }
     }
 
     @Override
-    public void onNext(T t) {
+    public void connect(Consumer<? super Disposable> connection) {
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.onNext(t);
-        }
-    }
-
-    @Override
-    public void onError(Throwable t) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.onError(t);
-        }
-    }
-
-    @Override
-    public void onComplete() {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.onComplete();
+            source.connect(connection);
         }
     }
 }

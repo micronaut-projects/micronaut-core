@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava2;
+package io.micronaut.reactive.rxjava2.instrumentation;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.reactivex.MaybeObserver;
+import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
 
 /**
@@ -30,17 +30,17 @@ import io.reactivex.disposables.Disposable;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstrumentedComponent {
-    private final MaybeObserver<T> source;
+final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComponent {
+    private final Observer<T> source;
     private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
      *
-     * @param source              The source observer
+     * @param source              The downstream observer
      * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedMaybeObserver(MaybeObserver<T> source, RxInstrumenterFactory instrumenterFactory) {
+    RxInstrumentedObserver(Observer<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
         this.instrumenter = instrumenterFactory.create();
     }
@@ -53,16 +53,16 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstru
     }
 
     @Override
-    public void onError(Throwable t) {
+    public void onNext(T t) {
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.onError(t);
+            source.onNext(t);
         }
     }
 
     @Override
-    public void onSuccess(T value) {
+    public void onError(Throwable t) {
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.onSuccess(value);
+            source.onError(t);
         }
     }
 

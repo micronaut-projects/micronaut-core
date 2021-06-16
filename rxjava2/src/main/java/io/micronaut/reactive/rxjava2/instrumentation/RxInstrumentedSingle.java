@@ -13,25 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava2;
+package io.micronaut.reactive.rxjava2.instrumentation;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.reactivex.Completable;
-import io.reactivex.CompletableObserver;
-import io.reactivex.CompletableSource;
+import io.reactivex.Single;
+import io.reactivex.SingleObserver;
+import io.reactivex.SingleSource;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
  * See https://github.com/openzipkin/brave/tree/master/context/rxjava2/src/main/java/brave/context/rxjava2/internal.
  *
+ * @param <T> The type
  * @author graemerocher
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedCompletable extends Completable implements RxInstrumentedComponent {
-    private final CompletableSource source;
+final class RxInstrumentedSingle<T> extends Single<T> implements RxInstrumentedComponent {
+    private final SingleSource<T> source;
     private final InvocationInstrumenter instrumenter;
 
     /**
@@ -40,13 +41,13 @@ final class RxInstrumentedCompletable extends Completable implements RxInstrumen
      * @param source       The source
      * @param instrumenter The instrumenter
      */
-    RxInstrumentedCompletable(CompletableSource source, InvocationInstrumenter instrumenter) {
+    RxInstrumentedSingle(SingleSource<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
         this.instrumenter = instrumenter;
     }
 
     @Override
-    protected void subscribeActual(CompletableObserver o) {
+    protected void subscribeActual(SingleObserver<? super T> o) {
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
             source.subscribe(o);
         }

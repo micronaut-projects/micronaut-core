@@ -13,16 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava2;
-
-import io.micronaut.core.annotation.Internal;
-
 /**
- * Marker interface.
+ * RxJava 2 HTTP Client related classes.
  *
  * @author graemerocher
- * @since 1.1
+ * @since 1.0
  */
-@Internal
-interface RxInstrumentedComponent {
-}
+package io.micronaut.reactive.rxjava.http.client;
+

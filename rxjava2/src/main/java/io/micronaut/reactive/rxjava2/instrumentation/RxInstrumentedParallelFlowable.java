@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava2;
+package io.micronaut.reactive.rxjava2.instrumentation;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.reactivex.SingleObserver;
-import io.reactivex.disposables.Disposable;
+import io.reactivex.parallel.ParallelFlowable;
+import org.reactivestreams.Subscriber;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -30,39 +30,47 @@ import io.reactivex.disposables.Disposable;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, RxInstrumentedComponent {
-    private final SingleObserver<T> source;
+final class RxInstrumentedParallelFlowable<T> extends ParallelFlowable<T> implements RxInstrumentedComponent {
+    protected final ParallelFlowable<T> source;
+    private final RxInstrumenterFactory instrumenterFactory;
     private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
      *
-     * @param source              The source observer
+     * @param source              The source
      * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedSingleObserver(SingleObserver<T> source, RxInstrumenterFactory instrumenterFactory) {
+    RxInstrumentedParallelFlowable(ParallelFlowable<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
+        this.instrumenterFactory = instrumenterFactory;
         this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
-    public void onSubscribe(Disposable d) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.onSubscribe(d);
-        }
+    public int parallelism() {
+        return source.parallelism();
     }
 
     @Override
-    public void onError(Throwable t) {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.onError(t);
+    public void subscribe(Subscriber<? super T>[] s) {
+        if (!validate(s)) {
+            return;
         }
-    }
-
-    @Override
-    public void onSuccess(T value) {
+        InvocationInstrumenter instrumenter = this.instrumenter;
+        if (instrumenter == null) {
+            source.subscribe(s);
+            return;
+        }
+        int n = s.length;
+        @SuppressWarnings("unchecked")
+        Subscriber<? super T>[] parents = new Subscriber[n];
+        for (int i = 0; i < n; i++) {
+            Subscriber<? super T> z = s[i];
+            parents[i] = RxInstrumentedWrappers.wrap(z, instrumenterFactory);
+        }
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.onSuccess(value);
+            source.subscribe(parents);
         }
     }
 }

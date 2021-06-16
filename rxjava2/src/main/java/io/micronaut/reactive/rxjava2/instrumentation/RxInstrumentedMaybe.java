@@ -13,15 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava2;
+package io.micronaut.reactive.rxjava2.instrumentation;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.reactivex.Flowable;
-import io.reactivex.FlowableSubscriber;
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
+import io.reactivex.Maybe;
+import io.reactivex.MaybeObserver;
+import io.reactivex.MaybeSource;
 
 
 /**
@@ -33,8 +32,8 @@ import org.reactivestreams.Subscriber;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumentedComponent {
-    private final Publisher<T> source;
+final class RxInstrumentedMaybe<T> extends Maybe<T> implements RxInstrumentedComponent {
+    private final MaybeSource<T> source;
     private final InvocationInstrumenter instrumenter;
 
     /**
@@ -43,18 +42,15 @@ final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumen
      * @param source       The source
      * @param instrumenter The instrumenter
      */
-    RxInstrumentedFlowable(Publisher<T> source, InvocationInstrumenter instrumenter) {
+    RxInstrumentedMaybe(MaybeSource<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
         this.instrumenter = instrumenter;
     }
 
     @Override
-    protected void subscribeActual(Subscriber<? super T> s) {
-        if (!(s instanceof FlowableSubscriber)) {
-            throw new IllegalArgumentException("Subscriber must be an instance of FlowableSubscriber");
-        }
+    protected void subscribeActual(MaybeObserver<? super T> o) {
         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            source.subscribe(s);
+            source.subscribe(o);
         }
     }
 }
