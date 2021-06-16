@@ -43,18 +43,15 @@ class HeadlineController {
     @Get(produces = MediaType.TEXT_EVENT_STREAM)
     Publisher<Event<Headline>> index() { // <1>
         String[] versions = ["1.0", "2.0"] // <2>
-        Flux.generate(() -> 0, new BiFunction<Integer, SynchronousSink<Event<Headline>>, Integer>() { // <3>
-            @Override
-            Integer apply(Integer i, SynchronousSink<Event<Headline>> emitter) {
-                if (i < versions.length) {
-                    emitter.next( // <4>
-                            Event.of(new Headline("Micronaut ${versions[i]} Released", "Come and get it"))
-                    )
-                } else {
-                    emitter.complete() // <5>
-                }
-                return ++i
+        Flux.generate(() -> 0, (i, emitter) -> {
+            if (i < versions.length) {
+                emitter.next( // <4>
+                        Event.of(new Headline("Micronaut ${versions[i]} Released", "Come and get it"))
+                )
+            } else {
+                emitter.complete() // <5>
             }
+            return i + 1
         })
     }
 }
