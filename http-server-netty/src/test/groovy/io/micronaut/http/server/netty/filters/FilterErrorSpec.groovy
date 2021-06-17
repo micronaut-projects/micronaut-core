@@ -33,7 +33,12 @@ class FilterErrorSpec extends Specification {
 
         when:
         def response = client.exchange("/filter-error-spec", String)
-                .onErrorResume(t -> Flux.just((HttpClientResponseException) t).response)
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                })
                 .blockFirst()
 
         then:
@@ -45,7 +50,12 @@ class FilterErrorSpec extends Specification {
 
         when:
         response = client.exchange(HttpRequest.GET("/filter-error-spec").header("X-Passthru", "true"), String)
-                .onErrorResume(t -> Flux.just(((HttpClientResponseException)t).response))
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException)t).response)
+                    }
+                    throw t
+                })
                 .blockFirst()
         def firstResponse = first.response.getAndSet(null)
 
@@ -69,7 +79,12 @@ class FilterErrorSpec extends Specification {
 
         when:
         def response = client.exchange("/filter-error-spec", String)
-                .onErrorResume(t -> Flux.just(((HttpClientResponseException)t).response))
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                })
                 .blockFirst()
 
         then:
@@ -90,7 +105,12 @@ class FilterErrorSpec extends Specification {
 
         when:
         def response = client.exchange("/filter-error-spec-3", String)
-                .onErrorResume(t -> Flux.just((HttpClientResponseException)t).response)
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                })
                 .blockFirst()
         def filterResponse = filter.response.getAndSet(null)
 
@@ -100,7 +120,6 @@ class FilterErrorSpec extends Specification {
         filter.executedCount.get() == 1
         filterResponse.status() == HttpStatus.INTERNAL_SERVER_ERROR
     }
-
 
     @Requires(property = 'spec.name', value = 'FilterErrorSpec')
     @Filter("/**")
