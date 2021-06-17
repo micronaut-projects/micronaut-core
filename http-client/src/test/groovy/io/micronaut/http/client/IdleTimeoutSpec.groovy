@@ -21,7 +21,10 @@ class IdleTimeoutSpec extends Specification {
 
   @Shared
   @AutoCleanup
-  EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+  ApplicationContext context = ApplicationContext.run()
+
+  @Shared
+  EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
   def "should close connection according to connection-pool-idle-timeout"() {
     setup:
