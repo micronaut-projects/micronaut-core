@@ -22,10 +22,12 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import jakarta.inject.Singleton
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
 /**
@@ -41,7 +43,12 @@ class ErrorSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/errors/server-error')
 
-        ).onErrorReturn({ t -> t.response.getBody(JsonError); return t.response } ).blockFirst()
+        ) .onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
@@ -54,7 +61,12 @@ class ErrorSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/errors/io-error')
 
-        ).onErrorReturn({ t -> t.response.getBody(JsonError); return t.response } ).blockFirst()
+        ) .onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
@@ -67,7 +79,12 @@ class ErrorSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/errors/blah')
 
-        ).onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockFirst()
+        ) .onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         then:
         response.code() == HttpStatus.NOT_FOUND.code
@@ -86,7 +103,12 @@ class ErrorSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.POST('/errors/server-error', 'blah')
 
-        ).onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockFirst()
+        ) .onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         then:
         response.code() == HttpStatus.METHOD_NOT_ALLOWED.code
@@ -105,7 +127,12 @@ class ErrorSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/errors/handler-content-type-error')
 
-        ).onErrorReturn({ t -> t.response; return t.response } ).blockFirst()
+        ) .onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
@@ -118,7 +145,12 @@ class ErrorSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/errors/injection')
 
-        ).onErrorReturn({ t -> t.response; return t.response } ).blockFirst()
+        ) .onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code

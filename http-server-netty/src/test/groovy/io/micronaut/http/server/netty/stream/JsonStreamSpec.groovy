@@ -88,10 +88,10 @@ class JsonStreamSpec extends Specification {
         ReactorStreamingHttpClient client = embeddedServer.applicationContext.createBean(ReactorStreamingHttpClient, embeddedServer.getURL())
 
         when:
-        def books = client.jsonStream(HttpRequest.GET("/json/stream/empty"), Book)
+        List<Book> books = client.jsonStream(HttpRequest.GET("/json/stream/empty"), Book).collectList().block()
 
         then:
-        books.blockingIterable().iterator().toList() == []
+        books == []
     }
 
     @Controller("/json/stream")

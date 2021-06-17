@@ -386,7 +386,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         @Post("/publisher-object")
         Publisher<String> publisherObject(@Body Flux<Foo> publisher) {
             return publisher
-                    .subscribeOn(Schedulers.io())
+                    .subscribeOn(Schedulers.boundedElastic())
                     .map({ Foo foo ->
                         foo.toString()
             })

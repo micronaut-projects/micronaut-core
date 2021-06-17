@@ -24,6 +24,7 @@ import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 
 import static io.micronaut.http.HttpHeaders.*
 
@@ -128,7 +129,12 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                 HttpRequest.POST('/test', [:])
                         .header(ORIGIN, 'foo.com')
 
-        ).onErrorReturn({ t -> t.response} ).blockFirst()
+        ) .onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         when:
         Set<String> headerNames = response.headers.names()
@@ -159,7 +165,12 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                         .header(ORIGIN, 'bar.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Accept')
 
-        ).onErrorReturn({ t -> t.response} ).blockFirst()
+        ) .onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         expect: "it fails because preflight requests check allowed headers"
         response.code() == HttpStatus.FORBIDDEN.code
@@ -172,7 +183,12 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
                         .header(ORIGIN, 'foo.com')
 
-        ).onErrorReturn({ t -> t.response} ).blockFirst()
+        ) .onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         expect:
         response.code() == HttpStatus.FORBIDDEN.code

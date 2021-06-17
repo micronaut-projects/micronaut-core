@@ -20,7 +20,9 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 import spock.lang.Unroll
 
 import javax.annotation.Nullable
@@ -54,7 +56,12 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
     void "test bind HTTP parameters for URI #uri"() {
         given:
         def response = rxClient.exchange(uri, String)
-                .onErrorReturn({t -> t.response}).blockFirst()
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                }).blockFirst()
         def status = response.status
         def body = null
         if (status == HttpStatus.OK) {

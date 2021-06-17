@@ -6,6 +6,7 @@ import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.CustomHttpMethod
 import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import reactor.core.publisher.Flux
 import spock.lang.Unroll
@@ -19,7 +20,12 @@ class CustomParameterBindingSpec extends AbstractMicronautSpec {
         given:
         def req = HttpRequest.create(HttpMethod.CUSTOM, uri, httpMethod)
         def exchange = rxClient.exchange(req, String)
-        def response = exchange.onErrorReturn({ t -> t.response }).blockFirst()
+        def response = exchange.onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
         def status = response.status
         def body = null
         if (status == HttpStatus.OK) {

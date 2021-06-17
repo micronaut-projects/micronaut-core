@@ -22,7 +22,9 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 import spock.lang.Unroll
 
 import javax.annotation.Nullable
@@ -37,7 +39,12 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         given:
         def req = httpMethod == HttpMethod.GET ? HttpRequest.GET(uri) : HttpRequest.POST(uri, '{}')
         def exchange = rxClient.exchange(req, String)
-        def response = exchange.onErrorReturn({ t -> t.response }).blockFirst()
+        def response = exchange.onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
         def status = response.status
         def body = null
         if (status == HttpStatus.OK) {
@@ -88,7 +95,12 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         given:
         def req = HttpRequest.GET('/parameter/exploded?title=The%20Stand&age=20&age=30')
         def exchange = rxClient.exchange(req, String)
-        def response = exchange.onErrorReturn({ t -> t.response }).blockFirst()
+        def response = exchange.onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         expect:
         response.status() == HttpStatus.BAD_REQUEST

@@ -22,8 +22,10 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 
 /**
  * @author Iván López
@@ -35,7 +37,12 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
         when:
         def response = rxClient
             .exchange(HttpRequest.GET('/errors'))
-            .onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockFirst()
+                .onErrorResume( t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                }).blockFirst()
 
         then:
         response.code() == HttpStatus.UNPROCESSABLE_ENTITY.code

@@ -29,6 +29,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.runtime.Micronaut
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import spock.lang.Shared
 import spock.lang.Unroll
 
@@ -47,7 +48,13 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     void "test custom HTTP response for java action #action"() {
 
         when:
-        def response = rxClient.exchange("/java/response/$action", String).onErrorReturn({ t -> t.response }).blockFirst()
+        def response = rxClient.exchange("/java/response/$action", String)
+                .onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         def actualHeaders = [:]
         for (name in response.headers.names()) {
@@ -83,7 +90,13 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     @Unroll
     void "test custom HTTP response for action #action"() {
         when:
-        def response = rxClient.exchange("/java/response/$action", String).onErrorReturn({ t -> t.response }).blockFirst()
+        def response = rxClient.exchange("/java/response/$action", String)
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                }).blockFirst()
 
         def actualHeaders = [:]
         for (name in response.headers.names()) {
@@ -113,7 +126,13 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test content encoding"() {
         when:
-        def response = rxClient.exchange(HttpRequest.GET("/java/response/ok-with-body").header("Accept-Encoding", "gzip"), String).onErrorReturn({ t -> t.response }).blockFirst()
+        def response = rxClient.exchange(HttpRequest.GET("/java/response/ok-with-body").header("Accept-Encoding", "gzip"), String)
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                }).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -124,7 +143,13 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test custom headers"() {
         when:
-        def response = rxClient.exchange(HttpRequest.GET("/java/response/custom-headers")).onErrorReturn({ t -> t.response }).blockFirst()
+        def response = rxClient.exchange(HttpRequest.GET("/java/response/custom-headers"))
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                }).blockFirst()
         HttpHeaders headers = response.headers
 
         then: // The content length header was replaced, not appended
@@ -215,7 +240,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
         client.exchange(
           HttpRequest.GET('/test-header/fail')
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -242,7 +267,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
         client.exchange(
           HttpRequest.GET('/test-header/fail')
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
