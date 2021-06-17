@@ -1,5 +1,7 @@
 package io.micronaut.http.client
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
@@ -8,6 +10,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Specification
 
+@Property(name = 'spec.name', value = 'ClientBindSpec')
 @MicronautTest
 class ClientBindSpec extends Specification {
 
@@ -25,6 +28,7 @@ class ClientBindSpec extends Specification {
         bindClient.pathValue("xx", Optional.empty()) == '/xx'
     }
 
+    @Requires(property = 'spec.name', value = 'ClientBindSpec')
     @Client("/bind")
     static interface BindClient {
 
@@ -36,6 +40,7 @@ class ClientBindSpec extends Specification {
 
     }
 
+    @Requires(property = 'spec.name', value = 'ClientBindSpec')
     @Controller("/bind")
     static class BindController {
 

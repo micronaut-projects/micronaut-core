@@ -16,7 +16,11 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.BasicAuth
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
@@ -35,11 +39,13 @@ class BasicAuthSpec extends Specification {
 
     void "test user in absolute URL"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
-        ApplicationContext ctx = server.getApplicationContext()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'BasicAuthSpec'
+        ])
+        ApplicationContext ctx = server.applicationContext
 
         def httpClient = ctx.createBean(ReactorHttpClient, new URL("http://sherlock:password@localhost:${server.port}"))
-        def client = httpClient.retrieve("/basic-auth")
+        def client = httpClient.retrieve("/basicauth")
         when:
         String resp = client.blockFirst()
 
@@ -49,5 +55,16 @@ class BasicAuthSpec extends Specification {
         cleanup:
         httpClient.close()
         ctx.close()
+        server.close()
+    }
+
+    @Requires(property = 'spec.name', value = 'BasicAuthSpec')
+    @Controller("/basicauth")
+    static class BasicAuthController {
+
+        @Get
+        String index(BasicAuth basicAuth) {
+            basicAuth.getUsername() + ":" + basicAuth.getPassword()
+        }
     }
 }

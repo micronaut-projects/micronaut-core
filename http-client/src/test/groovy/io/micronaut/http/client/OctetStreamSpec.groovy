@@ -1,6 +1,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.util.ArrayUtils
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
@@ -20,7 +21,8 @@ import java.nio.charset.StandardCharsets
 
 class OctetStreamSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,['micronaut.server.max-request-size': '10KB'])
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,['micronaut.server.max-request-size': '10KB',
+                                                                                                'spec.name': 'OctetStreamSpec',])
     @Shared UploadClient client = embeddedServer.applicationContext.getBean(UploadClient)
 
     void "test exchange byte[] blocking"() {
@@ -62,6 +64,7 @@ class OctetStreamSpec extends Specification {
         thrown(RuntimeException)
     }
 
+    @Requires(property = 'spec.name', value = 'OctetStreamSpec')
     @Client('/binary')
     static interface UploadClient {
 
@@ -72,6 +75,7 @@ class OctetStreamSpec extends Specification {
         Flux<byte[]> byteArrayFlowable(@Body Flux<byte[]> byteArray)
     }
 
+    @Requires(property = 'spec.name', value = 'OctetStreamSpec')
     @Controller("/binary")
     static class UploadController {
 

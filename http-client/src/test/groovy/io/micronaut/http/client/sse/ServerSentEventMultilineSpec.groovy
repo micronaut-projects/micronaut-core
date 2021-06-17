@@ -13,10 +13,9 @@ import spock.lang.Specification
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2586")
 class ServerSentEventMultilineSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['jackson.serialization.indentOutput': true])
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['jackson.serialization.indentOutput': true, 'spec.name': 'ServerSentEventStreamingSpec'])
     @Shared @AutoCleanup ReactorSseClient sseClient = embeddedServer.applicationContext.createBean(ReactorSseClient, embeddedServer.getURL())
     @Shared ProductClient productClient = embeddedServer.applicationContext.getBean(ProductClient)
-
 
     void "test consume multiline SSE stream with ReactorSseClient"() {
         when:

@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -32,6 +34,7 @@ import spock.lang.Specification
  * @author graemerocher
  * @since 1.0
  */
+@Property(name = 'spec.name', value = 'HttpDeleteSpec')
 @MicronautTest
 class HttpDeleteSpec extends Specification {
 
@@ -96,6 +99,7 @@ class HttpDeleteSpec extends Specification {
         val == "ok"
     }
 
+    @Requires(property = 'spec.name', value = 'HttpDeleteSpec')
     @Controller("/delete")
     static class DeleteController {
 
@@ -122,6 +126,7 @@ class HttpDeleteSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'HttpDeleteSpec')
     @Client("/delete")
     static interface MyDeleteClient {
 

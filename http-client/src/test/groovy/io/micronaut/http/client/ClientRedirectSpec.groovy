@@ -23,7 +23,9 @@ import spock.lang.Specification
 class ClientRedirectSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
+            ApplicationContext.run(EmbeddedServer, [
+                    'spec.name': 'ClientRedirectSpec',
+            ])
 
     void "test - client: full uri, direct"() {
         given:
@@ -155,7 +157,7 @@ class ClientRedirectSpec extends Specification {
     }
 
     void "test the host header is correct for redirect"() {
-        EmbeddedServer otherServer = ApplicationContext.run(EmbeddedServer, ['redirect.server': true])
+        EmbeddedServer otherServer = ApplicationContext.run(EmbeddedServer, ['redirect.server': true, 'spec.name': 'ClientRedirectSpec'])
         ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
 
         when:
@@ -168,6 +170,7 @@ class ClientRedirectSpec extends Specification {
         otherServer.close()
     }
 
+    @Requires(property = 'spec.name', value = 'ClientRedirectSpec')
     @Controller('/test')
     static class StreamController {
 
@@ -193,6 +196,7 @@ class ClientRedirectSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ClientRedirectSpec')
     @Requires(property = "redirect.server", value = StringUtils.TRUE)
     @Controller('/test')
     static class RedirectController {

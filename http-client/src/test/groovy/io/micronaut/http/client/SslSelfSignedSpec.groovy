@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
@@ -42,6 +43,7 @@ class SslSelfSignedSpec extends Specification {
     void setup() {
         port = SocketUtils.findAvailableTcpPort()
         context = ApplicationContext.run([
+                'spec.name': 'SslSelfSignedSpec',
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.buildSelfSigned': true,
                 'micronaut.ssl.port': port
@@ -71,6 +73,7 @@ class SslSelfSignedSpec extends Specification {
         response.body() == "Hello"
     }
 
+    @Requires(property = 'spec.name', value = 'SslSelfSignedSpec')
     @Controller('/')
     static class SslSelfSignedController {
 

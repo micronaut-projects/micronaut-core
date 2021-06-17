@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.convert.format.Format
 import io.micronaut.core.type.Argument
 import io.micronaut.http.*
@@ -44,6 +45,7 @@ import java.util.function.Consumer
  * @since 1.0
  */
 @MicronautTest
+@Property(name = 'spec.name', value = 'HttpGetSpec')
 @Property(name = "micronaut.server.netty.log-level", value = 'trace')
 @Property(name = "micronaut.http.client.log-level", value = 'trace')
 class HttpGetSpec extends Specification {
@@ -586,6 +588,7 @@ class HttpGetSpec extends Specification {
         ex.message == "Failed to decode the body for the given content type [does/notexist]"
     }
 
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller("/get")
     static class GetController {
 
@@ -700,7 +703,7 @@ class HttpGetSpec extends Specification {
         }
     }
 
-
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller("noslash")
     static class NoSlashController {
 
@@ -725,7 +728,7 @@ class HttpGetSpec extends Specification {
         }
     }
 
-
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller("/slash")
     static class SlashController {
 
@@ -750,6 +753,7 @@ class HttpGetSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller("/ending-slash/")
     static class EndingSlashController {
 
@@ -774,6 +778,7 @@ class HttpGetSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller
     static class SlashRootController {
 
@@ -806,6 +811,7 @@ class HttpGetSpec extends Specification {
         String message
     }
 
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Client("/get")
     static interface MyGetClient {
 
@@ -871,6 +877,7 @@ class HttpGetSpec extends Specification {
 
     }
 
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Client("http://not.used")
     static interface OverrideUrlClient {
 
@@ -879,6 +886,7 @@ class HttpGetSpec extends Specification {
 
     }
 
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @jakarta.inject.Singleton
     static class MyGetHelper {
 

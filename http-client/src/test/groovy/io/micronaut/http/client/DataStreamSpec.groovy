@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.io.buffer.ByteBufferFactory
 import io.micronaut.http.HttpRequest
@@ -49,6 +51,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * @author graemerocher
  * @since 1.0
  */
+@Property(name = 'spec.name', value = 'DataStreamSpec')
 @MicronautTest
 class DataStreamSpec extends Specification {
 
@@ -227,6 +230,7 @@ class DataStreamSpec extends Specification {
         String title
     }
 
+    @Requires(property = 'spec.name', value = 'DataStreamSpec')
     @Controller("/datastream")
     static class BookController {
 

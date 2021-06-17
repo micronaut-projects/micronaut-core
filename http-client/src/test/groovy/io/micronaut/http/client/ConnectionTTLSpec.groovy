@@ -1,6 +1,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
@@ -19,13 +20,14 @@ import java.lang.reflect.Field
 @Retry
 class ConnectionTTLSpec extends Specification {
 
-
   @Shared
   @AutoCleanup
-  ApplicationContext context = ApplicationContext.run()
+  EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+          'spec.name': 'ConnectionTTLSpec'
+  ])
 
   @Shared
-  EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+  ApplicationContext context = embeddedServer.applicationContext
 
 
   def "should close connection according to connect-ttl"() {
@@ -97,7 +99,7 @@ class ConnectionTTLSpec extends Specification {
     return innerMap.values().first().deque
   }
 
-
+  @Requires(property = 'spec.name', value = 'ConnectionTTLSpec')
   @Controller('/connectTTL')
   static class GetController {
 

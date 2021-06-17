@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.ServiceInstanceList
@@ -123,7 +124,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "test execution of a default method"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name': 'ClientIntroductionAdviceSpec'])
         context.getBean(EmbeddedServer).start()
         DefaultMethodClient myService = context.getBean(DefaultMethodClient)
 
@@ -136,7 +137,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "test execution of a default method 2"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name': 'ClientIntroductionAdviceSpec'])
         context.getBean(EmbeddedServer).start()
         DefaultMethodClient2 myService = context.getBean(DefaultMethodClient2)
         expect:
@@ -150,7 +151,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "test execution of a default method 3"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name': 'ClientIntroductionAdviceSpec'])
         context.getBean(EmbeddedServer).start()
         DefaultMethodClient3 myService = context.getBean(DefaultMethodClient3)
         expect:
@@ -204,9 +205,6 @@ class ClientIntroductionAdviceSpec extends Specification {
         }
     }
 
-    /**
-     * Also used by {@link BasicAuthSpec}
-     */
     @Controller("/basic-auth")
     static class BasicAuthController {
 

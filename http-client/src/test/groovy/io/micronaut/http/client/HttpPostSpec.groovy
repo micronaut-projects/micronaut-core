@@ -16,6 +16,8 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -37,6 +39,7 @@ import java.nio.charset.StandardCharsets
  * @author Graeme Rocher
  * @since 1.0
  */
+@Property(name = 'spec.name', value = 'HttpPostSpec')
 @MicronautTest
 class HttpPostSpec extends Specification {
 
@@ -374,6 +377,7 @@ class HttpPostSpec extends Specification {
         res.status == HttpStatus.NO_CONTENT
     }
 
+    @Requires(property = 'spec.name', value = 'HttpPostSpec')
     @Controller('/post')
     static class PostController {
 
@@ -490,6 +494,7 @@ class HttpPostSpec extends Specification {
         List<String> param
     }
 
+    @Requires(property = 'spec.name', value = 'HttpPostSpec')
     @Client("/post")
     static interface PostClient {
 

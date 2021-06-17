@@ -18,6 +18,8 @@ package io.micronaut.http.client
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpHeaders
@@ -41,6 +43,7 @@ import java.time.Duration
  * @author graemerocher
  * @since 1.0
  */
+@Property(name = 'spec.name', value = 'StreamRequestSpec')
 @MicronautTest
 class StreamRequestSpec extends Specification {
     @Inject
@@ -218,6 +221,7 @@ class StreamRequestSpec extends Specification {
 
     }
 
+    @Requires(property = 'spec.name', value = 'StreamRequestSpec')
     @Controller('/stream/request')
     static class StreamController {
 

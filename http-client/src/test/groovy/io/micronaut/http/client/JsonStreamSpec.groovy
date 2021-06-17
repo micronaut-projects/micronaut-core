@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
@@ -50,13 +51,16 @@ class JsonStreamSpec  extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            "spec.name": 'JsonStreamSpec'
+    ])
 
     @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @AutoCleanup
+    ApplicationContext context = embeddedServer.applicationContext
 
     @Shared
-    BookClient bookClient = embeddedServer.getApplicationContext().getBean(BookClient)
+    BookClient bookClient = context.getBean(BookClient)
 
     static Semaphore signal
 
@@ -200,6 +204,7 @@ class JsonStreamSpec  extends Specification {
         result.timeout(Duration.of(10, ChronoUnit.SECONDS)).block().bookCount == 7
     }
 
+    @Requires(property = "spec.name", value = 'JsonStreamSpec' )
     @Client("/jsonstream/books")
     static interface BookClient {
         @Get(consumes = MediaType.APPLICATION_JSON_STREAM)
@@ -209,6 +214,7 @@ class JsonStreamSpec  extends Specification {
         Mono<LibraryStats> count(@Body Flux<Book> theBooks)
     }
 
+    @Requires(property = "spec.name", value = 'JsonStreamSpec' )
     @Controller("/jsonstream/books")
     @ExecuteOn(TaskExecutors.IO)
     static class BookController {

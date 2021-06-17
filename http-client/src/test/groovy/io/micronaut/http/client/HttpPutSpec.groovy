@@ -16,6 +16,8 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.*
@@ -35,6 +37,7 @@ import spock.lang.Specification
  * @author Graeme Rocher
  * @since 1.0
  */
+@Requires(property = 'spec.name', value = 'HttpPutSpec')
 @MicronautTest
 class HttpPutSpec extends Specification {
 
@@ -202,6 +205,7 @@ class HttpPutSpec extends Specification {
         res.status == HttpStatus.NO_CONTENT
     }
 
+    @Requires(property = 'spec.name', value = 'HttpPutSpec')
     @Controller('/put')
     static class PostController {
 
@@ -270,6 +274,7 @@ class HttpPutSpec extends Specification {
         Integer pages
     }
 
+    @Requires(property = 'spec.name', value = 'HttpPutSpec')
     @Client("/put")
     static interface MyPutClient {
 

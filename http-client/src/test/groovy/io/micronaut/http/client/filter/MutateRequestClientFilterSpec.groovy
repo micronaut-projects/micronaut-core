@@ -16,6 +16,7 @@
 package io.micronaut.http.client.filter
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
@@ -41,7 +42,7 @@ class MutateRequestClientFilterSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'MutateRequestClientFilterSpec'])
 
     @Shared
     MyClient myClient = embeddedServer.applicationContext.getBean(MyClient)
@@ -57,6 +58,7 @@ class MutateRequestClientFilterSpec extends Specification {
         myClient.stream().blockFirst() == "xxxxxxxxxxx"
     }
 
+    @Requires(property = 'spec.name', value = 'MutateRequestClientFilterSpec')
     @Client("/filters/uri/test")
     static interface MyClient {
         @Get("/")
@@ -69,6 +71,7 @@ class MutateRequestClientFilterSpec extends Specification {
         Flux<String> stream()
     }
 
+    @Requires(property = 'spec.name', value = 'MutateRequestClientFilterSpec')
     @Controller('/filters/uri/test')
     static class UriController {
         @Get
@@ -85,6 +88,7 @@ class MutateRequestClientFilterSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'MutateRequestClientFilterSpec')
     @Filter('/filters/uri/**')
     static class MyFilter implements HttpClientFilter {
 

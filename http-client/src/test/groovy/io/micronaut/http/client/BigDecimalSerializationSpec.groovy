@@ -21,6 +21,8 @@ import com.fasterxml.jackson.databind.DeserializationContext
 import com.fasterxml.jackson.databind.JsonDeserializer
 import com.fasterxml.jackson.databind.JsonSerializer
 import com.fasterxml.jackson.databind.SerializerProvider
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
@@ -38,6 +40,7 @@ import spock.lang.Specification
 import java.math.RoundingMode
 
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1089")
+@Property(name = 'spec.name', value = 'BigDecimalSerializationSpec')
 @MicronautTest
 class BigDecimalSerializationSpec extends Specification {
 
@@ -72,7 +75,7 @@ class BigDecimalSerializationSpec extends Specification {
         bigDecimal == actual
     }
 
-
+    @Requires(property = 'spec.name', value = 'BigDecimalSerializationSpec')
     @Controller("/big-decimal/test")
     static class TestController {
 
@@ -95,6 +98,7 @@ class BigDecimalSerializationSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'BigDecimalSerializationSpec')
     @Singleton
     static class BigDecimalDeserializer extends JsonDeserializer<BigDecimal> {
 
@@ -104,6 +108,7 @@ class BigDecimalSerializationSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'BigDecimalSerializationSpec')
     @Singleton
     static class BigDecimalSerializer extends JsonSerializer<BigDecimal> {
 

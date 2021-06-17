@@ -18,6 +18,7 @@ package io.micronaut.http.client.sse
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -37,10 +38,9 @@ import java.util.concurrent.TimeUnit
 
 class ServerSentEventStreamingSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ServerSentEventStreamingSpec'])
     @Shared @AutoCleanup ReactorSseClient sseClient = embeddedServer.applicationContext.createBean(ReactorSseClient, embeddedServer.getURL())
     @Shared ProductClient productClient = embeddedServer.applicationContext.getBean(ProductClient)
-
 
     void "test consume SSE stream with ReactorSseClient"() {
         when:
@@ -108,6 +108,7 @@ class ServerSentEventStreamingSpec extends Specification {
         ]
     }
 
+    @Requires(property = 'spec.name', value = 'ServerSentEventStreamingSpec')
     @Client("/stream/sse")
     static interface ProductClient {
 
@@ -121,6 +122,7 @@ class ServerSentEventStreamingSpec extends Specification {
         Flux<Product> delayedStream()
     }
 
+    @Requires(property = 'spec.name', value = 'ServerSentEventStreamingSpec')
     @Controller("/stream/sse")
     @ExecuteOn(TaskExecutors.IO)
     static class SseController {

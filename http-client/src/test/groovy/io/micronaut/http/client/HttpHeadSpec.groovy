@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.convert.format.Format
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -37,6 +39,7 @@ import java.util.function.Consumer
  * @author Graeme Rocher
  * @since 1.0
  */
+@Property(name = 'spec.name', value = 'HttpHeadSpec')
 @MicronautTest
 class HttpHeadSpec extends Specification {
 
@@ -387,8 +390,18 @@ class HttpHeadSpec extends Specification {
         !body.isPresent()
     }
 
-    @Controller("/head")
+    @Requires(property = 'spec.name', value = 'HttpHeadSpec')
+    @Controller("/get")
     static class GetController {
+        @Get("/jsonError")
+        HttpResponse jsonError() {
+            return HttpResponse.serverError().body([foo: "bar"])
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpHeadSpec')
+    @Controller("/head")
+    static class HeadController {
 
         @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
         String simple() {
@@ -488,6 +501,7 @@ class HttpHeadSpec extends Specification {
         String message
     }
 
+    @Requires(property = 'spec.name', value = 'HttpHeadSpec')
     @Client("/head")
     static interface MyGetClient {
         @Head(value = "/simple")
@@ -536,6 +550,7 @@ class HttpHeadSpec extends Specification {
         String noContent()
     }
 
+    @Requires(property = 'spec.name', value = 'HttpHeadSpec')
     @jakarta.inject.Singleton
     static class MyGetHelper {
         private final ReactorStreamingHttpClient rxClientSlash

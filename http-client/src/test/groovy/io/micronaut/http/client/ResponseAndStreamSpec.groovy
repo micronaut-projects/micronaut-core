@@ -1,5 +1,7 @@
 package io.micronaut.http.client
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -16,6 +18,7 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.Specification
 
+@Property(name = 'spec.name', value = 'ResponseAndStreamSpec')
 @MicronautTest
 class ResponseAndStreamSpec extends Specification {
 
@@ -30,12 +33,14 @@ class ResponseAndStreamSpec extends Specification {
         response.body() == 'chunk1chunk2chunk3'
     }
 
+    @Requires(property = 'spec.name', value = 'ResponseAndStreamSpec')
     @Client('/test/response-stream')
     static interface ResponseStreamClient {
         @Get('/model')
         HttpResponse<String> go()
     }
 
+    @Requires(property = 'spec.name', value = 'ResponseAndStreamSpec')
     @Controller('/test/response-stream')
     static class ResponseStreamController {
 
@@ -45,6 +50,7 @@ class ResponseAndStreamSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ResponseAndStreamSpec')
     @Filter('/test/response-stream/*')
     static class MyFilter implements HttpServerFilter {
 

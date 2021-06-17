@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.client.rxjava2
 
+import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -25,6 +27,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
+import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpPostSpec
@@ -51,10 +54,10 @@ class RxHttpPostSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'RxHttpPostSpec'])
 
     @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    ApplicationContext context = embeddedServer.applicationContext
 
     @Shared
     @AutoCleanup
@@ -244,15 +247,37 @@ class RxHttpPostSpec extends Specification {
         ex.response.getBody(String).get() == "illegal.argument"
     }
 
+
+    @EqualsAndHashCode
+    @Introspected
+    static class Book {
+        String title
+        Integer pages
+    }
+
+    @Requires(property = 'spec.name', value = 'RxHttpPostSpec')
+    @Controller('/post')
+    static class PostController {
+
+        @Post('/simple')
+        Book simple(@Body Book book, @Header String contentType, @Header long contentLength, @Header accept, @Header('X-My-Header') custom) {
+            assert contentType == MediaType.APPLICATION_JSON
+            assert contentLength == 34
+            assert accept == MediaType.APPLICATION_JSON
+            assert custom == 'Foo'
+            return book
+        }
+    }
+
     @Introspected
     static class Person {
-
         @NotNull
         String firstName
         @NotNull
         String lastName
     }
 
+    @Requires(property = 'spec.name', value = 'RxHttpPostSpec')
     @Controller('/reactive/post')
     static class ReactivePostController {
 

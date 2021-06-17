@@ -1,6 +1,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -16,9 +17,9 @@ import java.util.concurrent.CompletableFuture
 
 class NonMutableResponseSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,['micronaut.server.max-request-size': '10KB'])
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,['micronaut.server.max-request-size': '10KB',
+                                                                                                'spec.name': 'NonMutableResponseSpec'])
     @Shared HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
-
 
     void "test returning a non mutable response from a controller"() {
         expect:
@@ -28,6 +29,7 @@ class NonMutableResponseSpec extends Specification {
         client.toBlocking().retrieve('/test/non-mutable/publisher') == 'test'
     }
 
+    @Requires(property = 'spec.name', value = 'NonMutableResponseSpec')
     @Client('/')
     static interface ResponseClient {
 
@@ -44,6 +46,7 @@ class NonMutableResponseSpec extends Specification {
         Publisher<HttpResponse<String>> goPublisher()
     }
 
+    @Requires(property = 'spec.name', value = 'NonMutableResponseSpec')
     @Controller
     static class ResponseController {
 

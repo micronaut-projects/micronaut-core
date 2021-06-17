@@ -16,6 +16,8 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -35,6 +37,7 @@ import spock.lang.Specification
  * @author Graeme Rocher
  * @since 1.0
  */
+@Property(name = 'spec.name', value = 'HttpPatchSpec')
 @MicronautTest
 class HttpPatchSpec extends Specification {
 
@@ -159,7 +162,7 @@ class HttpPatchSpec extends Specification {
         res.status == HttpStatus.NO_CONTENT
     }
 
-
+    @Requires(property = 'spec.name', value = 'HttpPatchSpec')
     @Controller('/patch')
     static class PostController {
 
@@ -209,6 +212,7 @@ class HttpPatchSpec extends Specification {
         Integer pages
     }
 
+    @Requires(property = 'spec.name', value = 'HttpPatchSpec')
     @Client("/patch")
     static interface MyPatchClient {
 

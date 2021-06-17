@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -27,6 +29,7 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
+@Property(name = 'spec.name', value = 'ServerErrorSpec')
 @MicronautTest
 class ServerErrorSpec extends Specification {
 
@@ -102,6 +105,7 @@ class ServerErrorSpec extends Specification {
         response.body.get() == "Internal Server Error"
     }
 
+    @Requires(property = 'spec.name', value = 'ServerErrorSpec')
     @Client('/server-errors')
     static interface MyClient {
         @Get('/five-hundred')
@@ -126,6 +130,7 @@ class ServerErrorSpec extends Specification {
         Flux fluxErrorFlux()
     }
 
+    @Requires(property = 'spec.name', value = 'ServerErrorSpec')
     @Controller('/server-errors')
     static class ServerErrorController {
 

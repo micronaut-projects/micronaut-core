@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -25,7 +26,11 @@ import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import spock.lang.*
+import spock.lang.Specification
+import spock.lang.Shared
+import spock.lang.AutoCleanup
+import spock.lang.Issue
+import spock.lang.Unroll
 
 /**
  * @author graemerocher
@@ -36,8 +41,9 @@ class ServerRedirectSpec extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
-
+            ApplicationContext.run(EmbeddedServer, [
+                    'spec.name': 'ServerRedirectSpec',
+            ])
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/217")
     void "test https redirect"() {
@@ -141,6 +147,7 @@ class ServerRedirectSpec extends Specification {
         client.close()
     }
 
+    @Requires(property = 'spec.name', value = 'ServerRedirectSpec')
     @Controller("/redirect")
     static class RedirectController {
 
@@ -185,6 +192,7 @@ class ServerRedirectSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ServerRedirectSpec')
     @Controller("/redirect/stream")
     static class StreamRedirectController {
 
@@ -228,9 +236,9 @@ class ServerRedirectSpec extends Specification {
             }
             return HttpResponse.ok(Flux.just(new Book(title: "The Stand"))).contentType(MediaType.APPLICATION_JSON_STREAM)
         }
-
     }
 
+    @Requires(property = 'spec.name', value = 'ServerRedirectSpec')
     @Client("https://www.youtube.com")
     static interface YoutubeClient {
         @Get

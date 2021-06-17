@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -34,7 +35,9 @@ import java.util.zip.GZIPOutputStream
 class CompressedRequest extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
+            ApplicationContext.run(EmbeddedServer, [
+                    'spec.name': 'CompressedRequest'
+            ])
 
     void "test gzipped body in post request"() {
         given:
@@ -54,6 +57,7 @@ class CompressedRequest extends Specification {
         client.close()
     }
 
+    @Requires(property = 'spec.name', value = 'CompressedRequest')
     @Controller('/gzip/request')
     static class StreamController {
 

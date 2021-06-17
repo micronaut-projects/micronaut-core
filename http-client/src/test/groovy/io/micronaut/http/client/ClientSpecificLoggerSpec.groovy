@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.netty.DefaultHttpClient
@@ -38,6 +39,7 @@ class ClientSpecificLoggerSpec extends Specification {
         int port = SocketUtils.findAvailableTcpPort()
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['micronaut.server.port': port,
+                 'spec.name': 'ClientSpecificLoggerSpec',
                 'micronaut.http.services.clientOne.url': "http://localhost:$port",
                 'micronaut.http.services.clientOne.logger-name': "${ClientSpecificLoggerSpec.class}.client.one",
                 'micronaut.http.services.clientOne.read-timeout': '500s']
@@ -55,6 +57,7 @@ class ClientSpecificLoggerSpec extends Specification {
         context.close()
     }
 
+    @Requires(property = 'spec.name', value = 'ClientSpecificLoggerSpec')
     @Singleton
     static class MyService {
 
@@ -68,6 +71,7 @@ class ClientSpecificLoggerSpec extends Specification {
 
     }
 
+    @Requires(property = 'spec.name', value = 'ClientSpecificLoggerSpec')
     @Singleton
     static class ClientTwoHttpConfiguration extends HttpClientConfiguration {
 

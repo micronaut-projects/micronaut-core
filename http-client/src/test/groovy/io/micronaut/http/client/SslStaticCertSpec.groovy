@@ -16,6 +16,8 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
@@ -42,6 +44,7 @@ class SslStaticCertSpec extends Specification {
     void setup() {
         port = SocketUtils.findAvailableTcpPort()
         context = ApplicationContext.run([
+                'spec.name': 'SslStaticCertSpec',
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.keyStore.path': 'classpath:keystore.p12',
                 'micronaut.ssl.keyStore.password': 'foobar',
@@ -82,6 +85,7 @@ class SslStaticCertSpec extends Specification {
         response.body() == "Hello"
     }
 
+    @Requires(property = 'spec.name', value = 'SslStaticCertSpec')
     @Controller('/')
     static class SslStaticController {
 
