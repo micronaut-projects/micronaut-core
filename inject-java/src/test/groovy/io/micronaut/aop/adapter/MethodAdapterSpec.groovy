@@ -102,7 +102,6 @@ package adapteroverloading;
 
 import io.micronaut.context.event.*;
 import io.micronaut.scheduling.annotation.Async;
-import io.reactivex.Completable;
 import jakarta.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 import io.micronaut.runtime.event.annotation.*;
@@ -152,7 +151,6 @@ package adapteraround;
 
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.scheduling.annotation.Async;
-import io.reactivex.Completable;
 import jakarta.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 import io.micronaut.runtime.event.annotation.*;
