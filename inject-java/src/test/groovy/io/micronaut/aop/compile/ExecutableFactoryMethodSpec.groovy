@@ -2,6 +2,7 @@ package io.micronaut.aop.compile
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
+import reactor.core.publisher.Flux
 
 class ExecutableFactoryMethodSpec extends AbstractTypeElementSpec {
 
@@ -95,8 +96,8 @@ interface MyClient extends ReactorStreamingHttpClient {
         def retrieveMethod = beanDefinition.getRequiredMethod("retrieve")
         def blockingMethod = beanDefinition.getRequiredMethod("blocking")
         def streamMethod = beanDefinition.getRequiredMethod("stream")
-        retrieveMethod.returnType.type == Flowable.class
-        streamMethod.returnType.type == Flowable.class
+        retrieveMethod.returnType.type == Flux.class
+        streamMethod.returnType.type == Flux.class
         retrieveMethod.returnType.typeParameters.length == 1
         retrieveMethod.returnType.typeParameters[0].type == Object.class
         streamMethod.returnType.typeParameters[0].type == byte[].class
