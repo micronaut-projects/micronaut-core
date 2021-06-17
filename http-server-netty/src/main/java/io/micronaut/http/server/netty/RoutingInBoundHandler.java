@@ -54,7 +54,6 @@ import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.content.HttpContentUtil;
-import io.micronaut.http.netty.stream.ArrayBracketSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
@@ -165,7 +164,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
             "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
     private static final Argument ARGUMENT_PART_DATA = Argument.of(PartData.class);
-
     private final Router router;
     private final ExecutorSelector executorSelector;
     private final StaticResourceResolver staticResourceResolver;
@@ -1236,7 +1234,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             }
                                             if (!isJson || first) {
                                                 first = false;
-                                                return httpContent;
+                                                if (isJson) {
+                                                    return HttpContentUtil.prefixOpenBracket(httpContent);
+                                                } else {
+                                                    return httpContent;
+                                                }
                                             } else {
                                                 return HttpContentUtil.prefixComma(httpContent);
                                             }
@@ -1246,10 +1248,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     if (isJson) {
                                         // if the Publisher is returning JSON then in order for it to be valid JSON for each emitted element
                                         // we must wrap the JSON in array and delimit the emitted items
-                                        httpContentPublisher = Flux.concat(Flux.just(HttpContentUtil.openBracket()),
-                                                Flux.from(httpContentPublisher),
-                                                Flux.just(HttpContentUtil.closeBracket()));
-                                                //TODO .lift((FlowableOperator<HttpContent, HttpContent>) ArrayBracketSubscriber::new);
+                                        httpContentPublisher = addTrailingBracket(httpContentPublisher);
                                     }
 
                                     httpContentPublisher = Publishers.then(httpContentPublisher, httpContent ->
@@ -1268,6 +1267,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     }
                     return Publishers.just(message);
                 });
+    }
+
+    private static Publisher<HttpContent> addTrailingBracket(Publisher<HttpContent> reactiveSequence) {
+        return Flux.concat(
+                Flux.from(reactiveSequence),
+                Mono.just(HttpContentUtil.closeBracket()))
+                .switchIfEmpty(Flux.just(HttpContentUtil.openBracket(), HttpContentUtil.closeBracket()));
     }
 
     private Flux<MutableHttpResponse<?>> buildResultEmitter(

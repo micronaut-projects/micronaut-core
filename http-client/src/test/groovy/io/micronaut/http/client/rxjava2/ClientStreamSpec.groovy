@@ -23,6 +23,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -39,7 +40,6 @@ class ClientStreamSpec extends Specification {
         books.size() == 2
         books[0].title == "The Stand"
         books[1].title == "The Shining"
-
     }
 
     void "test stream json stream of objects"() {
