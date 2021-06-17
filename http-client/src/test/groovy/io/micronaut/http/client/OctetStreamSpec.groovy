@@ -51,14 +51,13 @@ class OctetStreamSpec extends Specification {
         new String(client.byteArrayFlowable(Flux.just(data)).reduce({ byte[] a, byte[] b -> ArrayUtils.concat(a, b)}).block(), StandardCharsets.UTF_8) == new String(data, StandardCharsets.UTF_8)
     }
 
-    // TODO: Investigate why this fails on JDK 11
-    @IgnoreIf({ Jvm.current.isJava9Compatible() })
     void "test exchange byte[] non blocking - too big"() {
 
         given:
         def data = new String("xyz" * 100000).bytes
         when:
-        def result = new String(client.byteArrayFlowable(Flux.just(data)).reduce({ byte[] a, byte[] b -> ArrayUtils.concat(a, b) }).block(), StandardCharsets.UTF_8)
+        new String(client.byteArrayFlowable(Flux.just(data)).reduce({ byte[] a, byte[] b -> ArrayUtils.concat(a, b) }).block(), StandardCharsets.UTF_8)
+
         then:"Cannot compute ahead of time the content length so use the received amount, also streamed responses that fail in the middle result in connection reset exception"
         thrown(RuntimeException)
     }
