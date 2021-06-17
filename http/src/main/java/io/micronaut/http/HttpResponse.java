@@ -20,6 +20,9 @@ import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
 import io.micronaut.core.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
@@ -386,6 +389,18 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpResponse<T> status(HttpStatus status, String reason) {
         return HttpResponseFactory.INSTANCE.status(status, reason);
+    }
+
+    /**
+     * Return a response for the given status, optionally a non-standard status.
+     *
+     * @param statusCode The status code
+     * @param reason An alternatively reason message
+     * @param <T>    The response type
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> status(int statusCode, String reason) {
+        return HttpResponseFactory.INSTANCE.status(statusCode, reason);
     }
 
     /**
