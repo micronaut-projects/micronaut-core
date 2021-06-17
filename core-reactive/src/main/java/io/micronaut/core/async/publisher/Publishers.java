@@ -298,8 +298,8 @@ public class Publishers {
             @Override
             protected void doOnNext(T message) {
                 try {
-                    actual.onNext(message);
                     consumer.accept(message);
+                    actual.onNext(message);
                 } catch (Throwable e) {
                     onError(e);
                 }

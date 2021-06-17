@@ -206,6 +206,10 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
         return val != null && !(val instanceof UnresolvedArgument);
     }
 
+    default boolean isErrorRoute() {
+        return false;
+    }
+
     /**
      * Finds predefined route http status or uses default.
      *

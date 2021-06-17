@@ -60,6 +60,7 @@ class CustomErrorUnsatisfiedRouteSpec extends Specification {
             HttpStatus.BAD_REQUEST | '/somethingbad1'     | 'Something bad'
             HttpStatus.BAD_REQUEST | '/somethingbad2'     | 'Something bad'
             HttpStatus.BAD_REQUEST | '/somethingbad3'     | 'Something bad'
+            HttpStatus.I_AM_A_TEAPOT | '/somethingbad4'     | 'teapot'
     }
 
     void "not found is not mapped"(String uri) {
@@ -142,6 +143,11 @@ class CustomErrorUnsatisfiedRouteSpec extends Specification {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, ['myMessage': "Message lost"])
         }
 
+        @Get("/somethingbad4")
+        void somethingbad4() {
+            throw new HttpStatusException(HttpStatus.GONE, ['myMessage': "Message lost"])
+        }
+
         @Get("/notfound1")
         @Status(HttpStatus.NOT_FOUND)
         void notfound1() {
@@ -173,13 +179,19 @@ class CustomErrorUnsatisfiedRouteSpec extends Specification {
         }
 
         @Error(status = HttpStatus.BAD_REQUEST)
-        HttpResponse badRequest() {
-            HttpResponse.badRequest().body(['myMessage': "Something bad"])
+        Map<String, String> badRequest() {
+            ['myMessage': "Something bad"]
         }
 
         @Error(status = HttpStatus.NOT_FOUND)
         HttpResponse notFound() {
             HttpResponse.badRequest().body(['myMessage': "Cannot find"])
+        }
+
+        @Error(status = HttpStatus.GONE)
+        @Status(HttpStatus.I_AM_A_TEAPOT)
+        Map<String, String> gone() {
+            ['myMessage': "teapot"]
         }
     }
 }

@@ -2494,8 +2494,6 @@ public class DefaultBeanContext implements BeanContext {
                                 if (comparisonFunction.apply(beanType)) {
                                     return true;
                                 }
-                            } else {
-                                return false;
                             }
                         } else {
                             if (comparisonFunction.apply(beanType)) {

@@ -91,7 +91,8 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
                 HttpRequest.POST('/test1/simple', '<foo></foo>')
                         .contentType(MediaType.APPLICATION_XML),
                 String
-        ).blockingFirst()
+        ).onErrorReturn(t -> ((HttpClientResponseException) t).response)
+        .blockingFirst()
 
         then:
         response.getBody(String).get() == "You sent an unsupported media type - from Test1Controller.unsupportedMediaTypeHandler()"

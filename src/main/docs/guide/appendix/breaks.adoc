@@ -2,9 +2,25 @@ This section will document breaking changes between Micronaut 2.x and Micronaut 
 
 === Core Changes
 
+==== Inject Annotations
+
+Micronaut now provides the `jakarta.inject` annotations as a transitive dependency instead of the `javax.inject` annotations. To continue using the old annotations, add the following dependency.
+
+dependency:javax.inject:javax.inject:1[]
+
 ==== Nullable Annotations
 
-TODO: spotbugs gone, javax also gone. use Micronaut or pull in dep
+Micronaut no longer includes any third party dependency for nullability annotations. Micronaut now provides its own annotations for this purpose (api:core.annotation.Nullable[] and api:core.annotation.NonNull[]) that are used for our APIs. To continue using other nullability annotations, simply add the relevant dependency.
+
+==== Server Filter Behavior
+
+In Micronaut 2 server filters could have been called multiple times in the case of an exception being thrown, or sometimes not at all if the error resulted before route execution. This also allowed for filters to handle exceptions thrown from routes. Filters have changed in Micronaut 3 to always be called exactly once for each request, under all conditions. Exceptions are no longer propagated to filters and instead the resulting error response is passed through the reactive stream.
+
+In the case of a response being created as a result of an exception, the original cause is now stored as a response attribute (api:http.HttpAttributes#EXCEPTION[]). That attribute can be read by filters to have context for the error HTTP response.
+
+The api:http.filter.OncePerRequestHttpServerFilter[] class is now deprecated and will be removed in the next major release. The api:http.filter.OncePerRequestHttpServerFilter[] stores a request attribute when the filter is executed and some functionality may rely on that attribute existing. The class will still create the attribute but it is recommended to instead create a custom attribute in your filter class and use that instead of the one created by api:http.filter.OncePerRequestHttpServerFilter[].
+
+There is also a minor behavior change in when the response gets written. Any modifications to the response after the underlying `onNext` call is made will not have any effect as the response has already been written.
 
 ==== Decapitalization Strategy
 
@@ -29,6 +45,19 @@ Previously the `secure` configuration for cookies was only respected if the requ
 ==== Server Error Route Priority
 
 Previously if a route could not be satisfied, or an `HttpStatusException` was thrown, routes for the relevant HTTP status was searched before routes that handled the specific exception. In Micronaut 3 routes that handle the exception will be searched first, then routes that handle the HTTP status.
+
+==== Status Route Default Response Status
+
+Status error routes will now default to produce responses with the same HTTP status as specified in the `@Error` annotation. In previous versions a 200 OK response was created. For example:
+
+```
+@Error(status = HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+String unsupportedMediaTypeHandler() {
+    return "not supported";
+}
+```
+
+The above method will result in a response of HTTP status 415 with a body of "not supported". Previously it would have been a response of HTTP status 200 with a body of "not supported". To specify the desired response status, either annotate the method with `@Status` or return an `HttpResponse`.
 
 ==== No Longer Possible to Inject a `List` of `Provider`
 
