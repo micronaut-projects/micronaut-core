@@ -9,16 +9,15 @@ import spock.lang.Specification
 
 class DestroyDependentBeansSpec extends Specification {
 
-    def cleanup() {
-        TestData.DESTRUCTION_ORDER.clear()
-    }
     void "test destroy dependent objects from singleton"() {
+        given:
+        TestData.DESTRUCTION_ORDER.clear()
+
         when:
         def context = ApplicationContext.run()
         def bean = context.getBean(SingletonBeanA)
 
         then:
-        TestData.DESTRUCTION_ORDER.isEmpty()
         !bean.beanBField.destroyed
         !bean.beanBConstructor.destroyed
         !bean.beanBMethod.destroyed
@@ -45,6 +44,9 @@ class DestroyDependentBeansSpec extends Specification {
     }
 
     void "test destroy dependent bean objects for custom scope"() {
+        given:
+        TestData.DESTRUCTION_ORDER.clear()
+        
         when:
         def context = ApplicationContext.run()
         def bean = context.getBean(ScopedBeanA)
