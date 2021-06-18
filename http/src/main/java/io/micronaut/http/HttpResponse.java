@@ -20,8 +20,6 @@ import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
 import io.micronaut.core.annotation.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;

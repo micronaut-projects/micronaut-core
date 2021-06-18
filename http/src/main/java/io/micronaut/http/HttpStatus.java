@@ -90,10 +90,11 @@ public enum HttpStatus implements CharSequence {
     BANDWIDTH_LIMIT_EXCEEDED(509, "Bandwidth Limit Exceeded"),
     NOT_EXTENDED(510, "Not Extended"),
     NETWORK_AUTHENTICATION_REQUIRED(511, "Network Authentication Required"),
-    CONNECTION_TIMED_OUT(522, "Connection Timed Out");
+    CONNECTION_TIMED_OUT(522, "Connection Timed Out"),
+    CUSTOM_STATUS(0, "Custom Reason");
 
-    private final int code;
-    private final String reason;
+    private int code;
+    private String reason;
 
     /**
      * @param code   The code
@@ -262,7 +263,8 @@ public enum HttpStatus implements CharSequence {
             case 522:
                 return CONNECTION_TIMED_OUT;
             default:
-                throw new IllegalArgumentException("Invalid HTTP status code: " + code);
+                CUSTOM_STATUS.code = code;
+                return CUSTOM_STATUS;
         }
     }
 
