@@ -16,7 +16,6 @@
 package io.micronaut.messaging;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.ApplicationContextLifeCycle;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.naming.Described;
 import io.micronaut.inject.BeanDefinition;
