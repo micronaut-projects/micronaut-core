@@ -378,6 +378,17 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
+     * Return a response for the given status, optionally a non-standard status.
+     *
+     * @param statusCode The status code
+     * @param <T>    The response type
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> status(int statusCode) {
+        return HttpResponseFactory.INSTANCE.status(statusCode);
+    }
+
+    /**
      * Return a response for the given status.
      *
      * @param status The status

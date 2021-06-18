@@ -85,4 +85,13 @@ public interface HttpResponseFactory {
     default <T> MutableHttpResponse<T> status(HttpStatus status) {
         return status(status, null);
     }
+
+    /**
+     * @param statusCode The status code, optionally a non-standard status
+     * @param <T>    The response type
+     * @return The response
+     */
+    default <T> MutableHttpResponse<T> status(int statusCode) {
+        return status(statusCode, null);
+    }
 }
