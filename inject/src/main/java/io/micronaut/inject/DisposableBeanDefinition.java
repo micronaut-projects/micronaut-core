@@ -18,6 +18,7 @@ package io.micronaut.inject;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
+import io.micronaut.core.annotation.Internal;
 
 /**
  * A bean definition that provides disposing hooks normally in the form of {@link javax.annotation.PreDestroy}
@@ -28,6 +29,7 @@ import io.micronaut.context.DefaultBeanResolutionContext;
  * @see javax.annotation.PreDestroy
  * @since 1.0
  */
+@Internal
 public interface DisposableBeanDefinition<T> extends BeanDefinition<T> {
 
     /**
@@ -38,7 +40,9 @@ public interface DisposableBeanDefinition<T> extends BeanDefinition<T> {
      * @return The bean instance
      */
     default T dispose(BeanContext context, T bean) {
-        return dispose(new DefaultBeanResolutionContext(context, this), context, bean);
+        try (DefaultBeanResolutionContext rc = new DefaultBeanResolutionContext(context, this)) {
+            return dispose(rc, context, bean);
+        }
     }
 
     /**
