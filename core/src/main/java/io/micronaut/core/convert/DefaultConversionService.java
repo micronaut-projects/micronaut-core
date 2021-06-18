@@ -733,7 +733,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             ConversionContext newContext = context.with(componentType);
 
             Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
-            String[] strings = object.toString().split(",");
+            String[] strings = object.toString().split("\\s*,\\s*");
             List list = new ArrayList();
             for (String string : strings) {
                 Optional converted = convert(string, targetComponentType, newContext);

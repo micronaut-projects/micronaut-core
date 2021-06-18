@@ -102,6 +102,7 @@ class DefaultConversionServiceSpec extends Specification {
         where:
         sourceObject | targetType | typeArguments                  | result
         "1,2"        | List       | [E: Argument.of(Integer, 'E')] | [1, 2]
+        "1, 2"       | List       | [E: Argument.of(Integer, 'E')] | [1, 2]
         "1,2"        | Iterable   | [T: Argument.of(Long, 'T')]    | [1l, 2l]
         "1"          | Optional   | [T: Argument.of(Long, 'T')]    | Optional.of(1L)
 
