@@ -264,8 +264,42 @@ public enum HttpStatus implements CharSequence {
                 return CONNECTION_TIMED_OUT;
             default:
                 CUSTOM_STATUS.code = code;
+                CUSTOM_STATUS.reason = genericReason(code);
                 return CUSTOM_STATUS;
         }
+    }
+
+    /**
+     * Standard status codes are a 3-digit integer. The first digit defines the
+     * class of the response, that is the returned generic reason of this method.
+     *
+     * See: https://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html#sec6.1.1
+     *
+     * @param statusCode status code
+     * @return class of response according to RFC
+     */
+    private static String genericReason(int statusCode) {
+        int firstDigit = statusCode / 100;
+        String reason = "Unknown Status";
+
+        switch (firstDigit) {
+            case 1:
+                reason = "Informational";
+                break;
+            case 2:
+                reason = "Success";
+                break;
+            case 3:
+                reason = "Redirection";
+                break;
+            case 4:
+                reason = "Client Error";
+                break;
+            case 5:
+                reason = "Server Error";
+        }
+
+        return String.format("%s (%d)", reason, statusCode);
     }
 
     @Override
