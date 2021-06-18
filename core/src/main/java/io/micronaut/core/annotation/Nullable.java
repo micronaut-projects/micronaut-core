@@ -15,7 +15,6 @@
  */
 package io.micronaut.core.annotation;
 
-import javax.annotation.Nonnull;
 import javax.annotation.meta.TypeQualifierNickname;
 import javax.annotation.meta.When;
 import java.lang.annotation.Documented;
@@ -38,7 +37,7 @@ import java.lang.annotation.Target;
 @Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.ANNOTATION_TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@Nonnull(when = When.MAYBE)
+@javax.annotation.Nullable
 @TypeQualifierNickname
 public @interface Nullable {
 }
