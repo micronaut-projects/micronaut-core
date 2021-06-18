@@ -18,6 +18,7 @@ class DestroyDependentBeansSpec extends Specification {
         def bean = context.getBean(SingletonBeanA)
 
         then:
+        TestData.DESTRUCTION_ORDER.isEmpty()
         !bean.beanBField.destroyed
         !bean.beanBConstructor.destroyed
         !bean.beanBMethod.destroyed
@@ -34,9 +35,13 @@ class DestroyDependentBeansSpec extends Specification {
         bean.beanBConstructor.beanC.destroyed
         bean.beanBMethod.beanC.destroyed
         bean.collection.every { it.destroyed }
-        TestData.DESTRUCTION_ORDER.remove("BeanE") // don't want to depend on collection order
-        TestData.DESTRUCTION_ORDER.remove("BeanD") // don't want to depend on collection order
-        TestData.DESTRUCTION_ORDER == ['SingletonBeanA', 'BeanB', 'BeanC', 'TestInterceptor', 'BeanB', 'BeanC', 'TestInterceptor', 'BeanB', 'BeanC', 'TestInterceptor']
+        // don't want to depend on field/method order so have to do this
+        TestData.DESTRUCTION_ORDER.first() == 'SingletonBeanA'
+        TestData.DESTRUCTION_ORDER.count("BeanE") == 1
+        TestData.DESTRUCTION_ORDER.count("BeanD") == 1
+        TestData.DESTRUCTION_ORDER.count("BeanC") == 3
+        TestData.DESTRUCTION_ORDER.count("BeanB") == 3
+        TestData.DESTRUCTION_ORDER.count("TestInterceptor") == 3
     }
 
     void "test destroy dependent bean objects for custom scope"() {
@@ -46,6 +51,7 @@ class DestroyDependentBeansSpec extends Specification {
         def refreshScope = context.getBean(CustomScope, Qualifiers.byExactTypeArgumentName(Refreshable.class.name))
 
         then:
+        TestData.DESTRUCTION_ORDER.isEmpty()
         refreshScope.findBeanRegistration(bean).isPresent()
         !bean.beanBField.destroyed
         !bean.beanBConstructor.destroyed
@@ -65,6 +71,9 @@ class DestroyDependentBeansSpec extends Specification {
         target.beanBField.beanC.destroyed
         target.beanBConstructor.beanC.destroyed
         target.beanBMethod.beanC.destroyed
-        TestData.DESTRUCTION_ORDER == ['ScopedBeanA', 'BeanB', 'BeanC', 'TestInterceptor', 'BeanB', 'BeanC', 'TestInterceptor', 'BeanB', 'BeanC', 'TestInterceptor']
+        TestData.DESTRUCTION_ORDER.first() == 'ScopedBeanA'
+        TestData.DESTRUCTION_ORDER.count("BeanC") == 3
+        TestData.DESTRUCTION_ORDER.count("BeanB") == 3
+        TestData.DESTRUCTION_ORDER.count("TestInterceptor") == 3
     }
 }
