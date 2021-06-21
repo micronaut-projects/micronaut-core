@@ -17,7 +17,6 @@ package io.micronaut.inject.qualifiers.replaces;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Replaces;
-import io.micronaut.context.annotation.Requirements;
 import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 

@@ -40,6 +40,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     private final Path path;
     private final Map<CharSequence, Object> attributes = new LinkedHashMap<>(2);
     private Qualifier<?> qualifier;
+    private final List<BeanRegistration<?>> dependentBeans = new ArrayList<>(3);
 
     /**
      * @param context        The bean context
@@ -50,6 +51,19 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         this.context = context;
         this.rootDefinition = rootDefinition;
         this.path = new DefaultPath();
+    }
+
+    @Override
+    public <T> void addDependentBean(BeanIdentifier identifier, BeanDefinition<T> definition, T bean) {
+        dependentBeans.add(new BeanRegistration<>(identifier, definition, bean));
+    }
+
+    @NonNull
+    @Override
+    public List<BeanRegistration<?>> getAndResetDependentBeans() {
+        final List<BeanRegistration<?>> registrations = Collections.unmodifiableList(new ArrayList<>(dependentBeans));
+        dependentBeans.clear();
+        return registrations;
     }
 
     @Override
