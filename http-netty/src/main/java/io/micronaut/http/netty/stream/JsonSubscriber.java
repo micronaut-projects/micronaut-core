@@ -23,13 +23,14 @@ import org.reactivestreams.Subscription;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
+@SuppressWarnings("ReactiveStreamsSubscriberImplementation")
 @Internal
-public final class ArrayBracketSubscriber implements Subscriber<HttpContent> {
+public final class JsonSubscriber implements Subscriber<HttpContent> {
 
     private final AtomicBoolean empty = new AtomicBoolean(true);
     private final Subscriber<? super HttpContent> upstream;
 
-    public ArrayBracketSubscriber(Subscriber<? super HttpContent> upstream) {
+    public JsonSubscriber(Subscriber<? super HttpContent> upstream) {
         this.upstream = upstream;
     }
 
@@ -48,9 +49,10 @@ public final class ArrayBracketSubscriber implements Subscriber<HttpContent> {
     @Override
     public void onNext(HttpContent o) {
         if (empty.compareAndSet(true, false)) {
-            upstream.onNext(HttpContentUtil.openBracket());
+            upstream.onNext(HttpContentUtil.prefixOpenBracket(o));
+        } else {
+            upstream.onNext(HttpContentUtil.prefixComma(o));
         }
-        upstream.onNext(o);
     }
 
     @Override
@@ -65,9 +67,10 @@ public final class ArrayBracketSubscriber implements Subscriber<HttpContent> {
     @Override
     public void onComplete() {
         if (empty.get()) {
-            upstream.onNext(HttpContentUtil.openBracket());
+            upstream.onNext(HttpContentUtil.prefixOpenBracket(HttpContentUtil.closeBracket()));
+        } else {
+            upstream.onNext(HttpContentUtil.closeBracket());
         }
-        upstream.onNext(HttpContentUtil.closeBracket());
         upstream.onComplete();
     }
 }

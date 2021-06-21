@@ -73,8 +73,7 @@ import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.content.HttpContentUtil;
-import io.micronaut.http.netty.stream.ArrayBracketSubscriber;
+import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
@@ -1318,8 +1317,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
 
                                 Publisher<HttpContent> httpContentPublisher = Publishers.map(bodyPublisher, new Function<Object, HttpContent>() {
-                                    boolean first = true;
-
                                     @Override
                                     public HttpContent apply(Object message) {
                                         HttpContent httpContent;
@@ -1348,12 +1345,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             ByteBuffer<ByteBuf> encoded = codec.encode(message, byteBufferFactory);
                                             httpContent = new DefaultHttpContent(encoded.asNativeBuffer());
                                         }
-                                        if (!isJson || first) {
-                                            first = false;
-                                            return httpContent;
-                                        } else {
-                                            return HttpContentUtil.prefixComma(httpContent);
-                                        }
+                                        return httpContent;
                                     }
                                 });
 
@@ -1361,7 +1353,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     // if the Publisher is returning JSON then in order for it to be valid JSON for each emitted element
                                     // we must wrap the JSON in array and delimit the emitted items
                                     httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
-                                            .lift((FlowableOperator<HttpContent, HttpContent>) ArrayBracketSubscriber::new);
+                                            .lift((FlowableOperator<HttpContent, HttpContent>) JsonSubscriber::new);
                                 }
 
                                 httpContentPublisher = Publishers.then(httpContentPublisher, httpContent ->
