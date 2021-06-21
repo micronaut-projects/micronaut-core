@@ -62,4 +62,15 @@ public class HttpContentUtil {
             compositeByteBuf
         );
     }
+
+    /**
+     * @param httpContent The http content to prefix
+     * @return Produces HTTP content prefixed by an open bracket
+     */
+    public static HttpContent prefixOpenBracket(HttpContent httpContent) {
+        CompositeByteBuf compositeByteBuf = Unpooled.compositeBuffer(2);
+        compositeByteBuf.addComponent(true, Unpooled.wrappedBuffer(OPEN_BRACKET));
+        compositeByteBuf.addComponent(true, httpContent.content());
+        return httpContent.replace(compositeByteBuf);
+    }
 }

@@ -74,7 +74,6 @@ import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.content.HttpContentUtil;
-import io.micronaut.http.netty.stream.ArrayBracketSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
@@ -1350,7 +1349,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         }
                                         if (!isJson || first) {
                                             first = false;
-                                            return httpContent;
+                                            if (isJson) {
+                                                return HttpContentUtil.prefixOpenBracket(httpContent);
+                                            } else {
+                                                return httpContent;
+                                            }
                                         } else {
                                             return HttpContentUtil.prefixComma(httpContent);
                                         }
@@ -1360,8 +1363,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (isJson) {
                                     // if the Publisher is returning JSON then in order for it to be valid JSON for each emitted element
                                     // we must wrap the JSON in array and delimit the emitted items
-                                    httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
-                                            .lift((FlowableOperator<HttpContent, HttpContent>) ArrayBracketSubscriber::new);
+                                    httpContentPublisher = addTrailingBracket(httpContentPublisher);
                                 }
 
                                 httpContentPublisher = Publishers.then(httpContentPublisher, httpContent ->
@@ -1416,6 +1418,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 exceptionCaughtInternal(context, t, nettyHttpRequest, true);
             }
         });
+    }
+
+    private static Publisher<HttpContent> addTrailingBracket(Publisher<HttpContent> reactiveSequence) {
+        return Flowable.concat(
+                Flowable.fromPublisher(reactiveSequence)
+                        .switchIfEmpty(Flowable.just(HttpContentUtil.openBracket())),
+                Flowable.just(HttpContentUtil.closeBracket()));
     }
 
     private Publisher<? extends MutableHttpResponse<?>> buildResultEmitter(
