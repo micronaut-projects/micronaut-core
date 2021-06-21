@@ -254,6 +254,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             )
             populateProxyWriterConstructor(groovyClassElement, aopProxyWriter)
             beanDefinitionWriters.put(node, aopProxyWriter)
+            this.aopProxyWriter = aopProxyWriter
             visitIntroductionTypePublicMethods(aopProxyWriter, node)
             if (ArrayUtils.isNotEmpty(interfaceTypes)) {
                 List<AnnotationNode> annotationNodes = node.annotations
