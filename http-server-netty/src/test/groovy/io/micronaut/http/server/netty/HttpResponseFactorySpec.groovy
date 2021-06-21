@@ -13,7 +13,6 @@ class HttpResponseFactorySpec extends Specification {
         def httpStatus = HttpStatus.INTERNAL_SERVER_ERROR
         def customReason = 'The application failed'
 
-
         when:
         def response = HttpResponseFactory.INSTANCE.status(httpStatus, customReason)
 
