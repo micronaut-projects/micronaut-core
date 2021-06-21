@@ -124,6 +124,7 @@ import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
+import io.reactivex.FlowableOperator;
 import io.reactivex.Scheduler;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Cancellable;
@@ -1580,24 +1581,8 @@ public class DefaultHttpClient implements
                         });
 
                         if (!isSingle && MediaType.APPLICATION_JSON_TYPE.equals(requestContentType)) {
-                            requestBodyPublisher = requestBodyPublisher.map(new Function<HttpContent, HttpContent>() {
-                                boolean first = true;
-
-                                @Override
-                                public HttpContent apply(HttpContent httpContent) {
-                                    if (!first) {
-                                        return HttpContentUtil.prefixComma(httpContent);
-                                    } else {
-                                        first = false;
-                                        return httpContent;
-                                    }
-                                }
-                            });
-                            requestBodyPublisher = Flowable.concat(
-                                    Flowable.fromCallable(HttpContentUtil::openBracket),
-                                    requestBodyPublisher,
-                                    Flowable.fromCallable(HttpContentUtil::closeBracket)
-                            );
+                            requestBodyPublisher = requestBodyPublisher
+                                    .lift((FlowableOperator<HttpContent, HttpContent>) JsonSubscriber::new);
                         }
 
                         requestBodyPublisher = requestBodyPublisher.doOnError(onError);
