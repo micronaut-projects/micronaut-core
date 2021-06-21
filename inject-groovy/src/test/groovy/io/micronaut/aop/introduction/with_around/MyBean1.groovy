@@ -5,7 +5,7 @@ package io.micronaut.aop.introduction.with_around
 class MyBean1 {
 
     private Long id
-    //String name
+    String name
 
     Long getId() {
         return id
