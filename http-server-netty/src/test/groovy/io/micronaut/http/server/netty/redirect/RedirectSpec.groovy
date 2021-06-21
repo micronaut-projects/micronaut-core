@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.redirect
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpHeaders
@@ -34,8 +35,8 @@ import spock.lang.Specification
  */
 class RedirectSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-    @Shared @AutoCleanup RxHttpClient httpClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), new DefaultHttpClientConfiguration(followRedirects: false))
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ["spec.name": 'RedirectSpec'])
+    @Shared @AutoCleanup RxHttpClient httpClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), new DefaultHttpClientConfiguration("followRedirects": false))
 
     void 'test permanent redirect'() {
         when:
@@ -57,6 +58,7 @@ class RedirectSpec extends Specification {
         !response.header(HttpHeaders.CONTENT_TYPE)
     }
 
+    @Requires(property = "spec.name", value = "RedirectSpec")
     @Controller("/redirect")
     static class RedirectController {
 
