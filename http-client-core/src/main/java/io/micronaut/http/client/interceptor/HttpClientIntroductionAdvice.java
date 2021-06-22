@@ -119,7 +119,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final List<ReactiveClientResultTransformer> transformers;
     private final HttpClientBinderRegistry binderRegistry;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
-    private final ReactiveHttpClientRegistry<ReactorHttpClient> clientFactory;
+    private final ReactiveHttpClientRegistry<?> clientFactory;
 
     /**
      * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
@@ -132,7 +132,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     public HttpClientIntroductionAdvice(
             BeanContext beanContext,
-            ReactiveHttpClientRegistry<ReactorHttpClient> clientFactory,
+            ReactiveHttpClientRegistry<?> clientFactory,
             JsonMediaTypeCodec jsonMediaTypeCodec,
             List<ReactiveClientResultTransformer> transformers,
             HttpClientBinderRegistry binderRegistry) {
