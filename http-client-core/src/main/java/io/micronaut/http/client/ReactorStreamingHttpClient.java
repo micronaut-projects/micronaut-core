@@ -19,7 +19,6 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.client.StreamingHttpClient;
 import reactor.core.publisher.Flux;
 
 import java.util.Map;

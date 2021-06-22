@@ -19,7 +19,6 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.client.HttpClient;
 import reactor.core.publisher.Flux;
 
 /**
@@ -94,5 +93,4 @@ public interface ReactorHttpClient extends HttpClient {
                 DEFAULT_ERROR_TYPE
         );
     }
-
 }

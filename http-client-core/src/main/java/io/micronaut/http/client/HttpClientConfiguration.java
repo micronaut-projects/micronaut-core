@@ -829,6 +829,4 @@ public abstract class HttpClientConfiguration {
             this.acquireTimeout = acquireTimeout;
         }
     }
-
-
 }

@@ -24,13 +24,9 @@ import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * The default {@link BeanDefinitionDataCollector} implementation. Returns a {@link Map} with
@@ -68,6 +64,8 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
     protected Mono<Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
         return Flux.fromIterable(definitions)
                 .collectMap(definition -> definition.getClass().getName(),
-                        definition -> { return beanDefinitionData.getData(definition); });
+                        definition -> {
+                    return beanDefinitionData.getData(definition);
+                });
     }
 }

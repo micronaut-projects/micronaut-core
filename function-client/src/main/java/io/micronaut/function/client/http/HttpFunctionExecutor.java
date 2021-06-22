@@ -28,7 +28,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.ReactorHttpClient;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
