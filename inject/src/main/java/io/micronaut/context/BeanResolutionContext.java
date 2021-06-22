@@ -16,12 +16,16 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 
 import io.micronaut.core.annotation.Nullable;
+
+import java.util.Collections;
 import java.util.Deque;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -109,6 +113,22 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @param qualifier The qualifier
      */
     void setCurrentQualifier(@Nullable Qualifier<?> qualifier);
+
+    /**
+     * Adds a dependent bean to the resolution context.
+     * @param identifier The identifier
+     * @param definition The bean definition
+     * @param bean The bean
+     * @param <T> The generic type
+     */
+    <T> void addDependentBean(BeanIdentifier identifier, BeanDefinition<T> definition, T bean);
+
+    /**
+     * @return The dependent beans that must be destroyed by an upstream bean
+     */
+    default @NonNull List<BeanRegistration<?>> getAndResetDependentBeans() {
+        return Collections.emptyList();
+    }
 
     /**
      * Represents a path taken to resolve a bean definitions dependencies.

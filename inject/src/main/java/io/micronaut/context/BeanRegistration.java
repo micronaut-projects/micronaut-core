@@ -15,6 +15,8 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.scope.CreatedBean;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.inject.BeanDefinition;
@@ -24,13 +26,13 @@ import java.util.Objects;
 
 /**
  * <p>A bean registration is an association between a {@link BeanDefinition} and a created bean, typically a
- * {@link javax.inject.Singleton}.</p>
+ * {@link jakarta.inject.Singleton}.</p>
  *
  * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
-public class BeanRegistration<T> implements Ordered {
+public class BeanRegistration<T> implements Ordered, CreatedBean<T> {
     final BeanIdentifier identifier;
     final BeanDefinition<T> beanDefinition;
     final T bean;
@@ -93,5 +95,26 @@ public class BeanRegistration<T> implements Ordered {
     @Override
     public int hashCode() {
         return Objects.hash(identifier, beanDefinition);
+    }
+
+    @Override
+    public BeanDefinition<T> definition() {
+        return beanDefinition;
+    }
+
+    @NonNull
+    @Override
+    public T bean() {
+        return bean;
+    }
+
+    @Override
+    public BeanIdentifier id() {
+        return identifier;
+    }
+
+    @Override
+    public void close() {
+        // no-op
     }
 }

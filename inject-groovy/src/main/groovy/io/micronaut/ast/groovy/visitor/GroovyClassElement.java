@@ -28,7 +28,6 @@ import io.micronaut.inject.ast.*;
 import org.apache.groovy.ast.tools.ClassNodeUtils;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
-import org.codehaus.groovy.util.ArrayIterator;
 
 import java.lang.reflect.Modifier;
 import java.util.*;
