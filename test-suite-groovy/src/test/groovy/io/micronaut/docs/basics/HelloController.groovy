@@ -45,7 +45,7 @@ class HelloController {
     @Get("/hello/{name}")
     Mono<String> hello(String name) { // <1>
         httpClient.retrieve( GET("/hello/" + name) )
-                  .firstElement() // <2>
+                  .next() // <2>
     }
     // end::nonblocking[]
 

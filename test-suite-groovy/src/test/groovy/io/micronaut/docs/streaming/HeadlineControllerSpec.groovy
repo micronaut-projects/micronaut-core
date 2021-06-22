@@ -27,7 +27,7 @@ class HeadlineControllerSpec extends Specification {
         def headlineClient = embeddedServer.applicationContext
                                            .getBean(HeadlineClient) // <1>
 
-        Mono<Headline> firstHeadline = headlineClient.streamHeadlines().firstElement() // <2>
+        Mono<Headline> firstHeadline = headlineClient.streamHeadlines().next() // <2>
 
         Headline headline = firstHeadline.block() // <3>
 
