@@ -66,14 +66,6 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
         return new NettyMutableHttpResponse(HttpVersion.HTTP_1_1, nettyStatus, ConversionService.SHARED);
     }
 
-    /**
-     * Allow a response with a custom Http status code and reason.
-     *
-     * @param statusCode The status code
-     * @param reason An alternatively reason message
-     * @param <T> The type of the body
-     * @return The {@link NettyMutableHttpResponse}
-     */
     @Override
     public <T> MutableHttpResponse<T> status(int statusCode, String reason) {
         HttpResponseStatus nettyStatus;

@@ -44,4 +44,8 @@ public class SimpleHttpResponseFactory implements HttpResponseFactory {
         return new SimpleHttpResponse<T>().status(status).body(body);
     }
 
+    @Override
+    public <T> MutableHttpResponse<T> status(int statusCode, String reason) {
+        return new SimpleHttpResponse<T>().status(HttpStatus.custom(statusCode, reason));
+    }
 }

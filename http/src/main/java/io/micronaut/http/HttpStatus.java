@@ -263,10 +263,14 @@ public enum HttpStatus implements CharSequence {
             case 522:
                 return CONNECTION_TIMED_OUT;
             default:
-                CUSTOM_STATUS.code = code;
-                CUSTOM_STATUS.reason = genericReason(code);
-                return CUSTOM_STATUS;
+                return custom(code, genericReason(code));
         }
+    }
+
+    public static HttpStatus custom(int statusCode, String reason) {
+        CUSTOM_STATUS.code = statusCode;
+        CUSTOM_STATUS.reason = reason;
+        return CUSTOM_STATUS;
     }
 
     /**
