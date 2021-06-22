@@ -1271,9 +1271,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private static Publisher<HttpContent> addTrailingBracket(Publisher<HttpContent> reactiveSequence) {
         return Flux.concat(
-                Flux.from(reactiveSequence),
-                Mono.just(HttpContentUtil.closeBracket()))
-                .switchIfEmpty(Flux.just(HttpContentUtil.openBracket(), HttpContentUtil.closeBracket()));
+                Flux.from(reactiveSequence)
+                        .switchIfEmpty(Mono.just(HttpContentUtil.openBracket())),
+                Flux.just(HttpContentUtil.closeBracket()));
     }
 
     private Flux<MutableHttpResponse<?>> buildResultEmitter(
