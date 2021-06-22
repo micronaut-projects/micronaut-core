@@ -80,7 +80,7 @@ import java.util.function.Supplier;
 @BootstrapContextCompatible
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(RxHttpClient.class);
+    private static final Logger LOG = LoggerFactory.getLogger(HttpClientIntroductionAdvice.class);
 
     /**
      * The default Accept-Types.
