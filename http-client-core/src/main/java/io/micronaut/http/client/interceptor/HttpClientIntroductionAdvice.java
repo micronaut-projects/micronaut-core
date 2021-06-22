@@ -56,7 +56,6 @@ import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.ReactiveHttpClientRegistry;
-import io.micronaut.http.client.ReactorHttpClient;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
