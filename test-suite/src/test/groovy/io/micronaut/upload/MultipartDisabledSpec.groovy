@@ -24,14 +24,17 @@ class MultipartDisabledSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+        HttpResponse<?> response = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-json", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
-        ))
-        HttpResponse<String> response = flowable.onErrorReturn(t -> ((HttpClientResponseException) t).response)
-                .blockFirst()
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         then:
         response.code() == HttpStatus.UNSUPPORTED_MEDIA_TYPE.code
