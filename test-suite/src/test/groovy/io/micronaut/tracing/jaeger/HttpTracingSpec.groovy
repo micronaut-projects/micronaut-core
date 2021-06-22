@@ -37,6 +37,7 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -49,6 +50,7 @@ import java.util.concurrent.TimeUnit
  * @author graemerocher
  * @since 1.0
  */
+@Ignore
 class HttpTracingSpec extends Specification {
 
     @AutoCleanup
