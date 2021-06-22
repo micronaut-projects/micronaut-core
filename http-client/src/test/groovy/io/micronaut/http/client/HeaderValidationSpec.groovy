@@ -1,7 +1,6 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
