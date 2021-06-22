@@ -35,6 +35,7 @@ include "validation"
 include "websocket"
 
 include 'rxjava2'
+include 'rxjava2-websockets'
 include 'rxjava2-http-client'
 include 'rxjava2-http-server-netty'
 
